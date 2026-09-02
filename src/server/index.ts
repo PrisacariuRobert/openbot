@@ -95,6 +95,15 @@ const runner = new OpenCodeRunner({ db, onChange: () => broadcast(), internalUrl
 const providerConnections = new ProviderConnectionManager(() => broadcast({ type: "provider", at: Date.now() }));
 runner.start();
 
+function stopRun(runId: string, label = "Stopped by you") {
+  const run = db.getRun(runId);
+  if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return false;
+  if (!db.cancelRun(run.id)) return false;
+  if (run.status === "running") runner.cancel(run.id);
+  db.addActivity({ runId: run.id, botId: run.botId, kind: "status", label, detail: null });
+  return true;
+}
+
 app.get("/api/events", (request, response) => {
   response.setHeader("Content-Type", "text/event-stream");
   response.setHeader("Cache-Control", "no-cache");
@@ -400,10 +409,18 @@ app.post("/api/messages", (request, response) => {
     return response.status(201).json({ routines, routedTo: requested.map((bot) => ({ id: bot.id, name: bot.name })), attachments });
   }
   const prompt = attachmentLines.length ? `${body}\n\nFiles attached by the user are available in your workspace:\n${attachmentLines.join("\n")}\nInspect the relevant files before answering. Do not modify the originals in inbox.` : body;
-  const reason = approvalReason(body);
-  const runs = requested.map((bot) => db.createRun({ threadId: thread.id, botId: bot.id, prompt, status: reason ? "awaiting_approval" : "queued", approvalReason: reason }));
+  const reason = approvalReason(body), redirected: Array<{ botId: string; runId: string }> = [];
+  const runs = requested.map((bot) => {
+    const active = db.runningRun(thread.id, bot.id);
+    const canRedirect = active && !db.getCodeTaskWorkspace(active.id);
+    if (canRedirect && stopRun(active.id, "Updated with your new direction")) redirected.push({ botId: bot.id, runId: active.id });
+    return db.createRun({
+      threadId: thread.id, botId: bot.id, prompt, status: reason ? "awaiting_approval" : "queued", approvalReason: reason,
+      steeredFromRunId: canRedirect ? active.id : null,
+    });
+  });
   broadcast();
-  response.status(202).json({ runs, routedTo: requested.map((bot) => ({ id: bot.id, name: bot.name })), attachments });
+  response.status(202).json({ runs, redirected, routedTo: requested.map((bot) => ({ id: bot.id, name: bot.name })), attachments });
 });
 
 async function performApprovedAction(action: unknown): Promise<string> {
@@ -511,9 +528,7 @@ app.post("/api/runs/:id/approve", async (request, response) => {
 app.post("/api/runs/:id/cancel", async (request, response) => {
   const run = db.getRun(request.params.id);
   if (!run) return response.status(404).json({ error: "Task not found." });
-  if (run.status === "running") runner.cancel(run.id);
-  else { db.updateRun(run.id, { status: "cancelled", finishedAt: new Date().toISOString(), taskStage: "blocked" }); db.finishRunTask(run.id, "cancelled"); }
-  if (run.approvalId) await decideApproval(run.approvalId, "denied");
+  if (!stopRun(run.id)) return response.status(409).json({ error: "This task has already finished." });
   broadcast();
   response.json({ ok: true });
 });
@@ -665,7 +680,9 @@ const internalToolInput = z.object({ botId: z.string(), runId: z.string(), actio
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
-  if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getRun(parsed.data.runId)) return response.status(400).json({ error: "Invalid bot tool request." });
+  const toolRun = parsed.success ? db.getRun(parsed.data.runId) : null;
+  if (!parsed.success || !db.getBot(parsed.data.botId) || !toolRun || toolRun.botId !== parsed.data.botId) return response.status(400).json({ error: "Invalid bot tool request." });
+  if (toolRun.status !== "running") return response.status(409).json({ error: "This task is no longer active." });
   const { botId, runId, action, args } = parsed.data;
   const bot = db.getBot(botId)!;
   const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args) => {

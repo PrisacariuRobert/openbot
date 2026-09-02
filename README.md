@@ -1,8 +1,15 @@
-# OpenBot 0.10
+# OpenBot 0.11.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
+
+## What's new in 0.11.0
+
+- Every coding job now gets its own Git worktree and branch, so several teammates can work on the same project without touching the owner's checkout or one another's unfinished changes.
+- A different teammate reviews the exact tested commit before OpenBot can ask to publish a pull request.
+- Natural follow-up messages can redirect a teammate's active job instead of becoming an unrelated task waiting at the back of the queue.
+- Release verification now checks that this README names the exact package version and contains a matching “What's new” section.
 
 ## What is included
 
@@ -158,6 +165,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 - [Security model](docs/SECURITY.md)
 - [Workflow benchmark](docs/WORKFLOW_BENCHMARK.md)
 - [Launch readiness and honest gaps](docs/LAUNCH_READINESS.md)
+- [Product gap audit and next priorities](docs/PRODUCT_GAP_AUDIT.md)
 - [Marketing capability catalog](docs/MARKETING_FEATURES.md)
 
 ## Current boundary

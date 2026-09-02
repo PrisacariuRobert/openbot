@@ -14,7 +14,8 @@
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "test": "tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit",
-    "verify": "npm test && npm run check && npm run build"
+    "check:release": "node scripts/check-release.mjs",
+    "verify": "npm run check:release && npm test && npm run check && npm run build"
   },
   "dependencies": {
     "express": "^5.2.1",

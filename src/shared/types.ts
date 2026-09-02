@@ -136,6 +136,7 @@ export interface Run {
   botMascot: MascotKind;
   botColor: string;
   parentRunId: string | null;
+  steeredFromRunId: string | null;
   prompt: string;
   status: RunStatus;
   approvalReason: string | null;

@@ -11,6 +11,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Team handoff | Pass | Nova handed a four-item checklist to Scout; a repeated dedupe key produced exactly one Scout run | Adds explicit duplicate protection |
 | Teammate communication | Pass | DeepSeek V4 Flash made Pixel share a finding, ask Scout a question, and receive exactly one no-reply response; the control center displayed each route, kind, and content | More transparent, with hard loop limits |
 | Natural group routing | Pass | `@name`, multiple mentions, and `@everyone` are enforced on the server; untagged requests choose one owner by role fit and availability | Close for core routing; Grok also mentions groups, routines, skills, and plugins |
+| Mid-job steering | Pass for active non-code jobs | A natural follow-up immediately stops the prior run, preserves its session link, and starts a continuation with the new direction; the composer explains this before send | Close for the common chat flow; active code work deliberately queues to preserve its isolated branch |
 | File handoff | Pass | A real Markdown attachment was stored, displayed in chat, copied only into Pixel's inbox, read by DeepSeek, and returned exactly one verified answer | Useful core support; Grok accepts more media sizes and richer artifact previews |
 | Browser workflow | Pass | Open/type/click/read/screenshot succeeded against a real local page in Nova's persistent profile | Close for supported web actions; third-party login breadth remains untested |
 | Teach a task | Pass | Visible demonstration produced a three-step editable OpenCode skill with secret rules | Close for browser demonstrations |
@@ -26,9 +27,9 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Mobile check-in | Pass | 390×844 responsive UI, installable PWA, guided private connection, dictation, approvals, and live connection state verified | OpenBot is installable web software; Grok has a native iOS app and cloud push |
 | Mac file organization | Pass | One studio-wide permission, visible-home listing, bounded text reading, approval-only no-overwrite moves, and a real Desktop inspection completed | Safer and more explicit for file cleanup; Grok/Hermes remain broader for general computer control |
 | Spreadsheet fidelity | Partial | Persistent workspaces prevent rebuilding from scratch, but no native spreadsheet editor is included | Grok-style spreadsheet work needs a dedicated tool |
-| General macOS app control | Partial in 0.10 | The Accessibility bridge can list apps, inspect visible controls, focus apps, scroll, and approval-gate clicks/typing/keys; arbitrary pixel and canvas understanding remains unavailable | Grok/Hermes currently broader for visual computer use |
-| Large plugin catalog | Partial in 0.10 | Gmail, Drive, and Calendar are bundled; GitHub code delivery works, while GitHub issues, Slack, and Notion remain honest roadmap items | Grok currently broader |
-| Always-on hosted cloud computer | Not in 0.10 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
+| General macOS app control | Partial in 0.11 | The Accessibility bridge can list apps, inspect visible controls, focus apps, scroll, and approval-gate clicks/typing/keys; arbitrary pixel and canvas understanding remains unavailable | Grok/Hermes currently broader for visual computer use |
+| Large plugin catalog | Partial in 0.11 | Gmail, Drive, and Calendar are bundled; GitHub code delivery works, while GitHub issues, Slack, and Notion remain honest roadmap items | Grok currently broader |
+| Always-on hosted cloud computer | Not in 0.11 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
 
 ## Complaint-focused changes
 
@@ -42,6 +43,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - **A connection demo is not a useful outcome:** connected users can start a morning brief, meeting preparation, or follow-up review immediately; missing permissions disable the affected starter instead of creating a doomed task.
 - **Bots stop after an update instead of finishing:** substantial work has a durable outcome, deliverable, checklist, and verification state. The system marks an unverified completion as partial rather than silently presenting it as fully checked.
 - **Agent code changes are hard to trust:** every task uses an isolated worktree, the owner can inspect a bounded diff, commits name exact files, a different teammate reviews the unchanged commit, publishing requires owner approval, and unchanged agent edits have conflict-safe restore points.
+- **A follow-up becomes a disconnected second task:** active non-code work now stops and resumes as one continuation using the newest direction. Code work queues rather than risking its isolated branch.
 
 ## Provider-policy references
 
