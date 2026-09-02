@@ -1,0 +1,100 @@
+import Foundation
+
+struct StudioState: Decodable {
+    let bots: [StudioBot]
+    let threads: [StudioThread]
+    let messages: [StudioMessage]
+    let runs: [StudioRun]
+    let approvals: [StudioApproval]
+    let workflows: [StudioWorkflow]
+    let usage: StudioUsage
+    let activeThreadId: String
+}
+
+struct StudioBot: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let mascot: String
+    let color: String
+    let role: String
+    let status: String
+    let threadId: String
+    let lastActiveAt: String?
+}
+
+struct StudioThread: Decodable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let kind: String
+    let botId: String?
+    let updatedAt: String
+}
+
+struct StudioMessage: Decodable, Identifiable, Hashable {
+    let id: String
+    let threadId: String
+    let senderType: String
+    let senderId: String?
+    let senderName: String
+    let senderMascot: String?
+    let senderColor: String?
+    let body: String
+    let createdAt: String
+    let runId: String?
+    let attachments: [StudioAttachment]
+}
+
+struct StudioAttachment: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let kind: String
+    let size: Int
+}
+
+struct StudioWorkflow: Decodable, Identifiable, Hashable {
+    let id: String
+    let botId: String
+    let botName: String
+    let name: String
+    let skillSlug: String
+}
+
+struct StudioRun: Decodable, Identifiable, Hashable {
+    let id: String
+    let threadId: String
+    let botId: String
+    let botName: String
+    let botMascot: String
+    let botColor: String
+    let status: String
+    let approvalReason: String?
+    let partialText: String?
+    let summary: String?
+    let error: String?
+}
+
+struct StudioApproval: Decodable, Identifiable, Hashable {
+    let id: String
+    let runId: String
+    let botId: String
+    let botName: String
+    let reason: String
+    let actionLabel: String
+    let status: String
+}
+
+struct StudioUsage: Decodable, Hashable {
+    let totalTokens: Int
+    let completedRuns: Int
+    let activeRuns: Int
+}
+
+struct StudioEvent: Decodable { let type: String }
+
+extension StudioState {
+    static let empty = StudioState(
+        bots: [], threads: [], messages: [], runs: [], approvals: [], workflows: [],
+        usage: StudioUsage(totalTokens: 0, completedRuns: 0, activeRuns: 0),
+        activeThreadId: "team-room"
+    )
+}

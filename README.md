@@ -1,17 +1,20 @@
-# OpenBot 0.17.0
+# OpenBot 0.17.1
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.17.0
+## What's new in 0.17.1
 
-- Added a real SwiftUI iPhone companion project for chat, approvals, attachments, artifacts, and live progress against the owner's Mac-hosted studio.
+- Replaced the iPhone web-view studio with a real SwiftUI conversation experience: native messages, animated teammates, teammate targeting, sending, live runs, approvals, cancellation, settings, and offline state.
+- Added an authenticated native API client with bearer credentials from Keychain and server-sent event updates from the owner's Mac-hosted studio.
+- Added native file attachment intake plus premium mascot artwork shared by the web and iPhone apps.
+- Added a guided Tailscale away-access path that detects the private address, prioritizes it for pairing, and works over cellular or a different Wi-Fi network.
+- Compiled the app with Xcode Beta and added an iPhone 17 Pro UI test that signs in to a live local studio and verifies the native conversation header and composer.
 - Added safe one-tap address pairing through `openbot://connect` links; pairing links never carry the private access key.
-- Stores the private key with iPhone Keychain protection, exchanges it for OpenBot's HttpOnly session cookie, reconnects on foreground, and clears matching cookies when forgotten.
+- Stores the private key with iPhone Keychain protection, reconnects on foreground, and removes it when the owner forgets the connection.
 - Requires HTTPS for public hostnames, permits plain HTTP only for private/local addresses, and keeps the Mac's loopback-only mode as the secure default.
-- Added native offline state, pull-to-refresh, external-link handoff, a playful SwiftUI mascot welcome screen, and a new production icon shared with the web install experience.
-- Prevents the native shell from being trapped on a stale service-worker build and adds structural iOS privacy, deep-link, secret, and Swift-syntax verification to every release check.
+- Keeps artifact previews, push delivery, share-sheet input, and dedicated voice capture on the honest native roadmap rather than hiding the desktop site behind a phone shell.
 
 ## What is included
 
@@ -42,7 +45,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - An official Claude Code runtime adapter with the same isolated workspace, browser, memory, approval, and teamwork tools
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
-- Native SwiftUI iPhone companion source with Keychain storage, secure session handoff, offline/reconnect state, and address-only deep linking
+- Native SwiftUI iPhone app with conversations, teammate targeting, message sending, live task/approval state, Keychain-backed API access, offline/reconnect state, and address-only deep linking
 - Animated mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
 - Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
@@ -160,9 +163,9 @@ The default service binds only to `127.0.0.1`. To build and expose it to a trust
 npm run remote
 ```
 
-A private access key is created at `.openbot/access.token`. Non-local clients must sign in with it; the resulting cookie is HTTP-only and SameSite Strict. Open **Control center → Phone remote** on the Mac to copy the phone address, address-only iPhone link, and key. Use a trusted encrypted tunnel such as Tailscale or an HTTPS reverse proxy—do not expose the plain HTTP port directly to the public internet.
+A private access key is created at `.openbot/access.token`. Non-local clients must sign in with it; the resulting cookie is HTTP-only and SameSite Strict. Open **Control center → Phone remote** on the Mac to copy the phone address, address-only iPhone link, and key. For use away from home, OpenBot detects and prioritizes a Tailscale `100.x` address and can open Tailscale on the Mac; use the same Tailscale account on the iPhone. The address stays stable across cellular and different Wi-Fi networks. An HTTPS reverse proxy is also supported—never expose the plain HTTP port directly to the public internet.
 
-The native SwiftUI companion lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
+The native SwiftUI app lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. It uses native conversation, teammate, progress, approval, and settings views—not a web view. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
 
 Voice typing uses the browser or operating system speech-recognition service. OpenBot does not upload or store the audio itself, but the browser vendor may process it under its own policy.
 
@@ -203,7 +206,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. A native phone app, an always-on hosted service, organization administration, and a broad third-party connector marketplace remain future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. The native iPhone app accepts attachments but does not yet include rich artifact previews, push, share-sheet input, or dedicated voice capture. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
 
 ## License
 

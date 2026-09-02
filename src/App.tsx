@@ -64,6 +64,8 @@ const GOOGLE_API_SETUP = [
 type MascotBot = { name: string; color: string; mascot: MascotKind; status?: BotStatus };
 function Mascot({ bot, size = "medium", state }: { bot: MascotBot; size?: "tiny" | "small" | "medium" | "large"; state?: BotStatus }) {
   const status = state || bot.status || "ready";
+  const artwork = ["nova", "orbit"].includes(bot.mascot) ? "/mascots/nova.png" : ["sprout", "sunny"].includes(bot.mascot) ? "/mascots/scout.png" : "/mascots/pixel.png";
+  const faceColor = ["nova", "orbit"].includes(bot.mascot) ? "#53179e" : ["sprout", "sunny"].includes(bot.mascot) ? "#009465" : "#e62f61";
   const instanceId = useId();
   const motion = useMemo(() => Array.from(`${bot.name}:${bot.mascot}:${instanceId}`).reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) >>> 0, 7), [bot.name, bot.mascot, instanceId]);
   const style = {
@@ -72,18 +74,13 @@ function Mascot({ bot, size = "medium", state }: { bot: MascotBot; size?: "tiny"
     "--blink-delay": `${-((motion % 43) / 10)}s`,
     "--idle-duration": `${3.7 + (motion % 17) / 10}s`,
     "--idle-delay": `${-((motion % 31) / 10)}s`,
+    "--mascot-face-color": faceColor,
   } as React.CSSProperties;
   return (
     <div className={`mascot mascot-${size} mascot-${bot.mascot} mascot-state-${status}`} style={style} aria-label={`${bot.name} is ${status}`} data-mood={status}>
       <span className="mascot-shadow" />
-      <span className="mascot-antenna"><i /></span>
-      <span className="mascot-ear mascot-ear-left" /><span className="mascot-ear mascot-ear-right" />
-      <span className="mascot-body">
-        <span className="mascot-sheen" />
-        <span className="mascot-face"><i className="mascot-eye" /><i className="mascot-eye" /><b className="mascot-mouth" /></span>
-        <span className="mascot-cheek mascot-cheek-left" /><span className="mascot-cheek mascot-cheek-right" />
-        <span className="mascot-mark">{bot.mascot === "nova" ? "✦" : bot.mascot === "sprout" ? "⌁" : bot.mascot === "sunny" ? "•" : ""}</span>
-      </span>
+      <img className="mascot-art" src={artwork} alt="" draggable={false} />
+      <span className="mascot-art-blink"><i /><i /></span>
       <span className="mascot-spark mascot-spark-a">✦</span><span className="mascot-spark mascot-spark-b">·</span>
     </div>
   );
@@ -94,6 +91,10 @@ function Logo() {
 }
 
 function RoomCluster({ bots, large = false, hero = false }: { bots: Bot[]; large?: boolean; hero?: boolean }) {
+  const kinds = new Set(bots.slice(0, 3).map((bot) => bot.mascot));
+  if (bots.length >= 3 && kinds.has("nova") && kinds.has("blob") && kinds.has("sprout")) {
+    return <div className={`room-cluster room-cluster-artwork ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`} aria-label={`${bots.slice(0, 3).map((bot) => bot.name).join(", ")} are ready`}><img className="room-cluster-art" src="/mascots/studio.png" alt="" draggable={false} /></div>;
+  }
   return <div className={`room-cluster ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`}>{bots.slice(0, 3).map((bot) => <Mascot key={bot.id} bot={bot} size={hero ? "large" : large ? "medium" : "tiny"} />)}</div>;
 }
 
@@ -563,12 +564,18 @@ function ConnectorPanel({ status, bots, onRefresh, onNotice, onStartWorkflow }: 
   </div>;
 }
 
-type AccessInfo = { host: string; port: number; remoteEnabled: boolean; token: string; urls: string[]; iosConnectUrls?: string[] };
+type AccessInfo = { host: string; port: number; remoteEnabled: boolean; token: string; urls: string[]; iosConnectUrls?: string[]; tailscaleUrl?: string | null };
 function RemotePanel({ bots, installPrompt, onInstalled, onNotice }: { bots: Bot[]; installPrompt: InstallPrompt | null; onInstalled: () => void; onNotice: (message: string) => void }) {
   const [access, setAccess] = useState<AccessInfo | null>(null), [loading, setLoading] = useState(true), [showKey, setShowKey] = useState(false);
   const localHost = ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
   const nativeIOS = new URLSearchParams(window.location.search).get("native") === "ios" || navigator.userAgent.includes("OpenBot-iOS/");
-  useEffect(() => { api<AccessInfo>("/api/access").then(setAccess).catch(() => setAccess(null)).finally(() => setLoading(false)); }, []);
+  const loadAccess = useCallback(() => api<AccessInfo>("/api/access").then(setAccess).catch(() => setAccess(null)).finally(() => setLoading(false)), []);
+  useEffect(() => { void loadAccess(); }, [loadAccess]);
+  useEffect(() => {
+    if (!localHost || !access?.remoteEnabled || access.tailscaleUrl) return;
+    const timer = window.setInterval(() => void loadAccess(), 2_500);
+    return () => window.clearInterval(timer);
+  }, [access?.remoteEnabled, access?.tailscaleUrl, loadAccess, localHost]);
   const install = async () => {
     if (installPrompt) { await installPrompt.prompt(); const choice = await installPrompt.userChoice; if (choice.outcome === "accepted") onInstalled(); return; }
     onNotice(/iPhone|iPad|iPod/.test(navigator.userAgent) ? "On iPhone: tap Share, then Add to Home Screen." : "Use your browser menu and choose Install OpenBot.");
@@ -581,11 +588,18 @@ function RemotePanel({ bots, installPrompt, onInstalled, onNotice }: { bots: Bot
     }
     await copy(value, "iPhone connection link copied");
   };
+  const openTailscale = async () => {
+    try {
+      await api("/api/access/tailscale/open", { method: "POST" });
+      onNotice("Tailscale opened — turn it on, then use the same account on your iPhone");
+      window.setTimeout(() => void loadAccess(), 1_500);
+    } catch (error) { onNotice(error instanceof Error ? error.message : "Open Tailscale on this Mac"); }
+  };
   return <div className="remote-panel">
     <div className="remote-hero"><div className="remote-orbit"><RoomCluster bots={bots} large /><Smartphone size={22} /></div><span className="control-kicker"><Wifi size={13} /> Your studio, in your pocket</span><h3>Talk to the team while you’re away.</h3><p>Install OpenBot on your phone, dictate a task, watch progress and handle approvals without opening your laptop screen.</p></div>
     <section><div className="panel-section-heading"><div><h3>{nativeIOS ? "Native iPhone companion" : "Install the phone remote"}</h3><p>{nativeIOS ? "Securely connected through the OpenBot iOS app" : "Use the native companion or add the web app to your Home Screen"}</p></div></div>{nativeIOS ? <div className="remote-status good"><Smartphone size={17} /><span><strong>This iPhone is connected</strong><small>Your private key stays in Keychain</small></span></div> : <button className="install-app-card" onClick={() => void install()}><span><Smartphone size={19} /></span><div><strong>Add OpenBot to Home Screen</strong><small>{installPrompt ? "Ready to install" : "Takes about ten seconds"}</small></div><ChevronDown size={16} /></button>}</section>
-      <section><div className="panel-section-heading"><div><h3>Private connection</h3><p>Your Mac remains the host; the access key protects other devices</p></div></div>{loading ? <div className="remote-status"><LoaderCircle className="spinner" size={17} /> Checking this Mac…</div> : !localHost ? <div className="remote-status good"><Wifi size={17} /><span><strong>Connected remotely</strong><small>{window.location.origin}</small></span></div> : access?.remoteEnabled ? <div className="remote-setup"><div className="remote-status good"><Wifi size={17} /><span><strong>Phone access is ready</strong><small>Use the same private network or encrypted tunnel</small></span></div><div className="remote-links">{access.urls.map((url, index) => <div key={url}><button onClick={() => void copy(url, "Phone address copied")}><span><strong>{url}</strong><small>Copy the address for any phone</small></span><Copy size={14} /></button>{access.iosConnectUrls?.[index] && <button onClick={() => void shareWithIPhone(access.iosConnectUrls![index]!)}><span><strong>Send pairing link to iPhone</strong><small>Shares the address only—never your private key</small></span><Smartphone size={14} /></button>}</div>)}</div><div className="access-key-row"><span><strong>Access key</strong><code>{showKey ? access.token : "••••••••••••••••••••"}</code></span><button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Show"}</button><button onClick={() => void copy(access.token, "Private access key copied")}><Copy size={14} /></button></div></div> : <div className="remote-setup"><div className="remote-status warning"><WifiOff size={17} /><span><strong>Phone access is off</strong><small>Local-only is the secure default</small></span></div><div className="remote-command"><span>On this Mac, start the launch build with</span><code>npm run remote</code><button onClick={() => void copy("npm run remote", "Start command copied")}><Copy size={14} /></button></div></div>}</section>
-    <div className="security-footnote"><ShieldCheck size={16} /><p><strong>Use Tailscale or another HTTPS tunnel away from home.</strong><br />Do not expose OpenBot’s plain HTTP port directly to the public internet. Dictation uses your browser’s speech service; OpenBot does not store the audio.</p></div>
+      <section><div className="panel-section-heading"><div><h3>Private connection</h3><p>Your Mac remains the host; the access key protects other devices</p></div></div>{loading ? <div className="remote-status"><LoaderCircle className="spinner" size={17} /> Checking this Mac…</div> : !localHost ? <div className="remote-status good"><Wifi size={17} /><span><strong>Connected remotely</strong><small>{window.location.origin}</small></span></div> : access?.remoteEnabled ? <div className="remote-setup"><div className="remote-status good"><Wifi size={17} /><span><strong>{access.tailscaleUrl ? "Away access is ready" : "Phone access is ready nearby"}</strong><small>{access.tailscaleUrl ? "Works on cellular or any Wi-Fi through your private Tailscale network" : "Local Wi-Fi works now; add Tailscale for access from anywhere"}</small></span></div>{!access.tailscaleUrl && <div className="away-access-card"><span><Globe2 size={18} /></span><div><strong>Use OpenBot away from home</strong><small>Turn on Tailscale here and on your iPhone with the same account. OpenBot will detect it automatically.</small></div><button onClick={() => void openTailscale()}>Open Tailscale</button><a href="https://tailscale.com/docs/install/ios" target="_blank" rel="noreferrer">Get it for iPhone <ExternalLink size={11} /></a></div>}<div className="remote-links">{access.urls.map((url, index) => <div className={url === access.tailscaleUrl ? "is-away" : ""} key={url}><button onClick={() => void copy(url, "Phone address copied")}><span><strong>{url}</strong><small>{url === access.tailscaleUrl ? "Private address that works across networks" : "Address for this Wi-Fi network"}</small></span><Copy size={14} /></button>{access.iosConnectUrls?.[index] && <button onClick={() => void shareWithIPhone(access.iosConnectUrls![index]!)}><span><strong>Send pairing link to iPhone</strong><small>Shares the address only—never your private key</small></span><Smartphone size={14} /></button>}</div>)}</div><div className="access-key-row"><span><strong>Access key</strong><code>{showKey ? access.token : "••••••••••••••••••••"}</code></span><button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Show"}</button><button onClick={() => void copy(access.token, "Private access key copied")}><Copy size={14} /></button></div></div> : <div className="remote-setup"><div className="remote-status warning"><WifiOff size={17} /><span><strong>Phone access is off</strong><small>Local-only is the secure default</small></span></div><div className="remote-command"><span>On this Mac, start the launch build with</span><code>npm run remote</code><button onClick={() => void copy("npm run remote", "Start command copied")}><Copy size={14} /></button></div></div>}</section>
+    <div className="security-footnote"><ShieldCheck size={16} /><p><strong>Tailscale keeps away access private and encrypted.</strong><br />Use the same Tailscale account on the Mac and iPhone. Never expose OpenBot’s plain HTTP port directly to the public internet. Dictation does not store microphone audio in OpenBot.</p></div>
   </div>;
 }
 

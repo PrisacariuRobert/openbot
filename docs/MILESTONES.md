@@ -315,14 +315,16 @@ Verification: 74 automated tests pass, including official Slack and Notion respo
 
 ## M22 — Native iPhone companion
 
-Status: complete for the local-first 0.17 source release
+Status: complete for the local-first 0.17.1 native beta
 
-- A real SwiftUI iPhone companion connects to the owner-hosted OpenBot studio and presents chat, approvals, attachments, artifacts, and live progress through the existing responsive experience
-- Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, refresh, external links, and connection settings
-- The access key is stored with device-only-when-unlocked Keychain protection and exchanged for an HttpOnly cookie before WebKit loads the studio
+- A real SwiftUI iPhone app connects to the owner-hosted OpenBot studio with native conversations, message bubbles, teammate selection, sending, live work, approvals, cancellation, and settings
+- Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, live server events, and connection settings
+- The access key is stored with device-only-when-unlocked Keychain protection and used only as an authenticated API header
 - Public plain-HTTP hosts and URL credentials are rejected; certificate validation is never bypassed
 - Mac-generated `openbot://connect` links prefill only the normalized studio origin and never contain the access key
-- Native mode unregisters stale service workers, while the installable PWA remains available as a fallback
-- A production two-teammate mascot icon now represents both the iOS and installed web experiences
+- The iPhone app no longer embeds the responsive website or depends on service-worker state; the installable PWA remains a separate fallback
+- A premium three-teammate mascot set is shared by the native and web experiences, with independent status movement and blink timing
+- Native attachment selection uploads bounded files to the Mac before sending the message
+- Phone Remote detects a Tailscale address, prioritizes it for pairing, and can open Tailscale on the Mac for use across cellular or different Wi-Fi networks
 
-Verification: 76 automated tests pass. The Xcode project is deterministically generated with XcodeGen. Release checks validate required sources and assets, the privacy manifest and local-network declaration, address-only deep links, Keychain protection, cookie handoff, absence of embedded keys, and Swift syntax. The 390×844 native-mode web surface has zero horizontal overflow. A signed simulator/device build remains pending because this Mac has Command Line Tools rather than the full Xcode application; App Store distribution, push, share-sheet input, and an always-on host are not claimed.
+Verification: 77 automated web/server tests pass. The Xcode project is deterministically generated with XcodeGen and compiled using Xcode Beta. Four native unit tests pass on an iPhone 17 Pro simulator. A live UI test enters the address and private key, signs in to the running Mac studio, and verifies the native conversation header and composer. The live Tailscale address returns 401 without the private key and 200 with it. Release checks reject a return to `WKWebView`, embedded access keys, missing privacy declarations, or missing native API/event coverage. Physical-device/App Store distribution, rich native artifact previews, push, share-sheet input, dedicated voice capture, and an always-on host are not claimed.

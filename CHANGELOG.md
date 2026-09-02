@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.17.1 — 2026-09-03
+
+- Replaced the iPhone web-view studio with a genuine SwiftUI conversation experience
+- Added native conversation switching, animated teammate identity, teammate targeting, message sending, live run state, approvals, cancellation, and connection settings
+- Added native file selection and bounded attachment upload before a message is sent
+- Added one premium three-character mascot system shared by the web and native apps, with native status, blink, and movement overlays
+- Added Tailscale detection, an away-access address, address-only iPhone pairing, and one-click Mac app launch in Phone Remote
+- Added Keychain-backed bearer authentication and server-sent event refreshes without placing credentials in URLs or source
+- Compiled and launched the app with Xcode Beta on an iPhone 17 Pro simulator
+- Added a live native UI test that signs in to the running Mac studio and verifies the conversation header and message composer
+- Fixed the generated unit-test host/module configuration and verified all native connection tests
+- Kept native artifact previews, push, share-sheet input, and dedicated voice capture explicitly out of the current claim
+
 ## 0.17.0 — 2026-09-02
 
 - Added a native SwiftUI iPhone companion with secure onboarding, animated mascots, offline state, pull-to-refresh, and the complete responsive studio experience

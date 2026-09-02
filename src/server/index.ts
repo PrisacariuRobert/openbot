@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { z } from "zod";
 import { OpenBotDatabase } from "./database.js";
 import { OpenCodeRunner } from "./opencode.js";
@@ -23,7 +24,7 @@ import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSugges
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
 import { invokedWorkflow } from "../shared/skills.js";
-import { iosConnectURL } from "../shared/mobile.js";
+import { iosConnectURL, isTailscaleURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
 import type { AutomationEvent, Routine } from "../shared/types.js";
@@ -511,8 +512,17 @@ app.get("/api/access", (request, response) => {
   const remoteEnabled = host !== "127.0.0.1" && host !== "localhost";
   const clientPort = process.env.NODE_ENV === "production" ? port : 4310;
   const urls = remoteEnabled ? Object.values(networkInterfaces()).flat().filter((address) => address?.family === "IPv4" && !address.internal).map((address) => `http://${address!.address}:${clientPort}`) : [];
-  const uniqueURLs = [...new Set(urls)];
-  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: uniqueURLs, iosConnectUrls: uniqueURLs.map(iosConnectURL) });
+  const uniqueURLs = [...new Set(urls)].sort((left, right) => Number(isTailscaleURL(right)) - Number(isTailscaleURL(left)));
+  const tailscaleUrl = uniqueURLs.find(isTailscaleURL) || null;
+  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: uniqueURLs, iosConnectUrls: uniqueURLs.map(iosConnectURL), tailscaleUrl });
+});
+
+app.post("/api/access/tailscale/open", (request, response) => {
+  if (!loopback(request)) return response.status(403).json({ error: "Tailscale can only be opened from this Mac." });
+  if (process.platform !== "darwin") return response.status(400).json({ error: "Open Tailscale on this computer, then come back here." });
+  const result = spawnSync("/usr/bin/open", ["-a", "Tailscale"], { timeout: 5_000, stdio: "ignore" });
+  if (result.status !== 0) return response.status(400).json({ error: "Install Tailscale on this Mac, then try again." });
+  response.json({ ok: true });
 });
 
 function safeUploadName(raw: string) {

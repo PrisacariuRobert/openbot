@@ -33,10 +33,13 @@ struct ConnectionView: View {
                         TextField("https://your-private-address", text: $address)
                             .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
                             .textContentType(.URL).focused($focusedField, equals: .address)
+                            .accessibilityIdentifier("server-address")
                             .openBotField()
                         fieldLabel("Private access key", icon: "key.fill")
                         SecureField("Paste the key from your Mac", text: $accessKey)
-                            .textContentType(.password).focused($focusedField, equals: .key)
+                            .textContentType(.oneTimeCode).focused($focusedField, equals: .key)
+                            .privacySensitive()
+                            .accessibilityIdentifier("access-key")
                             .openBotField()
                         if let error = session.errorMessage {
                             Label(error, systemImage: "exclamationmark.circle.fill")
@@ -57,6 +60,7 @@ struct ConnectionView: View {
                             .frame(maxWidth: .infinity, minHeight: 54)
                         }
                         .buttonStyle(.plain).foregroundStyle(.white)
+                        .accessibilityIdentifier("connect-studio")
                         .background(OpenBotTheme.purple, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .shadow(color: OpenBotTheme.purple.opacity(0.22), radius: 18, y: 8)
                         .disabled(session.isConnecting)
@@ -66,7 +70,8 @@ struct ConnectionView: View {
                     .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.black.opacity(0.06)))
                     VStack(alignment: .leading, spacing: 10) {
                         reassurance("The access key is protected in this iPhone’s Keychain.", icon: "lock.shield.fill")
-                        reassurance("Plain HTTP works only on private local addresses; remote addresses must use HTTPS.", icon: "checkmark.shield.fill")
+                        reassurance("With Tailscale on both devices, OpenBot works over cellular or any Wi-Fi.", icon: "globe.americas.fill")
+                        reassurance("Other public addresses must use HTTPS; never expose the Mac’s plain port.", icon: "checkmark.shield.fill")
                         reassurance("Your Mac remains the host and must be awake to do work.", icon: "macbook")
                     }
                     Spacer(minLength: 20)
@@ -102,8 +107,7 @@ private extension View {
     }
 }
 
-private struct MascotPairView: View {
-    @State private var blinking = false
+struct MascotPairView: View {
     @State private var floating = false
 
     var body: some View {
@@ -111,36 +115,15 @@ private struct MascotPairView: View {
             RoundedRectangle(cornerRadius: 44, style: .continuous)
                 .fill(LinearGradient(colors: [OpenBotTheme.purple.opacity(0.12), .white.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 244, height: 122)
-            mascot(color: OpenBotTheme.purple, ears: false).offset(x: -43, y: floating ? -3 : 1).rotationEffect(.degrees(-2))
-            mascot(color: OpenBotTheme.green, ears: true).offset(x: 45, y: floating ? 2 : -2).rotationEffect(.degrees(2))
-            Image(systemName: "sparkle").foregroundStyle(.white).offset(x: 15, y: -36)
+            Image("MascotStudio")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 226, height: 110)
+                .offset(y: floating ? -2.5 : 2)
+                .shadow(color: OpenBotTheme.purple.opacity(0.15), radius: 16, y: 8)
         }
         .task {
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { floating = true }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2.3...4.8) * 1_000_000_000))
-                withAnimation(.easeInOut(duration: 0.08)) { blinking = true }
-                try? await Task.sleep(nanoseconds: 120_000_000)
-                withAnimation(.easeInOut(duration: 0.1)) { blinking = false }
-            }
-        }
-    }
-
-    private func mascot(color: Color, ears: Bool) -> some View {
-        ZStack {
-            if ears {
-                Capsule().fill(color.opacity(0.9)).frame(width: 24, height: 41).rotationEffect(.degrees(-28)).offset(x: -24, y: -36)
-                Capsule().fill(color.opacity(0.9)).frame(width: 24, height: 41).rotationEffect(.degrees(28)).offset(x: 24, y: -36)
-            }
-            RoundedRectangle(cornerRadius: 27, style: .continuous)
-                .fill(LinearGradient(colors: [color.opacity(0.78), color], startPoint: .top, endPoint: .bottom))
-                .frame(width: 92, height: 78)
-                .shadow(color: color.opacity(0.25), radius: 12, y: 7)
-            HStack(spacing: 18) {
-                Capsule().fill(OpenBotTheme.ink).frame(width: 8, height: blinking ? 2 : 12)
-                Capsule().fill(OpenBotTheme.ink).frame(width: 8, height: blinking ? 2 : 12)
-            }.offset(y: -5)
-            Capsule().fill(OpenBotTheme.ink.opacity(0.72)).frame(width: 15, height: 3).offset(y: 16)
         }
     }
 }

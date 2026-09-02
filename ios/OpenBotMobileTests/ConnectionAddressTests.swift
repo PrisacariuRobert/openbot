@@ -1,5 +1,5 @@
 import XCTest
-@testable import OpenBotMobile
+@testable import OpenBot
 
 final class ConnectionAddressTests: XCTestCase {
     func testAddsHTTPSAndRemovesPaths() throws {

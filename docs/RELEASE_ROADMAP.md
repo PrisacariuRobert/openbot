@@ -41,17 +41,19 @@ Goal: add breadth without weakening per-teammate authority.
 
 Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
-## Shipped in 0.17 — Native iPhone companion
+## Shipped in 0.17.1 — Native iPhone app
 
 Goal: make phone check-ins feel like a real product without moving private studio data to a new cloud.
 
-- Added a SwiftUI companion with premium playful onboarding and the complete responsive studio in a native WebKit shell
-- Stored the access key in the iPhone Keychain and handed an HttpOnly session cookie to the web view
-- Added address-only deep-link pairing, foreground reauthentication, pull-to-refresh, offline state, and external-link handoff
+- Added a genuine SwiftUI conversation experience with native messages, animated teammates, routing, sending, progress, approvals, cancellation, and settings
+- Stored the access key in the iPhone Keychain and used it only for authenticated native API requests
+- Added address-only deep-link pairing, foreground reauthentication, server-sent event updates, and offline state
+- Added native attachment intake and shared premium mascot artwork across the web and iPhone apps
+- Added detected Tailscale away access for use over cellular or different Wi-Fi networks
 - Required HTTPS for public hosts while keeping private-network development practical and loopback-only hosting as the default
-- Added native release structure, privacy, secret, and Swift-syntax checks plus a production mascot app icon
+- Added native release structure, privacy and secret checks, a production mascot app icon, and a release guard that rejects a return to WebKit
 
-Verified structurally on this Mac. A signed device/simulator build still requires the full Xcode app and an Apple development team; push, share-sheet capture, and App Store delivery are not claimed.
+Compiled with Xcode Beta and verified on an iPhone 17 Pro simulator with four native unit tests and a live sign-in UI test. The authenticated API was also verified over the detected Tailscale address. Physical-device signing, rich artifact previews, push, share-sheet capture, dedicated voice capture, and App Store delivery are not claimed.
 
 ## 0.18 — Find, organize, and share
 
