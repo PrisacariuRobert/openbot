@@ -13,5 +13,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install code-search dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: npm ci
       - run: npm run verify
