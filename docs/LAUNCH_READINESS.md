@@ -1,12 +1,13 @@
-# OpenBot 0.10 Launch Readiness
+# OpenBot 0.11.0 Launch Readiness
 
-OpenBot 0.10 is ready for an open-source local-first beta launch. Its completion engine and review-first coding harness make substantial work plan-driven, observable, editable, verifiable, and publishable with approval, but it is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, or wider plugin catalog.
+OpenBot 0.11.0 is ready for an open-source local-first beta launch. Its completion engine, natural mid-job steering, and review-first coding harness make substantial work plan-driven, observable, editable, verifiable, and publishable with approval, but it is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, or wider plugin catalog.
 
 ## What is launch-ready
 
 - Persistent named teammates with owned model connections, budgets, memory, files, browser sessions, routines, and observable work
 - Official OpenCode and Claude Code runtime paths plus encrypted API-key connections
 - Direct chat, natural mentions, automatic ownership, parallel room work, bounded bot-to-bot communication, and duplicate protection
+- Natural follow-up steering for active non-code jobs, with immediate cancellation and safe session continuation; coding jobs stay pinned to their isolated task branch
 - Real attachments, artifact downloads, voice typing, an installable phone UI, and authenticated remote access
 - Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
@@ -44,18 +45,18 @@ OpenBot 0.10 is ready for an open-source local-first beta launch. Its completion
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Rich Office/spreadsheet editing | Files persist, but there is no workbook-aware editor or fidelity engine. | Add document and spreadsheet tools with rendered before/after review. |
 | Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
-| Event-triggered routines | 0.10 provides interval schedules, not Slack/GitHub/webhook triggers. | Add signed webhook triggers with filters, rate limits, dedupe keys, and replay history. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.10 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Event-triggered routines | 0.11 provides interval schedules, not Slack/GitHub/webhook triggers. | Add signed webhook triggers with filters, rate limits, dedupe keys, and replay history. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.11 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
-| Reply/reaction/steering ergonomics | New instructions queue safely, but there are no threaded replies/reactions or true mid-turn steering. | Add message references and runner interruption/resume semantics. |
+| Reply/reaction ergonomics | Active non-code work can now be redirected naturally, but messages still lack explicit reply references and reactions. | Add lightweight reply context and reactions without turning the chat into a project-management interface. |
 
 ## Release decision
 
-Ship 0.10 as **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors work. The strongest launch story is: private persistent AI teammates that can plan, code, review, publish, use connected context, collaborate, and verify work while the owner keeps control of projects, models, and sensitive actions.
+Ship 0.11.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors work. The strongest launch story is: private persistent AI teammates that can plan, code, review, publish, use connected context, accept new direction while working, collaborate, and verify work while the owner keeps control of projects, models, and sensitive actions.
 
 ## Verified acceptance criteria
 
-- Automated tests: 50 passing
+- Automated tests: 52 passing
 - Type safety: passing
 - Production build: passing
 - Real model: Nova completed a three-step file workflow, reopened the artifact, recorded four passing checks, and returned one verified result receipt

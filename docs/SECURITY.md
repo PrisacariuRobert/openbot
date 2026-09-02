@@ -46,9 +46,9 @@ Teach mode opens a visible, bot-specific Chrome profile and records navigation, 
 - Claude Code subscription and usage-credit metering is controlled by Anthropic and may change independently of OpenBot.
 - Gmail read and Drive read scopes are classified by Google as restricted. Personal test-user setup can run locally, but public distribution requires OAuth verification and may require an independent security assessment.
 - OAuth access is broad at the connected Google account level. Per-bot switches are OpenBot policy controls, not separate Google grants; anyone with full access to the local OpenBot data and vault key can act as the owner.
-- Gmail sending currently supports plain-text messages and up to ten recipients. Attachments, drafts, and labels are not included in 0.10.
+- Gmail sending currently supports plain-text messages and up to ten recipients. Attachments, drafts, and labels are not included in 0.11.
 - Drive reading is intentionally bounded to supported text, Google Docs, and Google Sheets exports. Binary Office files and PDFs need a dedicated fidelity-preserving viewer.
-- Calendar is read-only in 0.10. Event creation or changes should be added later behind the same durable approval path as email sending.
+- Calendar is read-only in 0.11. Event creation or changes should be added later behind the same durable approval path as email sending.
 - Availability depends on the local OpenBot service, OpenCode/provider, Docker, and Chrome.
 
 Please report security issues privately to the repository owner rather than opening a public exploit report.

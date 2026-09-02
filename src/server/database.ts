@@ -238,6 +238,7 @@ export class OpenBotDatabase {
         cache_read_tokens INTEGER NOT NULL DEFAULT 0,
         cost REAL NOT NULL DEFAULT 0,
         parent_run_id TEXT,
+        steered_from_run_id TEXT,
         routine_id TEXT,
         task_goal TEXT,
         task_deliverable TEXT,
@@ -427,6 +428,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "cache_read_tokens INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "cost REAL NOT NULL DEFAULT 0");
     this.addColumn("runs", "parent_run_id TEXT");
+    this.addColumn("runs", "steered_from_run_id TEXT");
     this.addColumn("runs", "routine_id TEXT");
     this.addColumn("runs", "task_goal TEXT");
     this.addColumn("runs", "task_deliverable TEXT");
@@ -715,11 +717,11 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; routineId?: string | null }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null }): Run {
     const id = randomUUID();
-    const tracked = shouldTrackTask(input.prompt, Boolean(input.parentRunId || input.routineId));
-    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,routine_id,progress_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.routineId ?? null, now(),
+    const tracked = shouldTrackTask(input.prompt, Boolean(input.parentRunId || input.steeredFromRunId || input.routineId));
+    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,progress_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, now(),
     );
     this.db.prepare(`UPDATE runs SET task_goal=?,task_deliverable=?,task_approval_boundary=?,task_required_apps_json='[]',task_stage=?,task_steps_json=?,verification_status='pending',verification_summary=NULL,verification_checks_json='[]' WHERE id=?`).run(
       tracked ? taskGoal(input.prompt) : null, tracked ? "A finished, reviewable result in this conversation" : null, input.approvalReason ?? null,
@@ -754,6 +756,7 @@ export class OpenBotDatabase {
     return {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
+      steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null,
       prompt: String(row.prompt), status: row.status as RunStatus,
       approvalReason: row.approval_reason ? String(row.approval_reason) : null, approvalId: row.approval_id ? String(row.approval_id) : null,
       partialText: row.partial_text ? String(row.partial_text) : null, startedAt: row.started_at ? String(row.started_at) : null,
@@ -776,6 +779,11 @@ export class OpenBotDatabase {
   listRuns(threadId: string): Run[] {
     const rows = this.db.prepare(this.runSelect("WHERE r.thread_id=? ORDER BY r.created_at DESC LIMIT 40")).all(threadId) as Row[];
     return rows.map((row) => this.runFromRow(row));
+  }
+
+  runningRun(threadId: string, botId: string): Run | null {
+    const row = this.db.prepare(this.runSelect("WHERE r.thread_id=? AND r.bot_id=? AND r.status='running' ORDER BY r.created_at DESC LIMIT 1")).get(threadId, botId) as Row | undefined;
+    return row ? this.runFromRow(row) : null;
   }
 
   nextQueuedRun(excludedBotIds: string[]): Run | null {
@@ -975,6 +983,18 @@ export class OpenBotDatabase {
       this.finishRunTask(approval.runId, "cancelled");
     }
     return this.getApproval(id);
+  }
+
+  cancelRun(id: string): Run | null {
+    const run = this.getRun(id);
+    if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return null;
+    const approval = run.approvalId ? this.getApproval(run.approvalId) : null;
+    if (approval?.status === "pending") this.decideApproval(approval.id, "denied");
+    else {
+      this.updateRun(run.id, { status: "cancelled", finishedAt: now(), taskStage: "blocked" });
+      this.finishRunTask(run.id, "cancelled");
+    }
+    return this.getRun(id);
   }
 
   listProviders(): ProviderInstance[] {

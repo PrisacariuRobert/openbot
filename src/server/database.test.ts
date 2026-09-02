@@ -82,6 +82,8 @@ test("keeps approvals pending across a full database restart", () => {
     reopened.decideApproval(run.approvalId!, "approved");
     assert.equal(reopened.getRun(run.id)?.status, "queued");
     assert.equal(reopened.getRun(run.id)?.task.stage, "working");
+    assert.equal(reopened.cancelRun(run.id)?.status, "cancelled");
+    assert.equal(reopened.listApprovals().length, 0);
     reopened.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -148,6 +150,23 @@ test("keeps casual conversation lightweight until it becomes a real job", () => 
     const planned = db.setRunTaskPlan(run.id, { goal: "Help with a concrete request", deliverable: "A checked result", steps: ["Do it", "Check it"] });
     assert.equal(planned?.tracked, true);
     assert.equal(planned?.steps.length, 2);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("finds an active run and remembers which task a new direction replaced", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-steering-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const first = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Research the launch market", status: "queued" });
+    db.updateRun(first.id, { status: "running", startedAt: new Date().toISOString() });
+    assert.equal(db.runningRun("bot-nova", "nova")?.id, first.id);
+    const redirected = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Also compare pricing", status: "queued", steeredFromRunId: first.id });
+    assert.equal(redirected.steeredFromRunId, first.id);
+    assert.equal(redirected.task.tracked, true);
+    assert.equal(db.runningRun("bot-pixel", "nova"), null);
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });

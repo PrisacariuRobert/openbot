@@ -1,4 +1,4 @@
-# OpenBot 0.10 Milestones
+# OpenBot Milestones
 
 All milestones below are implemented in the current repository and were verified on September 2, 2026.
 
@@ -219,3 +219,16 @@ Status: complete on the 0.11 development branch
 - The Code projects panel shows active task branches, assigned mascots, review status, and whether a task was published
 
 Verification: 51 automated tests pass. The worktree integration test starts two concurrent runs from one repository, creates two independent branches and roots, writes different content to the same file, proves both are isolated from each other and from `main`, commits one task without moving the source checkout, renders its committed diff, records a second-teammate approval tied to the exact commit, and restores a file inside the other task's workspace. Type checking and the production build pass.
+
+## M16 — Natural steering and release confidence
+
+Status: complete on the 0.11 development branch
+
+- A follow-up message to a teammate who is actively working stops the old model process and starts a continuation with both the original request and the user's newest direction
+- The composer says in plain language when the next message will update work in progress and names the affected teammate
+- Cancelled runs are marked immediately, and internal tool requests are rejected after a run stops or when a run/bot identity does not match
+- Active coding jobs are not automatically redirected, because moving away from their run-scoped worktree could hide unfinished code; the follow-up queues safely instead
+- GitHub Actions use the current Node 24 action runtimes, removing the Node 20 deprecation warning
+- Release verification fails when `package.json`, `package-lock.json`, the README title, and its matching “What's new” section disagree
+
+Verification: 52 automated tests pass, including persistence of the steering relationship. Release-document checks, type checking, and the production build pass.

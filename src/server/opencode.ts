@@ -155,9 +155,12 @@ export class OpenCodeRunner {
   private buildPrompt(run: Run, bot: Bot, continuing: boolean): string {
     const inbox = this.options.db.listAgentInbox(bot.id, run.threadId);
     const teamContext = inbox.length ? `\n\nRecent private team signals:\n${inbox.map((message) => `- ${message.fromBotName} (${message.kind}): ${message.body}`).join("\n")}` : "";
-    const request = continuing
-      ? `Continue the existing task after the user's latest instruction or approval. Current request: ${run.prompt}`
-      : `Take care of this request for the user: ${run.prompt}`;
+    const redirectedFrom = run.steeredFromRunId ? this.options.db.getRun(run.steeredFromRunId) : null;
+    const request = redirectedFrom
+      ? `The user added a new direction while you were working. Continue the same job without repeating finished work.\n\nPrevious request: ${redirectedFrom.prompt}\n\nNewest direction (authoritative): ${run.prompt}`
+      : continuing
+        ? `Continue the existing task after the user's latest instruction or approval. Current request: ${run.prompt}`
+        : `Take care of this request for the user: ${run.prompt}`;
     const sharedProjects = this.options.db.listCodeProjects(bot.id).map((project) => {
       const access = project.access.find((item) => item.botId === bot.id)!;
       return `- ${project.name} (${project.id}): ${access.canWrite ? "edit" : "read-only"}${access.canRun ? ", checks enabled" : ""}`;
@@ -235,11 +238,17 @@ export class OpenCodeRunner {
       const finishedAt = new Date().toISOString();
       const current = this.options.db.getRun(run.id);
       const waiting = current?.status === "awaiting_approval";
-      const cancelled = signal === "SIGTERM";
+      const cancelled = signal === "SIGTERM" || current?.status === "cancelled";
       const usagePatch = { ...usage, progressAt: finishedAt, ...(sessionId ? { sessionId } : {}) };
       if (waiting) {
         this.options.db.updateRun(run.id, { ...usagePatch, partialText: responseText || current?.partialText || "" });
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Waiting for you", detail: current?.approvalReason || null });
+      } else if (cancelled) {
+        if (current?.status === "cancelled") this.options.db.updateRun(run.id, usagePatch);
+        else {
+          this.options.db.updateRun(run.id, { ...usagePatch, status: "cancelled", finishedAt });
+          this.options.db.finishRunTask(run.id, "cancelled");
+        }
       } else if (code === 0 && responseText.trim()) {
         const summary = responseText.trim();
         this.options.db.updateRun(run.id, { ...usagePatch, status: "completed", finishedAt, summary, partialText: null, error: null });
@@ -253,9 +262,6 @@ export class OpenCodeRunner {
             this.options.db.addActivity({ runId: parent.id, botId: parent.botId, kind: "message", label: `${bot.name} shared a finding`, detail: summary.slice(0, 180) });
           }
         }
-      } else if (cancelled) {
-        this.options.db.updateRun(run.id, { ...usagePatch, status: "cancelled", finishedAt });
-        this.options.db.finishRunTask(run.id, "cancelled");
       } else {
         const error = cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
         this.options.db.updateRun(run.id, { ...usagePatch, status: "failed", finishedAt, error, partialText: responseText || null });
