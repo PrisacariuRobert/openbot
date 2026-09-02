@@ -280,3 +280,20 @@ Status: complete for the local-first 0.14 release
 - Uploaded originals still enter only the selected teammates' private inboxes, with six-file and 25 MB-per-file limits
 
 Verification: 61 automated tests pass, including real PDF text extraction plus Word, spreadsheet, slide, image, and audio fixtures; database persistence; type detection; prompt-injection boundaries; media forwarding; workspace escape denial; artifact capture; and revision history. The production dependency audit reports zero vulnerabilities. A real DeepSeek V4 Flash Vision run interpreted the supplied screenshot through OpenBot, and a real DeepSeek V4 Flash workflow created, surfaced, updated, and re-surfaced the same Markdown artifact as versions 1 and 2. Desktop and 390×844 checks confirmed the new card is contained, survives refresh, opens its preview, and introduces no horizontal overflow.
+
+## M20 — Dependable automations and event triggers
+
+Status: complete for the local-first 0.15 release
+
+- Automations start from a local schedule, a matching upcoming primary-Calendar event, a signed GitHub webhook, or a signed generic webhook
+- GitHub filters can restrict event, action, and repository; Calendar filters can restrict title and minutes before; generic hooks can require one event name
+- Every delivery receives a durable event receipt linked to its run, outcome, attempt, summary, and retained bounded payload
+- Repeated delivery IDs are stopped before run creation for seven days, counted on the original receipt, and returned as successful duplicates to make sender retries safe
+- Per-automation burst limits, explicit origin-loop headers, narrow filters, and bounded redacted payloads reduce accidental storms and hostile input
+- HMAC-SHA256 secrets are encrypted at rest, shown only when created or rotated, and verified using timing-safe comparison
+- Incoming event content is recursively secret-redacted, size/depth bounded, and clearly delimited as untrusted before it reaches a model
+- Test runs require an explicit warning, approval waits enter the attention inbox, supported failed events can be replayed, and three consecutive failures pause the automation automatically
+- Schedule/Calendar missed-work and failure alerts use friendly repair guidance; browser notifications can surface new attention items when the app is hidden
+- The redesigned Automations screen keeps triggers, health, secret setup, receipts, replay, and repair actions contained at desktop and 390×844 phone widths
+
+Verification: 66 automated tests pass, including signature validation, filters, summaries, secret redaction, prompt boundaries, encrypted hook secrets, event persistence, duplicate delivery, linked run lifecycle, alerts, per-automation rate limits, and automatic pause after three failures. A real signed delivery created one durable event and one linked run, Muse Spark 1.2 Free completed it and produced `build-event-confirmation.md`, and replaying the same delivery ID returned the existing event without a second run. Type checking and the production build pass. Desktop and 390×844 browser QA confirmed contained layout, correct trigger-specific fields, no console errors, and no horizontal overflow. Availability remains honest: local schedules and Calendar polling stop when OpenBot or the Mac sleeps, and an internet sender needs an owner-managed HTTPS tunnel or reverse proxy.

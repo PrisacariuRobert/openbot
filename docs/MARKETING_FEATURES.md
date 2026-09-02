@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.14 local-first beta
+Release: 0.15 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, hand off work between specialists, schedule recurring jobs, connect Google Workspace, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, hand off work between specialists, run dependable scheduled or event-driven automations, connect Google Workspace, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -152,15 +152,19 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - App focus/open plus approval-gated click, typing, and key presses
 - Bounded scrolling without claiming unrestricted pixel-level computer control
 
-### Routines and reusable work
+### Automations and reusable work
 
-- Natural recurring requests, including intervals as short as five minutes
-- Persistent routine name, prompt, teammate, conversation, schedule, enabled state, next run, last run, last status, and run count
-- Manual **Test now** action
-- Pause and resume controls
-- Edit the routine name, instructions, teammate, and interval at any time
-- Inspect saved run history, open past results, and retry a previous routine
-- Delete a schedule without deleting its completed run history
+- Schedule, Google Calendar, signed GitHub webhook, and signed generic webhook triggers
+- Natural recurring requests, including intervals as short as five minutes, plus hourly, daily, and weekly phrasing
+- Narrow Calendar title/minutes-before, GitHub event/action/repository, and generic event-name filters
+- Persistent automation name, prompt, teammate, conversation, trigger, enabled state, event receipt, linked run, last outcome, health, and run count
+- Explicit **Test** confirmation because a test can use real tools and create real approvals
+- Pause, resume, edit, delete, secret rotation, and preserved event/run history
+- Attention inbox for failures, approval waits, missed schedules, repair guidance, retry, and alert clearing
+- Seven-day delivery-ID deduplication, per-automation burst limits, origin-loop headers, bounded replay input, and automatic pause after three consecutive failures
+- HMAC-SHA256 webhook verification with encrypted secrets shown only after creation or rotation
+- Secret-redacted, size-bounded payload retention and an explicit untrusted-event boundary before model use
+- Inspect event history, open linked results, and safely replay failed, cancelled, or rate-limited deliveries
 - In-app recurring messages when the user says “text me” without naming an external service
 - Demonstrated browser workflows saved as reusable local skills for both OpenCode and Claude Code
 - Learned-skill manager with use, rename, starting-page edit, and delete actions
@@ -210,6 +214,8 @@ These features are implemented, but marketing must explain their requirement.
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
+| Calendar automations | OpenBot polls the connected primary calendar while the local service is awake; the selected teammate needs Calendar permission. |
+| GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
 | Phone access | The Mac service must remain awake and reachable through a trusted private network, Tailscale, or HTTPS proxy. This is a PWA, not a native iOS app. |
@@ -227,6 +233,8 @@ These features are implemented, but marketing must explain their requirement.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
 - **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
+- **React to a repository event:** filter a signed GitHub webhook to one repository, event, and action; inspect its receipt and linked checked result, with duplicate deliveries stopped automatically.
+- **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events while OpenBot is awake.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
 
 ## Claims to avoid
@@ -248,9 +256,8 @@ Do not say OpenBot currently:
 
 - Native phone shell and opt-in push notifications
 - Optional always-on self-hosted daemon or private cloud deployment
-- GitHub event triggers and repository allowlist management
 - Slack, Notion, and broader connector SDK/marketplace
-- Event-triggered routines and signed webhooks
+- Hosted event ingress, Slack/Notion triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
 - Full-text search across conversations and projects

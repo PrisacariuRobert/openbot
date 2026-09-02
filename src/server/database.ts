@@ -9,6 +9,10 @@ import type {
   AppState,
   Approval,
   Attachment,
+  AutomationAlert,
+  AutomationEvent,
+  AutomationEventStatus,
+  AutomationTriggerType,
   Bot,
   BotConnectorAccess,
   CodeProject,
@@ -24,6 +28,7 @@ import type {
   Message,
   ProviderInstance,
   Routine,
+  RoutineTriggerConfig,
   Run,
   RunStatus,
   StudioSettings,
@@ -41,6 +46,7 @@ import { SecretVault } from "./vault.js";
 import { legacyCadence, normalizeRoutineInterval, routineIntervalMs } from "../shared/routines.js";
 import { skillSlug } from "../shared/skills.js";
 import type { AttachmentAnalysis } from "./attachments.js";
+import { automationRepairHint, normalizedTriggerConfig } from "./automations.js";
 
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
@@ -262,6 +268,7 @@ export class OpenBotDatabase {
         parent_run_id TEXT,
         steered_from_run_id TEXT,
         routine_id TEXT,
+        automation_event_id TEXT,
         consultation_pending INTEGER NOT NULL DEFAULT 0,
         attachment_ids_json TEXT NOT NULL DEFAULT '[]',
         task_goal TEXT,
@@ -303,11 +310,52 @@ export class OpenBotDatabase {
         prompt TEXT NOT NULL,
         cadence TEXT NOT NULL CHECK(cadence IN ('hourly', 'daily')),
         interval_minutes INTEGER NOT NULL DEFAULT 1440,
+        trigger_type TEXT NOT NULL DEFAULT 'schedule',
+        trigger_config_json TEXT NOT NULL DEFAULT '{}',
+        webhook_secret_ciphertext TEXT,
         enabled INTEGER NOT NULL DEFAULT 0,
         next_run_at TEXT,
         last_run_at TEXT,
         last_status TEXT NOT NULL DEFAULT 'never',
-        run_count INTEGER NOT NULL DEFAULT 0
+        run_count INTEGER NOT NULL DEFAULT 0,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        deduplicated_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        paused_reason TEXT,
+        last_success_at TEXT,
+        last_event_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS automation_events (
+        id TEXT PRIMARY KEY,
+        routine_id TEXT NOT NULL,
+        routine_name TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        bot_name TEXT NOT NULL,
+        source TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        dedupe_key TEXT NOT NULL,
+        status TEXT NOT NULL,
+        run_id TEXT,
+        replay_of_event_id TEXT,
+        payload_summary TEXT NOT NULL,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        received_at TEXT NOT NULL,
+        finished_at TEXT,
+        error TEXT,
+        attempt INTEGER NOT NULL DEFAULT 1
+      );
+      CREATE INDEX IF NOT EXISTS automation_events_routine_time ON automation_events(routine_id,received_at DESC);
+      CREATE INDEX IF NOT EXISTS automation_events_dedupe ON automation_events(routine_id,dedupe_key,received_at DESC);
+      CREATE TABLE IF NOT EXISTS automation_alerts (
+        id TEXT PRIMARY KEY,
+        routine_id TEXT NOT NULL,
+        routine_name TEXT NOT NULL,
+        run_id TEXT,
+        event_id TEXT,
+        kind TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
       );
       CREATE TABLE IF NOT EXISTS memories (
         id TEXT PRIMARY KEY,
@@ -478,6 +526,16 @@ export class OpenBotDatabase {
     this.addColumn("attachments", "replaces_attachment_id TEXT");
     this.addColumn("routines", "last_status TEXT NOT NULL DEFAULT 'never'");
     this.addColumn("routines", "run_count INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("routines", "trigger_type TEXT NOT NULL DEFAULT 'schedule'");
+    this.addColumn("routines", "trigger_config_json TEXT NOT NULL DEFAULT '{}'");
+    this.addColumn("routines", "webhook_secret_ciphertext TEXT");
+    this.addColumn("routines", "consecutive_failures INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("routines", "deduplicated_count INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("routines", "last_error TEXT");
+    this.addColumn("routines", "paused_reason TEXT");
+    this.addColumn("routines", "last_success_at TEXT");
+    this.addColumn("routines", "last_event_at TEXT");
+    this.addColumn("runs", "automation_event_id TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
     const hadRoutineInterval = this.hasColumn("routines", "interval_minutes");
     this.addColumn("routines", "interval_minutes INTEGER NOT NULL DEFAULT 1440");
@@ -773,11 +831,11 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null; attachmentIds?: string[] }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[] }): Run {
     const id = randomUUID();
     const tracked = shouldTrackTask(input.prompt, Boolean(input.parentRunId || input.steeredFromRunId || input.routineId));
-    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,progress_at,attachment_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, now(), JSON.stringify([...new Set(input.attachmentIds || [])].slice(0, 6)),
+    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,automation_event_id,progress_at,attachment_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, input.automationEventId ?? null, now(), JSON.stringify([...new Set(input.attachmentIds || [])].slice(0, 6)),
     );
     this.db.prepare(`UPDATE runs SET task_goal=?,task_deliverable=?,task_approval_boundary=?,task_required_apps_json='[]',task_stage=?,task_steps_json=?,verification_status='pending',verification_summary=NULL,verification_checks_json='[]' WHERE id=?`).run(
       tracked ? taskGoal(input.prompt) : null, tracked ? "A finished, reviewable result in this conversation" : null, input.approvalReason ?? null,
@@ -813,6 +871,7 @@ export class OpenBotDatabase {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
+      automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
       consultationPending: asBoolean(row.consultation_pending),
       attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),
       prompt: String(row.prompt), status: row.status as RunStatus,
@@ -865,8 +924,35 @@ export class OpenBotDatabase {
       value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), id,
     );
     if (patch.status === "running" || patch.status === "completed") this.db.prepare("UPDATE bots SET last_active_at=? WHERE id=?").run(now(), current.bot_id);
-    if ((patch.status === "completed" || patch.status === "failed") && current.routine_id) {
-      this.db.prepare("UPDATE routines SET last_status=?,run_count=run_count+1 WHERE id=?").run(patch.status, current.routine_id);
+    const statusChanged = patch.status !== undefined && patch.status !== current.status;
+    if (statusChanged && current.automation_event_id) {
+      const eventStatus: AutomationEventStatus | null = patch.status === "awaiting_approval" ? "waiting" : ["queued", "running", "completed", "failed", "cancelled"].includes(patch.status!) ? patch.status as AutomationEventStatus : null;
+      if (eventStatus) this.db.prepare("UPDATE automation_events SET status=?,finished_at=?,error=? WHERE id=?").run(
+        eventStatus, ["completed", "failed", "cancelled"].includes(eventStatus) ? (patch.finishedAt || now()) : null,
+        eventStatus === "failed" ? (patch.error || null) : null, current.automation_event_id,
+      );
+    }
+    if (statusChanged && (patch.status === "completed" || patch.status === "failed") && current.routine_id) {
+      if (patch.status === "completed") {
+        this.db.prepare("UPDATE routines SET last_status='completed',run_count=run_count+1,consecutive_failures=0,last_error=NULL,last_success_at=? WHERE id=?").run(patch.finishedAt || now(), current.routine_id);
+        this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE routine_id=? AND resolved_at IS NULL AND kind IN ('failure','approval')").run(now(), current.routine_id);
+      } else {
+        const routine = this.getRoutine(String(current.routine_id));
+        const failures = (routine?.consecutiveFailures || 0) + 1;
+        const error = patch.error || "The automation stopped before it could finish.";
+        const pause = failures >= 3;
+        this.db.prepare("UPDATE routines SET last_status='failed',run_count=run_count+1,consecutive_failures=?,last_error=?,enabled=CASE WHEN ? THEN 0 ELSE enabled END,next_run_at=CASE WHEN ? THEN NULL ELSE next_run_at END,paused_reason=CASE WHEN ? THEN ? ELSE paused_reason END WHERE id=?").run(
+          failures, error, pause ? 1 : 0, pause ? 1 : 0, pause ? 1 : 0, pause ? "Paused after three consecutive failures" : null, current.routine_id,
+        );
+        this.createAutomationAlert({
+          routineId: String(current.routine_id), runId: id, eventId: current.automation_event_id ? String(current.automation_event_id) : null, kind: "failure",
+          message: pause ? `${routine?.name || "This automation"} was paused after three failed attempts.` : `${routine?.name || "This automation"} needs another try: ${error}`,
+        });
+      }
+    }
+    if (statusChanged && patch.status === "awaiting_approval" && current.routine_id) {
+      const routine = this.getRoutine(String(current.routine_id));
+      this.createAutomationAlert({ routineId: String(current.routine_id), runId: id, eventId: current.automation_event_id ? String(current.automation_event_id) : null, kind: "approval", message: `${routine?.name || "An automation"} is waiting for your approval.` });
     }
   }
 
@@ -1029,10 +1115,13 @@ export class OpenBotDatabase {
 
   createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown }): Approval {
     const id = randomUUID();
+    const run = this.getRun(input.runId);
     this.db.prepare("INSERT INTO approvals (id,run_id,bot_id,kind,reason,action_label,action_json,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',?)").run(
       id, input.runId, input.botId, input.kind, input.reason, input.actionLabel, input.action ? JSON.stringify(input.action) : null, now(),
     );
     this.db.prepare("UPDATE runs SET status='awaiting_approval',approval_reason=?,approval_id=?,task_stage='waiting',progress_at=? WHERE id=?").run(input.reason, id, now(), input.runId);
+    if (run?.automationEventId) this.db.prepare("UPDATE automation_events SET status='waiting' WHERE id=?").run(run.automationEventId);
+    if (run?.routineId) this.createAutomationAlert({ routineId: run.routineId, runId: run.id, eventId: run.automationEventId, kind: "approval", message: `${this.getRoutine(run.routineId)?.name || "An automation"} is waiting for your approval.` });
     return this.getApproval(id)!;
   }
 
@@ -1063,9 +1152,12 @@ export class OpenBotDatabase {
     const approval = this.getApproval(id);
     if (!approval || approval.status !== "pending") return null;
     this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=?").run(decision, now(), id);
-    if (decision === "approved") this.db.prepare("UPDATE runs SET status='queued',approval_reason=NULL,task_stage='working',progress_at=? WHERE id=?").run(now(), approval.runId);
+    if (decision === "approved") {
+      this.updateRun(approval.runId, { status: "queued", approvalReason: null, taskStage: "working", progressAt: now() });
+      this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE run_id=? AND kind='approval' AND resolved_at IS NULL").run(now(), approval.runId);
+    }
     else {
-      this.db.prepare("UPDATE runs SET status='cancelled',finished_at=?,task_stage='blocked',progress_at=? WHERE id=?").run(now(), now(), approval.runId);
+      this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
       this.finishRunTask(approval.runId, "cancelled");
     }
     return this.getApproval(id);
@@ -1561,13 +1653,15 @@ export class OpenBotDatabase {
     return asBoolean(row?.present);
   }
 
-  createRoutine(input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled?: boolean }): Routine {
+  createRoutine(input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled?: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }): Routine {
     const id = randomUUID();
     const intervalMinutes = normalizeRoutineInterval(input.intervalMinutes);
+    const triggerType = input.triggerType || "schedule";
+    const triggerConfig = normalizedTriggerConfig(triggerType, input.triggerConfig);
     const enabled = input.enabled !== false;
-    const nextRunAt = enabled ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : null;
-    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,enabled,next_run_at) VALUES (?,?,?,?,?,?,?,?,?)")
-      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, enabled ? 1 : 0, nextRunAt);
+    const nextRunAt = enabled && triggerType === "schedule" ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : null;
+    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt);
     return this.getRoutine(id)!;
   }
 
@@ -1575,8 +1669,13 @@ export class OpenBotDatabase {
     return {
       id: String(row.id), name: String(row.name), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       threadId: String(row.thread_id), prompt: String(row.prompt), cadence: row.cadence as Routine["cadence"], intervalMinutes: normalizeRoutineInterval(Number(row.interval_minutes || (row.cadence === "hourly" ? 60 : 1440))), enabled: asBoolean(row.enabled),
+      triggerType: String(row.trigger_type || "schedule") as AutomationTriggerType, triggerConfig: jsonRecord(row.trigger_config_json) as RoutineTriggerConfig,
+      hasWebhookSecret: Boolean(row.webhook_secret_ciphertext),
       nextRunAt: row.next_run_at ? String(row.next_run_at) : null, lastRunAt: row.last_run_at ? String(row.last_run_at) : null,
       lastStatus: (row.last_status || "never") as Routine["lastStatus"], runCount: Number(row.run_count || 0),
+      consecutiveFailures: Number(row.consecutive_failures || 0), deduplicatedCount: Number(row.deduplicated_count || 0),
+      lastError: row.last_error ? String(row.last_error) : null, pausedReason: row.paused_reason ? String(row.paused_reason) : null,
+      lastSuccessAt: row.last_success_at ? String(row.last_success_at) : null, lastEventAt: row.last_event_at ? String(row.last_event_at) : null,
     };
   }
 
@@ -1589,14 +1688,17 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
   }
 
-  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled: boolean }): Routine | null {
+  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }): Routine | null {
     const routine = this.getRoutine(id);
     if (!routine) return null;
     const intervalMinutes = normalizeRoutineInterval(input.intervalMinutes);
-    const scheduleChanged = routine.intervalMinutes !== intervalMinutes || routine.enabled !== input.enabled;
-    const nextRunAt = input.enabled ? (scheduleChanged || !routine.nextRunAt ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : routine.nextRunAt) : null;
-    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,enabled=?,next_run_at=? WHERE id=?").run(
-      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, input.enabled ? 1 : 0, nextRunAt, id,
+    const triggerType = input.triggerType || routine.triggerType;
+    const triggerConfig = normalizedTriggerConfig(triggerType, input.triggerConfig ?? routine.triggerConfig);
+    const scheduleChanged = routine.intervalMinutes !== intervalMinutes || routine.enabled !== input.enabled || routine.triggerType !== triggerType;
+    const nextRunAt = input.enabled && triggerType === "schedule" ? (scheduleChanged || !routine.nextRunAt ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : routine.nextRunAt) : null;
+    const secret = input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : undefined;
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
+      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, input.enabled ? 1 : 0, id,
     );
     return this.getRoutine(id);
   }
@@ -1614,18 +1716,119 @@ export class OpenBotDatabase {
     const routine = this.getRoutine(id);
     if (!routine) return null;
     const delay = routineIntervalMs(routine.intervalMinutes);
-    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=? WHERE id=?").run(enabled ? 1 : 0, enabled ? new Date(Date.now() + delay).toISOString() : null, id);
+    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, enabled ? 1 : 0, id);
     return this.getRoutine(id);
   }
 
   dueRoutines(): Routine[] {
-    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.enabled=1 AND r.next_run_at IS NOT NULL AND r.next_run_at<=?").all(now()) as Row[]).map((row) => this.routineFromRow(row));
+    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.enabled=1 AND r.trigger_type='schedule' AND r.next_run_at IS NOT NULL AND r.next_run_at<=?").all(now()) as Row[]).map((row) => this.routineFromRow(row));
   }
 
   markRoutineRan(routine: Routine) {
+    this.markRoutineDispatched(routine, true);
+  }
+
+  markRoutineDispatched(routine: Routine, advanceSchedule: boolean) {
     const ranAt = now();
     const delay = routineIntervalMs(routine.intervalMinutes);
-    this.db.prepare("UPDATE routines SET last_run_at=?,next_run_at=? WHERE id=?").run(ranAt, routine.enabled ? new Date(Date.now() + delay).toISOString() : null, routine.id);
+    const nextRunAt = advanceSchedule && routine.enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : routine.nextRunAt;
+    this.db.prepare("UPDATE routines SET last_run_at=?,last_event_at=?,next_run_at=? WHERE id=?").run(ranAt, ranAt, nextRunAt, routine.id);
+  }
+
+  listCalendarRoutines(): Routine[] {
+    return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === "calendar");
+  }
+
+  routineWebhookSecret(id: string): string | null {
+    const row = this.db.prepare("SELECT webhook_secret_ciphertext FROM routines WHERE id=?").get(id) as Row | undefined;
+    return row?.webhook_secret_ciphertext ? this.vault.decrypt(String(row.webhook_secret_ciphertext)) : null;
+  }
+
+  receiveAutomationEvent(input: { routine: Routine; source: AutomationEvent["source"]; externalId: string; dedupeKey: string; payloadSummary: string; payload: unknown; replayOfEventId?: string | null; attempt?: number; dedupeWindowMs?: number; rateLimit?: number; bypassDedupe?: boolean }): { event: AutomationEvent; duplicate: boolean; rateLimited: boolean } {
+    const cutoff = new Date(Date.now() - (input.dedupeWindowMs ?? 7 * 86_400_000)).toISOString();
+    if (!input.bypassDedupe) {
+      const existing = this.db.prepare("SELECT * FROM automation_events WHERE routine_id=? AND dedupe_key=? AND received_at>=? AND status!='rate_limited' ORDER BY received_at DESC LIMIT 1").get(input.routine.id, input.dedupeKey, cutoff) as Row | undefined;
+      if (existing) {
+        this.db.prepare("UPDATE routines SET deduplicated_count=deduplicated_count+1 WHERE id=?").run(input.routine.id);
+        return { event: this.automationEventFromRow(existing), duplicate: true, rateLimited: false };
+      }
+    }
+    const rateCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
+    const recent = this.db.prepare("SELECT COUNT(*) count FROM automation_events WHERE routine_id=? AND received_at>=? AND status!='rate_limited'").get(input.routine.id, rateCutoff) as Row;
+    const rateLimited = Number(recent.count || 0) >= (input.rateLimit ?? 10);
+    const id = randomUUID(), receivedAt = now(), status: AutomationEventStatus = rateLimited ? "rate_limited" : "queued";
+    const serializedPayload = JSON.stringify(input.payload) || "{}";
+    const payloadJson = serializedPayload.length <= 20_000 ? serializedPayload : JSON.stringify({ truncated: true, preview: serializedPayload.slice(0, 19_000) });
+    this.db.prepare("INSERT INTO automation_events (id,routine_id,routine_name,bot_id,bot_name,source,external_id,dedupe_key,status,replay_of_event_id,payload_summary,payload_json,received_at,attempt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
+      id, input.routine.id, input.routine.name, input.routine.botId, input.routine.botName, input.source, input.externalId, input.dedupeKey, status,
+      input.replayOfEventId || null, input.payloadSummary.slice(0, 500), payloadJson, receivedAt, input.attempt || 1,
+    );
+    this.db.prepare("UPDATE routines SET last_event_at=? WHERE id=?").run(receivedAt, input.routine.id);
+    if (rateLimited) this.createAutomationAlert({ routineId: input.routine.id, eventId: id, kind: "rate_limit", message: `${input.routine.name} received too many events and paused this one safely.` });
+    return { event: this.getAutomationEvent(id)!, duplicate: false, rateLimited };
+  }
+
+  private automationEventFromRow(row: Row): AutomationEvent {
+    const error = row.error ? String(row.error) : null;
+    return {
+      id: String(row.id), routineId: String(row.routine_id), routineName: String(row.routine_name), botId: String(row.bot_id), botName: String(row.bot_name),
+      source: String(row.source) as AutomationEvent["source"], externalId: String(row.external_id), status: String(row.status) as AutomationEventStatus,
+      runId: row.run_id ? String(row.run_id) : null, replayOfEventId: row.replay_of_event_id ? String(row.replay_of_event_id) : null,
+      payloadSummary: String(row.payload_summary), receivedAt: String(row.received_at), finishedAt: row.finished_at ? String(row.finished_at) : null,
+      error, attempt: Number(row.attempt || 1), repairHint: automationRepairHint(error),
+    };
+  }
+
+  getAutomationEvent(id: string): AutomationEvent | null {
+    const row = this.db.prepare("SELECT * FROM automation_events WHERE id=?").get(id) as Row | undefined;
+    return row ? this.automationEventFromRow(row) : null;
+  }
+
+  automationEventPayload(id: string): unknown {
+    const row = this.db.prepare("SELECT payload_json FROM automation_events WHERE id=?").get(id) as Row | undefined;
+    if (!row?.payload_json) return {};
+    try { return JSON.parse(String(row.payload_json)); } catch { return {}; }
+  }
+
+  listAutomationEvents(routineId?: string, limit = 80): AutomationEvent[] {
+    const rows = routineId
+      ? this.db.prepare("SELECT * FROM automation_events WHERE routine_id=? ORDER BY received_at DESC LIMIT ?").all(routineId, Math.max(1, Math.min(limit, 200))) as Row[]
+      : this.db.prepare("SELECT * FROM automation_events ORDER BY received_at DESC LIMIT ?").all(Math.max(1, Math.min(limit, 200))) as Row[];
+    return rows.map((row) => this.automationEventFromRow(row));
+  }
+
+  linkAutomationEvent(eventId: string, runId: string, status: "queued" | "waiting" = "queued") {
+    this.db.prepare("UPDATE automation_events SET run_id=?,status=? WHERE id=?").run(runId, status, eventId);
+  }
+
+  createAutomationAlert(input: { routineId: string; runId?: string | null; eventId?: string | null; kind: AutomationAlert["kind"]; message: string }): AutomationAlert {
+    const routine = this.getRoutine(input.routineId);
+    const existing = this.db.prepare("SELECT * FROM automation_alerts WHERE routine_id=? AND kind=? AND COALESCE(run_id,'')=COALESCE(?,'') AND COALESCE(event_id,'')=COALESCE(?,'') AND resolved_at IS NULL LIMIT 1").get(input.routineId, input.kind, input.runId || null, input.eventId || null) as Row | undefined;
+    if (existing) return this.automationAlertFromRow(existing);
+    const id = randomUUID();
+    this.db.prepare("INSERT INTO automation_alerts (id,routine_id,routine_name,run_id,event_id,kind,message,created_at) VALUES (?,?,?,?,?,?,?,?)").run(
+      id, input.routineId, routine?.name || "Deleted automation", input.runId || null, input.eventId || null, input.kind, input.message.slice(0, 1_000), now(),
+    );
+    return this.listAutomationAlerts().find((alert) => alert.id === id)!;
+  }
+
+  private automationAlertFromRow(row: Row): AutomationAlert {
+    const event = row.event_id ? this.getAutomationEvent(String(row.event_id)) : null;
+    const error = event?.error || String(row.message || "");
+    return {
+      id: String(row.id), routineId: String(row.routine_id), routineName: String(row.routine_name), runId: row.run_id ? String(row.run_id) : null,
+      eventId: row.event_id ? String(row.event_id) : null, kind: String(row.kind) as AutomationAlert["kind"], message: String(row.message),
+      repairHint: automationRepairHint(error), createdAt: String(row.created_at), resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
+    };
+  }
+
+  listAutomationAlerts(includeResolved = false): AutomationAlert[] {
+    const rows = this.db.prepare(`SELECT * FROM automation_alerts ${includeResolved ? "" : "WHERE resolved_at IS NULL"} ORDER BY created_at DESC LIMIT 100`).all() as Row[];
+    return rows.map((row) => this.automationAlertFromRow(row));
+  }
+
+  resolveAutomationAlert(id: string): boolean {
+    return this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE id=? AND resolved_at IS NULL").run(now(), id).changes > 0;
   }
 
   nextWorkflowSlug(botId: string, name: string, excludedId?: string): string {
@@ -1687,6 +1890,6 @@ export class OpenBotDatabase {
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
   }
 }

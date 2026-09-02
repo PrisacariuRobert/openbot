@@ -149,6 +149,7 @@ export interface Run {
   parentRunId: string | null;
   steeredFromRunId: string | null;
   routineId: string | null;
+  automationEventId: string | null;
   consultationPending: boolean;
   attachmentIds: string[];
   prompt: string;
@@ -183,6 +184,17 @@ export interface Approval {
   decidedAt: string | null;
 }
 
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar";
+
+export interface RoutineTriggerConfig {
+  eventName?: string;
+  githubEvent?: string;
+  githubAction?: string;
+  repository?: string;
+  titleContains?: string;
+  minutesBefore?: number;
+}
+
 export interface Routine {
   id: string;
   name: string;
@@ -193,11 +205,54 @@ export interface Routine {
   prompt: string;
   cadence: "hourly" | "daily";
   intervalMinutes: number;
+  triggerType: AutomationTriggerType;
+  triggerConfig: RoutineTriggerConfig;
+  hasWebhookSecret: boolean;
   enabled: boolean;
   nextRunAt: string | null;
   lastRunAt: string | null;
   lastStatus: "never" | "completed" | "failed";
   runCount: number;
+  consecutiveFailures: number;
+  deduplicatedCount: number;
+  lastError: string | null;
+  pausedReason: string | null;
+  lastSuccessAt: string | null;
+  lastEventAt: string | null;
+}
+
+export type AutomationEventStatus = "queued" | "running" | "waiting" | "completed" | "failed" | "cancelled" | "rate_limited";
+
+export interface AutomationEvent {
+  id: string;
+  routineId: string;
+  routineName: string;
+  botId: string;
+  botName: string;
+  source: AutomationTriggerType | "manual";
+  externalId: string;
+  status: AutomationEventStatus;
+  runId: string | null;
+  replayOfEventId: string | null;
+  payloadSummary: string;
+  receivedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+  attempt: number;
+  repairHint: string | null;
+}
+
+export interface AutomationAlert {
+  id: string;
+  routineId: string;
+  routineName: string;
+  runId: string | null;
+  eventId: string | null;
+  kind: "missed" | "failure" | "approval" | "rate_limit";
+  message: string;
+  repairHint: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
 }
 
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
@@ -534,6 +589,8 @@ export interface AppState {
   messages: Message[];
   runs: Run[];
   routines: Routine[];
+  automationEvents: AutomationEvent[];
+  automationAlerts: AutomationAlert[];
   workflows: TaughtWorkflow[];
   approvals: Approval[];
   agentMessages: AgentMessage[];

@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.14 rich-input release.
+Updated September 2, 2026 after the 0.15 dependable-automations release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -16,17 +16,18 @@ Goal: make “read this and give me a finished file” dependable.
 
 Verified with real screenshot understanding, real artifact creation/revision, parser fixtures for every format family, zero production dependency vulnerabilities, and desktop/phone overflow checks. Model-dependent media stays explicit: scanned-document OCR, guaranteed local voice transcription, and fidelity-preserving Office editing remain future work rather than 0.14 claims.
 
-## 0.15 — Dependable automations and event triggers
+## Shipped in 0.15 — Dependable automations and event triggers
 
 Goal: turn routines into something users can trust unattended.
 
-- Add a failure inbox with retry, pause, repair guidance, and last-known-good input
-- Add signed webhook, GitHub, and calendar triggers with narrow filters
-- Enforce rate limits, idempotency, dedupe windows, loop prevention, and replay history
-- Make test runs explicit because they can perform real work
-- Notify on missed schedules, repeated failures, and approval waits
+- Failure and approval attention inbox with retry, pause, plain-language repair guidance, and retained bounded event input
+- Signed generic webhook, native GitHub webhook, schedule, and primary-Google-Calendar triggers with narrow filters
+- Seven-day delivery idempotency, duplicate counters, per-automation burst limits, origin-loop headers, and replay history
+- Explicit test confirmation because tests can perform real work and create approvals
+- Missed-schedule, repeated-failure, and approval-wait notifications, with automatic pause after three consecutive failures
+- Encrypted webhook secrets shown only after creation or rotation, timing-safe HMAC verification, redacted payload storage, and untrusted-event prompt boundaries
 
-Ship only when duplicate events cannot duplicate an action and every failed event can be explained and safely replayed.
+Verified with 66 automated tests, one real signed webhook delivery and duplicate replay, a real Muse Spark 1.2 Free result artifact, and desktop/390×844 UI acceptance. The same delivery ID created exactly one event and one linked run; every retained event exposes an explainable state and supported failures can be replayed. Local schedule and Calendar availability still depends on OpenBot staying awake, and public delivery still needs an owner-managed secure route.
 
 ## 0.16 — Connector platform, then Slack and Notion
 

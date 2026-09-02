@@ -21,6 +21,8 @@ import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
 import { invokedWorkflow } from "../shared/skills.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
+import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
+import type { AutomationEvent, Routine } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
@@ -57,7 +59,8 @@ function accessTokenMatches(value: string | null | undefined) {
   return actual.length === candidate.length && timingSafeEqual(actual, candidate);
 }
 
-app.use(express.json({ limit: "2mb" }));
+type RawBodyRequest = express.Request & { rawBody?: Buffer };
+app.use(express.json({ limit: "2mb", verify: (request, _response, buffer) => { (request as RawBodyRequest).rawBody = Buffer.from(buffer); } }));
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "same-origin");
@@ -86,7 +89,7 @@ app.post("/api/auth/login", (request, response) => {
 });
 
 app.use("/api", (request, response, next) => {
-  if (request.path === "/auth/login" || loopback(request)) return next();
+  if (request.path === "/auth/login" || request.path.startsWith("/automation-hooks/") || loopback(request)) return next();
   const bearer = request.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (accessTokenMatches(bearer) || accessTokenMatches(cookie(request, "openbot_access"))) return next();
   response.status(401).json({ error: "OpenBot needs your private access key." });
@@ -654,24 +657,71 @@ app.post("/api/providers", (request, response) => {
   response.status(201).json(provider);
 });
 
-const routineInput = z.object({ name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000), intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional() });
+const triggerConfigInput = z.object({
+  eventName: z.string().trim().max(100).optional(), githubEvent: z.string().trim().max(80).optional(), githubAction: z.string().trim().max(80).optional(),
+  repository: z.string().trim().max(200).regex(/^(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?$/).optional(), titleContains: z.string().trim().max(160).optional(), minutesBefore: z.number().int().min(0).max(1440).optional(),
+});
+const routineInput = z.object({
+  name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
+  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar"]).optional(), triggerConfig: triggerConfigInput.optional(),
+});
+
+function calendarAutomationReady(botId: string) {
+  const connection = db.getConnector("google-workspace");
+  const connected = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).some((entry) => entry.id === "google-calendar" && entry.connected);
+  return connected && Boolean(db.getBotConnectorAccess(botId, "google-calendar")?.canRead);
+}
+
+type DispatchResult = { event: AutomationEvent; run: ReturnType<OpenBotDatabase["createRun"]> | null; duplicate: boolean; rateLimited: boolean; ignored?: string };
+function dispatchRoutineEvent(routine: Routine, input: { source: AutomationEvent["source"]; payload: unknown; rawBody?: Buffer; headers?: Record<string, string | string[] | undefined>; externalId?: string; replayOfEventId?: string | null; attempt?: number; bypassDedupe?: boolean; skipMatch?: boolean; advanceSchedule?: boolean; rateLimit?: number }): DispatchResult {
+  const headers = input.headers || {}, rawBody = input.rawBody || Buffer.from(JSON.stringify(input.payload)), safePayload = sanitizeAutomationPayload(input.payload);
+  if (!input.skipMatch && ["webhook", "github", "calendar"].includes(routine.triggerType)) {
+    const match = automationEventMatches(routine, safePayload, headers);
+    if (!match.matches) return { event: null as unknown as AutomationEvent, run: null, duplicate: false, rateLimited: false, ignored: match.reason || "This event did not match the saved filter." };
+  }
+  const externalId = input.externalId || automationExternalId(input.source, headers, safePayload, rawBody);
+  const summary = summarizeAutomationPayload(input.source, safePayload);
+  const receipt = db.receiveAutomationEvent({
+    routine, source: input.source, externalId, dedupeKey: `${input.source}:${externalId}`, payloadSummary: summary, payload: safePayload,
+    replayOfEventId: input.replayOfEventId, attempt: input.attempt, bypassDedupe: input.bypassDedupe, rateLimit: input.rateLimit,
+  });
+  if (receipt.duplicate || receipt.rateLimited) {
+    if (receipt.duplicate && input.advanceSchedule === true) db.markRoutineDispatched(routine, true);
+    return { event: receipt.event, run: null, duplicate: receipt.duplicate, rateLimited: receipt.rateLimited };
+  }
+  const prompt = automationPrompt(routine, input.source, safePayload, summary), reason = approvalReason(routine.prompt);
+  const run = db.createRun({ threadId: routine.threadId, botId: routine.botId, prompt, status: reason ? "awaiting_approval" : "queued", approvalReason: reason, routineId: routine.id, automationEventId: receipt.event.id });
+  db.linkAutomationEvent(receipt.event.id, run.id, reason ? "waiting" : "queued");
+  if (reason) db.createAutomationAlert({ routineId: routine.id, runId: run.id, eventId: receipt.event.id, kind: "approval", message: `${routine.name} is waiting for your approval before it starts.` });
+  db.markRoutineDispatched(routine, input.advanceSchedule === true);
+  db.addMessage({ threadId: routine.threadId, senderType: "system", senderId: null, body: `${routine.name} started for ${routine.botName}${input.source === "manual" ? " as a test run" : ` from ${input.source}`}.`, runId: run.id });
+  broadcast();
+  return { event: receipt.event, run, duplicate: false, rateLimited: false };
+}
+
 app.post("/api/routines", (request, response) => {
   const parsed = routineInput.safeParse(request.body);
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getThread(parsed.data.threadId)) return response.status(400).json({ error: "That routine needs a teammate, conversation and instruction." });
-  const routine = db.createRoutine(parsed.data);
+  if (parsed.data.triggerType === "calendar" && parsed.data.enabled !== false && !calendarAutomationReady(parsed.data.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
+  const needsSecret = parsed.data.triggerType === "webhook" || parsed.data.triggerType === "github";
+  const webhookSecret = needsSecret ? randomBytes(32).toString("base64url") : null;
+  const routine = db.createRoutine({ ...parsed.data, webhookSecret });
   broadcast();
-  response.status(201).json(routine);
+  response.status(201).json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
 });
 app.patch("/api/routines/:id", (request, response) => {
   const current = db.getRoutine(request.params.id);
   if (!current) return response.status(404).json({ error: "Routine not found." });
   const parsed = routineInput.partial().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Check the routine name, teammate, instructions and repeat time." });
-  const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, enabled: parsed.data.enabled ?? current.enabled };
+  const nextTriggerType = parsed.data.triggerType ?? current.triggerType;
+  const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, enabled: parsed.data.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: parsed.data.triggerConfig ?? current.triggerConfig };
   if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
-  const routine = db.updateRoutine(request.params.id, next);
+  if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
+  const needsSecret = nextTriggerType === "webhook" || nextTriggerType === "github", webhookSecret = needsSecret && !current.hasWebhookSecret ? randomBytes(32).toString("base64url") : null;
+  const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret });
   if (!routine) return response.status(404).json({ error: "Routine not found." });
-  broadcast(); response.json(routine);
+  broadcast(); response.json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
 });
 app.delete("/api/routines/:id", (request, response) => {
   if (!db.deleteRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
@@ -681,11 +731,56 @@ app.get("/api/routines/:id/runs", (request, response) => {
   if (!db.getRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
   response.json(db.listRoutineRuns(request.params.id));
 });
+app.get("/api/routines/:id/events", (request, response) => {
+  if (!db.getRoutine(request.params.id)) return response.status(404).json({ error: "Automation not found." });
+  response.json(db.listAutomationEvents(request.params.id));
+});
 app.post("/api/routines/:id/run", (request, response) => {
   const routine = db.getRoutine(request.params.id);
   if (!routine) return response.status(404).json({ error: "Routine not found." });
-  const run = db.createRun({ threadId: routine.threadId, botId: routine.botId, prompt: routine.prompt, status: "queued", routineId: routine.id });
-  db.markRoutineRan(routine); broadcast(); response.status(202).json(run);
+  const parsed = z.object({ confirmed: z.literal(true) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Confirm the test run first—it can perform the routine’s real actions." });
+  const result = dispatchRoutineEvent(routine, { source: "manual", payload: { test: true, startedAt: new Date().toISOString() }, skipMatch: true, bypassDedupe: true, rateLimit: Number.MAX_SAFE_INTEGER });
+  response.status(202).json(result);
+});
+
+app.post("/api/routines/:id/rotate-secret", (request, response) => {
+  const routine = db.getRoutine(request.params.id);
+  if (!routine || !["webhook", "github"].includes(routine.triggerType)) return response.status(404).json({ error: "This automation does not use a signing secret." });
+  const secret = randomBytes(32).toString("base64url");
+  const updated = db.updateRoutine(routine.id, { ...routine, webhookSecret: secret });
+  broadcast();
+  response.json({ ...updated, webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret } });
+});
+
+app.post("/api/automation-hooks/:id", (request, response) => {
+  const routine = db.getRoutine(request.params.id);
+  if (!routine || !routine.enabled || !["webhook", "github"].includes(routine.triggerType)) return response.status(404).json({ error: "This automation hook is not available." });
+  const origin = request.header("x-openbot-origin");
+  if (origin === routine.id) return response.status(409).json({ error: "OpenBot stopped an automation loop." });
+  const secret = db.routineWebhookSecret(routine.id), rawBody = (request as RawBodyRequest).rawBody || Buffer.from(JSON.stringify(request.body));
+  const signature = routine.triggerType === "github" ? request.header("x-hub-signature-256") : request.header("x-openbot-signature");
+  if (!secret || !signature || !verifyAutomationSignature(secret, rawBody, signature)) return response.status(401).json({ error: "This event did not have a valid signature." });
+  const result = dispatchRoutineEvent(routine, { source: routine.triggerType, payload: request.body, rawBody, headers: request.headers });
+  if (result.ignored) return response.status(202).json({ accepted: false, ignored: result.ignored });
+  if (result.rateLimited) return response.status(429).json({ accepted: false, eventId: result.event.id, error: "This automation received too many events. Nothing was started." });
+  response.status(result.duplicate ? 200 : 202).json({ accepted: !result.duplicate, duplicate: result.duplicate, eventId: result.event.id, runId: result.run?.id || null });
+});
+
+app.post("/api/automation-events/:id/replay", (request, response) => {
+  const original = db.getAutomationEvent(request.params.id);
+  if (!original) return response.status(404).json({ error: "That automation event is no longer available." });
+  if (!["failed", "cancelled", "rate_limited"].includes(original.status)) return response.status(409).json({ error: "Only stopped or failed events need replaying." });
+  const routine = db.getRoutine(original.routineId);
+  if (!routine) return response.status(404).json({ error: "The automation was deleted, so this event cannot be replayed." });
+  const payload = db.automationEventPayload(original.id);
+  const result = dispatchRoutineEvent(routine, { source: original.source, payload, externalId: `replay:${original.id}:${randomBytes(8).toString("hex")}`, replayOfEventId: original.id, attempt: original.attempt + 1, bypassDedupe: true, skipMatch: true, rateLimit: Number.MAX_SAFE_INTEGER });
+  response.status(202).json(result);
+});
+
+app.post("/api/automation-alerts/:id/resolve", (request, response) => {
+  if (!db.resolveAutomationAlert(request.params.id)) return response.status(404).json({ error: "That alert is already cleared." });
+  broadcast(); response.json({ ok: true });
 });
 
 function safeWorkspacePath(botId: string, relativePath = ""): string | null {
@@ -1072,12 +1167,42 @@ app.post("/api/internal/tools", async (request, response) => {
 setInterval(() => {
   let changed = false;
   for (const routine of db.dueRoutines()) {
-    db.addMessage({ threadId: routine.threadId, senderType: "system", senderId: null, body: `Routine “${routine.name}” started for ${routine.botName}.` });
-    db.createRun({ threadId: routine.threadId, botId: routine.botId, prompt: routine.prompt, status: "queued", routineId: routine.id });
-    db.markRoutineRan(routine); changed = true;
+    const scheduledFor = routine.nextRunAt || new Date().toISOString();
+    const delayedMs = Date.now() - new Date(scheduledFor).getTime();
+    if (delayedMs > 2 * 60_000) db.createAutomationAlert({ routineId: routine.id, kind: "missed", message: `${routine.name} started ${Math.max(2, Math.round(delayedMs / 60_000))} minutes late after OpenBot came back online.` });
+    dispatchRoutineEvent(routine, { source: "schedule", payload: { scheduledFor }, externalId: `schedule:${scheduledFor}`, skipMatch: true, advanceSchedule: true });
+    changed = true;
   }
   if (changed) broadcast();
 }, 15_000);
+
+let calendarPollRunning = false;
+setInterval(async () => {
+  if (calendarPollRunning) return;
+  const routines = db.listCalendarRoutines();
+  if (!routines.length) return;
+  calendarPollRunning = true;
+  try {
+    const unavailable = routines.filter((routine) => !calendarAutomationReady(routine.botId));
+    for (const routine of unavailable) db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} cannot check Calendar until it is connected and ${routine.botName} has read access.` });
+    const readyRoutines = routines.filter((routine) => calendarAutomationReady(routine.botId));
+    if (!readyRoutines.length) { broadcast(); return; }
+    const events = await googleWorkspace.calendarAgenda(2, 40);
+    const timestamp = Date.now();
+    for (const routine of readyRoutines) {
+      const minutesBefore = Math.max(0, Math.min(1_440, Number(routine.triggerConfig.minutesBefore ?? 15)));
+      for (const event of events) {
+        const untilStart = new Date(event.start).getTime() - timestamp;
+        if (!Number.isFinite(untilStart) || untilStart < 0 || untilStart > minutesBefore * 60_000) continue;
+        dispatchRoutineEvent(routine, { source: "calendar", payload: event, externalId: `${event.id}:${event.start}`, headers: {}, rateLimit: 20 });
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    for (const routine of routines) db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} could not check Calendar: ${message}` });
+    broadcast();
+  } finally { calendarPollRunning = false; }
+}, 30_000);
 
 const distDir = path.join(rootDir, "dist");
 if (process.env.NODE_ENV === "production" && existsSync(distDir)) {

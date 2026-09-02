@@ -1,16 +1,16 @@
-# OpenBot 0.14.0
+# OpenBot 0.15.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.14.0
+## What's new in 0.15.0
 
-- Uploads are now understood instead of merely stored: OpenBot extracts bounded context from PDF, Word, Excel, CSV/TSV, PowerPoint, text, JSON, YAML, notebooks, email, and common source files.
-- Images, PDFs, audio, and video are passed to compatible OpenCode models as original media; local image, audio, and video metadata makes every card useful even when the chosen model cannot interpret that medium.
-- File cards now show the real file kind, safe summary, contained image/PDF preview, extracted-text preview, download action, and friendly fallback when a format cannot be prepared.
-- Files created by teammates become reviewable result cards automatically when linked in the final answer. Updating the same workspace file creates a numbered revision while preserving the earlier result.
-- File type detection no longer trusts the browser label alone, parser output is size-bounded, Office archive expansion is capped, and extracted text is marked as untrusted data before it reaches a model.
+- Automations can now start from a schedule, a signed generic webhook, a native GitHub webhook, or an upcoming Google Calendar event with narrow event, action, repository, and title filters.
+- Every incoming event receives a durable receipt linked to its run. Repeated delivery IDs are stopped before a second action, bursts are rate-limited, and failed events can be safely replayed from retained bounded input.
+- A new attention inbox explains approval waits, missed schedules, and failures in plain language. Three consecutive failures automatically pause the automation instead of repeating a broken action indefinitely.
+- Webhook secrets are encrypted locally, shown only when created or rotated, and verified with timing-safe HMAC-SHA256. Payload secrets are redacted and all event content is marked as untrusted before reaching a model.
+- The redesigned Automations screen keeps setup, health, activity, retry, testing, and repair guidance understandable and contained at both desktop and 390-pixel phone widths.
 
 ## What is included
 
@@ -33,7 +33,8 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - A persistent, constrained Docker computer for every bot
 - A persistent Chrome profile for every bot with open, read, click, type, and screenshot tools
 - Visible teach mode that turns a demonstrated browser task into an editable OpenCode and Claude Code skill, with chat discovery and management
-- Five-minute, hourly, and daily routines with editing, pause/resume, manual retry, run history, result links, and safe deletion
+- Dependable automations with five-minute/hourly/daily schedules, signed generic and GitHub webhooks, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
+- Duplicate-event protection, rate limits, loop headers, bounded retained inputs, visible failure guidance, approval-wait alerts, missed-schedule notices, and automatic pausing after three consecutive failures
 - Persistent approvals for destructive, publishing, communication, purchasing, credential, and system actions
 - Provider instances owned by the local user and explicitly assigned per bot
 - Provider-aware connections for OpenCode, Claude, ChatGPT/OpenAI, GitHub Copilot, GitLab Duo, and SuperGrok/xAI
@@ -127,6 +128,14 @@ Web work uses a separate persistent Chrome profile per bot. Bot navigation rejec
 
 OpenBot does not silently fall back to running terminal commands on the host when Docker is unavailable.
 
+## Automations
+
+Open **Automations** to create scheduled work or choose a Calendar, GitHub, or generic webhook trigger. Calendar triggers poll the connected primary calendar while OpenBot is running and require Calendar access for the selected teammate. GitHub and generic webhook cards show a signed endpoint plus a secret once; configure the sender with that secret, then rotate it from OpenBot whenever necessary.
+
+Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBot-Event-Id` for exact duplicate protection. GitHub hooks use GitHub's standard `X-Hub-Signature-256`, `X-GitHub-Delivery`, and `X-GitHub-Event` headers. An endpoint must be reachable by the sender, so a webhook from the public internet needs a trusted HTTPS tunnel or reverse proxy; never expose OpenBot's plain local HTTP port directly.
+
+Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.15 does not claim an always-on hosted scheduler.
+
 ## Remote and phone access
 
 The default service binds only to `127.0.0.1`. To build and expose it to a trusted private network:
@@ -160,7 +169,7 @@ Runtime data is excluded from Git:
 
 ## Architecture
 
-The React client receives live state over server-sent events. The local Express service owns scheduling, approvals, usage, provider bindings, connectors, file ingestion, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, routines, memories, attachment analysis and revisions, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, and approval tools.
+The React client receives live state over server-sent events. The local Express service owns scheduling, event dispatch, approvals, usage, provider bindings, connectors, file ingestion, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, automation definitions, event receipts, alerts, memories, attachment analysis and revisions, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, automation, and approval tools.
 
 The design borrows the strongest ideas from [Hermes Agent's architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture), [agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop), [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode), and [security model](https://hermes-agent.nousresearch.com/docs/user-guide/security): isolated profiles, observable execution, parallel tools, interruptible work, stable prompts, and layered boundaries.
 
@@ -176,7 +185,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. GitHub notifications, issue search, approval-gated issue creation, cloning, and approval-gated pull-request publishing are included through the official GitHub CLI; repository-event automation is not. Gmail, Google Drive, and Google Calendar are bundled; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Event-triggered routines, a native phone app, and an always-on hosted service are also future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. GitHub notifications, issue search, approval-gated issue creation, cloning, approval-gated pull-request publishing, and signed repository-event automation are included; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. A native phone app and an always-on hosted service remain future work.
 
 ## License
 

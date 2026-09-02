@@ -1,6 +1,6 @@
-# OpenBot 0.14.0 Launch Readiness
+# OpenBot 0.15.0 Launch Readiness
 
-OpenBot 0.14.0 is ready for an open-source local-first beta launch. Rich bounded file understanding and versioned result cards now sit beside one-voice teammate consultations, chat-native skills, inspectable routines, GitHub productivity, the completion engine, natural mid-job steering, and the review-first coding harness. It is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, guaranteed transcription/OCR, fidelity-preserving Office editing, or wider plugin catalog.
+OpenBot 0.15.0 is ready for an open-source local-first beta launch. Dependable scheduled and event-driven automations now sit beside rich bounded files, versioned results, one-voice teammate consultation, chat-native skills, GitHub productivity, natural mid-job steering, and the review-first coding harness. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, native iOS client, guaranteed transcription/OCR, fidelity-preserving Office editing, or wider plugin catalog.
 
 ## What is launch-ready
 
@@ -19,7 +19,8 @@ OpenBot 0.14.0 is ready for an open-source local-first beta launch. Rich bounded
 - One-click release-managed Google OAuth or a self-hosted credentials-file flow, encrypted local tokens, per-teammate app access, previews, and a private activity trail
 - Gmail search/read and approval-only sending, Drive search/document reading, and Calendar agenda reading
 - Official GitHub CLI connection with notifications, issue search, per-teammate read/create permissions, and approval-only issue creation
-- Routine editing, pause/resume, deletion, saved run history, result links, and manual retry
+- Scheduled, Calendar, signed GitHub, and signed generic-webhook automations with narrow filters, explicit tests, pause/resume/edit/delete, encrypted rotating secrets, event receipts, linked results, and safe replay
+- Failure and approval attention inbox, missed-schedule notices, seven-day event deduplication, burst limits, loop headers, bounded redacted input, and automatic pause after three consecutive failures
 - Studio-wide visible Mac-file access, protected hidden/system paths, and approval-only organization without deletion or overwriting
 - Safe Markdown messages and connector cards that keep status and capability text inside their borders
 - Durable job outcomes, deliverables, checklists, approval boundaries, and evidence-based final receipts across both supported agent runtimes
@@ -36,7 +37,8 @@ OpenBot 0.14.0 is ready for an open-source local-first beta launch. Rich bounded
 | Email authority | Reading and sending are separate per teammate; every send shows a durable one-time approval before execution. |
 | App least privilege | Gmail, Drive, and Calendar can be enabled independently for each teammate even though they share one Google account. |
 | GitHub authority | Reading activity and creating issues are separate per teammate; every issue creation shows a durable one-time approval. |
-| Reusable work | Learned skills stay local and reviewable, while routine edits and retries preserve their past run history. |
+| Reusable work | Learned skills stay local and reviewable, while automation edits, event receipts, retries, and results preserve their history. |
+| Automation safety | Signed event delivery, duplicate prevention before run creation, failure auto-pause, explicit tests, and explainable replay make unattended work inspectable. |
 | Cost control | Per-bot weekly token limits and provider-reported token/cache/cost data are visible. |
 | Completion trust | A claimed success is visibly distinguished from a checked result, and the supporting steps and checks can be inspected. |
 | Project authority | Each teammate gets explicit per-project read, edit, and test rights; no broad host filesystem permission is needed for coding. |
@@ -54,18 +56,19 @@ OpenBot 0.14.0 is ready for an open-source local-first beta launch. Rich bounded
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
 | Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
-| Event-triggered routines | The current release provides reliable interval operations and history, not Slack/GitHub/webhook triggers or failure alerts. | Add signed webhook triggers with filters, rate limits, dedupe keys, replay history, and visible failure recovery. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.14 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Hosted event ingress and execution | Schedule and Calendar triggers run only while the Mac and OpenBot are awake. Public webhook delivery requires an owner-managed HTTPS route to the local endpoint. | Add an optional always-on runner with encrypted leases, recovery, health checks, and hosted ingress without weakening local mode. |
+| Broader event sources | Signed GitHub and generic hooks plus primary-Calendar polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.15 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
 | Reply/reaction ergonomics | Active non-code work can now be redirected naturally, but messages still lack explicit reply references and reactions. | Add lightweight reply context and reactions without turning the chat into a project-management interface. |
 
 ## Release decision
 
-Ship 0.14.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors, universal media understanding, OCR, or native Office editing work. The strongest launch story is: private persistent AI teammates that understand useful files, return versioned results, consult one another behind one calm combined answer, reuse learned skills, run inspectable routines, plan, code, review, publish, use Google and GitHub context, accept new direction while working, and verify work while the owner keeps control of projects, models, and sensitive actions.
+Ship 0.15.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as an always-on hosted assistant or imply that roadmap connectors, universal media understanding, OCR, or native Office editing work. The strongest launch story is: private persistent AI teammates that understand useful files, consult one another behind one calm answer, react to dependable signed events, recover from automation failures, plan, code, review, publish, and verify work while the owner keeps control of projects, models, and sensitive actions.
 
 ## Verified acceptance criteria
 
-- Automated tests: 61 passing
+- Automated tests: 66 passing
 - Type safety: passing
 - Production build: passing
 - Real model: DeepSeek V4 Flash Vision interpreted the supplied screenshot through the new media path; DeepSeek V4 Flash then created, linked, verified, revised, and re-linked one result as versions 1 and 2
@@ -76,8 +79,10 @@ Ship 0.14.0 as a **local-first beta**, with the limitations above visible in the
 - Idle state after verification: zero active runs and zero pending approvals
 - Google integration: mocked OAuth/PKCE, encrypted storage, Gmail, Drive, Calendar, safe message construction, tool exposure, and per-bot access passing; real account consent intentionally left to the owner
 - GitHub integration: official CLI account health, live notification preview, live issue search, response normalization, URL safety, per-teammate read/create separation, approval-gated creation, and connector activity records passing. A real DeepSeek V4 Flash teammate read the newest notification with read-only access and returned its title/repository; no test issue was created and all temporary test state was removed.
-- Skills and routines: slash parsing, unique skill slugs, cross-runtime skill files, management actions, routine edits, deletion with preserved history, result links, and retry controls passing
-- 0.14 UI: rich image card, friendly metadata, accurate icon, preview/download actions, refresh persistence, and responsive containment inspected at desktop and 390×844
+- Skills and automations: slash parsing, unique skill slugs, cross-runtime skill files, trigger parsing, signed webhook verification, filters, encrypted secrets, event deduplication, rate limiting, lifecycle linkage, three-failure pausing, alerts, replay input, and preserved history passing
+- Real automation: one signed event was accepted, ran with Muse Spark 1.2 Free, produced `build-event-confirmation.md`, and a repeated delivery returned the original event without creating another run
+- 0.15 UI: automation hero, attention inbox, trigger form, health/status cards, one-time secret setup, receipts, repair/replay actions, and GitHub fields inspected at desktop and 390×844 with zero horizontal overflow or console errors
+- Automation security smoke: invalid/valid signatures, narrow matching, secret redaction, payload bounds, dedupe-before-dispatch, and three-failure pause are covered; the manual workflow confirmed one event, one run, and one duplicate stopped
 - Mac files: traversal, hidden/system paths, aliases, bounded reads, no-overwrite organization, database permission, tool exposure, and a real Desktop-listing run passing
 - Code projects: a real DeepSeek V4 Flash teammate created a separate branch, made one exact source edit, reviewed the diff, passed `npm test` in the no-network container, committed only the named file, reopened it, left the tree clean, and recorded five successful checks; the temporary grant was removed and the disposable fixture was moved to Trash afterward
 - Code projects UI: empty, GitHub clone, connected, and expanded review states verified at 1440×900 and 390×844; the document, sheet, fields, and review card had no horizontal overflow

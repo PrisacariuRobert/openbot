@@ -87,6 +87,64 @@ test("edits, pauses, retries, inspects, and deletes a routine without losing its
   }
 });
 
+test("deduplicates automation events, retains replay input, and pauses repeated failures", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-automation-reliability-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const routine = db.createRoutine({
+      name: "Issue triage", botId: "nova", threadId: "bot-nova", prompt: "Triage the issue.", intervalMinutes: 1440,
+      triggerType: "github", triggerConfig: { githubEvent: "issues", githubAction: "opened", repository: "acme/app" }, webhookSecret: "hook-secret",
+    });
+    assert.equal(routine.triggerType, "github");
+    assert.deepEqual(routine.triggerConfig, { githubEvent: "issues", githubAction: "opened", repository: "acme/app" });
+    assert.equal(routine.hasWebhookSecret, true);
+    assert.equal(db.routineWebhookSecret(routine.id), "hook-secret");
+
+    const payload = { action: "opened", repository: { full_name: "acme/app" }, issue: { number: 42 } };
+    const first = db.receiveAutomationEvent({ routine, source: "github", externalId: "delivery-1", dedupeKey: "github:delivery-1", payloadSummary: "acme/app · #42", payload });
+    const duplicate = db.receiveAutomationEvent({ routine, source: "github", externalId: "delivery-1", dedupeKey: "github:delivery-1", payloadSummary: "acme/app · #42", payload });
+    assert.equal(first.duplicate, false);
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(duplicate.event.id, first.event.id);
+    assert.deepEqual(db.automationEventPayload(first.event.id), payload);
+    assert.equal(db.getRoutine(routine.id)?.deduplicatedCount, 1);
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const receipt = attempt === 1 ? first : db.receiveAutomationEvent({ routine: db.getRoutine(routine.id)!, source: "github", externalId: `delivery-${attempt}`, dedupeKey: `github:delivery-${attempt}`, payloadSummary: `attempt ${attempt}`, payload: { attempt } });
+      const run = db.createRun({ threadId: routine.threadId, botId: routine.botId, prompt: routine.prompt, status: "queued", routineId: routine.id, automationEventId: receipt.event.id });
+      db.linkAutomationEvent(receipt.event.id, run.id);
+      db.updateRun(run.id, { status: "running", startedAt: new Date().toISOString() });
+      db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: `temporary failure ${attempt}` });
+    }
+    const paused = db.getRoutine(routine.id)!;
+    assert.equal(paused.enabled, false);
+    assert.equal(paused.consecutiveFailures, 3);
+    assert.match(paused.pausedReason || "", /three consecutive failures/);
+    assert.equal(db.listAutomationEvents(routine.id).filter((event) => event.status === "failed").length, 3);
+    assert.ok(db.listAutomationAlerts().some((alert) => alert.kind === "failure" && /paused/i.test(alert.message)));
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rate limits event floods without starting extra work", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-automation-rate-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const routine = db.createRoutine({ name: "Webhook pulse", botId: "scout", threadId: "bot-scout", prompt: "Check the pulse.", intervalMinutes: 60, triggerType: "webhook", webhookSecret: "secret" });
+    const accepted = db.receiveAutomationEvent({ routine, source: "webhook", externalId: "one", dedupeKey: "webhook:one", payloadSummary: "one", payload: {}, rateLimit: 1 });
+    const limited = db.receiveAutomationEvent({ routine, source: "webhook", externalId: "two", dedupeKey: "webhook:two", payloadSummary: "two", payload: {}, rateLimit: 1 });
+    assert.equal(accepted.rateLimited, false);
+    assert.equal(limited.rateLimited, true);
+    assert.equal(limited.event.status, "rate_limited");
+    assert.ok(db.listAutomationAlerts().some((alert) => alert.kind === "rate_limit"));
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("keeps learned skills globally discoverable with unique slash commands", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-skills-test-"));
   try {

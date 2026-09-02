@@ -15,12 +15,13 @@ const unitMinutes: Record<string, number> = {
 
 export function parseRoutineIntent(input: string): RoutineIntent | null {
   const text = input.trim();
-  const match = /\bevery\s+(\d+)\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\b/i.exec(text);
+  const match = /\b(?:every\s+(?:(\d+)\s*)?(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|week|weeks)|hourly|daily|weekly)\b/i.exec(text);
   if (!match || match.index === undefined) return null;
   const before = text.slice(0, match.index).trim();
   const explicitCommand = match.index === 0 || /\b(set|create|schedule|run|do|remind|text|message|post|check)\b/i.test(before);
   if (!explicitCommand) return null;
-  const intervalMinutes = Number(match[1]) * unitMinutes[match[2]!.toLowerCase()]!;
+  const keyword = match[0].toLowerCase();
+  const intervalMinutes = keyword === "hourly" ? 60 : keyword === "daily" ? 1440 : keyword === "weekly" ? 10_080 : Number(match[1] || 1) * (match[2]!.toLowerCase().startsWith("week") ? 10_080 : unitMinutes[match[2]!.toLowerCase()]!);
   if (!Number.isInteger(intervalMinutes) || intervalMinutes < 5 || intervalMinutes > 43_200) return null;
 
   let task = `${before} ${text.slice(match.index + match[0].length)}`.replace(/\s+/g, " ").trim();
@@ -46,6 +47,6 @@ export function parseRoutineIntent(input: string): RoutineIntent | null {
     intervalMinutes,
     name: `${shortTask.charAt(0).toUpperCase()}${shortTask.slice(1)}`,
     prompt,
-    confirmation: `I’ll ${localText ? `post “${shortTask}” here` : friendlyTask} ${schedule.toLowerCase()}. You can pause it anytime in Routines.`,
+    confirmation: `I’ll ${localText ? `post “${shortTask}” here` : friendlyTask} ${schedule.toLowerCase()}. You can test, pause or change it anytime in Automations.`,
   };
 }
