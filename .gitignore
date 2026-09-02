@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.openbot/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+coverage/

@@ -1,0 +1,465 @@
+export type BotStatus = "ready" | "working" | "waiting" | "offline" | "failed" | "celebrating";
+export type MascotKind = "nova" | "blob" | "sprout" | "orbit" | "pebble" | "sunny";
+export type RunStatus =
+  | "awaiting_approval"
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type TaskStage = "queued" | "planning" | "working" | "checking" | "waiting" | "done" | "blocked";
+export type TaskStepStatus = "pending" | "active" | "completed" | "blocked" | "skipped";
+export type TaskVerificationStatus = "pending" | "passed" | "partial" | "blocked";
+
+export interface TaskStep {
+  id: number;
+  title: string;
+  status: TaskStepStatus;
+  detail: string | null;
+}
+
+export interface TaskVerificationCheck {
+  label: string;
+  passed: boolean;
+}
+
+export interface TaskContract {
+  tracked: boolean;
+  goal: string;
+  deliverable: string;
+  approvalBoundary: string | null;
+  requiredApps: string[];
+  stage: TaskStage;
+  steps: TaskStep[];
+  verificationStatus: TaskVerificationStatus;
+  verificationSummary: string | null;
+  verificationChecks: TaskVerificationCheck[];
+}
+
+export interface Bot {
+  id: string;
+  ownerId: string;
+  providerInstanceId: string | null;
+  name: string;
+  emoji: string;
+  mascot: MascotKind;
+  color: string;
+  role: string;
+  instructions: string;
+  model: string;
+  status: BotStatus;
+  computerEnabled: boolean;
+  browserEnabled: boolean;
+  macAccessEnabled: boolean;
+  weeklyTokenBudget: number;
+  tokensUsedThisWeek: number;
+  createdAt: string;
+  lastActiveAt: string | null;
+  threadId: string;
+}
+
+export interface Thread {
+  id: string;
+  title: string;
+  kind: "direct" | "room";
+  botId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  unreadCount: number;
+}
+
+export interface Message {
+  id: string;
+  threadId: string;
+  senderType: "user" | "bot" | "system";
+  senderId: string | null;
+  senderName: string;
+  senderEmoji: string | null;
+  senderMascot: MascotKind | null;
+  senderColor: string | null;
+  body: string;
+  createdAt: string;
+  runId: string | null;
+  attachments: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  threadId: string;
+  messageId: string | null;
+  name: string;
+  mime: string;
+  size: number;
+  url: string;
+  createdAt: string;
+}
+
+export interface Activity {
+  id: string;
+  runId: string;
+  botId: string;
+  kind: "thought" | "tool" | "file" | "status" | "error" | "handoff" | "message";
+  label: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+export type AgentMessageKind = "message" | "question" | "finding" | "handoff";
+
+export interface AgentMessage {
+  id: string;
+  threadId: string;
+  fromBotId: string;
+  fromBotName: string;
+  fromBotMascot: MascotKind;
+  fromBotColor: string;
+  toBotId: string;
+  toBotName: string;
+  toBotMascot: MascotKind;
+  toBotColor: string;
+  body: string;
+  kind: AgentMessageKind;
+  expectsReply: boolean;
+  runId: string;
+  replyToId: string | null;
+  hopCount: number;
+  createdAt: string;
+}
+
+export interface Run {
+  id: string;
+  threadId: string;
+  botId: string;
+  botName: string;
+  botEmoji: string;
+  botMascot: MascotKind;
+  botColor: string;
+  parentRunId: string | null;
+  prompt: string;
+  status: RunStatus;
+  approvalReason: string | null;
+  approvalId: string | null;
+  partialText: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  progressAt: string | null;
+  summary: string | null;
+  error: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cost: number;
+  activities: Activity[];
+  task: TaskContract;
+}
+
+export interface Approval {
+  id: string;
+  runId: string;
+  botId: string;
+  botName: string;
+  kind: "prompt" | "terminal" | "browser" | "external";
+  reason: string;
+  actionLabel: string;
+  status: "pending" | "approved" | "denied";
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  botId: string;
+  botName: string;
+  botEmoji: string;
+  threadId: string;
+  prompt: string;
+  cadence: "hourly" | "daily";
+  intervalMinutes: number;
+  enabled: boolean;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastStatus: "never" | "completed" | "failed";
+  runCount: number;
+}
+
+export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
+export type ProviderRuntime = "opencode" | "claude_code";
+
+export interface ProviderInstance {
+  id: string;
+  ownerId: string;
+  provider: ProviderKind;
+  name: string;
+  authMode: "cli" | "subscription" | "api_key";
+  runtime: ProviderRuntime;
+  envName: string | null;
+  hasSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+  connected?: boolean;
+  models?: string[];
+  defaultModel?: string;
+  note?: string;
+}
+
+export interface ProviderCatalogEntry {
+  id: Exclude<ProviderKind, "custom">;
+  name: string;
+  shortName: string;
+  description: string;
+  badge: string;
+  connected: boolean;
+  installed: boolean;
+  canConnect: boolean;
+  connectionId: string | null;
+  models: string[];
+  note: string;
+}
+
+export interface ProviderLoginAttempt {
+  id: string;
+  providerId: string;
+  status: "waiting" | "connected" | "failed";
+  url: string | null;
+  callbackMode: "auto" | "code" | null;
+  instructions: string;
+  error: string | null;
+}
+
+export interface ProviderStatus {
+  id: "opencode";
+  name: string;
+  connected: boolean;
+  cliAvailable: boolean;
+  version: string | null;
+  defaultModel: string;
+  models: string[];
+  note: string;
+  instances: ProviderInstance[];
+  catalog: ProviderCatalogEntry[];
+  loginAttempts: ProviderLoginAttempt[];
+}
+
+export type ConnectorKind = "google_workspace";
+export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github";
+export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
+
+export interface ConnectorConnection {
+  id: string;
+  ownerId: string;
+  kind: ConnectorKind;
+  name: string;
+  configured: boolean;
+  connected: boolean;
+  accountEmail: string | null;
+  scopes: string[];
+  status: "unconfigured" | "configured" | "connected" | "needs_attention";
+  lastError: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BotConnectorAccess {
+  botId: string;
+  connectorId: string;
+  service: GoogleConnectorService;
+  canRead: boolean;
+  canSend: boolean;
+  updatedAt: string;
+}
+
+export interface ConnectorEvent {
+  id: string;
+  connectorId: string;
+  botId: string | null;
+  botName: string | null;
+  action: string;
+  status: "completed" | "failed" | "waiting";
+  summary: string;
+  createdAt: string;
+}
+
+export interface ConnectorCatalogEntry {
+  id: ConnectorServiceId;
+  name: string;
+  description: string;
+  badge: string;
+  availability: "live" | "next";
+  connected: boolean;
+  capabilities: string[];
+}
+
+export interface GoogleApiRecovery {
+  service: "gmail" | "google-drive" | "google-calendar";
+  serviceName: string;
+  projectId: string;
+  enableUrl: string;
+}
+
+export interface ConnectorStatus {
+  connection: ConnectorConnection | null;
+  callbackUrl: string;
+  managedGoogleClient: boolean;
+  oauthInProgress: boolean;
+  googleProjectId: string | null;
+  googleApiRecovery: GoogleApiRecovery | null;
+  googleApiRecoveries: GoogleApiRecovery[];
+  catalog: ConnectorCatalogEntry[];
+  access: BotConnectorAccess[];
+  events: ConnectorEvent[];
+}
+
+export interface GmailMessageSummary {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  unread: boolean;
+}
+
+export interface GmailMessageDetail extends GmailMessageSummary {
+  body: string;
+}
+
+export interface DriveFileSummary {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedTime: string;
+  webViewLink: string;
+  size: number | null;
+}
+
+export interface DriveFileDetail extends DriveFileSummary {
+  content: string;
+}
+
+export interface CalendarEventSummary {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  location: string;
+  description: string;
+  webLink: string;
+  attendeeCount: number;
+}
+
+export interface UsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  cost: number;
+  completedRuns: number;
+  activeRuns: number;
+}
+
+export interface ComputerStatus {
+  botId: string;
+  container: "ready" | "stopped" | "unavailable";
+  browser: "ready" | "stopped" | "unavailable";
+  currentUrl: string | null;
+  title: string | null;
+  screenshot: string | null;
+  updatedAt: string;
+}
+
+export interface TaughtWorkflow {
+  id: string;
+  botId: string;
+  name: string;
+  startUrl: string;
+  stepCount: number;
+  createdAt: string;
+}
+
+export interface CodeProjectAccess {
+  botId: string;
+  projectId: string;
+  canRead: boolean;
+  canWrite: boolean;
+  canRun: boolean;
+  updatedAt: string;
+}
+
+export interface CodeProject {
+  id: string;
+  ownerId: string;
+  name: string;
+  rootPath: string;
+  gitRepository: boolean;
+  projectKind: string;
+  remoteUrl: string | null;
+  defaultBranch: string | null;
+  managedClone: boolean;
+  access: CodeProjectAccess[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodeProjectEdit {
+  id: string;
+  projectId: string;
+  botId: string;
+  botName: string;
+  path: string;
+  operation: "created" | "updated";
+  additions: number;
+  deletions: number;
+  reversible: boolean;
+  restoredAt: string | null;
+  createdAt: string;
+}
+
+export interface CodeProjectReview {
+  projectId: string;
+  gitRepository: boolean;
+  branch: string | null;
+  defaultBranch: string | null;
+  remoteUrl: string | null;
+  changes: string[];
+  diff: string;
+  truncated: boolean;
+}
+
+export interface CodeProjectSuggestion {
+  name: string;
+  rootPath: string;
+  gitRepository: boolean;
+  projectKind: string;
+}
+
+export interface WorkspaceFile {
+  path: string;
+  size: number;
+  modifiedAt: string;
+  kind: "file" | "directory";
+}
+
+export interface StudioSettings {
+  macAccessEnabled: boolean;
+}
+
+export interface AppState {
+  bots: Bot[];
+  threads: Thread[];
+  messages: Message[];
+  runs: Run[];
+  routines: Routine[];
+  approvals: Approval[];
+  agentMessages: AgentMessage[];
+  providers: ProviderInstance[];
+  settings: StudioSettings;
+  usage: UsageSummary;
+  activeThreadId: string;
+}

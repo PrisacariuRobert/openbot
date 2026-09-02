@@ -1,0 +1,19 @@
+{
+  "name": "OpenBot",
+  "short_name": "OpenBot",
+  "description": "A local-first home for persistent AI teammates.",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f2ee",
+  "theme_color": "#6757d9",
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    { "name": "Open the studio", "short_name": "Studio", "url": "/" }
+  ],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

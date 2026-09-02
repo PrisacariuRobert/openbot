@@ -1,0 +1,40 @@
+{
+  "name": "openbot",
+  "version": "0.10.0",
+  "private": true,
+  "type": "module",
+  "description": "A local-first, open-source home for persistent AI teammates.",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:remote": "OPENBOT_HOST=0.0.0.0 concurrently -k -n server,web -c cyan,magenta \"npm:dev:server\" \"vite --host 0.0.0.0\"",
+    "remote": "npm run build && OPENBOT_HOST=0.0.0.0 NODE_ENV=production tsx src/server/index.ts",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "NODE_ENV=production tsx src/server/index.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "check": "tsc --noEmit",
+    "verify": "npm test && npm run check && npm run build"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "lucide-react": "^1.39.0",
+    "playwright-core": "^1.62.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

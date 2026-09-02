@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>OpenBot Browser Check</title></head>
+  <body>
+    <main>
+      <h1>Weekly project check-in</h1>
+      <label>Project note <input id="project-note" aria-label="Project note"></label>
+      <button id="preview-button" type="button">Preview safely</button>
+      <p id="result" role="status">Waiting for a preview.</p>
+    </main>
+    <script>
+      document.querySelector('#preview-button').addEventListener('click', () => {
+        document.querySelector('#result').textContent = `Preview: ${document.querySelector('#project-note').value}`;
+      });
+    </script>
+  </body>
+</html>

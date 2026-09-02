@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use Mac Apps"
+  short_description: "Safely inspect and control approved Mac apps"
+  default_prompt: "Use $use-mac-apps to inspect and operate a Mac app safely."

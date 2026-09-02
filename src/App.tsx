@@ -1,0 +1,680 @@
+import { Children, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  ArrowLeft, ArrowUp, AtSign, Bell, Check, ChevronDown, Clock3, Code2, Coins, Copy, Cpu, Download, ExternalLink, Eye, File, FileText,
+  Folder, FolderOpen, Gauge, GitBranch, GitPullRequest, Globe2, HardDrive, KeyRound, LoaderCircle, Menu, MonitorPlay, MoreHorizontal,
+  Inbox, Mail, Mic, MicOff, PanelTop, Paperclip, Play, Plus, Power, RefreshCw, Search, Settings2, ShieldCheck, Smartphone, Sparkles, Square,
+  RotateCcw, Terminal, Trash2, Users, WandSparkles, Wifi, WifiOff, Workflow, X,
+} from "lucide-react";
+import type {
+  AppState, Attachment, Bot, BotStatus, CalendarEventSummary, CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, ComputerStatus, ConnectorStatus, DriveFileSummary, GmailMessageSummary,
+  GoogleConnectorService, MascotKind, Message, ProviderCatalogEntry, ProviderKind, ProviderLoginAttempt, ProviderStatus, Routine, Run,
+  TaughtWorkflow, WorkspaceFile,
+} from "./shared/types";
+import { mentionedBotIds, mentionSlug } from "./shared/routing";
+import { presentBotMessage, signalKindLabels } from "./shared/presentation";
+import { routineScheduleLabel, routineStartsInLabel } from "./shared/routines";
+import { ProviderIcon } from "./ProviderIcon";
+import { ConnectorIcon } from "./ConnectorIcon";
+
+type Panel = "provider" | "connectors" | "projects" | "bot" | "files" | "routines" | "control" | "computer" | "teach" | "remote" | null;
+type ConnectionState = "online" | "reconnecting" | "offline";
+type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+type SpeechResultEvent = { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> };
+type SpeechRecognitionLike = {
+  continuous: boolean; interimResults: boolean; lang: string;
+  start: () => void; stop: () => void;
+  onresult: ((event: SpeechResultEvent) => void) | null; onend: (() => void) | null; onerror: (() => void) | null;
+};
+
+const PANEL_VALUES: Panel[] = ["provider", "connectors", "projects", "bot", "files", "routines", "control", "computer", "teach", "remote"];
+function panelFromLocation(): Panel {
+  const value = new URLSearchParams(window.location.search).get("panel") as Panel;
+  return PANEL_VALUES.includes(value) ? value : null;
+}
+
+class ApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) throw new ApiError(body.error || "Something went wrong.", response.status);
+  return body;
+}
+
+function relativeTime(value: string | null) {
+  if (!value) return "New";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 45) return "Now";
+  if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}h`;
+  return `${Math.floor(seconds / 86_400)}d`;
+}
+function shortModel(model: string) {
+  return model.replace(/^(opencode|opencode-go|claude-code|openai|github-copilot|gitlab|xai)\//, "").replace(/-contributor-free$/, " free").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function compactNumber(value: number) { return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value); }
+
+const GOOGLE_API_SETUP = [
+  { id: "gmail" as const, name: "Gmail", api: "gmail.googleapis.com" },
+  { id: "google-drive" as const, name: "Drive", api: "drive.googleapis.com" },
+  { id: "google-calendar" as const, name: "Calendar", api: "calendar-json.googleapis.com" },
+];
+
+type MascotBot = { name: string; color: string; mascot: MascotKind; status?: BotStatus };
+function Mascot({ bot, size = "medium", state }: { bot: MascotBot; size?: "tiny" | "small" | "medium" | "large"; state?: BotStatus }) {
+  const status = state || bot.status || "ready";
+  const instanceId = useId();
+  const motion = useMemo(() => Array.from(`${bot.name}:${bot.mascot}:${instanceId}`).reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) >>> 0, 7), [bot.name, bot.mascot, instanceId]);
+  const style = {
+    "--mascot-color": bot.color,
+    "--blink-duration": `${4.4 + (motion % 29) / 10}s`,
+    "--blink-delay": `${-((motion % 43) / 10)}s`,
+    "--idle-duration": `${3.7 + (motion % 17) / 10}s`,
+    "--idle-delay": `${-((motion % 31) / 10)}s`,
+  } as React.CSSProperties;
+  return (
+    <div className={`mascot mascot-${size} mascot-${bot.mascot} mascot-state-${status}`} style={style} aria-label={`${bot.name} is ${status}`} data-mood={status}>
+      <span className="mascot-shadow" />
+      <span className="mascot-antenna"><i /></span>
+      <span className="mascot-ear mascot-ear-left" /><span className="mascot-ear mascot-ear-right" />
+      <span className="mascot-body">
+        <span className="mascot-sheen" />
+        <span className="mascot-face"><i className="mascot-eye" /><i className="mascot-eye" /><b className="mascot-mouth" /></span>
+        <span className="mascot-cheek mascot-cheek-left" /><span className="mascot-cheek mascot-cheek-right" />
+        <span className="mascot-mark">{bot.mascot === "nova" ? "✦" : bot.mascot === "sprout" ? "⌁" : bot.mascot === "sunny" ? "•" : ""}</span>
+      </span>
+      <span className="mascot-spark mascot-spark-a">✦</span><span className="mascot-spark mascot-spark-b">·</span>
+    </div>
+  );
+}
+
+function Logo() {
+  return <div className="brand-mark" aria-hidden="true"><span className="brand-orbit brand-orbit-a" /><span className="brand-orbit brand-orbit-b" /><span className="brand-dot" /></div>;
+}
+
+function RoomCluster({ bots, large = false, hero = false }: { bots: Bot[]; large?: boolean; hero?: boolean }) {
+  return <div className={`room-cluster ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`}>{bots.slice(0, 3).map((bot) => <Mascot key={bot.id} bot={bot} size={hero ? "large" : large ? "medium" : "tiny"} />)}</div>;
+}
+
+function Sidebar({ state, provider, connectors, activeThreadId, onSelectThread, onCreateBot, onOpenPanel, open, onClose }: {
+  state: AppState; activeThreadId: string; onSelectThread: (id: string) => void; onCreateBot: () => void;
+  provider: ProviderStatus | null; connectors: ConnectorStatus | null; onOpenPanel: (panel: Panel) => void; open: boolean; onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const bots = state.bots.filter((bot) => bot.name.toLowerCase().includes(query.toLowerCase()));
+  const mainBot = state.bots[0], mainConnection = provider?.instances.find((instance) => instance.id === mainBot?.providerInstanceId);
+  return <>
+    {open && <button className="mobile-scrim" aria-label="Close menu" onClick={onClose} />}
+    <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
+      <div className="brand-row"><div className="brand-lockup"><Logo /><span>OpenBot</span><small>local</small></div><button className="icon-button mobile-only" onClick={onClose}><X size={18} /></button></div>
+      <label className="search-box"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a teammate" /></label>
+      <nav className="sidebar-scroll" aria-label="Conversations">
+        <p className="eyebrow">Together</p>
+        <button className={`nav-row room-row ${activeThreadId === "team-room" ? "active" : ""}`} onClick={() => onSelectThread("team-room")}>
+          <RoomCluster bots={state.bots} />
+          <div className="nav-copy"><strong>The studio</strong><span>{state.usage.activeRuns ? `${state.usage.activeRuns} things in motion` : "Everyone in one room"}</span></div>
+        </button>
+        <div className="section-label-row"><p className="eyebrow">Your teammates</p><button className="mini-add" onClick={onCreateBot} aria-label="Create a teammate"><Plus size={15} /></button></div>
+        <div className="bot-list">{bots.map((bot) => <button key={bot.id} className={`nav-row ${activeThreadId === bot.threadId ? "active" : ""}`} onClick={() => onSelectThread(bot.threadId)}>
+          <div className="avatar-wrap"><Mascot bot={bot} size="small" /><span className={`presence presence-${bot.status}`} /></div>
+          <div className="nav-copy"><strong>{bot.name}</strong><span>{bot.status === "working" ? "Working on it…" : bot.status === "waiting" ? "Needs your okay" : bot.status === "failed" ? "Needs a hand" : bot.role}</span></div>
+          <time>{relativeTime(bot.lastActiveAt)}</time>
+        </button>)}</div>
+      </nav>
+      <div className="sidebar-footer">
+        <button className="control-pill" onClick={() => onOpenPanel("control")}><span className="control-icon"><Gauge size={16} /></span><span><strong>Control center</strong><small>{compactNumber(state.usage.totalTokens)} tokens this week</small></span>{state.approvals.length > 0 && <b>{state.approvals.length}</b>}</button>
+        <button className="apps-pill" onClick={() => onOpenPanel("connectors")}><span className="apps-icon"><ConnectorIcon id="gmail" /></span><span><strong>Apps & tools</strong><small>{connectors?.connection?.connected ? `${connectors.connection.accountEmail} · ready` : "Connect Gmail and more"}</small></span><i className={connectors?.connection?.connected ? "ready" : ""} /></button>
+        <button className="provider-pill" onClick={() => onOpenPanel("provider")}><span className={`provider-spark provider-brand-${mainConnection?.provider || "opencode"}`}><ProviderIcon id={mainConnection?.provider || "opencode"} /></span><span><strong>{mainBot ? shortModel(mainBot.model) : "AI connections"}</strong><small>{mainConnection?.name || "Choose a connection"}</small></span><Settings2 size={16} /></button>
+      </div>
+    </aside>
+  </>;
+}
+
+function ConversationHeader({ threadTitle, activeBot, roomBots, onMenu, onOpenPanel, connection = "online" }: {
+  threadTitle: string; activeBot: Bot | null; roomBots: Bot[]; onMenu: () => void; onOpenPanel: (panel: Panel) => void;
+  connection?: ConnectionState;
+}) {
+  return <header className="conversation-header">
+    <button className="icon-button mobile-only" onClick={onMenu} aria-label="Open conversations"><Menu size={20} /></button>
+    <button className="conversation-identity" onClick={() => onOpenPanel(activeBot ? "bot" : "control")}>
+      {activeBot ? <Mascot bot={activeBot} size="medium" /> : <RoomCluster bots={roomBots} large />}
+      <div><h1>{threadTitle}</h1><p>{activeBot ? activeBot.status === "working" ? "Working right now" : activeBot.status === "waiting" ? "Waiting for your okay" : `${activeBot.role} · Ready` : `${roomBots.length} teammates · shared room`}</p></div><ChevronDown size={15} />
+    </button>
+    <div className="header-actions">
+      <span className={`connection-indicator connection-${connection}`} title={connection === "online" ? "OpenBot is connected" : connection === "reconnecting" ? "Reconnecting" : "Offline"}><i />{connection === "online" ? "Live" : connection === "reconnecting" ? "Reconnecting" : "Offline"}</span>
+      {activeBot && <button className="icon-button" onClick={() => onOpenPanel("computer")} aria-label="Open computer"><MonitorPlay size={19} /></button>}
+      {activeBot && <button className="icon-button header-files" onClick={() => onOpenPanel("files")} aria-label="Open files"><FolderOpen size={19} /></button>}
+      <button className="icon-button header-projects" onClick={() => onOpenPanel("projects")} aria-label="Open code projects"><Code2 size={19} /></button>
+      <button className="icon-button" onClick={() => onOpenPanel("routines")} aria-label="Open routines"><Clock3 size={19} /></button>
+      <button className="icon-button" onClick={() => onOpenPanel(activeBot ? "bot" : "control")} aria-label="More settings"><MoreHorizontal size={20} /></button>
+    </div>
+  </header>;
+}
+
+function highlightMentions(children: ReactNode) {
+  return Children.map(children, (child) => {
+    if (typeof child !== "string") return child;
+    return child.split(/(@[\p{L}\p{N}_-]+)/gu).map((part, index) => part.startsWith("@") ? <mark key={`${part}-${index}`}>{part}</mark> : part);
+  });
+}
+
+function MessageText({ body }: { body: string }) {
+  return <div className="message-content"><ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} components={{
+    p: ({ children }) => <p>{highlightMentions(children)}</p>,
+    li: ({ children }) => <li>{highlightMentions(children)}</li>,
+    a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+  }}>{body}</ReactMarkdown></div>;
+}
+
+const taskStageLabels: Record<Run["task"]["stage"], string> = {
+  queued: "Waiting for a turn", planning: "Setting the finish line", working: "Working through the job", checking: "Checking the result", waiting: "Waiting for your okay", done: "Finished", blocked: "Needs attention",
+};
+
+function TaskStepMark({ status }: { status: Run["task"]["steps"][number]["status"] }) {
+  if (status === "completed") return <Check size={11} />;
+  if (status === "active") return <LoaderCircle className="spinner" size={11} />;
+  if (status === "blocked") return <>!</>;
+  if (status === "skipped") return <>–</>;
+  return <i />;
+}
+
+function ResultReceipt({ run }: { run: Run }) {
+  const task = run.task;
+  const passed = task.verificationStatus === "passed", partial = task.verificationStatus === "partial";
+  const completed = task.steps.filter((step) => step.status === "completed").length;
+  return <div className={`result-receipt ${passed ? "verified" : partial ? "partial" : ""}`}>
+    <div className="result-receipt-top"><span>{passed ? <ShieldCheck size={13} /> : <Check size={13} />}</span><strong>{passed ? "Finished and checked" : partial ? "Finished with a note" : "Result delivered"}</strong>{task.steps.length > 0 && <b>{completed}/{task.steps.length}</b>}</div>
+    {task.verificationSummary && <p>{task.verificationSummary}</p>}
+    {(task.verificationChecks.length > 0 || task.steps.length > 0) && <details><summary>See the work behind this result</summary><div className="result-checks">{task.steps.filter((step) => step.status !== "skipped").map((step) => <div key={`step-${step.id}`} className={step.status === "completed" ? "passed" : "warning"}><span>{step.status === "completed" ? <Check size={10} /> : "!"}</span>{step.title}</div>)}{task.verificationChecks.map((check, index) => <div key={`${check.label}-${index}`} className={check.passed ? "passed" : "warning"}><span>{check.passed ? <Check size={10} /> : "!"}</span>{check.label}</div>)}</div></details>}
+  </div>;
+}
+
+function MessageBubble({ message, previous, macAccessEnabled = false, run }: { message: Message; previous?: Message; macAccessEnabled?: boolean; run?: Run }) {
+  if (message.senderType === "system") return <div className="system-message"><Sparkles size={13} />{message.body}</div>;
+  const user = message.senderType === "user";
+  const grouped = previous?.senderType === message.senderType && previous?.senderId === message.senderId;
+  const miniBot: MascotBot = { name: message.senderName, color: message.senderColor || "#777", mascot: message.senderMascot || "orbit", status: "ready" };
+  return <article className={`message-row ${user ? "message-user" : "message-bot"} ${grouped ? "message-grouped" : ""}`}>
+    {!user && !grouped ? <Mascot bot={miniBot} size="tiny" /> : !user ? <div className="message-avatar-placeholder" /> : null}
+    <div className="message-column">{!user && !grouped && <span className="message-sender">{message.senderName}</span>}<div className="message-bubble"><MessageText body={user ? message.body : presentBotMessage(message.body, { macAccessEnabled })} />{message.attachments.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><span><FileText size={14} /><b>{attachment.name}</b><small>{attachment.mime.split("/")[1]?.toUpperCase() || "FILE"} · {attachment.size < 1_000_000 ? `${Math.ceil(attachment.size / 1_000)} KB` : `${(attachment.size / 1_000_000).toFixed(1)} MB`}</small></span><Download size={14} /></a>)}</div>}{!user && run?.status === "completed" && run.task.tracked && <ResultReceipt run={run} />}</div>{!grouped && <time className="message-time">{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>}</div>
+  </article>;
+}
+
+function RunCard({ run, onApprove, onCancel }: { run: Run; onApprove: (id: string) => void; onCancel: (id: string) => void }) {
+  if (["completed", "cancelled"].includes(run.status)) return null;
+  const waiting = run.status === "awaiting_approval", failed = run.status === "failed";
+  const status: BotStatus = waiting ? "waiting" : failed ? "failed" : "working";
+  const bot: MascotBot = { name: run.botName, color: run.botColor, mascot: run.botMascot, status };
+  const completedSteps = run.task.steps.filter((step) => ["completed", "skipped"].includes(step.status)).length;
+  const progress = run.task.steps.length ? Math.round((completedSteps / run.task.steps.length) * 100) : 8;
+  return <article className={`run-card ${waiting ? "run-approval" : ""} ${failed ? "run-failed" : ""}`}>
+    <div className="run-topline"><Mascot bot={bot} size="small" /><div className="run-title"><strong>{waiting ? `${run.botName} needs your okay` : failed ? `${run.botName} hit a snag` : run.task.goal}</strong><span>{failed ? run.error : `${run.botName} · ${taskStageLabels[run.task.stage]}`}</span></div>{run.status === "running" && <LoaderCircle className="spinner" size={18} />}</div>
+    {!failed && run.task.tracked && <><div className="task-progress-head"><span>{waiting ? "Paused safely" : taskStageLabels[run.task.stage]}</span>{run.task.steps.length > 0 && <b>{completedSteps} of {run.task.steps.length}</b>}</div><div className="task-progress-track"><i style={{ width: `${waiting ? progress : Math.max(progress, run.status === "running" ? 7 : 0)}%` }} /></div><div className="task-step-list">{run.task.steps.map((step) => <div key={step.id} className={`task-step task-step-${step.status}`}><span><TaskStepMark status={step.status} /></span><p>{step.title}{step.detail && <small>{step.detail}</small>}</p></div>)}</div></>}
+    {!run.task.tracked && !waiting && run.activities.length > 0 && <div className="activity-list">{run.activities.slice(-3).map((activity, index, rows) => <div key={activity.id} className={index === rows.length - 1 ? "current" : ""}><span>{activity.kind === "error" ? "!" : <Check size={11} />}</span><p>{activity.label}{activity.detail && <small>{activity.detail}</small>}</p></div>)}</div>}
+    {waiting && <div className="approval-details"><ShieldCheck size={15} /><p>{run.approvalReason}</p></div>}
+    {waiting && <div className="approval-copy"><Clock3 size={14} /><span>This stays here until you decide.</span></div>}
+    {waiting && <div className="approval-actions"><button className="button-secondary" onClick={() => onCancel(run.id)}>Not now</button><button className="button-primary" onClick={() => onApprove(run.id)}><Check size={16} /> Allow once</button></div>}
+    {run.status === "running" && <button className="stop-button" onClick={() => onCancel(run.id)}><Square size={10} fill="currentColor" /> Stop</button>}
+  </article>;
+}
+
+function Composer({ bots, apps = [], isRoom, selectedBotIds, setSelectedBotIds, onSend, sending, onNotice }: {
+  bots: Bot[]; isRoom: boolean; selectedBotIds: string[]; setSelectedBotIds: (ids: string[]) => void;
+  apps?: ConnectorStatus["catalog"];
+  onSend: (body: string, files: File[]) => Promise<void>; sending: boolean; onNotice?: (message: string) => void;
+}) {
+  const [body, setBody] = useState(""), [files, setFiles] = useState<File[]>([]), [mentionQuery, setMentionQuery] = useState<string | null>(null), [routingOpen, setRoutingOpen] = useState(false), [listening, setListening] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null), fileInput = useRef<HTMLInputElement>(null), recognition = useRef<SpeechRecognitionLike | null>(null);
+  const mentionIds = useMemo(() => mentionedBotIds(body, bots), [body, bots]);
+  const routedBots = mentionIds.length ? bots.filter((bot) => mentionIds.includes(bot.id)) : bots.filter((bot) => selectedBotIds.includes(bot.id));
+  const mentionChoices = bots.filter((bot) => !mentionQuery || mentionSlug(bot.name).startsWith(mentionSlug(mentionQuery))).slice(0, 6);
+  const appAliases: Partial<Record<ConnectorStatus["catalog"][number]["id"], string>> = { gmail: "gmail", "google-drive": "drive", "google-calendar": "calendar" };
+  const appChoices = apps.filter((app) => app.connected).filter((app) => !mentionQuery || mentionSlug(appAliases[app.id] || app.name).startsWith(mentionSlug(mentionQuery)));
+  const resize = () => { const element = textarea.current; if (!element) return; element.style.height = "auto"; element.style.height = `${Math.min(element.scrollHeight, 132)}px`; };
+  const updateMention = (value: string, cursor: number | null) => {
+    const before = value.slice(0, cursor ?? value.length), match = before.match(/(?:^|\s)@([\p{L}\p{N}_-]*)$/u);
+    setMentionQuery(match ? match[1] : null);
+  };
+  const insertMention = (name: string) => {
+    const element = textarea.current, cursor = element?.selectionStart ?? body.length, before = body.slice(0, cursor), after = body.slice(cursor);
+    const match = before.match(/(?:^|\s)@([\p{L}\p{N}_-]*)$/u), start = match ? cursor - (match[1]?.length || 0) - 1 : cursor;
+    const prefix = start > 0 && !/\s$/.test(body.slice(0, start)) ? " " : "";
+    const next = `${body.slice(0, start)}${prefix}@${mentionSlug(name)} ${after}`;
+    setBody(next); setMentionQuery(null); setRoutingOpen(false);
+    requestAnimationFrame(() => { element?.focus(); resize(); });
+  };
+  const addFiles = (incoming: FileList | null) => {
+    if (!incoming) return;
+    const accepted = [...files];
+    for (const file of Array.from(incoming)) {
+      if (accepted.length >= 6) { onNotice?.("You can attach up to six files at once."); break; }
+      if (file.size > 25_000_000) { onNotice?.(`${file.name} is larger than 25 MB.`); continue; }
+      accepted.push(file);
+    }
+    setFiles(accepted);
+    if (fileInput.current) fileInput.current.value = "";
+  };
+  const startVoice = () => {
+    if (listening) { recognition.current?.stop(); return; }
+    const speechWindow = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+    const Constructor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Constructor) return onNotice?.("Voice typing is not available in this browser yet.");
+    const next = new Constructor(), original = body.trim(); let transcript = "";
+    next.continuous = false; next.interimResults = true; next.lang = navigator.language || "en-US";
+    next.onresult = (event) => {
+      transcript = Array.from(event.results).map((result) => result[0]?.transcript || "").join(" ").trim();
+      setBody(`${original}${original && transcript ? " " : ""}${transcript}`);
+      requestAnimationFrame(resize);
+    };
+    next.onerror = () => { setListening(false); onNotice?.("I couldn’t hear that clearly. You can try again."); };
+    next.onend = () => setListening(false);
+    recognition.current = next; setListening(true); next.start();
+  };
+  const submit = async () => {
+    if ((!body.trim() && !files.length) || sending) return;
+    await onSend(body.trim(), files);
+    setBody(""); setFiles([]); setMentionQuery(null); setRoutingOpen(false);
+    if (textarea.current) textarea.current.style.height = "auto";
+    textarea.current?.focus();
+  };
+  return <div className="composer-wrap" data-testid="composer-wrap">
+    {isRoom && <div className="recipient-summary-wrap">
+      <button className={`recipient-summary ${mentionIds.length ? "mentioned" : ""}`} onClick={() => { setRoutingOpen(!routingOpen); setMentionQuery(null); }} aria-expanded={routingOpen}>
+        <AtSign size={13} />{mentionIds.length ? `Mentioned: ${routedBots.map((bot) => bot.name).join(", ")}` : routedBots.length ? `To ${routedBots.map((bot) => bot.name).join(", ")}` : "Auto picks the best teammate"}<ChevronDown size={12} />
+      </button>
+      <span>Type @name anywhere to route naturally</span>
+    </div>}
+    {(routingOpen || mentionQuery !== null) && isRoom && <div className="routing-popover" role="listbox" aria-label={mentionQuery !== null ? "Mention a teammate" : "Choose who receives this"}>
+      {mentionQuery === null && <><button className={!selectedBotIds.length ? "selected" : ""} onClick={() => { setSelectedBotIds([]); setRoutingOpen(false); }}><span className="route-symbol"><Sparkles size={15} /></span><span><strong>Auto</strong><small>Pick one teammate from the request</small></span>{!selectedBotIds.length && <Check size={14} />}</button><button onClick={() => { setSelectedBotIds(bots.map((bot) => bot.id)); setRoutingOpen(false); }}><span className="route-symbol"><Users size={15} /></span><span><strong>Everyone</strong><small>Work in parallel</small></span>{selectedBotIds.length === bots.length && <Check size={14} />}</button></>}
+      {(mentionQuery !== null ? mentionChoices : bots).map((bot) => <button key={bot.id} onClick={() => mentionQuery !== null ? insertMention(bot.name) : (setSelectedBotIds([bot.id]), setRoutingOpen(false))}><Mascot bot={bot} size="small" /><span><strong>{bot.name}</strong><small>{bot.role}</small></span>{mentionQuery === null && selectedBotIds.length === 1 && selectedBotIds[0] === bot.id && <Check size={14} />}</button>)}
+      {mentionQuery !== null && appChoices.map((app) => <button key={`app-${app.id}`} className="route-app" onClick={() => insertMention(appAliases[app.id] || app.name)}><span className="route-app-icon"><ConnectorIcon id={app.id} /></span><span><strong>@{appAliases[app.id] || mentionSlug(app.name)}</strong><small>Use {app.name} in this request</small></span><Check size={13} /></button>)}
+      {mentionQuery !== null && (!mentionQuery || "everyone".startsWith(mentionQuery.toLowerCase())) && <button onClick={() => insertMention("everyone")}><span className="route-symbol"><Users size={15} /></span><span><strong>@everyone</strong><small>Ask the whole studio</small></span></button>}
+    </div>}
+    {files.length > 0 && <div className="pending-files">{files.map((file, index) => <div key={`${file.name}-${file.lastModified}`}><FileText size={14} /><span><strong>{file.name}</strong><small>{file.size < 1_000_000 ? `${Math.ceil(file.size / 1_000)} KB` : `${(file.size / 1_000_000).toFixed(1)} MB`}</small></span><button onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`Remove ${file.name}`}><X size={13} /></button></div>)}</div>}
+    <div className={`composer ${listening ? "is-listening" : ""}`}>
+      <input ref={fileInput} className="visually-hidden" type="file" multiple accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.json,.yaml,.yml,.txt,.md,.html,.js,.ts,.tsx,.py" onChange={(event) => addFiles(event.target.files)} />
+      <button className="composer-plus" onClick={() => fileInput.current?.click()} title="Attach files" aria-label="Attach files"><Paperclip size={18} /></button>
+      {isRoom && <button className="composer-mention" onClick={() => { setBody(`${body}${body && !body.endsWith(" ") ? " " : ""}@`); setMentionQuery(""); requestAnimationFrame(() => textarea.current?.focus()); }} title="Mention a teammate" aria-label="Mention a teammate"><AtSign size={17} /></button>}
+      <textarea data-testid="message-input" ref={textarea} value={body} onChange={(event) => { setBody(event.target.value); updateMention(event.target.value, event.target.selectionStart); resize(); }} onClick={(event) => updateMention(body, event.currentTarget.selectionStart)} onKeyDown={(event) => { if (event.key === "Escape") { setMentionQuery(null); setRoutingOpen(false); } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} placeholder={isRoom ? "Message the studio — try @nova…" : `Message ${bots[0]?.name || "your teammate"}`} rows={1} />
+      <button className={`voice-button ${listening ? "active" : ""}`} onClick={startVoice} aria-label={listening ? "Stop voice typing" : "Start voice typing"} aria-pressed={listening}>{listening ? <MicOff size={17} /> : <Mic size={17} />}</button>
+      <button className="send-button" onClick={() => void submit()} disabled={(!body.trim() && !files.length) || sending} aria-label="Send message">{sending ? <LoaderCircle className="spinner" size={18} /> : <ArrowUp size={19} strokeWidth={2.5} />}</button>
+    </div>
+    <p className="composer-note">Private by default · sensitive actions wait for your okay</p>
+  </div>;
+}
+
+function Sheet({ title, subtitle, children, onClose, wide = false }: { title: string; subtitle?: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  return <div className="sheet-layer"><button className="sheet-scrim" onClick={onClose} aria-label="Close panel" /><aside className={`sheet ${wide ? "sheet-wide" : ""}`}><div className="sheet-header"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="Close panel"><X size={19} /></button></div><div className="sheet-content">{children}</div></aside></div>;
+}
+
+function ControlPanel({ state, onNotify, onOpenProvider, onOpenRemote, onOpenConnectors, onOpenProjects, onSetMacAccess }: { state: AppState; onNotify: () => void; onOpenProvider: () => void; onOpenRemote: () => void; onOpenConnectors: () => void; onOpenProjects: () => void; onSetMacAccess: (enabled: boolean) => Promise<void> }) {
+  const active = state.bots.filter((bot) => ["working", "waiting"].includes(bot.status));
+  const signals = (state.agentMessages || []).slice(-6).reverse();
+  return <div className="control-panel">
+    <div className="control-hero"><div><span className="control-kicker"><Sparkles size={13} /> Your local studio</span><h3>{active.length ? `${active.length} teammate${active.length > 1 ? "s" : ""} in motion` : "Everything is calm"}</h3><p>One place to see progress, permissions and usage.</p></div><div className="hero-orb"><Logo /></div></div>
+    <div className="stat-grid"><div><Coins size={17} /><strong>{compactNumber(state.usage.totalTokens)}</strong><span>tokens · 7 days</span></div><div><Check size={17} /><strong>{state.usage.completedRuns}</strong><span>finished tasks</span></div><div><ShieldCheck size={17} /><strong>{state.approvals.length}</strong><span>waiting approvals</span></div></div>
+    <section><div className="panel-section-heading"><div><h3>Studio access</h3><p>One clear permission shared by every teammate</p></div><span className={`studio-access-state ${state.settings.macAccessEnabled ? "on" : ""}`}><i />{state.settings.macAccessEnabled ? "Available to everyone" : "Off for everyone"}</span></div><label className="studio-access-card"><span className="studio-access-icon"><HardDrive size={20} /></span><span><strong>Files & apps on this Mac</strong><small>Every current and future teammate can inspect visible files and accessible app controls. File moves, clicks and typing still wait for your okay.</small></span><input aria-label="Mac access for every teammate" type="checkbox" checked={state.settings.macAccessEnabled} onChange={(event) => { const enabled = event.target.checked; if (!enabled || window.confirm("Let every teammate inspect visible files and accessible app controls on this Mac? Actions such as moving files, clicking and typing will still ask first.")) void onSetMacAccess(enabled); }} /></label></section>
+    <section><div className="panel-section-heading"><div><h3>Right now</h3><p>Real activity from every teammate</p></div></div>{active.length ? <div className="now-list">{active.map((bot) => <div key={bot.id}><Mascot bot={bot} size="medium" /><span><strong>{bot.name}</strong><small>{bot.status === "waiting" ? "Waiting for your okay" : "Working in the background"}</small></span><i className={`now-dot now-${bot.status}`} /></div>)}</div> : <div className="calm-card"><RoomCluster bots={state.bots} large /><span><strong>Ready when you are</strong><small>Start in any conversation. Up to three teammates can work at once.</small></span></div>}</section>
+    {state.approvals.length > 0 && <section><div className="panel-section-heading"><div><h3>Needs your attention</h3><p>These never expire or disappear on their own</p></div></div><div className="attention-list">{state.approvals.map((approval) => <div key={approval.id}><ShieldCheck size={18} /><span><strong>{approval.botName}</strong><small>{approval.reason}</small></span></div>)}</div></section>}
+    <section><div className="panel-section-heading"><div><h3>Team signals</h3><p>Questions, findings and handoffs between teammates</p></div><span className="bounded-badge">Bounded</span></div>{signals.length ? <div className="signal-list">{signals.map((signal) => <article key={signal.id}><div className="signal-route"><Mascot bot={{ name: signal.fromBotName, mascot: signal.fromBotMascot, color: signal.fromBotColor }} size="tiny" /><span>{signal.fromBotName}</span><i>→</i><Mascot bot={{ name: signal.toBotName, mascot: signal.toBotMascot, color: signal.toBotColor }} size="tiny" /><span>{signal.toBotName}</span><b>{signalKindLabels[signal.kind] || "shared"}</b></div><p>{signal.body}</p></article>)}</div> : <div className="empty-signal"><Users size={19} /><span><strong>Quiet teamwork</strong><small>Teammates can ask each other questions without creating endless loops.</small></span></div>}</section>
+    <section><div className="panel-section-heading"><div><h3>Helpful extras</h3><p>Quiet unless you turn them on</p></div></div><div className="quick-actions"><button onClick={onOpenProjects}><Code2 size={18} /><span><strong>Code projects</strong><small>Let selected teammates build and test inside approved folders</small></span></button><button onClick={onOpenConnectors}><Mail size={18} /><span><strong>Apps & tools</strong><small>Connect Google Workspace and choose who can use each app</small></span></button><button onClick={onOpenRemote}><Smartphone size={18} /><span><strong>Phone remote</strong><small>Check in, speak tasks and approve on the go</small></span></button><button onClick={onNotify}><Bell size={18} /><span><strong>Finish notifications</strong><small>Hear when work or approval is ready</small></span></button><button onClick={onOpenProvider}><KeyRound size={18} /><span><strong>Your AI connections</strong><small>{state.providers.length} private connection{state.providers.length === 1 ? "" : "s"}</small></span></button></div></section>
+  </div>;
+}
+
+type CodeProjectsData = { projects: CodeProject[]; edits: CodeProjectEdit[]; suggestions: CodeProjectSuggestion[] };
+type ProjectLevel = "none" | "read" | "code";
+function CodeProjectsPanel({ bots, onNotice }: { bots: Bot[]; onNotice: (message: string) => void }) {
+  const [data, setData] = useState<CodeProjectsData | null>(null), [adding, setAdding] = useState(false), [cloning, setCloning] = useState(false), [busy, setBusy] = useState<string | null>(null), [error, setError] = useState("");
+  const [name, setName] = useState(""), [rootPath, setRootPath] = useState(""), [levels, setLevels] = useState<Record<string, ProjectLevel>>(() => Object.fromEntries(bots.map((bot) => [bot.id, "code"])));
+  const [repository, setRepository] = useState(""), [review, setReview] = useState<CodeProjectReview | null>(null);
+  const refresh = useCallback(async () => setData(await api<CodeProjectsData>("/api/code-projects")), []);
+  useEffect(() => { void refresh().catch((reason) => setError(reason instanceof Error ? reason.message : String(reason))); }, [refresh]);
+  const grants = (selected: Record<string, ProjectLevel>) => bots.map((bot) => { const level = selected[bot.id] || "code"; return { botId: bot.id, canRead: level !== "none", canWrite: level === "code", canRun: level === "code" }; });
+  const connect = async (input: { name: string; rootPath: string }, selected = levels) => {
+    setBusy(input.rootPath); setError("");
+    try { await api("/api/code-projects", { method: "POST", body: JSON.stringify({ ...input, access: grants(selected) }) }); await refresh(); setAdding(false); setName(""); setRootPath(""); onNotice(`${input.name} is connected`); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  const setAccess = async (projectId: string, botId: string, level: ProjectLevel) => {
+    setBusy(`${projectId}:${botId}`); setError("");
+    try { await api(`/api/code-projects/${projectId}/access/${botId}`, { method: "PATCH", body: JSON.stringify({ canRead: level !== "none", canWrite: level === "code", canRun: level === "code" }) }); await refresh(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  const remove = async (project: CodeProject) => {
+    if (!window.confirm(`Disconnect ${project.name}? No project files will be deleted.`)) return;
+    setBusy(project.id); setError("");
+    try { await api(`/api/code-projects/${project.id}`, { method: "DELETE" }); await refresh(); onNotice(`${project.name} disconnected — its files were untouched`); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  const clone = async (event: FormEvent) => {
+    event.preventDefault(); setBusy("clone"); setError("");
+    try { const project = await api<CodeProject>("/api/code-projects/clone", { method: "POST", body: JSON.stringify({ repository, access: grants(levels) }) }); await refresh(); setRepository(""); setCloning(false); onNotice(`${project.name} is ready for the team`); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  const openReview = async (project: CodeProject) => {
+    if (review?.projectId === project.id) { setReview(null); return; }
+    setBusy(`review:${project.id}`); setError("");
+    try { setReview(await api<CodeProjectReview>(`/api/code-projects/${project.id}/review`)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  const restore = async (edit: CodeProjectEdit) => {
+    if (!window.confirm(`Restore ${edit.path} to how it was before ${edit.botName}'s change? Newer work will never be overwritten.`)) return;
+    setBusy(`restore:${edit.id}`); setError("");
+    try { await api(`/api/code-project-edits/${edit.id}/restore`, { method: "POST" }); await refresh(); if (review?.projectId === edit.projectId) setReview(await api<CodeProjectReview>(`/api/code-projects/${edit.projectId}/review`)); onNotice(`${edit.path} restored safely`); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(null); }
+  };
+  return <div className="code-projects-panel">
+    <div className="code-project-hero"><span><Code2 size={19} /></span><div><small>YOUR CODE, REVIEWABLE</small><h3>From an idea to a tested pull request.</h3><p>Teammates work only in projects you share. Every change stays visible, scoped and recoverable.</p></div><Terminal size={49} /></div>
+    {data?.projects.length ? <section><div className="panel-section-heading"><div><h3>Connected projects</h3><p>Give every teammate exactly the access their role needs</p></div><span className="bounded-badge">{data.projects.length} connected</span></div><div className="code-project-list">{data.projects.map((project) => <article key={project.id}>
+      <header><span>{project.remoteUrl ? <ConnectorIcon id="github" /> : <FolderOpen size={18} />}</span><div><strong>{project.name}</strong><small>{project.projectKind} · {project.managedClone ? "Managed by OpenBot" : project.gitRepository ? "Git repository" : "Local folder"}</small></div>{project.gitRepository && <button className="project-review-button" aria-label={`Review changes in ${project.name}`} onClick={() => void openReview(project)} disabled={busy === `review:${project.id}`}><GitPullRequest size={14} /></button>}<button aria-label={`Disconnect ${project.name}`} onClick={() => void remove(project)} disabled={busy === project.id}><Trash2 size={14} /></button></header>
+      <div className="project-source"><code title={project.rootPath}>{project.rootPath}</code>{project.remoteUrl && <a href={project.remoteUrl} target="_blank" rel="noreferrer">GitHub <ExternalLink size={10} /></a>}</div>
+      {review?.projectId === project.id && <div className="project-review"><div><span><GitBranch size={13} /> {review.branch || "No branch"}</span><b>{review.changes.length ? `${review.changes.length} change${review.changes.length === 1 ? "" : "s"}` : "Ready and clean"}</b></div>{review.changes.length > 0 && <ul>{review.changes.slice(0, 8).map((change) => <li key={change}>{change}</li>)}</ul>}{review.diff ? <details><summary>See the code diff</summary><pre>{review.diff}{review.truncated ? "\n\n…diff shortened for review" : ""}</pre></details> : <p>No tracked code changes are waiting for review.</p>}</div>}
+      <div className="project-access-grid">{bots.map((bot) => { const access = project.access.find((item) => item.botId === bot.id), level: ProjectLevel = !access?.canRead ? "none" : access.canWrite && access.canRun ? "code" : "read"; return <label key={bot.id}><Mascot bot={bot} size="tiny" /><span><strong>{bot.name}</strong><small>{level === "code" ? "Can code + test" : level === "read" ? "Read only" : "No access"}</small></span><select aria-label={`${bot.name} access to ${project.name}`} value={level} disabled={busy === `${project.id}:${bot.id}`} onChange={(event) => void setAccess(project.id, bot.id, event.target.value as ProjectLevel)}><option value="code">Code + test</option><option value="read">Read only</option><option value="none">No access</option></select></label>; })}</div>
+    </article>)}</div></section> : <div className="empty-panel code-empty"><Code2 size={31} /><h3>Bring in your first project</h3><p>Paste a GitHub link or choose a folder already on this Mac. Then ask a teammate to build, fix and test it.</p></div>}
+    {!adding && data?.suggestions.length ? <section><div className="panel-section-heading"><div><h3>Projects on this Mac</h3><p>One click shares the folder with every teammate; access can be changed afterward</p></div></div><div className="project-suggestions">{data.suggestions.slice(0, 8).map((suggestion) => <button key={suggestion.rootPath} onClick={() => void connect({ name: suggestion.name, rootPath: suggestion.rootPath }, Object.fromEntries(bots.map((bot) => [bot.id, "code"]))) } disabled={busy === suggestion.rootPath}><span><FolderOpen size={16} /></span><div><strong>{suggestion.name}</strong><small>{suggestion.projectKind}{suggestion.gitRepository ? " · Git" : ""}</small></div><Plus size={15} /></button>)}</div></section> : null}
+    {cloning && <form className="project-connect-form project-clone-form" onSubmit={clone}><div className="panel-section-heading"><div><h3>Get a project from GitHub</h3><p>Public repositories work immediately. Private ones use Git already signed in on this Mac.</p></div><span className="project-form-logo"><ConnectorIcon id="github" /></span></div><label className="field"><span>GitHub repository</span><input value={repository} onChange={(event) => setRepository(event.target.value)} placeholder="github.com/you/your-project" required autoFocus /></label><div className="project-new-access"><strong>Who can work here?</strong>{bots.map((bot) => <label key={bot.id}><Mascot bot={bot} size="tiny" /><span>{bot.name}</span><select value={levels[bot.id] || "code"} onChange={(event) => setLevels({ ...levels, [bot.id]: event.target.value as ProjectLevel })}><option value="code">Code + test</option><option value="read">Read only</option><option value="none">No access</option></select></label>)}</div><div className="form-actions"><button type="button" className="button-secondary" onClick={() => setCloning(false)}>Cancel</button><button className="button-primary" disabled={busy === "clone"}>{busy === "clone" ? <LoaderCircle className="spinner" size={15} /> : <Download size={15} />} Get project</button></div></form>}
+    {adding && <form className="project-connect-form" onSubmit={(event) => { event.preventDefault(); void connect({ name, rootPath }); }}><div className="panel-section-heading"><div><h3>Connect a folder on this Mac</h3><p>OpenBot will leave the folder where it is and never claim access outside it.</p></div></div><label className="field"><span>Project name</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="My app" required /></label><label className="field"><span>Folder path</span><input value={rootPath} onChange={(event) => setRootPath(event.target.value)} placeholder="/Users/you/Documents/GitHub/my-app" required /></label><div className="project-new-access"><strong>Who can work here?</strong>{bots.map((bot) => <label key={bot.id}><Mascot bot={bot} size="tiny" /><span>{bot.name}</span><select aria-label={`${bot.name} access for the new project`} value={levels[bot.id] || "code"} onChange={(event) => setLevels({ ...levels, [bot.id]: event.target.value as ProjectLevel })}><option value="code">Code + test</option><option value="read">Read only</option><option value="none">No access</option></select></label>)}</div><div className="form-actions"><button type="button" className="button-secondary" onClick={() => setAdding(false)}>Cancel</button><button className="button-primary" disabled={Boolean(busy)}>{busy ? <LoaderCircle className="spinner" size={15} /> : <Code2 size={15} />} Connect project</button></div></form>}
+    {!adding && !cloning && <div className="project-entry-actions"><button className="add-routine project-github-action" onClick={() => setCloning(true)}><span><ConnectorIcon id="github" /></span> Get from GitHub</button><button className="add-routine" onClick={() => setAdding(true)}><FolderOpen size={17} /> Connect a folder</button></div>}
+    {data?.edits.length ? <section><div className="panel-section-heading"><div><h3>Safety net</h3><p>Restore an agent edit while it is still the newest version of that file</p></div></div><div className="project-edit-list">{data.edits.slice(0, 8).map((edit) => <div key={edit.id}><span><GitBranch size={14} /></span><div><strong>{edit.botName} {edit.operation} {edit.path}</strong><small>{data.projects.find((project) => project.id === edit.projectId)?.name || "Disconnected project"} · {edit.restoredAt ? "Restored" : relativeTime(edit.createdAt)}</small></div>{edit.reversible && data.projects.some((project) => project.id === edit.projectId) && <button className="project-restore" onClick={() => void restore(edit)} disabled={busy === `restore:${edit.id}`}><RotateCcw size={12} /> Restore</button>}</div>)}</div></section> : null}
+    <div className="friendly-note"><ShieldCheck size={17} /><p><strong>Fast work, calm review.</strong><br />Agents use separate branches, commit only named files, and run checks without network access. Publishing to GitHub always waits for your approval.</p></div>
+    {error && <p className="panel-error">{error}</p>}
+  </div>;
+}
+
+function ConnectorPanel({ status, bots, onRefresh, onNotice, onStartWorkflow }: { status: ConnectorStatus | null; bots: Bot[]; onRefresh: () => Promise<void>; onNotice: (message: string) => void; onStartWorkflow: (prompt: string) => Promise<void> }) {
+  const [clientId, setClientId] = useState(""), [clientSecret, setClientSecret] = useState(""), [busy, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [preview, setPreview] = useState<GmailMessageSummary[]>([]), [drivePreview, setDrivePreview] = useState<DriveFileSummary[]>([]), [calendarPreview, setCalendarPreview] = useState<CalendarEventSummary[]>([]), [previewKind, setPreviewKind] = useState<"gmail" | "drive" | "calendar">("gmail");
+  const credentialsFile = useRef<HTMLInputElement>(null);
+  const connection = status?.connection, connected = Boolean(connection?.connected);
+  const recovery = status?.googleApiRecovery;
+  const serviceRecoveries = status?.googleApiRecoveries || [];
+  const apiCheckProject = !recovery && connection?.status === "needs_attention" && !status?.managedGoogleClient ? status?.googleProjectId : null;
+  const gmailReady = Boolean(status?.catalog.find((entry) => entry.id === "gmail")?.connected), driveReady = Boolean(status?.catalog.find((entry) => entry.id === "google-drive")?.connected), calendarReady = Boolean(status?.catalog.find((entry) => entry.id === "google-calendar")?.connected);
+  useEffect(() => { const timer = setInterval(() => void onRefresh(), 2_500); return () => clearInterval(timer); }, [onRefresh]);
+  const run = async (key: string, operation: () => Promise<void>) => { setBusy(key); setError(""); try { await operation(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } finally { setBusy(null); } };
+  const save = async (event: FormEvent) => { event.preventDefault(); await run("save", async () => { await api("/api/connectors/google/config", { method: "POST", body: JSON.stringify({ clientId, clientSecret: clientSecret || undefined }) }); setClientSecret(""); await onRefresh(); onNotice("Google connection saved privately"); }); };
+  const connect = () => run("connect", async () => { const next = await api<{ url: string }>("/api/connectors/google/connect", { method: "POST" }); onNotice("Opening Google sign-in…"); window.location.assign(next.url); });
+  const importCredentials = (file: File | undefined) => run("import", async () => {
+    if (!file) return;
+    const parsed = JSON.parse(await file.text()) as { installed?: { client_id?: string; client_secret?: string }; web?: { client_id?: string } };
+    if (!parsed.installed?.client_id) throw new Error(parsed.web?.client_id ? "Choose a Desktop app credentials file. Web app files need extra callback setup." : "That is not a Google OAuth credentials file.");
+    await api("/api/connectors/google/config", { method: "POST", body: JSON.stringify({ clientId: parsed.installed.client_id, clientSecret: parsed.installed.client_secret }) });
+    const next = await api<{ url: string }>("/api/connectors/google/connect", { method: "POST" });
+    onNotice("Opening Google sign-in…"); window.location.assign(next.url);
+  }).finally(() => { if (credentialsFile.current) credentialsFile.current.value = ""; });
+  const testInbox = () => run("preview-gmail", async () => { const messages = await api<GmailMessageSummary[]>("/api/connectors/gmail/preview?q=newer_than%3A14d"); setPreview(messages); setPreviewKind("gmail"); await onRefresh(); onNotice(messages.length ? "Your inbox is ready" : "Connected — no recent mail found"); });
+  const testDrive = () => run("preview-drive", async () => { const files = await api<DriveFileSummary[]>("/api/connectors/drive/preview"); setDrivePreview(files); setPreviewKind("drive"); await onRefresh(); onNotice(files.length ? "Google Drive is ready" : "Connected — no recent files found"); });
+  const testCalendar = () => run("preview-calendar", async () => { const events = await api<CalendarEventSummary[]>("/api/connectors/calendar/preview"); setCalendarPreview(events); setPreviewKind("calendar"); await onRefresh(); onNotice(events.length ? "Google Calendar is ready" : "Connected — no events in the next week"); });
+  const copy = async () => { if (!status?.callbackUrl) return; await navigator.clipboard.writeText(status.callbackUrl); onNotice("Callback address copied"); };
+  const setAccess = async (botId: string, service: GoogleConnectorService, canRead: boolean, canSend = false) => run(`access-${service}-${botId}`, async () => { await api(`/api/connectors/google/access/${service}/${botId}`, { method: "PATCH", body: JSON.stringify({ canRead, canSend }) }); await onRefresh(); });
+  const friendlyAction = (action: string) => action === "gmail_search" ? "Searched the inbox" : action === "gmail_read" ? "Read an email" : action === "gmail_send" ? "Prepared or sent an email" : action === "google_drive_search" ? "Searched Google Drive" : action === "google_drive_read" ? "Read a Drive file" : action === "google_calendar_agenda" ? "Checked the calendar" : action === "connected" ? "Connected Google Workspace" : action === "disconnected" ? "Disconnected Google Workspace" : action;
+  const friendlyEventSummary = (event: ConnectorStatus["events"][number]) => {
+    if (event.status === "failed" && event.action.startsWith("google_drive")) return "Google Drive still needs to be turned on. Gmail remains connected.";
+    if (event.status === "failed" && event.action.startsWith("google_calendar")) return "Google Calendar still needs to be turned on. Gmail remains connected.";
+    if (event.status === "failed" && event.action.startsWith("gmail")) return "Gmail needs another connection check before this can run.";
+    return event.summary.length > 170 ? `${event.summary.slice(0, 167).trim()}…` : event.summary;
+  };
+  return <div className="connector-panel">
+    <div className="connector-hero">
+      <div className="connector-hero-copy"><span className="control-kicker"><Sparkles size={13} /> A calmer way to get things done</span><h3>Connect once. Give each teammate only what they need.</h3><p>Gmail, Drive and Calendar now work together—while outgoing email still waits for your okay.</p></div>
+      <div className="connector-stage" aria-hidden="true"><Mascot bot={{ name: "Pip", color: "#6657d8", mascot: "orbit", status: connected ? "ready" : "working" }} size="large" /><span className="connector-float connector-float-gmail"><ConnectorIcon id="gmail" /></span><span className="connector-float connector-float-drive"><ConnectorIcon id="google-drive" /></span><span className="connector-line" /></div>
+    </div>
+
+    <section><div className="panel-section-heading"><div><h3>Apps your team can use</h3><p>Working connections are clearly separated from the roadmap</p></div>{connected && <span className="connector-ready"><i /> Google ready</span>}</div><div className="connector-catalog">{status?.catalog.map((entry) => <article key={entry.id} className={`connector-card ${entry.connected ? "connected" : ""} ${entry.availability === "next" ? "coming" : ""}`}><span className={`connector-logo connector-logo-${entry.id}`}><ConnectorIcon id={entry.id} /></span><div className="connector-card-main"><div className="connector-card-title"><h4>{entry.name}</h4><b>{entry.connected ? "Connected" : entry.badge}</b></div><p>{entry.description}</p><div className="connector-capabilities">{entry.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div></div></article>) || <div className="connector-loading"><LoaderCircle className="spinner" /> Checking your apps…</div>}</div></section>
+
+    {!status ? null : !connection?.configured ? <section className="google-setup">
+      <input ref={credentialsFile} className="visually-hidden" type="file" accept=".json,application/json" onChange={(event) => void importCredentials(event.target.files?.[0])} />
+      <div className="setting-section-title"><h3>Connect Google Workspace</h3><p>The release build supports one-click Google sign-in. Self-hosters can get the same flow by choosing one Desktop OAuth credentials file.</p></div>
+      <button className="credential-import" onClick={() => credentialsFile.current?.click()} disabled={busy === "import"}><span className="credential-icons"><i><ConnectorIcon id="gmail" /></i><i><ConnectorIcon id="google-drive" /></i><i><ConnectorIcon id="google-calendar" /></i></span><span><strong>{busy === "import" ? "Reading your Google file…" : "Choose Google credentials file"}</strong><small>Then Google sign-in opens automatically—no copying IDs or callback addresses</small></span>{busy === "import" ? <LoaderCircle className="spinner" size={17} /> : <ArrowUp size={17} />}</button>
+      <div className="google-api-setup"><div><strong>Turn on the three Google apps first</strong><small>Each button opens the correct switch in Google Cloud.</small></div><div>{GOOGLE_API_SETUP.map((item) => <a key={item.id} href={`https://console.cloud.google.com/apis/library/${item.api}`} target="_blank" rel="noreferrer"><span><ConnectorIcon id={item.id} /></span>{item.name}<ExternalLink size={11} /></a>)}</div></div>
+      <div className="setup-steps setup-steps-simple"><div><b>1</b><span><strong>Create a Desktop OAuth client</strong><small>Add yourself as a test user, create a Desktop app, then download its JSON file.</small><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">Open credentials <ExternalLink size={12} /></a></span></div><div><b>2</b><span><strong>Choose the file above</strong><small>OpenBot saves it privately and opens Google’s official sign-in screen.</small></span></div></div>
+      <details className="connector-advanced"><summary>Advanced: enter details manually</summary><form className="connector-form" onSubmit={save}><label className="field"><span>Google client ID</span><input value={clientId} onChange={(event) => setClientId(event.target.value)} placeholder="…apps.googleusercontent.com" required /></label><label className="field"><span>Client secret <small>if Google gave you one</small></span><input type="password" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} autoComplete="new-password" /></label><div className="callback-row"><span><strong>Callback address</strong><code>{status.callbackUrl}</code></span><button type="button" onClick={() => void copy()}><Copy size={14} /> Copy</button></div><button className="button-primary button-wide" disabled={busy === "save"}>{busy === "save" ? <LoaderCircle className="spinner" size={16} /> : <ShieldCheck size={16} />} Save privately</button></form></details>
+      <div className="connector-note"><ShieldCheck size={16} /><p><strong>Your files and tokens stay on this Mac.</strong> For public distribution, the release maintainer adds a verified Google client so everyone sees a single Connect Google button.</p></div>
+    </section> : !connected ? <section className={`connect-account-card ${recovery || apiCheckProject ? "needs-api" : ""}`}><span className="google-app-stack"><i><ConnectorIcon id="gmail" /></i><i><ConnectorIcon id="google-drive" /></i><i><ConnectorIcon id="google-calendar" /></i></span><div><h3>{recovery ? `Turn on ${recovery.serviceName} to finish` : apiCheckProject ? "Finish your Google setup" : connection.status === "needs_attention" ? "Google needs a quick reconnect" : status.managedGoogleClient ? "Connect Google in one click" : "Your Google connection is ready"}</h3><p>{apiCheckProject ? "Before signing in again, make sure Gmail, Drive and Calendar are turned on for this project." : connection.lastError || "One Google sign-in adds Gmail, Drive and Calendar."}</p>{recovery ? <div className="google-recovery-steps"><span><b>1</b> Open the switch</span><span><b>2</b> Press Enable</span><span><b>3</b> Connect again</span></div> : apiCheckProject ? <div className="google-api-checks">{GOOGLE_API_SETUP.map((item) => <a key={item.id} href={`https://console.cloud.google.com/apis/library/${item.api}?project=${apiCheckProject}`} target="_blank" rel="noreferrer"><ConnectorIcon id={item.id} /> Turn on {item.name}</a>)}</div> : <small>Google shows every permission before you agree.</small>}</div><div className="connect-account-actions">{recovery && <a className="button-primary" href={recovery.enableUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Turn on {recovery.serviceName}</a>}<button className={recovery ? "button-secondary" : "button-primary"} onClick={() => void connect()} disabled={busy === "connect"}>{busy === "connect" || status.oauthInProgress ? <LoaderCircle className="spinner" size={16} /> : recovery || apiCheckProject ? <RefreshCw size={15} /> : <ExternalLink size={16} />} {status.oauthInProgress ? "Waiting for Google" : recovery || apiCheckProject ? "Connect again" : "Connect Google"}</button></div></section> : <>
+      <section className="connected-account"><div className="connected-account-top"><span className="google-app-stack"><i><ConnectorIcon id="gmail" /></i><i><ConnectorIcon id="google-drive" /></i><i><ConnectorIcon id="google-calendar" /></i></span><span><strong>{connection.accountEmail}</strong><small><i /> Google Workspace is ready for your team</small></span><div className="workspace-checks"><button onClick={() => void testInbox()} disabled={!gmailReady || busy === "preview-gmail"}>{busy === "preview-gmail" ? <LoaderCircle className="spinner" size={14} /> : <Inbox size={14} />} Inbox</button><button onClick={() => void testDrive()} disabled={!driveReady || busy === "preview-drive"}><FolderOpen size={14} /> Drive</button><button onClick={() => void testCalendar()} disabled={!calendarReady || busy === "preview-calendar"}><Clock3 size={14} /> Calendar</button></div></div>
+        {previewKind === "gmail" && preview.length > 0 && <div className="inbox-preview">{preview.map((message) => <div key={message.id}><i className={message.unread ? "unread" : ""} /><span><strong>{message.subject}</strong><small>{message.from.replace(/\s*<.*?>\s*$/, "")} · {message.snippet}</small></span></div>)}</div>}
+        {previewKind === "drive" && drivePreview.length > 0 && <div className="inbox-preview">{drivePreview.map((file) => <div key={file.id}><span className="mini-service-icon"><ConnectorIcon id="google-drive" /></span><span><strong>{file.name}</strong><small>{file.mimeType.replace("application/vnd.google-apps.", "Google ").replace("application/", "")} · {relativeTime(file.modifiedTime)}</small></span></div>)}</div>}
+        {previewKind === "calendar" && calendarPreview.length > 0 && <div className="inbox-preview">{calendarPreview.map((event) => <div key={event.id}><span className="mini-service-icon"><ConnectorIcon id="google-calendar" /></span><span><strong>{event.title}</strong><small>{event.allDay ? event.start : new Date(event.start).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}{event.location ? ` · ${event.location}` : ""}</small></span></div>)}</div>}
+      </section>
+      {serviceRecoveries.length > 0 && <section className="google-service-recovery"><div className="google-service-recovery-copy"><span><ShieldCheck size={17} /></span><div><strong>{serviceRecoveries.length === 1 ? `${serviceRecoveries[0]!.serviceName} needs one more step` : `${serviceRecoveries.length} Google apps need one more step`}</strong><small>Your working Google apps stay connected. Turn on only the missing ones, then try them again.</small></div></div><div className="google-service-recovery-list">{serviceRecoveries.map((item) => { const loading = busy === (item.service === "gmail" ? "preview-gmail" : item.service === "google-drive" ? "preview-drive" : "preview-calendar"); return <div key={item.service}><span className="mini-service-icon"><ConnectorIcon id={item.service} /></span><strong>{item.serviceName}</strong><a href={item.enableUrl} target="_blank" rel="noreferrer">Turn on <ExternalLink size={11} /></a><button disabled={loading} onClick={() => void (item.service === "gmail" ? testInbox() : item.service === "google-drive" ? testDrive() : testCalendar())}>{loading ? <LoaderCircle className="spinner" size={12} /> : <RefreshCw size={12} />} Try again</button></div>; })}</div></section>}
+      {serviceRecoveries.length === 0 && (!gmailReady || !driveReady || !calendarReady) && <button className="upgrade-google" onClick={() => void connect()}><RefreshCw size={15} /> Reconnect once to add the newest Google apps</button>}
+      <section><div className="panel-section-heading"><div><h3>Ready-made jobs</h3><p>Each one gathers the facts, produces something useful, and checks its own work.</p></div></div><div className="workflow-starters"><button disabled={!gmailReady || !calendarReady} onClick={() => void onStartWorkflow("Use @calendar and @gmail to create my morning brief for the next 24 hours. Deliver one concise brief with: today’s schedule, important unread mail, decisions I owe, preparation needed, and direct source links. Check dates, remove duplicates, and confirm every claim comes from a calendar event or email. Do not send or change anything.")}><span><Sparkles size={16} /></span><div><strong>Morning brief</strong><small>A checked plan for today, with every source linked</small></div><ArrowUp size={14} /></button><button disabled={!gmailReady || !driveReady || !calendarReady} onClick={() => void onStartWorkflow("Use @calendar, @drive, and @gmail to prepare me for my next meeting. Deliver a short briefing with the event details, attendees, recent related documents, the latest relevant email thread, likely decisions, and five useful questions. Link every source, verify that the material is about the same meeting, and do not change anything.")}><span><Users size={16} /></span><div><strong>Prepare my next meeting</strong><small>A sourced brief with decisions and useful questions</small></div><ArrowUp size={14} /></button><button disabled={!gmailReady} onClick={() => void onStartWorkflow("Use @gmail to find important messages from the last seven days that are genuinely waiting on me. Read the full relevant messages, group them by urgency, explain the evidence for each choice, and deliver short reply drafts in my voice. Verify dates and recipients and exclude anything already answered. Do not send anything unless I separately approve the exact email.")}><span><Mail size={16} /></span><div><strong>Clear my follow-ups</strong><small>Verified open loops with reviewable reply drafts</small></div><ArrowUp size={14} /></button></div></section>
+      <section><div className="panel-section-heading"><div><h3>Who can use each app</h3><p>OpenBot adds per-teammate controls that shared plugin accounts usually lack.</p></div></div><div className="connector-access-list">{bots.map((bot) => { const gmail = status.access.find((item) => item.botId === bot.id && item.service === "gmail"), drive = status.access.find((item) => item.botId === bot.id && item.service === "google-drive"), calendar = status.access.find((item) => item.botId === bot.id && item.service === "google-calendar"); return <div key={bot.id}><Mascot bot={bot} size="small" /><span><strong>{bot.name}</strong><small>{bot.role}</small></span><div className="service-access-buttons"><button className={gmail?.canRead ? "on" : ""} aria-pressed={Boolean(gmail?.canRead)} disabled={!gmailReady || busy === `access-gmail-${bot.id}`} onClick={() => void setAccess(bot.id, "gmail", !gmail?.canRead, Boolean(gmail?.canSend))}><Search size={13} /> Inbox</button><button className={gmail?.canSend ? "on send" : "send"} aria-pressed={Boolean(gmail?.canSend)} disabled={!gmailReady || busy === `access-gmail-${bot.id}`} onClick={() => void setAccess(bot.id, "gmail", Boolean(gmail?.canRead), !gmail?.canSend)}><Mail size={13} /> Send</button><button className={drive?.canRead ? "on drive" : "drive"} aria-pressed={Boolean(drive?.canRead)} disabled={!driveReady || busy === `access-google-drive-${bot.id}`} onClick={() => void setAccess(bot.id, "google-drive", !drive?.canRead)}><FolderOpen size={13} /> Drive</button><button className={calendar?.canRead ? "on calendar" : "calendar"} aria-pressed={Boolean(calendar?.canRead)} disabled={!calendarReady || busy === `access-google-calendar-${bot.id}`} onClick={() => void setAccess(bot.id, "google-calendar", !calendar?.canRead)}><Clock3 size={13} /> Calendar</button></div></div>; })}</div></section>
+      {status.events.length > 0 && <section><div className="panel-section-heading"><div><h3>Recent app activity</h3><p>A simple trail, without exposing private email text</p></div></div><div className="connector-events">{status.events.slice(0, 6).map((event) => <div key={event.id}><span className={`event-state event-${event.status}`}>{event.status === "completed" ? <Check size={11} /> : event.status === "waiting" ? <Clock3 size={11} /> : "!"}</span><span><strong>{event.botName ? `${event.botName} · ` : ""}{friendlyAction(event.action)}</strong><small>{friendlyEventSummary(event)}</small></span><time>{relativeTime(event.createdAt)}</time></div>)}</div></section>}
+      <button className="disconnect-button" onClick={() => { if (window.confirm("Disconnect Google Workspace from OpenBot? Your client details will stay saved so you can reconnect later.")) void run("disconnect", async () => { await api("/api/connectors/google/disconnect", { method: "POST" }); setPreview([]); setDrivePreview([]); setCalendarPreview([]); await onRefresh(); onNotice("Google Workspace disconnected"); }); }} disabled={busy === "disconnect"}>Disconnect Google Workspace</button>
+    </>}
+    {error && <p className="panel-error connector-error">{error}</p>}
+  </div>;
+}
+
+type AccessInfo = { host: string; port: number; remoteEnabled: boolean; token: string; urls: string[] };
+function RemotePanel({ bots, installPrompt, onInstalled, onNotice }: { bots: Bot[]; installPrompt: InstallPrompt | null; onInstalled: () => void; onNotice: (message: string) => void }) {
+  const [access, setAccess] = useState<AccessInfo | null>(null), [loading, setLoading] = useState(true), [showKey, setShowKey] = useState(false);
+  const localHost = ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
+  useEffect(() => { api<AccessInfo>("/api/access").then(setAccess).catch(() => setAccess(null)).finally(() => setLoading(false)); }, []);
+  const install = async () => {
+    if (installPrompt) { await installPrompt.prompt(); const choice = await installPrompt.userChoice; if (choice.outcome === "accepted") onInstalled(); return; }
+    onNotice(/iPhone|iPad|iPod/.test(navigator.userAgent) ? "On iPhone: tap Share, then Add to Home Screen." : "Use your browser menu and choose Install OpenBot.");
+  };
+  const copy = async (value: string, success: string) => { await navigator.clipboard.writeText(value); onNotice(success); };
+  return <div className="remote-panel">
+    <div className="remote-hero"><div className="remote-orbit"><RoomCluster bots={bots} large /><Smartphone size={22} /></div><span className="control-kicker"><Wifi size={13} /> Your studio, in your pocket</span><h3>Talk to the team while you’re away.</h3><p>Install OpenBot on your phone, dictate a task, watch progress and handle approvals without opening your laptop screen.</p></div>
+    <section><div className="panel-section-heading"><div><h3>Install the phone remote</h3><p>It behaves like an app and keeps the same conversations</p></div></div><button className="install-app-card" onClick={() => void install()}><span><Smartphone size={19} /></span><div><strong>Add OpenBot to Home Screen</strong><small>{installPrompt ? "Ready to install" : "Takes about ten seconds"}</small></div><ChevronDown size={16} /></button></section>
+      <section><div className="panel-section-heading"><div><h3>Private connection</h3><p>Your Mac remains the host; the access key protects other devices</p></div></div>{loading ? <div className="remote-status"><LoaderCircle className="spinner" size={17} /> Checking this Mac…</div> : !localHost ? <div className="remote-status good"><Wifi size={17} /><span><strong>Connected remotely</strong><small>{window.location.origin}</small></span></div> : access?.remoteEnabled ? <div className="remote-setup"><div className="remote-status good"><Wifi size={17} /><span><strong>Phone access is ready</strong><small>Use the same private network or encrypted tunnel</small></span></div><div className="remote-links">{access.urls.map((url) => <button key={url} onClick={() => void copy(url, "Phone address copied")}><span><strong>{url}</strong><small>Tap to copy this phone address</small></span><Copy size={14} /></button>)}</div><div className="access-key-row"><span><strong>Access key</strong><code>{showKey ? access.token : "••••••••••••••••••••"}</code></span><button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Show"}</button><button onClick={() => void copy(access.token, "Private access key copied")}><Copy size={14} /></button></div></div> : <div className="remote-setup"><div className="remote-status warning"><WifiOff size={17} /><span><strong>Phone access is off</strong><small>Local-only is the secure default</small></span></div><div className="remote-command"><span>On this Mac, start the launch build with</span><code>npm run remote</code><button onClick={() => void copy("npm run remote", "Start command copied")}><Copy size={14} /></button></div></div>}</section>
+    <div className="security-footnote"><ShieldCheck size={16} /><p><strong>Use Tailscale or another HTTPS tunnel away from home.</strong><br />Do not expose OpenBot’s plain HTTP port directly to the public internet. Dictation uses your browser’s speech service; OpenBot does not store the audio.</p></div>
+  </div>;
+}
+
+function ProviderPanel({ provider, bots, onUpdateBot, onAdd, onConnect, onFinish }: {
+  provider: ProviderStatus | null; bots: Bot[]; onUpdateBot: (id: string, patch: Partial<Bot>) => Promise<void>;
+  onAdd: (input: { name: string; provider: ProviderKind; authMode: "api_key"; runtime: "opencode"; envName: string; secret: string }) => Promise<void>;
+  onConnect: (providerId: ProviderCatalogEntry["id"]) => Promise<ProviderLoginAttempt>;
+  onFinish: (attemptId: string, code: string) => Promise<void>;
+}) {
+  const [adding, setAdding] = useState(false), [name, setName] = useState("My OpenAI API"), [envName, setEnvName] = useState("OPENAI_API_KEY"), [secret, setSecret] = useState(""), [apiProvider, setApiProvider] = useState<ProviderKind>("openai"), [apiPreset, setApiPreset] = useState("openai"), [activeAttempt, setActiveAttempt] = useState<ProviderLoginAttempt | null>(null), [code, setCode] = useState(""), [busyProvider, setBusyProvider] = useState<string | null>(null);
+  const submit = async (event: FormEvent) => { event.preventDefault(); await onAdd({ name, provider: apiProvider, authMode: "api_key", runtime: "opencode", envName, secret }); setSecret(""); setAdding(false); };
+  const connect = async (entry: ProviderCatalogEntry) => { setBusyProvider(entry.id); try { const attempt = await onConnect(entry.id); setActiveAttempt(attempt); if (attempt.url) window.open(attempt.url, "_blank", "noopener,noreferrer"); } finally { setBusyProvider(null); } };
+  const chooseApi = (value: string) => {
+    setApiPreset(value);
+    setApiProvider(value === "openai" ? "openai" : value === "claude" ? "claude" : "custom");
+    if (value === "openai") { setName("My OpenAI API"); setEnvName("OPENAI_API_KEY"); }
+    else if (value === "claude") { setName("My Anthropic API"); setEnvName("ANTHROPIC_API_KEY"); }
+    else if (value === "openrouter") { setName("My OpenRouter API"); setEnvName("OPENROUTER_API_KEY"); }
+    else { setName("My provider"); setEnvName("PROVIDER_API_KEY"); }
+  };
+  return <div className="settings-stack">
+    <div className="connection-hero"><span><Sparkles size={15} /> Bring your own AI</span><h3>One studio, the accounts you already trust.</h3><p>Subscriptions sign in with their official tools. API keys stay encrypted on this Mac.</p></div>
+    <section><div className="setting-section-title"><h3>Subscriptions and accounts</h3><p>Pick any mix. Every teammate can use a different connection.</p></div><div className="provider-catalog">{provider?.catalog.map((entry) => <article key={entry.id} className={`provider-choice provider-choice-${entry.id} ${entry.connected ? "is-connected" : ""}`}><div className="provider-choice-top"><span className="provider-logo"><ProviderIcon id={entry.id} /></span><div><h4>{entry.name}</h4><small>{entry.badge}</small></div><span className={`connection-state ${entry.connected ? "connected" : ""}`}><i />{entry.connected ? "Ready" : entry.installed ? "Available" : "Needs app"}</span></div><p>{entry.description}</p><footer><small>{entry.note}</small>{entry.connected ? <Check size={16} /> : entry.canConnect ? <button onClick={() => void connect(entry)} disabled={busyProvider === entry.id}>{busyProvider === entry.id ? <LoaderCircle className="spinner" size={14} /> : "Connect"}</button> : null}</footer></article>)}</div></section>
+    {activeAttempt?.status === "waiting" && !provider?.catalog.find((entry) => entry.id === activeAttempt.providerId)?.connected && <div className="login-progress"><div className="login-pulse"><i /><i /><i /></div><span><strong>Finish the secure sign-in</strong><small>{activeAttempt.instructions}</small></span>{activeAttempt.url && <button onClick={() => window.open(activeAttempt.url!, "_blank", "noopener,noreferrer")}>Open again</button>}{activeAttempt.callbackMode === "code" && <form onSubmit={(event) => { event.preventDefault(); void onFinish(activeAttempt.id, code); }}><input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Paste sign-in code" /><button className="button-primary">Finish</button></form>}</div>}
+    <div className="friendly-note"><ShieldCheck size={17} /><p><strong>No passwords pass through OpenBot.</strong><br />Claude uses Claude Code; supported subscription providers use OpenCode. Provider rules and metering still apply.</p></div>
+    <section><div className="setting-section-title"><h3>Models and ownership</h3><p>Each teammate uses only the connection assigned here.</p></div><div className="model-bot-list">{bots.map((bot) => {
+      const connection = provider?.instances.find((instance) => instance.id === bot.providerInstanceId);
+      const choices = connection?.models?.length ? connection.models : [bot.model];
+      const models = choices.includes(bot.model) ? choices : [bot.model, ...choices];
+      return <div key={bot.id} className="provider-bot-block"><div className="model-bot-row"><Mascot bot={bot} size="small" /><span><strong>{bot.name}</strong><small>{connection?.name || bot.role}</small></span><select value={bot.model} onChange={(event) => void onUpdateBot(bot.id, { model: event.target.value })}>{models.map((model) => <option key={model} value={model}>{shortModel(model)}</option>)}</select></div><label className="provider-owner"><span>Connection</span><select value={bot.providerInstanceId || ""} onChange={(event) => { const next = provider?.instances.find((instance) => instance.id === event.target.value); void onUpdateBot(bot.id, { providerInstanceId: event.target.value, ...(next?.defaultModel ? { model: next.defaultModel } : {}) }); }}>{provider?.instances.map((instance) => <option key={instance.id} value={instance.id}>{instance.name}{instance.hasSecret ? " · encrypted" : instance.connected ? " · ready" : " · check"}</option>)}</select></label></div>;
+    })}</div></section>
+    {adding ? <form className="routine-form api-key-form" onSubmit={submit}><label className="field"><span>Provider</span><select value={apiPreset} onChange={(event) => chooseApi(event.target.value)}><option value="openai">OpenAI API</option><option value="claude">Anthropic API</option><option value="openrouter">OpenRouter</option><option value="custom">Other compatible provider</option></select></label><label className="field"><span>Connection name</span><input value={name} onChange={(e) => setName(e.target.value)} /></label><label className="field"><span>Environment variable</span><input value={envName} onChange={(e) => setEnvName(e.target.value.toUpperCase())} placeholder="OPENAI_API_KEY" /></label><label className="field"><span>API key</span><input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="new-password" required /></label><p className="field-help"><KeyRound size={13} /> Encrypted with AES-256-GCM before it reaches local storage.</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => setAdding(false)}>Cancel</button><button className="button-primary">Save privately</button></div></form> : <button className="add-routine" onClick={() => setAdding(true)}><Plus size={17} /> Add an API-key connection</button>}
+    <div className="claude-boundary"><strong>About Claude subscriptions</strong><p>OpenBot uses Anthropic’s official Claude Code login, never an unofficial OpenCode subscription plug-in. Depending on Anthropic’s current policy and your account, third-party use may count toward plan limits or usage credits.</p></div>
+    <div className="tiny-details"><span>OpenCode {provider?.version || "not found"}</span><span>Local owner · isolated per teammate</span></div>
+  </div>;
+}
+
+function BotPanel({ bot, provider, apps = [], onSave, onOpenTeach }: { bot: Bot; provider: ProviderStatus | null; apps?: ConnectorStatus["access"]; onSave: (id: string, patch: Partial<Bot>) => Promise<void>; onOpenTeach: () => void }) {
+  const [form, setForm] = useState({ role: bot.role, instructions: bot.instructions, model: bot.model, weeklyTokenBudget: bot.weeklyTokenBudget, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled });
+  const [saved, setSaved] = useState(false);
+  const assignedModels = provider?.instances.find((instance) => instance.id === bot.providerInstanceId)?.models || [form.model];
+  const modelChoices = assignedModels.includes(form.model) ? assignedModels : [form.model, ...assignedModels];
+  const gmail = apps.find((access) => access.botId === bot.id && access.service === "gmail"), drive = apps.find((access) => access.botId === bot.id && access.service === "google-drive"), calendar = apps.find((access) => access.botId === bot.id && access.service === "google-calendar");
+  const submit = async (event: FormEvent) => { event.preventDefault(); await onSave(bot.id, form); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  return <form className="bot-editor" onSubmit={submit}>
+    <div className="bot-hero" style={{ "--bot-color": bot.color } as React.CSSProperties}><Mascot bot={bot} size="large" /><h3>{bot.name}</h3><p>{bot.status === "working" ? "Busy making progress" : bot.status === "waiting" ? "Patiently waiting for you" : "Ready for something new"}</p><div className="capability-pills"><span className={!form.computerEnabled ? "off" : ""}><Cpu size={12} /> {form.computerEnabled ? "private computer" : "computer off"}</span><span className={!form.browserEnabled ? "off" : ""}><Globe2 size={12} /> {form.browserEnabled ? "own browser" : "browser off"}</span><span className={!bot.macAccessEnabled ? "off" : ""}><HardDrive size={12} /> {bot.macAccessEnabled ? "Mac files & apps" : "Studio Mac access off"}</span>{gmail?.canRead && <span><Mail size={12} /> Gmail{gmail.canSend ? " + send" : ""}</span>}{drive?.canRead && <span><FolderOpen size={12} /> Drive</span>}{calendar?.canRead && <span><Clock3 size={12} /> Calendar</span>}</div></div>
+    <label className="field"><span>What {bot.name} is great at</span><input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></label>
+    <label className="field"><span>Personality and working style</span><textarea rows={5} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></label>
+    <label className="field"><span>Model</span><select value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })}>{modelChoices.map((value) => <option key={value} value={value}>{shortModel(value)}</option>)}</select></label>
+    <label className="field"><span>Weekly token limit</span><input type="number" min="0" step="10000" value={form.weeklyTokenBudget} onChange={(e) => setForm({ ...form, weeklyTokenBudget: Number(e.target.value) })} /><small>{compactNumber(bot.tokensUsedThisWeek)} used · 0 means unlimited</small></label>
+    <div className="switch-list"><label><span><Cpu size={17} /><b>Private computer</b><small>Terminal work stays in a limited container</small></span><input type="checkbox" checked={form.computerEnabled} onChange={(e) => setForm({ ...form, computerEnabled: e.target.checked })} /></label><label><span><Globe2 size={17} /><b>Private browser</b><small>Separate history and sign-ins for this bot</small></span><input type="checkbox" checked={form.browserEnabled} onChange={(e) => setForm({ ...form, browserEnabled: e.target.checked })} /></label></div>
+    <button type="button" className="teach-callout" onClick={onOpenTeach}><WandSparkles size={19} /><span><strong>Teach {bot.name} a website task</strong><small>Demonstrate it once in a visible browser</small></span><ChevronDown size={16} /></button>
+    <button className="button-primary button-wide" type="submit">{saved ? <><Check size={17} /> Saved</> : "Save changes"}</button>
+  </form>;
+}
+
+function FilesPanel({ bot }: { bot: Bot }) {
+  const [files, setFiles] = useState<WorkspaceFile[]>([]), [selected, setSelected] = useState<{ path: string; content: string } | null>(null), [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(true); api<WorkspaceFile[]>(`/api/bots/${bot.id}/files`).then(setFiles).finally(() => setLoading(false)); }, [bot.id]);
+  const open = async (file: WorkspaceFile) => { if (file.kind === "file") setSelected(await api(`/api/bots/${bot.id}/file?path=${encodeURIComponent(file.path)}`)); };
+  if (selected) return <div className="file-preview"><button className="back-button" onClick={() => setSelected(null)}><ArrowLeft size={16} /> All files</button><div className="file-preview-title"><FileText size={18} /><strong>{selected.path}</strong></div><pre>{selected.content}</pre></div>;
+  return <div className="files-view"><div className="friendly-note"><FolderOpen size={18} /><p><strong>{bot.name} has a private workspace.</strong><br />Files persist across sessions while terminal commands run inside the bot's constrained computer.</p></div>{loading ? <div className="empty-panel"><LoaderCircle className="spinner" /></div> : files.length ? <div className="file-list">{files.map((file) => <button key={file.path} onClick={() => void open(file)}>{file.kind === "directory" ? <Folder size={18} /> : <File size={18} />}<span>{file.path}</span>{file.kind === "file" && <small>{Math.max(1, Math.round(file.size / 1024))} KB</small>}</button>)}</div> : <div className="empty-panel"><div className="empty-illustration"><FolderOpen size={30} /></div><h3>Nothing here yet</h3><p>Ask {bot.name} to create a note, plan or small project.</p></div>}</div>;
+}
+
+function RoutinesPanel({ routines, bots, onCreate, onToggle, onRun }: { routines: Routine[]; bots: Bot[]; onCreate: (input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled: boolean }) => Promise<void>; onToggle: (routine: Routine) => Promise<void>; onRun: (routine: Routine) => Promise<void> }) {
+  const [creating, setCreating] = useState(routines.length === 0), [name, setName] = useState(""), [prompt, setPrompt] = useState(""), [botId, setBotId] = useState(bots[0]?.id || "");
+  const [schedule, setSchedule] = useState<"5" | "60" | "1440" | "10080" | "custom">("1440"), [customAmount, setCustomAmount] = useState(2), [customUnit, setCustomUnit] = useState<"minutes" | "hours" | "days">("hours"), [enabled, setEnabled] = useState(true), [saving, setSaving] = useState(false);
+  const selectedBot = bots.find((item) => item.id === botId) || bots[0];
+  const unitMultiplier = customUnit === "days" ? 1440 : customUnit === "hours" ? 60 : 1;
+  const intervalMinutes = schedule === "custom" ? Math.round(customAmount * unitMultiplier) : Number(schedule);
+  const intervalValid = intervalMinutes >= 5 && intervalMinutes <= 43_200;
+  const reset = () => { setName(""); setPrompt(""); setSchedule("1440"); setCustomAmount(2); setCustomUnit("hours"); setEnabled(true); setCreating(false); };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedBot || !intervalValid || saving) return;
+    setSaving(true);
+    try {
+      await onCreate({ name, prompt, botId: selectedBot.id, threadId: selectedBot.threadId, intervalMinutes, enabled });
+      reset();
+    } finally { setSaving(false); }
+  };
+  const lastStatus = (routine: Routine) => routine.lastStatus === "completed" ? "Last run finished" : routine.lastStatus === "failed" ? "Needs attention" : "Ready for its first run";
+  return <div className="routines-view">
+    <section className="routine-hero">
+      <div className="routine-orbit"><Clock3 size={22} /><i /><i /><i /></div>
+      <span><b>Runs in the background</b><h3>Set it once. Your team keeps it moving.</h3><p>Choose a quick rhythm or make your own—down to every five minutes.</p></span>
+    </section>
+    {routines.length > 0 && <div className="routine-list">{routines.map((routine) => { const bot = bots.find((item) => item.id === routine.botId)!; return <article key={routine.id} className={`routine-row ${routine.enabled ? "is-on" : ""}`}><Mascot bot={bot} size="small" /><div><strong>{routine.name}</strong><span>{routine.botName} · {routineScheduleLabel(routine.intervalMinutes)}</span><small>{routine.enabled ? lastStatus(routine) : "Paused"}</small></div><button className="routine-play" onClick={() => void onRun(routine)} title="Run once now" aria-label={`Run ${routine.name} now`}><Play size={13} /></button><button className={`toggle ${routine.enabled ? "on" : ""}`} onClick={() => void onToggle(routine)} aria-label={`${routine.enabled ? "Pause" : "Start"} ${routine.name}`}><span /></button></article>; })}</div>}
+    {creating ? <form className="routine-form" onSubmit={submit}>
+      <header className="routine-form-head"><span><Sparkles size={17} /></span><div><strong>New routine</strong><small>Give your teammate a job and a rhythm.</small></div></header>
+      <label className="field"><span>Name</span><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Morning project pulse" required /></label>
+      <fieldset className="routine-fieldset"><legend>Who should do it?</legend><div className="routine-teammates">{bots.map((bot) => <button key={bot.id} type="button" className={bot.id === selectedBot?.id ? "selected" : ""} onClick={() => setBotId(bot.id)} style={{ "--bot-color": bot.color } as React.CSSProperties}><Mascot bot={bot} size="small" /><span><b>{bot.name}</b><small>{bot.role}</small></span>{bot.id === selectedBot?.id && <Check size={14} />}</button>)}</div></fieldset>
+      <fieldset className="routine-fieldset"><legend>How often?</legend><div className="schedule-presets">{[{ value: "5", label: "5 min" }, { value: "60", label: "Hourly" }, { value: "1440", label: "Daily" }, { value: "10080", label: "Weekly" }, { value: "custom", label: "Custom" }].map((item) => <button key={item.value} type="button" className={schedule === item.value ? "selected" : ""} onClick={() => setSchedule(item.value as typeof schedule)}>{item.label}</button>)}</div>{schedule === "custom" && <div className="custom-schedule"><input type="number" min={customUnit === "minutes" ? 5 : 1} max={customUnit === "days" ? 30 : customUnit === "hours" ? 720 : 43200} value={customAmount} onChange={(e) => setCustomAmount(Number(e.target.value))} aria-label="Repeat interval" /><select value={customUnit} onChange={(e) => setCustomUnit(e.target.value as typeof customUnit)} aria-label="Repeat unit"><option value="minutes">minutes</option><option value="hours">hours</option><option value="days">days</option></select></div>}{!intervalValid && <small className="routine-error">Choose a repeat time from 5 minutes to 30 days.</small>}</fieldset>
+      <label className="field"><span>What should happen?</span><textarea rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Check the project and post a short update with the next best action…" required /></label>
+      <label className="routine-start"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /><span><b>Start it now</b><small>{enabled ? routineStartsInLabel(intervalMinutes) : "Keep it as a paused draft"}</small></span><i><Check size={12} /></i></label>
+      <div className="routine-preview"><Clock3 size={15} /><p><strong>{selectedBot?.name || "Your teammate"}</strong> will {enabled ? "start" : "save"} “{name.trim() || "your routine"}” {routineScheduleLabel(intervalMinutes).toLowerCase()}.</p></div>
+      <div className="form-actions"><button type="button" className="button-secondary" onClick={reset}>Cancel</button><button className="button-primary" disabled={!intervalValid || saving}>{saving ? <><LoaderCircle className="spinner" size={15} /> Creating…</> : "Create routine"}</button></div>
+    </form> : <button className="add-routine" onClick={() => setCreating(true)}><Plus size={17} /> Add a routine</button>}
+  </div>;
+}
+
+function ComputerPanel({ bot, onTeach }: { bot: Bot; onTeach: () => void }) {
+  const [status, setStatus] = useState<ComputerStatus | null>(null), [url, setUrl] = useState("https://example.com"), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const refresh = useCallback(() => api<ComputerStatus>(`/api/bots/${bot.id}/computer`).then(setStatus).catch((e) => setError(e.message)), [bot.id]);
+  useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 3500); return () => clearInterval(timer); }, [refresh]);
+  const start = async () => { setBusy(true); setError(""); try { setStatus(await api(`/api/bots/${bot.id}/computer/start`, { method: "POST" })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
+  const open = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { await api(`/api/bots/${bot.id}/browser/open`, { method: "POST", body: JSON.stringify({ url }) }); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
+  return <div className="computer-panel"><div className="computer-status-row"><div><span className={`status-light ${status?.container === "ready" ? "on" : ""}`} /><strong>Private computer</strong><small>{status?.container || "checking"}</small></div><div><span className={`status-light ${status?.browser === "ready" ? "on" : ""}`} /><strong>Private browser</strong><small>{status?.browser || "checking"}</small></div></div>
+    <div className="computer-screen">{status?.screenshot ? <img src={status.screenshot} alt={`${bot.name}'s current browser`} /> : <div className="screen-empty"><Mascot bot={bot} size="large" /><h3>{bot.name}'s own little computer</h3><p>Browser history, sign-ins and files stay with this teammate.</p></div>}<div className="screen-bar"><span><i />{status?.title || "No page open"}</span><button onClick={() => void refresh()} aria-label="Refresh preview"><RefreshCw size={14} /></button></div></div>
+    <form className="browser-address" onSubmit={open}><Globe2 size={16} /><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" aria-label="Web address" /><button disabled={busy} aria-label="Open web page">{busy ? <LoaderCircle className="spinner" size={16} /> : <ArrowUp size={16} />}</button></form>
+    {error && <p className="panel-error">{error}</p>}
+    <div className="computer-actions"><button className="button-secondary" onClick={() => void start()} disabled={busy}><Power size={15} /> Start computer</button><button className="button-primary" onClick={onTeach}><WandSparkles size={15} /> Teach a workflow</button></div>
+    <div className="security-footnote"><ShieldCheck size={16} /><p><strong>Safer by design.</strong> Terminal work runs with dropped privileges and resource limits. Browser actions use this bot's isolated profile. Destructive and external actions stop for approval.</p></div>
+  </div>;
+}
+
+function TeachPanel({ bot }: { bot: Bot }) {
+  const [name, setName] = useState(""), [startUrl, setStartUrl] = useState("https://example.com"), [recording, setRecording] = useState(false), [stepCount, setStepCount] = useState(0), [workflows, setWorkflows] = useState<TaughtWorkflow[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const refresh = useCallback(async () => { const [status, list] = await Promise.all([api<{ recording: boolean; stepCount: number }>(`/api/bots/${bot.id}/teach`), api<TaughtWorkflow[]>(`/api/bots/${bot.id}/workflows`)]); setRecording(status.recording); setStepCount(status.stepCount); setWorkflows(list); }, [bot.id]);
+  useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 2000); return () => clearInterval(timer); }, [refresh]);
+  const start = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { await api(`/api/bots/${bot.id}/teach/start`, { method: "POST", body: JSON.stringify({ name, startUrl }) }); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
+  const stop = async () => { setBusy(true); try { await api(`/api/bots/${bot.id}/teach/stop`, { method: "POST" }); await refresh(); setName(""); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
+  return <div className="teach-panel"><div className={`teach-hero ${recording ? "recording" : ""}`}><div className="teach-visual"><Mascot bot={{ ...bot, status: recording ? "working" : "ready" }} size="large" /><span className="teach-pointer">↖</span></div><h3>{recording ? `${bot.name} is watching the steps` : `Show ${bot.name} how you do it`}</h3><p>{recording ? `${stepCount} meaningful action${stepCount === 1 ? "" : "s"} captured. Secrets are replaced with placeholders.` : "Open a visible browser, complete the task once, then save it as a reusable skill."}</p></div>
+    {recording ? <button className="button-primary button-wide stop-teaching" onClick={() => void stop()} disabled={busy}><Square size={14} fill="currentColor" /> Stop and save workflow</button> : <form className="teach-form" onSubmit={start}><label className="field"><span>What should this be called?</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Update the weekly tracker" required /></label><label className="field"><span>Starting web page</span><input value={startUrl} onChange={(e) => setStartUrl(e.target.value)} required /></label><button className="button-primary button-wide" disabled={busy}>{busy ? <LoaderCircle className="spinner" size={16} /> : <Eye size={16} />} Open teaching browser</button></form>}
+    {error && <p className="panel-error">{error}</p>}
+    <div className="privacy-note"><KeyRound size={16} /><p>Passwords are never recorded. When a sign-in is needed later, OpenBot pauses so you can take over safely.</p></div>
+    <section><div className="panel-section-heading"><div><h3>Learned workflows</h3><p>Saved as readable, editable skills</p></div></div>{workflows.length ? <div className="workflow-list">{workflows.map((workflow) => <div key={workflow.id}><WandSparkles size={18} /><span><strong>{workflow.name}</strong><small>{workflow.stepCount} steps · {new URL(workflow.startUrl).hostname}</small></span></div>)}</div> : <div className="empty-panel compact"><PanelTop size={28} /><h3>Nothing taught yet</h3><p>Your first demonstrated workflow will appear here.</p></div>}</section>
+  </div>;
+}
+
+function CreateBotDialog({ provider, onClose, onCreate }: { provider: ProviderStatus | null; onClose: () => void; onCreate: (input: { name: string; emoji: string; mascot: MascotKind; color: string; role: string; instructions: string; model: string }) => Promise<void> }) {
+  const [name, setName] = useState(""), [mascot, setMascot] = useState<MascotKind>("orbit"), [color, setColor] = useState("#ee8b46"), [role, setRole] = useState(""), [instructions, setInstructions] = useState(""), [busy, setBusy] = useState(false);
+  const mascots: MascotKind[] = ["orbit", "nova", "blob", "sprout", "pebble", "sunny"], colors = ["#ee8b46", "#6757d9", "#ef6a8a", "#27a67a", "#3187dc", "#d49b16"];
+  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); try { await onCreate({ name, emoji: "•", mascot, color, role, instructions, model: provider?.defaultModel || "opencode/muse-spark-1.2-contributor-free" }); onClose(); } finally { setBusy(false); } };
+  const preview: MascotBot = { name: name || "New teammate", mascot, color, status: "ready" };
+  return <div className="dialog-layer"><button className="dialog-scrim" onClick={onClose} /><form className="dialog" onSubmit={submit}><button type="button" className="dialog-close" onClick={onClose}><X size={19} /></button><div className="dialog-heading"><Mascot bot={preview} size="large" /><h2>New teammate</h2><p>Give them a clear job and a little personality.</p></div><div className="mascot-picker">{mascots.map((kind) => <button type="button" key={kind} className={mascot === kind ? "chosen" : ""} onClick={() => setMascot(kind)}><Mascot bot={{ ...preview, mascot: kind }} size="small" /></button>)}</div><div className="color-picker">{colors.map((value) => <button type="button" key={value} className={color === value ? "chosen" : ""} style={{ background: value }} onClick={() => setColor(value)} />)}</div><label className="field"><span>Name</span><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Mochi" required /></label><label className="field"><span>What are they great at?</span><input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Travel planner, thoughtful editor…" required /></label><label className="field"><span>How should they work with you?</span><textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Warm, curious and concise. Show me options before big decisions." required /></label><button className="button-primary button-wide" disabled={busy}>{busy ? <LoaderCircle className="spinner" size={18} /> : <Sparkles size={17} />} Create teammate</button></form></div>;
+}
+
+function LoginScreen({ onLogin }: { onLogin: (token: string) => Promise<void> }) {
+  const [token, setToken] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  return <main className="login-screen"><div className="login-card"><Logo /><span className="login-kicker">Private remote access</span><h1>Welcome back to your studio</h1><p>Enter the access key shown on the computer running OpenBot.</p><form onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await onLogin(token); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }}><label className="field"><span>Access key</span><input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoFocus required /></label><button className="button-primary button-wide">{busy ? <LoaderCircle className="spinner" size={17} /> : <KeyRound size={17} />} Unlock OpenBot</button></form>{error && <p className="panel-error">{error}</p>}<small><ShieldCheck size={13} /> The key stays in a secure browser cookie.</small></div></main>;
+}
+
+export function App() {
+  const googleResult = new URLSearchParams(window.location.search).get("google");
+  const [state, setState] = useState<AppState | null>(null), [activeThreadId, setActiveThreadId] = useState("team-room"), [selectedBotIds, setSelectedBotIds] = useState<string[]>([]), [provider, setProvider] = useState<ProviderStatus | null>(null), [connectors, setConnectors] = useState<ConnectorStatus | null>(null), [panel, setPanelState] = useState<Panel>(panelFromLocation), [creatingBot, setCreatingBot] = useState(false), [sidebarOpen, setSidebarOpen] = useState(false), [sending, setSending] = useState(false), [toast, setToast] = useState<string | null>(googleResult === "connected" ? "Google is connected" : googleResult === "attention" ? "Google needs one more step" : null), [authRequired, setAuthRequired] = useState(false), [connection, setConnection] = useState<ConnectionState>(navigator.onLine ? "reconnecting" : "offline"), [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+  const messagesEnd = useRef<HTMLDivElement>(null), previousRuns = useRef<Record<string, string>>({});
+  const setPanel = useCallback((next: Panel) => {
+    setPanelState(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("panel", next); else url.searchParams.delete("panel");
+    url.searchParams.delete("google");
+    window.history.replaceState(null, "", url);
+  }, []);
+  const loadState = useCallback(async (threadId = activeThreadId, quiet = false) => { try { const next = await api<AppState>(`/api/state?threadId=${encodeURIComponent(threadId)}`); setState(next); setAuthRequired(false); } catch (error) { if (error instanceof ApiError && error.status === 401) setAuthRequired(true); else if (!quiet) setToast(error instanceof Error ? error.message : "OpenBot could not wake up."); } }, [activeThreadId]);
+  const loadConnectors = useCallback(async () => { try { setConnectors(await api<ConnectorStatus>("/api/connectors")); } catch { /* the main connection indicator handles server outages */ } }, []);
+  useEffect(() => { void loadState(activeThreadId); }, [activeThreadId, loadState]);
+  useEffect(() => { if (!authRequired) { api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); void loadConnectors(); } }, [authRequired, loadConnectors]);
+  useEffect(() => { if (authRequired) return; const events = new EventSource("/api/events"); events.onopen = () => setConnection("online"); events.onerror = () => setConnection(navigator.onLine ? "reconnecting" : "offline"); events.onmessage = (event) => { const data = JSON.parse(event.data) as { type: string }; if (data.type === "state") void loadState(activeThreadId, true); if (data.type === "provider") api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); if (data.type === "connector") void loadConnectors(); }; return () => events.close(); }, [activeThreadId, authRequired, loadConnectors, loadState]);
+  useEffect(() => { const online = () => setConnection("reconnecting"), offline = () => setConnection("offline"); window.addEventListener("online", online); window.addEventListener("offline", offline); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, []);
+  useEffect(() => { const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPrompt); }; window.addEventListener("beforeinstallprompt", capture); return () => window.removeEventListener("beforeinstallprompt", capture); }, []);
+  useEffect(() => { if (panel !== "provider" || authRequired) return; const refresh = () => api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); void refresh(); const timer = setInterval(refresh, 3_000); return () => clearInterval(timer); }, [panel, authRequired]);
+  useEffect(() => { messagesEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [state?.messages.length, state?.runs.map((run) => `${run.status}:${run.partialText?.length || 0}:${run.task.stage}:${run.task.steps.filter((step) => step.status === "completed").length}`).join(",")]);
+  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 3500); return () => clearTimeout(timer); }, [toast]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("google")) return;
+    url.searchParams.delete("google");
+    window.history.replaceState(null, "", url);
+  }, []);
+  useEffect(() => {
+    if (!state) return;
+    for (const run of state.runs) {
+      const prior = previousRuns.current[run.id];
+      if (prior && prior !== run.status && ["completed", "awaiting_approval", "failed"].includes(run.status) && document.hidden && Notification.permission === "granted") {
+        const message = run.status === "completed" ? `${run.botName} finished a task.` : run.status === "awaiting_approval" ? `${run.botName} needs your okay.` : `${run.botName} needs a hand.`;
+        new Notification("OpenBot", { body: message, icon: "/icon.svg" });
+      }
+      previousRuns.current[run.id] = run.status;
+    }
+  }, [state]);
+
+  const mutate = async (operation: () => Promise<unknown>, success?: string) => { try { await operation(); await loadState(activeThreadId, true); if (success) setToast(success); } catch (error) { setToast(error instanceof Error ? error.message : "Something went wrong."); throw error; } };
+  const selectThread = (id: string) => { setActiveThreadId(id); setSidebarOpen(false); const thread = state?.threads.find((item) => item.id === id); setSelectedBotIds(thread?.botId ? [thread.botId] : []); };
+  const activeThread = state?.threads.find((thread) => thread.id === activeThreadId) || null;
+  const activeBot = activeThread?.botId ? state?.bots.find((bot) => bot.id === activeThread.botId) || null : null;
+  const activeRuns = state?.runs.filter((run) => !["completed", "cancelled"].includes(run.status)).reverse() || [];
+  const updateBot = async (id: string, patch: Partial<Bot>) => mutate(() => api(`/api/bots/${id}`, { method: "PATCH", body: JSON.stringify(patch) }), "Saved");
+  const openPanel = (next: Panel) => setPanel(next);
+
+  if (authRequired) return <LoginScreen onLogin={async (token) => { await api("/api/auth/login", { method: "POST", body: JSON.stringify({ token }) }); await loadState(activeThreadId); }} />;
+  if (!state || !activeThread) return <main className="splash"><Logo /><h1>Waking up your studio…</h1><LoaderCircle className="spinner" /></main>;
+
+  return <div className="app-shell">
+    <Sidebar state={state} provider={provider} connectors={connectors} activeThreadId={activeThreadId} onSelectThread={selectThread} onCreateBot={() => setCreatingBot(true)} onOpenPanel={openPanel} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <main className="conversation"><ConversationHeader threadTitle={activeThread.title} activeBot={activeBot} roomBots={state.bots} onMenu={() => setSidebarOpen(true)} onOpenPanel={openPanel} connection={connection} /><div className="message-scroll"><div className="conversation-intro">{activeBot ? <><Mascot bot={activeBot} size="large" /><h2>{activeBot.name}</h2><p>{activeBot.role}</p><span>{shortModel(activeBot.model)}</span></> : <><div className="studio-stage"><RoomCluster bots={state.bots} hero /><span className="stage-spark">✦</span><span className="stage-spark stage-spark-small">·</span></div><h2>The studio</h2><p>Ask naturally. OpenBot can pick an owner, or use @name to choose.</p><span>{state.bots.map((bot) => bot.name).join(" · ")}</span></>}</div><div className="messages">{state.messages.map((message, index) => <MessageBubble key={message.id} message={message} previous={state.messages[index - 1]} macAccessEnabled={state.settings.macAccessEnabled} run={message.runId ? state.runs.find((run) => run.id === message.runId) : undefined} />)}<div className="run-list">{activeRuns.map((run) => <RunCard key={run.id} run={run} onApprove={(id) => void mutate(() => api(`/api/runs/${id}/approve`, { method: "POST" }))} onCancel={(id) => void mutate(() => api(`/api/runs/${id}/cancel`, { method: "POST" }))} />)}</div><div ref={messagesEnd} /></div></div><Composer bots={activeThread.kind === "room" ? state.bots : activeBot ? [activeBot] : []} apps={connectors?.catalog} isRoom={activeThread.kind === "room"} selectedBotIds={selectedBotIds} setSelectedBotIds={setSelectedBotIds} onNotice={setToast} onSend={async (body, files) => { setSending(true); try { const uploaded = await Promise.all(files.map((file) => api<Attachment>(`/api/attachments?threadId=${encodeURIComponent(activeThreadId)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "X-File-Type": file.type || "application/octet-stream" }, body: file }))); await mutate(() => api("/api/messages", { method: "POST", body: JSON.stringify({ threadId: activeThreadId, body, targetBotIds: selectedBotIds, attachmentIds: uploaded.map((attachment) => attachment.id) }) })); } finally { setSending(false); } }} sending={sending} /></main>
+    {panel === "control" && <Sheet title="Control center" subtitle="Your studio at a glance" onClose={() => setPanel(null)}><ControlPanel state={state} onNotify={async () => { if (!("Notification" in window)) return setToast("Notifications are not supported here"); const permission = await Notification.requestPermission(); setToast(permission === "granted" ? "Notifications are on" : "Notifications stayed off"); }} onOpenProvider={() => setPanel("provider")} onOpenRemote={() => setPanel("remote")} onOpenConnectors={() => setPanel("connectors")} onOpenProjects={() => setPanel("projects")} onSetMacAccess={async (enabled) => { await mutate(() => api("/api/settings", { method: "PATCH", body: JSON.stringify({ macAccessEnabled: enabled }) }), enabled ? "Every teammate can now use visible Mac files and apps" : "Mac access is off for the studio"); }} /></Sheet>}
+    {panel === "connectors" && <Sheet wide title="Apps & tools" subtitle="Useful connections, under your control" onClose={() => setPanel(null)}><ConnectorPanel status={connectors} bots={state.bots} onRefresh={loadConnectors} onNotice={setToast} onStartWorkflow={async (prompt) => { try { setPanel(null); setActiveThreadId("team-room"); setSelectedBotIds([]); await api("/api/messages", { method: "POST", body: JSON.stringify({ threadId: "team-room", body: prompt, targetBotIds: [], attachmentIds: [] }) }); await loadState("team-room", true); setToast("Started in the studio"); } catch (reason) { setToast(reason instanceof Error ? reason.message : "Could not start that workflow."); } }} /></Sheet>}
+    {panel === "projects" && <Sheet wide title="Code projects" subtitle="Approved folders for building and testing" onClose={() => setPanel(null)}><CodeProjectsPanel bots={state.bots} onNotice={setToast} /></Sheet>}
+    {panel === "remote" && <Sheet title="Phone remote" subtitle="Speak, check in and approve from anywhere" onClose={() => setPanel(null)}><RemotePanel bots={state.bots} installPrompt={installPrompt} onInstalled={() => setInstallPrompt(null)} onNotice={setToast} /></Sheet>}
+    {panel === "provider" && <Sheet title="Your AI connections" subtitle="Bring your own models and subscriptions" onClose={() => setPanel(null)}><ProviderPanel provider={provider} bots={state.bots} onUpdateBot={updateBot} onAdd={async (input) => { await mutate(() => api("/api/providers", { method: "POST", body: JSON.stringify(input) }), "Connection saved privately"); setProvider(await api("/api/provider")); }} onConnect={async (providerId) => { const attempt = await api<ProviderLoginAttempt>("/api/provider/connect", { method: "POST", body: JSON.stringify({ providerId }) }); setToast("Secure sign-in started"); return attempt; }} onFinish={async (attemptId, code) => { await api(`/api/provider/connect/${attemptId}/callback`, { method: "POST", body: JSON.stringify({ code }) }); setProvider(await api("/api/provider")); setToast("Connection ready"); }} /></Sheet>}
+    {panel === "bot" && activeBot && <Sheet title={`${activeBot.name}’s details`} subtitle="Role, limits and capabilities" onClose={() => setPanel(null)}><BotPanel bot={activeBot} provider={provider} apps={connectors?.access} onSave={updateBot} onOpenTeach={() => setPanel("teach")} /></Sheet>}
+    {panel === "files" && activeBot && <Sheet title={`${activeBot.name}’s workspace`} subtitle="Persistent files, private to this teammate" onClose={() => setPanel(null)}><FilesPanel bot={activeBot} /></Sheet>}
+    {panel === "computer" && activeBot && <Sheet title={`${activeBot.name}’s computer`} subtitle="A persistent workspace and private browser" onClose={() => setPanel(null)}><ComputerPanel bot={activeBot} onTeach={() => setPanel("teach")} /></Sheet>}
+    {panel === "teach" && activeBot && <Sheet title={`Teach ${activeBot.name}`} subtitle="Turn a demonstration into a reusable skill" onClose={() => setPanel(null)}><TeachPanel bot={activeBot} /></Sheet>}
+    {panel === "routines" && <Sheet title="Routines" subtitle="Small jobs that remember themselves" onClose={() => setPanel(null)}><RoutinesPanel routines={state.routines} bots={state.bots} onCreate={async (input) => { await mutate(() => api("/api/routines", { method: "POST", body: JSON.stringify(input) }), "Routine created"); }} onToggle={async (routine) => { await mutate(() => api(`/api/routines/${routine.id}`, { method: "PATCH", body: JSON.stringify({ enabled: !routine.enabled }) })); }} onRun={async (routine) => { await mutate(() => api(`/api/routines/${routine.id}/run`, { method: "POST" }), "Test run started"); }} /></Sheet>}
+    {creatingBot && <CreateBotDialog provider={provider} onClose={() => setCreatingBot(false)} onCreate={async (input) => { const bot = await api<Bot>("/api/bots", { method: "POST", body: JSON.stringify(input) }); await loadState(bot.threadId, true); setActiveThreadId(bot.threadId); setSelectedBotIds([bot.id]); setToast(`${bot.name} joined your studio`); }} />}
+    {toast && <div className="toast"><Check size={16} />{toast}</div>}
+  </div>;
+}
