@@ -16,6 +16,9 @@ import { MacFileAccess, type MacFileMove } from "./mac-files.js";
 import { MacAppControl } from "./mac-apps.js";
 import { CodeProjectManager } from "./code-projects.js";
 import { GitHubConnector } from "./github.js";
+import { SlackConnector } from "./slack.js";
+import { NotionConnector } from "./notion.js";
+import { CONNECTOR_MANIFESTS, friendlyConnectorError, manifestCatalogEntry } from "./connectors.js";
 import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
@@ -36,6 +39,8 @@ const internalToken = randomBytes(32).toString("base64url");
 const computer = new ComputerManager(db);
 const browser = new BrowserManager(db);
 const googleWorkspace = new GoogleWorkspaceConnector(db, `http://127.0.0.1:${port}/api/connectors/google/callback`);
+const slack = new SlackConnector(db, `http://127.0.0.1:${port}/api/connectors/slack/callback`);
+const notion = new NotionConnector(db, `http://127.0.0.1:${port}/api/connectors/notion/callback`);
 const attachmentsService = new AttachmentService(db);
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
@@ -43,6 +48,10 @@ const codeProjects = new CodeProjectManager(db);
 const github = new GitHubConnector();
 const managedGoogleClient = Boolean(process.env.OPENBOT_GOOGLE_CLIENT_ID?.trim());
 if (managedGoogleClient) db.configureGoogleConnector({ clientId: process.env.OPENBOT_GOOGLE_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_GOOGLE_CLIENT_SECRET?.trim() || null });
+const managedSlackClient = Boolean(process.env.OPENBOT_SLACK_CLIENT_ID?.trim() && process.env.OPENBOT_SLACK_CLIENT_SECRET?.trim());
+if (managedSlackClient) db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", clientId: process.env.OPENBOT_SLACK_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_SLACK_CLIENT_SECRET!.trim() });
+const managedNotionClient = Boolean(process.env.OPENBOT_NOTION_CLIENT_ID?.trim() && process.env.OPENBOT_NOTION_CLIENT_SECRET?.trim());
+if (managedNotionClient) db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: process.env.OPENBOT_NOTION_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_NOTION_CLIENT_SECRET!.trim() });
 const eventClients = new Set<express.Response>();
 
 function persistentAccessToken() {
@@ -243,19 +252,32 @@ function readConnectorStatus(): ConnectorStatus {
   const unavailableServices = new Set(serviceRecoveries.map((item) => item.service));
   const githubStatus = github.status();
   db.ensureLocalConnector("github-cli", "github_cli", "GitHub", githubStatus.connected, githubStatus.accountLogin);
+  const slackConnection = db.getConnector("slack"), notionConnection = db.getConnector("notion");
   const saved = new Map(db.listBotConnectorAccess().map((access) => [`${access.botId}:${access.service}`, access]));
   const githubSaved = new Map(db.listBotConnectorAccess("github-cli").map((access) => [access.botId, access]));
+  const slackSaved = new Map(db.listBotConnectorAccess("slack").map((access) => [access.botId, access]));
+  const notionSaved = new Map(db.listBotConnectorAccess("notion").map((access) => [access.botId, access]));
+  const catalog = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).map((entry) => {
+    if (entry.id === "github") return manifestCatalogEntry("github", githubStatus.connected, githubStatus.connected ? "Connected" : githubStatus.installed ? "Available now" : "Needs GitHub CLI", ["Notifications", "Search issues", "Approval-safe creating"]);
+    if (entry.id === "slack") return manifestCatalogEntry("slack", Boolean(slackConnection?.connected), slackConnection?.connected ? "Connected" : slackConnection?.configured ? "Ready to connect" : "Available now", ["Search messages", "Read context", "Approval-safe posting"]);
+    if (entry.id === "notion") return manifestCatalogEntry("notion", Boolean(notionConnection?.connected), notionConnection?.connected ? "Connected" : notionConnection?.configured ? "Ready to connect" : "Available now", ["Search pages", "Read content", "Approval-safe updates"]);
+    const manifest = CONNECTOR_MANIFESTS.find((item) => item.service === entry.id)!;
+    return { ...entry, connectorId: manifest.connectorId, manifestVersion: manifest.schemaVersion, writeRequiresApproval: manifest.writeRequiresApproval, ...(unavailableServices.has(entry.id as GoogleConnectorService) ? { connected: false, badge: "Needs setup" } : {}) };
+  });
   return {
     connection: connection ? { ...connection, lastError: connection.lastError ? friendlyGoogleError(connection.lastError) : null } : null,
+    connections: db.listConnectors(), manifests: [...CONNECTOR_MANIFESTS],
     callbackUrl: googleWorkspace.redirectUri, managedGoogleClient, oauthInProgress: googleWorkspace.oauthInProgress(),
     googleProjectId: googleCloudProjectFromClientId(credentials?.clientId), googleApiRecovery: googleIssue, googleApiRecoveries: serviceRecoveries,
     github: githubStatus,
-    catalog: connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).map((entry) => entry.id === "github"
-      ? { ...entry, availability: "live" as const, connected: githubStatus.connected, badge: githubStatus.connected ? "Connected" : githubStatus.installed ? "Available now" : "Needs GitHub CLI", description: "Follow notifications and issues, then create issues only after your approval.", capabilities: ["Notifications", "Search issues", "Approval-safe creating"] }
-      : unavailableServices.has(entry.id as GoogleConnectorService) ? { ...entry, connected: false, badge: "Needs setup" } : entry),
+    slack: { connectorId: "slack", configured: Boolean(slackConnection?.configured), connected: Boolean(slackConnection?.connected), managedClient: managedSlackClient, oauthInProgress: slack.oauthInProgress(), callbackUrl: slack.redirectUri, accountName: slackConnection?.accountEmail || null, lastError: slackConnection?.lastError ? friendlyConnectorError("slack", slackConnection.lastError) : null },
+    notion: { connectorId: "notion", configured: Boolean(notionConnection?.configured), connected: Boolean(notionConnection?.connected), managedClient: managedNotionClient, oauthInProgress: notion.oauthInProgress(), callbackUrl: notion.redirectUri, accountName: notionConnection?.accountEmail || null, lastError: notionConnection?.lastError ? friendlyConnectorError("notion", notionConnection.lastError) : null },
+    catalog,
     access: [...db.listBots().flatMap((bot) => services.map((service) => saved.get(`${bot.id}:${service}`) || { botId: bot.id, connectorId: "google-workspace", service, canRead: false, canSend: false, updatedAt: connection?.updatedAt || new Date(0).toISOString() })),
-      ...db.listBots().map((bot) => githubSaved.get(bot.id) || { botId: bot.id, connectorId: "github-cli", service: "github" as const, canRead: false, canSend: false, updatedAt: new Date(0).toISOString() })],
-    events: [...events, ...db.listConnectorEvents("github-cli", 12)].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 16),
+      ...db.listBots().map((bot) => githubSaved.get(bot.id) || { botId: bot.id, connectorId: "github-cli", service: "github" as const, canRead: false, canSend: false, updatedAt: new Date(0).toISOString() }),
+      ...db.listBots().map((bot) => slackSaved.get(bot.id) || { botId: bot.id, connectorId: "slack", service: "slack" as const, canRead: false, canSend: false, updatedAt: slackConnection?.updatedAt || new Date(0).toISOString() }),
+      ...db.listBots().map((bot) => notionSaved.get(bot.id) || { botId: bot.id, connectorId: "notion", service: "notion" as const, canRead: false, canSend: false, updatedAt: notionConnection?.updatedAt || new Date(0).toISOString() })],
+    events: [...events, ...db.listConnectorEvents("github-cli", 12), ...db.listConnectorEvents("slack", 12), ...db.listConnectorEvents("notion", 12)].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 20),
   };
 }
 
@@ -287,6 +309,118 @@ app.get("/api/connectors/github/notifications", async (request, response) => {
 app.get("/api/connectors/github/issues", async (request, response) => {
   try { response.json(await github.issues(typeof request.query.q === "string" ? request.query.q : "", Number(request.query.limit || 12))); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+
+const oauthConnectorConfig = z.object({ clientId: z.string().trim().min(5).max(500), clientSecret: z.string().trim().min(8).max(2_000) });
+const oauthCallbackInput = z.object({
+  state: z.string().min(10).max(500), code: z.string().min(1).max(4_000).optional(), error: z.string().trim().max(200).optional(), error_description: z.string().trim().max(1_000).optional(),
+}).refine((value) => Boolean(value.code || value.error));
+function connectorReturnUrl(connector: "slack" | "notion", result: "connected" | "attention") {
+  const url = new URL(appUrl);
+  url.searchParams.set("panel", "connectors"); url.searchParams.set("connector", connector); url.searchParams.set("status", result);
+  return url.toString();
+}
+
+app.post("/api/connectors/slack/config", (request, response) => {
+  if (managedSlackClient) return response.status(409).json({ error: "This OpenBot release already manages its Slack connection." });
+  const parsed = oauthConnectorConfig.safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Enter the Slack app client ID and client secret." });
+  const connection = db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", ...parsed.data });
+  broadcast({ type: "connector", at: Date.now() }); response.json(connection);
+});
+app.post("/api/connectors/slack/connect", (_request, response) => {
+  try { response.status(202).json(slack.beginOAuth()); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.get("/api/connectors/slack/callback", async (request, response) => {
+  const parsed = oauthCallbackInput.safeParse(request.query);
+  if (!parsed.success) return response.redirect(303, connectorReturnUrl("slack", db.getConnector("slack")?.connected ? "connected" : "attention"));
+  if (parsed.data.error) {
+    const existing = db.getConnector("slack");
+    if (!existing?.connected) db.markConnectorError("slack", parsed.data.error_description || parsed.data.error);
+    broadcast({ type: "connector", at: Date.now() }); return response.redirect(303, connectorReturnUrl("slack", existing?.connected ? "connected" : "attention"));
+  }
+  try {
+    const connection = await slack.completeOAuth(parsed.data.state, parsed.data.code!);
+    db.addConnectorEvent({ connectorId: "slack", action: "connected", status: "completed", summary: `Slack is ready for ${connection.accountEmail || "the connected workspace"}` });
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("slack", "connected"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const existing = db.getConnector("slack");
+    if (!existing?.connected) db.markConnectorError("slack", message);
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("slack", existing?.connected ? "connected" : "attention"));
+  }
+});
+app.post("/api/connectors/slack/disconnect", async (_request, response) => {
+  const result = await slack.disconnect(); db.addConnectorEvent({ connectorId: "slack", action: "disconnected", status: "completed", summary: "Slack was disconnected from OpenBot" });
+  broadcast({ type: "connector", at: Date.now() }); response.json(result);
+});
+app.patch("/api/connectors/slack/access/:botId", (request, response) => {
+  const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
+  if (!parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid Slack permissions for this teammate." });
+  if (!db.getConnector("slack")?.connected) return response.status(409).json({ error: "Connect Slack before sharing it with a teammate." });
+  response.json(db.setBotConnectorAccess(request.params.botId, parsed.data, "slack", "slack")); broadcast({ type: "connector", at: Date.now() });
+});
+app.get("/api/connectors/slack/preview", async (request, response) => {
+  try {
+    const query = typeof request.query.q === "string" ? request.query.q : "after:yesterday";
+    const messages = await slack.search(query, 6); db.markConnectorHealthy("slack"); response.json(messages);
+  } catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("slack", message); response.status(400).json({ error: friendlyConnectorError("slack", message) }); }
+});
+app.post("/api/connectors/slack/health", async (_request, response) => {
+  try { const health = await slack.health(); db.markConnectorHealthy("slack"); response.json(health); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("slack", message); response.status(400).json({ error: friendlyConnectorError("slack", message) }); }
+});
+
+app.post("/api/connectors/notion/config", (request, response) => {
+  if (managedNotionClient) return response.status(409).json({ error: "This OpenBot release already manages its Notion connection." });
+  const parsed = oauthConnectorConfig.safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Enter the Notion OAuth client ID and client secret." });
+  const connection = db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", ...parsed.data });
+  broadcast({ type: "connector", at: Date.now() }); response.json(connection);
+});
+app.post("/api/connectors/notion/connect", (_request, response) => {
+  try { response.status(202).json(notion.beginOAuth()); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.get("/api/connectors/notion/callback", async (request, response) => {
+  const parsed = oauthCallbackInput.safeParse(request.query);
+  if (!parsed.success) return response.redirect(303, connectorReturnUrl("notion", db.getConnector("notion")?.connected ? "connected" : "attention"));
+  if (parsed.data.error) {
+    const existing = db.getConnector("notion");
+    if (!existing?.connected) db.markConnectorError("notion", parsed.data.error_description || parsed.data.error);
+    broadcast({ type: "connector", at: Date.now() }); return response.redirect(303, connectorReturnUrl("notion", existing?.connected ? "connected" : "attention"));
+  }
+  try {
+    const connection = await notion.completeOAuth(parsed.data.state, parsed.data.code!);
+    db.addConnectorEvent({ connectorId: "notion", action: "connected", status: "completed", summary: `Notion is ready for ${connection.accountEmail || "the connected workspace"}` });
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("notion", "connected"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const existing = db.getConnector("notion");
+    if (!existing?.connected) db.markConnectorError("notion", message);
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("notion", existing?.connected ? "connected" : "attention"));
+  }
+});
+app.post("/api/connectors/notion/disconnect", async (_request, response) => {
+  const result = await notion.disconnect(); db.addConnectorEvent({ connectorId: "notion", action: "disconnected", status: "completed", summary: "Notion was disconnected from OpenBot" });
+  broadcast({ type: "connector", at: Date.now() }); response.json(result);
+});
+app.patch("/api/connectors/notion/access/:botId", (request, response) => {
+  const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
+  if (!parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid Notion permissions for this teammate." });
+  if (!db.getConnector("notion")?.connected) return response.status(409).json({ error: "Connect Notion before sharing it with a teammate." });
+  response.json(db.setBotConnectorAccess(request.params.botId, parsed.data, "notion", "notion")); broadcast({ type: "connector", at: Date.now() });
+});
+app.get("/api/connectors/notion/preview", async (request, response) => {
+  try {
+    const query = typeof request.query.q === "string" ? request.query.q : "";
+    const pages = await notion.search(query, 6); db.markConnectorHealthy("notion"); response.json(pages);
+  } catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("notion", message); response.status(400).json({ error: friendlyConnectorError("notion", message) }); }
+});
+app.post("/api/connectors/notion/health", async (_request, response) => {
+  try { const health = await notion.health(); db.markConnectorHealthy("notion"); response.json(health); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("notion", message); response.status(400).json({ error: friendlyConnectorError("notion", message) }); }
 });
 
 app.post("/api/connectors/google/config", (request, response) => {
@@ -534,6 +668,24 @@ async function performApprovedAction(action: unknown): Promise<string> {
     broadcast({ type: "connector", at: Date.now() });
     return `The GitHub issue was created: ${url}`;
   }
+  if (parsed.data.type === "slack_post") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "slack", "slack");
+    if (!bot || !access?.canSend || !db.getConnector("slack")?.connected) throw new Error("Posting to Slack is not available for this teammate.");
+    const channelId = String(args.channelId || ""), text = String(args.text || ""), threadTimestamp = args.threadTimestamp ? String(args.threadTimestamp) : null;
+    const result = await slack.post(channelId, text, threadTimestamp);
+    db.addConnectorEvent({ connectorId: "slack", botId: bot.id, action: "slack_post", status: "completed", summary: `${bot.name} posted the approved message in Slack` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The approved Slack message was posted${result.timestamp ? ` at ${result.timestamp}` : ""}.`;
+  }
+  if (parsed.data.type === "notion_update") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "notion", "notion");
+    if (!bot || !access?.canSend || !db.getConnector("notion")?.connected) throw new Error("Adding to Notion is not available for this teammate.");
+    const pageId = String(args.pageId || ""), content = String(args.content || ""), heading = args.heading ? String(args.heading) : null;
+    const result = await notion.append(pageId, content, heading);
+    db.addConnectorEvent({ connectorId: "notion", botId: bot.id, action: "notion_update", status: "completed", summary: `${bot.name} added ${result.blocksAdded} approved block${result.blocksAdded === 1 ? "" : "s"} to “${result.title.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The approved note was added to ${result.title}${result.url ? ` (${result.url})` : ""}.`;
+  }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
     const moves = z.array(z.object({ from: z.string().min(1).max(1_000), to: z.string().min(1).max(1_000) })).min(1).max(100).parse(args.moves) as MacFileMove[];
@@ -556,8 +708,14 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
   if (!approval || approval.status !== "pending") return null;
   const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string } | null;
   const decided = db.decideApproval(approval.id, decision);
-  if (decision === "denied" && (action?.type === "gmail_send" || action?.type === "github_issue_create")) {
-    db.addConnectorEvent({ connectorId: action.type === "github_issue_create" ? "github-cli" : "google-workspace", botId: action.botId || approval.botId, action: action.type, status: "failed", summary: action.type === "github_issue_create" ? "The issue was not created because you chose Not now" : "Email was not sent because you chose Not now" });
+  const connectorAction = action?.type ? ({
+    gmail_send: { connectorId: "google-workspace", denied: "Email was not sent because you chose Not now" },
+    github_issue_create: { connectorId: "github-cli", denied: "The issue was not created because you chose Not now" },
+    slack_post: { connectorId: "slack", denied: "The Slack message was not posted because you chose Not now" },
+    notion_update: { connectorId: "notion", denied: "Nothing was added to Notion because you chose Not now" },
+  } as const)[action.type as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update"] : undefined;
+  if (decision === "denied" && action?.type && connectorAction) {
+    db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: action.botId || approval.botId, action: action.type, status: "failed", summary: connectorAction.denied });
     broadcast({ type: "connector", at: Date.now() });
   }
   if (decision === "approved" && action?.type && action.type !== "run") {
@@ -568,7 +726,7 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
       db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Approved and completed", detail: result.slice(0, 180) });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (action.type === "gmail_send" || action.type === "github_issue_create") { db.addConnectorEvent({ connectorId: action.type === "github_issue_create" ? "github-cli" : "google-workspace", botId: action.botId || approval.botId, action: action.type, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
+      if (connectorAction) { db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: action.botId || approval.botId, action: action.type, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
       db.setRunPrompt(approval.runId, `The user approved the action, but it failed with: ${message}. Continue safely or explain the blocker.`);
       db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "error", label: "The approved action needs attention", detail: message.slice(0, 180) });
     }
@@ -862,7 +1020,7 @@ app.post("/api/bots/:id/teach/stop", async (request, response) => {
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
@@ -882,7 +1040,7 @@ app.post("/api/internal/tools", async (request, response) => {
       const plan = z.object({
         goal: z.string().trim().min(1).max(240), deliverable: z.string().trim().min(1).max(240),
         steps: z.array(z.string().trim().min(1).max(140)).min(1).max(8),
-        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "github", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
+        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "github", "slack", "notion", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
         approvalBoundary: z.string().trim().max(240).optional(),
       }).safeParse(args);
       if (!plan.success) return response.status(400).json({ error: "Set one clear outcome, deliverable, and up to eight meaningful steps." });
@@ -1106,6 +1264,70 @@ app.post("/api/internal/tools", async (request, response) => {
       const preview = issue.data.body.trim().replace(/\s+/g, " ").slice(0, 260);
       return holdForApproval("external", `${bot.name} prepared a GitHub issue in ${issue.data.repository}. Title: “${issue.data.title}”.${preview ? ` Preview: ${preview}${issue.data.body.trim().length > 260 ? "…" : ""}` : ""}`, `Create issue in ${issue.data.repository}`);
     }
+    if (action === "slack_search" || action === "slack_read" || action === "slack_post") {
+      const connection = db.getConnector("slack"), access = db.getBotConnectorAccess(botId, "slack", "slack");
+      if (!connection?.connected) return response.status(409).json({ error: "Slack is not connected yet. Ask the user to connect it in Apps & Tools." });
+      if ((action === "slack_search" || action === "slack_read") && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Slack." });
+      if (action === "slack_post" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Slack messages." });
+      if (action === "slack_search") {
+        const input = z.object({ query: z.string().trim().min(1).max(500), maxResults: z.number().int().min(1).max(20).optional() }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give Slack a short, focused search." });
+        const messages = await slack.search(input.data.query, input.data.maxResults || 12);
+        db.addConnectorEvent({ connectorId: "slack", botId, action, status: "completed", summary: `${bot.name} found ${messages.length} matching Slack message${messages.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json({ messages, count: messages.length });
+      }
+      if (action === "slack_read") {
+        const input = z.object({ channelId: z.string().trim().min(1).max(200), timestamp: z.string().trim().min(1).max(80), threadTimestamp: z.string().trim().max(80).nullable().optional(), maxResults: z.number().int().min(1).max(50).optional() }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Choose one of the Slack messages found by search." });
+        const conversation = await slack.read(input.data.channelId, input.data.timestamp, input.data.threadTimestamp, input.data.maxResults || 20);
+        db.addConnectorEvent({ connectorId: "slack", botId, action, status: "completed", summary: `${bot.name} read ${conversation.messages.length} Slack message${conversation.messages.length === 1 ? "" : "s"} for context` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json(conversation);
+      }
+      const input = z.object({ channelId: z.string().trim().min(1).max(200), text: z.string().trim().min(1).max(4_000), threadTimestamp: z.string().trim().max(80).nullable().optional() }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Choose a Slack conversation and write the message to prepare." });
+      db.addConnectorEvent({ connectorId: "slack", botId, action, status: "waiting", summary: `${bot.name} prepared a Slack message for approval` });
+      broadcast({ type: "connector", at: Date.now() });
+      return holdForApproval(
+        "external",
+        `${bot.name} wants to post this ${input.data.threadTimestamp ? "reply" : "message"} to Slack conversation ${input.data.channelId}. Review the complete message:\n\n${input.data.text}`,
+        `Post to Slack conversation ${input.data.channelId}`,
+        input.data,
+      );
+    }
+    if (action === "notion_search" || action === "notion_read" || action === "notion_update") {
+      const connection = db.getConnector("notion"), access = db.getBotConnectorAccess(botId, "notion", "notion");
+      if (!connection?.connected) return response.status(409).json({ error: "Notion is not connected yet. Ask the user to connect it in Apps & Tools." });
+      if ((action === "notion_search" || action === "notion_read") && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Notion." });
+      if (action === "notion_update" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Notion updates." });
+      if (action === "notion_search") {
+        const input = z.object({ query: z.string().trim().max(500).default(""), maxResults: z.number().int().min(1).max(20).optional() }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give Notion a short page search." });
+        const pages = await notion.search(input.data.query, input.data.maxResults || 12);
+        db.addConnectorEvent({ connectorId: "notion", botId, action, status: "completed", summary: `${bot.name} found ${pages.length} shared Notion page${pages.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json({ pages, count: pages.length });
+      }
+      if (action === "notion_read") {
+        const input = z.object({ pageId: z.string().trim().min(1).max(200) }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Choose a Notion page returned by search." });
+        const page = await notion.read(input.data.pageId);
+        db.addConnectorEvent({ connectorId: "notion", botId, action, status: "completed", summary: `${bot.name} read “${page.title.slice(0, 120)}” in Notion` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json(page);
+      }
+      const input = z.object({ pageId: z.string().trim().min(1).max(200), heading: z.string().trim().max(200).nullable().optional(), content: z.string().trim().min(1).max(8_000) }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Choose a shared Notion page and write the note to prepare." });
+      db.addConnectorEvent({ connectorId: "notion", botId, action, status: "waiting", summary: `${bot.name} prepared a Notion update for approval` });
+      broadcast({ type: "connector", at: Date.now() });
+      return holdForApproval(
+        "external",
+        `${bot.name} wants to add this to Notion page ${input.data.pageId}${input.data.heading ? ` under “${input.data.heading}”` : ""}. Review the complete content:\n\n${input.data.content}`,
+        `Add to Notion page ${input.data.pageId}`,
+        input.data,
+      );
+    }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;
       const routine = routineInput.safeParse({
@@ -1159,8 +1381,10 @@ app.post("/api/internal/tools", async (request, response) => {
     return response.status(400).json({ error: "Unknown tool." });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (action.startsWith("gmail_") || action.startsWith("google_")) { db.addConnectorEvent({ botId, action, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
-    return response.status(500).json({ error: message });
+    const connectorId = action.startsWith("slack_") ? "slack" : action.startsWith("notion_") ? "notion" : action.startsWith("github_") ? "github-cli" : action.startsWith("gmail_") || action.startsWith("google_") ? "google-workspace" : null;
+    if (connectorId) { db.addConnectorEvent({ connectorId, botId, action, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
+    const userMessage = connectorId === "slack" || connectorId === "notion" ? friendlyConnectorError(connectorId, message) : message;
+    return response.status(500).json({ error: userMessage });
   }
 });
 

@@ -389,3 +389,26 @@ test("encrypts Google credentials and keeps Gmail access separate for every team
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("encrypts reusable OAuth connectors and revokes stale model capabilities", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-oauth-connectors-test-"));
+  try {
+    const db = new OpenBotDatabase(root), before = db.botSessionFingerprint("nova");
+    db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", clientId: "slack-client", clientSecret: "slack-secret-private" });
+    db.completeOAuthConnector("slack", { bot: { accessToken: "slack-bot-private" }, user: { accessToken: "slack-user-private" }, teamId: "T1", teamName: "Studio" }, "Studio", ["search:read", "chat:write"]);
+    db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: "notion-client", clientSecret: "notion-secret-private" });
+    db.completeOAuthConnector("notion", { accessToken: "notion-token-private", workspaceId: "W1", workspaceName: "Notes", botId: "B1" }, "Notes", ["read_content", "insert_content"]);
+    db.setBotConnectorAccess("nova", { canRead: true, canSend: true }, "slack", "slack");
+    db.setBotConnectorAccess("nova", { canRead: true, canSend: false }, "notion", "notion");
+    assert.match(connectedAppsText(db, db.getBot("nova")!), /Slack search and conversation reading are available now/);
+    assert.match(connectedAppsText(db, db.getBot("nova")!), /Notion search and page reading are available now/);
+    assert.notEqual(db.botSessionFingerprint("nova"), before);
+    assert.equal(db.disconnectOAuthConnector("slack")?.connected, false);
+    assert.equal(db.getBotConnectorAccess("nova", "notion", "notion")?.canSend, false);
+    db.close();
+    const stored = readFileSync(path.join(root, ".openbot", "openbot.sqlite"));
+    for (const secret of ["slack-secret-private", "slack-bot-private", "slack-user-private", "notion-secret-private", "notion-token-private"]) assert.equal(stored.includes(Buffer.from(secret)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -162,6 +162,7 @@ export class OpenBotDatabase {
         client_secret_ciphertext TEXT,
         access_token_ciphertext TEXT,
         refresh_token_ciphertext TEXT,
+        credentials_ciphertext TEXT,
         token_expires_at TEXT,
         scopes_json TEXT NOT NULL DEFAULT '[]',
         account_email TEXT,
@@ -536,6 +537,7 @@ export class OpenBotDatabase {
     this.addColumn("routines", "last_success_at TEXT");
     this.addColumn("routines", "last_event_at TEXT");
     this.addColumn("runs", "automation_event_id TEXT");
+    this.addColumn("connectors", "credentials_ciphertext TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
     const hadRoutineInterval = this.hasColumn("routines", "interval_minutes");
     this.addColumn("routines", "interval_minutes INTEGER NOT NULL DEFAULT 1440");
@@ -1088,14 +1090,17 @@ export class OpenBotDatabase {
   }
 
   botSessionFingerprint(botId: string): string {
-    const bot = this.getBot(botId), connection = this.getConnector("google-workspace");
-    const access = this.listBotConnectorAccess().filter((item) => item.botId === botId).map((item) => ({ service: item.service, canRead: item.canRead, canSend: item.canSend }));
+    const bot = this.getBot(botId);
+    const connectors = this.listConnectors().map((connection) => ({
+      id: connection.id, connected: connection.connected, accountEmail: connection.accountEmail, scopes: [...connection.scopes].sort(),
+      access: this.listBotConnectorAccess(connection.id).filter((item) => item.botId === botId).map((item) => ({ service: item.service, canRead: item.canRead, canSend: item.canSend })),
+    }));
     const codeProjects = this.listCodeProjects(botId).map((project) => ({ id: project.id, canRead: true, access: project.access.find((item) => item.botId === botId) || null }));
     const serviceErrors = this.listConnectorServiceErrors().map((item) => item.service).sort();
     return JSON.stringify({
       bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled } : null,
       macAccessEnabled: this.getStudioSettings().macAccessEnabled,
-      google: connection ? { connected: connection.connected, accountEmail: connection.accountEmail, scopes: [...connection.scopes].sort(), access, serviceErrors } : null,
+      connectors, serviceErrors,
       codeProjects,
     });
   }
@@ -1222,7 +1227,7 @@ export class OpenBotDatabase {
     try { scopes = JSON.parse(String(row.scopes_json || "[]")) as string[]; } catch { /* keep an empty scope list */ }
     return {
       id: String(row.id), ownerId: String(row.owner_id), kind: row.kind as ConnectorConnection["kind"], name: String(row.name),
-      configured: Boolean(row.client_id), connected: row.status === "connected" && (row.kind === "github_cli" || Boolean(row.access_token_ciphertext || row.refresh_token_ciphertext)),
+      configured: Boolean(row.client_id), connected: row.status === "connected" && (row.kind === "github_cli" || Boolean(row.credentials_ciphertext || row.access_token_ciphertext || row.refresh_token_ciphertext)),
       accountEmail: row.account_email ? String(row.account_email) : null, scopes, status: row.status as ConnectorConnection["status"],
       lastError: row.last_error ? String(row.last_error) : null, lastUsedAt: row.last_used_at ? String(row.last_used_at) : null,
       createdAt: String(row.created_at), updatedAt: String(row.updated_at),
@@ -1236,6 +1241,56 @@ export class OpenBotDatabase {
   getConnector(id: string): ConnectorConnection | null {
     const row = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(id) as Row | undefined;
     return row ? this.connectorFromRow(row) : null;
+  }
+
+  configureOAuthConnector(input: { id: "slack" | "notion"; kind: "slack_oauth" | "notion_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
+    const existing = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(input.id) as Row | undefined;
+    const changedClient = Boolean(existing?.client_id && String(existing.client_id) !== input.clientId);
+    const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret);
+    const status = changedClient || !existing?.credentials_ciphertext ? "configured" : String(existing.status || "configured");
+    this.db.prepare(`INSERT INTO connectors
+      (id,owner_id,kind,name,client_id,client_secret_ciphertext,credentials_ciphertext,scopes_json,account_email,status,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,NULL,'[]',NULL,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,name=excluded.name,client_id=excluded.client_id,client_secret_ciphertext=excluded.client_secret_ciphertext,
+      credentials_ciphertext=CASE WHEN ? THEN NULL ELSE connectors.credentials_ciphertext END,
+      scopes_json=CASE WHEN ? THEN '[]' ELSE connectors.scopes_json END,account_email=CASE WHEN ? THEN NULL ELSE connectors.account_email END,
+      status=?,last_error=NULL,updated_at=excluded.updated_at`).run(
+      input.id, DEFAULT_OWNER, input.kind, input.name, input.clientId, encryptedSecret, status, existing?.created_at || at, at,
+      changedClient ? 1 : 0, changedClient ? 1 : 0, changedClient ? 1 : 0, status,
+    );
+    return this.getConnector(input.id)!;
+  }
+
+  oauthConnectorCredentials<T extends Record<string, unknown> = Record<string, unknown>>(id: "slack" | "notion"): { clientId: string; clientSecret: string; credentials: T | null } | null {
+    const row = this.db.prepare("SELECT client_id,client_secret_ciphertext,credentials_ciphertext FROM connectors WHERE id=?").get(id) as Row | undefined;
+    if (!row?.client_id || !row.client_secret_ciphertext) return null;
+    let credentials: T | null = null;
+    if (row.credentials_ciphertext) {
+      try { credentials = JSON.parse(this.vault.decrypt(String(row.credentials_ciphertext))) as T; } catch { credentials = null; }
+    }
+    return { clientId: String(row.client_id), clientSecret: this.vault.decrypt(String(row.client_secret_ciphertext)), credentials };
+  }
+
+  completeOAuthConnector(id: "slack" | "notion", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
+    if (!this.getConnector(id)) throw new Error(`Configure ${id === "slack" ? "Slack" : "Notion"} before connecting it.`);
+    this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,account_email=?,scopes_json=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
+      this.vault.encrypt(JSON.stringify(credentials)), accountName.slice(0, 200), JSON.stringify([...new Set(scopes)]), now(), now(), id,
+    );
+    return this.getConnector(id)!;
+  }
+
+  updateOAuthConnectorCredentials(id: "slack" | "notion", credentials: Record<string, unknown>): ConnectorConnection {
+    this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
+      this.vault.encrypt(JSON.stringify(credentials)), now(), now(), id,
+    );
+    const connector = this.getConnector(id);
+    if (!connector) throw new Error("That connector is not configured.");
+    return connector;
+  }
+
+  disconnectOAuthConnector(id: "slack" | "notion"): ConnectorConnection | null {
+    this.db.prepare("UPDATE connectors SET credentials_ciphertext=NULL,scopes_json='[]',account_email=NULL,status=CASE WHEN client_id IS NULL THEN 'unconfigured' ELSE 'configured' END,last_error=NULL,updated_at=? WHERE id=?").run(now(), id);
+    return this.getConnector(id);
   }
 
   configureGoogleConnector(input: { clientId: string; clientSecret?: string | null }): ConnectorConnection {
@@ -1299,6 +1354,11 @@ export class OpenBotDatabase {
 
   markConnectorError(id: string, error: string) {
     this.db.prepare("UPDATE connectors SET status='needs_attention',last_error=?,updated_at=? WHERE id=?").run(error.slice(0, 600), now(), id);
+  }
+
+  markConnectorHealthy(id: string) {
+    this.db.prepare("UPDATE connectors SET status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=? AND credentials_ciphertext IS NOT NULL").run(now(), now(), id);
+    return this.getConnector(id);
   }
 
   restoreGoogleConnectorAfterStaleCallback(): ConnectorConnection | null {

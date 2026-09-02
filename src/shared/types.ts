@@ -313,9 +313,23 @@ export interface ProviderStatus {
   loginAttempts: ProviderLoginAttempt[];
 }
 
-export type ConnectorKind = "google_workspace" | "github_cli";
+export type ConnectorKind = "google_workspace" | "github_cli" | "slack_oauth" | "notion_oauth";
 export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github";
 export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
+
+export interface ConnectorManifest {
+  schemaVersion: 1;
+  connectorId: string;
+  service: ConnectorServiceId;
+  name: string;
+  description: string;
+  auth: "oauth" | "local_cli";
+  readCapability: string;
+  writeCapability: string | null;
+  writeRequiresApproval: boolean;
+  dataBoundary: string;
+  docsUrl: string;
+}
 
 export interface ConnectorConnection {
   id: string;
@@ -355,12 +369,53 @@ export interface ConnectorEvent {
 
 export interface ConnectorCatalogEntry {
   id: ConnectorServiceId;
+  connectorId?: string;
+  manifestVersion?: 1;
   name: string;
   description: string;
   badge: string;
   availability: "live" | "next";
   connected: boolean;
+  writeRequiresApproval?: boolean;
   capabilities: string[];
+}
+
+export interface OAuthConnectorStatus {
+  connectorId: "slack" | "notion";
+  configured: boolean;
+  connected: boolean;
+  managedClient: boolean;
+  oauthInProgress: boolean;
+  callbackUrl: string;
+  accountName: string | null;
+  lastError: string | null;
+}
+
+export interface SlackMessageSummary {
+  channelId: string;
+  channelName: string;
+  timestamp: string;
+  threadTimestamp: string | null;
+  author: string;
+  text: string;
+  permalink: string | null;
+}
+
+export interface SlackConversationResult {
+  channelId: string;
+  messages: SlackMessageSummary[];
+}
+
+export interface NotionPageSummary {
+  id: string;
+  title: string;
+  url: string;
+  lastEditedAt: string;
+}
+
+export interface NotionPageDetail extends NotionPageSummary {
+  content: string;
+  truncated: boolean;
 }
 
 export interface GoogleApiRecovery {
@@ -372,6 +427,8 @@ export interface GoogleApiRecovery {
 
 export interface ConnectorStatus {
   connection: ConnectorConnection | null;
+  connections: ConnectorConnection[];
+  manifests: ConnectorManifest[];
   callbackUrl: string;
   managedGoogleClient: boolean;
   oauthInProgress: boolean;
@@ -379,6 +436,8 @@ export interface ConnectorStatus {
   googleApiRecovery: GoogleApiRecovery | null;
   googleApiRecoveries: GoogleApiRecovery[];
   github: GitHubConnectorStatus;
+  slack: OAuthConnectorStatus;
+  notion: OAuthConnectorStatus;
   catalog: ConnectorCatalogEntry[];
   access: BotConnectorAccess[];
   events: ConnectorEvent[];

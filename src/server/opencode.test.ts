@@ -61,6 +61,18 @@ test("turns internal tool names into friendly progress updates", () => {
   assert.deepEqual(toolActivity({ part: { tool: "google_calendar_agenda", state: {} } }), {
     label: "Checking your calendar", detail: null, kind: "tool",
   });
+  assert.deepEqual(toolActivity({ part: { tool: "slack_search", state: {} } }), {
+    label: "Looking through Slack", detail: null, kind: "tool",
+  });
+  assert.deepEqual(toolActivity({ part: { tool: "slack_post", state: {} } }), {
+    label: "Preparing a Slack message for your approval", detail: null, kind: "tool",
+  });
+  assert.deepEqual(toolActivity({ part: { tool: "notion_search", state: {} } }), {
+    label: "Looking through shared Notion pages", detail: null, kind: "tool",
+  });
+  assert.deepEqual(toolActivity({ part: { tool: "notion_update", state: {} } }), {
+    label: "Preparing a Notion update for your approval", detail: null, kind: "tool",
+  });
   assert.deepEqual(toolActivity({ part: { tool: "mac_organize", state: {} } }), {
     label: "Preparing a tidy-up for your approval", detail: null, kind: "tool",
   });

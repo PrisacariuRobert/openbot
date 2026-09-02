@@ -297,3 +297,18 @@ Status: complete for the local-first 0.15 release
 - The redesigned Automations screen keeps triggers, health, secret setup, receipts, replay, and repair actions contained at desktop and 390×844 phone widths
 
 Verification: 66 automated tests pass, including signature validation, filters, summaries, secret redaction, prompt boundaries, encrypted hook secrets, event persistence, duplicate delivery, linked run lifecycle, alerts, per-automation rate limits, and automatic pause after three failures. A real signed delivery created one durable event and one linked run, Muse Spark 1.2 Free completed it and produced `build-event-confirmation.md`, and replaying the same delivery ID returned the existing event without a second run. Type checking and the production build pass. Desktop and 390×844 browser QA confirmed contained layout, correct trigger-specific fields, no console errors, and no horizontal overflow. Availability remains honest: local schedules and Calendar polling stop when OpenBot or the Mac sleeps, and an internet sender needs an owner-managed HTTPS tunnel or reverse proxy.
+
+## M21 — Permissioned Slack and Notion connectors
+
+Status: complete for the local-first 0.16 release
+
+- Every connector publishes a versioned capability manifest with an explicit data boundary, read/write operations, approval rule, setup documentation, and managed or self-hosted availability
+- Slack OAuth keeps member search/read authority separate from bot posting authority; teammates receive independent **Read Slack** and **Post to Slack** grants
+- Slack search and conversation reads are bounded, and every channel message or thread reply waits for an exact destination-and-content approval
+- Notion OAuth preserves its page-picker boundary; teammates receive independent **Read Notion** and **Add to Notion** grants for selected or shared pages
+- Notion search and page reading are bounded and paginated, while appended headings and paragraphs wait for an exact approval and safely split long text
+- OAuth credentials remain encrypted, connection health is visible, stale teammate sessions are invalidated on revocation, and repeated callbacks cannot erase a healthy grant
+- Apps & Tools supports managed one-click connection and a contained self-host setup path with recognizable service marks, natural copy, connected previews, mentions, and useful workflow starters
+- Markdown rendering is lazy-loaded so rich conversation formatting no longer inflates the initial application bundle
+
+Verification: 74 automated tests pass, including official Slack and Notion response shapes, OAuth replay recovery, encryption, session revocation, per-teammate read/write separation, message/page boundaries, approval previews, rate-limit recovery, OpenCode tools, and Claude Code bridge exposure. Type checking and the production build pass. The Apps & Tools experience is visually verified at desktop and 390×844 with no page-level overflow or console errors. Live third-party account consent remains owner setup rather than a release-test claim.

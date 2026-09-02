@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.15 local-first beta
+Release: 0.16 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, hand off work between specialists, run dependable scheduled or event-driven automations, connect Google Workspace, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run dependable automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -140,6 +140,18 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Issue creation only after a durable owner approval shows the repository, title, and body preview
 - Private connector activity records for notification reads, issue searches, approvals, denials, and successful creation
 
+### Slack and Notion
+
+- Managed one-click OAuth for configured releases plus a clearly separated self-hosted client setup
+- Versioned connector manifests describing working capabilities, data boundaries, approval policy, documentation, and availability
+- Slack search and bounded conversation reading using only the connected member's existing visibility
+- Slack channel messages and thread replies through the installed app bot, always after an exact destination-and-message approval
+- Notion search and bounded page/block reading for pages selected or shared during connection
+- Notion heading/text append only after an exact page-and-content approval
+- Independent **Read Slack**, **Post to Slack**, **Read Notion**, and **Add to Notion** permissions for every teammate
+- Connected previews, health/reconnect guidance, natural `@slack` and `@notion` suggestions, multi-app workflow starters, and private local audit activity
+- Encrypted connector credentials that never enter model prompts, with immediate model-session invalidation after revocation
+
 ### Files and visible Mac apps
 
 - One owner-controlled **Files & apps on this Mac** switch for the studio
@@ -192,7 +204,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Loopback-only service by default
 - Private access key and HTTP-only SameSite Strict cookie for non-local access
 - SQLite WAL persistence for conversations, work, permissions, and audit records
-- AES-256-GCM encryption for API keys and Google credentials
+- AES-256-GCM encryption for API keys and Google, Slack, and Notion credentials
 - Machine-local vault key stored with mode `0600`
 - Small allowlisted environment passed to model processes instead of the full server environment
 - Durable approvals that do not silently expire
@@ -214,6 +226,8 @@ These features are implemented, but marketing must explain their requirement.
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
+| Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
+| Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
 | Calendar automations | OpenBot polls the connected primary calendar while the local service is awake; the selected teammate needs Calendar permission. |
 | GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
@@ -233,6 +247,9 @@ These features are implemented, but marketing must explain their requirement.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
 - **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
+- **Catch up without channel hopping:** ask a Slack-enabled teammate to search a topic, read the relevant conversation, and return one linked summary without posting.
+- **Turn a discussion into a durable brief:** combine current Slack context with selected Notion pages, then approve the exact Notion update only after reviewing it.
+- **Project pulse:** combine GitHub activity, Slack decisions, and a Notion project page into one checked status report.
 - **React to a repository event:** filter a signed GitHub webhook to one repository, event, and action; inspect its receipt and linked checked result, with duplicate deliveries stopped automatically.
 - **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events while OpenBot is awake.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
@@ -245,7 +262,8 @@ Do not say OpenBot currently:
 - is a native iOS or Android application;
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
-- connects Slack or Notion as working apps;
+- reads Slack content the connected member cannot access or Notion pages that were not selected/shared;
+- provides complete Slack administration/event automation or general Notion database editing;
 - creates or edits Calendar events;
 - handles Gmail attachments, labels, or rich HTML sending;
 - edits Office documents or spreadsheets with layout fidelity;
@@ -256,8 +274,8 @@ Do not say OpenBot currently:
 
 - Native phone shell and opt-in push notifications
 - Optional always-on self-hosted daemon or private cloud deployment
-- Slack, Notion, and broader connector SDK/marketplace
-- Hosted event ingress, Slack/Notion triggers, richer Calendar selection, and configurable retry backoff
+- Reviewed third-party connector SDK/marketplace plus task-manager and cloud-storage connectors
+- Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
 - Full-text search across conversations and projects
@@ -279,7 +297,7 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 - **A studio, not a chatbot tab.** Specialists can work in parallel, ask each other questions, and hand off focused jobs.
 - **Your subscriptions, your choice.** Mix supported OpenCode, Claude Code, and provider connections across teammates.
 - **Progress you can trust.** See the outcome, steps, approvals, checks, and final result for every substantial job.
-- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub activity, files, browser work, and durable memory.
+- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub, Slack, Notion, files, browser work, and durable memory—only for the teammates you choose.
 - **From attachment to finished file.** Read PDFs, Office files, sheets, screenshots, and source; return a previewable result without making the user search a workspace.
 - **Local-first by default.** Your OpenBot data lives on your machine, with encrypted secrets and visible permission boundaries.
 

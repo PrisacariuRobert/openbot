@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.15 dependable-automations release.
+Updated September 2, 2026 after the 0.16 connector-platform release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -29,17 +29,17 @@ Goal: turn routines into something users can trust unattended.
 
 Verified with 66 automated tests, one real signed webhook delivery and duplicate replay, a real Muse Spark 1.2 Free result artifact, and desktop/390×844 UI acceptance. The same delivery ID created exactly one event and one linked run; every retained event exposes an explainable state and supported failures can be replayed. Local schedule and Calendar availability still depends on OpenBot staying awake, and public delivery still needs an owner-managed secure route.
 
-## 0.16 — Connector platform, then Slack and Notion
+## Shipped in 0.16 — Connector platform, Slack, and Notion
 
 Goal: add breadth without weakening per-teammate authority.
 
-- Define a versioned connector manifest and common read/write/approval interfaces
-- Give each teammate independent scopes, previews, health checks, reconnect state, and audit events
-- Ship Slack search/read/draft-reply first, with posting behind approval
-- Ship Notion search/read/update next, with page changes previewed before approval
-- Document a third-party connector review and secret-storage policy before calling it a marketplace
+- Defined a versioned connector manifest and common read/write/approval interface
+- Gave each teammate independent read/write grants, previews, health checks, reconnect state, and audit events
+- Shipped Slack member-authority search/read with bot-authority messages and replies behind exact approval
+- Shipped Notion selected-page search/read and bounded heading/text append behind exact approval
+- Added managed one-click and self-hosted setup paths without exposing connector tokens to models
 
-Ship only when revoking one teammate's access invalidates its active session and never removes another teammate's grant.
+Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
 ## 0.17 — Find, organize, and share
 

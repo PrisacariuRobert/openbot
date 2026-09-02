@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.0 — 2026-09-02
+
+- Added a versioned connector manifest with explicit capabilities, data boundaries, approval policy, health, previews, and per-teammate authority
+- Added real Slack OAuth, member-authority search and conversation reading, bot-authority posting, exact message approvals, friendly scope recovery, and private audits
+- Added real Notion OAuth, selected-page search and bounded reading, approval-gated content append, pagination limits, refresh recovery, and private audits
+- Added managed one-click and self-hosted setup paths, recognizable service marks, connected previews, natural mentions, and multi-app workflow starters
+- Invalidated stale model sessions whenever connector access changes and kept healthy grants through repeated or expired OAuth callbacks
+- Split Markdown rendering from the initial client bundle and expanded connector, runtime, bridge, encryption, revocation, and approval coverage to 74 automated tests
+
+
 ## 0.10.0 — 2026-09-02
 
 - Added one-step GitHub repository cloning into a clearly managed local projects folder

@@ -1,16 +1,17 @@
-# OpenBot 0.15.0
+# OpenBot 0.16.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.15.0
+## What's new in 0.16.0
 
-- Automations can now start from a schedule, a signed generic webhook, a native GitHub webhook, or an upcoming Google Calendar event with narrow event, action, repository, and title filters.
-- Every incoming event receives a durable receipt linked to its run. Repeated delivery IDs are stopped before a second action, bursts are rate-limited, and failed events can be safely replayed from retained bounded input.
-- A new attention inbox explains approval waits, missed schedules, and failures in plain language. Three consecutive failures automatically pause the automation instead of repeating a broken action indefinitely.
-- Webhook secrets are encrypted locally, shown only when created or rotated, and verified with timing-safe HMAC-SHA256. Payload secrets are redacted and all event content is marked as untrusted before reaching a model.
-- The redesigned Automations screen keeps setup, health, activity, retry, testing, and repair guidance understandable and contained at both desktop and 390-pixel phone widths.
+- Slack and Notion are now real connectors rather than roadmap cards: search and read current context, then post to Slack or append to a selected Notion page only after an exact owner approval.
+- A versioned connector manifest gives every app the same honest contract for capabilities, data boundaries, per-teammate read/write grants, health, reconnect state, previews, audits, and approval policy.
+- Slack search runs with the connected member's visibility while posting uses the app bot; Notion can see only pages explicitly selected or shared during connection. Tokens stay encrypted and never enter model context.
+- Apps & Tools now offers a managed one-click path and a clearly separated self-hosted setup path, real service marks, natural status language, useful connected previews, responsive permission controls, and workflow starters that combine Slack, Notion, Google, and GitHub.
+- Connector revocation immediately invalidates stale teammate sessions, repeated OAuth callbacks cannot destroy a healthy connection, and provider errors become short recovery guidance with optional technical details.
+- Markdown rendering is loaded only when a conversation needs it, reducing the initial production JavaScript bundle while preserving formatted chat.
 
 ## What is included
 
@@ -45,8 +46,11 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
 - Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
 - Official GitHub CLI connection for notifications, issue search, and approval-gated issue creation
+- Slack search, bounded conversation reading, and approval-gated channel messages or thread replies
+- Notion page search, bounded page reading, and approval-gated content append for pages selected during connection
 - Per-teammate permissions for Inbox, sending, Drive, and Calendar—rather than exposing every connected app to every bot
-- Natural `@gmail`, `@drive`, and `@calendar` suggestions plus useful starter workflows that combine current information
+- Per-teammate Slack read/post and Notion read/update permissions, backed by the same connector health and audit contract
+- Natural `@gmail`, `@drive`, `@calendar`, `@slack`, `@notion`, and `@github` suggestions plus useful starter workflows that combine current information
 - Owner-controlled access to visible Mac home folders, with bounded text reading and approval-only file organization that cannot delete or overwrite
 - Safe Markdown chat rendering for headings, lists, links, tables, quotes, and code instead of showing raw formatting characters
 - Rebuilt connector cards with contained status labels and recognizable vector service marks at desktop and phone sizes
@@ -61,6 +65,7 @@ Requirements:
 - Google Chrome or Chromium for browser work
 - Docker for private bot computers
 - Optional [GitHub CLI](https://cli.github.com/) for GitHub activity, issues, and publishing pull requests
+- Optional Slack and Notion OAuth applications for self-hosted connector use
 
 ```bash
 npm install
@@ -95,6 +100,16 @@ For self-hosting, enable the Gmail, Drive, and Calendar APIs in [Google Cloud cr
 Each teammate gets separate Inbox, send, Drive, and Calendar controls. Every outgoing email creates a durable approval showing its recipient, subject, and body preview. OAuth tokens never enter model context.
 
 For personal local use, Google's testing mode can be sufficient when the account is listed as a test user. Distributing Gmail access to the public requires Google's OAuth verification; restricted Gmail scopes may also require a security assessment. See Google's [OAuth web-server guidance](https://developers.google.com/identity/protocols/oauth2/web-server), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), and [Gmail REST reference](https://developers.google.com/workspace/gmail/api/reference/rest).
+
+## Connect Slack and Notion
+
+Open **Apps & Tools** and choose Slack or Notion. A packaged build with managed OAuth credentials shows one **Connect** button. A self-hosted copy can save its own client ID and secret from the same card; the exact callback address is shown beside the setup fields.
+
+Slack uses the connected member only for searching and reading conversations they can already access. Posting uses the installed app bot and always pauses on a preview showing the destination and complete message. A workspace administrator may need to approve the app, and the bot must be allowed in the destination channel. See Slack's [OAuth v2 documentation](https://docs.slack.dev/authentication/installing-with-oauth) and [message API](https://docs.slack.dev/reference/methods/chat.postMessage).
+
+Notion's connection picker is the authority boundary: OpenBot can search and read only the pages the owner selected or later shared with the integration. Appending a heading or text to a page always waits for an exact preview approval. See Notion's [OAuth guide](https://developers.notion.com/docs/authorization) and [integration capabilities](https://developers.notion.com/reference/capabilities).
+
+Both connectors encrypt their OAuth credentials locally, expose separate read/write switches for every teammate, record a private activity trail, and invalidate active model sessions as soon as access is revoked. Managed public distribution still requires registering and reviewing each OAuth app with its provider.
 
 ## Files on this Mac
 
@@ -134,7 +149,7 @@ Open **Automations** to create scheduled work or choose a Calendar, GitHub, or g
 
 Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBot-Event-Id` for exact duplicate protection. GitHub hooks use GitHub's standard `X-Hub-Signature-256`, `X-GitHub-Delivery`, and `X-GitHub-Event` headers. An endpoint must be reachable by the sender, so a webhook from the public internet needs a trusted HTTPS tunnel or reverse proxy; never expose OpenBot's plain local HTTP port directly.
 
-Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.15 does not claim an always-on hosted scheduler.
+Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.16 does not claim an always-on hosted scheduler.
 
 ## Remote and phone access
 
@@ -169,7 +184,7 @@ Runtime data is excluded from Git:
 
 ## Architecture
 
-The React client receives live state over server-sent events. The local Express service owns scheduling, event dispatch, approvals, usage, provider bindings, connectors, file ingestion, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, automation definitions, event receipts, alerts, memories, attachment analysis and revisions, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, automation, and approval tools.
+The React client receives live state over server-sent events. The local Express service owns scheduling, event dispatch, approvals, usage, provider bindings, connectors, file ingestion, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, automation definitions, event receipts, alerts, memories, attachment analysis and revisions, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, Slack, Notion, teamwork, automation, and approval tools.
 
 The design borrows the strongest ideas from [Hermes Agent's architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture), [agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop), [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode), and [security model](https://hermes-agent.nousresearch.com/docs/user-guide/security): isolated profiles, observable execution, parallel tools, interruptible work, stable prompts, and layered boundaries.
 
@@ -185,7 +200,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. GitHub notifications, issue search, approval-gated issue creation, cloning, approval-gated pull-request publishing, and signed repository-event automation are included; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. A native phone app and an always-on hosted service remain future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. A native phone app, an always-on hosted service, organization administration, and a broad third-party connector marketplace remain future work.
 
 ## License
 

@@ -27,12 +27,14 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Workspace research and meeting preparation | Pass in mocked integration; owner sign-in pending | Gmail search/read, Drive search/text export, Calendar agenda, bounded payloads, per-bot access, and friendly progress are automated; the Apps & Tools panel includes live smoke checks and three useful starters | Close for core Google Workspace context; Grok also creates/organizes Drive items and changes Calendar events |
 | Approval-safe email | Pass in mocked integration | Header injection is rejected, recipient count/body size are bounded, every send becomes a persistent approval, and the shared approval path performs the saved action once | Stronger explicit per-bot read/send policy; real account delivery still needs owner authorization |
 | GitHub triage, issues, and event reaction | Pass | A real DeepSeek V4 Flash teammate used a temporary read-only grant to return the newest notification's title and repository. Live issue search passed; issue creation remains approval-gated, and signed GitHub event delivery now supports repository/event/action filters and duplicate IDs | Stronger local credential ownership, per-teammate write authority, and event receipts; public event ingress is owner-operated |
+| Slack catch-up and approved reply | Pass in mocked integration; owner sign-in pending | Official OAuth/search/conversation/message shapes, member versus bot authority, bounded results, per-teammate grants, exact post previews, scope recovery, and cross-runtime tools are automated | Close for focused Slack knowledge work, with stronger local permission visibility; Slack events and broad administration remain gaps |
+| Notion knowledge brief and approved append | Pass in mocked integration; owner sign-in pending | Official OAuth/search/page/block/append shapes, selected-page boundary, pagination caps, API versioning, per-teammate grants, exact update previews, rate-limit recovery, and cross-runtime tools are automated | Close for selected-page research and additive updates; database automation and general editing remain gaps |
 | Mobile check-in | Pass | 390×844 responsive UI, installable PWA, guided private connection, dictation, approvals, and live connection state verified | OpenBot is installable web software; Grok has a native iOS app and cloud push |
 | Mac file organization | Pass | One studio-wide permission, visible-home listing, bounded text reading, approval-only no-overwrite moves, and a real Desktop inspection completed | Safer and more explicit for file cleanup; Grok/Hermes remain broader for general computer control |
 | Spreadsheet understanding | Pass for bounded XLSX/XLSM/CSV/TSV reading; editing partial | Sheet names, rows, values, and formula results are prepared for the teammate and shown in a text preview; result files persist with revisions | Dependable analysis is present; layout/formula-preserving workbook editing still needs a dedicated tool |
 | General macOS app control | Partial in 0.12 | The Accessibility bridge can list apps, inspect visible controls, focus apps, scroll, and approval-gate clicks/typing/keys; arbitrary pixel and canvas understanding remains unavailable | Grok/Hermes currently broader for visual computer use |
-| Large plugin catalog | Partial in 0.12 | Gmail, Drive, Calendar, and GitHub notifications/issues are bundled; Slack and Notion remain honest roadmap items | Grok currently broader |
-| Always-on hosted cloud computer | Not in 0.12 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
+| Large plugin catalog | Partial in 0.16 | Gmail, Drive, Calendar, GitHub, Slack, and Notion are real bounded connectors; there is no third-party marketplace yet | Grok remains broader |
+| Always-on hosted cloud computer | Not in 0.16 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
 
 ## Complaint-focused changes
 
@@ -53,6 +55,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - **A follow-up becomes a disconnected second task:** active non-code work now stops and resumes as one continuation using the newest direction. Code work queues rather than risking its isolated branch.
 - **Learned automations disappear into settings:** typing `/` reveals relevant learned skills in chat; their owner, generated files, name, start page, and deletion remain under user control.
 - **GitHub writes feel too broad:** notification and issue reading is separate from issue creation for every teammate, and the write still waits for a durable preview approval.
+- **Connected apps expose too much:** Slack and Notion now separate read from write per teammate, explain the provider-side visibility boundary, invalidate stale sessions on revocation, and keep every write behind an exact preview.
 
 ## Provider-policy references
 
@@ -77,6 +80,12 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - [GitHub CLI — API](https://cli.github.com/manual/gh_api)
 - [GitHub REST — Notifications](https://docs.github.com/en/rest/activity/notifications)
 - [GitHub REST — Issues](https://docs.github.com/en/rest/issues/issues)
+- [Slack — Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth)
+- [Slack — Search messages](https://docs.slack.dev/reference/methods/search.messages)
+- [Slack — Post a message](https://docs.slack.dev/reference/methods/chat.postMessage)
+- [Notion — Authorization](https://developers.notion.com/docs/authorization)
+- [Notion — Search](https://developers.notion.com/reference/post-search)
+- [Notion — Append block children](https://developers.notion.com/reference/patch-block-children)
 - [Hermes Agent — Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture)
 - [Hermes Agent — Agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)
 - [Hermes Agent — Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode)
