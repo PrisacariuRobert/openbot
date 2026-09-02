@@ -14,8 +14,8 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Mid-job steering | Pass for active non-code jobs | A natural follow-up immediately stops the prior run, preserves its session link, and starts a continuation with the new direction; the composer explains this before send | Close for the common chat flow; active code work deliberately queues to preserve its isolated branch |
 | File handoff | Pass | A real Markdown attachment was stored, displayed in chat, copied only into Pixel's inbox, read by DeepSeek, and returned exactly one verified answer | Useful core support; Grok accepts more media sizes and richer artifact previews |
 | Browser workflow | Pass | Open/type/click/read/screenshot succeeded against a real local page in Nova's persistent profile | Close for supported web actions; third-party login breadth remains untested |
-| Teach a task | Pass | Visible demonstration produced a three-step editable OpenCode skill with secret rules | Close for browser demonstrations |
-| Routine reliability | Pass | Manual test created an artifact, reread it, and saved completed/run-count state | Improves visibility and testability |
+| Teach and reuse a task | Pass | Visible demonstration produced a three-step local skill with secret rules; 0.12 exposes it through a filtered `/` picker and generates it for both OpenCode and Claude Code | Close for browser demonstrations, with unusually transparent local skill files |
+| Routine reliability | Pass | Manual test created an artifact, reread it, and saved completed/run-count state; 0.12 adds edit, delete, history, result links, and retry while preserving prior runs | Stronger owner visibility and recovery for interval work; event triggers remain a gap |
 | Outcome completion and verification | Pass | A real model created a three-step contract, wrote an artifact, reopened it, recorded four concrete checks, and returned one expandable verified receipt | More explicit than an opaque “done”; plan and evidence persist through restarts and approvals |
 | Review-first engineering | Pass in bounded local scope | Each run receives an isolated Git worktree; parallel tasks cannot switch or dirty the owner's checkout. A real DeepSeek V4 Flash run previously completed the edit/test/commit loop, and 0.11 adds an exact-commit review verdict from a different teammate before owner-approved publishing | Stronger local concurrency, project authority, restore safety, and explicit two-agent review; hosted remote computers remain a gap |
 | Approval reliability | Pass | Pending approval persisted through database restart and never auto-expired | Directly addresses expiry/stale-state complaints |
@@ -24,17 +24,18 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Subscription portability | Pass for available accounts | OpenCode and ChatGPT/OpenAI were detected; Claude Code was detected and offered its official login; Copilot, GitLab Duo, and SuperGrok OAuth flows are available | Broader bring-your-own-account choice without credential pooling |
 | Workspace research and meeting preparation | Pass in mocked integration; owner sign-in pending | Gmail search/read, Drive search/text export, Calendar agenda, bounded payloads, per-bot access, and friendly progress are automated; the Apps & Tools panel includes live smoke checks and three useful starters | Close for core Google Workspace context; Grok also creates/organizes Drive items and changes Calendar events |
 | Approval-safe email | Pass in mocked integration | Header injection is rejected, recipient count/body size are bounded, every send becomes a persistent approval, and the shared approval path performs the saved action once | Stronger explicit per-bot read/send policy; real account delivery still needs owner authorization |
+| GitHub triage and issue capture | Pass | A real DeepSeek V4 Flash teammate used a temporary read-only grant to return the newest notification's title and repository. Live issue search also passed; creating an issue uses a separate grant and the durable approval path | Stronger local credential ownership and per-teammate write authority; no event-driven repository monitoring yet |
 | Mobile check-in | Pass | 390×844 responsive UI, installable PWA, guided private connection, dictation, approvals, and live connection state verified | OpenBot is installable web software; Grok has a native iOS app and cloud push |
 | Mac file organization | Pass | One studio-wide permission, visible-home listing, bounded text reading, approval-only no-overwrite moves, and a real Desktop inspection completed | Safer and more explicit for file cleanup; Grok/Hermes remain broader for general computer control |
 | Spreadsheet fidelity | Partial | Persistent workspaces prevent rebuilding from scratch, but no native spreadsheet editor is included | Grok-style spreadsheet work needs a dedicated tool |
-| General macOS app control | Partial in 0.11 | The Accessibility bridge can list apps, inspect visible controls, focus apps, scroll, and approval-gate clicks/typing/keys; arbitrary pixel and canvas understanding remains unavailable | Grok/Hermes currently broader for visual computer use |
-| Large plugin catalog | Partial in 0.11 | Gmail, Drive, and Calendar are bundled; GitHub code delivery works, while GitHub issues, Slack, and Notion remain honest roadmap items | Grok currently broader |
-| Always-on hosted cloud computer | Not in 0.11 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
+| General macOS app control | Partial in 0.12 | The Accessibility bridge can list apps, inspect visible controls, focus apps, scroll, and approval-gate clicks/typing/keys; arbitrary pixel and canvas understanding remains unavailable | Grok/Hermes currently broader for visual computer use |
+| Large plugin catalog | Partial in 0.12 | Gmail, Drive, Calendar, and GitHub notifications/issues are bundled; Slack and Notion remain honest roadmap items | Grok currently broader |
+| Always-on hosted cloud computer | Not in 0.12 | Computers are persistent while the local host/Docker are available | Different privacy/availability tradeoff |
 
 ## Complaint-focused changes
 
 - **Approvals expire or badges get stuck:** approval rows have no expiry; the UI derives its badge from pending database rows and approved/denied decisions clear it.
-- **Bots forget schedules:** routines are explicit database records with next run, last run, last status, and count, plus a manual test button.
+- **Bots forget schedules:** routines are explicit database records with next/last run, status, count, history, result links, edit/delete controls, and manual retry.
 - **Duplicate sends/actions:** teammate messages and handoffs use durable dedupe keys plus three-hop/eight-run limits. Gmail approvals are marked decided before delivery and cannot be approved twice; the bot is resumed only after the saved action succeeds or fails.
 - **Spreadsheet progress is lost:** persistent per-bot workspaces and sessions reduce restart loss; native workbook-aware editing remains a gap.
 - **Tone drifts:** role and working style live in stable generated `AGENTS.md`; durable memories are included on every run.
@@ -44,6 +45,8 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - **Bots stop after an update instead of finishing:** substantial work has a durable outcome, deliverable, checklist, and verification state. The system marks an unverified completion as partial rather than silently presenting it as fully checked.
 - **Agent code changes are hard to trust:** every task uses an isolated worktree, the owner can inspect a bounded diff, commits name exact files, a different teammate reviews the unchanged commit, publishing requires owner approval, and unchanged agent edits have conflict-safe restore points.
 - **A follow-up becomes a disconnected second task:** active non-code work now stops and resumes as one continuation using the newest direction. Code work queues rather than risking its isolated branch.
+- **Learned automations disappear into settings:** typing `/` reveals relevant learned skills in chat; their owner, generated files, name, start page, and deletion remain under user control.
+- **GitHub writes feel too broad:** notification and issue reading is separate from issue creation for every teammate, and the write still waits for a durable preview approval.
 
 ## Provider-policy references
 
@@ -65,6 +68,9 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - [Cursor — Agent computer use](https://cursor.com/blog/agent-computer-use)
 - [Cursor 3 engineering workflows](https://cursor.com/blog/cursor-3)
 - [GitHub CLI — Create a pull request](https://cli.github.com/manual/gh_pr_create)
+- [GitHub CLI — API](https://cli.github.com/manual/gh_api)
+- [GitHub REST — Notifications](https://docs.github.com/en/rest/activity/notifications)
+- [GitHub REST — Issues](https://docs.github.com/en/rest/issues/issues)
 - [Hermes Agent — Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture)
 - [Hermes Agent — Agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)
 - [Hermes Agent — Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode)

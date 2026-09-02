@@ -18,6 +18,7 @@ import type {
   CodeTaskWorkspace,
   ConnectorConnection,
   ConnectorEvent,
+  ConnectorServiceId,
   GoogleConnectorService,
   MascotKind,
   Message,
@@ -38,6 +39,7 @@ import type {
 } from "../shared/types.js";
 import { SecretVault } from "./vault.js";
 import { legacyCadence, normalizeRoutineInterval, routineIntervalMs } from "../shared/routines.js";
+import { skillSlug } from "../shared/skills.js";
 
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
@@ -441,6 +443,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "verification_checks_json TEXT NOT NULL DEFAULT '[]'");
     this.addColumn("routines", "last_status TEXT NOT NULL DEFAULT 'never'");
     this.addColumn("routines", "run_count INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("taught_workflows", "skill_slug TEXT");
     const hadRoutineInterval = this.hasColumn("routines", "interval_minutes");
     this.addColumn("routines", "interval_minutes INTEGER NOT NULL DEFAULT 1440");
     this.addColumn("code_projects", "connected INTEGER NOT NULL DEFAULT 1");
@@ -756,7 +759,7 @@ export class OpenBotDatabase {
     return {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
-      steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null,
+      steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       prompt: String(row.prompt), status: row.status as RunStatus,
       approvalReason: row.approval_reason ? String(row.approval_reason) : null, approvalId: row.approval_id ? String(row.approval_id) : null,
       partialText: row.partial_text ? String(row.partial_text) : null, startedAt: row.started_at ? String(row.started_at) : null,
@@ -1044,7 +1047,7 @@ export class OpenBotDatabase {
     try { scopes = JSON.parse(String(row.scopes_json || "[]")) as string[]; } catch { /* keep an empty scope list */ }
     return {
       id: String(row.id), ownerId: String(row.owner_id), kind: row.kind as ConnectorConnection["kind"], name: String(row.name),
-      configured: Boolean(row.client_id), connected: row.status === "connected" && Boolean(row.access_token_ciphertext || row.refresh_token_ciphertext),
+      configured: Boolean(row.client_id), connected: row.status === "connected" && (row.kind === "github_cli" || Boolean(row.access_token_ciphertext || row.refresh_token_ciphertext)),
       accountEmail: row.account_email ? String(row.account_email) : null, scopes, status: row.status as ConnectorConnection["status"],
       lastError: row.last_error ? String(row.last_error) : null, lastUsedAt: row.last_used_at ? String(row.last_used_at) : null,
       createdAt: String(row.created_at), updatedAt: String(row.updated_at),
@@ -1157,18 +1160,31 @@ export class OpenBotDatabase {
     return this.getConnector("google-workspace");
   }
 
+  ensureLocalConnector(id: string, kind: ConnectorConnection["kind"], name: string, connected: boolean, accountLogin: string | null = null): ConnectorConnection {
+    const existing = this.getConnector(id), expectedStatus = connected ? "connected" : "configured";
+    if (existing && existing.kind === kind && existing.name === name && existing.status === expectedStatus && existing.accountEmail === accountLogin) return existing;
+    const at = now();
+    this.db.prepare(`INSERT INTO connectors
+      (id,owner_id,kind,name,client_id,scopes_json,account_email,status,created_at,updated_at)
+      VALUES (?,?,?,?,?,'[]',?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,name=excluded.name,account_email=excluded.account_email,status=excluded.status,updated_at=excluded.updated_at`).run(
+      id, DEFAULT_OWNER, kind, name, "local-cli", accountLogin, expectedStatus, at, at,
+    );
+    return this.getConnector(id)!;
+  }
+
   listBotConnectorAccess(connectorId = "google-workspace"): BotConnectorAccess[] {
     return (this.db.prepare("SELECT * FROM bot_connector_access WHERE connector_id=? ORDER BY rowid").all(connectorId) as Row[]).map((row) => ({
-      botId: String(row.bot_id), connectorId: String(row.connector_id), service: row.service as GoogleConnectorService, canRead: asBoolean(row.can_read),
+      botId: String(row.bot_id), connectorId: String(row.connector_id), service: row.service as ConnectorServiceId, canRead: asBoolean(row.can_read),
       canSend: asBoolean(row.can_send), updatedAt: String(row.updated_at),
     }));
   }
 
-  getBotConnectorAccess(botId: string, service: GoogleConnectorService = "gmail", connectorId = "google-workspace"): BotConnectorAccess | null {
+  getBotConnectorAccess(botId: string, service: ConnectorServiceId = "gmail", connectorId = "google-workspace"): BotConnectorAccess | null {
     return this.listBotConnectorAccess(connectorId).find((access) => access.botId === botId && access.service === service) || null;
   }
 
-  setBotConnectorAccess(botId: string, input: { canRead: boolean; canSend: boolean }, service: GoogleConnectorService = "gmail", connectorId = "google-workspace"): BotConnectorAccess {
+  setBotConnectorAccess(botId: string, input: { canRead: boolean; canSend: boolean }, service: ConnectorServiceId = "gmail", connectorId = "google-workspace"): BotConnectorAccess {
     if (!this.getBot(botId) || !this.getConnector(connectorId)) throw new Error("Choose a valid teammate and connector.");
     const at = now();
     this.db.prepare(`INSERT INTO bot_connector_access (bot_id,connector_id,service,can_read,can_send,created_at,updated_at) VALUES (?,?,?,?,?,?,?)
@@ -1490,6 +1506,27 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
   }
 
+  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; enabled: boolean }): Routine | null {
+    const routine = this.getRoutine(id);
+    if (!routine) return null;
+    const intervalMinutes = normalizeRoutineInterval(input.intervalMinutes);
+    const scheduleChanged = routine.intervalMinutes !== intervalMinutes || routine.enabled !== input.enabled;
+    const nextRunAt = input.enabled ? (scheduleChanged || !routine.nextRunAt ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : routine.nextRunAt) : null;
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,enabled=?,next_run_at=? WHERE id=?").run(
+      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, input.enabled ? 1 : 0, nextRunAt, id,
+    );
+    return this.getRoutine(id);
+  }
+
+  deleteRoutine(id: string): boolean {
+    return this.db.prepare("DELETE FROM routines WHERE id=?").run(id).changes > 0;
+  }
+
+  listRoutineRuns(id: string, limit = 20): Run[] {
+    const rows = this.db.prepare(this.runSelect("WHERE r.routine_id=? ORDER BY r.created_at DESC LIMIT ?")).all(id, Math.max(1, Math.min(limit, 100))) as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
   toggleRoutine(id: string, enabled: boolean): Routine | null {
     const routine = this.getRoutine(id);
     if (!routine) return null;
@@ -1508,17 +1545,48 @@ export class OpenBotDatabase {
     this.db.prepare("UPDATE routines SET last_run_at=?,next_run_at=? WHERE id=?").run(ranAt, routine.enabled ? new Date(Date.now() + delay).toISOString() : null, routine.id);
   }
 
-  saveWorkflow(input: { botId: string; name: string; startUrl: string; steps: unknown[]; skillPath: string }): TaughtWorkflow {
+  nextWorkflowSlug(botId: string, name: string, excludedId?: string): string {
+    const base = skillSlug(name), used = new Set(this.listWorkflows().filter((workflow) => workflow.id !== excludedId).map((workflow) => workflow.skillSlug));
+    if (!used.has(base)) return base;
+    const bot = this.getBot(botId), botSuffix = skillSlug(bot?.name || botId);
+    if (!used.has(`${base}-${botSuffix}`)) return `${base}-${botSuffix}`;
+    let suffix = 2;
+    while (used.has(`${base}-${suffix}`)) suffix += 1;
+    return `${base}-${suffix}`;
+  }
+
+  saveWorkflow(input: { botId: string; name: string; startUrl: string; steps: unknown[]; skillPath: string; skillSlug: string }): TaughtWorkflow {
     const id = randomUUID();
-    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,start_url,steps_json,skill_path,created_at) VALUES (?,?,?,?,?,?,?)").run(id, input.botId, input.name, input.startUrl, JSON.stringify(input.steps), input.skillPath, now());
+    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,start_url,steps_json,skill_path,skill_slug,created_at) VALUES (?,?,?,?,?,?,?,?)").run(id, input.botId, input.name, input.startUrl, JSON.stringify(input.steps), input.skillPath, input.skillSlug, now());
     return this.listWorkflows(input.botId).find((workflow) => workflow.id === id)!;
   }
 
-  listWorkflows(botId: string): TaughtWorkflow[] {
-    return (this.db.prepare("SELECT * FROM taught_workflows WHERE bot_id=? ORDER BY created_at DESC").all(botId) as Row[]).map((row) => ({
-      id: String(row.id), botId: String(row.bot_id), name: String(row.name), startUrl: String(row.start_url),
-      stepCount: (JSON.parse(String(row.steps_json)) as unknown[]).length, createdAt: String(row.created_at),
+  listWorkflows(botId?: string): TaughtWorkflow[] {
+    const rows = botId
+      ? this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.bot_id=? ORDER BY w.created_at DESC").all(botId) as Row[]
+      : this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id ORDER BY w.created_at DESC").all() as Row[];
+    return rows.map((row) => ({
+      id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url),
+      stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at),
     }));
+  }
+
+  getWorkflowRecord(id: string): { workflow: TaughtWorkflow; steps: unknown[]; skillPath: string } | null {
+    const row = this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.id=?").get(id) as Row | undefined;
+    if (!row) return null;
+    return { workflow: { id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at) }, steps: jsonArray<unknown>(row.steps_json), skillPath: String(row.skill_path) };
+  }
+
+  updateWorkflowRecord(id: string, input: { name: string; startUrl: string; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
+    this.db.prepare("UPDATE taught_workflows SET name=?,start_url=?,skill_slug=?,skill_path=? WHERE id=?").run(input.name, input.startUrl, input.skillSlug, input.skillPath, id);
+    return this.listWorkflows().find((workflow) => workflow.id === id) || null;
+  }
+
+  deleteWorkflowRecord(id: string): { skillPath: string; botId: string } | null {
+    const row = this.db.prepare("SELECT skill_path,bot_id FROM taught_workflows WHERE id=?").get(id) as Row | undefined;
+    if (!row) return null;
+    this.db.prepare("DELETE FROM taught_workflows WHERE id=?").run(id);
+    return { skillPath: String(row.skill_path), botId: String(row.bot_id) };
   }
 
   getUsageSummary(): UsageSummary {
@@ -1536,6 +1604,6 @@ export class OpenBotDatabase {
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
   }
 }

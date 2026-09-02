@@ -15,9 +15,11 @@ import { friendlyGoogleError, googleApiRecovery, googleCallbackPage, googleCloud
 import { MacFileAccess, type MacFileMove } from "./mac-files.js";
 import { MacAppControl } from "./mac-apps.js";
 import { CodeProjectManager } from "./code-projects.js";
+import { GitHubConnector } from "./github.js";
 import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
+import { invokedWorkflow } from "../shared/skills.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
@@ -34,6 +36,7 @@ const googleWorkspace = new GoogleWorkspaceConnector(db, `http://127.0.0.1:${por
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
 const codeProjects = new CodeProjectManager(db);
+const github = new GitHubConnector();
 const managedGoogleClient = Boolean(process.env.OPENBOT_GOOGLE_CLIENT_ID?.trim());
 if (managedGoogleClient) db.configureGoogleConnector({ clientId: process.env.OPENBOT_GOOGLE_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_GOOGLE_CLIENT_SECRET?.trim() || null });
 const eventClients = new Set<express.Response>();
@@ -233,18 +236,53 @@ function readConnectorStatus(): ConnectorStatus {
   const googleIssue = connection?.lastError ? googleApiRecovery(connection.lastError) : null;
   const serviceRecoveries = db.listConnectorServiceErrors().map((item) => googleApiRecovery(item.error)).filter((item): item is NonNullable<typeof item> => Boolean(item));
   const unavailableServices = new Set(serviceRecoveries.map((item) => item.service));
+  const githubStatus = github.status();
+  db.ensureLocalConnector("github-cli", "github_cli", "GitHub", githubStatus.connected, githubStatus.accountLogin);
   const saved = new Map(db.listBotConnectorAccess().map((access) => [`${access.botId}:${access.service}`, access]));
+  const githubSaved = new Map(db.listBotConnectorAccess("github-cli").map((access) => [access.botId, access]));
   return {
     connection: connection ? { ...connection, lastError: connection.lastError ? friendlyGoogleError(connection.lastError) : null } : null,
     callbackUrl: googleWorkspace.redirectUri, managedGoogleClient, oauthInProgress: googleWorkspace.oauthInProgress(),
     googleProjectId: googleCloudProjectFromClientId(credentials?.clientId), googleApiRecovery: googleIssue, googleApiRecoveries: serviceRecoveries,
-    catalog: connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).map((entry) => unavailableServices.has(entry.id as GoogleConnectorService) ? { ...entry, connected: false, badge: "Needs setup" } : entry),
-    access: db.listBots().flatMap((bot) => services.map((service) => saved.get(`${bot.id}:${service}`) || { botId: bot.id, connectorId: "google-workspace", service, canRead: false, canSend: false, updatedAt: connection?.updatedAt || new Date(0).toISOString() })),
-    events,
+    github: githubStatus,
+    catalog: connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).map((entry) => entry.id === "github"
+      ? { ...entry, availability: "live" as const, connected: githubStatus.connected, badge: githubStatus.connected ? "Connected" : githubStatus.installed ? "Available now" : "Needs GitHub CLI", description: "Follow notifications and issues, then create issues only after your approval.", capabilities: ["Notifications", "Search issues", "Approval-safe creating"] }
+      : unavailableServices.has(entry.id as GoogleConnectorService) ? { ...entry, connected: false, badge: "Needs setup" } : entry),
+    access: [...db.listBots().flatMap((bot) => services.map((service) => saved.get(`${bot.id}:${service}`) || { botId: bot.id, connectorId: "google-workspace", service, canRead: false, canSend: false, updatedAt: connection?.updatedAt || new Date(0).toISOString() })),
+      ...db.listBots().map((bot) => githubSaved.get(bot.id) || { botId: bot.id, connectorId: "github-cli", service: "github" as const, canRead: false, canSend: false, updatedAt: new Date(0).toISOString() })],
+    events: [...events, ...db.listConnectorEvents("github-cli", 12)].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 16),
   };
 }
 
 app.get("/api/connectors", (_request, response) => response.json(readConnectorStatus()));
+
+app.post("/api/connectors/github/connect", (_request, response) => {
+  const status = github.beginLogin();
+  db.ensureLocalConnector("github-cli", "github_cli", "GitHub", status.connected, status.accountLogin);
+  if (status.connected) db.addConnectorEvent({ connectorId: "github-cli", action: "connected", status: "completed", summary: `GitHub is ready as ${status.accountLogin || "the signed-in account"}` });
+  broadcast({ type: "connector", at: Date.now() });
+  response.status(status.installed ? 202 : 409).json(status.installed ? status : { error: status.lastError });
+});
+
+app.patch("/api/connectors/github/access/:botId", (request, response) => {
+  const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
+  const status = github.status();
+  db.ensureLocalConnector("github-cli", "github_cli", "GitHub", status.connected, status.accountLogin);
+  if (!parsed.success) return response.status(400).json({ error: "Choose what this teammate may do on GitHub." });
+  if (!status.connected) return response.status(409).json({ error: "Connect GitHub first." });
+  try { response.json(db.setBotConnectorAccess(request.params.botId, parsed.data, "github", "github-cli")); broadcast({ type: "connector", at: Date.now() }); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+
+app.get("/api/connectors/github/notifications", async (request, response) => {
+  try { response.json(await github.notifications(Number(request.query.limit || 12))); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+
+app.get("/api/connectors/github/issues", async (request, response) => {
+  try { response.json(await github.issues(typeof request.query.q === "string" ? request.query.q : "", Number(request.query.limit || 12))); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
 
 app.post("/api/connectors/google/config", (request, response) => {
   if (managedGoogleClient) return response.status(409).json({ error: "This OpenBot release already manages its Google connection." });
@@ -381,7 +419,9 @@ app.post("/api/messages", (request, response) => {
   const thread = db.getThread(parsed.data.threadId);
   if (!thread) return response.status(404).json({ error: "Conversation not found." });
   const candidates = db.getThreadBots(thread.id);
-  const requested = resolveMessageTargets({ body: parsed.data.body, bots: candidates, requestedIds: parsed.data.targetBotIds, directBotId: thread.botId });
+  const invoked = invokedWorkflow(parsed.data.body, db.listWorkflows());
+  const workflow = invoked && candidates.some((bot) => bot.id === invoked.botId) ? invoked : null;
+  const requested = workflow ? candidates.filter((bot) => bot.id === workflow.botId) : resolveMessageTargets({ body: parsed.data.body, bots: candidates, requestedIds: parsed.data.targetBotIds, directBotId: thread.botId });
   if (!requested.length) return response.status(400).json({ error: "Choose at least one teammate." });
   const badAttachment = parsed.data.attachmentIds.map((id) => db.getAttachment(id)).find((item) => !item || item.threadId !== thread.id || item.messageId);
   if (badAttachment !== undefined) return response.status(400).json({ error: "One of those files is no longer available." });
@@ -408,7 +448,8 @@ app.post("/api/messages", (request, response) => {
     broadcast();
     return response.status(201).json({ routines, routedTo: requested.map((bot) => ({ id: bot.id, name: bot.name })), attachments });
   }
-  const prompt = attachmentLines.length ? `${body}\n\nFiles attached by the user are available in your workspace:\n${attachmentLines.join("\n")}\nInspect the relevant files before answering. Do not modify the originals in inbox.` : body;
+  const skillDirection = workflow ? `\n\nThe user explicitly invoked your learned /${workflow.skillSlug} skill (“${workflow.name}”). Follow that skill now, adapt it only to the rest of this request, and verify the result before answering.` : "";
+  const prompt = `${attachmentLines.length ? `${body}\n\nFiles attached by the user are available in your workspace:\n${attachmentLines.join("\n")}\nInspect the relevant files before answering. Do not modify the originals in inbox.` : body}${skillDirection}`;
   const reason = approvalReason(body), redirected: Array<{ botId: string; runId: string }> = [];
   const runs = requested.map((bot) => {
     const active = db.runningRun(thread.id, bot.id);
@@ -463,6 +504,15 @@ async function performApprovedAction(action: unknown): Promise<string> {
     broadcast({ type: "connector", at: Date.now() });
     return `The email was sent to ${message.to}. Gmail reference: ${result.id}.`;
   }
+  if (parsed.data.type === "github_issue_create") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "github", "github-cli");
+    if (!bot || !access?.canSend || !github.status().connected) throw new Error("Creating GitHub issues is not available for this teammate.");
+    const repository = String(args.repository || ""), title = String(args.title || "").trim(), body = String(args.body || "");
+    const url = await github.createIssue(repository, title, body);
+    db.addConnectorEvent({ connectorId: "github-cli", botId: bot.id, action: "github_issue_create", status: "completed", summary: `Created “${title.slice(0, 120)}” in ${repository}` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The GitHub issue was created: ${url}`;
+  }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
     const moves = z.array(z.object({ from: z.string().min(1).max(1_000), to: z.string().min(1).max(1_000) })).min(1).max(100).parse(args.moves) as MacFileMove[];
@@ -485,8 +535,8 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
   if (!approval || approval.status !== "pending") return null;
   const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string } | null;
   const decided = db.decideApproval(approval.id, decision);
-  if (decision === "denied" && action?.type === "gmail_send") {
-    db.addConnectorEvent({ botId: action.botId || approval.botId, action: "gmail_send", status: "failed", summary: "Email was not sent because you chose Not now" });
+  if (decision === "denied" && (action?.type === "gmail_send" || action?.type === "github_issue_create")) {
+    db.addConnectorEvent({ connectorId: action.type === "github_issue_create" ? "github-cli" : "google-workspace", botId: action.botId || approval.botId, action: action.type, status: "failed", summary: action.type === "github_issue_create" ? "The issue was not created because you chose Not now" : "Email was not sent because you chose Not now" });
     broadcast({ type: "connector", at: Date.now() });
   }
   if (decision === "approved" && action?.type && action.type !== "run") {
@@ -497,7 +547,7 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
       db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Approved and completed", detail: result.slice(0, 180) });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (action.type === "gmail_send") { db.addConnectorEvent({ botId: action.botId || approval.botId, action: "gmail_send", status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
+      if (action.type === "gmail_send" || action.type === "github_issue_create") { db.addConnectorEvent({ connectorId: action.type === "github_issue_create" ? "github-cli" : "google-workspace", botId: action.botId || approval.botId, action: action.type, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
       db.setRunPrompt(approval.runId, `The user approved the action, but it failed with: ${message}. Continue safely or explain the blocker.`);
       db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "error", label: "The approved action needs attention", detail: message.slice(0, 180) });
     }
@@ -595,11 +645,23 @@ app.post("/api/routines", (request, response) => {
   response.status(201).json(routine);
 });
 app.patch("/api/routines/:id", (request, response) => {
-  const parsed = z.object({ enabled: z.boolean() }).safeParse(request.body);
-  if (!parsed.success) return response.status(400).json({ error: "Choose whether this routine is on or off." });
-  const routine = db.toggleRoutine(request.params.id, parsed.data.enabled);
+  const current = db.getRoutine(request.params.id);
+  if (!current) return response.status(404).json({ error: "Routine not found." });
+  const parsed = routineInput.partial().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Check the routine name, teammate, instructions and repeat time." });
+  const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, enabled: parsed.data.enabled ?? current.enabled };
+  if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
+  const routine = db.updateRoutine(request.params.id, next);
   if (!routine) return response.status(404).json({ error: "Routine not found." });
   broadcast(); response.json(routine);
+});
+app.delete("/api/routines/:id", (request, response) => {
+  if (!db.deleteRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
+  broadcast(); response.json({ ok: true });
+});
+app.get("/api/routines/:id/runs", (request, response) => {
+  if (!db.getRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
+  response.json(db.listRoutineRuns(request.params.id));
 });
 app.post("/api/routines/:id/run", (request, response) => {
   const routine = db.getRoutine(request.params.id);
@@ -663,7 +725,18 @@ app.post("/api/bots/:id/browser/type", async (request, response) => {
   try { response.json(await browser.type(request.params.id, parsed.data.selector, parsed.data.value)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
+app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
+app.patch("/api/workflows/:id", (request, response) => {
+  const parsed = z.object({ name: z.string().trim().min(1).max(80), startUrl: z.string().url() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Give the skill a name and complete starting web address." });
+  try { const workflow = browser.updateTaughtWorkflow(request.params.id, parsed.data); if (!workflow) return response.status(404).json({ error: "Learned workflow not found." }); broadcast(); response.json(workflow); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.delete("/api/workflows/:id", (request, response) => {
+  if (!browser.deleteTaughtWorkflow(request.params.id)) return response.status(404).json({ error: "Learned workflow not found." });
+  broadcast(); response.json({ ok: true });
+});
 app.get("/api/bots/:id/teach", (request, response) => response.json(browser.teachingStatus(request.params.id)));
 app.post("/api/bots/:id/teach/start", async (request, response) => {
   const parsed = z.object({ name: z.string().trim().min(1).max(80), startUrl: z.string().url() }).safeParse(request.body);
@@ -676,7 +749,7 @@ app.post("/api/bots/:id/teach/stop", async (request, response) => {
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
@@ -696,7 +769,7 @@ app.post("/api/internal/tools", async (request, response) => {
       const plan = z.object({
         goal: z.string().trim().min(1).max(240), deliverable: z.string().trim().min(1).max(240),
         steps: z.array(z.string().trim().min(1).max(140)).min(1).max(8),
-        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
+        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "github", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
         approvalBoundary: z.string().trim().max(240).optional(),
       }).safeParse(args);
       if (!plan.success) return response.status(400).json({ error: "Set one clear outcome, deliverable, and up to eight meaningful steps." });
@@ -893,6 +966,31 @@ app.post("/api/internal/tools", async (request, response) => {
       const events = await googleWorkspace.calendarAgenda(Number(args.days || 7), Number(args.maxResults || 20));
       db.addConnectorEvent({ botId, action, status: "completed", summary: `${bot.name} checked ${events.length} upcoming calendar event${events.length === 1 ? "" : "s"}` });
       broadcast({ type: "connector", at: Date.now() }); return response.json({ events, count: events.length });
+    }
+    if (action === "github_notifications" || action === "github_issues" || action === "github_issue_create") {
+      const status = github.status(), access = db.getBotConnectorAccess(botId, "github", "github-cli");
+      db.ensureLocalConnector("github-cli", "github_cli", "GitHub", status.connected, status.accountLogin);
+      if (!status.connected) return response.status(409).json({ error: "GitHub is not connected yet. Ask the user to connect it in Apps & Tools." });
+      if ((action === "github_notifications" || action === "github_issues") && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read GitHub activity." });
+      if (action === "github_issue_create" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare GitHub issues." });
+      if (action === "github_notifications") {
+        const notifications = await github.notifications(Number(args.maxResults || 12));
+        db.addConnectorEvent({ connectorId: "github-cli", botId, action, status: "completed", summary: `${bot.name} checked ${notifications.length} GitHub notification${notifications.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json({ notifications, count: notifications.length });
+      }
+      if (action === "github_issues") {
+        const issues = await github.issues(String(args.query || ""), Number(args.maxResults || 12));
+        db.addConnectorEvent({ connectorId: "github-cli", botId, action, status: "completed", summary: `${bot.name} found ${issues.length} matching GitHub issue${issues.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() });
+        return response.json({ issues, count: issues.length });
+      }
+      const issue = z.object({ repository: z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/), title: z.string().trim().min(1).max(256), body: z.string().max(20_000).default("") }).safeParse(args);
+      if (!issue.success) return response.status(400).json({ error: "Choose a repository as owner/name and give the issue a clear title." });
+      db.addConnectorEvent({ connectorId: "github-cli", botId, action, status: "waiting", summary: `${bot.name} prepared “${issue.data.title.slice(0, 120)}” for ${issue.data.repository}` });
+      broadcast({ type: "connector", at: Date.now() });
+      const preview = issue.data.body.trim().replace(/\s+/g, " ").slice(0, 260);
+      return holdForApproval("external", `${bot.name} prepared a GitHub issue in ${issue.data.repository}. Title: “${issue.data.title}”.${preview ? ` Preview: ${preview}${issue.data.body.trim().length > 260 ? "…" : ""}` : ""}`, `Create issue in ${issue.data.repository}`);
     }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;

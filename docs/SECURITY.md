@@ -16,8 +16,8 @@ OpenBot is local-first software that runs models and automation tools. It reduce
 10. **Attachment boundary** — uploads use server-generated paths, sanitized names, a six-file/25 MB message limit, authenticated downloads, forced attachment disposition, MIME sniffing protection, and a sandbox content policy. Routed copies go only to the selected bots' inboxes.
 11. **Audit boundary** — messages, attachments, runs, task contracts, verification checks, tool activities, usage, approvals, teammate signals, handoffs, routine outcomes, and taught workflows persist in SQLite.
 12. **Authentication boundary** — subscription logins are completed in the provider's official browser/CLI flow. The temporary OpenCode OAuth bridge binds to a random loopback port and is protected with a random Basic-auth password. Remote access-key comparisons are constant-time.
-13. **Connector boundary** — Google sign-in uses state plus PKCE S256 and the official OAuth page. Client secret, access token, and refresh token are encrypted locally and never placed in model prompts. Inbox, send, Drive, and Calendar authority are stored separately for each bot.
-14. **Communication boundary** — Gmail search/read calls require explicit inbox access. Every send is stored as a durable approval; recipient, subject, and a body preview are shown before one-time execution. The model cannot call Google APIs directly or receive OAuth tokens.
+13. **Connector boundary** — Google sign-in uses state plus PKCE S256 and the official OAuth page. Client secret, access token, and refresh token are encrypted locally and never placed in model prompts. GitHub uses the official CLI's own credential store and exposes only account health and bounded results to OpenBot. Connector credentials and CLI tokens never enter model prompts.
+14. **Communication boundary** — Gmail search/read calls require explicit inbox access; GitHub notification/issue reads require separate activity access. Every email send and GitHub issue creation is stored as a durable approval with a useful preview before one-time execution. Read and write authority are stored separately for every bot. Models cannot call provider APIs directly or receive connector tokens.
 15. **Code-project boundary** — a user must connect one specific real folder and grant each teammate read, write, and run capabilities. Project tools require relative paths and block traversal, hidden files, symbolic links, binary content, and oversized files. Every coding run receives a private Git worktree, keeping concurrent tasks isolated from one another and from the user's main checkout. Project checks run against that worktree in disposable no-network containers with protected hidden paths masked. Dedicated Git tools show only bounded visible diffs and commit only named paths. Pull requests require recorded passing checks, an approval from a different teammate tied to the unchanged commit, and a durable owner approval before `git push` or `gh pr create`; Git hooks and interactive prompting are disabled. Revoking a grant changes the model-session capability fingerprint immediately.
 16. **Conflict-safe edit recovery** — every agent write stores the prior text and a hash of the exact resulting file. Restore proceeds only when the current file still matches that hash, preventing a stale restore from overwriting newer user or agent work.
 
@@ -26,6 +26,8 @@ OpenBot is local-first software that runs models and automation tools. It reduce
 Approvals do not expire. Denying cancels the associated run. Approving an intercepted terminal/browser action performs exactly the saved action once, records the result, and continues the existing bot session with that result. Prompt-level approvals queue the original request.
 
 Gmail follows the same path. OpenBot marks the approval decided before calling Gmail, temporarily keeps the run out of the queue, records success or failure, and then resumes the bot with the result. This prioritizes avoiding duplicate sends if the service is interrupted after Gmail accepts a message.
+
+GitHub issue creation also follows the durable approval path. The repository, title, and body preview are stored with the proposed action; creation is unavailable unless the teammate has the separate write grant and occurs only after approval.
 
 Mac organization also follows the durable approval path. The proposal stores exact source/destination pairs, validates every path again after approval, creates destination folders, and moves regular files only. Existing targets fail the whole preflight instead of being overwritten.
 
@@ -46,9 +48,10 @@ Teach mode opens a visible, bot-specific Chrome profile and records navigation, 
 - Claude Code subscription and usage-credit metering is controlled by Anthropic and may change independently of OpenBot.
 - Gmail read and Drive read scopes are classified by Google as restricted. Personal test-user setup can run locally, but public distribution requires OAuth verification and may require an independent security assessment.
 - OAuth access is broad at the connected Google account level. Per-bot switches are OpenBot policy controls, not separate Google grants; anyone with full access to the local OpenBot data and vault key can act as the owner.
-- Gmail sending currently supports plain-text messages and up to ten recipients. Attachments, drafts, and labels are not included in 0.11.
+- Gmail sending currently supports plain-text messages and up to ten recipients. Attachments, drafts, and labels are not included in 0.12.
 - Drive reading is intentionally bounded to supported text, Google Docs, and Google Sheets exports. Binary Office files and PDFs need a dedicated fidelity-preserving viewer.
-- Calendar is read-only in 0.11. Event creation or changes should be added later behind the same durable approval path as email sending.
+- Calendar is read-only in 0.12. Event creation or changes should be added later behind the same durable approval path as email sending.
+- GitHub access inherits the repositories and organizations available to the signed-in official CLI account. OpenBot's per-bot switches are local policy controls, so owners should keep that CLI account scoped appropriately.
 - Availability depends on the local OpenBot service, OpenCode/provider, Docker, and Chrome.
 
 Please report security issues privately to the repository owner rather than opening a public exploit report.

@@ -137,6 +137,7 @@ export interface Run {
   botColor: string;
   parentRunId: string | null;
   steeredFromRunId: string | null;
+  routineId: string | null;
   prompt: string;
   status: RunStatus;
   approvalReason: string | null;
@@ -244,7 +245,7 @@ export interface ProviderStatus {
   loginAttempts: ProviderLoginAttempt[];
 }
 
-export type ConnectorKind = "google_workspace";
+export type ConnectorKind = "google_workspace" | "github_cli";
 export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github";
 export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
 
@@ -267,7 +268,7 @@ export interface ConnectorConnection {
 export interface BotConnectorAccess {
   botId: string;
   connectorId: string;
-  service: GoogleConnectorService;
+  service: ConnectorServiceId;
   canRead: boolean;
   canSend: boolean;
   updatedAt: string;
@@ -309,9 +310,41 @@ export interface ConnectorStatus {
   googleProjectId: string | null;
   googleApiRecovery: GoogleApiRecovery | null;
   googleApiRecoveries: GoogleApiRecovery[];
+  github: GitHubConnectorStatus;
   catalog: ConnectorCatalogEntry[];
   access: BotConnectorAccess[];
   events: ConnectorEvent[];
+}
+
+export interface GitHubConnectorStatus {
+  installed: boolean;
+  connected: boolean;
+  connecting: boolean;
+  accountLogin: string | null;
+  lastError: string | null;
+}
+
+export interface GitHubNotificationSummary {
+  id: string;
+  repository: string;
+  title: string;
+  type: string;
+  reason: string;
+  unread: boolean;
+  updatedAt: string;
+  url: string | null;
+}
+
+export interface GitHubIssueSummary {
+  id: string;
+  number: number;
+  repository: string;
+  title: string;
+  state: "open" | "closed";
+  author: string | null;
+  labels: string[];
+  updatedAt: string;
+  url: string;
 }
 
 export interface GmailMessageSummary {
@@ -378,7 +411,9 @@ export interface ComputerStatus {
 export interface TaughtWorkflow {
   id: string;
   botId: string;
+  botName: string;
   name: string;
+  skillSlug: string;
   startUrl: string;
   stepCount: number;
   createdAt: string;
@@ -486,6 +521,7 @@ export interface AppState {
   messages: Message[];
   runs: Run[];
   routines: Routine[];
+  workflows: TaughtWorkflow[];
   approvals: Approval[];
   agentMessages: AgentMessage[];
   providers: ProviderInstance[];

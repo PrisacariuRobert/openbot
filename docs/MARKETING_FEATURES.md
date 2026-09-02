@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.10 local-first beta
+Release: 0.12 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -36,12 +36,14 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 ### Natural teamwork
 
 - Natural `@name`, multiple-teammate, and `@everyone` mentions
+- Type `/` to discover learned skills, filter them for the current conversation, and run one with its owning teammate
 - Automatic role-based task ownership when no teammate is tagged
 - Up to three teammates working concurrently, with only one active run per teammate
 - Focused teammate questions, replies, findings, and task handoffs
 - Visible Team signals feed in Control center
 - Durable deduplication plus three-hop/eight-related-run limits to prevent loops
 - New user instructions queue safely while a teammate is working
+- Natural follow-ups redirect active non-code work while preserving one visible continuation; coding work queues safely on its task branch
 
 ### Verifiable completion
 
@@ -125,6 +127,16 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Morning brief, meeting preparation, and follow-up starter workflows
 - Connected-account previews and a private local connector activity trail
 
+### GitHub productivity
+
+- One-click connection through the user's official GitHub CLI login without copying a personal access token into OpenBot
+- Friendly account health and reconnect states
+- Live notification previews with direct repository or subject links
+- Issue search across repositories the signed-in account can access
+- Separate **Read activity** and **Create issues** permissions for every teammate
+- Issue creation only after a durable owner approval shows the repository, title, and body preview
+- Private connector activity records for notification reads, issue searches, approvals, denials, and successful creation
+
 ### Files and visible Mac apps
 
 - One owner-controlled **Files & apps on this Mac** switch for the studio
@@ -143,8 +155,12 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Persistent routine name, prompt, teammate, conversation, schedule, enabled state, next run, last run, last status, and run count
 - Manual **Test now** action
 - Pause and resume controls
+- Edit the routine name, instructions, teammate, and interval at any time
+- Inspect saved run history, open past results, and retry a previous routine
+- Delete a schedule without deleting its completed run history
 - In-app recurring messages when the user says “text me” without naming an external service
-- Demonstrated browser workflows saved as reusable local skills
+- Demonstrated browser workflows saved as reusable local skills for both OpenCode and Claude Code
+- Learned-skill manager with use, rename, starting-page edit, and delete actions
 
 ### Messages, files, voice, and phone use
 
@@ -182,7 +198,7 @@ These features are implemented, but marketing must explain their requirement.
 |---|---|
 | Model execution | A supported OpenCode or Claude Code setup, or a supported API key, must be connected by the owner. |
 | Code and terminal checks | Docker must be installed and running; dependencies must already be available because project checks have no network. |
-| GitHub pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account allowed to push the repository. |
+| GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
@@ -199,6 +215,7 @@ These features are implemented, but marketing must explain their requirement.
 - **Research in parallel:** ask several specialists in the studio, then let them share findings and hand off focused follow-ups.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
+- **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
 
 ## Claims to avoid
@@ -209,7 +226,7 @@ Do not say OpenBot currently:
 - is a native iOS or Android application;
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
-- connects Slack or Notion as working apps, or claims GitHub issue/notification support;
+- connects Slack or Notion as working apps;
 - creates or edits Calendar events;
 - handles Gmail attachments, labels, or rich HTML sending;
 - edits Office documents or spreadsheets with layout fidelity;
@@ -220,14 +237,14 @@ Do not say OpenBot currently:
 
 - Native phone shell and opt-in push notifications
 - Optional always-on self-hosted daemon or private cloud deployment
-- GitHub issues, notifications, event triggers, and repository allowlist management
+- GitHub event triggers and repository allowlist management
 - Slack, Notion, and broader connector SDK/marketplace
 - Event-triggered routines and signed webhooks
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
 - Full-text search across conversations and projects
 - Roster pinning, sections, templates, duplication, and sharing
-- Threaded replies, reactions, and true mid-run interruption/steering
+- Threaded replies and reactions
 - Multi-user organizations, SSO, policy administration, and audit export
 
 ## Ready-to-use homepage copy
@@ -244,7 +261,7 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 - **A studio, not a chatbot tab.** Specialists can work in parallel, ask each other questions, and hand off focused jobs.
 - **Your subscriptions, your choice.** Mix supported OpenCode, Claude Code, and provider connections across teammates.
 - **Progress you can trust.** See the outcome, steps, approvals, checks, and final result for every substantial job.
-- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, files, browser work, and durable memory.
+- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub activity, files, browser work, and durable memory.
 - **Local-first by default.** Your OpenBot data lives on your machine, with encrypted secrets and visible permission boundaries.
 
 ### Closing line

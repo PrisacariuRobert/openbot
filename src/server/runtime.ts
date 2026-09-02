@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 import type { ComputerStatus } from "../shared/types.js";
@@ -195,6 +195,21 @@ export class BrowserManager {
 
   constructor(private readonly db: OpenBotDatabase) {}
 
+  private writeTaughtSkill(botId: string, slug: string, name: string, startUrl: string, steps: TeachStep[]): string {
+    const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
+    const description = JSON.stringify(`Repeat the browser workflow the user taught for ${name}.`);
+    const content = `---\nname: ${slug}\ndescription: ${description}\n---\n\n# ${name}\n\nStart at ${startUrl}. Use the browser tools and verify each page before the next action. Never guess credentials; ask for takeover or approval when a secret is needed.\n\n## Demonstrated steps\n\n${stepText || "No actions were captured. Ask the user to demonstrate again."}\n`;
+    let primary = "";
+    for (const provider of [".opencode", ".claude"]) {
+      const skillDir = path.join(this.db.workspacesDir, botId, provider, "skills", slug);
+      mkdirSync(skillDir, { recursive: true });
+      const skillPath = path.join(skillDir, "SKILL.md");
+      writeFileSync(skillPath, content, "utf8");
+      if (provider === ".opencode") primary = skillPath;
+    }
+    return primary;
+  }
+
   isAvailable() { return Boolean(chromePath()); }
 
   private async context(botId: string, headless = true): Promise<BrowserContext> {
@@ -305,14 +320,39 @@ export class BrowserManager {
     if (!session) throw new Error("No teaching session is running for this bot.");
     this.teaching.delete(botId);
     await this.contexts.get(botId)?.close();
-    const slug = session.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "taught-workflow";
-    const skillDir = path.join(this.db.workspacesDir, botId, ".opencode", "skills", slug);
-    mkdirSync(skillDir, { recursive: true });
-    const skillPath = path.join(skillDir, "SKILL.md");
-    const { writeFileSync } = await import("node:fs");
-    const steps = session.steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
-    writeFileSync(skillPath, `---\nname: ${slug}\ndescription: Repeat the browser workflow the user taught for ${session.name}.\n---\n\n# ${session.name}\n\nStart at ${session.startUrl}. Use the browser tools and verify each page before the next action. Never guess credentials; ask for takeover or approval when a secret is needed.\n\n## Demonstrated steps\n\n${steps || "No actions were captured. Ask the user to demonstrate again."}\n`, "utf8");
-    return this.db.saveWorkflow({ botId, name: session.name, startUrl: session.startUrl, steps: session.steps, skillPath });
+    const slug = this.db.nextWorkflowSlug(botId, session.name);
+    const skillPath = this.writeTaughtSkill(botId, slug, session.name, session.startUrl, session.steps);
+    return this.db.saveWorkflow({ botId, name: session.name, startUrl: session.startUrl, steps: session.steps, skillPath, skillSlug: slug });
+  }
+
+  updateTaughtWorkflow(id: string, input: { name: string; startUrl: string }) {
+    safeUrl(input.startUrl);
+    const record = this.db.getWorkflowRecord(id);
+    if (!record) throw new Error("Learned workflow not found.");
+    const slug = this.db.nextWorkflowSlug(record.workflow.botId, input.name, id);
+    const oldSlug = record.workflow.skillSlug;
+    const skillPath = this.writeTaughtSkill(record.workflow.botId, slug, input.name, input.startUrl, record.steps as TeachStep[]);
+    if (oldSlug !== slug) {
+      for (const provider of [".opencode", ".claude"]) {
+        const oldDirectory = path.resolve(this.db.workspacesDir, record.workflow.botId, provider, "skills", oldSlug);
+        const skillsRoot = path.resolve(this.db.workspacesDir, record.workflow.botId, provider, "skills");
+        if (oldDirectory.startsWith(`${skillsRoot}${path.sep}`) && existsSync(oldDirectory)) rmSync(oldDirectory, { recursive: true });
+      }
+    }
+    return this.db.updateWorkflowRecord(id, { ...input, skillSlug: slug, skillPath });
+  }
+
+  deleteTaughtWorkflow(id: string): boolean {
+    const record = this.db.getWorkflowRecord(id);
+    if (!record) return false;
+    const removed = this.db.deleteWorkflowRecord(id);
+    if (!removed) return false;
+    for (const provider of [".opencode", ".claude"]) {
+      const directory = path.resolve(this.db.workspacesDir, removed.botId, provider, "skills", record.workflow.skillSlug);
+      const skillsRoot = path.resolve(this.db.workspacesDir, removed.botId, provider, "skills");
+      if (directory.startsWith(`${skillsRoot}${path.sep}`) && existsSync(directory)) rmSync(directory, { recursive: true });
+    }
+    return true;
   }
 
   teachingStatus(botId: string) {

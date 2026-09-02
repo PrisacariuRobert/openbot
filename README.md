@@ -1,21 +1,21 @@
-# OpenBot 0.11.0
+# OpenBot 0.12.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.11.0
+## What's new in 0.12.0
 
-- Every coding job now gets its own Git worktree and branch, so several teammates can work on the same project without touching the owner's checkout or one another's unfinished changes.
-- A different teammate reviews the exact tested commit before OpenBot can ask to publish a pull request.
-- Natural follow-up messages can redirect a teammate's active job instead of becoming an unrelated task waiting at the back of the queue.
-- Release verification now checks that this README names the exact package version and contains a matching “What's new” section.
+- Type `/` in chat to find and run learned skills. Skills can be used, renamed, revised, or removed from one clear place and are generated for both OpenCode and Claude Code teammates.
+- Routines are now operational rather than write-only: edit the name, instructions, teammate, or timing; pause, resume, retry, inspect run history, open results, or delete the schedule without losing its past results.
+- Connect the official GitHub CLI in one click to see notifications, search issues, and let selected teammates read GitHub context. Issue creation always shows an owner approval before anything is posted.
+- GitHub access is separated per teammate into **Read activity** and **Create issues**, with friendly live previews and a private activity trail.
 
 ## What is included
 
 - Named teammates with stable roles, personality, memory, files, model, connection, and token limit
 - Direct chat plus a shared studio where up to three bots work in parallel
-- Natural `@name` and `@everyone` routing, plus automatic role-based ownership when nobody is tagged
+- Natural `@name` and `@everyone` routing, automatic role-based ownership, and a `/` picker for learned skills
 - Working file attachments (up to six files, 25 MB each) copied into only the selected teammates' private inboxes
 - Browser voice typing for quick phone tasks; OpenBot stores the transcript, not the microphone audio
 - Visible bot-to-bot questions, findings, replies, and deduplicated handoffs
@@ -29,8 +29,8 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Independent teammate code review of the exact tested commit before approval-gated GitHub pull-request publishing
 - A persistent, constrained Docker computer for every bot
 - A persistent Chrome profile for every bot with open, read, click, type, and screenshot tools
-- Visible teach mode that turns a demonstrated browser task into an editable OpenCode skill
-- Hourly and daily routines with a manual “test now” action and saved run status
+- Visible teach mode that turns a demonstrated browser task into an editable OpenCode and Claude Code skill, with chat discovery and management
+- Five-minute, hourly, and daily routines with editing, pause/resume, manual retry, run history, result links, and safe deletion
 - Persistent approvals for destructive, publishing, communication, purchasing, credential, and system actions
 - Provider instances owned by the local user and explicitly assigned per bot
 - Provider-aware connections for OpenCode, Claude, ChatGPT/OpenAI, GitHub Copilot, GitLab Duo, and SuperGrok/xAI
@@ -40,6 +40,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Animated mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
 - Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
+- Official GitHub CLI connection for notifications, issue search, and approval-gated issue creation
 - Per-teammate permissions for Inbox, sending, Drive, and Calendar—rather than exposing every connected app to every bot
 - Natural `@gmail`, `@drive`, and `@calendar` suggestions plus useful starter workflows that combine current information
 - Owner-controlled access to visible Mac home folders, with bounded text reading and approval-only file organization that cannot delete or overwrite
@@ -55,7 +56,7 @@ Requirements:
 - Optional [Claude Code](https://docs.anthropic.com/en/docs/claude-code/getting-started) for Claude Pro, Max, Team, Enterprise, or Console access
 - Google Chrome or Chromium for browser work
 - Docker for private bot computers
-- Optional [GitHub CLI](https://cli.github.com/) signed in for publishing pull requests
+- Optional [GitHub CLI](https://cli.github.com/) for GitHub activity, issues, and publishing pull requests
 
 ```bash
 npm install
@@ -149,13 +150,14 @@ Runtime data is excluded from Git:
   workspaces/<bot>/
     AGENTS.md
     CLAUDE.md
+    .claude/skills/
     .opencode/tools/
     .opencode/skills/
 ```
 
 ## Architecture
 
-The React client receives live state over server-sent events. The local Express service owns scheduling, approvals, usage, provider bindings, connectors, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, routines, memories, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, teamwork, and approval tools.
+The React client receives live state over server-sent events. The local Express service owns scheduling, approvals, usage, provider bindings, connectors, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, routines, memories, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, and approval tools.
 
 The design borrows the strongest ideas from [Hermes Agent's architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture), [agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop), [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode), and [security model](https://hermes-agent.nousresearch.com/docs/user-guide/security): isolated profiles, observable execution, parallel tools, interruptible work, stable prompts, and layered boundaries.
 
@@ -170,7 +172,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. GitHub cloning and approval-gated pull-request publishing are included, but GitHub issues, notifications, and repository-event automation are not yet a general connector. Gmail, Google Drive, and Google Calendar are bundled; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. An always-on hosted service is also future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. GitHub notifications, issue search, approval-gated issue creation, cloning, and approval-gated pull-request publishing are included through the official GitHub CLI; repository-event automation is not. Gmail, Google Drive, and Google Calendar are bundled; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Event-triggered routines, a native phone app, and an always-on hosted service are also future work.
 
 ## License
 

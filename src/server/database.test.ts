@@ -65,6 +65,48 @@ test("stores and advances a five-minute enabled routine", () => {
   }
 });
 
+test("edits, pauses, retries, inspects, and deletes a routine without losing its results", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-ops-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const routine = db.createRoutine({ name: "Daily pulse", botId: "nova", threadId: "bot-nova", prompt: "Make a pulse.", intervalMinutes: 1440 });
+    const edited = db.updateRoutine(routine.id, { name: "Hourly pulse", botId: "scout", threadId: "bot-scout", prompt: "Make a checked pulse.", intervalMinutes: 60, enabled: false });
+    assert.equal(edited?.botName, "Scout");
+    assert.equal(edited?.enabled, false);
+    assert.equal(edited?.intervalMinutes, 60);
+    const run = db.createRun({ threadId: "bot-scout", botId: "scout", prompt: edited!.prompt, status: "queued", routineId: routine.id });
+    db.updateRun(run.id, { status: "failed", error: "Temporary problem" });
+    assert.equal(db.listRoutineRuns(routine.id)[0]?.routineId, routine.id);
+    assert.equal(db.getRoutine(routine.id)?.lastStatus, "failed");
+    assert.equal(db.deleteRoutine(routine.id), true);
+    assert.equal(db.getRoutine(routine.id), null);
+    assert.equal(db.getRun(run.id)?.error, "Temporary problem");
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("keeps learned skills globally discoverable with unique slash commands", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-skills-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const firstSlug = db.nextWorkflowSlug("nova", "Morning brief");
+    const first = db.saveWorkflow({ botId: "nova", name: "Morning brief", startUrl: "https://example.com", steps: [{ type: "navigate" }], skillPath: "/tmp/morning-brief/SKILL.md", skillSlug: firstSlug });
+    const secondSlug = db.nextWorkflowSlug("pixel", "Morning brief");
+    const second = db.saveWorkflow({ botId: "pixel", name: "Morning brief", startUrl: "https://example.org", steps: [], skillPath: "/tmp/morning-brief-pixel/SKILL.md", skillSlug: secondSlug });
+    assert.equal(first.skillSlug, "morning-brief");
+    assert.equal(second.skillSlug, "morning-brief-pixel");
+    assert.equal(db.getState("team-room").workflows.length, 2);
+    assert.equal(db.updateWorkflowRecord(first.id, { name: "Daily brief", startUrl: "https://example.net", skillSlug: "daily-brief", skillPath: "/tmp/daily-brief/SKILL.md" })?.skillSlug, "daily-brief");
+    assert.equal(db.deleteWorkflowRecord(second.id)?.botId, "pixel");
+    assert.equal(db.listWorkflows().length, 1);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("keeps approvals pending across a full database restart", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-approval-test-"));
   try {

@@ -1,6 +1,6 @@
 const riskyPatterns: Array<[RegExp, string]> = [
   [/\b(delete|remove|erase|wipe|drop|truncate)\b/i, "This may delete files or data."],
-  [/\b(git\s+push|publish|deploy|release|merge\s+(the\s+)?pr)\b/i, "This may publish work outside your computer."],
+  [/\b(git\s+push|publish|deploy|merge\s+(the\s+)?pr)\b/i, "This may publish work outside your computer."],
   [/\b(send|post|message|email|reply|submit)\b.{0,45}\b(client|customer|team|public|twitter|x|slack|discord|form|application)\b/i, "This may communicate with other people."],
   [/\b(buy|purchase|pay|subscribe|order|checkout|transfer)\b/i, "This may spend money or start a subscription."],
   [/\b(sudo|chmod|chown|rm\s+-rf|killall|shutdown|reboot)\b/i, "This requests a high-impact system action."],

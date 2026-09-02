@@ -7,6 +7,7 @@ test("ordinary local work does not require an extra approval", () => {
   assert.equal(approvalReason("Call message_teammate to share a finding with the team"), null);
   assert.equal(approvalReason("Run the checks, but do not publish and never delete files"), null);
   assert.equal(approvalReason("Do not send an email to the client"), null);
+  assert.equal(approvalReason("Run a read-only release check and summarize the result"), null);
   assert.equal(approvalReason("Do not publish the preview, then deploy the approved release"), "This may publish work outside your computer.");
 });
 

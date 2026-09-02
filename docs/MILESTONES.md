@@ -232,3 +232,18 @@ Status: complete on the 0.11 development branch
 - Release verification fails when `package.json`, `package-lock.json`, the README title, and its matching “What's new” section disagree
 
 Verification: 52 automated tests pass, including persistence of the steering relationship. Release-document checks, type checking, and the production build pass.
+
+## M17 — Chat-native skills, trusted routines, and GitHub productivity
+
+Status: complete on the 0.12 development branch
+
+- Typing `/` in the composer opens a searchable picker of learned skills available to the current conversation
+- Choosing a skill inserts its stable command, selects the owning teammate, and routes the request to that teammate without affecting ordinary path text
+- Learned browser workflows generate compatible skill folders for both OpenCode and Claude Code and can be used, renamed, revised, or deleted from the Teach panel
+- Routine operations now include full editing, pause/resume, deletion, saved run history, result links, manual retry, and preserved history after schedule deletion
+- The official GitHub CLI provides a one-click account connection, live notifications, issue search, and approval-gated issue creation without placing access tokens in OpenBot or model context
+- Every teammate receives separate GitHub **Read activity** and **Create issues** permissions; every issue write is previewed, approved, performed once, and added to the private connector activity trail
+- GitHub, routines, skills, and provider panels remain contained and usable at desktop and 390×844 phone widths
+- Release documentation names the exact 0.12.0 package version and separates shipped GitHub capabilities from event triggers, Slack, Notion, and other roadmap work
+
+Verification: 57 automated tests pass, including skill parsing, unique skill persistence, routine history and deletion safety, GitHub response normalization, connector URL handling, and safe read-only release phrasing. Type checking and the production build pass. A real DeepSeek V4 Flash teammate read the newest GitHub notification through the permissioned tool and returned its title and repository without write access. Live notification previews, issue search, slash selection, routine operations, skill management, and desktop/phone layouts were inspected against the running app; the temporary model, permission, run, and messages were removed afterward.
