@@ -253,6 +253,12 @@ test("stores provider runtimes and bounded teammate signals", () => {
 
     const parent = db.createRun({ threadId: "team-room", botId: "nova", prompt: "Coordinate this", status: "queued" });
     const child = db.createRun({ threadId: "team-room", botId: "scout", prompt: "Check the details", status: "queued", parentRunId: parent.id });
+    db.markRunConsultationPending(parent.id);
+    assert.equal(db.getRun(parent.id)?.consultationPending, true);
+    assert.equal(db.pauseRunForConsultation(parent.id)?.status, "waiting_for_teammate");
+    assert.equal(db.runningRun("team-room", "nova")?.id, parent.id);
+    assert.equal(db.hasPendingChildRuns(parent.id), true);
+    assert.equal(db.readyConsultationCoordinators().length, 0);
     assert.equal(db.runDepth(child.id), 1);
     assert.equal(db.rootRunId(child.id), parent.id);
     assert.equal(db.descendantRunCount(child.id), 2);
@@ -263,6 +269,13 @@ test("stores provider runtimes and bounded teammate signals", () => {
     assert.equal(db.hasAgentMessage(parent.id, "scout", "nova"), false);
     assert.equal(db.addAgentMessage({ threadId: "team-room", fromBotId: "nova", toBotId: "scout", body: "Verify the checklist", kind: "question", expectsReply: true, runId: parent.id, hopCount: 1, dedupeKey: "one-question" }), null);
     assert.equal(db.listAgentInbox("scout", "team-room").length, 1);
+    db.updateRun(child.id, { status: "completed", finishedAt: new Date().toISOString() });
+    assert.equal(db.hasPendingChildRuns(parent.id), false);
+    assert.equal(db.readyConsultationCoordinators()[0]?.id, parent.id);
+    const resumed = db.resumeRunAfterConsultation(parent.id, "Give one combined answer");
+    assert.equal(resumed?.status, "queued");
+    assert.equal(resumed?.consultationPending, false);
+    assert.equal(resumed?.prompt, "Give one combined answer");
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });

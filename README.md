@@ -1,15 +1,15 @@
-# OpenBot 0.12.0
+# OpenBot 0.13.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.12.0
+## What's new in 0.13.0
 
-- Type `/` in chat to find and run learned skills. Skills can be used, renamed, revised, or removed from one clear place and are generated for both OpenCode and Claude Code teammates.
-- Routines are now operational rather than write-only: edit the name, instructions, teammate, or timing; pause, resume, retry, inspect run history, open results, or delete the schedule without losing its past results.
-- Connect the official GitHub CLI in one click to see notifications, search issues, and let selected teammates read GitHub context. Issue creation always shows an owner approval before anything is posted.
-- GitHub access is separated per teammate into **Read activity** and **Create issues**, with friendly live previews and a private activity trail.
+- Teammates now consult in private and return one answer: the original bot remains the coordinator, waits for requested opinions or handoffs, and combines them in its own voice.
+- Consultant runs no longer appear as extra chat speakers or send duplicate completion notifications. The conversation shows one calm **consulting the team** state while details remain inspectable in Control center.
+- Nested consultations, independent code reviews, failures, cancellations, and several parallel opinions all converge back to the correct coordinator with strict hop and task limits.
+- Token and cost totals now accumulate across approval and consultation resumptions instead of losing the earlier part of a long-running job.
 
 ## What is included
 
@@ -18,7 +18,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Natural `@name` and `@everyone` routing, automatic role-based ownership, and a `/` picker for learned skills
 - Working file attachments (up to six files, 25 MB each) copied into only the selected teammates' private inboxes
 - Browser voice typing for quick phone tasks; OpenBot stores the transcript, not the microphone audio
-- Visible bot-to-bot questions, findings, replies, and deduplicated handoffs
+- Private bot-to-bot questions, findings, replies, and deduplicated handoffs, with one coordinator-owned final answer and an inspectable Team signals feed
 - Three-hop/eight-task teamwork limits that prevent accidental agent loops
 - Live streaming text, activity history, token/cache/cost usage, and a studio control center
 - A persistent completion contract for real jobs: clear outcome, deliverable, live checklist, approval boundary, and recorded final checks
@@ -168,6 +168,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 - [Workflow benchmark](docs/WORKFLOW_BENCHMARK.md)
 - [Launch readiness and honest gaps](docs/LAUNCH_READINESS.md)
 - [Product gap audit and next priorities](docs/PRODUCT_GAP_AUDIT.md)
+- [Release roadmap](docs/RELEASE_ROADMAP.md)
 - [Marketing capability catalog](docs/MARKETING_FEATURES.md)
 
 ## Current boundary

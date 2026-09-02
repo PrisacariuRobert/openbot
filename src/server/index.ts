@@ -848,8 +848,9 @@ app.post("/api/internal/tools", async (request, response) => {
         if (previous?.headCommit === prepared.headCommit && previous.verdict === "approved") return response.json({ ok: true, status: `${previous.reviewerBotName} already approved this exact commit.`, review: previous });
         if (!db.claimDedupe(`code-review:${runId}:${prepared.headCommit}`)) return response.json({ ok: true, status: `${target.name} is already reviewing this commit.` });
         const verification = sourceRun?.task.verificationSummary || "The coding teammate recorded all requested checks as passed.";
-        const reviewerPrompt = `Independent code review requested by ${sourceRun?.botName || bot.name}.\n\nProject: ${prepared.project.name}\nBranch: ${prepared.workspace.branch}\nBase: ${prepared.base}\nExact commit: ${prepared.headCommit}\nRecorded verification: ${verification}\n\nChanged files:\n${prepared.review.changes.join("\n")}\n\nCode diff:\n${prepared.review.diff}\n\nReview the supplied diff independently for correctness, regressions, security, unsafe scope, and missing tests. Do not edit or publish anything. When finished, call code_review_result exactly once with sourceRunId=${runId}, projectId=${projectId}, headCommit=${prepared.headCommit}, a verdict of approved or changes_requested, a concise summary, and up to 12 actionable findings. Then give the user a short natural review outcome.`;
+        const reviewerPrompt = `Private independent code review requested by ${sourceRun?.botName || bot.name}.\n\nProject: ${prepared.project.name}\nBranch: ${prepared.workspace.branch}\nBase: ${prepared.base}\nExact commit: ${prepared.headCommit}\nRecorded verification: ${verification}\n\nChanged files:\n${prepared.review.changes.join("\n")}\n\nCode diff:\n${prepared.review.diff}\n\nReview the supplied diff independently for correctness, regressions, security, unsafe scope, and missing tests. Do not edit or publish anything. When finished, call code_review_result exactly once with sourceRunId=${runId}, projectId=${projectId}, headCommit=${prepared.headCommit}, a verdict of approved or changes_requested, a concise summary, and up to 12 actionable findings. End with a focused internal review summary for ${sourceRun?.botName || bot.name}; do not address the user because the requesting teammate will combine the result into one final answer.`;
         const reviewerRun = db.createRun({ threadId: sourceRun!.threadId, botId: target.id, prompt: reviewerPrompt, status: "queued", parentRunId: runId });
+        db.markRunConsultationPending(runId);
         db.addAgentMessage({ threadId: sourceRun!.threadId, fromBotId: botId, toBotId: target.id, body: `Please independently review ${prepared.project.name} branch ${prepared.workspace.branch} at ${prepared.headCommit.slice(0, 8)}.`, kind: "handoff", expectsReply: true, runId, hopCount: db.runDepth(runId) + 1, dedupeKey: `agent:code-review:${reviewerRun.id}` });
         db.addActivity({ runId, botId, kind: "handoff", label: `${target.name} is independently reviewing the code`, detail: prepared.workspace.branch });
         broadcast();
@@ -1015,7 +1016,8 @@ app.post("/api/internal/tools", async (request, response) => {
       if (!db.claimDedupe(dedupeKey)) return response.json({ ok: true, status: `${target.name} is already taking a look.` });
       const sourceRun = db.getRun(runId)!;
       db.addAgentMessage({ threadId: sourceRun.threadId, fromBotId: botId, toBotId: target.id, body: String(args.task || "").slice(0, 4_000), kind: "handoff", expectsReply: true, runId, hopCount: depth + 1, dedupeKey: `agent:${dedupeKey}` });
-      db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Handoff from ${sourceRun.botName}: ${String(args.task || "")}`, status: "queued", parentRunId: runId });
+      db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private handoff from ${sourceRun.botName}: ${String(args.task || "")}\n\nComplete this focused part and end with a concise internal result for ${sourceRun.botName}. Do not address the user or present this as the final answer; ${sourceRun.botName} will combine the team's work into one response.`, status: "queued", parentRunId: runId });
+      db.markRunConsultationPending(runId);
       db.addActivity({ runId, botId, kind: "handoff", label: `${target.name} is helping with this`, detail: null });
       broadcast(); return response.json({ ok: true, status: `${target.name} is taking care of that part.` });
     }
@@ -1034,7 +1036,8 @@ app.post("/api/internal/tools", async (request, response) => {
       });
       if (!message) return response.json({ ok: true, status: `${target.name} already has this.` });
       if (expectsReply) {
-        db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private teammate message from ${sourceRun.botName}: ${body}\n\nGive a focused answer. Quietly share the useful result back with message_teammate using expectsReply=false. Then tell the user only the useful outcome in natural language—never mention the tool name, fields, IDs, or delivery receipt.`, status: "queued", parentRunId: runId });
+        db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private teammate question from ${sourceRun.botName}: ${body}\n\nInvestigate the question and end with a concise internal finding for ${sourceRun.botName}. Do not address the user, send a second chat reply, or mention internal tool details; OpenBot will privately return your result so ${sourceRun.botName} can give one combined answer.`, status: "queued", parentRunId: runId });
+        db.markRunConsultationPending(runId);
       }
       db.addActivity({ runId, botId, kind: "message", label: expectsReply ? `Asked ${target.name} for a second look` : `Shared an update with ${target.name}`, detail: null });
       broadcast(); return response.json({ ok: true, status: expectsReply ? `${target.name} is taking a look.` : `${target.name} has the update.` });

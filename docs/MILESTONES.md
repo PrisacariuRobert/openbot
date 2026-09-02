@@ -247,3 +247,20 @@ Status: complete on the 0.12 development branch
 - Release documentation names the exact 0.12.0 package version and separates shipped GitHub capabilities from event triggers, Slack, Notion, and other roadmap work
 
 Verification: 57 automated tests pass, including skill parsing, unique skill persistence, routine history and deletion safety, GitHub response normalization, connector URL handling, and safe read-only release phrasing. Type checking and the production build pass. A real DeepSeek V4 Flash teammate read the newest GitHub notification through the permissioned tool and returned its title and repository without write access. Live notification previews, issue search, slash selection, routine operations, skill management, and desktop/phone layouts were inspected against the running app; the temporary model, permission, run, and messages were removed afterward.
+
+## M18 — One-voice teammate consultation
+
+Status: complete on the 0.13 development branch
+
+- The bot that receives the user's request remains the coordinator when it asks another teammate for an opinion, handoff, or independent code review
+- Consultant work and results stay private to the team instead of creating a second bot bubble in the main conversation
+- A coordinator pauses in a durable **consulting the team** state and resumes only after every direct child consultation has completed, failed, or been cancelled
+- The resumed coordinator sees the latest private findings, resolves differences, and gives the user one combined answer in its own voice
+- Nested consultations converge recursively without bypassing the existing three-hop/eight-related-run limits
+- Internal consultant completions do not produce duplicate desktop notifications or clutter the active-run list; the Control center still exposes the bounded Team signals trail
+- Failed consultant work returns a private failure finding so the coordinator can answer honestly instead of waiting forever
+- Token, cache, reasoning, and cost usage accumulates across approval and consultation continuation turns
+- New user direction can stop a coordinator while it is waiting on the team
+- Release documentation names the exact 0.13.0 package version and records the next five product releases with honest acceptance boundaries
+
+Verification: 58 automated tests pass, including persisted consultation state, child readiness, coordinator resumption, active-run steering, and the coordinator-only publish rule. Type checking and the production build pass. The exact Pixel-to-Nova consultation flow and desktop/phone UI are verified against the running application before release.

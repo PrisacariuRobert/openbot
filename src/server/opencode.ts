@@ -80,6 +80,10 @@ export function toolActivity(event: Record<string, unknown>): ToolActivity | nul
 
 export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number };
 
+export function shouldPublishRunMessage(run: Pick<Run, "parentRunId">): boolean {
+  return run.parentRunId === null;
+}
+
 export function eventUsage(event: Record<string, unknown>): Usage | null {
   const part = event.part as Record<string, unknown> | undefined;
   const message = event.message as Record<string, unknown> | undefined;
@@ -130,10 +134,40 @@ export class OpenCodeRunner {
     return true;
   }
 
+  private resumeCoordinatorIfReady(runId: string): boolean {
+    const run = this.options.db.getRun(runId);
+    if (!run || run.status !== "waiting_for_teammate" || !run.consultationPending || this.options.db.hasPendingChildRuns(run.id)) return false;
+    const consultants = [...new Set(this.options.db.listChildRuns(run.id).map((child) => child.botName))];
+    const originalRequest = run.prompt.replace(/^The private consultation is complete[\s\S]*?Original request:\n/u, "");
+    const prompt = `The private consultation is complete. Review the newest private team signals and now give the user one final synthesized answer in your own voice. Incorporate useful findings and resolve any differences. Only you should answer the user. Start directly with the useful conclusion: do not narrate that a teammate replied, say you are about to finalize, mention internal consultation mechanics, or use prefaces such as “their answer is in” or “I got their take.”\n\nOriginal request:\n${originalRequest}`;
+    this.options.db.resumeRunAfterConsultation(run.id, prompt);
+    this.options.db.addActivity({ runId: run.id, botId: run.botId, kind: "message", label: consultants.length ? `Team input from ${consultants.join(" and ")} is ready` : "Team input is ready", detail: null });
+    return true;
+  }
+
+  private shareChildOutcome(run: Run, bot: Bot, body: string, failed = false) {
+    if (!run.parentRunId) return;
+    const parent = this.options.db.getRun(run.parentRunId);
+    if (!parent || parent.botId === bot.id) return;
+    if (!this.options.db.hasAgentMessage(run.id, bot.id, parent.botId)) {
+      this.options.db.addAgentMessage({
+        threadId: run.threadId, fromBotId: bot.id, toBotId: parent.botId,
+        body: body.slice(0, 4_000), kind: "finding", expectsReply: false, runId: run.id,
+        hopCount: this.options.db.runDepth(run.id), dedupeKey: `result:${run.id}`,
+      });
+    }
+    this.options.db.addActivity({
+      runId: parent.id, botId: parent.botId, kind: failed ? "status" : "message",
+      label: failed ? `${bot.name} could not finish their part` : `${bot.name} shared a finding`, detail: body.slice(0, 180),
+    });
+    this.resumeCoordinatorIfReady(parent.id);
+  }
+
   private async tick() {
     if (this.ticking) return;
     this.ticking = true;
     try {
+      for (const run of this.options.db.readyConsultationCoordinators()) this.resumeCoordinatorIfReady(run.id);
       const maximum = this.options.maxParallel || 3;
       while (this.running.size < maximum) {
         const excludedBotIds = [...this.running.keys()].map((runId) => this.options.db.getRun(runId)?.botId).filter((id): id is string => Boolean(id));
@@ -240,7 +274,15 @@ export class OpenCodeRunner {
       const current = this.options.db.getRun(run.id);
       const waiting = current?.status === "awaiting_approval";
       const cancelled = signal === "SIGTERM" || current?.status === "cancelled";
-      const usagePatch = { ...usage, progressAt: finishedAt, ...(sessionId ? { sessionId } : {}) };
+      const usagePatch = {
+        inputTokens: (current?.inputTokens || 0) + usage.inputTokens,
+        outputTokens: (current?.outputTokens || 0) + usage.outputTokens,
+        reasoningTokens: (current?.reasoningTokens || 0) + usage.reasoningTokens,
+        cacheReadTokens: (current?.cacheReadTokens || 0) + usage.cacheReadTokens,
+        cost: (current?.cost || 0) + usage.cost,
+        progressAt: finishedAt,
+        ...(sessionId ? { sessionId } : {}),
+      };
       if (waiting) {
         this.options.db.updateRun(run.id, { ...usagePatch, partialText: responseText || current?.partialText || "" });
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Waiting for you", detail: current?.approvalReason || null });
@@ -250,24 +292,26 @@ export class OpenCodeRunner {
           this.options.db.updateRun(run.id, { ...usagePatch, status: "cancelled", finishedAt });
           this.options.db.finishRunTask(run.id, "cancelled");
         }
+      } else if (current?.consultationPending) {
+        this.options.db.updateRun(run.id, usagePatch);
+        this.options.db.pauseRunForConsultation(run.id);
+        const pendingNames = [...new Set(this.options.db.listChildRuns(run.id).filter((childRun) => !["completed", "failed", "cancelled"].includes(childRun.status)).map((childRun) => childRun.botName))];
+        this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "handoff", label: pendingNames.length ? `Waiting for ${pendingNames.join(" and ")}` : "Bringing the team's ideas together", detail: null });
+        this.resumeCoordinatorIfReady(run.id);
       } else if (code === 0 && responseText.trim()) {
         const summary = responseText.trim();
         this.options.db.updateRun(run.id, { ...usagePatch, status: "completed", finishedAt, summary, partialText: null, error: null });
         this.options.db.finishRunTask(run.id, "completed");
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
-        this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id });
-        if (run.parentRunId) {
-          const parent = this.options.db.getRun(run.parentRunId);
-          if (parent && parent.botId !== bot.id && !this.options.db.hasAgentMessage(run.id, bot.id, parent.botId)) {
-            this.options.db.addAgentMessage({ threadId: run.threadId, fromBotId: bot.id, toBotId: parent.botId, body: summary.slice(0, 4_000), kind: "finding", expectsReply: false, runId: run.id, hopCount: this.options.db.runDepth(run.id), dedupeKey: `result:${run.id}` });
-            this.options.db.addActivity({ runId: parent.id, botId: parent.botId, kind: "message", label: `${bot.name} shared a finding`, detail: summary.slice(0, 180) });
-          }
-        }
+        if (!shouldPublishRunMessage(run)) {
+          this.shareChildOutcome(run, bot, summary);
+        } else this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id });
       } else {
         const error = cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
         this.options.db.updateRun(run.id, { ...usagePatch, status: "failed", finishedAt, error, partialText: responseText || null });
         this.options.db.finishRunTask(run.id, "failed", error);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Couldn’t finish", detail: error });
+        this.shareChildOutcome(run, bot, `I could not finish the private consultation: ${error}`, true);
       }
       this.options.onChange();
       void this.tick();

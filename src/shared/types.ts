@@ -2,6 +2,7 @@ export type BotStatus = "ready" | "working" | "waiting" | "offline" | "failed" |
 export type MascotKind = "nova" | "blob" | "sprout" | "orbit" | "pebble" | "sunny";
 export type RunStatus =
   | "awaiting_approval"
+  | "waiting_for_teammate"
   | "queued"
   | "running"
   | "completed"
@@ -138,6 +139,7 @@ export interface Run {
   parentRunId: string | null;
   steeredFromRunId: string | null;
   routineId: string | null;
+  consultationPending: boolean;
   prompt: string;
   status: RunStatus;
   approvalReason: string | null;

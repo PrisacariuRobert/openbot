@@ -1,12 +1,12 @@
-# OpenBot 0.12.0 Launch Readiness
+# OpenBot 0.13.0 Launch Readiness
 
-OpenBot 0.12.0 is ready for an open-source local-first beta launch. Its chat-native skills, inspectable routines, GitHub productivity connection, completion engine, natural mid-job steering, and review-first coding harness make substantial work reusable, observable, editable, verifiable, and publishable with approval, but it is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, or wider plugin catalog.
+OpenBot 0.13.0 is ready for an open-source local-first beta launch. Its one-voice teammate consultations, chat-native skills, inspectable routines, GitHub productivity connection, completion engine, natural mid-job steering, and review-first coding harness make substantial work reusable, observable, editable, verifiable, and publishable with approval, but it is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, rich artifact support, or wider plugin catalog.
 
 ## What is launch-ready
 
 - Persistent named teammates with owned model connections, budgets, memory, files, browser sessions, routines, and observable work
 - Official OpenCode and Claude Code runtime paths plus encrypted API-key connections
-- Direct chat, natural mentions, automatic ownership, parallel room work, bounded bot-to-bot communication, and duplicate protection
+- Direct chat, natural mentions, automatic ownership, parallel room work, bounded private bot-to-bot communication, one coordinator-owned answer, and duplicate protection
 - Chat-native `/` discovery for learned skills, with use, rename, starting-page edit, and delete controls plus OpenCode and Claude Code skill generation
 - Natural follow-up steering for active non-code jobs, with immediate cancellation and safe session continuation; coding jobs stay pinned to their isolated task branch
 - Real attachments, artifact downloads, voice typing, an installable phone UI, and authenticated remote access
@@ -28,7 +28,7 @@ OpenBot 0.12.0 is ready for an open-source local-first beta launch. Its chat-nat
 |---|---|
 | Ownership | The user selects and owns the model/subscription connection assigned to each bot. |
 | Privacy | Loopback-only by default, local database, isolated per-bot workspaces/computers, and inspectable encrypted secrets. |
-| Team safety | Bot messages and handoffs are visible, deduplicated, and capped at three hops/eight related runs. |
+| Team safety | Consultations are privately inspectable, deduplicated, capped at three hops/eight related runs, and synthesized by one coordinator instead of producing noisy duplicate replies. |
 | Approval durability | Approval decisions persist without short expiry windows. |
 | Email authority | Reading and sending are separate per teammate; every send shows a durable one-time approval before execution. |
 | App least privilege | Gmail, Drive, and Calendar can be enabled independently for each teammate even though they share one Google account. |
@@ -50,18 +50,18 @@ OpenBot 0.12.0 is ready for an open-source local-first beta launch. Its chat-nat
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Rich Office/spreadsheet editing | Files persist, but there is no workbook-aware editor or fidelity engine. | Add document and spreadsheet tools with rendered before/after review. |
 | Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
-| Event-triggered routines | 0.12 provides reliable interval operations and history, not Slack/GitHub/webhook triggers or failure alerts. | Add signed webhook triggers with filters, rate limits, dedupe keys, replay history, and visible failure recovery. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.12 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Event-triggered routines | The current release provides reliable interval operations and history, not Slack/GitHub/webhook triggers or failure alerts. | Add signed webhook triggers with filters, rate limits, dedupe keys, replay history, and visible failure recovery. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.13 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
 | Reply/reaction ergonomics | Active non-code work can now be redirected naturally, but messages still lack explicit reply references and reactions. | Add lightweight reply context and reactions without turning the chat into a project-management interface. |
 
 ## Release decision
 
-Ship 0.12.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors work. The strongest launch story is: private persistent AI teammates that can reuse learned skills, run inspectable routines, plan, code, review, publish, use Google and GitHub context, accept new direction while working, collaborate, and verify work while the owner keeps control of projects, models, and sensitive actions.
+Ship 0.13.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors work. The strongest launch story is: private persistent AI teammates that can consult one another, return one calm combined answer, reuse learned skills, run inspectable routines, plan, code, review, publish, use Google and GitHub context, accept new direction while working, and verify work while the owner keeps control of projects, models, and sensitive actions.
 
 ## Verified acceptance criteria
 
-- Automated tests: 57 passing
+- Automated tests: 58 passing
 - Type safety: passing
 - Production build: passing
 - Real model: Nova completed a three-step file workflow, reopened the artifact, recorded four passing checks, and returned one verified result receipt
@@ -72,7 +72,7 @@ Ship 0.12.0 as a **local-first beta**, with the limitations above visible in the
 - Google integration: mocked OAuth/PKCE, encrypted storage, Gmail, Drive, Calendar, safe message construction, tool exposure, and per-bot access passing; real account consent intentionally left to the owner
 - GitHub integration: official CLI account health, live notification preview, live issue search, response normalization, URL safety, per-teammate read/create separation, approval-gated creation, and connector activity records passing. A real DeepSeek V4 Flash teammate read the newest notification with read-only access and returned its title/repository; no test issue was created and all temporary test state was removed.
 - Skills and routines: slash parsing, unique skill slugs, cross-runtime skill files, management actions, routine edits, deletion with preserved history, result links, and retry controls passing
-- 0.12 UI: GitHub connection/activity, skill picker/manager, and routine editor/history inspected at desktop and 390×844 without horizontal overflow
+- 0.13 UI: one coordinator card, private consultant runs, GitHub connection/activity, skill picker/manager, and routine editor/history inspected at desktop and 390×844 without horizontal overflow
 - Mac files: traversal, hidden/system paths, aliases, bounded reads, no-overwrite organization, database permission, tool exposure, and a real Desktop-listing run passing
 - Code projects: a real DeepSeek V4 Flash teammate created a separate branch, made one exact source edit, reviewed the diff, passed `npm test` in the no-network container, committed only the named file, reopened it, left the tree clean, and recorded five successful checks; the temporary grant was removed and the disposable fixture was moved to Trash afterward
 - Code projects UI: empty, GitHub clone, connected, and expanded review states verified at 1440×900 and 390×844; the document, sheet, fields, and review card had no horizontal overflow

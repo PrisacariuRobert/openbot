@@ -242,6 +242,7 @@ export class OpenBotDatabase {
         parent_run_id TEXT,
         steered_from_run_id TEXT,
         routine_id TEXT,
+        consultation_pending INTEGER NOT NULL DEFAULT 0,
         task_goal TEXT,
         task_deliverable TEXT,
         task_approval_boundary TEXT,
@@ -432,6 +433,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "parent_run_id TEXT");
     this.addColumn("runs", "steered_from_run_id TEXT");
     this.addColumn("runs", "routine_id TEXT");
+    this.addColumn("runs", "consultation_pending INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "task_goal TEXT");
     this.addColumn("runs", "task_deliverable TEXT");
     this.addColumn("runs", "task_approval_boundary TEXT");
@@ -546,7 +548,7 @@ export class OpenBotDatabase {
     return `
       SELECT b.*, t.id AS thread_id,
         EXISTS(SELECT 1 FROM runs r WHERE r.bot_id=b.id AND r.status IN ('queued','running')) AS active_run,
-        EXISTS(SELECT 1 FROM runs r WHERE r.bot_id=b.id AND r.status='awaiting_approval') AS waiting_run,
+        EXISTS(SELECT 1 FROM runs r WHERE r.bot_id=b.id AND r.status IN ('awaiting_approval','waiting_for_teammate')) AS waiting_run,
         (SELECT status FROM runs r WHERE r.bot_id=b.id ORDER BY created_at DESC LIMIT 1) AS latest_status,
         (SELECT finished_at FROM runs r WHERE r.bot_id=b.id ORDER BY created_at DESC LIMIT 1) AS latest_finished_at,
         COALESCE((SELECT SUM(input_tokens+output_tokens+reasoning_tokens) FROM runs r WHERE r.bot_id=b.id AND r.created_at >= datetime('now','-7 days')),0) AS tokens_used_week
@@ -760,6 +762,7 @@ export class OpenBotDatabase {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
+      consultationPending: asBoolean(row.consultation_pending),
       prompt: String(row.prompt), status: row.status as RunStatus,
       approvalReason: row.approval_reason ? String(row.approval_reason) : null, approvalId: row.approval_id ? String(row.approval_id) : null,
       partialText: row.partial_text ? String(row.partial_text) : null, startedAt: row.started_at ? String(row.started_at) : null,
@@ -785,7 +788,7 @@ export class OpenBotDatabase {
   }
 
   runningRun(threadId: string, botId: string): Run | null {
-    const row = this.db.prepare(this.runSelect("WHERE r.thread_id=? AND r.bot_id=? AND r.status='running' ORDER BY r.created_at DESC LIMIT 1")).get(threadId, botId) as Row | undefined;
+    const row = this.db.prepare(this.runSelect("WHERE r.thread_id=? AND r.bot_id=? AND r.status IN ('running','waiting_for_teammate') ORDER BY r.created_at DESC LIMIT 1")).get(threadId, botId) as Row | undefined;
     return row ? this.runFromRow(row) : null;
   }
 
@@ -817,6 +820,34 @@ export class OpenBotDatabase {
 
   setRunPrompt(id: string, prompt: string) {
     this.db.prepare("UPDATE runs SET prompt=?,progress_at=? WHERE id=?").run(prompt, now(), id);
+  }
+
+  markRunConsultationPending(id: string) {
+    this.db.prepare("UPDATE runs SET consultation_pending=1,progress_at=? WHERE id=?").run(now(), id);
+  }
+
+  pauseRunForConsultation(id: string): Run | null {
+    this.db.prepare("UPDATE runs SET status='waiting_for_teammate',task_stage='waiting',partial_text=NULL,summary=NULL,error=NULL,finished_at=NULL,progress_at=? WHERE id=? AND consultation_pending=1").run(now(), id);
+    return this.getRun(id);
+  }
+
+  listChildRuns(parentRunId: string): Run[] {
+    return (this.db.prepare(this.runSelect("WHERE r.parent_run_id=? ORDER BY r.created_at ASC")).all(parentRunId) as Row[]).map((row) => this.runFromRow(row));
+  }
+
+  hasPendingChildRuns(parentRunId: string): boolean {
+    const row = this.db.prepare("SELECT EXISTS(SELECT 1 FROM runs WHERE parent_run_id=? AND status IN ('queued','running','awaiting_approval','waiting_for_teammate')) present").get(parentRunId) as Row | undefined;
+    return asBoolean(row?.present);
+  }
+
+  readyConsultationCoordinators(): Run[] {
+    const rows = this.db.prepare(this.runSelect("WHERE r.status='waiting_for_teammate' AND r.consultation_pending=1 AND NOT EXISTS(SELECT 1 FROM runs child WHERE child.parent_run_id=r.id AND child.status IN ('queued','running','awaiting_approval','waiting_for_teammate')) ORDER BY r.created_at ASC")).all() as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
+  resumeRunAfterConsultation(id: string, prompt: string): Run | null {
+    this.db.prepare("UPDATE runs SET prompt=?,status='queued',consultation_pending=0,task_stage='working',partial_text=NULL,summary=NULL,error=NULL,finished_at=NULL,progress_at=? WHERE id=? AND status='waiting_for_teammate'").run(prompt, now(), id);
+    return this.getRun(id);
   }
 
   startRunTask(id: string): TaskContract | null {
@@ -1590,7 +1621,7 @@ export class OpenBotDatabase {
   }
 
   getUsageSummary(): UsageSummary {
-    const row = this.db.prepare(`SELECT COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens,COALESCE(SUM(reasoning_tokens),0) reasoning_tokens,COALESCE(SUM(cache_read_tokens),0) cache_read_tokens,COALESCE(SUM(cost),0) cost,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_runs,SUM(CASE WHEN status IN ('queued','running','awaiting_approval') THEN 1 ELSE 0 END) active_runs FROM runs WHERE created_at>=datetime('now','-7 days')`).get() as Row;
+    const row = this.db.prepare(`SELECT COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens,COALESCE(SUM(reasoning_tokens),0) reasoning_tokens,COALESCE(SUM(cache_read_tokens),0) cache_read_tokens,COALESCE(SUM(cost),0) cost,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_runs,SUM(CASE WHEN status IN ('queued','running','awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) active_runs FROM runs WHERE created_at>=datetime('now','-7 days')`).get() as Row;
     const inputTokens = Number(row.input_tokens || 0), outputTokens = Number(row.output_tokens || 0), reasoningTokens = Number(row.reasoning_tokens || 0), cacheReadTokens = Number(row.cache_read_tokens || 0);
     return { inputTokens, outputTokens, reasoningTokens, cacheReadTokens, totalTokens: inputTokens + outputTokens + reasoningTokens, cost: Number(row.cost || 0), completedRuns: Number(row.completed_runs || 0), activeRuns: Number(row.active_runs || 0) };
   }

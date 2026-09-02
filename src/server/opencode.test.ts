@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendModelText, eventText, eventUsage, toolActivity } from "./opencode.js";
+import { appendModelText, eventText, eventUsage, shouldPublishRunMessage, toolActivity } from "./opencode.js";
 
 test("keeps streaming fragments together", () => {
   assert.equal(appendModelText("Open", "Bot"), "OpenBot");
   assert.equal(appendModelText("Hello ", "there"), "Hello there");
+});
+
+test("publishes only the coordinator's final answer to the conversation", () => {
+  assert.equal(shouldPublishRunMessage({ parentRunId: null }), true);
+  assert.equal(shouldPublishRunMessage({ parentRunId: "coordinator-run" }), false);
 });
 
 test("reads token and cache usage from OpenCode completion events", () => {

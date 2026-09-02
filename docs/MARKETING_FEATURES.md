@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.12 local-first beta
+Release: 0.13 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -18,7 +18,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 1. **Bring your own AI.** Assign a different supported model connection to every teammate instead of buying model access from OpenBot.
 2. **Review-first coding without a broad host shell.** Clone or share one project, let multiple teammates work safely in parallel, inspect every diff, restore an unchanged agent edit, and publish only after checks and an independent teammate review pass.
 3. **Finished means checked.** Real jobs have a durable outcome, deliverable, checklist, approval boundary, and verification receipt.
-4. **Agents can collaborate without spiraling.** Questions, findings, replies, and handoffs are visible, deduplicated, and limited to three hops and eight related runs.
+4. **A team that speaks with one voice.** Teammates consult privately, every signal stays inspectable, and one coordinator combines the result instead of making the user reconcile duplicate replies. Conversations remain limited to three hops and eight related runs.
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 
@@ -40,6 +40,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Automatic role-based task ownership when no teammate is tagged
 - Up to three teammates working concurrently, with only one active run per teammate
 - Focused teammate questions, replies, findings, and task handoffs
+- One coordinator waits for private teammate results and returns one synthesized answer in its own voice
+- Consultant runs stay out of the main transcript and do not send duplicate completion notifications
 - Visible Team signals feed in Control center
 - Durable deduplication plus three-hop/eight-related-run limits to prevent loops
 - New user instructions queue safely while a teammate is working

@@ -8,8 +8,8 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 |---|---|---|---|
 | Persistent specialist | Pass | Nova, Pixel, and Scout retained separate role, session, memory, files, model, provider, browser, and budget | Close, with stronger local ownership visibility |
 | Parallel one-shot tasks | Pass | Nova and Pixel ran simultaneously and each created/verified a different workspace file | Close for local file/research tasks |
-| Team handoff | Pass | Nova handed a four-item checklist to Scout; a repeated dedupe key produced exactly one Scout run | Adds explicit duplicate protection |
-| Teammate communication | Pass | DeepSeek V4 Flash made Pixel share a finding, ask Scout a question, and receive exactly one no-reply response; the control center displayed each route, kind, and content | More transparent, with hard loop limits |
+| Team handoff | Pass | A coordinator can hand a focused part to another bot, wait for it, and resume only when the private result is ready; a repeated dedupe key produces exactly one consultant run | Adds explicit duplicate protection and one coordinator-owned answer |
+| Teammate communication | Pass | Private questions, replies, code reviews, failures, and nested consultations converge on the requesting bot; consultant runs stay out of chat while Control center preserves each route, kind, and finding | Less noisy, more transparent, with hard loop limits |
 | Natural group routing | Pass | `@name`, multiple mentions, and `@everyone` are enforced on the server; untagged requests choose one owner by role fit and availability | Close for core routing; Grok also mentions groups, routines, skills, and plugins |
 | Mid-job steering | Pass for active non-code jobs | A natural follow-up immediately stops the prior run, preserves its session link, and starts a continuation with the new direction; the composer explains this before send | Close for the common chat flow; active code work deliberately queues to preserve its isolated branch |
 | File handoff | Pass | A real Markdown attachment was stored, displayed in chat, copied only into Pixel's inbox, read by DeepSeek, and returned exactly one verified answer | Useful core support; Grok accepts more media sizes and richer artifact previews |
@@ -37,6 +37,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - **Approvals expire or badges get stuck:** approval rows have no expiry; the UI derives its badge from pending database rows and approved/denied decisions clear it.
 - **Bots forget schedules:** routines are explicit database records with next/last run, status, count, history, result links, edit/delete controls, and manual retry.
 - **Duplicate sends/actions:** teammate messages and handoffs use durable dedupe keys plus three-hop/eight-run limits. Gmail approvals are marked decided before delivery and cannot be approved twice; the bot is resumed only after the saved action succeeds or fails.
+- **Two bots answer one question:** consultant results now remain private, the coordinator waits for every requested result, and only that coordinator publishes one synthesized response and completion notification.
 - **Spreadsheet progress is lost:** persistent per-bot workspaces and sessions reduce restart loss; native workbook-aware editing remains a gap.
 - **Tone drifts:** role and working style live in stable generated `AGENTS.md`; durable memories are included on every run.
 - **Slow or opaque usage:** three bots can run concurrently, live partial text and tools are visible, and OpenCode token/cache/cost events are recorded per run.
