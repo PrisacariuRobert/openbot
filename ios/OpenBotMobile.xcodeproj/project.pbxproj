@@ -1,0 +1,494 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05768E35E7D1E1AB96C3EE32 /* ConnectionAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F26D0E29F0D7E7DB32DEC8 /* ConnectionAddress.swift */; };
+		33065AD9AAEF6DFDCD84D7C6 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E80C244DD0AC56003E1039 /* NetworkMonitor.swift */; };
+		71307A9366A036321DAF3FDC /* StudioContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3682D6F0A28601E71C264117 /* StudioContainerView.swift */; };
+		73489734DAE0C9E75DEBDE20 /* ConnectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A8B2A8E9BB46D40E325F99 /* ConnectionSession.swift */; };
+		75E248CC681D81278BD52C64 /* OpenBotMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918EFF9622D2C64E786CF5E4 /* OpenBotMobileApp.swift */; };
+		8C851E6F8C1F4276696F57C2 /* ConnectionAddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB60718AB6609498F64EB03 /* ConnectionAddressTests.swift */; };
+		A84A28ED6B4E0F8636AB7A23 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 400F29CCD38BE50784C1A732 /* PrivacyInfo.xcprivacy */; };
+		DAC63A615EAE0691CDCC694F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BBB4F0F29D096280E4F3E975 /* Assets.xcassets */; };
+		E408A829F7CCE69DD061340B /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68867F381BFD41C3E1B3B47 /* KeychainStore.swift */; };
+		E73B0B5A5FF29D612719DF72 /* StudioWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4E645A6DB3668BF3569441 /* StudioWebView.swift */; };
+		F056E0D90CEE83BDD7C34CC9 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E6A177987867773EF6B192 /* ConnectionView.swift */; };
+		F49977E1D51F842185872472 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41C2E7C00C18C882B39EDC0 /* RootView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AD6081376E60744BD73978D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2179E9B8B23258A4AC7FC3CA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6F6AB255CB52DFC68FA648D0;
+			remoteInfo = OpenBotMobile;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		03E80C244DD0AC56003E1039 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		18F26D0E29F0D7E7DB32DEC8 /* ConnectionAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAddress.swift; sourceTree = "<group>"; };
+		3682D6F0A28601E71C264117 /* StudioContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioContainerView.swift; sourceTree = "<group>"; };
+		37E6A177987867773EF6B192 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		400F29CCD38BE50784C1A732 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		712B10B831D2EC2FC73D6078 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7C4E645A6DB3668BF3569441 /* StudioWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioWebView.swift; sourceTree = "<group>"; };
+		8CB60718AB6609498F64EB03 /* ConnectionAddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAddressTests.swift; sourceTree = "<group>"; };
+		918EFF9622D2C64E786CF5E4 /* OpenBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotMobileApp.swift; sourceTree = "<group>"; };
+		B1A8B2A8E9BB46D40E325F99 /* ConnectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSession.swift; sourceTree = "<group>"; };
+		BB539F661436BBF791E22079 /* OpenBotMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenBotMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBB4F0F29D096280E4F3E975 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D68867F381BFD41C3E1B3B47 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		E41C2E7C00C18C882B39EDC0 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		F919EEFAA0146B7446987E5B /* OpenBotMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenBotMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0A800D3D05500870C07D98CF /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				D68867F381BFD41C3E1B3B47 /* KeychainStore.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		422AA85B259C41884713CBE2 /* OpenBotMobileTests */ = {
+			isa = PBXGroup;
+			children = (
+				8CB60718AB6609498F64EB03 /* ConnectionAddressTests.swift */,
+			);
+			path = OpenBotMobileTests;
+			sourceTree = "<group>";
+		};
+		4E9502AB61163D4DF9645FE2 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				18F26D0E29F0D7E7DB32DEC8 /* ConnectionAddress.swift */,
+				B1A8B2A8E9BB46D40E325F99 /* ConnectionSession.swift */,
+				03E80C244DD0AC56003E1039 /* NetworkMonitor.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		6D2F7E1EA3DAB4D3D70C3335 /* OpenBotMobile */ = {
+			isa = PBXGroup;
+			children = (
+				8EE62BE1E0A55A64B458E148 /* App */,
+				4E9502AB61163D4DF9645FE2 /* Models */,
+				E616F99D71F3F1A3CD819941 /* Resources */,
+				0A800D3D05500870C07D98CF /* Security */,
+				B4BCAB95C27FB5D6675FB90B /* Views */,
+			);
+			path = OpenBotMobile;
+			sourceTree = "<group>";
+		};
+		8EE62BE1E0A55A64B458E148 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				918EFF9622D2C64E786CF5E4 /* OpenBotMobileApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		8F03A4F445D2AAC529E042BA = {
+			isa = PBXGroup;
+			children = (
+				6D2F7E1EA3DAB4D3D70C3335 /* OpenBotMobile */,
+				422AA85B259C41884713CBE2 /* OpenBotMobileTests */,
+				C891B44DD878E7DE485E64AA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B4BCAB95C27FB5D6675FB90B /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				37E6A177987867773EF6B192 /* ConnectionView.swift */,
+				E41C2E7C00C18C882B39EDC0 /* RootView.swift */,
+				3682D6F0A28601E71C264117 /* StudioContainerView.swift */,
+				7C4E645A6DB3668BF3569441 /* StudioWebView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		C891B44DD878E7DE485E64AA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F919EEFAA0146B7446987E5B /* OpenBotMobile.app */,
+				BB539F661436BBF791E22079 /* OpenBotMobileTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E616F99D71F3F1A3CD819941 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BBB4F0F29D096280E4F3E975 /* Assets.xcassets */,
+				712B10B831D2EC2FC73D6078 /* Info.plist */,
+				400F29CCD38BE50784C1A732 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6F6AB255CB52DFC68FA648D0 /* OpenBotMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C3742FBCD43047F02373F102 /* Build configuration list for PBXNativeTarget "OpenBotMobile" */;
+			buildPhases = (
+				335416E2CF96DA0C1A48ED81 /* Sources */,
+				9ED2592FDBE3FFDE1AA8503D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenBotMobile;
+			packageProductDependencies = (
+			);
+			productName = OpenBotMobile;
+			productReference = F919EEFAA0146B7446987E5B /* OpenBotMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B5A5F1A620EC76445F604D20 /* OpenBotMobileTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 19BC13783AF180128EA2DA71 /* Build configuration list for PBXNativeTarget "OpenBotMobileTests" */;
+			buildPhases = (
+				3F88965C5EB3A47D4ADE5452 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				82D912B6B196B22B9E4BEDED /* PBXTargetDependency */,
+			);
+			name = OpenBotMobileTests;
+			packageProductDependencies = (
+			);
+			productName = OpenBotMobileTests;
+			productReference = BB539F661436BBF791E22079 /* OpenBotMobileTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2179E9B8B23258A4AC7FC3CA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					6F6AB255CB52DFC68FA648D0 = {
+						ProvisioningStyle = Automatic;
+					};
+					B5A5F1A620EC76445F604D20 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E9EFB57E72FA66E678D0D505 /* Build configuration list for PBXProject "OpenBotMobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 8F03A4F445D2AAC529E042BA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C891B44DD878E7DE485E64AA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6F6AB255CB52DFC68FA648D0 /* OpenBotMobile */,
+				B5A5F1A620EC76445F604D20 /* OpenBotMobileTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9ED2592FDBE3FFDE1AA8503D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DAC63A615EAE0691CDCC694F /* Assets.xcassets in Resources */,
+				A84A28ED6B4E0F8636AB7A23 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		335416E2CF96DA0C1A48ED81 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05768E35E7D1E1AB96C3EE32 /* ConnectionAddress.swift in Sources */,
+				73489734DAE0C9E75DEBDE20 /* ConnectionSession.swift in Sources */,
+				F056E0D90CEE83BDD7C34CC9 /* ConnectionView.swift in Sources */,
+				E408A829F7CCE69DD061340B /* KeychainStore.swift in Sources */,
+				33065AD9AAEF6DFDCD84D7C6 /* NetworkMonitor.swift in Sources */,
+				75E248CC681D81278BD52C64 /* OpenBotMobileApp.swift in Sources */,
+				F49977E1D51F842185872472 /* RootView.swift in Sources */,
+				71307A9366A036321DAF3FDC /* StudioContainerView.swift in Sources */,
+				E73B0B5A5FF29D612719DF72 /* StudioWebView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3F88965C5EB3A47D4ADE5452 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C851E6F8C1F4276696F57C2 /* ConnectionAddressTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		82D912B6B196B22B9E4BEDED /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6F6AB255CB52DFC68FA648D0 /* OpenBotMobile */;
+			targetProxy = AD6081376E60744BD73978D0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6B134C01DC3B5F8C06397711 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 17;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		76E45981758B26CE8D6E75A7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.mobile.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenBotMobile.app/OpenBotMobile";
+			};
+			name = Debug;
+		};
+		AAA290B85CC530E67C0C5EC7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.mobile.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenBotMobile.app/OpenBotMobile";
+			};
+			name = Release;
+		};
+		C2C0ED537844CAC902F4CE74 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 17;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D79E94CF7DC0C1FC0AA332F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenBotMobile/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.mobile;
+				PRODUCT_NAME = OpenBot;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E6E74F72EE99CAB6DB8E6FC3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenBotMobile/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.mobile;
+				PRODUCT_NAME = OpenBot;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		19BC13783AF180128EA2DA71 /* Build configuration list for PBXNativeTarget "OpenBotMobileTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				76E45981758B26CE8D6E75A7 /* Debug */,
+				AAA290B85CC530E67C0C5EC7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C3742FBCD43047F02373F102 /* Build configuration list for PBXNativeTarget "OpenBotMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D79E94CF7DC0C1FC0AA332F1 /* Debug */,
+				E6E74F72EE99CAB6DB8E6FC3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E9EFB57E72FA66E678D0D505 /* Build configuration list for PBXProject "OpenBotMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6B134C01DC3B5F8C06397711 /* Debug */,
+				C2C0ED537844CAC902F4CE74 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2179E9B8B23258A4AC7FC3CA /* Project object */;
+}

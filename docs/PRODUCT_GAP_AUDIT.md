@@ -1,10 +1,10 @@
 # OpenBot Product Gap Audit
 
-Updated for OpenBot 0.16.0. This audit compares the locally verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
+Updated for OpenBot 0.17.0. This audit compares the locally verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
 
 ## Current position
 
-OpenBot's strongest difference is owner control: local data, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.16 adds a reusable connector contract plus real Slack and Notion context and approval-gated writes. Grok Bot remains broader where a hosted product has an advantage: an always-on cloud computer, native mobile delivery, general computer takeover, a larger connector marketplace, fidelity-preserving Office work, and organization administration.
+OpenBot's strongest difference is owner control: local data, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.17 adds a native iPhone companion without copying studio data or credentials into a hosted service. Grok Bot remains broader where a hosted product has an advantage: an always-on cloud computer, push delivery, general computer takeover, a larger connector marketplace, fidelity-preserving Office work, and organization administration.
 
 ## Highest-value gaps
 
@@ -17,19 +17,19 @@ OpenBot's strongest difference is owner control: local data, bring-your-own mode
 | P1 | Hosted automation availability | Schedule, Calendar, GitHub, and generic webhook triggers now have durable receipts and recovery, but local schedules stop when the host sleeps and public events need an owner-managed secure route. | Add an optional always-on runner, hosted ingress, encrypted job leases, recovery, health checks, and push delivery while preserving local-only mode. |
 | P2 | Visual computer use and takeover | Accessibility controls cannot understand arbitrary canvases, images, remote desktops, or video; some sign-in and CAPTCHA steps require a person. | Add opt-in screen capture, bounded visual actions, a visible takeover mode, and per-action policy. Never make this a silent global permission. |
 | P2 | Conversation retrieval and context | As chats and teammates grow, users need replies, reactions, pins, roster sections, and cross-chat search. | Start with reply context and local full-text search, then add lightweight reactions and organization. |
-| P2 | Native phone experience | The PWA is useful but lacks guaranteed background execution, platform push, share-sheet capture, and polished voice sessions. | Package a small native shell only after the always-on runner and notification model are reliable. |
+| P2 | Native phone delivery | The SwiftUI companion handles secure live use, but lacks platform push, share-sheet capture, App Store distribution, and polished native voice sessions. | Add these only with an always-on runner, explicit data-location choice, signing, and notification threat model. |
 | P3 | Multi-user administration | A local single-owner product does not yet have SSO, central policies, audit export, deployment templates, or offboarding. | Design tenancy, policy inheritance, network rules, connector allowlists, and key rotation as a separate architecture milestone. |
 
 ## Next release sequence
 
-1. **0.17 — Find and organize:** reply context, local full-text search, pins, roster sections, duplication, and private skill import/export.
-2. **0.18 — Work anywhere:** optional always-on self-hosted runner, hosted event ingress, push delivery, and then a thin native phone shell without changing local-only mode.
-3. **0.19 — Focused breadth:** add one task manager and one cloud-storage connector through the reviewed 0.16 contract, then add Slack/Notion event sources.
+1. **0.18 — Find and organize:** reply context, local full-text search, pins, roster sections, duplication, and private skill import/export.
+2. **0.19 — Always-on work:** optional self-hosted runner, hosted event ingress, encrypted leases, health, recovery, and push delivery without changing local-only mode.
+3. **0.20 — Focused breadth:** add one task manager and one cloud-storage connector through the reviewed connector contract, then add Slack/Notion event sources.
 4. **Later — Fidelity tools:** OCR, local transcription, and format-aware Office editing after their model, privacy, and rendered-review boundaries are proven.
 
 ## Release truth
 
-OpenBot 0.16.0 is a strong local-first beta, not feature parity with Grok Bot. It is differentiated for private model ownership, granular per-teammate authority across Google, GitHub, Slack, Notion, Mac files, and code projects; rich bounded inputs; one-voice consultation; exact-commit review; recoverable writes; and signed automations with explainable recovery. “Better” means more trustworthy and owner-controlled first; breadth should be added only when each connector, event source, file processor, and computer action has real permission, recovery, and verification behavior.
+OpenBot 0.17.0 is a strong local-first beta, not feature parity with Grok Bot. It adds a secure native iPhone client while remaining differentiated for private model ownership, granular per-teammate authority, rich bounded inputs, one-voice consultation, exact-commit review, recoverable writes, and signed automations with explainable recovery. “Better” means more trustworthy and owner-controlled first; always-on infrastructure and breadth still need real permission, recovery, and verification behavior.
 
 ## Primary comparison sources
 

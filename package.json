@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",
@@ -14,8 +14,9 @@
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "test": "tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit",
+    "check:ios": "node scripts/check-ios.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "verify": "npm run check:release && npm test && npm run check && npm run build"
+    "verify": "npm run check:release && npm run check:ios && npm test && npm run check && npm run build"
   },
   "dependencies": {
     "express": "^5.2.1",

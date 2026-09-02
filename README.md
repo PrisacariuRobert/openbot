@@ -1,17 +1,17 @@
-# OpenBot 0.16.0
+# OpenBot 0.17.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.16.0
+## What's new in 0.17.0
 
-- Slack and Notion are now real connectors rather than roadmap cards: search and read current context, then post to Slack or append to a selected Notion page only after an exact owner approval.
-- A versioned connector manifest gives every app the same honest contract for capabilities, data boundaries, per-teammate read/write grants, health, reconnect state, previews, audits, and approval policy.
-- Slack search runs with the connected member's visibility while posting uses the app bot; Notion can see only pages explicitly selected or shared during connection. Tokens stay encrypted and never enter model context.
-- Apps & Tools now offers a managed one-click path and a clearly separated self-hosted setup path, real service marks, natural status language, useful connected previews, responsive permission controls, and workflow starters that combine Slack, Notion, Google, and GitHub.
-- Connector revocation immediately invalidates stale teammate sessions, repeated OAuth callbacks cannot destroy a healthy connection, and provider errors become short recovery guidance with optional technical details.
-- Markdown rendering is loaded only when a conversation needs it, reducing the initial production JavaScript bundle while preserving formatted chat.
+- Added a real SwiftUI iPhone companion project for chat, approvals, attachments, artifacts, and live progress against the owner's Mac-hosted studio.
+- Added safe one-tap address pairing through `openbot://connect` links; pairing links never carry the private access key.
+- Stores the private key with iPhone Keychain protection, exchanges it for OpenBot's HttpOnly session cookie, reconnects on foreground, and clears matching cookies when forgotten.
+- Requires HTTPS for public hostnames, permits plain HTTP only for private/local addresses, and keeps the Mac's loopback-only mode as the secure default.
+- Added native offline state, pull-to-refresh, external-link handoff, a playful SwiftUI mascot welcome screen, and a new production icon shared with the web install experience.
+- Prevents the native shell from being trapped on a stale service-worker build and adds structural iOS privacy, deep-link, secret, and Swift-syntax verification to every release check.
 
 ## What is included
 
@@ -42,6 +42,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - An official Claude Code runtime adapter with the same isolated workspace, browser, memory, approval, and teamwork tools
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
+- Native SwiftUI iPhone companion source with Keychain storage, secure session handoff, offline/reconnect state, and address-only deep linking
 - Animated mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
 - Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
@@ -149,7 +150,7 @@ Open **Automations** to create scheduled work or choose a Calendar, GitHub, or g
 
 Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBot-Event-Id` for exact duplicate protection. GitHub hooks use GitHub's standard `X-Hub-Signature-256`, `X-GitHub-Delivery`, and `X-GitHub-Event` headers. An endpoint must be reachable by the sender, so a webhook from the public internet needs a trusted HTTPS tunnel or reverse proxy; never expose OpenBot's plain local HTTP port directly.
 
-Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.16 does not claim an always-on hosted scheduler.
+Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.17 does not claim an always-on hosted scheduler.
 
 ## Remote and phone access
 
@@ -159,7 +160,9 @@ The default service binds only to `127.0.0.1`. To build and expose it to a trust
 npm run remote
 ```
 
-A private access key is created at `.openbot/access.token`. Non-local clients must sign in with it; the resulting cookie is HTTP-only and SameSite Strict. Open **Control center → Phone remote** on the Mac to copy the phone address and key, then add OpenBot to the phone's Home Screen. Use a trusted encrypted tunnel such as Tailscale or an HTTPS reverse proxy—do not expose the plain HTTP port directly to the public internet.
+A private access key is created at `.openbot/access.token`. Non-local clients must sign in with it; the resulting cookie is HTTP-only and SameSite Strict. Open **Control center → Phone remote** on the Mac to copy the phone address, address-only iPhone link, and key. Use a trusted encrypted tunnel such as Tailscale or an HTTPS reverse proxy—do not expose the plain HTTP port directly to the public internet.
+
+The native SwiftUI companion lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
 
 Voice typing uses the browser or operating system speech-recognition service. OpenBot does not upload or store the audio itself, but the browser vendor may process it under its own policy.
 

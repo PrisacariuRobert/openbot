@@ -1,6 +1,6 @@
-# OpenBot 0.16.0 Launch Readiness
+# OpenBot 0.17.0 Launch Readiness
 
-OpenBot 0.16.0 is ready for an open-source local-first beta launch. A permissioned Slack and Notion connector platform now sits beside dependable automations, rich bounded files, one-voice teammate consultation, Google and GitHub productivity, and the review-first coding harness. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, native iOS client, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
+OpenBot 0.17.0 is ready for an open-source local-first beta launch with a source-ready native iPhone companion. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, push delivery, App Store distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
 
 ## What is launch-ready
 
@@ -12,7 +12,7 @@ OpenBot 0.16.0 is ready for an open-source local-first beta launch. A permission
 - Rich PDF, Word, workbook, CSV/TSV, PowerPoint, text, JSON/YAML/notebook/email/source, image, audio, and video ingestion with format-specific bounds
 - Original media forwarded to compatible OpenCode models, contained image/PDF and extracted-text previews, friendly unsupported-format recovery, and hardened downloads
 - Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
-- Voice typing, an installable phone UI, and authenticated remote access
+- Voice typing, an installable PWA, authenticated remote access, and a native SwiftUI iPhone companion with Keychain-backed session handoff
 - Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
@@ -53,24 +53,25 @@ OpenBot 0.16.0 is ready for an open-source local-first beta launch. A permission
 | Gap | Honest status | Best next move |
 |---|---|---|
 | Always-on cloud work | OpenBot stops when the host Mac sleeps or the service exits. | Add an optional self-hosted daemon/VPS deployment with encrypted backup and health checks. |
-| Native iPhone app and push | OpenBot is an installable PWA; background push delivery is browser/platform dependent. | Package a thin native shell and add opt-in push infrastructure. |
+| Native distribution and push | The SwiftUI companion is source-ready, but still needs Xcode signing/App Store delivery and has no push provider or always-on host. | Complete device QA and signing, then add opt-in push only with an always-on runner. |
 | Large connector marketplace | Gmail, Drive, Calendar, GitHub, Slack, and Notion have real bounded tools; this is still a focused built-in set, not a marketplace. | Publish a connector security/review contract, then add task management and cloud storage through the same manifest. |
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
 | Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
 | Hosted event ingress and execution | Schedule and Calendar triggers run only while the Mac and OpenBot are awake. Public webhook delivery requires an owner-managed HTTPS route to the local endpoint. | Add an optional always-on runner with encrypted leases, recovery, health checks, and hosted ingress without weakening local mode. |
 | Broader event sources | Signed GitHub and generic hooks plus primary-Calendar polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.16 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.17 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
 | Reply/reaction ergonomics | Active non-code work can now be redirected naturally, but messages still lack explicit reply references and reactions. | Add lightweight reply context and reactions without turning the chat into a project-management interface. |
 
 ## Release decision
 
-Ship 0.16.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as an always-on hosted assistant, a large connector marketplace, or imply that universal media understanding, OCR, or native Office editing work. The strongest launch story is: private persistent AI teammates that consult behind one calm answer, use carefully scoped Google, GitHub, Slack, Notion, files, browsers, and code projects, and show their checks while the owner keeps control of models and sensitive actions.
+Ship 0.17.0 as a **local-first beta**, with the limitations above visible in the README. The native iPhone source is launch-ready for owner-signed testing, not yet an App Store claim. Do not market OpenBot as always-on or imply that universal media understanding, OCR, or native Office editing work.
 
 ## Verified acceptance criteria
 
-- Automated tests: 74 passing
+- Automated tests: 76 passing
+- iOS project: generated by XcodeGen; structure, privacy declarations, deep-link secret policy, Keychain storage, and Swift syntax checked without full Xcode
 - Type safety: passing
 - Production build: passing
 - Real model: DeepSeek V4 Flash Vision interpreted the supplied screenshot through the new media path; DeepSeek V4 Flash then created, linked, verified, revised, and re-linked one result as versions 1 and 2

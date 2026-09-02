@@ -23,6 +23,7 @@ import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSugges
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
 import { invokedWorkflow } from "../shared/skills.js";
+import { iosConnectURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
 import type { AutomationEvent, Routine } from "../shared/types.js";
@@ -510,7 +511,8 @@ app.get("/api/access", (request, response) => {
   const remoteEnabled = host !== "127.0.0.1" && host !== "localhost";
   const clientPort = process.env.NODE_ENV === "production" ? port : 4310;
   const urls = remoteEnabled ? Object.values(networkInterfaces()).flat().filter((address) => address?.family === "IPv4" && !address.internal).map((address) => `http://${address!.address}:${clientPort}`) : [];
-  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: [...new Set(urls)] });
+  const uniqueURLs = [...new Set(urls)];
+  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: uniqueURLs, iosConnectUrls: uniqueURLs.map(iosConnectURL) });
 });
 
 function safeUploadName(raw: string) {

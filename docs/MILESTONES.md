@@ -312,3 +312,17 @@ Status: complete for the local-first 0.16 release
 - Markdown rendering is lazy-loaded so rich conversation formatting no longer inflates the initial application bundle
 
 Verification: 74 automated tests pass, including official Slack and Notion response shapes, OAuth replay recovery, encryption, session revocation, per-teammate read/write separation, message/page boundaries, approval previews, rate-limit recovery, OpenCode tools, and Claude Code bridge exposure. Type checking and the production build pass. The Apps & Tools experience is visually verified at desktop and 390×844 with no page-level overflow or console errors. Live third-party account consent remains owner setup rather than a release-test claim.
+
+## M22 — Native iPhone companion
+
+Status: complete for the local-first 0.17 source release
+
+- A real SwiftUI iPhone companion connects to the owner-hosted OpenBot studio and presents chat, approvals, attachments, artifacts, and live progress through the existing responsive experience
+- Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, refresh, external links, and connection settings
+- The access key is stored with device-only-when-unlocked Keychain protection and exchanged for an HttpOnly cookie before WebKit loads the studio
+- Public plain-HTTP hosts and URL credentials are rejected; certificate validation is never bypassed
+- Mac-generated `openbot://connect` links prefill only the normalized studio origin and never contain the access key
+- Native mode unregisters stale service workers, while the installable PWA remains available as a fallback
+- A production two-teammate mascot icon now represents both the iOS and installed web experiences
+
+Verification: 76 automated tests pass. The Xcode project is deterministically generated with XcodeGen. Release checks validate required sources and assets, the privacy manifest and local-network declaration, address-only deep links, Keychain protection, cookie handoff, absence of embedded keys, and Swift syntax. The 390×844 native-mode web surface has zero horizontal overflow. A signed simulator/device build remains pending because this Mac has Command Line Tools rather than the full Xcode application; App Store distribution, push, share-sheet input, and an always-on host are not claimed.

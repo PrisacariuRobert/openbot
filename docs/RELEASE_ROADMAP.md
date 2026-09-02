@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.16 connector-platform release.
+Updated September 2, 2026 after the 0.17 native-companion release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -41,7 +41,19 @@ Goal: add breadth without weakening per-teammate authority.
 
 Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
-## 0.17 — Find, organize, and share
+## Shipped in 0.17 — Native iPhone companion
+
+Goal: make phone check-ins feel like a real product without moving private studio data to a new cloud.
+
+- Added a SwiftUI companion with premium playful onboarding and the complete responsive studio in a native WebKit shell
+- Stored the access key in the iPhone Keychain and handed an HttpOnly session cookie to the web view
+- Added address-only deep-link pairing, foreground reauthentication, pull-to-refresh, offline state, and external-link handoff
+- Required HTTPS for public hosts while keeping private-network development practical and loopback-only hosting as the default
+- Added native release structure, privacy, secret, and Swift-syntax checks plus a production mascot app icon
+
+Verified structurally on this Mac. A signed device/simulator build still requires the full Xcode app and an Apple development team; push, share-sheet capture, and App Store delivery are not claimed.
+
+## 0.18 — Find, organize, and share
 
 Goal: keep a growing studio understandable.
 
@@ -53,13 +65,13 @@ Goal: keep a growing studio understandable.
 
 Ship only when exported skills and bot templates contain no secrets and imported versions remain reviewable and reversible.
 
-## 0.18 — Work anywhere
+## 0.19 — Always-on work
 
 Goal: make remote and mobile use reliable while preserving local-only mode.
 
 - Add an optional signed-in self-hosted runner or private VPS deployment
 - Add encrypted synchronization, job leases, recovery, health checks, and push delivery
-- Package a thin native phone shell for voice capture, share-sheet input, progress, artifacts, and approvals
+- Add push delivery, share-sheet capture, and native voice sessions to the existing iPhone companion
 - Keep the current loopback-only local mode as a first-class zero-cloud choice
 - Prototype bounded screenshot understanding and visible human takeover for interfaces the structured tools cannot operate
 

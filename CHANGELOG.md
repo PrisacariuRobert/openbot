@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 — 2026-09-02
+
+- Added a native SwiftUI iPhone companion with secure onboarding, animated mascots, offline state, pull-to-refresh, and the complete responsive studio experience
+- Added Keychain-only private-key storage, HttpOnly cookie handoff, foreground session refresh, safe forget/reconnect behavior, and private-network transport rules
+- Added address-only `openbot://connect` pairing links from the Mac; credentials are never added to a URL
+- Added a new production mascot icon for native iOS and installed web experiences
+- Added stale-service-worker prevention for the native shell plus automated mobile structure, privacy, secret, and Swift-syntax checks
+- Kept availability honest: the native client still depends on an awake reachable Mac, and App Store signing, push, share-sheet input, and always-on hosting remain separate release work
+
 ## 0.16.0 — 2026-09-02
 
 - Added a versioned connector manifest with explicit capabilities, data boundaries, approval policy, health, previews, and per-teammate authority

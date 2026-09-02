@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.16 local-first beta
+Release: 0.17 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -22,6 +22,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
+8. **A real iPhone companion without a data grab.** The native SwiftUI app keeps the Mac as host, protects the key in Keychain, and brings chat, progress, artifacts, and approvals to the phone.
 
 ## Available now
 
@@ -232,7 +233,7 @@ These features are implemented, but marketing must explain their requirement.
 | GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
-| Phone access | The Mac service must remain awake and reachable through a trusted private network, Tailscale, or HTTPS proxy. This is a PWA, not a native iOS app. |
+| Phone access | The native iOS companion source and PWA both require the Mac service to remain awake and reachable through a trusted private network, Tailscale, or HTTPS proxy. Native installation currently requires Xcode signing; it is not an App Store download yet. |
 | Notifications | Browser and operating-system notification support and permission are required. |
 
 ## Useful launch workflows
@@ -259,7 +260,7 @@ These features are implemented, but marketing must explain their requirement.
 Do not say OpenBot currently:
 
 - runs continuously in the cloud when the owner's computer is off;
-- is a native iOS or Android application;
+- is already distributed through the iOS App Store or available for Android;
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
 - reads Slack content the connected member cannot access or Notion pages that were not selected/shared;
@@ -272,7 +273,7 @@ Do not say OpenBot currently:
 
 ## Roadmap, not launch copy
 
-- Native phone shell and opt-in push notifications
+- Native push notifications, share-sheet ingestion, and polished voice sessions
 - Optional always-on self-hosted daemon or private cloud deployment
 - Reviewed third-party connector SDK/marketplace plus task-manager and cloud-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
