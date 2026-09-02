@@ -15,7 +15,7 @@ import { friendlyGoogleError, googleApiRecovery, googleCallbackPage, googleCloud
 import { MacFileAccess, type MacFileMove } from "./mac-files.js";
 import { MacAppControl } from "./mac-apps.js";
 import { CodeProjectManager } from "./code-projects.js";
-import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
+import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
 
@@ -119,7 +119,7 @@ app.patch("/api/settings", (request, response) => {
 });
 
 app.get("/api/code-projects", (_request, response) => {
-  response.json({ projects: db.listCodeProjects(), edits: db.listCodeProjectEdits(undefined, 30), suggestions: codeProjects.suggestions() } satisfies { projects: CodeProject[]; edits: CodeProjectEdit[]; suggestions: CodeProjectSuggestion[] });
+  response.json({ projects: db.listCodeProjects(), edits: db.listCodeProjectEdits(undefined, 30), workspaces: db.listCodeTaskWorkspaces(), reviews: db.listCodeTaskReviews(), suggestions: codeProjects.suggestions() } satisfies { projects: CodeProject[]; edits: CodeProjectEdit[]; workspaces: CodeTaskWorkspace[]; reviews: CodeTaskReview[]; suggestions: CodeProjectSuggestion[] });
 });
 
 app.post("/api/code-projects", (request, response) => {
@@ -154,9 +154,12 @@ app.post("/api/code-projects/clone", async (request, response) => {
 });
 
 app.get("/api/code-projects/:projectId/review", (request, response) => {
-  const project = db.getCodeProject(request.params.projectId), reader = project?.access.find((item) => item.canRead);
+  const requestedRunId = typeof request.query.runId === "string" ? request.query.runId : undefined;
+  const workspace = requestedRunId ? db.getCodeTaskWorkspace(requestedRunId) : null;
+  if (requestedRunId && (!workspace || workspace.projectId !== request.params.projectId)) return response.status(404).json({ error: "That isolated task is not available for this project." });
+  const project = db.getCodeProject(request.params.projectId), reader = workspace ? project?.access.find((item) => item.botId === workspace.botId && item.canRead) : project?.access.find((item) => item.canRead);
   if (!project || !reader) return response.status(404).json({ error: "That project is not available for review." });
-  try { response.json(codeProjects.review(reader.botId, project.id) satisfies CodeProjectReview); }
+  try { response.json(codeProjects.review(reader.botId, project.id, requestedRunId) satisfies CodeProjectReview); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
@@ -179,9 +182,11 @@ app.patch("/api/code-projects/:projectId/access/:botId", (request, response) => 
 });
 
 app.delete("/api/code-projects/:projectId", (request, response) => {
-  if (!db.deleteCodeProject(request.params.projectId)) return response.status(404).json({ error: "That code project is no longer connected." });
-  broadcast({ type: "code-project", at: Date.now() });
-  response.json({ removed: true, filesDeleted: false });
+  try {
+    if (!codeProjects.disconnectProject(request.params.projectId)) return response.status(404).json({ error: "That code project is no longer connected." });
+    broadcast({ type: "code-project", at: Date.now() });
+    response.json({ removed: true, filesDeleted: false });
+  } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
 app.get("/api/provider", async (_request, response) => {
@@ -411,8 +416,8 @@ async function performApprovedAction(action: unknown): Promise<string> {
     return `Command exited ${result.code}.\n${result.stdout || result.stderr}`.slice(0, 12_000);
   }
   if (parsed.data.type === "code_run") {
-    const projectId = String(args.projectId || ""), project = db.getCodeProjectForBot(parsed.data.botId, projectId, "run");
-    if (!project) throw new Error("This teammate can no longer run checks in that code project.");
+    const projectId = String(args.projectId || ""), workspaceRunId = args.workspaceRunId ? String(args.workspaceRunId) : undefined;
+    const project = codeProjects.forRun(parsed.data.botId, projectId, workspaceRunId);
     const access = project.access.find((item) => item.botId === parsed.data.botId)!;
     const result = await computer.executeCodeProject(parsed.data.botId, project.rootPath, String(args.command || ""), access.canWrite);
     return `Project command exited ${result.code}.\n${result.stdout || result.stderr}`.slice(0, 14_000);
@@ -420,7 +425,7 @@ async function performApprovedAction(action: unknown): Promise<string> {
   if (parsed.data.type === "code_publish_pr") {
     return JSON.stringify(await codeProjects.publishPullRequest(parsed.data.botId, String(args.projectId || ""), {
       title: String(args.title || ""), body: String(args.body || ""), base: args.base ? String(args.base) : undefined, draft: args.draft === true,
-    }));
+    }, args.workspaceRunId ? String(args.workspaceRunId) : undefined));
   }
   if (parsed.data.type === "browser_click") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
@@ -656,15 +661,15 @@ app.post("/api/bots/:id/teach/stop", async (request, response) => {
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getRun(parsed.data.runId)) return response.status(400).json({ error: "Invalid bot tool request." });
   const { botId, runId, action, args } = parsed.data;
   const bot = db.getBot(botId)!;
-  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string) => {
-    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: action, botId, args } });
+  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args) => {
+    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: action, botId, args: savedArgs } });
     broadcast();
     setTimeout(() => runner.cancel(runId), 80);
     return response.json({ approvalRequired: true, approvalId: approval.id, message: "Paused. The user can approve this whenever they are ready; it will not expire." });
@@ -700,38 +705,78 @@ app.post("/api/internal/tools", async (request, response) => {
       return response.json({ ok: true, task });
     }
     if (action === "code_projects") {
+      const workspace = db.getCodeTaskWorkspace(runId);
       const projects = db.listCodeProjects(botId).map((project) => {
         const access = project.access.find((item) => item.botId === botId)!;
-        return { id: project.id, name: project.name, projectKind: project.projectKind, gitRepository: project.gitRepository, remoteUrl: project.remoteUrl, defaultBranch: project.defaultBranch, canRead: access.canRead, canWrite: access.canWrite, canRun: access.canRun };
+        const reviewers = project.access.filter((item) => item.botId !== botId && item.canRead).map((item) => { const reviewer = db.getBot(item.botId)!; return { id: reviewer.id, name: reviewer.name, role: reviewer.role }; });
+        return { id: project.id, name: project.name, projectKind: project.projectKind, gitRepository: project.gitRepository, remoteUrl: project.remoteUrl, defaultBranch: project.defaultBranch, canRead: access.canRead, canWrite: access.canWrite, canRun: access.canRun, workspace: workspace?.projectId === project.id ? workspace : null, reviewers };
       });
       return response.json({ projects });
     }
-    if (["code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_publish_pr", "code_run"].includes(action)) {
+    if (action === "code_review_result") {
+      const result = z.object({ sourceRunId: z.string().uuid(), projectId: z.string().uuid(), headCommit: z.string().regex(/^[a-f0-9]{40}$/i), verdict: z.enum(["approved", "changes_requested"]), summary: z.string().trim().min(1).max(800), findings: z.array(z.string().trim().min(1).max(500)).max(12) }).safeParse(args);
+      if (!result.success) return response.status(400).json({ error: "Give the code review a clear verdict, summary, and focused findings." });
+      const reviewerRun = db.getRun(runId), sourceRun = db.getRun(result.data.sourceRunId), workspace = db.getCodeTaskWorkspace(result.data.sourceRunId);
+      if (!reviewerRun || reviewerRun.botId !== botId || reviewerRun.parentRunId !== result.data.sourceRunId || !sourceRun || sourceRun.botId === botId || !workspace || workspace.projectId !== result.data.projectId) return response.status(403).json({ error: "This review is not linked to the coding task that requested it." });
+      if (!db.getCodeProjectForBot(botId, result.data.projectId, "read")) return response.status(403).json({ error: "This teammate no longer has review access to that project." });
+      if (codeProjects.currentCommit(sourceRun.botId, result.data.projectId, result.data.sourceRunId) !== result.data.headCommit) return response.status(409).json({ error: "The branch changed during review. Ask for a fresh independent review." });
+      if (db.getCodeTaskReviewByReviewerRun(runId)) return response.json({ ok: true, review: db.getCodeTaskReviewByReviewerRun(runId) });
+      const saved = db.recordCodeTaskReview({ sourceRunId: result.data.sourceRunId, reviewerRunId: runId, projectId: result.data.projectId, reviewerBotId: botId, verdict: result.data.verdict, summary: result.data.summary, findings: result.data.findings, headCommit: result.data.headCommit });
+      db.addActivity({ runId: result.data.sourceRunId, botId: sourceRun.botId, kind: "message", label: `${bot.name} ${saved.verdict === "approved" ? "approved the code review" : "requested changes"}`, detail: saved.summary.slice(0, 180) });
+      db.addAgentMessage({ threadId: sourceRun.threadId, fromBotId: botId, toBotId: sourceRun.botId, body: `${saved.verdict === "approved" ? "Review approved" : "Changes requested"}: ${saved.summary}${saved.findings.length ? `\n${saved.findings.map((finding) => `- ${finding}`).join("\n")}` : ""}`.slice(0, 4_000), kind: "finding", expectsReply: false, runId, hopCount: db.runDepth(runId), dedupeKey: `code-review-result:${runId}` });
+      broadcast();
+      return response.json({ ok: true, review: saved });
+    }
+    if (["code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_publish_pr", "code_run"].includes(action)) {
       const base = z.object({ projectId: z.string().uuid() }).safeParse(args);
       if (!base.success) return response.status(400).json({ error: "Choose one of the code projects shared with you." });
       const projectId = base.data.projectId;
-      if (action === "code_list") return response.json(codeProjects.list(botId, projectId, typeof args.path === "string" ? args.path : ""));
-      if (action === "code_search") return response.json(codeProjects.search(botId, projectId, z.string().min(1).max(240).parse(args.query)));
-      if (action === "code_read") return response.json(codeProjects.read(botId, projectId, z.string().min(1).max(1_000).parse(args.path)));
-      if (action === "code_write") return response.json(codeProjects.write(botId, projectId, z.string().min(1).max(1_000).parse(args.path), z.string().max(1_000_000).parse(args.content)));
-      if (action === "code_replace") return response.json(codeProjects.replace(botId, projectId, z.string().min(1).max(1_000).parse(args.path), z.string().min(1).max(1_000_000).parse(args.oldText), z.string().max(1_000_000).parse(args.newText), args.expectedOccurrences === undefined ? 1 : z.number().int().min(1).max(100).parse(args.expectedOccurrences)));
-      if (action === "code_status") return response.json(codeProjects.status(botId, projectId));
-      if (action === "code_diff") return response.json(codeProjects.review(botId, projectId));
-      if (action === "code_branch") return response.json(codeProjects.branch(botId, projectId, z.string().min(1).max(120).parse(args.name)));
+      const taskWorkspace = db.getCodeTaskWorkspace(runId);
+      if (["code_write", "code_replace", "code_commit", "code_request_review", "code_publish_pr", "code_run"].includes(action) && !taskWorkspace) return response.status(409).json({ error: "Start an isolated task branch before changing code or running checks." });
+      if (taskWorkspace && taskWorkspace.projectId !== projectId) return response.status(409).json({ error: `This task is already working in ${taskWorkspace.projectName}.` });
+      if (action === "code_list") return response.json(codeProjects.list(botId, projectId, typeof args.path === "string" ? args.path : "", runId));
+      if (action === "code_search") return response.json(codeProjects.search(botId, projectId, z.string().min(1).max(240).parse(args.query), runId));
+      if (action === "code_read") return response.json(codeProjects.read(botId, projectId, z.string().min(1).max(1_000).parse(args.path), runId));
+      if (action === "code_write") return response.json(codeProjects.write(botId, projectId, z.string().min(1).max(1_000).parse(args.path), z.string().max(1_000_000).parse(args.content), runId));
+      if (action === "code_replace") return response.json(codeProjects.replace(botId, projectId, z.string().min(1).max(1_000).parse(args.path), z.string().min(1).max(1_000_000).parse(args.oldText), z.string().max(1_000_000).parse(args.newText), args.expectedOccurrences === undefined ? 1 : z.number().int().min(1).max(100).parse(args.expectedOccurrences), runId));
+      if (action === "code_status") return response.json(codeProjects.status(botId, projectId, runId));
+      if (action === "code_diff") return response.json(codeProjects.review(botId, projectId, runId));
+      if (action === "code_branch") return response.json(codeProjects.branch(botId, projectId, z.string().min(1).max(120).parse(args.name), runId));
       if (action === "code_commit") {
         const commit = z.object({ message: z.string().min(1).max(120), paths: z.array(z.string().min(1).max(1_000)).min(1).max(50) }).parse(args);
-        return response.json(codeProjects.commit(botId, projectId, commit.message, commit.paths));
+        return response.json(codeProjects.commit(botId, projectId, commit.message, commit.paths, runId));
+      }
+      if (action === "code_request_review") {
+        const requestReview = z.object({ reviewerBotId: z.string().min(1) }).parse(args);
+        const target = db.getBot(requestReview.reviewerBotId), sourceRun = db.getRun(runId);
+        if (!sourceRun || sourceRun.botId !== botId) return response.status(403).json({ error: "This coding task is not available for that teammate." });
+        if (!target || target.id === botId) return response.status(400).json({ error: "Choose a different teammate to review the code." });
+        if (!db.getCodeProjectForBot(target.id, projectId, "read")) return response.status(403).json({ error: `${target.name} needs read access to this project before reviewing it.` });
+        if (sourceRun?.task.verificationStatus !== "passed") return response.status(409).json({ error: "Finish and record the project checks before asking for independent review." });
+        if (db.runDepth(runId) >= 3 || db.descendantRunCount(runId) >= 8) return response.status(409).json({ error: "Teamwork limit reached for this task." });
+        const prepared = codeProjects.prepareIndependentReview(botId, projectId, runId), previous = db.latestCodeTaskReview(runId);
+        if (previous?.headCommit === prepared.headCommit && previous.verdict === "approved") return response.json({ ok: true, status: `${previous.reviewerBotName} already approved this exact commit.`, review: previous });
+        if (!db.claimDedupe(`code-review:${runId}:${prepared.headCommit}`)) return response.json({ ok: true, status: `${target.name} is already reviewing this commit.` });
+        const verification = sourceRun?.task.verificationSummary || "The coding teammate recorded all requested checks as passed.";
+        const reviewerPrompt = `Independent code review requested by ${sourceRun?.botName || bot.name}.\n\nProject: ${prepared.project.name}\nBranch: ${prepared.workspace.branch}\nBase: ${prepared.base}\nExact commit: ${prepared.headCommit}\nRecorded verification: ${verification}\n\nChanged files:\n${prepared.review.changes.join("\n")}\n\nCode diff:\n${prepared.review.diff}\n\nReview the supplied diff independently for correctness, regressions, security, unsafe scope, and missing tests. Do not edit or publish anything. When finished, call code_review_result exactly once with sourceRunId=${runId}, projectId=${projectId}, headCommit=${prepared.headCommit}, a verdict of approved or changes_requested, a concise summary, and up to 12 actionable findings. Then give the user a short natural review outcome.`;
+        const reviewerRun = db.createRun({ threadId: sourceRun!.threadId, botId: target.id, prompt: reviewerPrompt, status: "queued", parentRunId: runId });
+        db.addAgentMessage({ threadId: sourceRun!.threadId, fromBotId: botId, toBotId: target.id, body: `Please independently review ${prepared.project.name} branch ${prepared.workspace.branch} at ${prepared.headCommit.slice(0, 8)}.`, kind: "handoff", expectsReply: true, runId, hopCount: db.runDepth(runId) + 1, dedupeKey: `agent:code-review:${reviewerRun.id}` });
+        db.addActivity({ runId, botId, kind: "handoff", label: `${target.name} is independently reviewing the code`, detail: prepared.workspace.branch });
+        broadcast();
+        return response.json({ ok: true, status: `${target.name} is independently reviewing this exact commit.` });
       }
       if (action === "code_publish_pr") {
         const publish = z.object({ title: z.string().min(1).max(160), body: z.string().min(1).max(10_000), base: z.string().min(1).max(120).optional(), draft: z.boolean().optional() }).parse(args);
         const run = db.getRun(runId);
         if (run?.task.verificationStatus !== "passed") return response.status(409).json({ error: "Run and record the final checks before asking to publish this pull request." });
-        const ready = codeProjects.preparePublish(botId, projectId, publish.base);
-        return holdForApproval("external", `${bot.name} finished the checks and is ready to publish branch “${ready.branch}” as ${publish.draft ? "a draft " : ""}pull request into “${ready.base}”. Title: “${publish.title}”.`, `Publish pull request for ${ready.project.name}`);
+        const ready = codeProjects.preparePublish(botId, projectId, publish.base, runId);
+        const independentReview = db.latestCodeTaskReview(runId), headCommit = codeProjects.currentCommit(botId, projectId, runId);
+        if (!independentReview || independentReview.verdict !== "approved" || independentReview.headCommit !== headCommit) return response.status(409).json({ error: "Ask another teammate for an independent code review of this exact commit before publishing." });
+        return holdForApproval("external", `${bot.name} finished the checks and is ready to publish branch “${ready.branch}” as ${publish.draft ? "a draft " : ""}pull request into “${ready.base}”. Title: “${publish.title}”.`, `Publish pull request for ${ready.project.name}`, { ...args, workspaceRunId: runId });
       }
       const command = z.string().min(1).max(4_000).parse(args.command), reason = commandApprovalReason(command);
-      if (reason) return holdForApproval("terminal", reason, `Run in ${db.getCodeProject(projectId)?.name || "code project"}: ${command.slice(0, 140)}`);
-      const project = codeProjects.forRun(botId, projectId);
+      if (reason) return holdForApproval("terminal", reason, `Run in ${db.getCodeProject(projectId)?.name || "code project"}: ${command.slice(0, 140)}`, { ...args, workspaceRunId: runId });
+      const project = codeProjects.forRun(botId, projectId, runId);
       const access = project.access.find((item) => item.botId === botId)!;
       const result = await computer.executeCodeProject(botId, project.rootPath, command, access.canWrite);
       return response.json(result);

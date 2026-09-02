@@ -16,7 +16,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 ## Best differentiators
 
 1. **Bring your own AI.** Assign a different supported model connection to every teammate instead of buying model access from OpenBot.
-2. **Review-first coding without a broad host shell.** Clone or share one project, choose who can code, inspect every diff, restore an unchanged agent edit, and approve publishing only after checks pass.
+2. **Review-first coding without a broad host shell.** Clone or share one project, let multiple teammates work safely in parallel, inspect every diff, restore an unchanged agent edit, and publish only after checks and an independent teammate review pass.
 3. **Finished means checked.** Real jobs have a durable outcome, deliverable, checklist, approval boundary, and verification receipt.
 4. **Agents can collaborate without spiraling.** Questions, findings, replies, and handoffs are visible, deduplicated, and limited to three hops and eight related runs.
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
@@ -66,9 +66,12 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Text-file reading up to 1 MB
 - Exact-block replacement with occurrence checks to prevent stale or ambiguous edits
 - Atomic text-file creation and replacement
-- Clean separate branch creation plus bounded staged and working-tree diff review
+- A private Git worktree and branch for every coding task, leaving the owner's main checkout untouched
+- Concurrent coding tasks on the same repository without branch switching or shared working-tree collisions
+- Bounded staged, working-tree, and committed task diff review
 - Exact-file commits that cannot run on the default branch or silently include unrelated paths
-- Approval-gated branch push and GitHub pull-request creation after recorded checks pass
+- Independent review by a different teammate, tied to the exact commit with approved/changes-requested findings
+- Approval-gated branch push and GitHub pull-request creation only after checks and independent review pass
 - Automatic per-edit restore points that refuse to overwrite newer content
 - Disposable Docker checks for tests, builds, linting, and inspection
 - No network inside project check containers

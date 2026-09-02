@@ -14,6 +14,8 @@ import type {
   CodeProject,
   CodeProjectAccess,
   CodeProjectEdit,
+  CodeTaskReview,
+  CodeTaskWorkspace,
   ConnectorConnection,
   ConnectorEvent,
   GoogleConnectorService,
@@ -370,7 +372,30 @@ export class OpenBotDatabase {
         deletions INTEGER NOT NULL DEFAULT 0,
         before_content TEXT,
         after_hash TEXT,
+        workspace_run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
         restored_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS code_task_workspaces (
+        run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+        project_id TEXT NOT NULL REFERENCES code_projects(id) ON DELETE CASCADE,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        branch TEXT NOT NULL,
+        root_path TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS code_task_reviews (
+        id TEXT PRIMARY KEY,
+        source_run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        reviewer_run_id TEXT NOT NULL UNIQUE REFERENCES runs(id) ON DELETE CASCADE,
+        project_id TEXT NOT NULL REFERENCES code_projects(id) ON DELETE CASCADE,
+        reviewer_bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        verdict TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        findings_json TEXT NOT NULL DEFAULT '[]',
+        head_commit TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS messages_thread_created ON messages(thread_id, created_at);
@@ -382,6 +407,8 @@ export class OpenBotDatabase {
       CREATE INDEX IF NOT EXISTS agent_messages_to_created ON agent_messages(to_bot_id, created_at);
       CREATE INDEX IF NOT EXISTS connector_events_created ON connector_events(connector_id, created_at);
       CREATE INDEX IF NOT EXISTS code_project_edits_created ON code_project_edits(project_id, created_at);
+      CREATE INDEX IF NOT EXISTS code_task_workspaces_project_updated ON code_task_workspaces(project_id, updated_at);
+      CREATE INDEX IF NOT EXISTS code_task_reviews_source_created ON code_task_reviews(source_run_id, created_at);
     `);
 
     this.addColumn("bots", "owner_id TEXT");
@@ -420,6 +447,7 @@ export class OpenBotDatabase {
     this.addColumn("code_projects", "managed_clone INTEGER NOT NULL DEFAULT 0");
     this.addColumn("code_project_edits", "before_content TEXT");
     this.addColumn("code_project_edits", "after_hash TEXT");
+    this.addColumn("code_project_edits", "workspace_run_id TEXT");
     this.addColumn("code_project_edits", "restored_at TEXT");
     if (!hadRoutineInterval) this.db.exec("UPDATE routines SET interval_minutes=CASE cadence WHEN 'hourly' THEN 60 ELSE 1440 END");
     this.addColumn("provider_instances", "runtime TEXT NOT NULL DEFAULT 'opencode'");
@@ -1243,30 +1271,89 @@ export class OpenBotDatabase {
     }
   }
 
-  recordCodeProjectEdit(input: { projectId: string; botId: string; path: string; operation: "created" | "updated"; additions: number; deletions: number; beforeContent: string | null; afterHash: string }): CodeProjectEdit {
+  recordCodeProjectEdit(input: { projectId: string; botId: string; path: string; operation: "created" | "updated"; additions: number; deletions: number; beforeContent: string | null; afterHash: string; workspaceRunId?: string | null }): CodeProjectEdit {
     const id = randomUUID(), createdAt = now();
-    this.db.prepare("INSERT INTO code_project_edits (id,project_id,bot_id,path,operation,additions,deletions,before_content,after_hash,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run(
-      id, input.projectId, input.botId, input.path, input.operation, input.additions, input.deletions, input.beforeContent, input.afterHash, createdAt,
+    this.db.prepare("INSERT INTO code_project_edits (id,project_id,bot_id,path,operation,additions,deletions,before_content,after_hash,workspace_run_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
+      id, input.projectId, input.botId, input.path, input.operation, input.additions, input.deletions, input.beforeContent, input.afterHash, input.workspaceRunId || null, createdAt,
     );
     const bot = this.getBot(input.botId)!;
-    return { id, projectId: input.projectId, botId: input.botId, botName: bot.name, path: input.path, operation: input.operation, additions: input.additions, deletions: input.deletions, reversible: true, restoredAt: null, createdAt };
+    return { id, projectId: input.projectId, botId: input.botId, botName: bot.name, path: input.path, operation: input.operation, additions: input.additions, deletions: input.deletions, workspaceRunId: input.workspaceRunId || null, reversible: true, restoredAt: null, createdAt };
   }
 
   listCodeProjectEdits(projectId?: string, limit = 30): CodeProjectEdit[] {
     const rows = projectId
       ? this.db.prepare(`SELECT e.*,b.name bot_name FROM code_project_edits e JOIN bots b ON b.id=e.bot_id WHERE e.project_id=? ORDER BY e.created_at DESC LIMIT ?`).all(projectId, limit) as Row[]
       : this.db.prepare(`SELECT e.*,b.name bot_name FROM code_project_edits e JOIN bots b ON b.id=e.bot_id ORDER BY e.created_at DESC LIMIT ?`).all(limit) as Row[];
-    return rows.map((row) => ({ id: String(row.id), projectId: String(row.project_id), botId: String(row.bot_id), botName: String(row.bot_name), path: String(row.path), operation: row.operation as CodeProjectEdit["operation"], additions: Number(row.additions), deletions: Number(row.deletions), reversible: Boolean(row.after_hash) && !row.restored_at, restoredAt: row.restored_at ? String(row.restored_at) : null, createdAt: String(row.created_at) }));
+    return rows.map((row) => ({ id: String(row.id), projectId: String(row.project_id), botId: String(row.bot_id), botName: String(row.bot_name), path: String(row.path), operation: row.operation as CodeProjectEdit["operation"], additions: Number(row.additions), deletions: Number(row.deletions), workspaceRunId: row.workspace_run_id ? String(row.workspace_run_id) : null, reversible: Boolean(row.after_hash) && !row.restored_at, restoredAt: row.restored_at ? String(row.restored_at) : null, createdAt: String(row.created_at) }));
   }
 
   getCodeProjectEdit(id: string): ({ beforeContent: string | null; afterHash: string } & CodeProjectEdit) | null {
     const row = this.db.prepare(`SELECT e.*,b.name bot_name FROM code_project_edits e JOIN bots b ON b.id=e.bot_id WHERE e.id=?`).get(id) as Row | undefined;
     if (!row) return null;
-    return { id: String(row.id), projectId: String(row.project_id), botId: String(row.bot_id), botName: String(row.bot_name), path: String(row.path), operation: row.operation as CodeProjectEdit["operation"], additions: Number(row.additions), deletions: Number(row.deletions), reversible: Boolean(row.after_hash) && !row.restored_at, restoredAt: row.restored_at ? String(row.restored_at) : null, createdAt: String(row.created_at), beforeContent: row.before_content === null || row.before_content === undefined ? null : String(row.before_content), afterHash: String(row.after_hash || "") };
+    return { id: String(row.id), projectId: String(row.project_id), botId: String(row.bot_id), botName: String(row.bot_name), path: String(row.path), operation: row.operation as CodeProjectEdit["operation"], additions: Number(row.additions), deletions: Number(row.deletions), workspaceRunId: row.workspace_run_id ? String(row.workspace_run_id) : null, reversible: Boolean(row.after_hash) && !row.restored_at, restoredAt: row.restored_at ? String(row.restored_at) : null, createdAt: String(row.created_at), beforeContent: row.before_content === null || row.before_content === undefined ? null : String(row.before_content), afterHash: String(row.after_hash || "") };
   }
 
   markCodeProjectEditRestored(id: string) {
     this.db.prepare("UPDATE code_project_edits SET restored_at=? WHERE id=? AND restored_at IS NULL").run(now(), id);
+  }
+
+  createCodeTaskWorkspace(input: { runId: string; projectId: string; botId: string; branch: string; rootPath: string }): CodeTaskWorkspace {
+    const at = now();
+    this.db.prepare("INSERT INTO code_task_workspaces (run_id,project_id,bot_id,branch,root_path,status,created_at,updated_at) VALUES (?,?,?,?,?,'active',?,?)").run(input.runId, input.projectId, input.botId, input.branch, input.rootPath, at, at);
+    return this.getCodeTaskWorkspace(input.runId)!;
+  }
+
+  private codeTaskWorkspaceFromRow(row: Row): CodeTaskWorkspace {
+    return { runId: String(row.run_id), projectId: String(row.project_id), projectName: String(row.project_name), botId: String(row.bot_id), botName: String(row.bot_name), branch: String(row.branch), rootPath: String(row.root_path), status: row.status as CodeTaskWorkspace["status"], createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
+  }
+
+  getCodeTaskWorkspace(runId: string): CodeTaskWorkspace | null {
+    const row = this.db.prepare(`SELECT w.*,p.name project_name,b.name bot_name FROM code_task_workspaces w JOIN code_projects p ON p.id=w.project_id JOIN bots b ON b.id=w.bot_id WHERE w.run_id=?`).get(runId) as Row | undefined;
+    return row ? this.codeTaskWorkspaceFromRow(row) : null;
+  }
+
+  listCodeTaskWorkspaces(projectId?: string): CodeTaskWorkspace[] {
+    const rows = (projectId
+      ? this.db.prepare(`SELECT w.*,p.name project_name,b.name bot_name FROM code_task_workspaces w JOIN code_projects p ON p.id=w.project_id JOIN bots b ON b.id=w.bot_id WHERE w.project_id=? ORDER BY w.updated_at DESC`).all(projectId)
+      : this.db.prepare(`SELECT w.*,p.name project_name,b.name bot_name FROM code_task_workspaces w JOIN code_projects p ON p.id=w.project_id JOIN bots b ON b.id=w.bot_id ORDER BY w.updated_at DESC`).all()) as Row[];
+    return rows.map((row) => this.codeTaskWorkspaceFromRow(row));
+  }
+
+  updateCodeTaskWorkspaceStatus(runId: string, status: CodeTaskWorkspace["status"]) {
+    this.db.prepare("UPDATE code_task_workspaces SET status=?,updated_at=? WHERE run_id=?").run(status, now(), runId);
+  }
+
+  recordCodeTaskReview(input: { sourceRunId: string; reviewerRunId: string; projectId: string; reviewerBotId: string; verdict: CodeTaskReview["verdict"]; summary: string; findings: string[]; headCommit: string }): CodeTaskReview {
+    const id = randomUUID(), createdAt = now();
+    this.db.prepare("INSERT INTO code_task_reviews (id,source_run_id,reviewer_run_id,project_id,reviewer_bot_id,verdict,summary,findings_json,head_commit,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run(
+      id, input.sourceRunId, input.reviewerRunId, input.projectId, input.reviewerBotId, input.verdict, input.summary, JSON.stringify(input.findings), input.headCommit, createdAt,
+    );
+    return this.getCodeTaskReviewByReviewerRun(input.reviewerRunId)!;
+  }
+
+  private codeTaskReviewFromRow(row: Row): CodeTaskReview {
+    return {
+      id: String(row.id), sourceRunId: String(row.source_run_id), reviewerRunId: String(row.reviewer_run_id), projectId: String(row.project_id),
+      reviewerBotId: String(row.reviewer_bot_id), reviewerBotName: String(row.reviewer_bot_name), verdict: row.verdict as CodeTaskReview["verdict"],
+      summary: String(row.summary), findings: jsonArray<string>(row.findings_json).filter((finding) => typeof finding === "string"), headCommit: String(row.head_commit), createdAt: String(row.created_at),
+    };
+  }
+
+  getCodeTaskReviewByReviewerRun(runId: string): CodeTaskReview | null {
+    const row = this.db.prepare(`SELECT r.*,b.name reviewer_bot_name FROM code_task_reviews r JOIN bots b ON b.id=r.reviewer_bot_id WHERE r.reviewer_run_id=?`).get(runId) as Row | undefined;
+    return row ? this.codeTaskReviewFromRow(row) : null;
+  }
+
+  latestCodeTaskReview(sourceRunId: string): CodeTaskReview | null {
+    const row = this.db.prepare(`SELECT r.*,b.name reviewer_bot_name FROM code_task_reviews r JOIN bots b ON b.id=r.reviewer_bot_id WHERE r.source_run_id=? ORDER BY r.created_at DESC LIMIT 1`).get(sourceRunId) as Row | undefined;
+    return row ? this.codeTaskReviewFromRow(row) : null;
+  }
+
+  listCodeTaskReviews(projectId?: string): CodeTaskReview[] {
+    const rows = (projectId
+      ? this.db.prepare(`SELECT r.*,b.name reviewer_bot_name FROM code_task_reviews r JOIN bots b ON b.id=r.reviewer_bot_id WHERE r.project_id=? ORDER BY r.created_at DESC`).all(projectId)
+      : this.db.prepare(`SELECT r.*,b.name reviewer_bot_name FROM code_task_reviews r JOIN bots b ON b.id=r.reviewer_bot_id ORDER BY r.created_at DESC`).all()) as Row[];
+    return rows.map((row) => this.codeTaskReviewFromRow(row));
   }
 
   remember(botId: string, key: string, content: string) {

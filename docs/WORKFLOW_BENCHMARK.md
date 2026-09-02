@@ -16,7 +16,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 | Teach a task | Pass | Visible demonstration produced a three-step editable OpenCode skill with secret rules | Close for browser demonstrations |
 | Routine reliability | Pass | Manual test created an artifact, reread it, and saved completed/run-count state | Improves visibility and testability |
 | Outcome completion and verification | Pass | A real model created a three-step contract, wrote an artifact, reopened it, recorded four concrete checks, and returned one expandable verified receipt | More explicit than an opaque “done”; plan and evidence persist through restarts and approvals |
-| Review-first engineering | Pass in bounded local scope | A real DeepSeek V4 Flash run created a separate branch, edited one file, inspected the diff, passed an isolated test, committed only that file, reopened it, and recorded five checks; GitHub clone and approval-gated pull requests use the same narrow harness | Close to Grok Bot's engineering loop, with clearer per-project authority and conflict-safe local restore points; hosted remote computers remain a gap |
+| Review-first engineering | Pass in bounded local scope | Each run receives an isolated Git worktree; parallel tasks cannot switch or dirty the owner's checkout. A real DeepSeek V4 Flash run previously completed the edit/test/commit loop, and 0.11 adds an exact-commit review verdict from a different teammate before owner-approved publishing | Stronger local concurrency, project authority, restore safety, and explicit two-agent review; hosted remote computers remain a gap |
 | Approval reliability | Pass | Pending approval persisted through database restart and never auto-expired | Directly addresses expiry/stale-state complaints |
 | Usage control | Pass | Real run stopped before model execution after the token budget was exceeded | More explicit per-bot limits |
 | Provider ownership | Pass | Provider is owner-scoped, assigned per bot, and optional key is encrypted | More local and inspectable |
@@ -41,7 +41,7 @@ This benchmark uses workflows repeatedly highlighted in Grok Bot's official use 
 - **Messages feel mechanical:** people can route tasks naturally with mentions or dictate from a phone; mascot expressions are independent rather than synchronized.
 - **A connection demo is not a useful outcome:** connected users can start a morning brief, meeting preparation, or follow-up review immediately; missing permissions disable the affected starter instead of creating a doomed task.
 - **Bots stop after an update instead of finishing:** substantial work has a durable outcome, deliverable, checklist, and verification state. The system marks an unverified completion as partial rather than silently presenting it as fully checked.
-- **Agent code changes are hard to trust:** work happens on a separate branch, the owner can inspect a bounded diff, commits name exact files, publishing requires passed checks plus approval, and unchanged agent edits have conflict-safe restore points.
+- **Agent code changes are hard to trust:** every task uses an isolated worktree, the owner can inspect a bounded diff, commits name exact files, a different teammate reviews the unchanged commit, publishing requires owner approval, and unchanged agent edits have conflict-safe restore points.
 
 ## Provider-policy references
 

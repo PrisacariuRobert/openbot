@@ -416,8 +416,36 @@ export interface CodeProjectEdit {
   operation: "created" | "updated";
   additions: number;
   deletions: number;
+  workspaceRunId: string | null;
   reversible: boolean;
   restoredAt: string | null;
+  createdAt: string;
+}
+
+export interface CodeTaskWorkspace {
+  runId: string;
+  projectId: string;
+  projectName: string;
+  botId: string;
+  botName: string;
+  branch: string;
+  rootPath: string;
+  status: "active" | "published" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodeTaskReview {
+  id: string;
+  sourceRunId: string;
+  reviewerRunId: string;
+  projectId: string;
+  reviewerBotId: string;
+  reviewerBotName: string;
+  verdict: "approved" | "changes_requested";
+  summary: string;
+  findings: string[];
+  headCommit: string;
   createdAt: string;
 }
 
@@ -427,6 +455,7 @@ export interface CodeProjectReview {
   branch: string | null;
   defaultBranch: string | null;
   remoteUrl: string | null;
+  workspace: CodeTaskWorkspace | null;
   changes: string[];
   diff: string;
   truncated: boolean;

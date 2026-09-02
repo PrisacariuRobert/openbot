@@ -16,7 +16,7 @@ OpenBot 0.10 is ready for an open-source local-first beta launch. Its completion
 - Studio-wide visible Mac-file access, protected hidden/system paths, and approval-only organization without deletion or overwriting
 - Safe Markdown messages and connector cards that keep status and capability text inside their borders
 - Durable job outcomes, deliverables, checklists, approval boundaries, and evidence-based final receipts across both supported agent runtimes
-- One-click GitHub clone and local project connections, per-teammate grants, separate branches, bounded diffs, exact-file commits, conflict-safe restore points, disposable no-network checks, and approval-gated pull requests
+- One-click GitHub clone and local project connections, per-teammate grants, isolated per-task worktrees, concurrent branches, bounded diffs, exact-file commits, independent teammate review, conflict-safe restore points, disposable no-network checks, and approval-gated pull requests
 
 ## Where OpenBot is better by design
 
@@ -43,7 +43,7 @@ OpenBot 0.10 is ready for an open-source local-first beta launch. Its completion
 | Large connector marketplace | Gmail, Drive, and Calendar are real. GitHub clone/PR delivery is real but issues and notifications are not a general app connector; Slack and Notion remain upcoming. | Extract the Google boundary into a connector SDK, then implement Slack with the same read/write separation. |
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Rich Office/spreadsheet editing | Files persist, but there is no workbook-aware editor or fidelity engine. | Add document and spreadsheet tools with rendered before/after review. |
-| Hosted remote dev environments | The local harness can clone, branch, edit, test, commit, and approval-publish a pull request, but work stops when the host is unavailable and agents share a connected working tree. | Add optional per-task Git worktrees, then an encrypted always-on runner without weakening local mode. |
+| Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
 | Event-triggered routines | 0.10 provides interval schedules, not Slack/GitHub/webhook triggers. | Add signed webhook triggers with filters, rate limits, dedupe keys, and replay history. |
 | Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.10 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
