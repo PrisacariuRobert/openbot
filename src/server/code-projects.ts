@@ -39,9 +39,13 @@ export type CodeFileEntry = { path: string; kind: "file" | "directory"; size: nu
 
 export class CodeProjectManager {
   readonly allowedRoot: string;
+  readonly worktreesRoot: string;
 
   constructor(private readonly db: OpenBotDatabase, allowedRoot = homedir()) {
     this.allowedRoot = realpathSync(path.resolve(allowedRoot));
+    const worktreesRoot = path.join(db.dataDir, "code-worktrees");
+    mkdirSync(worktreesRoot, { recursive: true });
+    this.worktreesRoot = realpathSync(worktreesRoot);
   }
 
   inspectRoot(requested: string): { rootPath: string; gitRepository: boolean; projectKind: string; remoteUrl: string | null; defaultBranch: string | null; managedClone: boolean } {
@@ -121,15 +125,24 @@ export class CodeProjectManager {
     return suggestions;
   }
 
-  private project(botId: string, projectId: string, capability: "read" | "write" | "run" = "read"): CodeProject {
+  private project(botId: string, projectId: string, capability: "read" | "write" | "run" = "read", runId?: string): CodeProject {
     const project = this.db.getCodeProjectForBot(botId, projectId, capability);
     if (!project) throw new Error(capability === "read" ? "This teammate cannot access that code project." : `This teammate does not have ${capability} access to that code project.`);
     if (!existsSync(project.rootPath) || lstatSync(project.rootPath).isSymbolicLink() || realpathSync(project.rootPath) !== project.rootPath) throw new Error("This code project moved or became an alias. Disconnect it, then connect its real folder again.");
+    if (runId) {
+      const workspace = this.db.getCodeTaskWorkspace(runId);
+      if (workspace) {
+        if (workspace.botId !== botId || workspace.projectId !== projectId) throw new Error("That isolated task belongs to a different teammate or project.");
+        if (workspace.status === "archived") throw new Error("That isolated task workspace has been archived.");
+        if (!existsSync(workspace.rootPath) || lstatSync(workspace.rootPath).isSymbolicLink() || realpathSync(workspace.rootPath) !== workspace.rootPath) throw new Error("That isolated task workspace is no longer available.");
+        return { ...project, rootPath: workspace.rootPath };
+      }
+    }
     return project;
   }
 
-  forRun(botId: string, projectId: string): CodeProject {
-    return this.project(botId, projectId, "run");
+  forRun(botId: string, projectId: string, runId?: string): CodeProject {
+    return this.project(botId, projectId, "run", runId);
   }
 
   private resolveFile(project: CodeProject, requested = "", allowMissing = false): { target: string; relative: string } {
@@ -151,8 +164,8 @@ export class CodeProjectManager {
     return { target, relative: relative || "." };
   }
 
-  list(botId: string, projectId: string, requested = ""): { project: Pick<CodeProject, "id" | "name" | "projectKind">; path: string; entries: CodeFileEntry[] } {
-    const project = this.project(botId, projectId), start = this.resolveFile(project, requested);
+  list(botId: string, projectId: string, requested = "", runId?: string): { project: Pick<CodeProject, "id" | "name" | "projectKind">; path: string; entries: CodeFileEntry[] } {
+    const project = this.project(botId, projectId, "read", runId), start = this.resolveFile(project, requested);
     if (!statSync(start.target).isDirectory()) throw new Error("Choose a folder inside the code project.");
     const entries: CodeFileEntry[] = [];
     const walk = (directory: string, depth: number) => {
@@ -168,8 +181,8 @@ export class CodeProjectManager {
     return { project: { id: project.id, name: project.name, projectKind: project.projectKind }, path: start.relative, entries };
   }
 
-  read(botId: string, projectId: string, requested: string): { projectId: string; path: string; content: string; characters: number } {
-    const project = this.project(botId, projectId), file = this.resolveFile(project, requested);
+  read(botId: string, projectId: string, requested: string, runId?: string): { projectId: string; path: string; content: string; characters: number } {
+    const project = this.project(botId, projectId, "read", runId), file = this.resolveFile(project, requested);
     if (!statSync(file.target).isFile()) throw new Error("Choose a file inside the code project.");
     if (statSync(file.target).size > MAX_FILE_BYTES) throw new Error("That code file is larger than the 1 MB reading limit.");
     const buffer = readFileSync(file.target);
@@ -178,8 +191,8 @@ export class CodeProjectManager {
     return { projectId, path: file.relative, content, characters: content.length };
   }
 
-  search(botId: string, projectId: string, query: string): { projectId: string; query: string; matches: string[] } {
-    const project = this.project(botId, projectId), needle = query.trim();
+  search(botId: string, projectId: string, query: string, runId?: string): { projectId: string; query: string; matches: string[] } {
+    const project = this.project(botId, projectId, "read", runId), needle = query.trim();
     if (!needle || needle.length > 240) throw new Error("Use a focused code search of up to 240 characters.");
     const result = spawnSync("rg", ["-n", "-F", "--no-heading", "--color", "never", "--max-count", "20", "--max-columns", "360", "--glob", "!node_modules/**", "--glob", "!.git/**", "--glob", "!.env*", "--glob", "!dist/**", "--glob", "!build/**", needle, "."], { cwd: project.rootPath, encoding: "utf8", timeout: 15_000, maxBuffer: 800_000 });
     if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("Code search needs ripgrep installed on this Mac.");
@@ -187,10 +200,10 @@ export class CodeProjectManager {
     return { projectId, query: needle, matches: String(result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 200) };
   }
 
-  write(botId: string, projectId: string, requested: string, content: string) {
-    const project = this.project(botId, projectId, "write"), file = this.resolveFile(project, requested, true);
+  write(botId: string, projectId: string, requested: string, content: string, runId?: string) {
+    const project = this.project(botId, projectId, "write", runId), file = this.resolveFile(project, requested, true);
     if (Buffer.byteLength(content, "utf8") > MAX_FILE_BYTES) throw new Error("Write code files smaller than 1 MB at a time.");
-    const existed = existsSync(file.target), originalMode = existed ? statSync(file.target).mode : null, before = existed ? this.read(botId, projectId, requested).content : "";
+    const existed = existsSync(file.target), originalMode = existed ? statSync(file.target).mode : null, before = existed ? this.read(botId, projectId, requested, runId).content : "";
     if (existed && !statSync(file.target).isFile()) throw new Error("That project path is not a file.");
     mkdirSync(path.dirname(file.target), { recursive: true });
     const temporary = path.join(path.dirname(file.target), `.openbot-write-${randomUUID()}`);
@@ -200,23 +213,23 @@ export class CodeProjectManager {
       renameSync(temporary, file.target);
     } finally { if (existsSync(temporary)) unlinkSync(temporary); }
     const beforeLines = before ? before.split(/\r?\n/).length : 0, afterLines = content ? content.split(/\r?\n/).length : 0;
-    const edit = this.db.recordCodeProjectEdit({ projectId, botId, path: file.relative, operation: existed ? "updated" : "created", additions: Math.max(0, afterLines - beforeLines) || (existed ? 0 : afterLines), deletions: Math.max(0, beforeLines - afterLines), beforeContent: existed ? before : null, afterHash: contentHash(content) });
+    const edit = this.db.recordCodeProjectEdit({ projectId, botId, path: file.relative, operation: existed ? "updated" : "created", additions: Math.max(0, afterLines - beforeLines) || (existed ? 0 : afterLines), deletions: Math.max(0, beforeLines - afterLines), beforeContent: existed ? before : null, afterHash: contentHash(content), workspaceRunId: runId && this.db.getCodeTaskWorkspace(runId) ? runId : null });
     return { projectId, path: file.relative, operation: edit.operation, additions: edit.additions, deletions: edit.deletions, editId: edit.id };
   }
 
-  replace(botId: string, projectId: string, requested: string, oldText: string, newText: string, expectedOccurrences = 1) {
+  replace(botId: string, projectId: string, requested: string, oldText: string, newText: string, expectedOccurrences = 1, runId?: string) {
     if (!oldText) throw new Error("Choose the exact existing code to replace.");
-    const current = this.read(botId, projectId, requested).content;
+    const current = this.read(botId, projectId, requested, runId).content;
     const occurrences = current.split(oldText).length - 1;
     if (occurrences !== expectedOccurrences) throw new Error(`Expected ${expectedOccurrences} matching code block${expectedOccurrences === 1 ? "" : "s"}, but found ${occurrences}. Read the file again before editing.`);
-    return this.write(botId, projectId, requested, current.split(oldText).join(newText));
+    return this.write(botId, projectId, requested, current.split(oldText).join(newText), runId);
   }
 
-  status(botId: string, projectId: string) {
-    const project = this.project(botId, projectId);
+  status(botId: string, projectId: string, runId?: string) {
+    const project = this.project(botId, projectId, "read", runId);
     if (!project.gitRepository) return { projectId, gitRepository: false, branch: null, defaultBranch: null, remoteUrl: null, changes: [] as string[] };
     const branch = spawnSync("git", ["branch", "--show-current"], { cwd: project.rootPath, encoding: "utf8", timeout: 8_000 });
-    const status = spawnSync("git", ["status", "--short"], { cwd: project.rootPath, encoding: "utf8", timeout: 8_000, maxBuffer: 300_000 });
+    const status = spawnSync("git", ["status", "--short", "--untracked-files=all"], { cwd: project.rootPath, encoding: "utf8", timeout: 8_000, maxBuffer: 300_000 });
     const changes = String(status.stdout || "").split(/\r?\n/).filter((line) => {
       if (!line) return false;
       const fileNames = line.slice(3).split(" -> ");
@@ -225,30 +238,113 @@ export class CodeProjectManager {
     return { projectId, gitRepository: true, branch: String(branch.stdout || "").trim() || null, defaultBranch: project.defaultBranch, remoteUrl: project.remoteUrl, changes };
   }
 
-  review(botId: string, projectId: string): CodeProjectReview {
-    const project = this.project(botId, projectId), state = this.status(botId, projectId);
-    if (!project.gitRepository) return { projectId, gitRepository: false, branch: null, defaultBranch: null, remoteUrl: null, changes: [], diff: "", truncated: false };
-    const visiblePaths = state.changes.map((line) => line.slice(3).split(" -> ").pop()?.replace(/^"|"$/g, "") || "").filter((file) => file && !file.split(/[\\/]/).some((part) => part.startsWith(".") && !SAFE_HIDDEN_DIRECTORIES.has(part))).slice(0, 120);
-    if (!visiblePaths.length) return { ...state, diff: "", truncated: false };
+  review(botId: string, projectId: string, runId?: string): CodeProjectReview {
+    const project = this.project(botId, projectId, "read", runId), state = this.status(botId, projectId, runId);
+    const workspace = runId ? this.db.getCodeTaskWorkspace(runId) : null;
+    if (!project.gitRepository) return { projectId, gitRepository: false, branch: null, defaultBranch: null, remoteUrl: null, workspace, changes: [], diff: "", truncated: false };
+    let changes = state.changes;
+    let visiblePaths = changes.map((line) => line.slice(3).split(" -> ").pop()?.replace(/^"|"$/g, "") || "").filter((file) => file && !file.split(/[\\/]/).some((part) => part.startsWith(".") && !SAFE_HIDDEN_DIRECTORIES.has(part))).slice(0, 120);
+    if (!visiblePaths.length && workspace && state.branch && state.defaultBranch && state.branch !== state.defaultBranch) {
+      const committed = this.git(project, ["diff", "--name-status", `${state.defaultBranch}...HEAD`]).split(/\r?\n/).filter(Boolean).map((line) => {
+        const parts = line.split("\t"), file = parts.at(-1) || "";
+        return { file, display: `${(parts[0] || "M").padEnd(2)} ${file}` };
+      }).filter(({ file }) => file && !file.split(/[\\/]/).some((part) => part.startsWith(".") && !SAFE_HIDDEN_DIRECTORIES.has(part))).slice(0, 120);
+      changes = committed.map(({ display }) => display);
+      visiblePaths = committed.map(({ file }) => file);
+    }
+    if (!visiblePaths.length) return { ...state, workspace, diff: "", truncated: false };
     const unstaged = this.git(project, ["diff", "--no-ext-diff", "--unified=3", "--", ...visiblePaths]);
     const staged = this.git(project, ["diff", "--cached", "--no-ext-diff", "--unified=3", "--", ...visiblePaths]);
-    const full = [staged && "Staged changes\n\n" + staged, unstaged && "Working changes\n\n" + unstaged].filter(Boolean).join("\n");
-    return { ...state, diff: full.slice(0, MAX_DIFF_CHARACTERS), truncated: full.length > MAX_DIFF_CHARACTERS };
+    const committed = !staged && !unstaged && workspace && state.defaultBranch ? this.git(project, ["diff", "--no-ext-diff", "--unified=3", `${state.defaultBranch}...HEAD`, "--", ...visiblePaths]) : "";
+    const created = state.changes.filter((line) => line.startsWith("?? ")).map((line) => line.slice(3)).filter((file) => visiblePaths.includes(file)).map((file) => {
+      const resolved = this.resolveFile(project, file);
+      if (!statSync(resolved.target).isFile() || statSync(resolved.target).size > MAX_FILE_BYTES) return "";
+      const buffer = readFileSync(resolved.target);
+      if (buffer.includes(0)) return "";
+      const content = buffer.toString("utf8"), lines = content ? content.replace(/\n$/, "").split("\n") : [];
+      return `diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((line) => `+${line}`).join("\n")}`;
+    }).filter(Boolean).join("\n");
+    const full = [committed && "Committed task changes\n\n" + committed, staged && "Staged changes\n\n" + staged, unstaged && "Working changes\n\n" + unstaged, created && "New files\n\n" + created].filter(Boolean).join("\n");
+    return { ...state, changes, workspace, diff: full.slice(0, MAX_DIFF_CHARACTERS), truncated: full.length > MAX_DIFF_CHARACTERS };
   }
 
-  branch(botId: string, projectId: string, requested: string) {
+  prepareIndependentReview(botId: string, projectId: string, runId: string) {
+    const workspace = this.db.getCodeTaskWorkspace(runId);
+    if (!workspace || workspace.botId !== botId || workspace.projectId !== projectId) throw new Error("Start and commit an isolated task branch before asking for review.");
+    const project = this.project(botId, projectId, "write", runId);
+    if (!project.gitRepository) throw new Error("Independent review needs a Git project.");
+    if (this.git(project, ["status", "--porcelain"]).trim()) throw new Error("Commit or restore every current change before asking a teammate to review it.");
+    const branch = this.git(project, ["branch", "--show-current"]).trim(), base = project.defaultBranch || "main";
+    if (!branch || branch === base) throw new Error("Create and commit on an isolated task branch before asking for review.");
+    const headCommit = this.git(project, ["rev-parse", "HEAD"]).trim();
+    if (headCommit === this.git(project, ["rev-parse", base]).trim()) throw new Error("Commit the task changes before asking for review.");
+    const review = this.review(botId, projectId, runId);
+    if (!review.diff) throw new Error("No visible code changes are available for review.");
+    if (review.truncated) throw new Error("This change is too large for one bounded independent review. Split it into a smaller task first.");
+    return { project, workspace, review, headCommit, base };
+  }
+
+  currentCommit(botId: string, projectId: string, runId: string) {
+    const project = this.project(botId, projectId, "read", runId);
+    return this.git(project, ["rev-parse", "HEAD"]).trim();
+  }
+
+  disconnectProject(projectId: string) {
+    const project = this.db.getCodeProject(projectId);
+    if (!project) return false;
+    const workspaces = this.db.listCodeTaskWorkspaces(projectId).filter((workspace) => workspace.status !== "archived");
+    for (const workspace of workspaces) {
+      if (!existsSync(workspace.rootPath)) continue;
+      const resolved = realpathSync(workspace.rootPath), relative = path.relative(this.worktreesRoot, resolved);
+      if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error("A task workspace moved outside OpenBot's private code area.");
+      if (this.git({ ...project, rootPath: resolved }, ["status", "--porcelain"]).trim()) throw new Error(`Review, commit, or restore the unfinished work on ${workspace.branch} before disconnecting this project.`);
+    }
+    for (const workspace of workspaces) {
+      if (existsSync(workspace.rootPath)) this.git(project, ["worktree", "remove", "--force", workspace.rootPath], 30_000);
+      this.db.updateCodeTaskWorkspaceStatus(workspace.runId, "archived");
+    }
+    return this.db.deleteCodeProject(projectId);
+  }
+
+  branch(botId: string, projectId: string, requested: string, runId?: string) {
     const project = this.project(botId, projectId, "write");
     if (!project.gitRepository) throw new Error("This project is not a Git repository.");
     const name = requested.trim();
     if (!name || name.length > 120 || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name) || name.includes("..") || name.endsWith("/") || name.includes("//")) throw new Error("Use a short branch name such as openbot/fix-login.");
-    if (this.git(project, ["status", "--porcelain"]).trim()) throw new Error("Review or commit the current changes before starting another branch.");
     this.git(project, ["check-ref-format", "--branch", name]);
+    if (runId) {
+      const run = this.db.getRun(runId);
+      if (!run || run.botId !== botId) throw new Error("That coding task is no longer available for this teammate.");
+      const existing = this.db.getCodeTaskWorkspace(runId);
+      if (existing) {
+        if (existing.projectId !== projectId || existing.branch !== name) throw new Error(`This task is already working on ${existing.branch}.`);
+        return { projectId, branch: name, workspaceRunId: runId, isolated: true, message: `Continuing isolated branch ${name}.` };
+      }
+      const parent = path.join(this.worktreesRoot, project.id), destination = path.join(parent, runId);
+      mkdirSync(parent, { recursive: true });
+      if (existsSync(destination)) throw new Error("That isolated task folder already exists but is not registered. Remove it before trying again.");
+      let added = false;
+      try {
+        this.git(project, ["-c", "core.hooksPath=/dev/null", "worktree", "add", "-b", name, destination, "HEAD"], 30_000);
+        added = true;
+        const rootPath = realpathSync(destination);
+        this.db.createCodeTaskWorkspace({ runId, projectId, botId, branch: name, rootPath });
+        return { projectId, branch: name, workspaceRunId: runId, isolated: true, message: `Started isolated branch ${name}. Your main project stays untouched.` };
+      } catch (error) {
+        if (added) {
+          try { this.git(project, ["worktree", "remove", "--force", destination]); } catch { if (existsSync(destination)) rmSync(destination, { recursive: true, force: true }); }
+          try { this.git(project, ["branch", "-D", name]); } catch { /* Keep the original error; the private branch can be cleaned up later. */ }
+        }
+        throw error;
+      }
+    }
+    if (this.git(project, ["status", "--porcelain"]).trim()) throw new Error("Review or commit the current changes before starting another branch.");
     this.git(project, ["-c", "core.hooksPath=/dev/null", "switch", "-c", name]);
     return { projectId, branch: name, message: `Started branch ${name}.` };
   }
 
-  commit(botId: string, projectId: string, requestedMessage: string, requestedPaths: string[]) {
-    const project = this.project(botId, projectId, "write");
+  commit(botId: string, projectId: string, requestedMessage: string, requestedPaths: string[], runId?: string) {
+    const project = this.project(botId, projectId, "write", runId);
     if (!project.gitRepository) throw new Error("This project is not a Git repository.");
     const branch = this.git(project, ["branch", "--show-current"]).trim();
     if (!branch) throw new Error("Create a named branch before committing changes.");
@@ -265,8 +361,8 @@ export class CodeProjectManager {
     return { projectId, branch, commit, files: selected.split(/\r?\n/).filter(Boolean), message };
   }
 
-  preparePublish(botId: string, projectId: string, requestedBase?: string) {
-    const project = this.project(botId, projectId, "write");
+  preparePublish(botId: string, projectId: string, requestedBase?: string, runId?: string) {
+    const project = this.project(botId, projectId, "write", runId);
     if (!project.gitRepository || !project.remoteUrl) throw new Error("Connect a GitHub repository before publishing a pull request.");
     const repository = parseGitHubRepository(project.remoteUrl), branch = this.git(project, ["branch", "--show-current"]).trim();
     const base = (requestedBase || project.defaultBranch || "main").trim();
@@ -276,8 +372,8 @@ export class CodeProjectManager {
     return { project, repository, branch, base };
   }
 
-  async publishPullRequest(botId: string, projectId: string, input: { title: string; body: string; base?: string; draft?: boolean }) {
-    const prepared = this.preparePublish(botId, projectId, input.base), title = input.title.trim(), body = input.body.trim();
+  async publishPullRequest(botId: string, projectId: string, input: { title: string; body: string; base?: string; draft?: boolean }, runId?: string) {
+    const prepared = this.preparePublish(botId, projectId, input.base, runId), title = input.title.trim(), body = input.body.trim();
     if (!title || title.length > 160 || !body || body.length > 10_000) throw new Error("Give the pull request a clear title and review summary.");
     const repo = `${prepared.repository.owner}/${prepared.repository.name}`;
     await this.command("gh", ["auth", "status", "--hostname", "github.com"], { cwd: prepared.project.rootPath, timeout: 15_000 });
@@ -285,21 +381,30 @@ export class CodeProjectManager {
     try {
       const existing = await this.command("gh", ["pr", "view", prepared.branch, "--repo", repo, "--json", "url"], { cwd: prepared.project.rootPath, timeout: 20_000 });
       const url = (JSON.parse(existing.stdout) as { url?: string }).url;
-      if (url) return { projectId, branch: prepared.branch, url, existing: true };
+      if (url) {
+        if (runId) this.db.updateCodeTaskWorkspaceStatus(runId, "published");
+        return { projectId, branch: prepared.branch, url, existing: true };
+      }
     } catch { /* No pull request exists for this branch yet. */ }
     const args = ["pr", "create", "--repo", repo, "--base", prepared.base, "--head", prepared.branch, "--title", title, "--body", body];
     if (input.draft) args.push("--draft");
     const created = await this.command("gh", args, { cwd: prepared.project.rootPath, timeout: 60_000 });
     const url = created.stdout.split(/\r?\n/).find((line) => /^https:\/\/github\.com\//.test(line.trim()))?.trim();
     if (!url) throw new Error("GitHub created the pull request but did not return its link.");
+    if (runId) this.db.updateCodeTaskWorkspaceStatus(runId, "published");
     return { projectId, branch: prepared.branch, url, existing: false };
   }
 
   restoreEdit(editId: string) {
     const edit = this.db.getCodeProjectEdit(editId);
     if (!edit || !edit.reversible) throw new Error("That restore point is no longer available.");
-    const project = this.db.getCodeProject(edit.projectId);
+    let project = this.db.getCodeProject(edit.projectId);
     if (!project) throw new Error("Reconnect that project before restoring its file.");
+    if (edit.workspaceRunId) {
+      const workspace = this.db.getCodeTaskWorkspace(edit.workspaceRunId);
+      if (!workspace || workspace.projectId !== project.id || !existsSync(workspace.rootPath)) throw new Error("That isolated task workspace is no longer available.");
+      project = { ...project, rootPath: workspace.rootPath };
+    }
     const file = this.resolveFile(project, edit.path);
     if (!statSync(file.target).isFile() || contentHash(readFileSync(file.target)) !== edit.afterHash) throw new Error("That file changed again, so OpenBot left the newer work untouched.");
     if (edit.operation === "created") unlinkSync(file.target);

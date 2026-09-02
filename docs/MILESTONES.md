@@ -203,3 +203,19 @@ Status: complete for the local-first 0.10 release
 - The Code projects sheet now includes GitHub cloning, real service marks, source links, review state, expandable diffs, and reversible edit actions at desktop and phone widths
 
 Verification: 50 automated tests pass. The Git integration test initializes a real repository, rejects a default-branch commit, creates `openbot/fix-answer`, shows the changed line in review, commits only `app.ts`, and leaves unrelated `notes.md` work uncommitted. Restore coverage proves newer user content is refused, an unchanged update returns to its prior content, and an unchanged newly created file can be removed. In a disposable real DeepSeek V4 Flash run, Nova created `openbot/agent-harness-qa`, changed only `value.js`, reviewed the 41→42 diff, passed the isolated Node test, committed only that file as `6314a7a`, reopened it, and recorded five passing checks. Type checking, the production build, and desktop/phone review UI pass.
+
+## M15 — Parallel coding workspaces and independent review
+
+Status: complete on the 0.11 development branch
+
+- Every coding run creates a dedicated Git worktree and task branch under OpenBot's private data directory
+- The original project checkout remains on its current branch and is never dirtied by agent edits
+- File reads, searches, atomic edits, diffs, checks, commits, restores, and approved publishing stay pinned to the same run workspace
+- Multiple teammates can work on the same repository concurrently without switching each other's branch or sharing uncommitted state
+- Committed task changes remain visible in the review panel relative to the configured default branch
+- A coding teammate can request an independent review from another teammate with project read access
+- Review input is pinned to the exact tested commit; the reviewer records an approved or changes-requested verdict and focused findings
+- Publishing is blocked unless the latest independent review approved the current unchanged commit
+- The Code projects panel shows active task branches, assigned mascots, review status, and whether a task was published
+
+Verification: 51 automated tests pass. The worktree integration test starts two concurrent runs from one repository, creates two independent branches and roots, writes different content to the same file, proves both are isolated from each other and from `main`, commits one task without moving the source checkout, renders its committed diff, records a second-teammate approval tied to the exact commit, and restores a file inside the other task's workspace. Type checking and the production build pass.

@@ -17,9 +17,9 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - A persistent completion contract for real jobs: clear outcome, deliverable, live checklist, approval boundary, and recorded final checks
 - Compact result receipts that show whether the work was checked and let the user expand the supporting steps and evidence
 - One-click GitHub cloning or local code-project connections with separate read-only, code-and-test, or no-access choices for every teammate
-- Project-aware code listing, search, reading, exact edits, atomic file creation, isolated branches, bounded diffs, scoped commits, and network-isolated checks
+- Project-aware code listing, search, reading, exact edits, atomic file creation, per-task Git worktrees, bounded diffs, scoped commits, and network-isolated checks
 - A recoverable local code-change trail; restore points refuse to overwrite newer work, and disconnecting never deletes project files
-- Approval-gated GitHub pull-request publishing after the teammate records passing checks
+- Independent teammate code review of the exact tested commit before approval-gated GitHub pull-request publishing
 - A persistent, constrained Docker computer for every bot
 - A persistent Chrome profile for every bot with open, read, click, type, and screenshot tools
 - Visible teach mode that turns a demonstrated browser task into an editable OpenCode skill
@@ -94,7 +94,9 @@ Text reading is limited to supported files up to 500 KB. File organization can c
 
 Open **Code projects** from the conversation header or Control center. Paste a GitHub repository link to clone it into `Documents/OpenBot Projects`, choose a suggested folder from `Documents/GitHub`, `Developer`, or `Projects`, or enter a specific project folder inside your home directory. Each teammate can be set to **Code + test**, **Read only**, or **No access**.
 
-Coding teammates can inspect project instructions, create a separate branch, make focused atomic edits, inspect a bounded diff, run builds or tests in a disposable Docker container, and commit only explicitly named files. Commands run from the project root with networking disabled, a read-only container system, resource limits, dropped privileges, and masks over `.git`, `.env`, and other protected hidden paths. After the task records passing checks, a teammate can prepare a pull request; the branch is pushed and the GitHub pull request is opened only after the owner approves the exact publish action.
+Coding teammates can inspect project instructions, create an isolated task branch, make focused atomic edits, inspect a bounded diff, run builds or tests in a disposable Docker container, and commit only explicitly named files. Every coding task receives its own Git worktree under OpenBot's private data directory, so multiple teammates can work on the same repository at once without switching branches or changing the user's main checkout. Commands run from that task workspace with networking disabled, a read-only container system, resource limits, dropped privileges, and masks over `.git`, `.env`, and other protected hidden paths.
+
+After the task records passing checks, the coding teammate asks a different teammate to inspect the exact commit and bounded diff. The reviewer records either **Approved** or **Changes requested** with focused findings. OpenBot refuses to publish when independent approval is missing, changes were requested, or the branch changed after review. The branch is pushed and the GitHub pull request is opened only after the owner approves the exact publish action.
 
 Every agent write creates a local restore point. Restore succeeds only while the file still matches that exact agent edit, so newer user or agent work is never overwritten. Disconnecting a project removes access but never deletes the user's files; managed clones also stay on disk.
 

@@ -384,6 +384,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .project-source { min-width: 0; margin: 10px 0 11px; display: flex; align-items: center; gap: 7px; }
 .project-source code { min-width: 0; flex: 1; padding: 6px 8px; display: block; overflow: hidden; color: #77708d; border-radius: 8px; background: #f5f3f8; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: 7.7px; text-overflow: ellipsis; white-space: nowrap; }
 .project-source a { flex: none; padding: 6px 8px; display: inline-flex; align-items: center; gap: 4px; color: #5c50b4; border-radius: 8px; background: #f0edff; font-size: 7.4px; font-weight: 750; text-decoration: none; }
+.project-workspaces { min-width: 0; margin: 0 0 11px; padding: 9px; display: grid; gap: 6px; border: 1px solid rgba(96,82,190,.11); border-radius: 14px; background: linear-gradient(145deg,#f8f6ff,#fbfaff); }
+.project-workspaces-title { min-width: 0; padding: 1px 2px 4px; display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.project-workspaces-title span { display: inline-flex; align-items: center; gap: 5px; color: #5e53a9; font-size: 8px; font-weight: 780; }
+.project-workspaces-title small { overflow: hidden; color: #a19bad; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.project-workspaces > button { min-width: 0; padding: 7px 8px; border: 1px solid rgba(62,54,82,.07); display: grid; grid-template-columns: 28px minmax(0,1fr) auto 18px; align-items: center; gap: 7px; border-radius: 11px; text-align: left; background: rgba(255,255,255,.9); cursor: pointer; transition: transform .16s ease,box-shadow .16s ease,border-color .16s ease; }
+.project-workspaces > button:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(102,87,215,.2); box-shadow: 0 7px 16px rgba(48,39,98,.07); }
+.project-workspaces > button:disabled { opacity: .58; cursor: default; }
+.project-workspaces > button > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.project-workspaces > button strong,.project-workspaces > button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-workspaces > button strong { color: #3e3946; font-size: 8.4px; }.project-workspaces > button small { color: #8d8699; font: 7px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.project-workspaces > button > svg { color: #8b80c8; }
+.workspace-state { padding: 4px 6px; border-radius: 99px; font-size: 6.5px; white-space: nowrap; }
+.workspace-active { color: #5a50ad; background: #eeeaff; }.workspace-approved,.workspace-published { color: #377351; background: #e4f3e9; }.workspace-changes { color: #9b553f; background: #fbe9e2; }
 .project-review { min-width: 0; margin: 0 0 11px; padding: 11px; overflow: hidden; border: 1px solid rgba(102,87,215,.14); border-radius: 13px; background: linear-gradient(145deg,#fbfaff,#f7f5ff); }
 .project-review > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .project-review > div span { display: inline-flex; align-items: center; gap: 5px; color: #6559b3; font-size: 8px; font-weight: 750; }
@@ -394,6 +407,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .project-review summary { color: #6256b2; font-size: 7.8px; font-weight: 750; cursor: pointer; }
 .project-review pre { max-height: 310px; margin: 8px 0 0; padding: 10px; overflow: auto; color: #484253; border: 1px solid rgba(54,48,68,.08); border-radius: 9px; background: #fff; font: 7.1px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; white-space: pre; }
 .project-review > p { margin: 8px 0 0; color: #8d8796; font-size: 7.7px; }
+.project-review .workspace-review-note { padding: 7px 8px; color: #6258a0; border-radius: 8px; background: rgba(238,234,255,.8); line-height: 1.4; }
 .project-access-grid { min-width: 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
 .project-access-grid > label { min-width: 0; min-height: 54px; padding: 7px; display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 12px; background: #fbfaf8; }
 .project-access-grid > label > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -441,6 +455,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .project-new-access > strong { grid-column: 1; }
   .project-suggestions { grid-template-columns: 1fr; }
   .project-entry-actions { grid-template-columns: 1fr; }
+  .project-workspaces > button { grid-template-columns: 28px minmax(0,1fr) auto; }
+  .project-workspaces > button > svg { display: none; }
   .project-access-grid > label,.project-new-access > label { grid-template-columns: 28px minmax(0,1fr) minmax(100px,auto); }
   .project-access-grid select,.project-new-access select { grid-column: 3; }
 }
