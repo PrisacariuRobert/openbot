@@ -4,6 +4,7 @@ import type { Bot, Run } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
 import { connectedAppsText, prepareWorkspace } from "./workspace.js";
+import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 
 const CLAUDE_MCP_PATH = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
 
@@ -105,6 +106,7 @@ export interface OpenCodeRunnerOptions {
   onChange: () => void;
   internalUrl: string;
   internalToken: string;
+  attachments: AttachmentService;
   maxParallel?: number;
 }
 
@@ -201,7 +203,7 @@ export class OpenCodeRunner {
       return `- ${project.name} (${project.id}): ${access.canWrite ? "edit" : "read-only"}${access.canRun ? ", checks enabled" : ""}`;
     }).join("\n") || "- No code projects are shared with this teammate.";
     const liveApps = `Current connected-app state for this task (authoritative; it overrides older messages and memories):\n${connectedAppsText(this.options.db, bot)}\n\nShared code projects:\n${sharedProjects}\n\nIf the request can be answered with an available app or code project, use its tool now. For code work, inspect project instructions and current status, make focused changes, and run the smallest relevant checks. For “latest” or “last email,” search the inbox for one newest message, then read it before answering. Never claim an app is disconnected based only on an earlier reply; only report a connection problem when a tool returns one during this task.`;
-    const completion = `Completion rules:\n- Own the requested outcome, not merely the next response.\n- For multi-step work, call task_plan before the first work tool, keep meaningful steps current with task_progress, and call task_verify before the final answer.\n- Continue until the deliverable is finished and checked, an external action needs approval, or a real blocker remains.\n- A progress update, explanation of what you could do, or unverified draft is not a finished deliverable.\n- Keep the conversation quiet: use the task tools for progress and reserve prose for a short useful result or a genuine question.`;
+    const completion = `Completion rules:\n- Own the requested outcome, not merely the next response.\n- For multi-step work, call task_plan before the first work tool, keep meaningful steps current with task_progress, and call task_verify before the final answer.\n- Continue until the deliverable is finished and checked, an external action needs approval, or a real blocker remains.\n- A progress update, explanation of what you could do, or unverified draft is not a finished deliverable.\n- Keep the conversation quiet: use the task tools for progress and reserve prose for a short useful result or a genuine question.\n- When you create a useful file, save it inside your workspace and include its relative path as a Markdown link in the final answer so OpenBot can show it as a reviewable result card.`;
     const taskContext = continuing && run.task.tracked
       ? `\n\nResume the existing job contract; do not replace its plan unless the user's outcome changed.\nGoal: ${run.task.goal}\nDeliverable: ${run.task.deliverable}\nSteps:\n${run.task.steps.map((step) => `- ${step.id}. [${step.status}] ${step.title}${step.detail ? ` — ${step.detail}` : ""}`).join("\n")}`
       : "";
@@ -226,11 +228,12 @@ export class OpenCodeRunner {
       OPENBOT_INTERNAL_TOKEN: this.options.internalToken, OPENBOT_BOT_ID: bot.id, OPENBOT_RUN_ID: run.id, OPENBOT_WORKSPACE: workspace,
     };
     const prompt = this.buildPrompt(run, bot, Boolean(previousSession));
+    const attachedFiles = modelAttachmentFiles(this.options.db, run);
     const mcpConfig = JSON.stringify({ mcpServers: { openbot: { command: process.execPath, args: [CLAUDE_MCP_PATH] } } });
     const claudeTools = ["mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_calendar_agenda", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__routine_create", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval"].join(",");
     const args = useClaude
       ? ["-p", "--output-format", "stream-json", "--verbose", "--model", bot.model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", claudeTools, ...(previousSession ? ["--resume", previousSession] : []), prompt]
-      : ["run", "--auto", "--format", "json", "--model", bot.model, "--dir", workspace, ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
+      : ["run", "--auto", "--format", "json", "--model", bot.model, "--dir", workspace, ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
     const child = spawn(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"] });
     this.running.set(run.id, child);
     let stdoutBuffer = "", stderr = "", responseText = "", sessionId: string | null = previousSession, lastTool = "";
@@ -266,7 +269,7 @@ export class OpenCodeRunner {
     });
     child.stderr.on("data", (chunk) => (stderr += String(chunk)));
     child.on("error", (error) => (stderr += error.message));
-    child.on("close", (code, signal) => {
+    child.on("close", async (code, signal) => {
       if (stdoutBuffer) consumeLine(stdoutBuffer);
       this.running.delete(run.id);
       if (sessionId) this.options.db.rememberSessionCapabilities(sessionId, capabilityFingerprint);
@@ -305,7 +308,13 @@ export class OpenCodeRunner {
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
         if (!shouldPublishRunMessage(run)) {
           this.shareChildOutcome(run, bot, summary);
-        } else this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id });
+        } else {
+          const message = this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id });
+          try {
+            const artifacts = await this.options.attachments.captureArtifacts(bot, message, summary);
+            if (artifacts.length) this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "file", label: artifacts.length === 1 ? "Prepared your result file" : `Prepared ${artifacts.length} result files`, detail: artifacts.map((artifact) => artifact.name).join(", ") });
+          } catch { /* A finished answer remains useful even if a result card cannot be prepared. */ }
+        }
       } else {
         const error = cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
         this.options.db.updateRun(run.id, { ...usagePatch, status: "failed", finishedAt, error, partialText: responseText || null });

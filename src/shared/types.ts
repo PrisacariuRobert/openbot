@@ -91,6 +91,16 @@ export interface Attachment {
   messageId: string | null;
   name: string;
   mime: string;
+  detectedMime: string;
+  kind: "text" | "document" | "spreadsheet" | "presentation" | "image" | "audio" | "video" | "archive" | "file";
+  processingStatus: "ready" | "partial" | "unsupported" | "failed";
+  summary: string | null;
+  previewText: string | null;
+  metadata: Record<string, string | number | boolean>;
+  previewUrl: string | null;
+  source: "upload" | "artifact";
+  revision: number;
+  replacesAttachmentId: string | null;
   size: number;
   url: string;
   createdAt: string;
@@ -140,6 +150,7 @@ export interface Run {
   steeredFromRunId: string | null;
   routineId: string | null;
   consultationPending: boolean;
+  attachmentIds: string[];
   prompt: string;
   status: RunStatus;
   approvalReason: string | null;

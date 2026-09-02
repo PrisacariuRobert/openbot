@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",
@@ -19,12 +19,16 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.39.0",
+    "music-metadata": "^11.15.0",
+    "pdfjs-dist": "^6.3.289",
     "playwright-core": "^1.62.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.35.4",
     "zod": "^4.5.4"
   },
   "devDependencies": {

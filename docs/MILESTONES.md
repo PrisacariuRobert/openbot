@@ -264,3 +264,19 @@ Status: complete on the 0.13 development branch
 - Release documentation names the exact 0.13.0 package version and records the next five product releases with honest acceptance boundaries
 
 Verification: 58 automated tests pass, including persisted consultation state, child readiness, coordinator resumption, active-run steering, and the coordinator-only publish rule. Type checking and the production build pass. The exact Pixel-to-Nova consultation flow and desktop/phone UI are verified against the running application before release.
+
+## M19 — Rich inputs and reviewable artifacts
+
+Status: complete for the local-first 0.14 release
+
+- A single bounded ingestion layer identifies the actual file type and prepares private context for PDF, DOCX, XLSX/XLSM, CSV/TSV, PPTX, text, JSON, YAML, notebooks, email, common source, images, audio, and video
+- PDF pages, Word text, workbook sheets/rows, presentation slides, and plain text are extracted locally with explicit page, row, archive-expansion, and character limits
+- Images, PDFs, audio, and video are attached to compatible OpenCode models as original media; useful dimensions, duration, codec, sheet, page, and slide metadata remains available independently
+- Extracted file content is clearly delimited as untrusted data so a document cannot silently rewrite the user's or system's instructions
+- Contained cards use real file-kind icons, safe image/PDF previews, expandable text previews, friendly status language, and distinct preview/download actions
+- Files linked by a teammate from its private workspace are copied into OpenBot's attachment store and shown as result cards in the same answer
+- Re-linking the same workspace file creates a numbered revision that points back to the previous result while preserving both copies
+- Preview responses use an allowlist, inline disposition, MIME sniffing protection, a private cache policy, and a sandbox content policy; ordinary downloads remain forced
+- Uploaded originals still enter only the selected teammates' private inboxes, with six-file and 25 MB-per-file limits
+
+Verification: 61 automated tests pass, including real PDF text extraction plus Word, spreadsheet, slide, image, and audio fixtures; database persistence; type detection; prompt-injection boundaries; media forwarding; workspace escape denial; artifact capture; and revision history. The production dependency audit reports zero vulnerabilities. A real DeepSeek V4 Flash Vision run interpreted the supplied screenshot through OpenBot, and a real DeepSeek V4 Flash workflow created, surfaced, updated, and re-surfaced the same Markdown artifact as versions 1 and 2. Desktop and 390×844 checks confirmed the new card is contained, survives refresh, opens its preview, and introduces no horizontal overflow.

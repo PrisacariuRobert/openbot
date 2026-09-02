@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 2, 2026
-Release: 0.13 local-first beta
+Release: 0.14 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -21,6 +21,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 4. **A team that speaks with one voice.** Teammates consult privately, every signal stays inspectable, and one coordinator combines the result instead of making the user reconcile duplicate replies. Conversations remain limited to three hops and eight related runs.
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
+7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
 
 ## Available now
 
@@ -170,6 +171,11 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Safe GitHub-flavored Markdown for headings, lists, links, tables, quotes, inline code, and code blocks
 - Six attachments per message, up to 25 MB each
 - Attachments copied only into the routed teammates' private inboxes
+- Local bounded text extraction for PDF, Word, Excel, CSV/TSV, PowerPoint, text, JSON, YAML, notebooks, email, and common source files
+- Original image, PDF, audio, and video handoff to compatible OpenCode models, plus locally extracted media metadata
+- Safe, contained image/PDF and extracted-text previews with accurate file-kind icons and clear recovery for unsupported formats
+- Teammate-created files automatically surfaced as result cards when linked in the answer
+- Numbered revisions for updated workspace results, with previous copies preserved
 - Authenticated artifact downloads with forced download behavior, content sniffing protection, and a sandbox content policy
 - Browser/operating-system voice typing; OpenBot stores the transcript rather than microphone audio
 - Installable responsive PWA for phone check-ins
@@ -199,6 +205,7 @@ These features are implemented, but marketing must explain their requirement.
 | Capability | Requirement or qualifier |
 |---|---|
 | Model execution | A supported OpenCode or Claude Code setup, or a supported API key, must be connected by the owner. |
+| Image, audio, and video understanding | The assigned model must accept that medium. OpenBot still shows local dimensions, duration, codec, and file metadata when it does not. Scanned-document OCR and guaranteed local transcription are not bundled. |
 | Code and terminal checks | Docker must be installed and running; dependencies must already be available because project checks have no network. |
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
@@ -215,6 +222,8 @@ These features are implemented, but marketing must explain their requirement.
 - **Prepare for a meeting:** gather the event, attendees, recent messages, and supporting documents into one brief.
 - **Review follow-ups:** identify promised actions from mail and meetings, then draft next steps without sending them.
 - **Research in parallel:** ask several specialists in the studio, then let them share findings and hand off focused follow-ups.
+- **Reconcile a brief and spreadsheet:** attach a PDF and workbook together, ask for discrepancies, then receive the checked report as a reviewable versioned result.
+- **Review a screenshot:** send a design or error screenshot to a vision-capable teammate and keep the visual next to the answer.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
 - **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
@@ -264,6 +273,7 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 - **Your subscriptions, your choice.** Mix supported OpenCode, Claude Code, and provider connections across teammates.
 - **Progress you can trust.** See the outcome, steps, approvals, checks, and final result for every substantial job.
 - **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub activity, files, browser work, and durable memory.
+- **From attachment to finished file.** Read PDFs, Office files, sheets, screenshots, and source; return a previewable result without making the user search a workspace.
 - **Local-first by default.** Your OpenBot data lives on your machine, with encrypted secrets and visible permission boundaries.
 
 ### Closing line

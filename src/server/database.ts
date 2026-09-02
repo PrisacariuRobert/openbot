@@ -40,6 +40,7 @@ import type {
 import { SecretVault } from "./vault.js";
 import { legacyCadence, normalizeRoutineInterval, routineIntervalMs } from "../shared/routines.js";
 import { skillSlug } from "../shared/skills.js";
+import type { AttachmentAnalysis } from "./attachments.js";
 
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
@@ -54,6 +55,14 @@ function jsonArray<T>(value: string | number | null | undefined): T[] {
   if (typeof value !== "string" || !value) return [];
   try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed as T[] : []; }
   catch { return []; }
+}
+
+function jsonRecord(value: string | number | null | undefined): Record<string, string | number | boolean> {
+  if (typeof value !== "string" || !value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, string | number | boolean> : {};
+  } catch { return {}; }
 }
 
 function taskGoal(prompt: string): string {
@@ -214,6 +223,17 @@ export class OpenBotDatabase {
         message_id TEXT REFERENCES messages(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         mime TEXT NOT NULL,
+        detected_mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+        kind TEXT NOT NULL DEFAULT 'file',
+        processing_status TEXT NOT NULL DEFAULT 'ready',
+        summary TEXT,
+        extracted_text TEXT,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        previewable INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'upload',
+        artifact_key TEXT,
+        revision INTEGER NOT NULL DEFAULT 1,
+        replaces_attachment_id TEXT,
         size INTEGER NOT NULL,
         storage_path TEXT NOT NULL,
         created_at TEXT NOT NULL
@@ -243,6 +263,7 @@ export class OpenBotDatabase {
         steered_from_run_id TEXT,
         routine_id TEXT,
         consultation_pending INTEGER NOT NULL DEFAULT 0,
+        attachment_ids_json TEXT NOT NULL DEFAULT '[]',
         task_goal TEXT,
         task_deliverable TEXT,
         task_approval_boundary TEXT,
@@ -434,6 +455,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "steered_from_run_id TEXT");
     this.addColumn("runs", "routine_id TEXT");
     this.addColumn("runs", "consultation_pending INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("runs", "attachment_ids_json TEXT NOT NULL DEFAULT '[]'");
     this.addColumn("runs", "task_goal TEXT");
     this.addColumn("runs", "task_deliverable TEXT");
     this.addColumn("runs", "task_approval_boundary TEXT");
@@ -443,6 +465,17 @@ export class OpenBotDatabase {
     this.addColumn("runs", "verification_status TEXT NOT NULL DEFAULT 'pending'");
     this.addColumn("runs", "verification_summary TEXT");
     this.addColumn("runs", "verification_checks_json TEXT NOT NULL DEFAULT '[]'");
+    this.addColumn("attachments", "detected_mime TEXT NOT NULL DEFAULT 'application/octet-stream'");
+    this.addColumn("attachments", "kind TEXT NOT NULL DEFAULT 'file'");
+    this.addColumn("attachments", "processing_status TEXT NOT NULL DEFAULT 'ready'");
+    this.addColumn("attachments", "summary TEXT");
+    this.addColumn("attachments", "extracted_text TEXT");
+    this.addColumn("attachments", "metadata_json TEXT NOT NULL DEFAULT '{}'");
+    this.addColumn("attachments", "previewable INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("attachments", "source TEXT NOT NULL DEFAULT 'upload'");
+    this.addColumn("attachments", "artifact_key TEXT");
+    this.addColumn("attachments", "revision INTEGER NOT NULL DEFAULT 1");
+    this.addColumn("attachments", "replaces_attachment_id TEXT");
     this.addColumn("routines", "last_status TEXT NOT NULL DEFAULT 'never'");
     this.addColumn("routines", "run_count INTEGER NOT NULL DEFAULT 0");
     this.addColumn("taught_workflows", "skill_slug TEXT");
@@ -671,11 +704,14 @@ export class OpenBotDatabase {
     return rows.map((row) => this.messageFromRow(row));
   }
 
-  createAttachment(input: { threadId: string; name: string; mime: string; size: number; storagePath: string }): Attachment {
+  createAttachment(input: { threadId: string; messageId?: string | null; name: string; mime: string; size: number; storagePath: string; analysis?: AttachmentAnalysis; source?: Attachment["source"]; artifactKey?: string | null; revision?: number; replacesAttachmentId?: string | null }): Attachment {
     const id = path.basename(path.dirname(input.storagePath));
     const createdAt = now();
-    this.db.prepare("INSERT INTO attachments (id,thread_id,message_id,name,mime,size,storage_path,created_at) VALUES (?,?,NULL,?,?,?,?,?)").run(
-      id, input.threadId, input.name, input.mime, input.size, input.storagePath, createdAt,
+    const analysis = input.analysis;
+    this.db.prepare("INSERT INTO attachments (id,thread_id,message_id,name,mime,detected_mime,kind,processing_status,summary,extracted_text,metadata_json,previewable,source,artifact_key,revision,replaces_attachment_id,size,storage_path,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
+      id, input.threadId, input.messageId ?? null, input.name, input.mime, analysis?.detectedMime || input.mime, analysis?.kind || "file", analysis?.processingStatus || "ready",
+      analysis?.summary ?? null, analysis?.extractedText ?? null, JSON.stringify(analysis?.metadata || {}), analysis?.previewable ? 1 : 0, input.source || "upload", input.artifactKey ?? null,
+      input.revision || 1, input.replacesAttachmentId ?? null, input.size, input.storagePath, createdAt,
     );
     return this.getAttachment(id)!;
   }
@@ -684,7 +720,12 @@ export class OpenBotDatabase {
     const id = String(row.id);
     return {
       id, threadId: String(row.thread_id), messageId: row.message_id ? String(row.message_id) : null,
-      name: String(row.name), mime: String(row.mime), size: Number(row.size), url: `/api/attachments/${id}`,
+      name: String(row.name), mime: String(row.mime), detectedMime: String(row.detected_mime || row.mime),
+      kind: String(row.kind || "file") as Attachment["kind"], processingStatus: String(row.processing_status || "ready") as Attachment["processingStatus"],
+      summary: row.summary ? String(row.summary) : null, previewText: row.extracted_text ? String(row.extracted_text).slice(0, 4_000) : null,
+      metadata: jsonRecord(row.metadata_json), previewUrl: asBoolean(row.previewable) ? `/api/attachments/${id}/preview` : null,
+      source: String(row.source || "upload") as Attachment["source"], revision: Number(row.revision || 1), replacesAttachmentId: row.replaces_attachment_id ? String(row.replaces_attachment_id) : null,
+      size: Number(row.size), url: `/api/attachments/${id}`,
       createdAt: String(row.created_at),
     };
   }
@@ -698,6 +739,16 @@ export class OpenBotDatabase {
     const row = this.db.prepare("SELECT * FROM attachments WHERE id=?").get(id) as Row | undefined;
     if (!row) return null;
     return { attachment: this.attachmentFromRow(row), storagePath: String(row.storage_path) };
+  }
+
+  attachmentText(id: string): string | null {
+    const row = this.db.prepare("SELECT extracted_text FROM attachments WHERE id=?").get(id) as Row | undefined;
+    return row?.extracted_text ? String(row.extracted_text) : null;
+  }
+
+  latestArtifact(threadId: string, artifactKey: string): { id: string; revision: number } | null {
+    const row = this.db.prepare("SELECT id,revision FROM attachments WHERE thread_id=? AND artifact_key=? ORDER BY revision DESC,created_at DESC LIMIT 1").get(threadId, artifactKey) as Row | undefined;
+    return row ? { id: String(row.id), revision: Number(row.revision || 1) } : null;
   }
 
   listMessageAttachments(messageId: string): Attachment[] {
@@ -722,11 +773,11 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null; attachmentIds?: string[] }): Run {
     const id = randomUUID();
     const tracked = shouldTrackTask(input.prompt, Boolean(input.parentRunId || input.steeredFromRunId || input.routineId));
-    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,progress_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
-      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, now(),
+    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,progress_at,attachment_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, now(), JSON.stringify([...new Set(input.attachmentIds || [])].slice(0, 6)),
     );
     this.db.prepare(`UPDATE runs SET task_goal=?,task_deliverable=?,task_approval_boundary=?,task_required_apps_json='[]',task_stage=?,task_steps_json=?,verification_status='pending',verification_summary=NULL,verification_checks_json='[]' WHERE id=?`).run(
       tracked ? taskGoal(input.prompt) : null, tracked ? "A finished, reviewable result in this conversation" : null, input.approvalReason ?? null,
@@ -763,6 +814,7 @@ export class OpenBotDatabase {
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       consultationPending: asBoolean(row.consultation_pending),
+      attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),
       prompt: String(row.prompt), status: row.status as RunStatus,
       approvalReason: row.approval_reason ? String(row.approval_reason) : null, approvalId: row.approval_id ? String(row.approval_id) : null,
       partialText: row.partial_text ? String(row.partial_text) : null, startedAt: row.started_at ? String(row.started_at) : null,

@@ -1,20 +1,20 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.13 one-voice teamwork release.
+Updated September 2, 2026 after the 0.14 rich-input release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
-## 0.14 — Rich inputs and reviewable artifacts
+## Shipped in 0.14 — Rich inputs and reviewable artifacts
 
 Goal: make “read this and give me a finished file” dependable.
 
-- Extract and reason over PDFs, images, audio, video metadata, Office files, CSV, JSON, YAML, email files, notebooks, and common source formats
-- Add image and audio understanding instead of treating every attachment as text
-- Render document and spreadsheet results as contained preview cards with download, revision, and source links
-- Preserve originals and revise the same artifact rather than producing disconnected copies
-- Add format-specific limits, clear unsupported-file recovery, and parser isolation
+- Bounded local extraction for PDFs, Word, Excel/XLSM, CSV/TSV, PowerPoint, JSON, YAML, email, notebooks, text, and common source formats
+- Original image, PDF, audio, and video handoff to compatible OpenCode models plus local media metadata
+- Contained image/PDF and extracted-text cards with real file-kind icons, preview, download, and friendly recovery
+- Teammate-created file capture with numbered revisions and preserved earlier copies
+- Real type detection, untrusted-content boundaries, Office archive expansion caps, page/row/character limits, and workspace-containment checks
 
-Ship only when mixed PDF-plus-spreadsheet reconciliation, screenshot understanding, voice-note summarization, and artifact revision all pass on desktop and phone.
+Verified with real screenshot understanding, real artifact creation/revision, parser fixtures for every format family, zero production dependency vulnerabilities, and desktop/phone overflow checks. Model-dependent media stays explicit: scanned-document OCR, guaranteed local voice transcription, and fidelity-preserving Office editing remain future work rather than 0.14 claims.
 
 ## 0.15 — Dependable automations and event triggers
 

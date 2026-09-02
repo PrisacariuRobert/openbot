@@ -2,10 +2,10 @@ import { Children, useCallback, useEffect, useId, useMemo, useRef, useState, typ
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ArrowLeft, ArrowUp, AtSign, Bell, Check, ChevronDown, Clock3, Code2, Coins, Copy, Cpu, Download, ExternalLink, Eye, File, FileText,
+  ArrowLeft, ArrowUp, AtSign, Bell, Check, ChevronDown, Clock3, Code2, Coins, Copy, Cpu, Download, ExternalLink, Eye, File, FileArchive, FileAudio, FileImage, FileSpreadsheet, FileText, FileVideo,
   Folder, FolderOpen, Gauge, GitBranch, GitPullRequest, Globe2, HardDrive, KeyRound, LoaderCircle, Menu, MonitorPlay, MoreHorizontal,
   Inbox, Mail, Mic, MicOff, PanelTop, Paperclip, Play, Plus, Power, RefreshCw, Search, Settings2, ShieldCheck, Smartphone, Sparkles, Square,
-  RotateCcw, Terminal, Trash2, Users, WandSparkles, Wifi, WifiOff, Workflow, X,
+  Presentation, RotateCcw, Terminal, Trash2, Users, WandSparkles, Wifi, WifiOff, Workflow, X,
 } from "lucide-react";
 import type {
   AppState, Attachment, Bot, BotStatus, CalendarEventSummary, CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ComputerStatus, ConnectorStatus, DriveFileSummary, GmailMessageSummary,
@@ -159,12 +159,56 @@ function highlightMentions(children: ReactNode) {
   });
 }
 
-function MessageText({ body }: { body: string }) {
+function MessageText({ body, attachments = [] }: { body: string; attachments?: Attachment[] }) {
+  const attachmentHref = (href: string | undefined) => {
+    if (!href || /^[a-z]+:\/\//i.test(href) || href.startsWith("/api/")) return href;
+    let candidate = href.split(/[?#]/)[0]!.split("/").at(-1) || href;
+    try { candidate = decodeURIComponent(candidate); } catch { /* keep the literal name */ }
+    return attachments.find((attachment) => attachment.source === "artifact" && attachment.name === candidate)?.url || href;
+  };
   return <div className="message-content"><ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} components={{
     p: ({ children }) => <p>{highlightMentions(children)}</p>,
     li: ({ children }) => <li>{highlightMentions(children)}</li>,
-    a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+    a: ({ href, children }) => <a href={attachmentHref(href)} target="_blank" rel="noreferrer">{children}</a>,
   }}>{body}</ReactMarkdown></div>;
+}
+
+function fileSize(bytes: number) {
+  return bytes < 1_000_000 ? `${Math.max(1, Math.ceil(bytes / 1_000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
+function attachmentKindLabel(attachment: Attachment) {
+  const labels: Record<Attachment["kind"], string> = { text: "Text", document: "Document", spreadsheet: "Spreadsheet", presentation: "Presentation", image: "Image", audio: "Audio", video: "Video", archive: "Archive", file: "File" };
+  return labels[attachment.kind];
+}
+
+function AttachmentIcon({ kind }: { kind: Attachment["kind"] }) {
+  if (kind === "image") return <FileImage size={17} />;
+  if (kind === "audio") return <FileAudio size={17} />;
+  if (kind === "video") return <FileVideo size={17} />;
+  if (kind === "spreadsheet") return <FileSpreadsheet size={17} />;
+  if (kind === "presentation") return <Presentation size={17} />;
+  if (kind === "archive") return <FileArchive size={17} />;
+  return <FileText size={17} />;
+}
+
+function AttachmentCard({ attachment }: { attachment: Attachment }) {
+  const imagePreview = attachment.kind === "image" && attachment.previewUrl;
+  const prepared = attachment.processingStatus === "ready" || attachment.processingStatus === "partial";
+  return <article className={`attachment-card attachment-kind-${attachment.kind}`}>
+    {imagePreview && <a className="attachment-image" href={attachment.previewUrl!} target="_blank" rel="noreferrer" aria-label={`Preview ${attachment.name}`}><img src={attachment.previewUrl!} alt="" loading="lazy" /></a>}
+    <div className="attachment-main">
+      <span className="attachment-kind-icon"><AttachmentIcon kind={attachment.kind} /></span>
+      <span className="attachment-copy"><strong>{attachment.name}</strong><small>{attachmentKindLabel(attachment)} · {fileSize(attachment.size)}{attachment.source === "artifact" ? attachment.revision > 1 ? ` · Updated result v${attachment.revision}` : " · Result" : ""}</small></span>
+      <span className={`attachment-state ${prepared ? "prepared" : ""}`} title={prepared ? "Ready" : "Saved"}>{prepared ? <Check size={10} /> : "·"}</span>
+    </div>
+    {attachment.summary && <p>{attachment.summary}</p>}
+    {attachment.previewText && <details className="attachment-text-preview"><summary>Read preview</summary><pre>{attachment.previewText}</pre></details>}
+    <footer>
+      {attachment.previewUrl && <a href={attachment.previewUrl} target="_blank" rel="noreferrer"><Eye size={12} /> Preview</a>}
+      <a href={attachment.url}><Download size={12} /> Download</a>
+    </footer>
+  </article>;
 }
 
 const taskStageLabels: Record<Run["task"]["stage"], string> = {
@@ -197,7 +241,7 @@ function MessageBubble({ message, previous, macAccessEnabled = false, run }: { m
   const miniBot: MascotBot = { name: message.senderName, color: message.senderColor || "#777", mascot: message.senderMascot || "orbit", status: "ready" };
   return <article className={`message-row ${user ? "message-user" : "message-bot"} ${grouped ? "message-grouped" : ""}`}>
     {!user && !grouped ? <Mascot bot={miniBot} size="tiny" /> : !user ? <div className="message-avatar-placeholder" /> : null}
-    <div className="message-column">{!user && !grouped && <span className="message-sender">{message.senderName}</span>}<div className="message-bubble"><MessageText body={user ? message.body : presentBotMessage(message.body, { macAccessEnabled })} />{message.attachments.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><span><FileText size={14} /><b>{attachment.name}</b><small>{attachment.mime.split("/")[1]?.toUpperCase() || "FILE"} · {attachment.size < 1_000_000 ? `${Math.ceil(attachment.size / 1_000)} KB` : `${(attachment.size / 1_000_000).toFixed(1)} MB`}</small></span><Download size={14} /></a>)}</div>}{!user && run?.status === "completed" && run.task.tracked && <ResultReceipt run={run} />}</div>{!grouped && <time className="message-time">{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>}</div>
+    <div className="message-column">{!user && !grouped && <span className="message-sender">{message.senderName}</span>}<div className="message-bubble"><MessageText body={user ? message.body : presentBotMessage(message.body, { macAccessEnabled })} attachments={message.attachments} />{message.attachments.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => <AttachmentCard key={attachment.id} attachment={attachment} />)}</div>}{!user && run?.status === "completed" && run.task.tracked && <ResultReceipt run={run} />}</div>{!grouped && <time className="message-time">{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>}</div>
   </article>;
 }
 

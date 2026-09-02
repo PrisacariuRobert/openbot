@@ -1,22 +1,25 @@
-# OpenBot 0.13.0
+# OpenBot 0.14.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.13.0
+## What's new in 0.14.0
 
-- Teammates now consult in private and return one answer: the original bot remains the coordinator, waits for requested opinions or handoffs, and combines them in its own voice.
-- Consultant runs no longer appear as extra chat speakers or send duplicate completion notifications. The conversation shows one calm **consulting the team** state while details remain inspectable in Control center.
-- Nested consultations, independent code reviews, failures, cancellations, and several parallel opinions all converge back to the correct coordinator with strict hop and task limits.
-- Token and cost totals now accumulate across approval and consultation resumptions instead of losing the earlier part of a long-running job.
+- Uploads are now understood instead of merely stored: OpenBot extracts bounded context from PDF, Word, Excel, CSV/TSV, PowerPoint, text, JSON, YAML, notebooks, email, and common source files.
+- Images, PDFs, audio, and video are passed to compatible OpenCode models as original media; local image, audio, and video metadata makes every card useful even when the chosen model cannot interpret that medium.
+- File cards now show the real file kind, safe summary, contained image/PDF preview, extracted-text preview, download action, and friendly fallback when a format cannot be prepared.
+- Files created by teammates become reviewable result cards automatically when linked in the final answer. Updating the same workspace file creates a numbered revision while preserving the earlier result.
+- File type detection no longer trusts the browser label alone, parser output is size-bounded, Office archive expansion is capped, and extracted text is marked as untrusted data before it reaches a model.
 
 ## What is included
 
 - Named teammates with stable roles, personality, memory, files, model, connection, and token limit
 - Direct chat plus a shared studio where up to three bots work in parallel
 - Natural `@name` and `@everyone` routing, automatic role-based ownership, and a `/` picker for learned skills
-- Working file attachments (up to six files, 25 MB each) copied into only the selected teammates' private inboxes
+- Rich file attachments (up to six files, 25 MB each) with bounded PDF/Office/spreadsheet/text extraction, media handoff to compatible models, and copies in only the selected teammates' private inboxes
+- Contained image/PDF previews, extracted-text previews, accurate file-kind icons, friendly unsupported-file recovery, and hardened downloads
+- Automatic result cards for teammate-created files, including revision numbers and preserved earlier versions
 - Browser voice typing for quick phone tasks; OpenBot stores the transcript, not the microphone audio
 - Private bot-to-bot questions, findings, replies, and deduplicated handoffs, with one coordinator-owned final answer and an inspectable Team signals feed
 - Three-hop/eight-task teamwork limits that prevent accidental agent loops
@@ -51,7 +54,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 
 Requirements:
 
-- Node.js 22 or newer
+- Node.js 22.13 or newer
 - [OpenCode](https://opencode.ai/docs/) installed and connected to your account
 - Optional [Claude Code](https://docs.anthropic.com/en/docs/claude-code/getting-started) for Claude Pro, Max, Team, Enterprise, or Console access
 - Google Chrome or Chromium for browser work
@@ -157,7 +160,7 @@ Runtime data is excluded from Git:
 
 ## Architecture
 
-The React client receives live state over server-sent events. The local Express service owns scheduling, approvals, usage, provider bindings, connectors, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, routines, memories, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, and approval tools.
+The React client receives live state over server-sent events. The local Express service owns scheduling, approvals, usage, provider bindings, connectors, file ingestion, bot computers, and browsers. SQLite in WAL mode keeps conversations, runs, approvals, routines, memories, attachment analysis and revisions, provider ownership, encrypted connector credentials, per-bot connector and code-project access, connector audit events, code edits, agent messages, taught workflows, and dedupe keys. OpenCode and Claude Code are runtime adapters; OpenBot supplies the common isolated workspace, permissioned code-project harness, browser, memory, Google Workspace, GitHub, teamwork, and approval tools.
 
 The design borrows the strongest ideas from [Hermes Agent's architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture), [agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop), [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode), and [security model](https://hermes-agent.nousresearch.com/docs/user-guide/security): isolated profiles, observable execution, parallel tools, interruptible work, stable prompts, and layered boundaries.
 
@@ -173,7 +176,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. GitHub notifications, issue search, approval-gated issue creation, cloning, and approval-gated pull-request publishing are included through the official GitHub CLI; repository-event automation is not. Gmail, Google Drive, and Google Calendar are bundled; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Event-triggered routines, a native phone app, and an always-on hosted service are also future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. GitHub notifications, issue search, approval-gated issue creation, cloning, and approval-gated pull-request publishing are included through the official GitHub CLI; repository-event automation is not. Gmail, Google Drive, and Google Calendar are bundled; Slack and Notion remain roadmap items. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Event-triggered routines, a native phone app, and an always-on hosted service are also future work.
 
 ## License
 

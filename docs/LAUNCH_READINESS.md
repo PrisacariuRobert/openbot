@@ -1,6 +1,6 @@
-# OpenBot 0.13.0 Launch Readiness
+# OpenBot 0.14.0 Launch Readiness
 
-OpenBot 0.13.0 is ready for an open-source local-first beta launch. Its one-voice teammate consultations, chat-native skills, inspectable routines, GitHub productivity connection, completion engine, natural mid-job steering, and review-first coding harness make substantial work reusable, observable, editable, verifiable, and publishable with approval, but it is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, rich artifact support, or wider plugin catalog.
+OpenBot 0.14.0 is ready for an open-source local-first beta launch. Rich bounded file understanding and versioned result cards now sit beside one-voice teammate consultations, chat-native skills, inspectable routines, GitHub productivity, the completion engine, natural mid-job steering, and the review-first coding harness. It is not yet an honest drop-in replacement for Grok Bot's hosted service, native iOS client, guaranteed transcription/OCR, fidelity-preserving Office editing, or wider plugin catalog.
 
 ## What is launch-ready
 
@@ -9,7 +9,10 @@ OpenBot 0.13.0 is ready for an open-source local-first beta launch. Its one-voic
 - Direct chat, natural mentions, automatic ownership, parallel room work, bounded private bot-to-bot communication, one coordinator-owned answer, and duplicate protection
 - Chat-native `/` discovery for learned skills, with use, rename, starting-page edit, and delete controls plus OpenCode and Claude Code skill generation
 - Natural follow-up steering for active non-code jobs, with immediate cancellation and safe session continuation; coding jobs stay pinned to their isolated task branch
-- Real attachments, artifact downloads, voice typing, an installable phone UI, and authenticated remote access
+- Rich PDF, Word, workbook, CSV/TSV, PowerPoint, text, JSON/YAML/notebook/email/source, image, audio, and video ingestion with format-specific bounds
+- Original media forwarded to compatible OpenCode models, contained image/PDF and extracted-text previews, friendly unsupported-format recovery, and hardened downloads
+- Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
+- Voice typing, an installable phone UI, and authenticated remote access
 - Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
@@ -38,6 +41,7 @@ OpenBot 0.13.0 is ready for an open-source local-first beta launch. Its one-voic
 | Completion trust | A claimed success is visibly distinguished from a checked result, and the supporting steps and checks can be inspected. |
 | Project authority | Each teammate gets explicit per-project read, edit, and test rights; no broad host filesystem permission is needed for coding. |
 | Change recovery | Every agent write has a local restore point that refuses to overwrite newer work. |
+| Artifact clarity | Inputs and teammate-created outputs stay beside the conversation with safe previews, useful metadata, and preserved revisions. |
 | Portability | The product is MIT-licensed and does not require one hosted model vendor. |
 
 ## What Grok Bot still has that OpenBot does not
@@ -48,31 +52,32 @@ OpenBot 0.13.0 is ready for an open-source local-first beta launch. Its one-voic
 | Native iPhone app and push | OpenBot is an installable PWA; background push delivery is browser/platform dependent. | Package a thin native shell and add opt-in push infrastructure. |
 | Large connector marketplace | Gmail, Drive, Calendar, and GitHub notifications/issues are real; Slack and Notion remain upcoming. | Reuse the proven per-teammate read/write, approval, health, and audit contract for Slack next. |
 | Full visual desktop takeover | The macOS Accessibility bridge can inspect controls and approval-gate interactions, but it cannot reason over arbitrary pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
-| Rich Office/spreadsheet editing | Files persist, but there is no workbook-aware editor or fidelity engine. | Add document and spreadsheet tools with rendered before/after review. |
+| Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
 | Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
 | Event-triggered routines | The current release provides reliable interval operations and history, not Slack/GitHub/webhook triggers or failure alerts. | Add signed webhook triggers with filters, rate limits, dedupe keys, replay history, and visible failure recovery. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.13 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.14 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 | Roster organization and global search | No pin/section/hide/duplicate/share-template workflow or cross-chat search yet. | Add local full-text search and roster sections before expanding to 50 bots. |
 | Reply/reaction ergonomics | Active non-code work can now be redirected naturally, but messages still lack explicit reply references and reactions. | Add lightweight reply context and reactions without turning the chat into a project-management interface. |
 
 ## Release decision
 
-Ship 0.13.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors work. The strongest launch story is: private persistent AI teammates that can consult one another, return one calm combined answer, reuse learned skills, run inspectable routines, plan, code, review, publish, use Google and GitHub context, accept new direction while working, and verify work while the owner keeps control of projects, models, and sensitive actions.
+Ship 0.14.0 as a **local-first beta**, with the limitations above visible in the README. Do not market it as a hosted virtual-assistant replacement or imply that roadmap connectors, universal media understanding, OCR, or native Office editing work. The strongest launch story is: private persistent AI teammates that understand useful files, return versioned results, consult one another behind one calm combined answer, reuse learned skills, run inspectable routines, plan, code, review, publish, use Google and GitHub context, accept new direction while working, and verify work while the owner keeps control of projects, models, and sensitive actions.
 
 ## Verified acceptance criteria
 
-- Automated tests: 58 passing
+- Automated tests: 61 passing
 - Type safety: passing
 - Production build: passing
-- Real model: Nova completed a three-step file workflow, reopened the artifact, recorded four passing checks, and returned one verified result receipt
-- Desktop viewport: 1440×900 without document overflow
-- Phone viewport: 390×844 without document overflow; composer and sheet respect the visible edge
-- Security smoke: attachment download returns 200 with forced disposition, sandbox CSP, `nosniff`, and exact content length
+- Real model: DeepSeek V4 Flash Vision interpreted the supplied screenshot through the new media path; DeepSeek V4 Flash then created, linked, verified, revised, and re-linked one result as versions 1 and 2
+- Rich-input fixtures: real PDF text plus Word, spreadsheet, slide, image, audio, type-detection, prompt-boundary, model-forwarding, workspace-escape, artifact, and revision cases pass
+- Desktop viewport: 1280×720 rich image card is fully contained with preview and download actions
+- Phone viewport: 390×844 without page or card overflow; the rich card survives refresh
+- Security smoke: preview MIME allowlist, inline sandbox policy, `nosniff`, private caching, forced ordinary downloads, parser bounds, and artifact workspace containment are covered
 - Idle state after verification: zero active runs and zero pending approvals
 - Google integration: mocked OAuth/PKCE, encrypted storage, Gmail, Drive, Calendar, safe message construction, tool exposure, and per-bot access passing; real account consent intentionally left to the owner
 - GitHub integration: official CLI account health, live notification preview, live issue search, response normalization, URL safety, per-teammate read/create separation, approval-gated creation, and connector activity records passing. A real DeepSeek V4 Flash teammate read the newest notification with read-only access and returned its title/repository; no test issue was created and all temporary test state was removed.
 - Skills and routines: slash parsing, unique skill slugs, cross-runtime skill files, management actions, routine edits, deletion with preserved history, result links, and retry controls passing
-- 0.13 UI: one coordinator card, private consultant runs, GitHub connection/activity, skill picker/manager, and routine editor/history inspected at desktop and 390×844 without horizontal overflow
+- 0.14 UI: rich image card, friendly metadata, accurate icon, preview/download actions, refresh persistence, and responsive containment inspected at desktop and 390×844
 - Mac files: traversal, hidden/system paths, aliases, bounded reads, no-overwrite organization, database permission, tool exposure, and a real Desktop-listing run passing
 - Code projects: a real DeepSeek V4 Flash teammate created a separate branch, made one exact source edit, reviewed the diff, passed `npm test` in the no-network container, committed only the named file, reopened it, left the tree clean, and recorded five successful checks; the temporary grant was removed and the disposable fixture was moved to Trash afterward
 - Code projects UI: empty, GitHub clone, connected, and expanded review states verified at 1440×900 and 390×844; the document, sheet, fields, and review card had no horizontal overflow
