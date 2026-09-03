@@ -11,6 +11,9 @@ const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", impo
 const runner = readFileSync(new URL("../src/server/opencode.ts", import.meta.url), "utf8");
 const backgroundService = readFileSync(new URL("../src/server/background-service.ts", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
+const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
+const todoist = readFileSync(new URL("../src/server/todoist.ts", import.meta.url), "utf8");
+const dropbox = readFileSync(new URL("../src/server/dropbox.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
@@ -23,6 +26,9 @@ if (!readme.startsWith(`# OpenBot ${version}\n`)) {
 }
 if (!readme.includes(`## What's new in ${version}\n`)) {
   failures.push(`README.md must contain “## What's new in ${version}”.`);
+}
+if (!connectorManifests.includes('service: "todoist"') || !connectorManifests.includes('service: "dropbox"') || !todoist.includes("oauth/register") || !dropbox.includes("files.content.read")) {
+  failures.push("Todoist and read-only Dropbox must remain registered through the reviewed connector contract.");
 }
 if (!app.includes("room-cluster-motion") || !app.includes("mascot-presence") || !app.includes("mascot-body")) {
   failures.push("The shared studio must keep its independently animated mascot composition.");

@@ -52,6 +52,9 @@ struct StudioAttachment: Decodable, Identifiable, Hashable {
     let name: String
     let kind: String
     let size: Int
+    let mime: String?
+    let summary: String?
+    let previewText: String?
 }
 
 struct StudioWorkflow: Decodable, Identifiable, Hashable {

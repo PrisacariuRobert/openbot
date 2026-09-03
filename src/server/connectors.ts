@@ -37,6 +37,18 @@ export const CONNECTOR_MANIFESTS: readonly ConnectorManifest[] = [
     readCapability: "Search and read explicitly shared pages", writeCapability: "Append reviewed page content", writeRequiresApproval: true,
     dataBoundary: "Notion's page picker limits the connection; block content is flattened and bounded.", docsUrl: "https://developers.notion.com/guides/get-started/authorization",
   },
+  {
+    schemaVersion: 1, connectorId: "todoist", service: "todoist", name: "Todoist",
+    description: "See what is due and create a task only after you approve it.", auth: "oauth",
+    readCapability: "Read active tasks", writeCapability: "Create tasks", writeRequiresApproval: true,
+    dataBoundary: "Only bounded task fields enter a teammate task; OAuth credentials never do.", docsUrl: "https://developer.todoist.com/api/v1/",
+  },
+  {
+    schemaVersion: 1, connectorId: "dropbox", service: "dropbox", name: "Dropbox",
+    description: "Find cloud files and bring safe, bounded text into the conversation.", auth: "oauth",
+    readCapability: "Search and read supported text files", writeCapability: null, writeRequiresApproval: false,
+    dataBoundary: "Search metadata and supported text are bounded before model use; OpenBot never changes Dropbox files.", docsUrl: "https://developers.dropbox.com/oauth-guide",
+  },
 ] as const;
 
 export function connectorManifest(service: ConnectorServiceId): ConnectorManifest {
@@ -66,14 +78,17 @@ export function validateConnectorManifests(manifests: readonly ConnectorManifest
   return errors;
 }
 
-export function friendlyConnectorError(service: "slack" | "notion", value: unknown): string {
+export function friendlyConnectorError(service: "slack" | "notion" | "todoist" | "dropbox", value: unknown): string {
   const raw = value instanceof Error ? value.message : String(value || ""), lower = raw.toLowerCase();
-  const name = service === "slack" ? "Slack" : "Notion";
+  const names = { slack: "Slack", notion: "Notion", todoist: "Todoist", dropbox: "Dropbox" } as const;
+  const name = names[service];
   if (/expired|invalid_auth|token_revoked|unauthorized/.test(lower)) return `${name} needs a quick reconnect. Open Apps & Tools and connect it again.`;
   if (/invalid_client|client[_ ]secret|client[_ ]id/.test(lower)) return `${name} did not accept these app details. Check the client ID and secret, then try again.`;
   if (service === "slack" && /missing_scope|permission/.test(lower)) return "Slack needs one more permission for that action. Update the app permissions, then reconnect Slack.";
   if (service === "slack" && /not_in_channel|channel_not_found|is_archived/.test(lower)) return "OpenBot cannot use that Slack conversation yet. Add the Slack app to the channel or choose another conversation.";
   if (service === "notion" && /object_not_found|not[_ ]shared|could not open/.test(lower)) return "OpenBot cannot see that Notion page. Share the page with the integration, then try again.";
+  if (service === "todoist" && /forbidden|scope|permission/.test(lower)) return "Todoist needs permission to use tasks. Reconnect it and allow the requested access.";
+  if (service === "dropbox" && /path\/not_found|not[_ ]found|unsupported/.test(lower)) return "OpenBot cannot read that Dropbox file. Choose a supported text file returned by search.";
   const retry = raw.match(/try again in\s+(\d+)\s+seconds?/i);
   if (/rate[_ ]limited|too many requests|slow down/.test(lower) || retry) return `${name} is temporarily busy.${retry ? ` Try again in ${retry[1]} seconds.` : " Try again shortly."}`;
   if (/sign-in failed|oauth|authorization/.test(lower)) return `${name} could not finish sign-in. Return to Apps & Tools and try connecting again.`;

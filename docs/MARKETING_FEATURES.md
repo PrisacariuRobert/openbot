@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.20.0 local-first beta
+Release: 0.21.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run process-resilient automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; interrupted work resumes from a saved claim; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run process-resilient automations, connect Google Workspace, GitHub, Slack, Notion, Todoist, and Dropbox, and let approved teammates build and test real code. Important actions wait for you; interrupted work resumes from a saved claim; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -174,6 +174,16 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Connected previews, health/reconnect guidance, natural `@slack` and `@notion` suggestions, multi-app workflow starters, and private local audit activity
 - Encrypted connector credentials that never enter model prompts, with immediate model-session invalidation after revocation
 
+### Todoist and Dropbox
+
+- One-click Todoist sign-in backed by official runtime OAuth client registration for local AI agents
+- Active-task reading with title, description, due date, priority, project, and normal task link
+- Task creation only after a durable approval shows the exact title, notes, due phrase, and priority
+- Official Dropbox offline OAuth with encrypted refresh credentials and a clear self-hosted app setup
+- Read-only Dropbox file search plus bounded reading for supported text and code files up to 1 MB
+- Separate **See tasks**, **Create tasks**, and **Read Dropbox** permissions for every teammate
+- Connected previews, health/reconnect guidance, recognizable service marks, private local audit activity, and OpenCode/Claude Code support
+
 ### Files and visible Mac apps
 
 - One owner-controlled **Files & apps on this Mac** switch for the studio
@@ -300,9 +310,9 @@ Do not say OpenBot currently:
 
 ## Roadmap, not launch copy
 
-- Native push notifications, share-sheet ingestion, and polished voice sessions
+- Native push notifications, share-sheet ingestion from other apps, and polished voice sessions
 - Optional private-VPS runner and encrypted cross-host handoff for execution while the Mac sleeps
-- Reviewed third-party connector SDK/marketplace plus task-manager and cloud-storage connectors
+- Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
@@ -325,7 +335,7 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 - **A studio, not a chatbot tab.** Specialists can work in parallel, ask each other questions, and hand off focused jobs.
 - **Your subscriptions, your choice.** Mix supported OpenCode, Claude Code, and provider connections across teammates.
 - **Progress you can trust.** See the outcome, steps, approvals, checks, and final result for every substantial job.
-- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub, Slack, Notion, files, browser work, and durable memory—only for the teammates you choose.
+- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub, Slack, Notion, Todoist, Dropbox, local files, browser work, and durable memory—only for the teammates you choose.
 - **From attachment to finished file.** Read PDFs, Office files, sheets, screenshots, and source; return a previewable result without making the user search a workspace.
 - **Local-first by default.** Your OpenBot data lives on your machine, with encrypted secrets and visible permission boundaries.
 

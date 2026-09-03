@@ -406,3 +406,16 @@ Status: complete for the local-first 0.20.0 beta
 - Web, phone-sized web, and native SwiftUI share the same awake/protected/recovered language and authenticated **Check now** control
 
 Verification: 86 automated tests pass, including competing-runner exclusion, atomic claims, lease expiry, safe recovery, graceful requeue primitives, LaunchAgent shell-avoidance, durable outbox state, and subscription privacy. Type checking, production build, responsive browser QA, real macOS service handoff, and native simulator tests form the final gate. The guarantee is explicit: OpenBot survives process exits and resumes after wake, but a powered-off or sleeping Mac does not execute work.
+
+## M27 — Task, cloud-file, and native artifact delivery
+
+Status: complete for the local-first 0.21.0 beta
+
+- Todoist uses official dynamic client registration for one-click local OAuth, encrypted tokens, active-task reading, and approval-gated task creation
+- Dropbox uses official offline OAuth, encrypted refresh credentials, read-only metadata/search scopes, and bounded supported text/code reading
+- Both connectors share the versioned manifest, per-teammate permission, health, audit, friendly recovery, OpenCode, and Claude Code contracts
+- Calendar + Todoist planning and Dropbox project-context starters turn the new sources into practical multi-app workflows
+- The native SwiftUI app downloads artifacts with the private bearer credential, opens them in Quick Look, shows bounded summaries, and shares messages or downloaded files through native controls
+- Todoist and Dropbox use recognizable code-drawn service marks without adding static mascot artwork or weakening customizable character motion
+
+Verification: 88 automated tests pass, including live-shaped Todoist registration/token/task responses, Dropbox offline OAuth/search/download responses, rejection of unsupported Dropbox files, connector manifests, encrypted storage, and existing security boundaries. Type checking and the production build pass, and Xcode Beta compiles the native target for an iPhone 17 Pro simulator. Live third-party consent remains owner setup; native APNs, share-sheet ingestion from other apps, Slack/Notion event sources, and execution while the Mac is asleep remain explicit future work.

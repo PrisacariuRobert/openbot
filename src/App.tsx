@@ -96,6 +96,7 @@ import type {
   ComputerStatus,
   ConnectorStatus,
   DriveFileSummary,
+  DropboxFileSummary,
   GmailMessageSummary,
   GitHubIssueSummary,
   GitHubNotificationSummary,
@@ -103,6 +104,7 @@ import type {
   MascotKind,
   Message,
   NotionPageSummary,
+  TodoistTaskSummary,
   ProviderCatalogEntry,
   ProviderKind,
   ProviderLoginAttempt,
@@ -3695,7 +3697,7 @@ function GitHubConnectorPanel({
   );
 }
 
-type OAuthProduct = "slack" | "notion";
+type OAuthProduct = "slack" | "notion" | "todoist" | "dropbox";
 function OAuthConnectorPanel({
   kind,
   status,
@@ -3709,9 +3711,8 @@ function OAuthConnectorPanel({
   onRefresh: () => Promise<void>;
   onNotice: (message: string) => void;
 }) {
-  const details =
-    kind === "slack"
-      ? {
+  const details = {
+    slack: {
           name: "Slack",
           kicker: "TEAM CONVERSATIONS",
           connectTitle: "Bring Slack into the studio",
@@ -3726,8 +3727,11 @@ function OAuthConnectorPanel({
           defaultQuery: "after:yesterday",
           boundary:
             "Search follows the connected member’s existing Slack access. Posts are sent by the app only after approval.",
-        }
-      : {
+          resultName: "messages",
+          canWrite: true,
+          oneClick: false,
+        },
+    notion: {
           name: "Notion",
           kicker: "SHARED KNOWLEDGE",
           connectTitle: "Bring Notion into the studio",
@@ -3742,7 +3746,43 @@ function OAuthConnectorPanel({
           defaultQuery: "",
           boundary:
             "OpenBot sees only the pages selected or shared during Notion sign-in. Updates append content; they never replace a page.",
-        };
+          resultName: "pages",
+          canWrite: true,
+          oneClick: false,
+        },
+    todoist: {
+          name: "Todoist",
+          kicker: "TASKS & PRIORITIES",
+          connectTitle: "Bring Todoist into the studio",
+          connectedCopy: "See what is due, plan around your real workload, and review every new task before it is created.",
+          setupCopy: "Connect in one click. OpenBot securely creates its local OAuth client for this Mac.",
+          docs: "https://developer.todoist.com/api/v1/",
+          readLabel: "See tasks",
+          writeLabel: "Create tasks",
+          searchPlaceholder: "Search active tasks…",
+          defaultQuery: "",
+          boundary: "OpenBot reads active tasks only. Creating a task always pauses for your approval of the exact title and due date.",
+          resultName: "tasks",
+          canWrite: true,
+          oneClick: true,
+        },
+    dropbox: {
+          name: "Dropbox",
+          kicker: "CLOUD FILES",
+          connectTitle: "Bring Dropbox into the studio",
+          connectedCopy: "Find cloud files and read bounded text or code without changing anything in Dropbox.",
+          setupCopy: "Create one Dropbox app for this self-hosted release, then sign in through the official Dropbox page.",
+          docs: "https://www.dropbox.com/developers/apps",
+          readLabel: "Read",
+          writeLabel: "",
+          searchPlaceholder: "Search Dropbox files…",
+          defaultQuery: "",
+          boundary: "Dropbox is read-only in OpenBot. Only file metadata and bounded supported text enter a teammate task.",
+          resultName: "files",
+          canWrite: false,
+          oneClick: false,
+        },
+  }[kind];
   const connector = status?.[kind],
     connection = status?.connections.find((item) => item.id === kind);
   const [clientId, setClientId] = useState(""),
@@ -3751,7 +3791,9 @@ function OAuthConnectorPanel({
   const [busy, setBusy] = useState<string | null>(null),
     [error, setError] = useState(""),
     [slackResults, setSlackResults] = useState<SlackMessageSummary[]>([]),
-    [notionResults, setNotionResults] = useState<NotionPageSummary[]>([]);
+    [notionResults, setNotionResults] = useState<NotionPageSummary[]>([]),
+    [todoistResults, setTodoistResults] = useState<TodoistTaskSummary[]>([]),
+    [dropboxResults, setDropboxResults] = useState<DropboxFileSummary[]>([]);
   const run = async (key: string, operation: () => Promise<void>) => {
     setBusy(key);
     setError("");
@@ -3792,16 +3834,18 @@ function OAuthConnectorPanel({
     });
   const preview = () =>
     run("preview", async () => {
-      const results = await api<SlackMessageSummary[] | NotionPageSummary[]>(
+      const results = await api<SlackMessageSummary[] | NotionPageSummary[] | TodoistTaskSummary[] | DropboxFileSummary[]>(
         `/api/connectors/${kind}/preview?q=${encodeURIComponent(query)}`,
       );
       if (kind === "slack") setSlackResults(results as SlackMessageSummary[]);
-      else setNotionResults(results as NotionPageSummary[]);
+      else if (kind === "notion") setNotionResults(results as NotionPageSummary[]);
+      else if (kind === "todoist") setTodoistResults(results as TodoistTaskSummary[]);
+      else setDropboxResults(results as DropboxFileSummary[]);
       await onRefresh();
       onNotice(
         results.length
           ? `${details.name} results are ready`
-          : `Connected — no matching ${kind === "slack" ? "messages" : "pages"}`,
+          : `Connected — no matching ${details.resultName}`,
       );
     });
   const setAccess = (botId: string, canRead: boolean, canSend: boolean) =>
@@ -3817,6 +3861,8 @@ function OAuthConnectorPanel({
       await api(`/api/connectors/${kind}/disconnect`, { method: "POST" });
       setSlackResults([]);
       setNotionResults([]);
+      setTodoistResults([]);
+      setDropboxResults([]);
       await onRefresh();
       onNotice(`${details.name} disconnected`);
     });
@@ -3853,7 +3899,7 @@ function OAuthConnectorPanel({
           <span className="connector-ready">
             <i /> Connected
           </span>
-        ) : connector.configured ? (
+        ) : connector.configured || details.oneClick ? (
           <button
             className="button-primary"
             onClick={() => void connect()}
@@ -3868,7 +3914,7 @@ function OAuthConnectorPanel({
           </button>
         ) : null}
       </div>
-      {!connector.configured && !connector.managedClient && (
+      {!connector.configured && !connector.managedClient && !details.oneClick && (
         <form className="oauth-setup-form" onSubmit={configure}>
           <div className="oauth-setup-intro">
             <span>
@@ -4014,6 +4060,33 @@ function OAuthConnectorPanel({
               ))}
             </div>
           )}
+          {kind === "todoist" && todoistResults.length > 0 && (
+            <div className="oauth-preview-list">
+              {todoistResults.map((item) => (
+                <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
+                  <span className="mini-service-icon"><ConnectorIcon id="todoist" /></span>
+                  <span>
+                    <strong>{item.content}</strong>
+                    <small>{item.due ? `Due ${item.due}` : item.description || "Active task"}</small>
+                  </span>
+                  <ExternalLink size={11} />
+                </a>
+              ))}
+            </div>
+          )}
+          {kind === "dropbox" && dropboxResults.length > 0 && (
+            <div className="oauth-preview-list">
+              {dropboxResults.map((item) => (
+                <div key={item.id}>
+                  <span className="mini-service-icon"><ConnectorIcon id="dropbox" /></span>
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>{item.path}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="oauth-boundary">
             <ShieldCheck size={14} />
             <span>{details.boundary}</span>
@@ -4050,15 +4123,15 @@ function OAuthConnectorPanel({
                   >
                     <Eye size={12} /> {details.readLabel}
                   </button>
-                  <button
-                    className={access?.canSend ? "on create" : "create"}
-                    onClick={() =>
-                      void setAccess(bot.id, true, !access?.canSend)
-                    }
-                    disabled={busy === `access-${bot.id}`}
-                  >
-                    <Plus size={12} /> {details.writeLabel}
-                  </button>
+                  {details.canWrite && (
+                    <button
+                      className={access?.canSend ? "on create" : "create"}
+                      onClick={() => void setAccess(bot.id, true, !access?.canSend)}
+                      disabled={busy === `access-${bot.id}`}
+                    >
+                      <Plus size={12} /> {details.writeLabel}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -4137,6 +4210,8 @@ function ConnectorPanel({
     );
   const slackReady = Boolean(status?.slack.connected),
     notionReady = Boolean(status?.notion.connected),
+    todoistReady = Boolean(status?.todoist.connected),
+    dropboxReady = Boolean(status?.dropbox.connected),
     githubReady = Boolean(status?.github.connected);
   useEffect(() => {
     const timer = setInterval(() => void onRefresh(), 2_500);
@@ -4297,6 +4372,14 @@ function ConnectorPanel({
                                 ? "Read a Notion page"
                                 : action === "notion_update"
                                   ? "Prepared or added to Notion"
+                                  : action === "todoist_tasks"
+                                    ? "Checked Todoist tasks"
+                                    : action === "todoist_task_create"
+                                      ? "Prepared or created a Todoist task"
+                                      : action === "dropbox_search"
+                                        ? "Searched Dropbox"
+                                        : action === "dropbox_read"
+                                          ? "Read a Dropbox file"
                                   : action === "connected"
                                     ? "Connected an app"
                                     : action === "disconnected"
@@ -4319,6 +4402,10 @@ function ConnectorPanel({
         status?.notion.lastError ||
         "Notion needs a quick connection check before this can run."
       );
+    if (event.status === "failed" && event.action.startsWith("todoist"))
+      return status?.todoist.lastError || "Todoist needs a quick connection check before this can run.";
+    if (event.status === "failed" && event.action.startsWith("dropbox"))
+      return status?.dropbox.lastError || "Dropbox needs a quick connection check before this can run.";
     return event.summary.length > 170
       ? `${event.summary.slice(0, 167).trim()}…`
       : event.summary;
@@ -5051,7 +5138,21 @@ function ConnectorPanel({
         onRefresh={onRefresh}
         onNotice={onNotice}
       />
-      {(slackReady || notionReady) && (
+      <OAuthConnectorPanel
+        kind="todoist"
+        status={status}
+        bots={bots}
+        onRefresh={onRefresh}
+        onNotice={onNotice}
+      />
+      <OAuthConnectorPanel
+        kind="dropbox"
+        status={status}
+        bots={bots}
+        onRefresh={onRefresh}
+        onNotice={onNotice}
+      />
+      {(slackReady || notionReady || todoistReady || dropboxReady) && (
         <section>
           <div className="panel-section-heading">
             <div>
@@ -5113,6 +5214,36 @@ function ConnectorPanel({
               <div>
                 <strong>Project pulse</strong>
                 <small>Cross-check Slack, Notion and GitHub in one view</small>
+              </div>
+              <ArrowUp size={14} />
+            </button>
+            <button
+              disabled={!todoistReady || !calendarReady}
+              onClick={() =>
+                void onStartWorkflow(
+                  "Use @calendar and @todoist to plan my day. Compare today’s events with active tasks, flag conflicts, and give me one realistic ordered schedule. Do not create or change anything.",
+                )
+              }
+            >
+              <span><ConnectorIcon id="todoist" /></span>
+              <div>
+                <strong>Plan my real day</strong>
+                <small>Calendar and tasks, turned into one schedule</small>
+              </div>
+              <ArrowUp size={14} />
+            </button>
+            <button
+              disabled={!dropboxReady}
+              onClick={() =>
+                void onStartWorkflow(
+                  "Use @dropbox to find the files most relevant to my current projects. Read only supported text files, distinguish current context from stale notes, and give me one concise briefing with file names. Do not change anything.",
+                )
+              }
+            >
+              <span><ConnectorIcon id="dropbox" /></span>
+              <div>
+                <strong>Find project context</strong>
+                <small>Useful Dropbox files, distilled into one brief</small>
               </div>
               <ArrowUp size={14} />
             </button>
@@ -5853,6 +5984,12 @@ function BotPanel({
     ),
     notion = apps.find(
       (access) => access.botId === bot.id && access.service === "notion",
+    ),
+    todoist = apps.find(
+      (access) => access.botId === bot.id && access.service === "todoist",
+    ),
+    dropbox = apps.find(
+      (access) => access.botId === bot.id && access.service === "dropbox",
     );
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -5925,6 +6062,15 @@ function BotPanel({
               <ConnectorIcon id="notion" /> Notion
               {notion.canSend ? " + notes" : ""}
             </span>
+          )}
+          {todoist?.canRead && (
+            <span>
+              <ConnectorIcon id="todoist" /> Todoist
+              {todoist.canSend ? " + create" : ""}
+            </span>
+          )}
+          {dropbox?.canRead && (
+            <span><ConnectorIcon id="dropbox" /> Dropbox</span>
           )}
         </div>
       </div>

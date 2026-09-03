@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0 — 2026-09-03
+
+- Added one-click Todoist OAuth registration, active-task reading, approval-gated task creation, per-teammate access, health checks, and audit receipts
+- Added Dropbox OAuth, encrypted refresh tokens, read-only file search, bounded text/code reading, per-teammate access, health checks, and audit receipts
+- Added both connectors to the manifest, web setup, real service-icon system, natural activity language, OpenCode tools, and Claude Code MCP bridge
+- Added Calendar + Todoist and Dropbox project-context starter workflows
+- Added native authenticated artifact downloads, Quick Look previews, content summaries, and share actions for messages and downloaded files
+- Expanded the automated suite to 88 passing tests and compiled the native app against the iPhone 17 Pro simulator
+
 ## 0.20.0 — 2026-09-03
 
 - Added exclusive renewable runner leadership so overlapping foreground/background processes cannot dispatch the same work

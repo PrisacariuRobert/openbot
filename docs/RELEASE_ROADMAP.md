@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 3, 2026 after the 0.20 dependable-runner release.
+Updated September 3, 2026 after the 0.21 connector and native-artifact release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -109,12 +109,18 @@ Goal: make remote and mobile use reliable while preserving local-only mode.
 
 Verified with 86 automated tests, production type/build checks, duplicate-runner exclusion, lease expiry/reclaim tests, private subscription-state tests, real macOS service installation/handoff checks, responsive browser QA, and native simulator tests. This is dependable self-hosting while the Mac is powered on and awake; it is not cloud execution during sleep or power-off.
 
-## 0.21 — Focused connector breadth and native delivery
+## Shipped in 0.21 — Focused connector breadth and native artifacts
 
-- Add one task manager and one cloud-storage connector through the existing manifest, permission, audit, and approval contract
+- Todoist through the existing manifest, encrypted OAuth, per-teammate permission, audit, and write-approval contract
+- Read-only Dropbox search and bounded text/code reading through the same connector contract
+- Calendar + task planning and cloud-file context starter workflows
+- Authenticated native artifact download, Quick Look preview, and message/file sharing
+
+## 0.22 — Events and physical-device delivery
+
 - Add Slack and Notion event sources with the same receipt, dedupe, replay, and rate-limit behavior as current hooks
 - Add native APNs only after device signing, an explicit delivery architecture, and a notification privacy review
-- Add native share-sheet capture and rich artifact previews
+- Add share-sheet ingestion from other iPhone apps
 - Keep hosted ingress, encrypted cross-host recovery, and private VPS packaging as a separate deployment track
 
 ## Later, not implied by the beta

@@ -8,12 +8,15 @@ test("registers one valid, approval-safe manifest for every live connector", () 
   assert.ok(CONNECTOR_MANIFESTS.every((item) => !item.writeCapability || item.writeRequiresApproval));
   assert.equal(connectorManifest("slack").connectorId, "slack");
   assert.equal(connectorManifest("notion").dataBoundary.includes("page picker"), true);
+  assert.equal(connectorManifest("todoist").writeRequiresApproval, true);
+  assert.equal(connectorManifest("dropbox").writeCapability, null);
 });
 
 test("turns connector failures into short recovery guidance", () => {
   assert.equal(friendlyConnectorError("slack", "Slack could not complete that request (missing_scope)."), "Slack needs one more permission for that action. Update the app permissions, then reconnect Slack.");
   assert.equal(friendlyConnectorError("notion", "Slow down. Try again in 3 seconds."), "Notion is temporarily busy. Try again in 3 seconds.");
   assert.doesNotMatch(friendlyConnectorError("slack", "invalid_auth"), /invalid_auth/);
+  assert.match(friendlyConnectorError("dropbox", "path/not_found"), /supported text file/);
 });
 
 test("builds the public app catalog from the connector contract", () => {

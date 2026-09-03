@@ -95,6 +95,16 @@ final class StudioStore: ObservableObject {
         }
     }
 
+    func download(_ attachment: StudioAttachment) async -> URL? {
+        do {
+            errorMessage = nil
+            return try await client.download(attachment)
+        } catch {
+            handle(error)
+            return nil
+        }
+    }
+
     func refresh(silent: Bool = false) async {
         guard !refreshInProgress else { return }
         refreshInProgress = true

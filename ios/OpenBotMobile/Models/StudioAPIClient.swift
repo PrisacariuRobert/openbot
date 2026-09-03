@@ -43,6 +43,18 @@ struct StudioAPIClient {
         catch { throw StudioAPIError.invalidResponse }
     }
 
+    func download(_ attachment: StudioAttachment) async throws -> URL {
+        let data = try await dataRequest("api/attachments/\(attachment.id)")
+        guard data.count <= 25_000_000 else { throw StudioAPIError.server("That file is larger than OpenBot’s 25 MB limit.") }
+        let safeName = attachment.name.replacingOccurrences(of: "/", with: "-")
+        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appending(path: "OpenBotArtifacts", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appending(path: "\(attachment.id)-\(safeName)")
+        try data.write(to: destination, options: .atomic)
+        return destination
+    }
+
     func approve(runID: String) async throws {
         _ = try await dataRequest("api/runs/\(runID)/approve", method: "POST")
     }

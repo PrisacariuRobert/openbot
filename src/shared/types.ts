@@ -365,8 +365,8 @@ export interface ProviderStatus {
   loginAttempts: ProviderLoginAttempt[];
 }
 
-export type ConnectorKind = "google_workspace" | "github_cli" | "slack_oauth" | "notion_oauth";
-export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github";
+export type ConnectorKind = "google_workspace" | "github_cli" | "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth";
+export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github" | "todoist" | "dropbox";
 export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
 
 export interface ConnectorManifest {
@@ -433,7 +433,7 @@ export interface ConnectorCatalogEntry {
 }
 
 export interface OAuthConnectorStatus {
-  connectorId: "slack" | "notion";
+  connectorId: "slack" | "notion" | "todoist" | "dropbox";
   configured: boolean;
   connected: boolean;
   managedClient: boolean;
@@ -470,6 +470,32 @@ export interface NotionPageDetail extends NotionPageSummary {
   truncated: boolean;
 }
 
+export interface TodoistTaskSummary {
+  id: string;
+  content: string;
+  description: string;
+  projectId: string;
+  priority: number;
+  due: string | null;
+  completed: boolean;
+  url: string;
+}
+
+export interface DropboxFileSummary {
+  id: string;
+  path: string;
+  name: string;
+  modifiedAt: string;
+  size: number;
+  isDownloadable: boolean;
+  webUrl: string | null;
+}
+
+export interface DropboxFileDetail extends DropboxFileSummary {
+  content: string;
+  truncated: boolean;
+}
+
 export interface GoogleApiRecovery {
   service: "gmail" | "google-drive" | "google-calendar";
   serviceName: string;
@@ -490,6 +516,8 @@ export interface ConnectorStatus {
   github: GitHubConnectorStatus;
   slack: OAuthConnectorStatus;
   notion: OAuthConnectorStatus;
+  todoist: OAuthConnectorStatus;
+  dropbox: OAuthConnectorStatus;
   catalog: ConnectorCatalogEntry[];
   access: BotConnectorAccess[];
   events: ConnectorEvent[];

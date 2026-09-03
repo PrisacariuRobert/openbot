@@ -19,6 +19,8 @@ import { CodeProjectManager } from "./code-projects.js";
 import { GitHubConnector } from "./github.js";
 import { SlackConnector } from "./slack.js";
 import { NotionConnector } from "./notion.js";
+import { TodoistConnector } from "./todoist.js";
+import { DropboxConnector } from "./dropbox.js";
 import { CONNECTOR_MANIFESTS, friendlyConnectorError, manifestCatalogEntry } from "./connectors.js";
 import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
@@ -46,6 +48,8 @@ const browser = new BrowserManager(db);
 const googleWorkspace = new GoogleWorkspaceConnector(db, `http://127.0.0.1:${port}/api/connectors/google/callback`);
 const slack = new SlackConnector(db, `http://127.0.0.1:${port}/api/connectors/slack/callback`);
 const notion = new NotionConnector(db, `http://127.0.0.1:${port}/api/connectors/notion/callback`);
+const todoist = new TodoistConnector(db, `http://localhost:${port}/api/connectors/todoist/callback`);
+const dropbox = new DropboxConnector(db, `http://127.0.0.1:${port}/api/connectors/dropbox/callback`);
 const attachmentsService = new AttachmentService(db);
 const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
@@ -58,6 +62,8 @@ const managedSlackClient = Boolean(process.env.OPENBOT_SLACK_CLIENT_ID?.trim() &
 if (managedSlackClient) db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", clientId: process.env.OPENBOT_SLACK_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_SLACK_CLIENT_SECRET!.trim() });
 const managedNotionClient = Boolean(process.env.OPENBOT_NOTION_CLIENT_ID?.trim() && process.env.OPENBOT_NOTION_CLIENT_SECRET?.trim());
 if (managedNotionClient) db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: process.env.OPENBOT_NOTION_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_NOTION_CLIENT_SECRET!.trim() });
+const managedDropboxClient = Boolean(process.env.OPENBOT_DROPBOX_CLIENT_ID?.trim() && process.env.OPENBOT_DROPBOX_CLIENT_SECRET?.trim());
+if (managedDropboxClient) db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", clientId: process.env.OPENBOT_DROPBOX_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_DROPBOX_CLIENT_SECRET!.trim() });
 const eventClients = new Set<express.Response>();
 
 function persistentAccessToken() {
@@ -344,12 +350,15 @@ function readConnectorStatus(): ConnectorStatus {
   const unavailableServices = new Set(serviceRecoveries.map((item) => item.service));
   const githubStatus = github.status();
   db.ensureLocalConnector("github-cli", "github_cli", "GitHub", githubStatus.connected, githubStatus.accountLogin);
-  const slackConnection = db.getConnector("slack"), notionConnection = db.getConnector("notion");
+  const slackConnection = db.getConnector("slack"), notionConnection = db.getConnector("notion"), todoistConnection = db.getConnector("todoist"), dropboxConnection = db.getConnector("dropbox");
   const saved = new Map(db.listBotConnectorAccess().map((access) => [`${access.botId}:${access.service}`, access]));
   const githubSaved = new Map(db.listBotConnectorAccess("github-cli").map((access) => [access.botId, access]));
   const slackSaved = new Map(db.listBotConnectorAccess("slack").map((access) => [access.botId, access]));
   const notionSaved = new Map(db.listBotConnectorAccess("notion").map((access) => [access.botId, access]));
-  const catalog = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).map((entry) => {
+  const todoistSaved = new Map(db.listBotConnectorAccess("todoist").map((access) => [access.botId, access]));
+  const dropboxSaved = new Map(db.listBotConnectorAccess("dropbox").map((access) => [access.botId, access]));
+  const baseCatalog = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []);
+  const catalog = [...baseCatalog, manifestCatalogEntry("todoist", Boolean(todoistConnection?.connected), todoistConnection?.connected ? "Connected" : "One-click connect", ["See active tasks", "Approval-safe creating"]), manifestCatalogEntry("dropbox", Boolean(dropboxConnection?.connected), dropboxConnection?.connected ? "Connected" : dropboxConnection?.configured ? "Ready to connect" : "Available now", ["Search files", "Read supported text"])].map((entry) => {
     if (entry.id === "github") return manifestCatalogEntry("github", githubStatus.connected, githubStatus.connected ? "Connected" : githubStatus.installed ? "Available now" : "Needs GitHub CLI", ["Notifications", "Search issues", "Approval-safe creating"]);
     if (entry.id === "slack") return manifestCatalogEntry("slack", Boolean(slackConnection?.connected), slackConnection?.connected ? "Connected" : slackConnection?.configured ? "Ready to connect" : "Available now", ["Search messages", "Read context", "Approval-safe posting"]);
     if (entry.id === "notion") return manifestCatalogEntry("notion", Boolean(notionConnection?.connected), notionConnection?.connected ? "Connected" : notionConnection?.configured ? "Ready to connect" : "Available now", ["Search pages", "Read content", "Approval-safe updates"]);
@@ -364,12 +373,16 @@ function readConnectorStatus(): ConnectorStatus {
     github: githubStatus,
     slack: { connectorId: "slack", configured: Boolean(slackConnection?.configured), connected: Boolean(slackConnection?.connected), managedClient: managedSlackClient, oauthInProgress: slack.oauthInProgress(), callbackUrl: slack.redirectUri, accountName: slackConnection?.accountEmail || null, lastError: slackConnection?.lastError ? friendlyConnectorError("slack", slackConnection.lastError) : null },
     notion: { connectorId: "notion", configured: Boolean(notionConnection?.configured), connected: Boolean(notionConnection?.connected), managedClient: managedNotionClient, oauthInProgress: notion.oauthInProgress(), callbackUrl: notion.redirectUri, accountName: notionConnection?.accountEmail || null, lastError: notionConnection?.lastError ? friendlyConnectorError("notion", notionConnection.lastError) : null },
+    todoist: { connectorId: "todoist", configured: Boolean(todoistConnection?.configured), connected: Boolean(todoistConnection?.connected), managedClient: true, oauthInProgress: todoist.oauthInProgress(), callbackUrl: todoist.redirectUri, accountName: todoistConnection?.accountEmail || null, lastError: todoistConnection?.lastError ? friendlyConnectorError("todoist", todoistConnection.lastError) : null },
+    dropbox: { connectorId: "dropbox", configured: Boolean(dropboxConnection?.configured), connected: Boolean(dropboxConnection?.connected), managedClient: managedDropboxClient, oauthInProgress: dropbox.oauthInProgress(), callbackUrl: dropbox.redirectUri, accountName: dropboxConnection?.accountEmail || null, lastError: dropboxConnection?.lastError ? friendlyConnectorError("dropbox", dropboxConnection.lastError) : null },
     catalog,
     access: [...db.listBots().flatMap((bot) => services.map((service) => saved.get(`${bot.id}:${service}`) || { botId: bot.id, connectorId: "google-workspace", service, canRead: false, canSend: false, updatedAt: connection?.updatedAt || new Date(0).toISOString() })),
       ...db.listBots().map((bot) => githubSaved.get(bot.id) || { botId: bot.id, connectorId: "github-cli", service: "github" as const, canRead: false, canSend: false, updatedAt: new Date(0).toISOString() }),
       ...db.listBots().map((bot) => slackSaved.get(bot.id) || { botId: bot.id, connectorId: "slack", service: "slack" as const, canRead: false, canSend: false, updatedAt: slackConnection?.updatedAt || new Date(0).toISOString() }),
-      ...db.listBots().map((bot) => notionSaved.get(bot.id) || { botId: bot.id, connectorId: "notion", service: "notion" as const, canRead: false, canSend: false, updatedAt: notionConnection?.updatedAt || new Date(0).toISOString() })],
-    events: [...events, ...db.listConnectorEvents("github-cli", 12), ...db.listConnectorEvents("slack", 12), ...db.listConnectorEvents("notion", 12)].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 20),
+      ...db.listBots().map((bot) => notionSaved.get(bot.id) || { botId: bot.id, connectorId: "notion", service: "notion" as const, canRead: false, canSend: false, updatedAt: notionConnection?.updatedAt || new Date(0).toISOString() }),
+      ...db.listBots().map((bot) => todoistSaved.get(bot.id) || { botId: bot.id, connectorId: "todoist", service: "todoist" as const, canRead: false, canSend: false, updatedAt: todoistConnection?.updatedAt || new Date(0).toISOString() }),
+      ...db.listBots().map((bot) => dropboxSaved.get(bot.id) || { botId: bot.id, connectorId: "dropbox", service: "dropbox" as const, canRead: false, canSend: false, updatedAt: dropboxConnection?.updatedAt || new Date(0).toISOString() })],
+    events: [...events, ...db.listConnectorEvents("github-cli", 12), ...db.listConnectorEvents("slack", 12), ...db.listConnectorEvents("notion", 12), ...db.listConnectorEvents("todoist", 12), ...db.listConnectorEvents("dropbox", 12)].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 20),
   };
 }
 
@@ -407,7 +420,7 @@ const oauthConnectorConfig = z.object({ clientId: z.string().trim().min(5).max(5
 const oauthCallbackInput = z.object({
   state: z.string().min(10).max(500), code: z.string().min(1).max(4_000).optional(), error: z.string().trim().max(200).optional(), error_description: z.string().trim().max(1_000).optional(),
 }).refine((value) => Boolean(value.code || value.error));
-function connectorReturnUrl(connector: "slack" | "notion", result: "connected" | "attention") {
+function connectorReturnUrl(connector: "slack" | "notion" | "todoist" | "dropbox", result: "connected" | "attention") {
   const url = new URL(appUrl);
   url.searchParams.set("panel", "connectors"); url.searchParams.set("connector", connector); url.searchParams.set("status", result);
   return url.toString();
@@ -513,6 +526,97 @@ app.get("/api/connectors/notion/preview", async (request, response) => {
 app.post("/api/connectors/notion/health", async (_request, response) => {
   try { const health = await notion.health(); db.markConnectorHealthy("notion"); response.json(health); }
   catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("notion", message); response.status(400).json({ error: friendlyConnectorError("notion", message) }); }
+});
+
+app.post("/api/connectors/todoist/connect", async (_request, response) => {
+  try { response.status(202).json(await todoist.beginOAuth()); }
+  catch (error) { response.status(400).json({ error: friendlyConnectorError("todoist", error) }); }
+});
+app.get("/api/connectors/todoist/callback", async (request, response) => {
+  const parsed = oauthCallbackInput.safeParse(request.query);
+  if (!parsed.success) return response.redirect(303, connectorReturnUrl("todoist", db.getConnector("todoist")?.connected ? "connected" : "attention"));
+  if (parsed.data.error) {
+    const existing = db.getConnector("todoist");
+    if (!existing?.connected) db.markConnectorError("todoist", parsed.data.error_description || parsed.data.error);
+    broadcast({ type: "connector", at: Date.now() }); return response.redirect(303, connectorReturnUrl("todoist", existing?.connected ? "connected" : "attention"));
+  }
+  try {
+    const connection = await todoist.completeOAuth(parsed.data.state, parsed.data.code!);
+    for (const bot of db.listBots()) db.setBotConnectorAccess(bot.id, { canRead: true, canSend: true }, "todoist", "todoist");
+    db.addConnectorEvent({ connectorId: "todoist", action: "connected", status: "completed", summary: `Todoist is ready for ${connection.accountEmail || "the connected account"}` });
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("todoist", "connected"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error), existing = db.getConnector("todoist");
+    if (!existing?.connected) db.markConnectorError("todoist", message);
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("todoist", existing?.connected ? "connected" : "attention"));
+  }
+});
+app.post("/api/connectors/todoist/disconnect", async (_request, response) => {
+  const result = await todoist.disconnect(); db.addConnectorEvent({ connectorId: "todoist", action: "disconnected", status: "completed", summary: "Todoist was disconnected from OpenBot" });
+  broadcast({ type: "connector", at: Date.now() }); response.json(result);
+});
+app.patch("/api/connectors/todoist/access/:botId", (request, response) => {
+  const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
+  if (!parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid Todoist permissions for this teammate." });
+  if (!db.getConnector("todoist")?.connected) return response.status(409).json({ error: "Connect Todoist before sharing it with a teammate." });
+  response.json(db.setBotConnectorAccess(request.params.botId, parsed.data, "todoist", "todoist")); broadcast({ type: "connector", at: Date.now() });
+});
+app.get("/api/connectors/todoist/preview", async (request, response) => {
+  try { response.json(await todoist.tasks(typeof request.query.q === "string" ? request.query.q : "", 8)); db.markConnectorHealthy("todoist"); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("todoist", message); response.status(400).json({ error: friendlyConnectorError("todoist", message) }); }
+});
+app.post("/api/connectors/todoist/health", async (_request, response) => {
+  try { response.json(await todoist.health()); db.markConnectorHealthy("todoist"); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("todoist", message); response.status(400).json({ error: friendlyConnectorError("todoist", message) }); }
+});
+
+app.post("/api/connectors/dropbox/config", (request, response) => {
+  if (managedDropboxClient) return response.status(409).json({ error: "This OpenBot release already manages its Dropbox connection." });
+  const parsed = oauthConnectorConfig.safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Enter the Dropbox app key and app secret." });
+  const connection = db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", ...parsed.data });
+  broadcast({ type: "connector", at: Date.now() }); response.json(connection);
+});
+app.post("/api/connectors/dropbox/connect", (_request, response) => {
+  try { response.status(202).json(dropbox.beginOAuth()); }
+  catch (error) { response.status(400).json({ error: friendlyConnectorError("dropbox", error) }); }
+});
+app.get("/api/connectors/dropbox/callback", async (request, response) => {
+  const parsed = oauthCallbackInput.safeParse(request.query);
+  if (!parsed.success) return response.redirect(303, connectorReturnUrl("dropbox", db.getConnector("dropbox")?.connected ? "connected" : "attention"));
+  if (parsed.data.error) {
+    const existing = db.getConnector("dropbox");
+    if (!existing?.connected) db.markConnectorError("dropbox", parsed.data.error_description || parsed.data.error);
+    broadcast({ type: "connector", at: Date.now() }); return response.redirect(303, connectorReturnUrl("dropbox", existing?.connected ? "connected" : "attention"));
+  }
+  try {
+    const connection = await dropbox.completeOAuth(parsed.data.state, parsed.data.code!);
+    for (const bot of db.listBots()) db.setBotConnectorAccess(bot.id, { canRead: true, canSend: false }, "dropbox", "dropbox");
+    db.addConnectorEvent({ connectorId: "dropbox", action: "connected", status: "completed", summary: `Dropbox is ready for ${connection.accountEmail || "the connected account"}` });
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("dropbox", "connected"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error), existing = db.getConnector("dropbox");
+    if (!existing?.connected) db.markConnectorError("dropbox", message);
+    broadcast({ type: "connector", at: Date.now() }); response.redirect(303, connectorReturnUrl("dropbox", existing?.connected ? "connected" : "attention"));
+  }
+});
+app.post("/api/connectors/dropbox/disconnect", async (_request, response) => {
+  const result = await dropbox.disconnect(); db.addConnectorEvent({ connectorId: "dropbox", action: "disconnected", status: "completed", summary: "Dropbox was disconnected from OpenBot" });
+  broadcast({ type: "connector", at: Date.now() }); response.json(result);
+});
+app.patch("/api/connectors/dropbox/access/:botId", (request, response) => {
+  const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
+  if (!parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid Dropbox permissions for this teammate." });
+  if (!db.getConnector("dropbox")?.connected) return response.status(409).json({ error: "Connect Dropbox before sharing it with a teammate." });
+  response.json(db.setBotConnectorAccess(request.params.botId, { canRead: parsed.data.canRead, canSend: false }, "dropbox", "dropbox")); broadcast({ type: "connector", at: Date.now() });
+});
+app.get("/api/connectors/dropbox/preview", async (request, response) => {
+  try { response.json(await dropbox.search(typeof request.query.q === "string" ? request.query.q : "", 8)); db.markConnectorHealthy("dropbox"); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("dropbox", message); response.status(400).json({ error: friendlyConnectorError("dropbox", message) }); }
+});
+app.post("/api/connectors/dropbox/health", async (_request, response) => {
+  try { response.json(await dropbox.health()); db.markConnectorHealthy("dropbox"); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("dropbox", message); response.status(400).json({ error: friendlyConnectorError("dropbox", message) }); }
 });
 
 app.post("/api/connectors/google/config", (request, response) => {
@@ -801,6 +905,18 @@ async function performApprovedAction(action: unknown): Promise<string> {
     broadcast({ type: "connector", at: Date.now() });
     return `The approved note was added to ${result.title}${result.url ? ` (${result.url})` : ""}.`;
   }
+  if (parsed.data.type === "todoist_task_create") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
+    if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Creating Todoist tasks is not available for this teammate.");
+    const task = await todoist.create({
+      content: String(args.content || ""), description: args.description ? String(args.description) : undefined,
+      dueString: args.dueString ? String(args.dueString) : undefined, projectId: args.projectId ? String(args.projectId) : undefined,
+      priority: args.priority === undefined ? undefined : Number(args.priority),
+    });
+    db.addConnectorEvent({ connectorId: "todoist", botId: bot.id, action: "todoist_task_create", status: "completed", summary: `${bot.name} created the approved task “${task.content.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The Todoist task was created: ${task.content}${task.url ? ` (${task.url})` : ""}.`;
+  }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
     const moves = z.array(z.object({ from: z.string().min(1).max(1_000), to: z.string().min(1).max(1_000) })).min(1).max(100).parse(args.moves) as MacFileMove[];
@@ -828,7 +944,8 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
     github_issue_create: { connectorId: "github-cli", denied: "The issue was not created because you chose Not now" },
     slack_post: { connectorId: "slack", denied: "The Slack message was not posted because you chose Not now" },
     notion_update: { connectorId: "notion", denied: "Nothing was added to Notion because you chose Not now" },
-  } as const)[action.type as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update"] : undefined;
+    todoist_task_create: { connectorId: "todoist", denied: "The Todoist task was not created because you chose Not now" },
+  } as const)[action.type as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"] : undefined;
   if (decision === "denied" && action?.type && connectorAction) {
     db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: action.botId || approval.botId, action: action.type, status: "failed", summary: connectorAction.denied });
     broadcast({ type: "connector", at: Date.now() });
@@ -1198,7 +1315,7 @@ app.post("/api/bots/:id/teach/stop", async (request, response) => {
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
@@ -1218,7 +1335,7 @@ app.post("/api/internal/tools", async (request, response) => {
       const plan = z.object({
         goal: z.string().trim().min(1).max(240), deliverable: z.string().trim().min(1).max(240),
         steps: z.array(z.string().trim().min(1).max(140)).min(1).max(8),
-        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "github", "slack", "notion", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
+        requiredApps: z.array(z.enum(["gmail", "google-drive", "google-calendar", "github", "slack", "notion", "todoist", "dropbox", "browser", "computer", "mac", "code", "teammate"])).max(8).default([]),
         approvalBoundary: z.string().trim().max(240).optional(),
       }).safeParse(args);
       if (!plan.success) return response.status(400).json({ error: "Set one clear outcome, deliverable, and up to eight meaningful steps." });
@@ -1506,6 +1623,45 @@ app.post("/api/internal/tools", async (request, response) => {
         input.data,
       );
     }
+    if (action === "todoist_tasks" || action === "todoist_task_create") {
+      const connection = db.getConnector("todoist"), access = db.getBotConnectorAccess(botId, "todoist", "todoist");
+      if (!connection?.connected) return response.status(409).json({ error: "Todoist is not connected yet. Ask the user to connect it in Apps & Tools." });
+      if (action === "todoist_tasks" && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Todoist tasks." });
+      if (action === "todoist_task_create" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Todoist tasks." });
+      if (action === "todoist_tasks") {
+        const input = z.object({ query: z.string().trim().max(500).default(""), maxResults: z.number().int().min(1).max(20).optional() }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give Todoist a short task search." });
+        const tasks = await todoist.tasks(input.data.query, input.data.maxResults || 20);
+        db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "completed", summary: `${bot.name} checked ${tasks.length} active Todoist task${tasks.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() }); return response.json({ tasks, count: tasks.length });
+      }
+      const input = z.object({
+        content: z.string().trim().min(1).max(500), description: z.string().trim().max(4_000).optional(), dueString: z.string().trim().max(200).optional(),
+        projectId: z.string().trim().max(200).optional(), priority: z.number().int().min(1).max(4).optional(),
+      }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give the Todoist task a clear title and optional due date." });
+      db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "waiting", summary: `${bot.name} prepared “${input.data.content.slice(0, 120)}” for approval` });
+      broadcast({ type: "connector", at: Date.now() });
+      const details = [input.data.dueString ? `Due: ${input.data.dueString}.` : "", input.data.description ? `\n\n${input.data.description}` : ""].filter(Boolean).join(" ");
+      return holdForApproval("external", `${bot.name} wants to create this Todoist task: “${input.data.content}”. ${details}`.trim(), `Create “${input.data.content}” in Todoist`, input.data);
+    }
+    if (action === "dropbox_search" || action === "dropbox_read") {
+      const connection = db.getConnector("dropbox"), access = db.getBotConnectorAccess(botId, "dropbox", "dropbox");
+      if (!connection?.connected) return response.status(409).json({ error: "Dropbox is not connected yet. Ask the user to connect it in Apps & Tools." });
+      if (!access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Dropbox files." });
+      if (action === "dropbox_search") {
+        const input = z.object({ query: z.string().trim().max(500).default(""), maxResults: z.number().int().min(1).max(20).optional() }).safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give Dropbox a short file search." });
+        const files = await dropbox.search(input.data.query, input.data.maxResults || 12);
+        db.addConnectorEvent({ connectorId: "dropbox", botId, action, status: "completed", summary: `${bot.name} found ${files.length} matching Dropbox file${files.length === 1 ? "" : "s"}` });
+        broadcast({ type: "connector", at: Date.now() }); return response.json({ files, count: files.length });
+      }
+      const input = z.object({ fileIdOrPath: z.string().trim().min(1).max(2_000) }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Choose a Dropbox file returned by search." });
+      const file = await dropbox.read(input.data.fileIdOrPath);
+      db.addConnectorEvent({ connectorId: "dropbox", botId, action, status: "completed", summary: `${bot.name} read “${file.name.slice(0, 120)}” from Dropbox` });
+      broadcast({ type: "connector", at: Date.now() }); return response.json(file);
+    }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;
       const routine = routineInput.safeParse({
@@ -1559,9 +1715,9 @@ app.post("/api/internal/tools", async (request, response) => {
     return response.status(400).json({ error: "Unknown tool." });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const connectorId = action.startsWith("slack_") ? "slack" : action.startsWith("notion_") ? "notion" : action.startsWith("github_") ? "github-cli" : action.startsWith("gmail_") || action.startsWith("google_") ? "google-workspace" : null;
+    const connectorId = action.startsWith("slack_") ? "slack" : action.startsWith("notion_") ? "notion" : action.startsWith("todoist_") ? "todoist" : action.startsWith("dropbox_") ? "dropbox" : action.startsWith("github_") ? "github-cli" : action.startsWith("gmail_") || action.startsWith("google_") ? "google-workspace" : null;
     if (connectorId) { db.addConnectorEvent({ connectorId, botId, action, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
-    const userMessage = connectorId === "slack" || connectorId === "notion" ? friendlyConnectorError(connectorId, message) : message;
+    const userMessage = connectorId === "slack" || connectorId === "notion" || connectorId === "todoist" || connectorId === "dropbox" ? friendlyConnectorError(connectorId, message) : message;
     return response.status(500).json({ error: userMessage });
   }
 });

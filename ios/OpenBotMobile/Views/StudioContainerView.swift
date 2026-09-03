@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import QuickLook
 
 struct StudioContainerView: View {
     @EnvironmentObject private var session: ConnectionSession
@@ -122,7 +123,8 @@ private struct NativeConversationView: View {
                     ForEach(store.state.messages) { message in
                         NativeMessageBubble(
                             message: message,
-                            bot: message.senderId.flatMap { id in store.state.bots.first(where: { $0.id == id }) }
+                            bot: message.senderId.flatMap { id in store.state.bots.first(where: { $0.id == id }) },
+                            onOpenAttachment: { attachment in await store.download(attachment) }
                         )
                         .id(message.id)
                     }
@@ -194,6 +196,7 @@ private struct ConversationWelcome: View {
 private struct NativeMessageBubble: View {
     let message: StudioMessage
     let bot: StudioBot?
+    let onOpenAttachment: (StudioAttachment) async -> URL?
 
     private var isUser: Bool { message.senderType == "user" }
 
@@ -242,28 +245,68 @@ private struct NativeMessageBubble: View {
                 if !message.attachments.isEmpty {
                     VStack(spacing: 6) {
                         ForEach(message.attachments) { attachment in
-                            HStack(spacing: 8) {
-                                Image(systemName: attachment.kind.openBotAttachmentIcon)
-                                    .foregroundStyle(OpenBotTheme.purple)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(attachment.name).lineLimit(1)
-                                    Text(attachment.size.openBotFileSize).font(.caption2).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .padding(9)
-                            .background(.white.opacity(0.75), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            NativeAttachmentCard(attachment: attachment, onOpen: onOpenAttachment)
                         }
                     }
                 }
-                Text(message.createdAt.openBotRelativeTime)
-                    .font(.system(size: 9.5, weight: .regular, design: .rounded))
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 8) {
+                    Text(message.createdAt.openBotRelativeTime)
+                    if !message.body.isEmpty {
+                        ShareLink(item: message.body, subject: Text("From \(message.senderName)")) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("Share message")
+                    }
+                }
+                .font(.system(size: 9.5, weight: .regular, design: .rounded))
+                .foregroundStyle(.tertiary)
             }
             if !isUser { Spacer(minLength: 28) }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct NativeAttachmentCard: View {
+    let attachment: StudioAttachment
+    let onOpen: (StudioAttachment) async -> URL?
+    @State private var previewURL: URL?
+    @State private var isLoading = false
+
+    var body: some View {
+        Button {
+            guard !isLoading else { return }
+            isLoading = true
+            Task {
+                previewURL = await onOpen(attachment)
+                isLoading = false
+            }
+        } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(OpenBotTheme.purple.opacity(0.1))
+                    if isLoading { ProgressView().controlSize(.mini).tint(OpenBotTheme.purple) }
+                    else { Image(systemName: attachment.kind.openBotAttachmentIcon).foregroundStyle(OpenBotTheme.purple) }
+                }
+                .frame(width: 34, height: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attachment.name).lineLimit(1).foregroundStyle(OpenBotTheme.ink)
+                    Text(attachment.summary?.isEmpty == false ? attachment.summary! : attachment.size.openBotFileSize)
+                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "eye").font(.system(size: 11, weight: .bold)).foregroundStyle(OpenBotTheme.purple)
+            }
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .padding(8)
+            .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(OpenBotTheme.purple.opacity(0.1)))
+        }
+        .buttonStyle(.plain)
+        .quickLookPreview($previewURL)
+        .contextMenu {
+            if let previewURL { ShareLink(item: previewURL) { Label("Share file", systemImage: "square.and.arrow.up") } }
+        }
     }
 }
 

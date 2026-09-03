@@ -1,21 +1,19 @@
-# OpenBot 0.20.0
+# OpenBot 0.21.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.20.0
+## What's new in 0.21.0
 
-- Added an exclusive, renewable **studio runner lease**, so only one OpenBot process can dispatch saved work even when a foreground app and background service overlap.
-- Added per-job leases and atomic claims. Queued work cannot be picked up twice by competing processes.
-- Added restart recovery for interrupted jobs, preserving the original task, checklist, approvals, and conversation while visibly recording that the job resumed.
-- Added graceful handoff: closing or updating OpenBot returns active jobs to the durable queue instead of mislabeling them as cancelled.
-- Added one-click macOS background protection with login launch, crash restart, and a safe handoff from the currently running app session.
-- Added a clear runner-health card with online state, background protection, working/queued/waiting totals, recovery count, and a manual “Check now” control.
-- Added a durable notification outbox and standards-based Web Push for finished work, approvals, failures, missed schedules, and rate-limited automations.
-- Added notification deep links back to the correct conversation or Automations screen, with stale-device cleanup and bounded retry behavior.
-- Added matching native iPhone runner health, recovery language, and remote “Check now” support.
-- Expanded the verified product suite to 86 tests covering leadership exclusion, job claiming, restart recovery, background-service safety, notification durability, and private subscription data.
+- Added **Todoist** with genuine one-click local OAuth registration, active-task reading, per-teammate permissions, and approval-gated task creation.
+- Added **Dropbox** search and bounded text/code reading through a read-only OAuth grant, encrypted credentials, per-teammate access, health checks, and audit events.
+- Added recognizable code-drawn Todoist and Dropbox marks across connector cards, previews, workflows, and teammate capabilities.
+- Added two useful starter workflows: a Calendar + Todoist day plan and a Dropbox project-context brief.
+- Added Todoist and Dropbox tools to both OpenCode and official Claude Code runtimes, with natural progress language and no model-visible credentials.
+- Added authenticated native artifact downloads, Quick Look previews, result summaries, and message/file sharing to the SwiftUI iPhone app.
+- Preserved the 0.20 single-leader runner, crash recovery, macOS background protection, and Web Push foundation.
+- Expanded the verified product suite to 88 tests, including live-shaped Todoist and Dropbox OAuth/API contracts.
 
 ## What is included
 
@@ -58,9 +56,11 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Official GitHub CLI connection for notifications, issue search, and approval-gated issue creation
 - Slack search, bounded conversation reading, and approval-gated channel messages or thread replies
 - Notion page search, bounded page reading, and approval-gated content append for pages selected during connection
+- Todoist active-task reading and approval-gated task creation, with runtime-created local OAuth credentials for one-click setup
+- Read-only Dropbox search and bounded text/code reading with official offline OAuth refresh
 - Per-teammate permissions for Inbox, sending, Drive, and Calendar—rather than exposing every connected app to every bot
-- Per-teammate Slack read/post and Notion read/update permissions, backed by the same connector health and audit contract
-- Natural `@gmail`, `@drive`, `@calendar`, `@slack`, `@notion`, and `@github` suggestions plus useful starter workflows that combine current information
+- Per-teammate Slack read/post, Notion read/update, Todoist read/create, and Dropbox read permissions, backed by the same connector health and audit contract
+- Natural connected-app suggestions plus useful starter workflows that combine calendar, tasks, cloud files, conversations, knowledge, and code activity
 - Owner-controlled access to visible Mac home folders, with bounded text reading and approval-only file organization that cannot delete or overwrite
 - Safe Markdown chat rendering for headings, lists, links, tables, quotes, and code instead of showing raw formatting characters
 - Rebuilt connector cards with contained status labels and recognizable vector service marks at desktop and phone sizes
@@ -75,7 +75,7 @@ Requirements:
 - Google Chrome or Chromium for browser work
 - Docker for private bot computers
 - Optional [GitHub CLI](https://cli.github.com/) for GitHub activity, issues, and publishing pull requests
-- Optional Slack and Notion OAuth applications for self-hosted connector use
+- Optional Slack, Notion, and Dropbox OAuth applications for self-hosted connector use; Todoist registers its local OAuth client automatically
 
 ```bash
 npm install
@@ -111,7 +111,7 @@ Each teammate gets separate Inbox, send, Drive, and Calendar controls. Every out
 
 For personal local use, Google's testing mode can be sufficient when the account is listed as a test user. Distributing Gmail access to the public requires Google's OAuth verification; restricted Gmail scopes may also require a security assessment. See Google's [OAuth web-server guidance](https://developers.google.com/identity/protocols/oauth2/web-server), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), and [Gmail REST reference](https://developers.google.com/workspace/gmail/api/reference/rest).
 
-## Connect Slack and Notion
+## Connect Slack, Notion, Todoist, and Dropbox
 
 Open **Apps & Tools** and choose Slack or Notion. A packaged build with managed OAuth credentials shows one **Connect** button. A self-hosted copy can save its own client ID and secret from the same card; the exact callback address is shown beside the setup fields.
 
@@ -120,6 +120,10 @@ Slack uses the connected member only for searching and reading conversations the
 Notion's connection picker is the authority boundary: OpenBot can search and read only the pages the owner selected or later shared with the integration. Appending a heading or text to a page always waits for an exact preview approval. See Notion's [OAuth guide](https://developers.notion.com/docs/authorization) and [integration capabilities](https://developers.notion.com/reference/capabilities).
 
 Both connectors encrypt their OAuth credentials locally, expose separate read/write switches for every teammate, record a private activity trail, and invalidate active model sessions as soon as access is revoked. Managed public distribution still requires registering and reviewing each OAuth app with its provider.
+
+Todoist is the simplest path: choose **Connect Todoist** and OpenBot registers a private local OAuth client through Todoist's official dynamic-registration endpoint. Teammates can read active tasks; creating a task always shows the exact title, notes, due phrase, and priority for approval first.
+
+Dropbox uses an official read-only OAuth app. A self-hosted owner enters the app key and secret once, adds the callback address shown by OpenBot, and signs in. Teammates can search metadata and read bounded supported text or code files up to 1 MB; OpenBot cannot upload, move, share, or delete Dropbox content.
 
 ## Files on this Mac
 
@@ -161,7 +165,7 @@ Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBo
 
 Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results.
 
-Version 0.20 adds a durable single-leader runner. Each active job is claimed atomically and renews a short lease; a second OpenBot process cannot dispatch it. After a crash or update, an expired job returns to the queue with its task contract and approval state intact. On macOS, **Keep OpenBot running** installs an owner-visible LaunchAgent that starts at login, restarts after an unexpected exit, and safely waits for the current app session before taking over. The Mac still has to be powered on and awake—this is dependable self-hosting, not a hosted cloud scheduler.
+Version 0.20 added the durable single-leader runner retained in 0.21. Each active job is claimed atomically and renews a short lease; a second OpenBot process cannot dispatch it. After a crash or update, an expired job returns to the queue with its task contract and approval state intact. On macOS, **Keep OpenBot running** installs an owner-visible LaunchAgent that starts at login, restarts after an unexpected exit, and safely waits for the current app session before taking over. The Mac still has to be powered on and awake—this is dependable self-hosting, not a hosted cloud scheduler.
 
 ## Remote and phone access
 
@@ -175,7 +179,7 @@ A private access key is created at `.openbot/access.token`. Non-local clients mu
 
 Installed web apps served from a secure HTTPS address can enable background notifications from Control center. Subscriptions stay in local SQLite, VAPID signing keys stay in a mode-0600 local file, notification payloads are short, and clicking one returns to the relevant conversation or automation. Plain HTTP remote addresses can show live in-app updates but cannot use standards-based Web Push; the native iPhone app currently shows live runner and approval state while connected, and full APNs delivery remains future release work.
 
-The native SwiftUI app lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. It uses native conversation, teammate, progress, approval, and settings views—not a web view. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
+The native SwiftUI app lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. It uses native conversation, teammate, progress, approval, Quick Look artifact, sharing, and settings views—not a web view. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
 
 Voice typing uses the browser or operating system speech-recognition service. OpenBot does not upload or store the audio itself, but the browser vendor may process it under its own policy.
 
@@ -218,7 +222,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. Skill import/export currently covers OpenBot's browser-oriented saved workflows; it is not a public third-party executable plugin marketplace. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or powers off. Without background protection it also stops when the foreground service exits. The native iPhone app accepts attachments and shows runner health, but does not yet include rich artifact previews, native APNs push, share-sheet input, or dedicated voice capture. Secure installed web clients can use Web Push. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. Skill import/export currently covers OpenBot's browser-oriented saved workflows; it is not a public third-party executable plugin marketplace. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. Todoist support covers active-task reading and new-task creation rather than full project administration; Dropbox is deliberately read-only and supports bounded text/code reading rather than arbitrary document conversion. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or powers off. Without background protection it also stops when the foreground service exits. The native iPhone app accepts attachments, shows runner health, previews downloaded artifacts, and shares results, but does not yet include native APNs push, share-sheet input from other apps, or dedicated voice capture. Secure installed web clients can use Web Push. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
 
 ## License
 

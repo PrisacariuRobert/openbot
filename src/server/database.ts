@@ -1481,7 +1481,7 @@ export class OpenBotDatabase {
     return row ? this.connectorFromRow(row) : null;
   }
 
-  configureOAuthConnector(input: { id: "slack" | "notion"; kind: "slack_oauth" | "notion_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
+  configureOAuthConnector(input: { id: "slack" | "notion" | "todoist" | "dropbox"; kind: "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
     const existing = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(input.id) as Row | undefined;
     const changedClient = Boolean(existing?.client_id && String(existing.client_id) !== input.clientId);
     const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret);
@@ -1499,7 +1499,7 @@ export class OpenBotDatabase {
     return this.getConnector(input.id)!;
   }
 
-  oauthConnectorCredentials<T extends Record<string, unknown> = Record<string, unknown>>(id: "slack" | "notion"): { clientId: string; clientSecret: string; credentials: T | null } | null {
+  oauthConnectorCredentials<T extends Record<string, unknown> = Record<string, unknown>>(id: "slack" | "notion" | "todoist" | "dropbox"): { clientId: string; clientSecret: string; credentials: T | null } | null {
     const row = this.db.prepare("SELECT client_id,client_secret_ciphertext,credentials_ciphertext FROM connectors WHERE id=?").get(id) as Row | undefined;
     if (!row?.client_id || !row.client_secret_ciphertext) return null;
     let credentials: T | null = null;
@@ -1509,15 +1509,16 @@ export class OpenBotDatabase {
     return { clientId: String(row.client_id), clientSecret: this.vault.decrypt(String(row.client_secret_ciphertext)), credentials };
   }
 
-  completeOAuthConnector(id: "slack" | "notion", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
-    if (!this.getConnector(id)) throw new Error(`Configure ${id === "slack" ? "Slack" : "Notion"} before connecting it.`);
+  completeOAuthConnector(id: "slack" | "notion" | "todoist" | "dropbox", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
+    const names = { slack: "Slack", notion: "Notion", todoist: "Todoist", dropbox: "Dropbox" } as const;
+    if (!this.getConnector(id)) throw new Error(`Configure ${names[id]} before connecting it.`);
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,account_email=?,scopes_json=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
       this.vault.encrypt(JSON.stringify(credentials)), accountName.slice(0, 200), JSON.stringify([...new Set(scopes)]), now(), now(), id,
     );
     return this.getConnector(id)!;
   }
 
-  updateOAuthConnectorCredentials(id: "slack" | "notion", credentials: Record<string, unknown>): ConnectorConnection {
+  updateOAuthConnectorCredentials(id: "slack" | "notion" | "todoist" | "dropbox", credentials: Record<string, unknown>): ConnectorConnection {
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
       this.vault.encrypt(JSON.stringify(credentials)), now(), now(), id,
     );
@@ -1526,7 +1527,7 @@ export class OpenBotDatabase {
     return connector;
   }
 
-  disconnectOAuthConnector(id: "slack" | "notion"): ConnectorConnection | null {
+  disconnectOAuthConnector(id: "slack" | "notion" | "todoist" | "dropbox"): ConnectorConnection | null {
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=NULL,scopes_json='[]',account_email=NULL,status=CASE WHEN client_id IS NULL THEN 'unconfigured' ELSE 'configured' END,last_error=NULL,updated_at=? WHERE id=?").run(now(), id);
     return this.getConnector(id);
   }
