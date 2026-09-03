@@ -356,3 +356,19 @@ Status: complete for the local-first 0.17.4 native beta
 - Web reduced-motion CSS and native Reduce Motion behavior remain supported
 
 Verification: the live browser reports zero image elements inside mascots, separately captured frames differ during idle motion, the appearance preview updates before saving, the database test covers shape and color persistence, and the native SwiftUI target compiles and renders the same three-character studio on the iPhone simulator.
+
+## M24 — Find, organize, and supervise
+
+Status: complete for the local-first 0.18.0 beta
+
+- Live Studio shows every teammate's active or recent job, real checklist progress, persistent failure/approval attention, browser preview, stop control, and direct conversation link
+- The owner can enter a teammate's browser, click its visible screenshot, type through a private non-chat keyboard, send common keys, and return to the full studio
+- Password-, token-, secret-, and one-time-code-like inputs are masked before browser snapshots are exposed to a model
+- Local studio search covers messages, result attachments, automations, learned skills, and teammates, and opens the durable source conversation
+- Messages support durable reply references and lightweight reactions
+- Direct conversations support custom sidebar sections, pinning, reversible hide/restore, and setup-only teammate duplication
+- Duplicated teammates inherit role, working style, model, budget, appearance, capability switches, connector permissions, and code-project grants without inheriting history, memory, credentials, browser state, or workspaces
+- The new surfaces reuse the same code-drawn, independently animated character system on desktop and phone
+- The native iPhone client adds a matching Live Studio overview for every teammate, attention item, and recent job
+
+Verification: 79 automated tests pass, including durable organization, search, reply, reaction, global run visibility, duplication boundaries, and restore behavior. Type checking and the production build pass. Live browser QA verified the complete Live Studio, search results, and private takeover controls at 402×874 with no page-level horizontal overflow; a second responsive width also remained contained. The native Xcode build and release checks remain part of the final gate. Always-on hosting, push delivery, arbitrary-pixel macOS takeover, private skill export/import, and a broad connector marketplace are not claimed.

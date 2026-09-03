@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.17 native-companion release.
+Updated September 3, 2026 after the 0.18 Live Studio release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -66,17 +66,19 @@ Goal: make phone check-ins feel like a real product without moving private studi
 
 Compiled with Xcode Beta and verified on an iPhone 17 Pro simulator with four native unit tests, a live sign-in UI test, and two-way draft persistence in the 78-test product suite. The authenticated API was also verified over the detected Tailscale address. Physical-device signing, unsent attachment handoff, rich artifact previews, push, share-sheet capture, dedicated voice capture, and App Store delivery are not claimed.
 
-## 0.18 — Find, organize, and share
+## Shipped in 0.18 — Find, organize, and supervise
 
 Goal: keep a growing studio understandable.
 
-- Add local full-text search across conversations, files, links, routines, and results
-- Add reply context and lightweight reactions
-- Add sidebar pins, sections, hide/restore, and bot duplication
-- Add private skill manifests, versions, import/export, tests, and secret scanning
-- Add owner-controlled bot templates without sharing history, credentials, or browser state
+- Added local search across conversations, result files, routines, learned skills, and teammates
+- Added reply context and lightweight reactions
+- Added sidebar pins, sections, reversible hide/restore, and setup-only teammate duplication
+- Added a Live Studio with global run visibility, persistent attention, teammate desks, progress, browser previews, stop controls, and direct conversation links
+- Added visible owner takeover of each teammate's private browser with private typing and common navigation keys
+- Masked password-like fields in model-visible browser snapshots
+- Kept copies free of conversation history, memory, credentials, browser profiles, and workspace files
 
-Ship only when exported skills and bot templates contain no secrets and imported versions remain reviewable and reversible.
+Verified with 79 automated tests, the production build, native release checks, and responsive browser acceptance at 402×874 with zero horizontal overflow. Private skill import/export remains deliberately unclaimed until versioning, secret scanning, and rollback exist.
 
 ## 0.19 — Always-on work
 
@@ -87,6 +89,7 @@ Goal: make remote and mobile use reliable while preserving local-only mode.
 - Add push delivery, share-sheet capture, and native voice sessions to the existing iPhone companion
 - Keep the current loopback-only local mode as a first-class zero-cloud choice
 - Prototype bounded screenshot understanding and visible human takeover for interfaces the structured tools cannot operate
+- Add private skill manifests, versions, import/export, tests, secret scanning, and reversible owner-controlled templates
 
 Ship only after threat modeling, encrypted recovery testing, offline/duplicate-job testing, and a clear data-location choice during setup.
 

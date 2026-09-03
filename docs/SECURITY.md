@@ -63,7 +63,7 @@ Teach mode opens a visible, bot-specific Chrome profile and records navigation, 
 - GitHub access inherits the repositories and organizations available to the signed-in official CLI account. OpenBot's per-bot switches are local policy controls, so owners should keep that CLI account scoped appropriately.
 - Webhook signatures authenticate possession of the automation secret; they do not establish the real-world identity or trustworthiness of every field in the payload. Keep narrow filters enabled and rotate a secret if it may have leaked.
 - Generic and GitHub webhook endpoints are local by default. Internet delivery requires an owner-managed HTTPS tunnel or reverse proxy; exposing OpenBot's plain HTTP port publicly is unsupported.
-- Schedules and Calendar polling run only while the local OpenBot service and Mac are awake. Missed work can be noticed when the service returns, but 0.17 does not provide a hosted lease or guaranteed offline catch-up.
+- Schedules and Calendar polling run only while the local OpenBot service and Mac are awake. Missed work can be noticed when the service returns, but 0.18 does not provide a hosted lease or guaranteed offline catch-up.
 - The iPhone companion is source-ready but not App Store distributed. It has no push provider, background job runner, or share-sheet extension yet; live work still depends on a reachable awake Mac.
 - Event deduplication depends on a stable sender delivery ID and uses a seven-day window. A sender that intentionally changes the ID creates a new event; side effects still rely on the normal approval and tool boundaries.
 - Availability depends on the local OpenBot service, OpenCode/provider, Docker, and Chrome.

@@ -32,6 +32,7 @@ import type {
   Run,
   RunStatus,
   StudioSettings,
+  StudioSearchResult,
   StudioDraft,
   TaskContract,
   TaskStage,
@@ -208,6 +209,9 @@ export class OpenBotDatabase {
         title TEXT NOT NULL,
         kind TEXT NOT NULL CHECK(kind IN ('direct', 'room')),
         bot_id TEXT REFERENCES bots(id) ON DELETE CASCADE,
+        section_name TEXT,
+        pinned INTEGER NOT NULL DEFAULT 0,
+        hidden INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -229,7 +233,15 @@ export class OpenBotDatabase {
         sender_id TEXT,
         body TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        run_id TEXT
+        run_id TEXT,
+        reply_to_id TEXT REFERENCES messages(id) ON DELETE SET NULL
+      );
+      CREATE TABLE IF NOT EXISTS message_reactions (
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(message_id, emoji, actor)
       );
       CREATE TABLE IF NOT EXISTS attachments (
         id TEXT PRIMARY KEY,
@@ -480,6 +492,7 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS messages_thread_created ON messages(thread_id, created_at);
+      CREATE INDEX IF NOT EXISTS message_reactions_message ON message_reactions(message_id, created_at);
       CREATE INDEX IF NOT EXISTS attachments_message_created ON attachments(message_id, created_at);
       CREATE INDEX IF NOT EXISTS runs_status_created ON runs(status, created_at);
       CREATE INDEX IF NOT EXISTS runs_bot_created ON runs(bot_id, created_at);
@@ -499,6 +512,10 @@ export class OpenBotDatabase {
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
+    this.addColumn("threads", "section_name TEXT");
+    this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("threads", "hidden INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("messages", "reply_to_id TEXT");
     this.addColumn("runs", "approval_id TEXT");
     this.addColumn("runs", "partial_text TEXT");
     this.addColumn("runs", "progress_at TEXT");
@@ -722,15 +739,45 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
+  duplicateBot(id: string): Bot | null {
+    const source = this.getBot(id);
+    if (!source) return null;
+    const copy = this.createBot({
+      name: `${source.name} copy`.slice(0, 30), emoji: source.emoji, mascot: source.mascot, color: source.color,
+      role: source.role, instructions: source.instructions, model: source.model, providerInstanceId: source.providerInstanceId,
+      weeklyTokenBudget: source.weeklyTokenBudget,
+    });
+    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled });
+    this.db.prepare("DELETE FROM bot_connector_access WHERE bot_id=?").run(copy.id);
+    this.db.prepare(`INSERT INTO bot_connector_access (bot_id,connector_id,service,can_read,can_send,created_at,updated_at)
+      SELECT ?,connector_id,service,can_read,can_send,?,? FROM bot_connector_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
+    this.db.prepare(`INSERT INTO bot_project_access (bot_id,project_id,can_read,can_write,can_run,created_at,updated_at)
+      SELECT ?,project_id,can_read,can_write,can_run,?,? FROM bot_project_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
+    const sourceThread = this.getThread(source.threadId);
+    if (sourceThread) this.updateThread(copy.threadId, { section: sourceThread.section });
+    return this.getBot(copy.id);
+  }
+
   listThreads(): Thread[] {
-    return (this.db.prepare("SELECT * FROM threads ORDER BY CASE kind WHEN 'room' THEN 0 ELSE 1 END, updated_at DESC").all() as Row[]).map((row) => ({
+    return (this.db.prepare("SELECT * FROM threads ORDER BY CASE kind WHEN 'room' THEN 0 ELSE 1 END, pinned DESC, COALESCE(section_name,''), updated_at DESC").all() as Row[]).map((row) => ({
       id: String(row.id), title: String(row.title), kind: row.kind as Thread["kind"], botId: row.bot_id ? String(row.bot_id) : null,
+      section: row.section_name ? String(row.section_name) : null, pinned: asBoolean(row.pinned), hidden: asBoolean(row.hidden),
       createdAt: String(row.created_at), updatedAt: String(row.updated_at), unreadCount: 0,
     }));
   }
 
   getThread(id: string): Thread | null {
     return this.listThreads().find((thread) => thread.id === id) || null;
+  }
+
+  updateThread(id: string, patch: Partial<Pick<Thread, "section" | "pinned" | "hidden">>): Thread | null {
+    const current = this.getThread(id);
+    if (!current || current.kind === "room") return null;
+    const section = patch.section === undefined ? current.section : patch.section?.replace(/\s+/g, " ").trim().slice(0, 40) || null;
+    this.db.prepare("UPDATE threads SET section_name=?,pinned=?,hidden=?,updated_at=? WHERE id=?").run(
+      section, (patch.pinned ?? current.pinned) ? 1 : 0, (patch.hidden ?? current.hidden) ? 1 : 0, now(), id,
+    );
+    return this.getThread(id);
   }
 
   getDraft(threadId: string): StudioDraft {
@@ -761,10 +808,12 @@ export class OpenBotDatabase {
     return rows.map((row) => this.getBot(String(row.bot_id))).filter((bot): bot is Bot => Boolean(bot));
   }
 
-  addMessage(input: { threadId: string; senderType: Message["senderType"]; senderId: string | null; body: string; runId?: string | null }): Message {
+  addMessage(input: { threadId: string; senderType: Message["senderType"]; senderId: string | null; body: string; runId?: string | null; replyToId?: string | null }): Message {
     const id = randomUUID();
     const createdAt = now();
-    this.db.prepare("INSERT INTO messages (id,thread_id,sender_type,sender_id,body,created_at,run_id) VALUES (?,?,?,?,?,?,?)").run(id, input.threadId, input.senderType, input.senderId, input.body, createdAt, input.runId ?? null);
+    const reply = input.replyToId ? this.getMessage(input.replyToId) : null;
+    if (input.replyToId && (!reply || reply.threadId !== input.threadId)) throw new Error("That message is no longer available to reply to.");
+    this.db.prepare("INSERT INTO messages (id,thread_id,sender_type,sender_id,body,created_at,run_id,reply_to_id) VALUES (?,?,?,?,?,?,?,?)").run(id, input.threadId, input.senderType, input.senderId, input.body, createdAt, input.runId ?? null, reply?.id || null);
     this.db.prepare("UPDATE threads SET updated_at=? WHERE id=?").run(createdAt, input.threadId);
     return this.getMessage(id)!;
   }
@@ -777,18 +826,69 @@ export class OpenBotDatabase {
       senderEmoji: row.bot_emoji ? String(row.bot_emoji) : null, senderColor: row.bot_color ? String(row.bot_color) : null,
       senderMascot: row.bot_mascot ? String(row.bot_mascot) as MascotKind : null,
       body: String(row.body), createdAt: String(row.created_at), runId: row.run_id ? String(row.run_id) : null,
+      replyTo: row.reply_id ? {
+        id: String(row.reply_id),
+        senderName: row.reply_sender_type === "user" ? "You" : row.reply_sender_type === "system" ? "OpenBot" : String(row.reply_bot_name || "Teammate"),
+        body: String(row.reply_body || "").replace(/\s+/g, " ").trim().slice(0, 220),
+      } : null,
+      reactions: (this.db.prepare("SELECT emoji,COUNT(*) count,MAX(CASE WHEN actor='owner' THEN 1 ELSE 0 END) reacted FROM message_reactions WHERE message_id=? GROUP BY emoji ORDER BY MIN(created_at)").all(String(row.id)) as Row[]).map((reaction) => ({ emoji: String(reaction.emoji), count: Number(reaction.count), reactedByYou: asBoolean(reaction.reacted) })),
       attachments: this.listMessageAttachments(String(row.id)),
     };
   }
 
-  private getMessage(id: string): Message | null {
-    const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.id=?`).get(id) as Row | undefined;
+  getMessage(id: string): Message | null {
+    const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.id=?`).get(id) as Row | undefined;
     return row ? this.messageFromRow(row) : null;
   }
 
   listMessages(threadId: string, limit = 120): Message[] {
-    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit) as Row[];
+    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit) as Row[];
     return rows.map((row) => this.messageFromRow(row));
+  }
+
+  toggleMessageReaction(messageId: string, emoji: string): Message | null {
+    const message = this.getMessage(messageId);
+    if (!message) return null;
+    const existing = this.db.prepare("SELECT 1 present FROM message_reactions WHERE message_id=? AND emoji=? AND actor='owner'").get(messageId, emoji) as Row | undefined;
+    if (existing) this.db.prepare("DELETE FROM message_reactions WHERE message_id=? AND emoji=? AND actor='owner'").run(messageId, emoji);
+    else this.db.prepare("INSERT INTO message_reactions (message_id,emoji,actor,created_at) VALUES (?,?,'owner',?)").run(messageId, emoji, now());
+    return this.getMessage(messageId);
+  }
+
+  searchStudio(rawQuery: string, limit = 40): StudioSearchResult[] {
+    const query = rawQuery.replace(/\s+/g, " ").trim().slice(0, 100);
+    if (query.length < 2) return [];
+    const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const results: StudioSearchResult[] = [];
+    for (const bot of this.listBots().filter((item) => `${item.name} ${item.role} ${item.instructions}`.toLowerCase().includes(query.toLowerCase())).slice(0, 8)) {
+      results.push({ id: bot.id, kind: "teammate", title: bot.name, subtitle: bot.role, snippet: bot.instructions.slice(0, 220), threadId: bot.threadId, botId: bot.id, createdAt: bot.lastActiveAt || bot.createdAt });
+    }
+    const messages = this.db.prepare(`SELECT m.id,m.thread_id,m.body,m.created_at,m.sender_type,b.id bot_id,b.name bot_name,t.title thread_title
+      FROM messages m LEFT JOIN bots b ON b.id=m.sender_id JOIN threads t ON t.id=m.thread_id
+      WHERE m.body LIKE ? ESCAPE '\\' ORDER BY m.created_at DESC LIMIT 18`).all(pattern) as Row[];
+    for (const row of messages) results.push({
+      id: String(row.id), kind: "message", title: row.sender_type === "user" ? "You" : row.sender_type === "system" ? "OpenBot" : String(row.bot_name || "Teammate"),
+      subtitle: String(row.thread_title), snippet: String(row.body).replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id),
+      botId: row.bot_id ? String(row.bot_id) : null, createdAt: String(row.created_at),
+    });
+    const files = this.db.prepare(`SELECT a.id,a.thread_id,a.name,a.summary,a.extracted_text,a.created_at,t.title thread_title,t.bot_id
+      FROM attachments a JOIN threads t ON t.id=a.thread_id
+      WHERE a.name LIKE ? ESCAPE '\\' OR COALESCE(a.summary,'') LIKE ? ESCAPE '\\' OR COALESCE(a.extracted_text,'') LIKE ? ESCAPE '\\'
+      ORDER BY a.created_at DESC LIMIT 12`).all(pattern, pattern, pattern) as Row[];
+    for (const row of files) results.push({
+      id: String(row.id), kind: "file", title: String(row.name), subtitle: String(row.thread_title),
+      snippet: String(row.summary || row.extracted_text || "Saved file").replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id),
+      botId: row.bot_id ? String(row.bot_id) : null, createdAt: String(row.created_at),
+    });
+    const routines = this.db.prepare(`SELECT r.id,r.name,r.prompt,r.thread_id,r.bot_id,r.last_run_at,r.next_run_at,b.name bot_name
+      FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.name LIKE ? ESCAPE '\\' OR r.prompt LIKE ? ESCAPE '\\'
+      ORDER BY COALESCE(r.last_run_at,r.next_run_at) DESC LIMIT 10`).all(pattern, pattern) as Row[];
+    for (const row of routines) results.push({ id: String(row.id), kind: "routine", title: String(row.name), subtitle: `${row.bot_name} · Automation`, snippet: String(row.prompt).replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id), botId: String(row.bot_id), createdAt: String(row.last_run_at || row.next_run_at || "1970-01-01T00:00:00.000Z") });
+    const skills = this.db.prepare(`SELECT w.id,w.name,w.start_url,w.created_at,w.bot_id,b.name bot_name,t.id thread_id
+      FROM taught_workflows w JOIN bots b ON b.id=w.bot_id JOIN threads t ON t.bot_id=b.id AND t.kind='direct'
+      WHERE w.name LIKE ? ESCAPE '\\' OR w.start_url LIKE ? ESCAPE '\\' ORDER BY w.created_at DESC LIMIT 10`).all(pattern, pattern) as Row[];
+    for (const row of skills) results.push({ id: String(row.id), kind: "skill", title: String(row.name), subtitle: `${row.bot_name} · Learned skill`, snippet: String(row.start_url), threadId: String(row.thread_id), botId: String(row.bot_id), createdAt: String(row.created_at) });
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, Math.max(1, Math.min(limit, 60)));
   }
 
   createAttachment(input: { threadId: string; messageId?: string | null; name: string; mime: string; size: number; storagePath: string; analysis?: AttachmentAnalysis; source?: Attachment["source"]; artifactKey?: string | null; revision?: number; replacesAttachmentId?: string | null }): Attachment {
@@ -924,6 +1024,11 @@ export class OpenBotDatabase {
 
   listRuns(threadId: string): Run[] {
     const rows = this.db.prepare(this.runSelect("WHERE r.thread_id=? ORDER BY r.created_at DESC LIMIT 40")).all(threadId) as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
+  listStudioRuns(limit = 30): Run[] {
+    const rows = this.db.prepare(this.runSelect(`WHERE r.status IN ('queued','running','awaiting_approval','waiting_for_teammate','failed') OR r.finished_at>=datetime('now','-1 day') ORDER BY CASE r.status WHEN 'awaiting_approval' THEN 0 WHEN 'waiting_for_teammate' THEN 1 WHEN 'running' THEN 2 WHEN 'queued' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END,r.created_at DESC LIMIT ?`)).all(Math.max(1, Math.min(limit, 80))) as Row[];
     return rows.map((row) => this.runFromRow(row));
   }
 
@@ -1977,6 +2082,6 @@ export class OpenBotDatabase {
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

@@ -30,6 +30,18 @@ if (!app.includes("MASCOT_COLORS") || !app.includes('type="color"') || !database
 if (!styles.includes(".mascot-state-celebrating .mascot-eye") || !styles.includes("prefers-reduced-motion")) {
   failures.push("The web mascot system must keep celebration and reduced-motion states.");
 }
+if (!app.includes("function LiveStudioPanel") || !app.includes("function LiveBrowser") || !app.includes('panel === "live"')) {
+  failures.push("The release must keep the Live Studio and visible owner browser takeover.");
+}
+if (!app.includes("function SearchPanel") || !database.includes("searchStudio(rawQuery") || !database.includes("toggleMessageReaction")) {
+  failures.push("The release must keep studio-wide search, replies, and reactions.");
+}
+if (!database.includes("updateThread(id") || !database.includes("duplicateBot(id")) {
+  failures.push("The release must keep persistent sections, pins, hide/restore, and safe teammate duplication.");
+}
+if (!styles.includes(".live-desk-grid") || !styles.includes(".studio-search-results") || !styles.includes(".conversation-organizer")) {
+  failures.push("The Live Studio, search, and conversation organization surfaces must remain styled responsively.");
+}
 
 if (failures.length) {
   console.error(`Release documentation check failed:\n- ${failures.join("\n- ")}`);

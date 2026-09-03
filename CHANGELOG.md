@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.18.0 — 2026-09-03
+
+- Added a studio-wide Live Studio with teammate desks, current and recent work, durable attention items, progress, stop controls, browser previews, and direct conversation links
+- Added a matching native SwiftUI Live Studio overview for checking every teammate, attention item, and recent job from iPhone
+- Added owner browser takeover with click, private typing, common keys, fresh screenshots, and masking for password, token, secret, and one-time-code fields in model-visible snapshots
+- Added local search across messages, result files, automations, learned skills, and teammates, opening every result in its original conversation
+- Added persistent reply references and lightweight message reactions
+- Added sidebar sections, pins, reversible hide/restore, and safe teammate duplication that excludes history, memory, credentials, and browser state
+- Unified the new controls with the customizable animated mascot system and verified Live Studio, search, and takeover at a 402-point iPhone width with zero horizontal overflow
+- Expanded the automated product suite to 79 passing tests and kept the full production and native release gates green
+
 ## 0.17.4 — 2026-09-03
 
 - Replaced web and native mascot image rendering with code-drawn, runtime-colored characters

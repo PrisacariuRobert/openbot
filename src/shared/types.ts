@@ -65,9 +65,24 @@ export interface Thread {
   title: string;
   kind: "direct" | "room";
   botId: string | null;
+  section: string | null;
+  pinned: boolean;
+  hidden: boolean;
   createdAt: string;
   updatedAt: string;
   unreadCount: number;
+}
+
+export interface MessageReplyPreview {
+  id: string;
+  senderName: string;
+  body: string;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  reactedByYou: boolean;
 }
 
 export interface Message {
@@ -82,7 +97,20 @@ export interface Message {
   body: string;
   createdAt: string;
   runId: string | null;
+  replyTo: MessageReplyPreview | null;
+  reactions: MessageReaction[];
   attachments: Attachment[];
+}
+
+export interface StudioSearchResult {
+  id: string;
+  kind: "message" | "file" | "routine" | "skill" | "teammate";
+  title: string;
+  subtitle: string;
+  snippet: string;
+  threadId: string;
+  botId: string | null;
+  createdAt: string;
 }
 
 export interface Attachment {
@@ -654,6 +682,7 @@ export interface AppState {
   threads: Thread[];
   messages: Message[];
   runs: Run[];
+  studioRuns: Run[];
   routines: Routine[];
   automationEvents: AutomationEvent[];
   automationAlerts: AutomationAlert[];

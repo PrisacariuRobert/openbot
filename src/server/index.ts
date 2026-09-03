@@ -138,6 +138,21 @@ app.get("/api/state", (request, response) => {
   response.json(db.getState(threadId));
 });
 
+app.get("/api/search", (request, response) => {
+  const parsed = z.string().trim().min(2).max(100).safeParse(request.query.q);
+  if (!parsed.success) return response.json([]);
+  response.json(db.searchStudio(parsed.data));
+});
+
+app.patch("/api/threads/:id", (request, response) => {
+  const parsed = z.object({ section: z.string().trim().max(40).nullable().optional(), pinned: z.boolean().optional(), hidden: z.boolean().optional() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a short project section and valid conversation options." });
+  const thread = db.updateThread(request.params.id, parsed.data);
+  if (!thread) return response.status(404).json({ error: "That teammate conversation is not available." });
+  broadcast();
+  response.json(thread);
+});
+
 app.put("/api/drafts/:threadId", (request, response) => {
   const parsed = z.object({ body: z.string().max(20_000), source: z.enum(["web", "ios"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That draft is too long to hand off." });
@@ -585,7 +600,7 @@ app.get("/api/attachments/:id/preview", (request, response) => {
 
 const messageInput = z.object({
   threadId: z.string().min(1), body: z.string().trim().max(20_000).default(""),
-  targetBotIds: z.array(z.string()).max(6).optional(), attachmentIds: z.array(z.string()).max(6).default([]),
+  targetBotIds: z.array(z.string()).max(6).optional(), attachmentIds: z.array(z.string()).max(6).default([]), replyToId: z.string().uuid().nullable().optional(),
 }).refine((value) => value.body.length > 0 || value.attachmentIds.length > 0, { message: "Write a message or attach a file." });
 
 app.post("/api/messages", (request, response) => {
@@ -600,8 +615,12 @@ app.post("/api/messages", (request, response) => {
   if (!requested.length) return response.status(400).json({ error: "Choose at least one teammate." });
   const badAttachment = parsed.data.attachmentIds.map((id) => db.getAttachment(id)).find((item) => !item || item.threadId !== thread.id || item.messageId);
   if (badAttachment !== undefined) return response.status(400).json({ error: "One of those files is no longer available." });
+  if (parsed.data.replyToId) {
+    const reply = db.getMessage(parsed.data.replyToId);
+    if (!reply || reply.threadId !== thread.id) return response.status(400).json({ error: "That message is no longer available to reply to." });
+  }
   const body = parsed.data.body || `Shared ${parsed.data.attachmentIds.length} file${parsed.data.attachmentIds.length === 1 ? "" : "s"}.`;
-  const userMessage = db.addMessage({ threadId: thread.id, senderType: "user", senderId: null, body });
+  const userMessage = db.addMessage({ threadId: thread.id, senderType: "user", senderId: null, body, replyToId: parsed.data.replyToId });
   const attachments = db.claimAttachments(parsed.data.attachmentIds, userMessage.id, thread.id);
   const attachmentBlocks = attachments.map((attachment) => {
     const file = db.attachmentFile(attachment.id)!;
@@ -638,6 +657,15 @@ app.post("/api/messages", (request, response) => {
   });
   broadcast();
   response.status(202).json({ runs, redirected, routedTo: requested.map((bot) => ({ id: bot.id, name: bot.name })), attachments });
+});
+
+app.post("/api/messages/:id/reactions", (request, response) => {
+  const parsed = z.object({ emoji: z.enum(["👍", "❤️", "✅", "👀", "🎉"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose one of the available reactions." });
+  const message = db.toggleMessageReaction(request.params.id, parsed.data.emoji);
+  if (!message) return response.status(404).json({ error: "That message is no longer available." });
+  broadcast();
+  response.json(message);
 });
 
 async function performApprovedAction(action: unknown): Promise<string> {
@@ -798,6 +826,13 @@ app.post("/api/bots", (request, response) => {
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   if (parsed.data.model && !modelBelongsToConnection(parsed.data.model, connection)) return response.status(400).json({ error: "That model does not belong to the selected connection." });
   const bot = db.createBot(parsed.data);
+  broadcast();
+  response.status(201).json(bot);
+});
+
+app.post("/api/bots/:id/duplicate", (request, response) => {
+  const bot = db.duplicateBot(request.params.id);
+  if (!bot) return response.status(404).json({ error: "Teammate not found." });
   broadcast();
   response.status(201).json(bot);
 });
@@ -1015,6 +1050,24 @@ app.post("/api/bots/:id/browser/type", async (request, response) => {
   const parsed = z.object({ selector: z.string().min(1), value: z.string() }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a field and value." });
   try { response.json(await browser.type(request.params.id, parsed.data.selector, parsed.data.value)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/takeover/click", async (request, response) => {
+  const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a point inside the browser preview." });
+  try { response.json(await browser.takeoverClick(request.params.id, parsed.data.x, parsed.data.y)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/takeover/type", async (request, response) => {
+  const parsed = z.object({ value: z.string().max(4_000), replace: z.boolean().default(false) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "That text is too long for secure takeover." });
+  try { response.json(await browser.takeoverType(request.params.id, parsed.data.value, parsed.data.replace)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
+  const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
+  try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));

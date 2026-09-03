@@ -65,6 +65,33 @@ test("hands an unfinished draft between web and iPhone", () => {
   }
 });
 
+test("organizes the studio, searches durable work, and keeps replies and reactions", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-live-studio-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const organized = db.updateThread("bot-nova", { section: "Launch", pinned: true });
+    assert.equal(organized?.section, "Launch");
+    assert.equal(organized?.pinned, true);
+    const source = db.addMessage({ threadId: "bot-nova", senderType: "bot", senderId: "nova", body: "The launch brief is ready to review." });
+    const reply = db.addMessage({ threadId: "bot-nova", senderType: "user", senderId: null, body: "Please tighten the opening.", replyToId: source.id });
+    assert.equal(reply.replyTo?.senderName, "Nova");
+    assert.match(reply.replyTo?.body || "", /launch brief/i);
+    assert.throws(() => db.addMessage({ threadId: "bot-pixel", senderType: "user", senderId: null, body: "Wrong room", replyToId: source.id }), /no longer available/i);
+    assert.equal(db.toggleMessageReaction(source.id, "✅")?.reactions[0]?.reactedByYou, true);
+    assert.equal(db.toggleMessageReaction(source.id, "✅")?.reactions.length, 0);
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Finish the launch brief", status: "running" });
+    assert.equal(db.listStudioRuns().some((item) => item.id === run.id), true);
+    assert.equal(db.searchStudio("launch").some((item) => item.kind === "message" && item.threadId === "bot-nova"), true);
+    const duplicate = db.duplicateBot("nova");
+    assert.equal(duplicate?.role, "Researcher");
+    assert.equal(db.getThread(duplicate!.threadId)?.section, "Launch");
+    assert.equal(db.updateThread("bot-nova", { hidden: true })?.hidden, true);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("stores and advances a five-minute enabled routine", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-test-"));
   try {

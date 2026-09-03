@@ -6,6 +6,7 @@ struct StudioContainerView: View {
     @StateObject private var store: StudioStore
     @StateObject private var network = NetworkMonitor()
     @State private var showingThreads = false
+    @State private var showingLiveStudio = false
     @State private var showingSettings = false
 
     init(url: URL) {
@@ -20,6 +21,7 @@ struct StudioContainerView: View {
                     bots: store.activeBot.map { [$0] } ?? store.state.bots,
                     isLive: network.isOnline && store.isLive,
                     onThreads: { showingThreads = true },
+                    onLiveStudio: { showingLiveStudio = true },
                     onSettings: { showingSettings = true }
                 )
                 Divider().opacity(0.55)
@@ -43,6 +45,12 @@ struct StudioContainerView: View {
                 Task { await store.chooseThread(id) }
             }
         }
+        .sheet(isPresented: $showingLiveStudio) {
+            NativeLiveStudioView(store: store) { threadID in
+                showingLiveStudio = false
+                Task { await store.chooseThread(threadID) }
+            }
+        }
         .sheet(isPresented: $showingSettings) { ConnectionSettingsView() }
     }
 }
@@ -52,6 +60,7 @@ private struct StudioHeader: View {
     let bots: [StudioBot]
     let isLive: Bool
     let onThreads: () -> Void
+    let onLiveStudio: () -> Void
     let onSettings: () -> Void
 
     var body: some View {
@@ -79,6 +88,13 @@ private struct StudioHeader: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onLiveStudio) {
+                Image(systemName: "rectangle.3.group")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 34, height: 40)
+            }
+            .accessibilityLabel("Live Studio")
 
             Button(action: onSettings) {
                 Image(systemName: "ellipsis")
@@ -469,6 +485,126 @@ private struct NativeComposer: View {
         guard draft != shared.body else { return }
         appliedDraftBody = shared.body
         draft = shared.body
+    }
+}
+
+private struct NativeLiveStudioView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var store: StudioStore
+    let onSelect: (String) -> Void
+
+    private var runs: [StudioRun] { store.state.studioRuns ?? store.state.runs }
+    private var attention: [StudioRun] { runs.filter { ["awaiting_approval", "failed"].contains($0.status) } }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("LIVE FROM YOUR MAC", systemImage: "circle.fill")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.white.opacity(0.78))
+                        Text(store.state.usage.activeRuns > 0 ? "Your team is moving work forward" : "Your team is ready")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("Watch every teammate, open the right conversation, and handle anything that needs you.")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.white.opacity(0.72))
+                        MascotStack(bots: store.state.bots, large: true).frame(maxWidth: .infinity, minHeight: 82)
+                    }
+                    .padding(20)
+                    .background(
+                        LinearGradient(colors: [OpenBotTheme.messagePurpleStart, OpenBotTheme.messagePurpleEnd], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    )
+
+                    HStack(spacing: 8) {
+                        liveStat(value: store.state.usage.activeRuns, label: "working", icon: "sparkles")
+                        liveStat(value: attention.count, label: "attention", icon: "hand.raised.fill")
+                        liveStat(value: store.state.usage.completedRuns, label: "finished", icon: "checkmark.circle.fill")
+                    }
+
+                    if !attention.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Needs your attention", systemImage: "bell.badge.fill")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color(red: 0.55, green: 0.37, blue: 0.13))
+                            ForEach(attention.prefix(5)) { run in
+                                HStack(spacing: 10) {
+                                    BotMascotView(colorHex: run.botColor, variant: run.botMascot, status: run.status == "failed" ? "failed" : "waiting", size: 38)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(run.status == "failed" ? "\(run.botName) needs a hand" : "\(run.botName) needs your okay")
+                                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        Text(run.error ?? run.approvalReason ?? run.summary ?? "Open the conversation to continue.")
+                                            .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Button("Open") { onSelect(run.threadId) }
+                                        .buttonStyle(.bordered).controlSize(.small)
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(Color(red: 1, green: 0.97, blue: 0.90), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Teammate desks")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                        ForEach(store.state.bots) { bot in
+                            let run = runs.first(where: { $0.botId == bot.id })
+                            Button { onSelect(bot.threadId) } label: {
+                                HStack(spacing: 11) {
+                                    BotMascotView(colorHex: bot.color, variant: bot.mascot, status: bot.status, size: 48)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(bot.name).font(.system(size: 14, weight: .bold, design: .rounded))
+                                            Text(bot.status.openBotRunLabel)
+                                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                                .foregroundStyle(OpenBotTheme.green)
+                                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                                .background(OpenBotTheme.green.opacity(0.1), in: Capsule())
+                                        }
+                                        Text(run.map { liveRunDescription($0) } ?? "Ready for a new task")
+                                            .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
+                                }
+                                .padding(13)
+                                .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 19, style: .continuous).stroke(.black.opacity(0.055)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(OpenBotTheme.paper)
+            .navigationTitle("Live Studio")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func liveStat(value: Int, label: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: icon).foregroundStyle(OpenBotTheme.purple)
+            Text("\(value)").font(.system(size: 18, weight: .bold, design: .rounded))
+            Text(label).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(11)
+        .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+    }
+
+    private func liveRunDescription(_ run: StudioRun) -> String {
+        if run.status == "failed" { return run.error ?? "Needs a hand" }
+        if run.status == "completed" { return run.summary ?? "Recently finished" }
+        if run.status == "awaiting_approval" { return run.approvalReason ?? "Waiting for your okay" }
+        return run.partialText ?? run.summary ?? run.status.openBotRunLabel
     }
 }
 

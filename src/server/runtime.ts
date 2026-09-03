@@ -249,7 +249,9 @@ export class BrowserManager {
       return elements.map((element, index) => {
         const html = element as HTMLElement;
         const role = html.getAttribute("role") || html.tagName.toLowerCase();
-        const label = html.getAttribute("aria-label") || html.getAttribute("placeholder") || html.innerText || (html as HTMLInputElement).value || "";
+        const input = html as HTMLInputElement;
+        const privateField = input.tagName === "INPUT" && (input.type === "password" || /password|secret|token|one-time-code/i.test(`${input.name} ${input.autocomplete} ${input.getAttribute("aria-label") || ""}`));
+        const label = html.getAttribute("aria-label") || html.getAttribute("placeholder") || html.innerText || (privateField ? "Secure field" : input.value) || "";
         return `${index + 1}. [${role}] ${label.trim().replace(/\s+/g, " ").slice(0, 240)}`;
       }).filter((line) => !line.endsWith("] ")).join("\n");
     });
@@ -267,6 +269,28 @@ export class BrowserManager {
     const locator = page.locator(selector).first();
     await locator.fill(value, { timeout: 12_000 });
     return { url: page.url(), title: await page.title() };
+  }
+
+  async takeoverClick(botId: string, x: number, y: number) {
+    const page = await this.page(botId);
+    await page.mouse.click(Math.max(0, Math.min(1280, x)), Math.max(0, Math.min(820, y)));
+    await page.waitForTimeout(180);
+    return { url: page.url(), title: await page.title(), screenshot: await this.screenshot(botId) };
+  }
+
+  async takeoverType(botId: string, value: string, replace = false) {
+    const page = await this.page(botId);
+    if (replace) await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.type(value, { delay: 12 });
+    await page.waitForTimeout(120);
+    return { url: page.url(), title: await page.title(), screenshot: await this.screenshot(botId) };
+  }
+
+  async takeoverKey(botId: string, key: "Enter" | "Tab" | "Escape" | "Backspace" | "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") {
+    const page = await this.page(botId);
+    await page.keyboard.press(key);
+    await page.waitForTimeout(150);
+    return { url: page.url(), title: await page.title(), screenshot: await this.screenshot(botId) };
   }
 
   async screenshot(botId: string): Promise<string | null> {

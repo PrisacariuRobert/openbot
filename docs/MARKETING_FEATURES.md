@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.17.4 local-first beta
+Release: 0.18.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -23,7 +23,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
 8. **Continue on the device in your hand.** Start an unfinished message on the Mac and continue it on the native iPhone app, or return it to the web studio, while the owner's Mac remains the source of truth.
-8. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
+9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
+10. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
 
 ## Available now
 
@@ -35,6 +36,18 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Live ready, working, waiting, success, and failure states
 - Six mascot shapes, six color presets, a custom color picker, and independent blink/idle timing with working, waiting, celebration/laugh, and failure expressions
 - Add, edit, and remove teammates without recreating the whole studio
+- Pin teammates, group them into custom sidebar sections, hide and restore them, or duplicate only their setup and permissions
+
+### Live Studio and retrieval
+
+- One live desk per teammate with status, current or recent job, real checklist progress, browser preview, and direct Message/Watch actions
+- One durable attention area for approvals, failures, and automation alerts
+- Stop active work from the desk or open the original conversation for context
+- Enter an isolated teammate browser, click its visible screen, type through a private non-chat keyboard, and send common navigation keys
+- Password-, token-, secret-, and one-time-code-like fields masked in snapshots before model inspection
+- Local cross-studio search across messages, result files, automations, learned skills, and teammates
+- Search results return to their original conversation instead of creating copied or detached records
+- Persistent reply context and lightweight reactions across refreshes
 
 ### Natural teamwork
 
