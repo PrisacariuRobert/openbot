@@ -1,18 +1,18 @@
-# OpenBot 0.17.2
+# OpenBot 0.17.3
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.17.2
+## What's new in 0.17.3
 
-- Unified the responsive web studio and native iPhone app around the same room name, presence language, conversation hierarchy, composer geometry, and exact mascot artwork.
-- Added durable cross-device drafts: begin a message on the Mac and continue it on the iPhone, or move an unfinished iPhone message back to the web studio.
-- Sends draft changes through the owner's authenticated Mac-hosted studio and refreshes the other client live without copying conversations to a new cloud service.
-- Added clear “Continued from your Mac/iPhone” handoff cues and protected the handoff from bouncing an unchanged draft back to the other device.
-- Kept native compatibility with an older Mac service by treating cross-device drafts as an optional capability until both sides update.
-- Re-verified the native SwiftUI client, secure remote path, automated product suite, and matching phone-sized web experience.
-- Keeps attachment handoff, platform push, rich native artifact previews, share-sheet input, and dedicated voice capture on the honest roadmap.
+- Rebuilt the web and native iPhone studio around one shared visual system: matching header geometry, live status, backgrounds, message bubbles, spacing, routing pill, composer, icons, and language.
+- Replaced the static room illustration with three independently animated production mascots in both clients.
+- Added asynchronous float and blink timing so teammates feel alive without moving in lockstep.
+- Added visible ready, working, waiting, offline, failed, and short celebration moods, including happy eyes and sparkles after completed work.
+- Uses the same mascot image files on the web and iPhone while preserving native SwiftUI controls and behavior.
+- Honors Reduce Motion on both platforms and keeps status readable without relying on animation alone.
+- Re-verified the phone-sized web studio and compiled native iPhone app at the same 402-point layout width.
 
 ## What is included
 

@@ -41,7 +41,7 @@ Goal: add breadth without weakening per-teammate authority.
 
 Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
-## Shipped in 0.17.2 — Native iPhone continuity
+## Shipped in 0.17.3 — Native iPhone continuity and shared design
 
 Goal: make phone check-ins feel like a real product without moving private studio data to a new cloud.
 
@@ -50,6 +50,8 @@ Goal: make phone check-ins feel like a real product without moving private studi
 - Added address-only deep-link pairing, foreground reauthentication, server-sent event updates, and offline state
 - Added native attachment intake and shared premium mascot artwork across the web and iPhone apps
 - Matched the web and native studio presentation and added durable, live Mac/iPhone text-draft handoff
+- Unified header, conversation, bubble, routing, composer, and icon geometry at the same phone width
+- Composed the exact shared mascot art as three independently floating and blinking teammates with matching status and celebration moods
 - Added detected Tailscale away access for use over cellular or different Wi-Fi networks
 - Required HTTPS for public hosts while keeping private-network development practical and loopback-only hosting as the default
 - Added native release structure, privacy and secret checks, a production mascot app icon, and a release guard that rejects a return to WebKit

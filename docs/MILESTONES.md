@@ -330,3 +330,17 @@ Status: complete for the local-first 0.17.2 native beta
 - Unfinished text moves between Mac and iPhone through an authenticated durable draft, updates live, and identifies the originating device without echoing unchanged text back
 
 Verification: 78 automated web/server tests pass, including two-way durable draft handoff. The Xcode project is deterministically generated with XcodeGen and compiled using Xcode Beta. Four native unit tests pass on an iPhone 17 Pro simulator. A live UI test enters the address and private key, signs in to the running Mac studio, and verifies the native conversation header and composer. The live Tailscale address returns 401 without the private key and 200 with it. Phone-sized web QA confirms the matching room header, hero, messages, and composer. Release checks reject a return to `WKWebView`, embedded access keys, missing privacy declarations, or missing native API/event coverage. Physical-device/App Store distribution, unsent attachment handoff, rich native artifact previews, push, share-sheet input, dedicated voice capture, and an always-on host are not claimed.
+
+## M23 — One studio design across web and iPhone
+
+Status: complete for the local-first 0.17.3 native beta
+
+- Web and SwiftUI share the same paper, ink, bot bubble, message gradient, presence, and accent colors
+- The room header matches at 402 points: menu, 78-point teammate group, title, live dot and subtitle, flexible space, and settings action
+- Message typography, bubble radii, horizontal insets, sender spacing, and avatar sizes use the same values on phone-sized web and native screens
+- Routing and composer controls share the same capsule, 56-point input surface, attachment/mention/skill/voice order, icon colors, and circular send action
+- The studio trio is composed from the exact same three production image files rather than a static web/native group approximation
+- Every mascot floats and blinks on its own offset timing, changes its presence color with work state, and briefly celebrates successful work with happy eyes and sparkles
+- Web media queries and native Accessibility settings both honor reduced motion without removing readable status cues
+
+Verification: type checking and production builds pass for the shared web client, and the native SwiftUI target compiles with Xcode Beta. Browser QA at 402×874 verifies the aligned header, studio hero, messages, routing pill, and composer without horizontal overflow; two captured frames differ while the conversation is otherwise idle, confirming live mascot motion. Native simulator QA uses the same 402-point viewport and production assets. The full 78-test product suite plus native unit and live UI tests remain the final release gate.

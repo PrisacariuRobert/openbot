@@ -108,6 +108,7 @@ private extension View {
 }
 
 struct MascotPairView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var floating = false
 
     var body: some View {
@@ -115,14 +116,17 @@ struct MascotPairView: View {
             RoundedRectangle(cornerRadius: 44, style: .continuous)
                 .fill(LinearGradient(colors: [OpenBotTheme.purple.opacity(0.12), .white.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 244, height: 122)
-            Image("MascotStudio")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 226, height: 110)
+            HStack(spacing: -17) {
+                BotMascotView(colorHex: "#6D5BD8", variant: "nova", status: "ready", size: 70).zIndex(3)
+                BotMascotView(colorHex: "#E75C83", variant: "blob", status: "ready", size: 70).offset(y: 4).zIndex(2)
+                BotMascotView(colorHex: "#36AA82", variant: "sprout", status: "ready", size: 70).zIndex(1)
+            }
+                .frame(width: 176, height: 90)
                 .offset(y: floating ? -2.5 : 2)
                 .shadow(color: OpenBotTheme.purple.opacity(0.15), radius: 16, y: 8)
         }
         .task {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { floating = true }
         }
     }

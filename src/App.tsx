@@ -82,6 +82,7 @@ function Mascot({ bot, size = "medium", state }: { bot: MascotBot; size?: "tiny"
       <img className="mascot-art" src={artwork} alt="" draggable={false} />
       <span className="mascot-art-blink"><i /><i /></span>
       <span className="mascot-spark mascot-spark-a">✦</span><span className="mascot-spark mascot-spark-b">·</span>
+      <span className="mascot-presence" aria-hidden="true" />
     </div>
   );
 }
@@ -91,11 +92,7 @@ function Logo() {
 }
 
 function RoomCluster({ bots, large = false, hero = false }: { bots: Bot[]; large?: boolean; hero?: boolean }) {
-  const kinds = new Set(bots.slice(0, 3).map((bot) => bot.mascot));
-  if (bots.length >= 3 && kinds.has("nova") && kinds.has("blob") && kinds.has("sprout")) {
-    return <div className={`room-cluster room-cluster-artwork ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`} aria-label={`${bots.slice(0, 3).map((bot) => bot.name).join(", ")} are ready`}><img className="room-cluster-art" src="/mascots/studio.png" alt="" draggable={false} /></div>;
-  }
-  return <div className={`room-cluster ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`}>{bots.slice(0, 3).map((bot) => <Mascot key={bot.id} bot={bot} size={hero ? "large" : large ? "medium" : "tiny"} />)}</div>;
+  return <div className={`room-cluster room-cluster-motion ${large ? "room-cluster-large" : ""} ${hero ? "room-cluster-hero" : ""}`} aria-label={`${bots.slice(0, 3).map((bot) => bot.name).join(", ")} are here`}>{bots.slice(0, 3).map((bot) => <Mascot key={bot.id} bot={bot} size={hero ? "large" : large ? "medium" : "tiny"} />)}</div>;
 }
 
 function Sidebar({ state, provider, connectors, activeThreadId, onSelectThread, onCreateBot, onOpenPanel, open, onClose }: {
@@ -141,7 +138,7 @@ function ConversationHeader({ threadTitle, activeBot, roomBots, onMenu, onOpenPa
     <button className="icon-button mobile-only" onClick={onMenu} aria-label="Open conversations"><Menu size={20} /></button>
     <button className="conversation-identity" onClick={() => onOpenPanel(activeBot ? "bot" : "control")}>
       {activeBot ? <Mascot bot={activeBot} size="medium" /> : <RoomCluster bots={roomBots} large />}
-      <div><h1>{threadTitle}</h1><p>{activeBot ? activeBot.status === "working" ? "Working right now" : activeBot.status === "waiting" ? "Waiting for your okay" : `${activeBot.role} · Ready` : connection === "online" ? "Live on your Mac" : connection === "reconnecting" ? "Syncing with your Mac…" : "Your Mac is offline"}</p></div><ChevronDown size={15} />
+      <div><h1>{threadTitle}</h1><p><i className={`header-live-dot header-live-${connection}`} />{connection === "online" ? "Live on your Mac" : connection === "reconnecting" ? "Syncing with your Mac…" : "Your Mac is offline"}</p></div><ChevronDown size={15} />
     </button>
     <div className="header-actions">
       <span className={`connection-indicator connection-${connection}`} title={connection === "online" ? "OpenBot is connected" : connection === "reconnecting" ? "Reconnecting" : "Offline"}><i />{connection === "online" ? "Live" : connection === "reconnecting" ? "Reconnecting" : "Offline"}</span>
@@ -365,7 +362,7 @@ function Composer({ threadId, sharedDraft, bots, apps = [], skills = [], isRoom,
       <button className="composer-plus" onClick={() => fileInput.current?.click()} title="Attach files" aria-label="Attach files"><Paperclip size={18} /></button>
       {isRoom && <button className="composer-mention" onClick={() => { setBody(`${body}${body && !body.endsWith(" ") ? " " : ""}@`); setMentionQuery(""); requestAnimationFrame(() => textarea.current?.focus()); }} title="Mention a teammate" aria-label="Mention a teammate"><AtSign size={17} /></button>}
       {availableSkills.length > 0 && <button className="composer-skill" onClick={() => { setBody(`${body}${body && !body.endsWith(" ") ? " " : ""}/`); setSkillQuery(""); setMentionQuery(null); requestAnimationFrame(() => textarea.current?.focus()); }} title="Use a learned skill" aria-label="Use a learned skill"><WandSparkles size={16} /></button>}
-      <textarea data-testid="message-input" ref={textarea} value={body} onChange={(event) => { setBody(event.target.value); updateMention(event.target.value, event.target.selectionStart); resize(); }} onClick={(event) => updateMention(body, event.currentTarget.selectionStart)} onKeyDown={(event) => { if (event.key === "Escape") { setMentionQuery(null); setSkillQuery(null); setRoutingOpen(false); } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} placeholder={steeringBots.length ? `Add a direction for ${steeringBots.map((bot) => bot.name).join(" and ")}…` : isRoom ? "Message the studio — try @nova or /skill…" : `Message ${bots[0]?.name || "your teammate"}`} rows={1} />
+      <textarea data-testid="message-input" ref={textarea} value={body} onChange={(event) => { setBody(event.target.value); updateMention(event.target.value, event.target.selectionStart); resize(); }} onClick={(event) => updateMention(body, event.currentTarget.selectionStart)} onKeyDown={(event) => { if (event.key === "Escape") { setMentionQuery(null); setSkillQuery(null); setRoutingOpen(false); } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} placeholder={steeringBots.length ? `Add a direction for ${steeringBots.map((bot) => bot.name).join(" and ")}…` : isRoom ? "Message the studio" : `Message ${bots[0]?.name || "your teammate"}`} rows={1} />
       <button className={`voice-button ${listening ? "active" : ""}`} onClick={startVoice} aria-label={listening ? "Stop voice typing" : "Start voice typing"} aria-pressed={listening}>{listening ? <MicOff size={17} /> : <Mic size={17} />}</button>
       <button className="send-button" onClick={() => void submit()} disabled={(!body.trim() && !files.length) || sending} aria-label="Send message">{sending ? <LoaderCircle className="spinner" size={18} /> : <ArrowUp size={19} strokeWidth={2.5} />}</button>
     </div>

@@ -55,26 +55,26 @@ private struct StudioHeader: View {
     let onSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button(action: onThreads) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 17, weight: .medium))
-                    .frame(width: 32, height: 40)
+                    .frame(width: 34, height: 40)
             }
             .accessibilityLabel("Open conversations")
 
-            MascotStack(bots: bots).frame(width: bots.count > 1 ? 70 : 40, height: 42)
+            MascotStack(bots: bots).frame(width: bots.count > 1 ? 78 : 40, height: 42)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(OpenBotTheme.ink)
                     .lineLimit(1)
                     .accessibilityIdentifier("studio-native-title")
                 HStack(spacing: 5) {
                     Circle().fill(isLive ? OpenBotTheme.green : .orange).frame(width: 7, height: 7)
                     Text(isLive ? "Live on your Mac" : "Reconnecting…")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -83,7 +83,7 @@ private struct StudioHeader: View {
             Button(action: onSettings) {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .bold))
-                    .frame(width: 32, height: 40)
+                    .frame(width: 34, height: 40)
             }
             .accessibilityLabel("Studio settings")
         }
@@ -213,7 +213,9 @@ private struct NativeMessageBubble: View {
                     .textSelection(.enabled)
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(
-                        isUser ? AnyShapeStyle(OpenBotTheme.purple) : AnyShapeStyle(Color(red: 0.933, green: 0.925, blue: 0.91)),
+                        isUser
+                            ? AnyShapeStyle(LinearGradient(colors: [OpenBotTheme.messagePurpleStart, OpenBotTheme.messagePurpleEnd], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            : AnyShapeStyle(OpenBotTheme.botBubble),
                         in: bubbleShape
                     )
                     .overlay {
@@ -352,7 +354,7 @@ private struct NativeComposer: View {
                     Image(systemName: "paperclip")
                         .font(.system(size: 18, weight: .semibold))
                         .frame(width: 32, height: 38)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(OpenBotTheme.lavender)
                 }
                 .accessibilityLabel("Attach files")
 
@@ -398,7 +400,7 @@ private struct NativeComposer: View {
                     Image(systemName: "mic")
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 27, height: 38)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(OpenBotTheme.lavender)
                 }
                 .accessibilityLabel("Use iPhone dictation")
 
@@ -409,7 +411,12 @@ private struct NativeComposer: View {
                     }
                     .frame(width: 42, height: 42)
                     .foregroundStyle(.white)
-                    .background(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.35) : OpenBotTheme.purple, in: Circle())
+                    .background(
+                        draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? AnyShapeStyle(Color.gray.opacity(0.35))
+                            : AnyShapeStyle(LinearGradient(colors: [OpenBotTheme.messagePurpleStart, OpenBotTheme.messagePurpleEnd], startPoint: .topLeading, endPoint: .bottomTrailing)),
+                        in: Circle()
+                    )
                 }
                 .disabled(store.isSending || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingFiles.isEmpty))
                 .accessibilityIdentifier("native-send-message")
@@ -553,37 +560,40 @@ private struct MascotStack: View {
     let bots: [StudioBot]
     var large = false
 
-    private var isCoreStudio: Bool {
-        let kinds = Set(bots.prefix(3).map(\.mascot))
-        return bots.count >= 3 && kinds.contains("nova") && kinds.contains("blob") && kinds.contains("sprout")
-    }
-
     var body: some View {
-        Group {
-            if isCoreStudio {
-                Image("MascotStudio")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: large ? 176 : 78, height: large ? 88 : 42)
-            } else {
-                HStack(spacing: large ? -10 : -5) {
-                    ForEach(Array(bots.prefix(3).enumerated()), id: \.element.id) { index, bot in
-                        BotMascotView(colorHex: bot.color, variant: bot.mascot, status: bot.status, size: large ? 70 : 34)
-                            .zIndex(Double(3 - index))
-                    }
-                }
+        HStack(spacing: large ? -17 : -12) {
+            ForEach(Array(bots.prefix(3).enumerated()), id: \.element.id) { index, bot in
+                BotMascotView(colorHex: bot.color, variant: bot.mascot, status: bot.status, size: large ? 70 : 34)
+                    .offset(y: index == 1 ? (large ? 4 : 2) : 0)
+                    .zIndex(Double(3 - index))
             }
         }
     }
 }
 
-private struct BotMascotView: View {
+struct BotMascotView: View {
     let colorHex: String
     let variant: String
     let status: String
     let size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var blinking = false
     @State private var floating = false
+
+    private var motionDelay: Double {
+        switch variant {
+        case "nova", "orbit": return 0.08
+        case "sprout", "sunny": return 0.42
+        default: return 0.25
+        }
+    }
+
+    private var motionDuration: Double {
+        let variation = motionDelay * 0.7
+        if status == "celebrating" { return 0.62 + variation }
+        if status == "working" { return 0.72 + variation }
+        return 1.65 + variation
+    }
 
     private var assetName: String {
         switch variant {
@@ -602,7 +612,17 @@ private struct BotMascotView: View {
     }
 
     private var movement: CGFloat {
-        status == "working" ? 2.5 : status == "waiting" ? 1 : 1.5
+        status == "celebrating" ? 4 : status == "working" ? 2.5 : status == "waiting" ? 1 : 1.5
+    }
+
+    private var presenceColor: Color {
+        switch status {
+        case "failed": return .red
+        case "waiting": return .orange
+        case "working": return OpenBotTheme.purple
+        case "offline": return .gray
+        default: return OpenBotTheme.green
+        }
     }
 
     var body: some View {
@@ -613,7 +633,7 @@ private struct BotMascotView: View {
                 .frame(width: size, height: size)
                 .shadow(color: Color(openBotHex: colorHex).opacity(0.18), radius: size * 0.13, y: size * 0.08)
 
-            if blinking {
+            if blinking || status == "celebrating" {
                 HStack(spacing: size * 0.13) {
                     blinkEye
                     blinkEye
@@ -621,17 +641,32 @@ private struct BotMascotView: View {
                 .offset(y: -size * 0.035)
             }
 
-            Circle().fill(status == "failed" ? .red : status == "waiting" ? .orange : status == "working" ? OpenBotTheme.purple : OpenBotTheme.green)
+            if status == "celebrating" {
+                Text("✦")
+                    .font(.system(size: size * 0.20, weight: .bold, design: .rounded))
+                    .foregroundStyle(OpenBotTheme.lavender)
+                    .scaleEffect(floating ? 1.2 : 0.65)
+                    .offset(x: -size * 0.40, y: -size * 0.36)
+                Text("·")
+                    .font(.system(size: size * 0.27, weight: .bold, design: .rounded))
+                    .foregroundStyle(OpenBotTheme.green)
+                    .scaleEffect(floating ? 0.7 : 1.15)
+                    .offset(x: size * 0.39, y: -size * 0.28)
+            }
+
+            Circle().fill(presenceColor)
                 .frame(width: size * 0.18, height: size * 0.18)
                 .overlay(Circle().stroke(.white, lineWidth: Swift.max(1.5, size * 0.045)))
                 .offset(x: size * 0.36, y: size * 0.34)
         }
         .frame(width: size, height: size)
-        .scaleEffect(status == "waiting" && floating ? 0.98 : 1)
-        .rotationEffect(.degrees(status == "working" ? (floating ? 1.2 : -1.2) : 0))
+        .scaleEffect(status == "celebrating" ? (floating ? 1.04 : 0.98) : status == "waiting" && floating ? 0.98 : 1)
+        .rotationEffect(.degrees(status == "working" || status == "celebrating" ? (floating ? 1.2 : -1.2) : 0))
         .offset(y: floating ? -movement : movement * 0.45)
         .task {
-            withAnimation(.easeInOut(duration: status == "working" ? 0.75 : 1.8).repeatForever(autoreverses: true)) { floating = true }
+            guard !reduceMotion else { return }
+            try? await Task.sleep(for: .milliseconds(Int(motionDelay * 1_000)))
+            withAnimation(.easeInOut(duration: motionDuration).repeatForever(autoreverses: true)) { floating = true }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2.2...5.2) * 1_000_000_000))
                 withAnimation(.easeInOut(duration: 0.08)) { blinking = true }

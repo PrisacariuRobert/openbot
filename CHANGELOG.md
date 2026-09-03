@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.3 — 2026-09-03
+
+- Unified web and native layout tokens for the studio header, live status, conversation, bubbles, composer, routing pill, and controls
+- Replaced the static shared-room image with three independently animated production mascots in both clients
+- Added deliberately offset float and blink timing instead of synchronized character movement
+- Added matching ready, working, waiting, offline, failed, and celebration treatments with status dots, happy eyes, and sparkles
+- Matched native and web message gradients, bot surfaces, icon colors, direct-chat mascot sizing, and composer language
+- Preserved reduced-motion behavior and verified both clients at a 402-point iPhone layout width
+
 ## 0.17.2 — 2026-09-03
 
 - Unified the web and native iPhone studio around one visual and conversational language

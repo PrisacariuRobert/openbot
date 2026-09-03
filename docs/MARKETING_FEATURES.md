@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.17.2 local-first beta
+Release: 0.17.3 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
