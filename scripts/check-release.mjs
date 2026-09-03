@@ -6,6 +6,8 @@ const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 const database = readFileSync(new URL("../src/server/database.ts", import.meta.url), "utf8");
+const runtime = readFileSync(new URL("../src/server/runtime.ts", import.meta.url), "utf8");
+const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
 
@@ -41,6 +43,18 @@ if (!database.includes("updateThread(id") || !database.includes("duplicateBot(id
 }
 if (!styles.includes(".live-desk-grid") || !styles.includes(".studio-search-results") || !styles.includes(".conversation-organizer")) {
   failures.push("The Live Studio, search, and conversation organization surfaces must remain styled responsively.");
+}
+if (!database.includes("CREATE TABLE IF NOT EXISTS workflow_versions") || !database.includes("reviseWorkflowRecord") || !database.includes("listWorkflowVersions")) {
+  failures.push("The Skill Library must keep immutable versions and non-destructive rollback support.");
+}
+if (!skillLibrary.includes('format: z.literal("openbot.skill")') || !skillLibrary.includes("createHash") || !skillLibrary.includes("skillSecretFindings")) {
+  failures.push("Portable skills must keep their strict format, integrity check, and secret scanner.");
+}
+if (!runtime.includes("importTaughtWorkflow") || !runtime.includes("assignTaughtWorkflow") || !runtime.includes("rollbackTaughtWorkflow")) {
+  failures.push("Portable skill import, teammate assignment, and rollback must remain connected to generated skill files.");
+}
+if (!app.includes("skill-owner-switcher") || !app.includes("Import reviewed skill") || !app.includes("Useful starters") || !styles.includes(".skill-template-grid")) {
+  failures.push("The responsive Skill Library management experience is incomplete.");
 }
 
 if (failures.length) {

@@ -390,7 +390,7 @@ private struct NativeComposer: View {
                         Text("No learned skills yet")
                     } else {
                         ForEach(store.state.workflows) { workflow in
-                            Button("\(workflow.name) · \(workflow.botName)") {
+                            Button("\(workflow.name) · \(workflow.botName) · v\(workflow.version ?? 1)") {
                                 draft = "/\(workflow.skillSlug) "
                                 focused = true
                             }

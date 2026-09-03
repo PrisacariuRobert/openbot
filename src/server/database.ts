@@ -31,6 +31,7 @@ import type {
   RoutineTriggerConfig,
   Run,
   RunStatus,
+  SkillVersion,
   StudioSettings,
   StudioSearchResult,
   StudioDraft,
@@ -389,10 +390,28 @@ export class OpenBotDatabase {
         id TEXT PRIMARY KEY,
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        instructions TEXT NOT NULL DEFAULT '',
         start_url TEXT NOT NULL,
         steps_json TEXT NOT NULL,
         skill_path TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        skill_slug TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        source TEXT NOT NULL DEFAULT 'taught',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS workflow_versions (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL REFERENCES taught_workflows(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        instructions TEXT NOT NULL,
+        start_url TEXT NOT NULL,
+        steps_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(workflow_id, version)
       );
       CREATE TABLE IF NOT EXISTS dedupe_keys (
         dedupe_key TEXT PRIMARY KEY,
@@ -503,6 +522,7 @@ export class OpenBotDatabase {
       CREATE INDEX IF NOT EXISTS code_project_edits_created ON code_project_edits(project_id, created_at);
       CREATE INDEX IF NOT EXISTS code_task_workspaces_project_updated ON code_task_workspaces(project_id, updated_at);
       CREATE INDEX IF NOT EXISTS code_task_reviews_source_created ON code_task_reviews(source_run_id, created_at);
+      CREATE INDEX IF NOT EXISTS workflow_versions_workflow_version ON workflow_versions(workflow_id, version DESC);
     `);
 
     this.addColumn("bots", "owner_id TEXT");
@@ -563,6 +583,11 @@ export class OpenBotDatabase {
     this.addColumn("runs", "automation_event_id TEXT");
     this.addColumn("connectors", "credentials_ciphertext TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
+    this.addColumn("taught_workflows", "description TEXT NOT NULL DEFAULT ''");
+    this.addColumn("taught_workflows", "instructions TEXT NOT NULL DEFAULT ''");
+    this.addColumn("taught_workflows", "version INTEGER NOT NULL DEFAULT 1");
+    this.addColumn("taught_workflows", "source TEXT NOT NULL DEFAULT 'taught'");
+    this.addColumn("taught_workflows", "updated_at TEXT");
     const hadRoutineInterval = this.hasColumn("routines", "interval_minutes");
     this.addColumn("routines", "interval_minutes INTEGER NOT NULL DEFAULT 1440");
     this.addColumn("code_projects", "connected INTEGER NOT NULL DEFAULT 1");
@@ -575,6 +600,9 @@ export class OpenBotDatabase {
     this.addColumn("code_project_edits", "restored_at TEXT");
     if (!hadRoutineInterval) this.db.exec("UPDATE routines SET interval_minutes=CASE cadence WHEN 'hourly' THEN 60 ELSE 1440 END");
     this.addColumn("provider_instances", "runtime TEXT NOT NULL DEFAULT 'opencode'");
+    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
+      SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare(`
       INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
       VALUES ('mac_access_enabled', CASE WHEN EXISTS(SELECT 1 FROM bots WHERE mac_access_enabled=1) THEN '1' ELSE '0' END, ?)
@@ -2033,31 +2061,83 @@ export class OpenBotDatabase {
     return `${base}-${suffix}`;
   }
 
-  saveWorkflow(input: { botId: string; name: string; startUrl: string; steps: unknown[]; skillPath: string; skillSlug: string }): TaughtWorkflow {
-    const id = randomUUID();
-    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,start_url,steps_json,skill_path,skill_slug,created_at) VALUES (?,?,?,?,?,?,?,?)").run(id, input.botId, input.name, input.startUrl, JSON.stringify(input.steps), input.skillPath, input.skillSlug, now());
+  saveWorkflow(input: { botId: string; name: string; description?: string; instructions?: string; startUrl: string; steps: unknown[]; skillPath: string; skillSlug: string; source?: TaughtWorkflow["source"] }): TaughtWorkflow {
+    const id = randomUUID(), createdAt = now();
+    const description = input.description?.trim() || `Repeat the saved ${input.name} workflow.`;
+    const instructions = input.instructions?.trim() || `Start at ${input.startUrl}, follow the demonstrated steps, and verify the result.`;
+    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,description,instructions,start_url,steps_json,skill_path,skill_slug,version,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?)").run(
+      id, input.botId, input.name, description, instructions, input.startUrl, JSON.stringify(input.steps), input.skillPath, input.skillSlug, input.source || "taught", createdAt, createdAt,
+    );
+    this.db.prepare("INSERT INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at) VALUES (?,?,1,?,?,?,?,?,?)").run(
+      randomUUID(), id, input.name, description, instructions, input.startUrl, JSON.stringify(input.steps), createdAt,
+    );
     return this.listWorkflows(input.botId).find((workflow) => workflow.id === id)!;
+  }
+
+  private workflowFromRow(row: Row): TaughtWorkflow {
+    return {
+      id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name),
+      skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)),
+      description: String(row.description || `Repeat the saved ${row.name} workflow.`),
+      instructions: String(row.instructions || `Start at ${row.start_url}, follow the demonstrated steps, and verify the result.`),
+      startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, version: Number(row.version || 1),
+      source: (["taught", "imported", "template", "assigned"].includes(String(row.source)) ? String(row.source) : "taught") as TaughtWorkflow["source"],
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at || row.created_at),
+    };
   }
 
   listWorkflows(botId?: string): TaughtWorkflow[] {
     const rows = botId
-      ? this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.bot_id=? ORDER BY w.created_at DESC").all(botId) as Row[]
-      : this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id ORDER BY w.created_at DESC").all() as Row[];
-    return rows.map((row) => ({
-      id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url),
-      stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at),
-    }));
+      ? this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.bot_id=? ORDER BY w.updated_at DESC,w.created_at DESC").all(botId) as Row[]
+      : this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id ORDER BY w.updated_at DESC,w.created_at DESC").all() as Row[];
+    return rows.map((row) => this.workflowFromRow(row));
   }
 
   getWorkflowRecord(id: string): { workflow: TaughtWorkflow; steps: unknown[]; skillPath: string } | null {
     const row = this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.id=?").get(id) as Row | undefined;
     if (!row) return null;
-    return { workflow: { id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at) }, steps: jsonArray<unknown>(row.steps_json), skillPath: String(row.skill_path) };
+    return { workflow: this.workflowFromRow(row), steps: jsonArray<unknown>(row.steps_json), skillPath: String(row.skill_path) };
   }
 
-  updateWorkflowRecord(id: string, input: { name: string; startUrl: string; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
-    this.db.prepare("UPDATE taught_workflows SET name=?,start_url=?,skill_slug=?,skill_path=? WHERE id=?").run(input.name, input.startUrl, input.skillSlug, input.skillPath, id);
-    return this.listWorkflows().find((workflow) => workflow.id === id) || null;
+  reviseWorkflowRecord(id: string, input: { name: string; description: string; instructions: string; startUrl: string; steps: unknown[]; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
+    const current = this.getWorkflowRecord(id);
+    if (!current) return null;
+    const version = current.workflow.version + 1, updatedAt = now();
+    this.db.prepare("UPDATE taught_workflows SET name=?,description=?,instructions=?,start_url=?,steps_json=?,skill_slug=?,skill_path=?,version=?,updated_at=? WHERE id=?").run(
+      input.name, input.description, input.instructions, input.startUrl, JSON.stringify(input.steps), input.skillSlug, input.skillPath, version, updatedAt, id,
+    );
+    this.db.prepare("INSERT INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at) VALUES (?,?,?,?,?,?,?,?,?)").run(
+      randomUUID(), id, version, input.name, input.description, input.instructions, input.startUrl, JSON.stringify(input.steps), updatedAt,
+    );
+    return this.getWorkflowRecord(id)?.workflow || null;
+  }
+
+  updateWorkflowRecord(id: string, input: { name: string; description?: string; instructions?: string; startUrl: string; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
+    const current = this.getWorkflowRecord(id);
+    if (!current) return null;
+    return this.reviseWorkflowRecord(id, {
+      ...input, description: input.description?.trim() || current.workflow.description,
+      instructions: input.instructions?.trim() || current.workflow.instructions, steps: current.steps,
+    });
+  }
+
+  listWorkflowVersions(workflowId: string): SkillVersion[] {
+    const rows = this.db.prepare("SELECT * FROM workflow_versions WHERE workflow_id=? ORDER BY version DESC").all(workflowId) as Row[];
+    return rows.map((row) => ({
+      id: String(row.id), workflowId: String(row.workflow_id), version: Number(row.version), name: String(row.name),
+      description: String(row.description), instructions: String(row.instructions), startUrl: String(row.start_url),
+      stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at),
+    }));
+  }
+
+  getWorkflowVersion(workflowId: string, version: number): (SkillVersion & { steps: unknown[] }) | null {
+    const row = this.db.prepare("SELECT * FROM workflow_versions WHERE workflow_id=? AND version=?").get(workflowId, version) as Row | undefined;
+    if (!row) return null;
+    return {
+      id: String(row.id), workflowId: String(row.workflow_id), version: Number(row.version), name: String(row.name),
+      description: String(row.description), instructions: String(row.instructions), startUrl: String(row.start_url),
+      stepCount: jsonArray<unknown>(row.steps_json).length, steps: jsonArray<unknown>(row.steps_json), createdAt: String(row.created_at),
+    };
   }
 
   deleteWorkflowRecord(id: string): { skillPath: string; botId: string } | null {

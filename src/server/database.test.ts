@@ -203,7 +203,11 @@ test("keeps learned skills globally discoverable with unique slash commands", ()
     assert.equal(first.skillSlug, "morning-brief");
     assert.equal(second.skillSlug, "morning-brief-pixel");
     assert.equal(db.getState("team-room").workflows.length, 2);
-    assert.equal(db.updateWorkflowRecord(first.id, { name: "Daily brief", startUrl: "https://example.net", skillSlug: "daily-brief", skillPath: "/tmp/daily-brief/SKILL.md" })?.skillSlug, "daily-brief");
+    const revised = db.updateWorkflowRecord(first.id, { name: "Daily brief", description: "A clearer brief.", instructions: "Gather and verify today's updates.", startUrl: "https://example.net", skillSlug: "daily-brief", skillPath: "/tmp/daily-brief/SKILL.md" });
+    assert.equal(revised?.skillSlug, "daily-brief");
+    assert.equal(revised?.version, 2);
+    assert.equal(db.listWorkflowVersions(first.id).length, 2);
+    assert.equal(db.getWorkflowVersion(first.id, 1)?.name, "Morning brief");
     assert.equal(db.deleteWorkflowRecord(second.id)?.botId, "pixel");
     assert.equal(db.listWorkflows().length, 1);
     db.close();

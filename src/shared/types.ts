@@ -569,9 +569,44 @@ export interface TaughtWorkflow {
   botName: string;
   name: string;
   skillSlug: string;
+  description: string;
+  instructions: string;
+  startUrl: string;
+  stepCount: number;
+  version: number;
+  source: "taught" | "imported" | "template" | "assigned";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillStep {
+  type: "navigate" | "click" | "input" | "submit";
+  url: string;
+  selector?: string;
+  value?: string;
+  label?: string;
+}
+
+export interface SkillVersion {
+  id: string;
+  workflowId: string;
+  version: number;
+  name: string;
+  description: string;
+  instructions: string;
   startUrl: string;
   stepCount: number;
   createdAt: string;
+}
+
+export interface SkillTemplate {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  startUrl: string;
+  category: string;
+  stepCount: number;
 }
 
 export interface CodeProjectAccess {

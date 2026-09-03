@@ -110,6 +110,8 @@ import type {
   Routine,
   Run,
   SlackMessageSummary,
+  SkillTemplate,
+  SkillVersion,
   StudioDraft,
   StudioSearchResult,
   TaughtWorkflow,
@@ -1794,6 +1796,7 @@ function ControlPanel({
   onOpenRemote,
   onOpenConnectors,
   onOpenProjects,
+  onOpenSkills,
   onSetMacAccess,
 }: {
   state: AppState;
@@ -1802,6 +1805,7 @@ function ControlPanel({
   onOpenRemote: () => void;
   onOpenConnectors: () => void;
   onOpenProjects: () => void;
+  onOpenSkills: () => void;
   onSetMacAccess: (enabled: boolean) => Promise<void>;
 }) {
   const active = state.bots.filter((bot) =>
@@ -2008,6 +2012,13 @@ function ControlPanel({
           </div>
         </div>
         <div className="quick-actions">
+          <button onClick={onOpenSkills}>
+            <WandSparkles size={18} />
+            <span>
+              <strong>Skill Library</strong>
+              <small>Teach once, reuse safely, and share between teammates</small>
+            </span>
+          </button>
           <button onClick={onOpenProjects}>
             <Code2 size={18} />
             <span>
@@ -7133,10 +7144,14 @@ function ComputerPanel({ bot, onTeach }: { bot: Bot; onTeach: () => void }) {
 
 function TeachPanel({
   bot,
+  bots,
+  onBotChange,
   onUse,
   onNotice,
 }: {
   bot: Bot;
+  bots: Bot[];
+  onBotChange: (botId: string) => void;
   onUse: (workflow: TaughtWorkflow) => Promise<void>;
   onNotice: (message: string) => void;
 }) {
@@ -7144,30 +7159,46 @@ function TeachPanel({
     [startUrl, setStartUrl] = useState("https://example.com"),
     [recording, setRecording] = useState(false),
     [stepCount, setStepCount] = useState(0),
-    [workflows, setWorkflows] = useState<TaughtWorkflow[]>([]),
+    [allWorkflows, setAllWorkflows] = useState<TaughtWorkflow[]>([]),
+    [templates, setTemplates] = useState<SkillTemplate[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [editingWorkflow, setEditingWorkflow] = useState<TaughtWorkflow | null>(
       null,
     ),
     [editName, setEditName] = useState(""),
-    [editUrl, setEditUrl] = useState("");
+    [editDescription, setEditDescription] = useState(""),
+    [editInstructions, setEditInstructions] = useState(""),
+    [editUrl, setEditUrl] = useState(""),
+    [historyWorkflow, setHistoryWorkflow] = useState<TaughtWorkflow | null>(null),
+    [versions, setVersions] = useState<SkillVersion[]>([]);
+  const importInput = useRef<HTMLInputElement>(null);
+  const workflows = allWorkflows.filter((workflow) => workflow.botId === bot.id);
+  const studioSkills = allWorkflows.filter((workflow) => workflow.botId !== bot.id);
   const refresh = useCallback(async () => {
-    const [status, list] = await Promise.all([
+    const [status, list, starters] = await Promise.all([
       api<{ recording: boolean; stepCount: number }>(
         `/api/bots/${bot.id}/teach`,
       ),
-      api<TaughtWorkflow[]>(`/api/bots/${bot.id}/workflows`),
+      api<TaughtWorkflow[]>("/api/workflows"),
+      api<SkillTemplate[]>("/api/skill-templates"),
     ]);
     setRecording(status.recording);
     setStepCount(status.stepCount);
-    setWorkflows(list);
+    setAllWorkflows(list);
+    setTemplates(starters);
   }, [bot.id]);
   useEffect(() => {
     void refresh();
     const timer = setInterval(() => void refresh(), 2000);
     return () => clearInterval(timer);
   }, [refresh]);
+  useEffect(() => {
+    setEditingWorkflow(null);
+    setHistoryWorkflow(null);
+    setVersions([]);
+    setError("");
+  }, [bot.id]);
   const start = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -7199,6 +7230,8 @@ function TeachPanel({
   const edit = (workflow: TaughtWorkflow) => {
     setEditingWorkflow(workflow);
     setEditName(workflow.name);
+    setEditDescription(workflow.description);
+    setEditInstructions(workflow.instructions);
     setEditUrl(workflow.startUrl);
     setError("");
   };
@@ -7210,7 +7243,12 @@ function TeachPanel({
     try {
       await api(`/api/workflows/${editingWorkflow.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: editName, startUrl: editUrl }),
+        body: JSON.stringify({
+          name: editName,
+          description: editDescription,
+          instructions: editInstructions,
+          startUrl: editUrl,
+        }),
       });
       setEditingWorkflow(null);
       await refresh();
@@ -7241,8 +7279,143 @@ function TeachPanel({
       setBusy(false);
     }
   };
+  const download = async (workflow: TaughtWorkflow) => {
+    setBusy(true);
+    setError("");
+    try {
+      const portable = await api<unknown>(`/api/workflows/${workflow.id}/export`);
+      const url = URL.createObjectURL(
+        new Blob([`${JSON.stringify(portable, null, 2)}\n`], {
+          type: "application/json",
+        }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${workflow.skillSlug}.openbot-skill.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      onNotice("Safe skill file exported");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const importSkill = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      if (file.size > 256_000)
+        throw new Error("That skill file is too large. Choose one under 256 KB.");
+      const portable = JSON.parse(await file.text()) as unknown;
+      await api("/api/skills/import", {
+        method: "POST",
+        body: JSON.stringify({ botId: bot.id, package: portable }),
+      });
+      await refresh();
+      onNotice(`Skill added to ${bot.name}`);
+    } catch (e) {
+      setError(
+        e instanceof SyntaxError
+          ? "That file is not a valid OpenBot skill."
+          : e instanceof Error
+            ? e.message
+            : String(e),
+      );
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+      setBusy(false);
+    }
+  };
+  const installTemplate = async (template: SkillTemplate) => {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/skill-templates/${template.id}/install`, {
+        method: "POST",
+        body: JSON.stringify({ botId: bot.id }),
+      });
+      await refresh();
+      onNotice(`${template.name} added to ${bot.name}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const assign = async (workflow: TaughtWorkflow) => {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/workflows/${workflow.id}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ botId: bot.id }),
+      });
+      await refresh();
+      onNotice(`${workflow.name} added to ${bot.name}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const openHistory = async (workflow: TaughtWorkflow) => {
+    setHistoryWorkflow(workflow);
+    setVersions([]);
+    setError("");
+    try {
+      setVersions(
+        await api<SkillVersion[]>(`/api/workflows/${workflow.id}/versions`),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const rollback = async (workflow: TaughtWorkflow, version: number) => {
+    if (
+      !window.confirm(
+        `Restore version ${version}? OpenBot will keep the current version in history too.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      const restored = await api<TaughtWorkflow>(
+        `/api/workflows/${workflow.id}/rollback`,
+        { method: "POST", body: JSON.stringify({ version }) },
+      );
+      await refresh();
+      await openHistory(restored);
+      onNotice(`Version ${version} restored as version ${restored.version}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <div className="teach-panel">
+    <div className="teach-panel skill-library">
+      <div className="skill-owner-switcher">
+        <span>
+          <Mascot bot={bot} size="medium" />
+          <span>
+            <strong>{bot.name}'s library</strong>
+            <small>Skills stay owned by the teammate you choose</small>
+          </span>
+        </span>
+        <label>
+          <span>Teammate</span>
+          <select value={bot.id} onChange={(event) => onBotChange(event.target.value)}>
+            {bots.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} · {item.role}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className={`teach-hero ${recording ? "recording" : ""}`}>
         <div className="teach-visual">
           <Mascot
@@ -7259,7 +7432,7 @@ function TeachPanel({
         <p>
           {recording
             ? `${stepCount} meaningful action${stepCount === 1 ? "" : "s"} captured. Secrets are replaced with placeholders.`
-            : "Open a visible browser, complete the task once, then save it as a reusable skill."}
+            : "Demonstrate a browser task, install a safe starter, or bring in a reviewed OpenBot skill file."}
         </p>
       </div>
       {recording ? (
@@ -7300,18 +7473,56 @@ function TeachPanel({
         </form>
       )}
       {error && <p className="panel-error">{error}</p>}
+      <div className="skill-portability-bar">
+        <input
+          ref={importInput}
+          type="file"
+          className="visually-hidden"
+          accept=".json,.openbot-skill.json,application/json"
+          onChange={(event) => void importSkill(event.target.files?.[0])}
+        />
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={busy}
+          onClick={() => importInput.current?.click()}
+        >
+          <ArrowUp size={15} /> Import reviewed skill
+        </button>
+        <span>
+          <ShieldCheck size={15} /> Integrity checked · secrets blocked · rollback ready
+        </span>
+      </div>
       <div className="privacy-note">
         <KeyRound size={16} />
-        <p>
-          Passwords are never recorded. When a sign-in is needed later, OpenBot
-          pauses so you can take over safely.
-        </p>
+        <p>Passwords are replaced with placeholders. Imported files are rejected if they contain credentials, private keys, or changed integrity data.</p>
       </div>
       <section>
         <div className="panel-section-heading">
           <div>
+            <h3>Useful starters</h3>
+            <p>Small, editable foundations—not opaque automations</p>
+          </div>
+        </div>
+        <div className="skill-template-grid">
+          {templates.map((template) => (
+            <article key={template.id}>
+              <span className="skill-template-icon"><WandSparkles size={17} /></span>
+              <span className="skill-category">{template.category}</span>
+              <h4>{template.name}</h4>
+              <p>{template.description}</p>
+              <button disabled={busy} onClick={() => void installTemplate(template)}>
+                <Plus size={13} /> Add to {bot.name}
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section>
+        <div className="panel-section-heading">
+          <div>
             <h3>Learned skills</h3>
-            <p>Type / in chat, or manage each reusable workflow here</p>
+            <p>Type / in chat, edit safely, or return to an earlier version</p>
           </div>
         </div>
         {workflows.length ? (
@@ -7322,9 +7533,10 @@ function TeachPanel({
                 <span>
                   <strong>/{workflow.skillSlug}</strong>
                   <small>
-                    {workflow.name} · {workflow.stepCount} steps ·{" "}
+                    {workflow.name} · v{workflow.version} · {workflow.stepCount} steps ·{" "}
                     {new URL(workflow.startUrl).hostname}
                   </small>
+                  <em>{workflow.description}</em>
                 </span>
                 <div className="workflow-actions">
                   <button onClick={() => void onUse(workflow)}>
@@ -7332,6 +7544,12 @@ function TeachPanel({
                   </button>
                   <button onClick={() => edit(workflow)}>
                     <Settings2 size={12} /> Edit
+                  </button>
+                  <button onClick={() => void openHistory(workflow)}>
+                    <RotateCcw size={12} /> History
+                  </button>
+                  <button onClick={() => void download(workflow)}>
+                    <Download size={12} /> Export
                   </button>
                   <button
                     className="danger"
@@ -7352,6 +7570,31 @@ function TeachPanel({
           </div>
         )}
       </section>
+      {studioSkills.length > 0 && (
+        <section>
+          <div className="panel-section-heading">
+            <div>
+              <h3>From your studio</h3>
+              <p>Copy a teammate's setup without copying their private history</p>
+            </div>
+          </div>
+          <div className="studio-skill-list">
+            {studioSkills.map((workflow) => (
+              <article key={workflow.id}>
+                <span className="skill-share-mark"><Copy size={15} /></span>
+                <span>
+                  <strong>{workflow.name}</strong>
+                  <small>/{workflow.skillSlug} · {workflow.botName} · v{workflow.version}</small>
+                  <p>{workflow.description}</p>
+                </span>
+                <button disabled={busy} onClick={() => void assign(workflow)}>
+                  Add to {bot.name}
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {editingWorkflow && (
         <form className="workflow-edit-form" onSubmit={saveEdit}>
           <header>
@@ -7370,6 +7613,25 @@ function TeachPanel({
               onChange={(event) => setEditName(event.target.value)}
               required
               autoFocus
+            />
+          </label>
+          <label className="field">
+            <span>What it is for</span>
+            <input
+              value={editDescription}
+              onChange={(event) => setEditDescription(event.target.value)}
+              maxLength={300}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>How it should work</span>
+            <textarea
+              value={editInstructions}
+              onChange={(event) => setEditInstructions(event.target.value)}
+              maxLength={5000}
+              rows={5}
+              required
             />
           </label>
           <label className="field">
@@ -7398,6 +7660,35 @@ function TeachPanel({
             </button>
           </div>
         </form>
+      )}
+      {historyWorkflow && (
+        <section className="skill-history-panel">
+          <header>
+            <span><RotateCcw size={16} /></span>
+            <div>
+              <strong>{historyWorkflow.name} history</strong>
+              <small>Restoring creates a new version, so nothing is lost.</small>
+            </div>
+            <button className="icon-button" onClick={() => setHistoryWorkflow(null)} aria-label="Close skill history"><X size={15} /></button>
+          </header>
+          <div className="skill-version-list">
+            {versions.map((version) => (
+              <article key={version.id}>
+                <b>v{version.version}</b>
+                <span>
+                  <strong>{version.name}</strong>
+                  <small>{version.stepCount} steps · {relativeTime(version.createdAt)}</small>
+                  <p>{version.description}</p>
+                </span>
+                {version.version === historyWorkflow.version ? (
+                  <em>Current</em>
+                ) : (
+                  <button disabled={busy} onClick={() => void rollback(historyWorkflow, version.version)}>Restore</button>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
@@ -7620,6 +7911,7 @@ export function App() {
     [sidebarOpen, setSidebarOpen] = useState(false),
     [sending, setSending] = useState(false),
     [replyingTo, setReplyingTo] = useState<Message | null>(null),
+    [skillBotId, setSkillBotId] = useState(""),
     [searchQuery, setSearchQuery] = useState(""),
     [toast, setToast] = useState<string | null>(callbackNotice),
     [authRequired, setAuthRequired] = useState(false),
@@ -7825,6 +8117,11 @@ export function App() {
   const activeBot = activeThread?.botId
     ? state?.bots.find((bot) => bot.id === activeThread.botId) || null
     : null;
+  const skillBot =
+    state?.bots.find((bot) => bot.id === skillBotId) ||
+    activeBot ||
+    state?.bots[0] ||
+    null;
   const activeRuns =
     state?.runs
       .filter(
@@ -8055,6 +8352,10 @@ export function App() {
             onOpenRemote={() => setPanel("remote")}
             onOpenConnectors={() => setPanel("connectors")}
             onOpenProjects={() => setPanel("projects")}
+            onOpenSkills={() => {
+              setSkillBotId(state.bots[0]?.id || "");
+              setPanel("teach");
+            }}
             onSetMacAccess={async (enabled) => {
               await mutate(
                 () =>
@@ -8249,7 +8550,10 @@ export function App() {
               setSelectedBotIds([duplicate.id]);
               setToast(`${duplicate.name} joined your studio`);
             }}
-            onOpenTeach={() => setPanel("teach")}
+            onOpenTeach={() => {
+              setSkillBotId(activeBot.id);
+              setPanel("teach");
+            }}
           />
         </Sheet>
       )}
@@ -8268,31 +8572,41 @@ export function App() {
           subtitle="A persistent workspace and private browser"
           onClose={() => setPanel(null)}
         >
-          <ComputerPanel bot={activeBot} onTeach={() => setPanel("teach")} />
+          <ComputerPanel
+            bot={activeBot}
+            onTeach={() => {
+              setSkillBotId(activeBot.id);
+              setPanel("teach");
+            }}
+          />
         </Sheet>
       )}
-      {panel === "teach" && activeBot && (
+      {panel === "teach" && skillBot && (
         <Sheet
-          title={`Teach ${activeBot.name}`}
-          subtitle="Turn a demonstration into a reusable skill"
+          wide
+          title="Skill Library"
+          subtitle="Teach once, reuse safely, and keep every version"
           onClose={() => setPanel(null)}
         >
           <TeachPanel
-            bot={activeBot}
+            bot={skillBot}
+            bots={state.bots}
+            onBotChange={setSkillBotId}
             onNotice={setToast}
             onUse={async (workflow) => {
               setPanel(null);
-              selectThread(activeBot.threadId);
+              const owner = state.bots.find((bot) => bot.id === workflow.botId) || skillBot;
+              selectThread(owner.threadId);
               await api("/api/messages", {
                 method: "POST",
                 body: JSON.stringify({
-                  threadId: activeBot.threadId,
+                  threadId: owner.threadId,
                   body: `/${workflow.skillSlug}`,
-                  targetBotIds: [activeBot.id],
+                  targetBotIds: [owner.id],
                   attachmentIds: [],
                 }),
               });
-              await loadState(activeBot.threadId, true);
+              await loadState(owner.threadId, true);
               setToast(`${workflow.name} started`);
             }}
           />

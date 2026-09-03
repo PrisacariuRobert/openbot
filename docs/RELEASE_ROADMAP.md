@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 3, 2026 after the 0.18 Live Studio release.
+Updated September 3, 2026 after the 0.19 Skill Library release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -80,7 +80,21 @@ Goal: keep a growing studio understandable.
 
 Verified with 79 automated tests, the production build, native release checks, and responsive browser acceptance at 402×874 with zero horizontal overflow. Private skill import/export remains deliberately unclaimed until versioning, secret scanning, and rollback exist.
 
-## 0.19 — Always-on work
+## Shipped in 0.19 — Reusable, portable skills
+
+Goal: make successful browser work safely reusable instead of trapping it inside one teammate.
+
+- Rebuilt taught workflows as a teammate-owned Skill Library with editable purpose, instructions, starting page, source, and version
+- Added strict `.openbot-skill.json` packages with SHA-256 integrity verification
+- Added bounded import with schema validation, supported-address checks, embedded-secret detection, placeholder support, and tamper rejection
+- Added immutable version history and non-destructive rollback, where restoring an older version creates a new retained version
+- Added one-click assignment between teammates without copying private conversation, memory, credentials, browser profile, or workspace data
+- Added three transparent starter skills and a responsive library for teaching, installing, importing, exporting, editing, launching, and restoring
+- Kept `/` chat invocation and the native iPhone skill picker aligned with the saved owner and current version
+
+Verified with 83 automated tests, including real workspace file generation, package integrity, secret blocking, template bounds, import, assignment, versioning, and rollback. This remains a browser-oriented private skill format rather than a public executable plugin marketplace.
+
+## 0.20 — Always-on work
 
 Goal: make remote and mobile use reliable while preserving local-only mode.
 
@@ -89,7 +103,7 @@ Goal: make remote and mobile use reliable while preserving local-only mode.
 - Add push delivery, share-sheet capture, and native voice sessions to the existing iPhone companion
 - Keep the current loopback-only local mode as a first-class zero-cloud choice
 - Prototype bounded screenshot understanding and visible human takeover for interfaces the structured tools cannot operate
-- Add private skill manifests, versions, import/export, tests, secret scanning, and reversible owner-controlled templates
+- Extend the private skill format only after sandboxed executable assets and dependency review have a separate threat model
 
 Ship only after threat modeling, encrypted recovery testing, offline/duplicate-job testing, and a clear data-location choice during setup.
 

@@ -22,6 +22,7 @@ OpenBot is local-first software that runs models and automation tools. It reduce
 16. **Conflict-safe edit recovery** — every agent write stores the prior text and a hash of the exact resulting file. Restore proceeds only when the current file still matches that hash, preventing a stale restore from overwriting newer user or agent work.
 17. **Automation-event boundary** — generic and GitHub hooks require HMAC-SHA256 signatures verified with timing-safe comparison. Hook secrets are encrypted locally and returned only when created or rotated. Source delivery IDs are deduplicated before a run exists, per-automation burst limits reject storms, and an explicit origin header blocks direct self-loops. Retained payloads are recursively secret-redacted and bounded by depth, collection size, string size, and total storage size. Event content is delimited as untrusted model input. Calendar events use the selected bot's read permission and local polling; automation events never bypass the ordinary tool permissions or durable approval path.
 18. **Native-mobile boundary** — the iPhone companion accepts only HTTP(S) server addresses without URL credentials, rejects public plain-HTTP hosts, and stores the private access key with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. It exchanges that key for the same HttpOnly session cookie used by the web app. Pairing deep links carry only a normalized server origin and reject key/token query fields. Forgetting a connection removes the Keychain item and matching WebKit cookies; certificate validation is not bypassed. Its privacy manifest declares no tracking or developer data collection and records the approved app-only UserDefaults reason for the remembered address.
+19. **Portable-skill boundary** — imported skills use one strict data-only schema with bounded text, at most 80 supported browser actions, and HTTP(S)-only starting and step addresses. SHA-256 integrity rejects files altered after export. Scanning rejects embedded URL credentials, sensitive query values, private keys, common provider tokens, bearer tokens, credential-like assignments, and values captured in password/token-like fields. Placeholders such as `{{secret}}` are allowed; secrets themselves are not. Export excludes teammate identity, conversations, memory, credentials, browser profiles, and workspace files. Every edit and rollback creates an immutable retained version.
 
 ## Approval semantics
 
@@ -39,12 +40,13 @@ Automations use the same durable approval path as direct chat. An incoming event
 
 ## Teach mode
 
-Teach mode opens a visible, bot-specific Chrome profile and records navigation, click, changed-field, and submit events. Password inputs are always replaced with `{{secret}}`. Labels suggesting tokens, passwords, keys, or secrets also trigger redaction. The output is readable Markdown, not an opaque macro.
+Teach mode opens a visible, bot-specific Chrome profile and records navigation, click, changed-field, and submit events. Password inputs are always replaced with `{{secret}}`. Labels suggesting tokens, passwords, keys, or secrets also trigger redaction. The output is readable Markdown, not an opaque macro. Saving, editing, importing, assigning, and rolling back regenerate the same bounded skill for OpenCode and Claude Code. Assigning makes a new independent teammate-owned copy; it does not link private histories.
 
 ## Known limitations
 
 - Prompt and command risk detection is defense in depth, not a formal proof of intent.
 - Browser selector text cannot always reveal that a click has a side effect. Users should keep external accounts scoped and review approval cards.
+- Portable skills are data-only browser workflows, not sandboxed executable plugins. Integrity detects post-export changes but does not certify that an unchanged workflow is useful or trustworthy; owners should read instructions and steps before importing.
 - A compromised model process can modify files inside its own workspace.
 - A teammate with **Code + test** access can modify non-hidden text files inside that connected project. Atomic writes and an edit trail reduce accidental damage, but users should keep projects under version control and review the working tree before publishing.
 - Project checks use the configured Docker image and have no network. A project that needs to download dependencies must install them separately before the check, use vendored dependencies, or opt into a future reviewed dependency-fetch workflow.
@@ -63,7 +65,7 @@ Teach mode opens a visible, bot-specific Chrome profile and records navigation, 
 - GitHub access inherits the repositories and organizations available to the signed-in official CLI account. OpenBot's per-bot switches are local policy controls, so owners should keep that CLI account scoped appropriately.
 - Webhook signatures authenticate possession of the automation secret; they do not establish the real-world identity or trustworthiness of every field in the payload. Keep narrow filters enabled and rotate a secret if it may have leaked.
 - Generic and GitHub webhook endpoints are local by default. Internet delivery requires an owner-managed HTTPS tunnel or reverse proxy; exposing OpenBot's plain HTTP port publicly is unsupported.
-- Schedules and Calendar polling run only while the local OpenBot service and Mac are awake. Missed work can be noticed when the service returns, but 0.18 does not provide a hosted lease or guaranteed offline catch-up.
+- Schedules and Calendar polling run only while the local OpenBot service and Mac are awake. Missed work can be noticed when the service returns, but 0.19 does not provide a hosted lease or guaranteed offline catch-up.
 - The iPhone companion is source-ready but not App Store distributed. It has no push provider, background job runner, or share-sheet extension yet; live work still depends on a reachable awake Mac.
 - Event deduplication depends on a stable sender delivery ID and uses a seven-day window. A sender that intentionally changes the ID creates a new event; side effects still rely on the normal approval and tool boundaries.
 - Availability depends on the local OpenBot service, OpenCode/provider, Docker, and Chrome.

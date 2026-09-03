@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.19.0 — 2026-09-03
+
+- Rebuilt learned browser workflows as a teammate-owned Skill Library with purpose, instructions, source, and visible version metadata
+- Added portable `.openbot-skill.json` export packages with a strict format and SHA-256 integrity verification
+- Added bounded import with web-address validation, credential and private-key detection, placeholder support, and tamper rejection
+- Added immutable skill versions and non-destructive rollback; every edit or restore produces a new retained version
+- Added setup-only skill assignment across teammates without copying conversations, memories, browser profiles, credentials, or workspace files
+- Added three editable starter skills for website QA, current research, and approval-safe browser administration
+- Added a polished responsive library for teammate switching, teaching, installing, importing, editing, sharing, exporting, launching, and restoring skills
+- Kept native iPhone skill launch metadata aligned and expanded the automated product suite to 83 passing tests
+
 ## 0.18.0 — 2026-09-03
 
 - Added a studio-wide Live Studio with teammate desks, current and recent work, durable attention items, progress, stop controls, browser previews, and direct conversation links

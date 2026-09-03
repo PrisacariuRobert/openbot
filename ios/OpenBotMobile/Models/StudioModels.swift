@@ -59,6 +59,9 @@ struct StudioWorkflow: Decodable, Identifiable, Hashable {
     let botName: String
     let name: String
     let skillSlug: String
+    let description: String?
+    let version: Int?
+    let source: String?
 }
 
 struct StudioRun: Decodable, Identifiable, Hashable {

@@ -2,11 +2,12 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
-import type { ComputerStatus } from "../shared/types.js";
+import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTemplate, type SkillDefinition } from "./skill-library.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string };
-type TeachStep = { type: "navigate" | "click" | "input" | "submit"; url: string; selector?: string; value?: string; label?: string; at: string };
+type TeachStep = SkillStep & { at: string };
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
 export function protectedProjectPaths(projectPath: string): Array<{ relative: string; directory: boolean }> {
@@ -195,10 +196,9 @@ export class BrowserManager {
 
   constructor(private readonly db: OpenBotDatabase) {}
 
-  private writeTaughtSkill(botId: string, slug: string, name: string, startUrl: string, steps: TeachStep[]): string {
+  private writeTaughtSkill(botId: string, slug: string, name: string, description: string, instructions: string, startUrl: string, steps: SkillStep[]): string {
     const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
-    const description = JSON.stringify(`Repeat the browser workflow the user taught for ${name}.`);
-    const content = `---\nname: ${slug}\ndescription: ${description}\n---\n\n# ${name}\n\nStart at ${startUrl}. Use the browser tools and verify each page before the next action. Never guess credentials; ask for takeover or approval when a secret is needed.\n\n## Demonstrated steps\n\n${stepText || "No actions were captured. Ask the user to demonstrate again."}\n`;
+    const content = `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n# ${name}\n\n${instructions}\n\nStart at ${startUrl}. Use the browser tools and verify each page before the next action. Never guess credentials; ask for takeover or approval when a secret is needed.\n\n## Saved steps\n\n${stepText || "No fixed actions are required. Follow the instructions and verify the result."}\n`;
     let primary = "";
     for (const provider of [".opencode", ".claude"]) {
       const skillDir = path.join(this.db.workspacesDir, botId, provider, "skills", slug);
@@ -208,6 +208,51 @@ export class BrowserManager {
       if (provider === ".opencode") primary = skillPath;
     }
     return primary;
+  }
+
+  private validateSkill(definition: SkillDefinition) {
+    safeUrl(definition.startUrl);
+    for (const step of definition.steps) safeUrl(step.url);
+    const findings = skillSecretFindings(definition);
+    if (findings.length) throw new Error(`Remove private information first: ${findings.join(", ")}. Use placeholders such as {{secret}} instead.`);
+  }
+
+  createTaughtWorkflow(botId: string, definition: SkillDefinition, source: TaughtWorkflow["source"]): TaughtWorkflow {
+    if (!this.db.getBot(botId)) throw new Error("Choose an available teammate for this skill.");
+    this.validateSkill(definition);
+    const slug = this.db.nextWorkflowSlug(botId, definition.name);
+    const skillPath = this.writeTaughtSkill(botId, slug, definition.name, definition.description, definition.instructions, definition.startUrl, definition.steps);
+    return this.db.saveWorkflow({ ...definition, botId, skillPath, skillSlug: slug, source });
+  }
+
+  importTaughtWorkflow(botId: string, input: unknown): TaughtWorkflow {
+    return this.createTaughtWorkflow(botId, parseSkillPackage(input), "imported");
+  }
+
+  installSkillTemplate(botId: string, templateId: string): TaughtWorkflow {
+    const template = skillTemplate(templateId);
+    if (!template) throw new Error("That starter skill is no longer available.");
+    return this.createTaughtWorkflow(botId, { name: template.name, description: template.description, instructions: template.instructions, startUrl: template.startUrl, steps: template.steps, version: 1 }, "template");
+  }
+
+  assignTaughtWorkflow(id: string, botId: string): TaughtWorkflow {
+    const record = this.db.getWorkflowRecord(id);
+    if (!record) throw new Error("That skill is no longer available.");
+    return this.createTaughtWorkflow(botId, {
+      name: record.workflow.name, description: record.workflow.description, instructions: record.workflow.instructions,
+      startUrl: record.workflow.startUrl, steps: record.steps as SkillStep[], version: 1,
+    }, "assigned");
+  }
+
+  exportTaughtWorkflow(id: string) {
+    const record = this.db.getWorkflowRecord(id);
+    if (!record) throw new Error("That skill is no longer available.");
+    const definition = {
+      name: record.workflow.name, description: record.workflow.description, instructions: record.workflow.instructions,
+      startUrl: record.workflow.startUrl, steps: record.steps as SkillStep[], version: record.workflow.version,
+    };
+    this.validateSkill(definition);
+    return createSkillPackage(definition);
   }
 
   isAvailable() { return Boolean(chromePath()); }
@@ -345,17 +390,24 @@ export class BrowserManager {
     this.teaching.delete(botId);
     await this.contexts.get(botId)?.close();
     const slug = this.db.nextWorkflowSlug(botId, session.name);
-    const skillPath = this.writeTaughtSkill(botId, slug, session.name, session.startUrl, session.steps);
-    return this.db.saveWorkflow({ botId, name: session.name, startUrl: session.startUrl, steps: session.steps, skillPath, skillSlug: slug });
+    const description = `Repeat the browser workflow taught for ${session.name}.`;
+    const instructions = `Start at the saved page, follow the demonstrated actions in order, and verify the result before answering.`;
+    const skillPath = this.writeTaughtSkill(botId, slug, session.name, description, instructions, session.startUrl, session.steps);
+    return this.db.saveWorkflow({ botId, name: session.name, description, instructions, startUrl: session.startUrl, steps: session.steps, skillPath, skillSlug: slug, source: "taught" });
   }
 
-  updateTaughtWorkflow(id: string, input: { name: string; startUrl: string }) {
-    safeUrl(input.startUrl);
+  updateTaughtWorkflow(id: string, input: { name: string; description?: string; instructions?: string; startUrl: string }) {
     const record = this.db.getWorkflowRecord(id);
     if (!record) throw new Error("Learned workflow not found.");
+    const definition = {
+      name: input.name, description: input.description?.trim() || record.workflow.description,
+      instructions: input.instructions?.trim() || record.workflow.instructions, startUrl: input.startUrl,
+      steps: record.steps as SkillStep[], version: record.workflow.version + 1,
+    };
+    this.validateSkill(definition);
     const slug = this.db.nextWorkflowSlug(record.workflow.botId, input.name, id);
     const oldSlug = record.workflow.skillSlug;
-    const skillPath = this.writeTaughtSkill(record.workflow.botId, slug, input.name, input.startUrl, record.steps as TeachStep[]);
+    const skillPath = this.writeTaughtSkill(record.workflow.botId, slug, definition.name, definition.description, definition.instructions, definition.startUrl, definition.steps);
     if (oldSlug !== slug) {
       for (const provider of [".opencode", ".claude"]) {
         const oldDirectory = path.resolve(this.db.workspacesDir, record.workflow.botId, provider, "skills", oldSlug);
@@ -363,7 +415,28 @@ export class BrowserManager {
         if (oldDirectory.startsWith(`${skillsRoot}${path.sep}`) && existsSync(oldDirectory)) rmSync(oldDirectory, { recursive: true });
       }
     }
-    return this.db.updateWorkflowRecord(id, { ...input, skillSlug: slug, skillPath });
+    return this.db.updateWorkflowRecord(id, { ...definition, skillSlug: slug, skillPath });
+  }
+
+  rollbackTaughtWorkflow(id: string, version: number) {
+    const current = this.db.getWorkflowRecord(id), snapshot = this.db.getWorkflowVersion(id, version);
+    if (!current || !snapshot) throw new Error("That saved version is no longer available.");
+    const definition = {
+      name: snapshot.name, description: snapshot.description, instructions: snapshot.instructions,
+      startUrl: snapshot.startUrl, steps: snapshot.steps as SkillStep[], version: current.workflow.version + 1,
+    };
+    this.validateSkill(definition);
+    const slug = this.db.nextWorkflowSlug(current.workflow.botId, definition.name, id);
+    const oldSlug = current.workflow.skillSlug;
+    const skillPath = this.writeTaughtSkill(current.workflow.botId, slug, definition.name, definition.description, definition.instructions, definition.startUrl, definition.steps);
+    if (oldSlug !== slug) {
+      for (const provider of [".opencode", ".claude"]) {
+        const oldDirectory = path.resolve(this.db.workspacesDir, current.workflow.botId, provider, "skills", oldSlug);
+        const skillsRoot = path.resolve(this.db.workspacesDir, current.workflow.botId, provider, "skills");
+        if (oldDirectory.startsWith(`${skillsRoot}${path.sep}`) && existsSync(oldDirectory)) rmSync(oldDirectory, { recursive: true });
+      }
+    }
+    return this.db.reviseWorkflowRecord(id, { ...definition, skillSlug: slug, skillPath });
   }
 
   deleteTaughtWorkflow(id: string): boolean {

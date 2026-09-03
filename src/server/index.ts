@@ -27,6 +27,7 @@ import { invokedWorkflow } from "../shared/skills.js";
 import { iosConnectURL, isTailscaleURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
+import { SKILL_TEMPLATES } from "./skill-library.js";
 import type { AutomationEvent, Routine } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -1072,8 +1073,46 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
 });
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
+app.get("/api/skill-templates", (_request, response) => response.json(SKILL_TEMPLATES.map(({ steps, ...template }) => ({ ...template, stepCount: steps.length }))));
+app.get("/api/workflows/:id/versions", (request, response) => {
+  if (!db.getWorkflowRecord(request.params.id)) return response.status(404).json({ error: "That skill is no longer available." });
+  response.json(db.listWorkflowVersions(request.params.id));
+});
+app.get("/api/workflows/:id/export", (request, response) => {
+  try {
+    const exported = browser.exportTaughtWorkflow(request.params.id);
+    const workflow = db.getWorkflowRecord(request.params.id)!.workflow;
+    response.setHeader("Content-Disposition", `attachment; filename="${workflow.skillSlug}.openbot-skill.json"`);
+    response.type("application/json").send(`${JSON.stringify(exported, null, 2)}\n`);
+  } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/skills/import", (request, response) => {
+  const parsed = z.object({ botId: z.string().min(1), package: z.unknown() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate and an OpenBot skill file." });
+  if (Buffer.byteLength(JSON.stringify(parsed.data.package), "utf8") > 256_000) return response.status(413).json({ error: "That skill file is too large. Choose one under 256 KB." });
+  try { const workflow = browser.importTaughtWorkflow(parsed.data.botId, parsed.data.package); broadcast(); response.status(201).json(workflow); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/skill-templates/:id/install", (request, response) => {
+  const parsed = z.object({ botId: z.string().min(1) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate for this starter skill." });
+  try { const workflow = browser.installSkillTemplate(parsed.data.botId, request.params.id); broadcast(); response.status(201).json(workflow); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/workflows/:id/assign", (request, response) => {
+  const parsed = z.object({ botId: z.string().min(1) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate for this skill." });
+  try { const workflow = browser.assignTaughtWorkflow(request.params.id, parsed.data.botId); broadcast(); response.status(201).json(workflow); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/workflows/:id/rollback", (request, response) => {
+  const parsed = z.object({ version: z.number().int().min(1).max(10_000) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a saved skill version." });
+  try { const workflow = browser.rollbackTaughtWorkflow(request.params.id, parsed.data.version); broadcast(); response.json(workflow); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
 app.patch("/api/workflows/:id", (request, response) => {
-  const parsed = z.object({ name: z.string().trim().min(1).max(80), startUrl: z.string().url() }).safeParse(request.body);
+  const parsed = z.object({ name: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(300).optional(), instructions: z.string().trim().min(1).max(5_000).optional(), startUrl: z.string().url() }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Give the skill a name and complete starting web address." });
   try { const workflow = browser.updateTaughtWorkflow(request.params.id, parsed.data); if (!workflow) return response.status(404).json({ error: "Learned workflow not found." }); broadcast(); response.json(workflow); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }

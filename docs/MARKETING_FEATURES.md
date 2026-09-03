@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.18.0 local-first beta
+Release: 0.19.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run dependable automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run dependable automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -25,6 +25,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 8. **Continue on the device in your hand.** Start an unfinished message on the Mac and continue it on the native iPhone app, or return it to the web studio, while the owner's Mac remains the source of truth.
 9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
 10. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
+11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
 
 ## Available now
 
@@ -125,6 +126,11 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Live computer and browser preview in the teammate panel
 - Visible teach mode that records a demonstrated browser workflow
 - Generated browser skills are readable and editable rather than opaque macros
+- Teammate-owned Skill Library with editable purpose, instructions, starting page, source, and visible current version
+- Three transparent starter skills for website QA, research, and approval-safe browser administration
+- Strict `.openbot-skill.json` export with SHA-256 integrity plus import limits, supported-address checks, secret scanning, and tamper rejection
+- Immutable version history and non-destructive rollback, where restoring an old version retains the version being replaced
+- One-click assignment to another teammate without copying conversations, memory, browser state, credentials, or workspace data
 - Password, token, key, and secret-like demonstrated inputs are redacted
 
 ### Google Workspace
@@ -194,7 +200,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Inspect event history, open linked results, and safely replay failed, cancelled, or rate-limited deliveries
 - In-app recurring messages when the user says “text me” without naming an external service
 - Demonstrated browser workflows saved as reusable local skills for both OpenCode and Claude Code
-- Learned-skill manager with use, rename, starting-page edit, and delete actions
+- Skill Library with teaching, starter installation, import, teammate assignment, purpose/instruction editing, version history, rollback, export, chat launch, and deletion
 
 ### Messages, files, voice, and phone use
 
@@ -240,6 +246,7 @@ These features are implemented, but marketing must explain their requirement.
 | Code and terminal checks | Docker must be installed and running; dependencies must already be available because project checks have no network. |
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
+| Portable skills | Import/export covers bounded browser-oriented OpenBot skills. Imported definitions are inspected and secret-scanned, but this is not a public executable plugin marketplace. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
 | Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
 | Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
@@ -261,6 +268,7 @@ These features are implemented, but marketing must explain their requirement.
 - **Review a screenshot:** send a design or error screenshot to a vision-capable teammate and keep the visual next to the answer.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
+- **Reuse a proven workflow safely:** export an integrity-checked skill, review the readable file, assign or import it for another teammate, and restore an earlier version if an edit performs worse.
 - **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
 - **Catch up without channel hopping:** ask a Slack-enabled teammate to search a topic, read the relevant conversation, and return one linked summary without posting.
 - **Turn a discussion into a durable brief:** combine current Slack context with selected Notion pages, then approve the exact Notion update only after reviewing it.

@@ -1,20 +1,20 @@
-# OpenBot 0.18.0
+# OpenBot 0.19.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.18.0
+## What's new in 0.19.0
 
-- Added **Live Studio**, one calm place to see every teammate's current or recent job, persistent failures, approvals, progress, and private browser state.
-- Added visible browser takeover: watch a teammate's screen, click it, enter sign-in text through a private non-chat keyboard, and hand control back without exposing credentials to model context.
-- Added local studio-wide search across messages, result files, automations, learned skills, and teammates, with each result opening its original conversation.
-- Added reply context and lightweight reactions that persist across refreshes and devices.
-- Added sidebar sections, pins, hide/restore, and safe teammate duplication; copies inherit setup and access but never history, memory, credentials, or browser state.
-- Masked password, token, secret, and one-time-code values from browser snapshots before a model can inspect the page.
-- Added a matching native Live Studio overview on iPhone for checking every teammate, attention item, and recent job while away from the Mac.
-- Kept the animated code-drawn mascots and the same responsive product language across desktop and the native iPhone companion.
-- Expanded the verified product suite to 79 tests and checked Live Studio and search at a 402-point iPhone width without horizontal overflow.
+- Rebuilt learned workflows as a **Skill Library** with a clear owner, purpose, instructions, starting page, source, and version.
+- Added portable `.openbot-skill.json` export files with SHA-256 integrity checks and no teammate identity, conversation history, credentials, or workspace data.
+- Added safe skill import with schema limits, supported-web-address checks, secret scanning, credential-pattern blocking, and `{{secret}}` placeholders.
+- Added immutable version history. Every edit and restore creates a new version, so returning to an earlier skill never erases the current one.
+- Added one-click skill assignment between teammates without copying private memory, browser sessions, or conversations.
+- Added three editable starter skills for website quality checks, research roundups, and approval-safe browser administration.
+- Added a responsive, mascot-led library with teammate switching, editing, history, export, import, and chat launch controls.
+- Kept native iPhone skill invocation in sync with visible owner and version information.
+- Expanded the verified product suite to 83 tests, including package tampering, embedded secrets, imports, assignment, versioning, and rollback.
 
 ## What is included
 
@@ -39,7 +39,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Independent teammate code review of the exact tested commit before approval-gated GitHub pull-request publishing
 - A persistent, constrained Docker computer for every bot
 - A persistent Chrome profile for every bot with open, read, click, type, and screenshot tools
-- Visible teach mode that turns a demonstrated browser task into an editable OpenCode and Claude Code skill, with chat discovery and management
+- A versioned Skill Library with visible teach mode, editable instructions, starter templates, teammate assignment, portable integrity-checked import/export, secret scanning, rollback, chat discovery, and OpenCode/Claude Code generation
 - Dependable automations with five-minute/hourly/daily schedules, signed generic and GitHub webhooks, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
 - Duplicate-event protection, rate limits, loop headers, bounded retained inputs, visible failure guidance, approval-wait alerts, missed-schedule notices, and automatic pausing after three consecutive failures
 - Persistent approvals for destructive, publishing, communication, purchasing, credential, and system actions
@@ -156,7 +156,7 @@ Open **Automations** to create scheduled work or choose a Calendar, GitHub, or g
 
 Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBot-Event-Id` for exact duplicate protection. GitHub hooks use GitHub's standard `X-Hub-Signature-256`, `X-GitHub-Delivery`, and `X-GitHub-Event` headers. An endpoint must be reachable by the sender, so a webhook from the public internet needs a trusted HTTPS tunnel or reverse proxy; never expose OpenBot's plain local HTTP port directly.
 
-Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.18 does not claim an always-on hosted scheduler.
+Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results. Scheduled and Calendar work runs only while the local OpenBot service and Mac are awake; 0.19 does not claim an always-on hosted scheduler.
 
 ## Remote and phone access
 
@@ -209,7 +209,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. The native iPhone app accepts attachments but does not yet include rich artifact previews, push, share-sheet input, or dedicated voice capture. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. Skill import/export currently covers OpenBot's browser-oriented saved workflows; it is not a public third-party executable plugin marketplace. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or OpenBot exits. The native iPhone app accepts attachments but does not yet include rich artifact previews, push, share-sheet input, or dedicated voice capture. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
 
 ## License
 

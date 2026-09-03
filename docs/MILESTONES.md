@@ -372,3 +372,20 @@ Status: complete for the local-first 0.18.0 beta
 - The native iPhone client adds a matching Live Studio overview for every teammate, attention item, and recent job
 
 Verification: 79 automated tests pass, including durable organization, search, reply, reaction, global run visibility, duplication boundaries, and restore behavior. Type checking and the production build pass. Live browser QA verified the complete Live Studio, search results, and private takeover controls at 402×874 with no page-level horizontal overflow; a second responsive width also remained contained. The native Xcode build and release checks remain part of the final gate. Always-on hosting, push delivery, arbitrary-pixel macOS takeover, private skill export/import, and a broad connector marketplace are not claimed.
+
+## M25 — Portable Skill Library
+
+Status: complete for the local-first 0.19.0 beta
+
+- Every learned browser skill has a visible owner, purpose, instructions, starting page, source, and current version
+- Every edit creates an immutable version snapshot; restoring an older snapshot creates another version instead of deleting newer history
+- Exported `.openbot-skill.json` packages contain the reusable definition without teammate IDs, conversation history, memory, credentials, browser profiles, or workspace files
+- SHA-256 integrity verification rejects packages changed after export
+- Import applies strict field, length, step-count, action-type, and web-address limits before any teammate files are written
+- Private keys, common provider credentials, bearer tokens, credential-like values, URL credentials, and sensitive query parameters are rejected; explicit placeholders such as `{{secret}}` remain allowed
+- Any skill can be assigned to another teammate as a new independently owned copy
+- Three readable starter skills cover website QA, current research, and approval-safe browser administration
+- The desktop library supports teammate switching, teaching, starter installation, import, edit, history, rollback, export, launch, and deletion without losing the animated character system
+- The native iPhone skill picker continues to launch the same saved commands and now shows their version
+
+Verification: 83 automated tests pass, including export/import round trips, integrity tampering, embedded secrets, placeholders, bounded templates, real OpenCode and Claude skill-file generation, assignment, immutable version history, and non-destructive rollback. Type checking and the production build pass. Browser QA verifies the live library at desktop and 402×874 phone widths with zero page-level horizontal overflow and no console errors. This milestone does not claim a public executable plugin marketplace or safe third-party code installation.
