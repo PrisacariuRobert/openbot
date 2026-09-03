@@ -5,6 +5,7 @@ const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", impo
 const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const database = readFileSync(new URL("../src/server/database.ts", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
 
@@ -17,10 +18,16 @@ if (!readme.startsWith(`# OpenBot ${version}\n`)) {
 if (!readme.includes(`## What's new in ${version}\n`)) {
   failures.push(`README.md must contain “## What's new in ${version}”.`);
 }
-if (!app.includes("room-cluster-motion") || !app.includes("mascot-presence")) {
+if (!app.includes("room-cluster-motion") || !app.includes("mascot-presence") || !app.includes("mascot-body")) {
   failures.push("The shared studio must keep its independently animated mascot composition.");
 }
-if (!styles.includes(".mascot-state-celebrating .mascot-art-blink") || !styles.includes("prefers-reduced-motion")) {
+if (app.includes('/mascots/') || app.includes('className="mascot-art"')) {
+  failures.push("Mascots must remain code-drawn and recolorable rather than image-backed.");
+}
+if (!app.includes("MASCOT_COLORS") || !app.includes('type="color"') || !database.includes('patch.color ?? current.color')) {
+  failures.push("Existing teammate appearance customization must remain editable and persistent.");
+}
+if (!styles.includes(".mascot-state-celebrating .mascot-eye") || !styles.includes("prefers-reduced-motion")) {
   failures.push("The web mascot system must keep celebration and reduced-motion states.");
 }
 

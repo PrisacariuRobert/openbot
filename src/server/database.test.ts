@@ -22,6 +22,9 @@ test("seeds persistent teammates and creates a routable task", () => {
     assert.equal(db.listBots().every((bot) => bot.macAccessEnabled), true);
     const newBot = db.createBot({ name: "Mochi", emoji: "•", color: "#6757d9", role: "Helper", instructions: "Help clearly." });
     assert.equal(newBot.macAccessEnabled, true);
+    const restyled = db.updateBot("nova", { mascot: "sunny", color: "#3187dc" });
+    assert.equal(restyled?.mascot, "sunny");
+    assert.equal(restyled?.color, "#3187dc");
     const novaWorkspace = prepareWorkspace(db, state.bots[0]!);
     assert.equal(existsSync(path.join(novaWorkspace, ".opencode", "skills", "use-mac-apps", "SKILL.md")), true);
     assert.equal(existsSync(path.join(novaWorkspace, ".claude", "skills", "use-mac-apps", "SKILL.md")), true);

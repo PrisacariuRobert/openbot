@@ -595,24 +595,41 @@ struct BotMascotView: View {
         return 1.65 + variation
     }
 
-    private var assetName: String {
-        switch variant {
-        case "nova", "orbit": return "MascotNova"
-        case "sprout", "sunny": return "MascotScout"
-        default: return "MascotPixel"
-        }
-    }
-
-    private var faceColor: Color {
-        switch variant {
-        case "nova", "orbit": return Color(red: 0.31, green: 0.08, blue: 0.60)
-        case "sprout", "sunny": return Color(red: 0.00, green: 0.56, blue: 0.39)
-        default: return Color(red: 0.88, green: 0.18, blue: 0.38)
-        }
-    }
-
     private var movement: CGFloat {
         status == "celebrating" ? 4 : status == "working" ? 2.5 : status == "waiting" ? 1 : 1.5
+    }
+
+    private var baseColor: Color { Color(openBotHex: colorHex) }
+    private var hasAntenna: Bool { !["blob", "pebble", "sprout"].contains(variant) }
+    private var bodyWidth: CGFloat {
+        switch variant {
+        case "blob", "pebble": return size * 0.90
+        case "sunny": return size * 0.70
+        default: return size * 0.84
+        }
+    }
+    private var bodyHeight: CGFloat {
+        switch variant {
+        case "sprout": return size * 0.73
+        case "pebble": return size * 0.74
+        case "sunny": return size * 0.70
+        default: return size * 0.80
+        }
+    }
+    private var bodyOffsetY: CGFloat {
+        switch variant {
+        case "sprout": return size * 0.065
+        case "pebble": return size * 0.06
+        default: return size * 0.03
+        }
+    }
+    private var bodyCorner: CGFloat {
+        switch variant {
+        case "sunny": return bodyWidth * 0.50
+        case "blob", "pebble": return bodyWidth * 0.38
+        case "sprout": return bodyWidth * 0.36
+        default: return bodyWidth * 0.30
+        }
     }
 
     private var presenceColor: Color {
@@ -627,19 +644,15 @@ struct BotMascotView: View {
 
     var body: some View {
         ZStack {
-            Image(assetName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: size, height: size)
-                .shadow(color: Color(openBotHex: colorHex).opacity(0.18), radius: size * 0.13, y: size * 0.08)
+            Ellipse()
+                .fill(baseColor.opacity(0.24))
+                .frame(width: size * 0.62, height: size * 0.09)
+                .blur(radius: size * 0.045)
+                .offset(y: size * 0.44)
 
-            if blinking || status == "celebrating" {
-                HStack(spacing: size * 0.13) {
-                    blinkEye
-                    blinkEye
-                }
-                .offset(y: -size * 0.035)
-            }
+            if hasAntenna { antenna }
+            characterEars
+            characterBody
 
             if status == "celebrating" {
                 Text("✦")
@@ -663,6 +676,8 @@ struct BotMascotView: View {
         .scaleEffect(status == "celebrating" ? (floating ? 1.04 : 0.98) : status == "waiting" && floating ? 0.98 : 1)
         .rotationEffect(.degrees(status == "working" || status == "celebrating" ? (floating ? 1.2 : -1.2) : 0))
         .offset(y: floating ? -movement : movement * 0.45)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Animated \(variant) teammate, \(status)")
         .task {
             guard !reduceMotion else { return }
             try? await Task.sleep(for: .milliseconds(Int(motionDelay * 1_000)))
@@ -676,11 +691,116 @@ struct BotMascotView: View {
         }
     }
 
-    private var blinkEye: some View {
+    private var antenna: some View {
         ZStack {
-            Ellipse().fill(faceColor).frame(width: size * 0.14, height: size * 0.15)
-            Capsule().fill(OpenBotTheme.ink).frame(width: size * 0.11, height: Swift.max(1.2, size * 0.025))
+            Capsule().fill(baseColor.opacity(0.88))
+                .frame(width: Swift.max(1.5, size * 0.025), height: size * (variant == "sunny" ? 0.16 : 0.20))
+            Circle().fill(baseColor)
+                .overlay(Circle().fill(.white.opacity(0.30)).padding(size * 0.022))
+                .overlay(Circle().stroke(.black.opacity(0.16), lineWidth: Swift.max(0.6, size * 0.012)))
+                .frame(width: size * 0.12, height: size * 0.12)
+                .offset(y: -size * 0.09)
         }
+        .offset(y: -size * 0.39)
+    }
+
+    @ViewBuilder private var characterEars: some View {
+        if variant == "sprout" {
+            RoundedRectangle(cornerRadius: size * 0.10, style: .continuous)
+                .fill(baseColor)
+                .overlay(RoundedRectangle(cornerRadius: size * 0.10).fill(.white.opacity(0.15)))
+                .frame(width: size * 0.26, height: size * 0.20)
+                .rotationEffect(.degrees(-32)).offset(x: -size * 0.13, y: -size * 0.36)
+            RoundedRectangle(cornerRadius: size * 0.10, style: .continuous)
+                .fill(baseColor)
+                .overlay(RoundedRectangle(cornerRadius: size * 0.10).fill(.white.opacity(0.15)))
+                .frame(width: size * 0.26, height: size * 0.20)
+                .rotationEffect(.degrees(32)).offset(x: size * 0.13, y: -size * 0.36)
+        } else if variant == "nova" || variant == "sunny" {
+            RoundedRectangle(cornerRadius: size * 0.055, style: .continuous)
+                .fill(baseColor.opacity(0.94))
+                .frame(width: size * (variant == "sunny" ? 0.18 : 0.21), height: size * (variant == "sunny" ? 0.18 : 0.21))
+                .rotationEffect(.degrees(43)).offset(x: -size * 0.35, y: -size * 0.12)
+            RoundedRectangle(cornerRadius: size * 0.055, style: .continuous)
+                .fill(baseColor.opacity(0.94))
+                .frame(width: size * (variant == "sunny" ? 0.18 : 0.21), height: size * (variant == "sunny" ? 0.18 : 0.21))
+                .rotationEffect(.degrees(43)).offset(x: size * 0.35, y: -size * 0.12)
+        }
+    }
+
+    private var characterBody: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: bodyCorner, style: .continuous)
+                .fill(baseColor)
+            RoundedRectangle(cornerRadius: bodyCorner, style: .continuous)
+                .fill(LinearGradient(colors: [.white.opacity(0.52), .clear, .black.opacity(0.16)], startPoint: .topLeading, endPoint: .bottomTrailing))
+            RoundedRectangle(cornerRadius: bodyCorner, style: .continuous)
+                .stroke(.black.opacity(0.16), lineWidth: Swift.max(0.7, size * 0.01))
+            Ellipse().fill(.white.opacity(0.22))
+                .frame(width: bodyWidth * 0.50, height: bodyHeight * 0.30)
+                .rotationEffect(.degrees(-18))
+                .offset(x: -bodyWidth * 0.17, y: -bodyHeight * 0.27)
+
+            HStack(spacing: size * 0.09) {
+                mascotEye
+                mascotEye
+            }
+            .offset(y: -bodyHeight * 0.075)
+
+            Ellipse().fill(Color(red: 1.0, green: 0.67, blue: 0.71).opacity(0.28))
+                .frame(width: size * 0.075, height: size * 0.028)
+                .offset(x: -size * 0.20, y: bodyHeight * 0.08)
+            Ellipse().fill(Color(red: 1.0, green: 0.67, blue: 0.71).opacity(0.28))
+                .frame(width: size * 0.075, height: size * 0.028)
+                .offset(x: size * 0.20, y: bodyHeight * 0.08)
+            mascotMouth.offset(y: bodyHeight * 0.15)
+
+            if variant == "nova" || variant == "sprout" || variant == "sunny" {
+                Text(variant == "nova" ? "✦" : variant == "sprout" ? "⌁" : "•")
+                    .font(.system(size: size * 0.13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .offset(x: bodyWidth * 0.34, y: bodyHeight * 0.34)
+            }
+        }
+        .frame(width: bodyWidth, height: bodyHeight)
+        .offset(y: bodyOffsetY)
+        .shadow(color: baseColor.opacity(0.24), radius: size * 0.12, y: size * 0.07)
+    }
+
+    private var mascotEye: some View {
+        Capsule()
+            .fill(OpenBotTheme.ink)
+            .frame(width: size * (blinking || status == "celebrating" ? 0.105 : 0.075), height: blinking || status == "celebrating" ? Swift.max(1.4, size * 0.022) : size * 0.105)
+            .animation(.easeInOut(duration: 0.09), value: blinking)
+    }
+
+    @ViewBuilder private var mascotMouth: some View {
+        if status == "celebrating" {
+            Capsule()
+                .fill(OpenBotTheme.ink)
+                .frame(width: size * 0.14, height: size * 0.105)
+                .overlay(Capsule().fill(Color(red: 0.91, green: 0.47, blue: 0.57)).frame(height: size * 0.035).offset(y: size * 0.035).clipped())
+        } else if status == "waiting" {
+            Circle().stroke(OpenBotTheme.ink.opacity(0.75), lineWidth: Swift.max(1, size * 0.016))
+                .frame(width: size * 0.07, height: size * 0.07)
+        } else {
+            MascotMouthShape(frowning: status == "failed")
+                .stroke(OpenBotTheme.ink.opacity(0.78), style: StrokeStyle(lineWidth: Swift.max(1, size * 0.016), lineCap: .round))
+                .frame(width: size * 0.12, height: size * 0.06)
+        }
+    }
+}
+
+private struct MascotMouthShape: Shape {
+    let frowning: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let edgeY = frowning ? rect.maxY * 0.82 : rect.minY + rect.height * 0.18
+        let controlY = frowning ? rect.minY : rect.maxY
+        path.move(to: CGPoint(x: rect.minX, y: edgeY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: edgeY), control: CGPoint(x: rect.midX, y: controlY))
+        return path
     }
 }
 

@@ -1,6 +1,6 @@
-# OpenBot 0.17.3 Launch Readiness
+# OpenBot 0.17.4 Launch Readiness
 
-OpenBot 0.17.3 is ready for an open-source local-first beta launch with a compiled native iPhone experience, durable cross-device draft handoff, and one verified cross-platform visual and motion system. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, push delivery, App Store distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
+OpenBot 0.17.4 is ready for an open-source local-first beta launch with a compiled native iPhone experience, durable cross-device draft handoff, and one verified, customizable cross-platform character and motion system. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, push delivery, App Store distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
 
 ## What is launch-ready
 
@@ -13,7 +13,7 @@ OpenBot 0.17.3 is ready for an open-source local-first beta launch with a compil
 - Original media forwarded to compatible OpenCode models, contained image/PDF and extracted-text previews, friendly unsupported-format recovery, and hardened downloads
 - Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
 - Voice typing, an installable PWA, authenticated remote access, and a native SwiftUI iPhone app with Keychain-backed API access, conversations, teammate routing, live work, and approvals
-- Matching web and native studio geometry, language, exact shared mascot artwork, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
+- Matching web and native studio geometry, language, code-drawn runtime-colored mascots, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
 - Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
@@ -67,7 +67,7 @@ OpenBot 0.17.3 is ready for an open-source local-first beta launch with a compil
 
 ## Release decision
 
-Ship 0.17.3 as a **local-first beta**, with the limitations above visible in the README. The native iPhone app is simulator-verified and ready for owner-signed device testing, not yet an App Store claim. Draft handoff requires the owner's Mac service to remain reachable and does not yet move unsent attachments. Do not market OpenBot as always-on or imply that universal media understanding, OCR, or native Office editing work.
+Ship 0.17.4 as a **local-first beta**, with the limitations above visible in the README. The native iPhone app is simulator-verified and ready for owner-signed device testing, not yet an App Store claim. Draft handoff requires the owner's Mac service to remain reachable and does not yet move unsent attachments. Do not market OpenBot as always-on or imply that universal media understanding, OCR, or native Office editing work.
 
 ## Verified acceptance criteria
 

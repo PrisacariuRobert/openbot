@@ -344,3 +344,15 @@ Status: complete for the local-first 0.17.3 native beta
 - Web media queries and native Accessibility settings both honor reduced motion without removing readable status cues
 
 Verification: type checking and production builds pass for the shared web client, and the native SwiftUI target compiles with Xcode Beta. Browser QA at 402×874 verifies the aligned header, studio hero, messages, routing pill, and composer without horizontal overflow; two captured frames differ while the conversation is otherwise idle, confirming live mascot motion. Native simulator QA uses the same 402-point viewport and production assets. The full 78-test product suite plus native unit and live UI tests remain the final release gate.
+
+## Milestone 18 — Customizable code-drawn mascots
+
+Status: complete for the local-first 0.17.4 native beta
+
+- Live mascots are built from HTML/CSS layers and SwiftUI shapes instead of fixed character images
+- Six shapes, six color presets, and a full custom color picker are available for new and existing teammates
+- Shape and color updates persist in the local database and automatically flow into every chat surface and the iPhone client
+- Each teammate keeps independent blink and float timing plus working, waiting, celebration, failure, and offline state cues
+- Web reduced-motion CSS and native Reduce Motion behavior remain supported
+
+Verification: the live browser reports zero image elements inside mascots, separately captured frames differ during idle motion, the appearance preview updates before saving, the database test covers shape and color persistence, and the native SwiftUI target compiles and renders the same three-character studio on the iPhone simulator.

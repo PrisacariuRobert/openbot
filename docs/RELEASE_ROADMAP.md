@@ -41,6 +41,14 @@ Goal: add breadth without weakening per-teammate authority.
 
 Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
+## Shipped in 0.17.4 — Customizable living characters
+
+- Replaced mascot image rendering with code-drawn layers on the web and native SwiftUI shapes on iPhone
+- Restored independent float, blink, work, wait, celebration, and failure motion without synchronizing teammates
+- Added six editable character shapes, six color presets, and a full custom color picker for existing teammates
+- Persisted appearance edits so every conversation and connected iPhone sees the same character identity
+- Added release guards that reject image-backed live mascots or lost color persistence
+
 ## Shipped in 0.17.3 — Native iPhone continuity and shared design
 
 Goal: make phone check-ins feel like a real product without moving private studio data to a new cloud.

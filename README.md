@@ -1,18 +1,18 @@
-# OpenBot 0.17.3
+# OpenBot 0.17.4
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.17.3
+## What's new in 0.17.4
 
-- Rebuilt the web and native iPhone studio around one shared visual system: matching header geometry, live status, backgrounds, message bubbles, spacing, routing pill, composer, icons, and language.
-- Replaced the static room illustration with three independently animated production mascots in both clients.
-- Added asynchronous float and blink timing so teammates feel alive without moving in lockstep.
-- Added visible ready, working, waiting, offline, failed, and short celebration moods, including happy eyes and sparkles after completed work.
-- Uses the same mascot image files on the web and iPhone while preserving native SwiftUI controls and behavior.
-- Honors Reduce Motion on both platforms and keeps status readable without relying on animation alone.
-- Re-verified the phone-sized web studio and compiled native iPhone app at the same 402-point layout width.
+- Replaced image-backed mascots with one code-drawn character system across the web and native SwiftUI app.
+- Restored independently timed floating, blinking, working, waiting, celebrating, and failure expressions while honoring Reduce Motion.
+- Added appearance editing for existing teammates: six shapes, six color presets, and a full custom color picker.
+- Persisted mascot shape and color changes in the local studio so the same appearance follows every conversation and the iPhone app.
+- Improved native onboarding keyboard flow so Next moves from the server address to the access key and Go connects.
+- Added release checks that prevent the live mascots from silently becoming static image assets again.
+- Re-verified the responsive web studio and compiled native iPhone app with the new runtime-colored characters.
 
 ## What is included
 
@@ -44,7 +44,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
 - Native SwiftUI iPhone app with conversations, teammate targeting, message sending, live task/approval state, Keychain-backed API access, offline/reconnect state, and address-only deep linking
-- Animated mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
+- Customizable code-drawn mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
 - Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
 - Official GitHub CLI connection for notifications, issue search, and approval-gated issue creation

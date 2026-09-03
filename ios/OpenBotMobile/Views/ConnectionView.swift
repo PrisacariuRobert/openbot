@@ -33,11 +33,15 @@ struct ConnectionView: View {
                         TextField("https://your-private-address", text: $address)
                             .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
                             .textContentType(.URL).focused($focusedField, equals: .address)
+                            .submitLabel(.next)
+                            .onSubmit { focusedField = .key }
                             .accessibilityIdentifier("server-address")
                             .openBotField()
                         fieldLabel("Private access key", icon: "key.fill")
                         SecureField("Paste the key from your Mac", text: $accessKey)
                             .textContentType(.oneTimeCode).focused($focusedField, equals: .key)
+                            .submitLabel(.go)
+                            .onSubmit { connect() }
                             .privacySensitive()
                             .accessibilityIdentifier("access-key")
                             .openBotField()
@@ -48,8 +52,7 @@ struct ConnectionView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         Button {
-                            focusedField = nil
-                            Task { await session.connect(address: address, accessKey: accessKey) }
+                            connect()
                         } label: {
                             HStack(spacing: 9) {
                                 if session.isConnecting { ProgressView().tint(.white) }
@@ -89,6 +92,11 @@ struct ConnectionView: View {
             .foregroundStyle(OpenBotTheme.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, -8)
+    }
+
+    private func connect() {
+        focusedField = nil
+        Task { await session.connect(address: address, accessKey: accessKey) }
     }
 
     private func reassurance(_ text: String, icon: String) -> some View {

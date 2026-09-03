@@ -709,12 +709,12 @@ export class OpenBotDatabase {
     return this.getBot(id)!;
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "computerEnabled" | "browserEnabled" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
-    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, computer_enabled=?, browser_enabled=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
+    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
       patch.name ?? current.name, patch.role ?? current.role, patch.instructions ?? current.instructions, patch.model ?? current.model,
-      patch.mascot ?? current.mascot, (patch.computerEnabled ?? current.computerEnabled) ? 1 : 0,
+      patch.mascot ?? current.mascot, patch.color ?? current.color, (patch.computerEnabled ?? current.computerEnabled) ? 1 : 0,
       (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.4 — 2026-09-03
+
+- Replaced web and native mascot image rendering with code-drawn, runtime-colored characters
+- Restored independent blinking, floating, work, wait, celebration, and failure expressions across both clients
+- Added six shape choices, six color presets, and a custom color picker to every existing teammate's settings
+- Fixed teammate color updates so they persist in the local database and immediately flow into conversations and the iPhone client
+- Improved the native connection form with reliable Next-to-key and Go-to-connect keyboard actions
+- Added release guards for recolorable web layers, native SwiftUI shapes, saved appearance changes, and reduced-motion behavior
+- Rebuilt and visually verified the responsive web studio and native iPhone onboarding at matching dimensions
+
 ## 0.17.3 — 2026-09-03
 
 - Unified web and native layout tokens for the studio header, live status, conversation, bubbles, composer, routing pill, and controls

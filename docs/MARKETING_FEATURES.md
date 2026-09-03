@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.17.3 local-first beta
+Release: 0.17.4 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -29,11 +29,11 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 ### Persistent AI teammates
 
-- Named teammates with a stable role, working style, mascot, model, connection, token budget, and durable memory
+- Named teammates with a stable role, working style, customizable code-drawn mascot, model, connection, token budget, and durable memory
 - Separate direct conversations plus one shared studio room
 - Persistent private workspace and model session for every teammate
 - Live ready, working, waiting, success, and failure states
-- Independent mascot blink and idle timing with working, waiting, celebration/laugh, and failure expressions
+- Six mascot shapes, six color presets, a custom color picker, and independent blink/idle timing with working, waiting, celebration/laugh, and failure expressions
 - Add, edit, and remove teammates without recreating the whole studio
 
 ### Natural teamwork

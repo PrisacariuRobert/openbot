@@ -29,10 +29,10 @@ final class OpenBotMobileUITests: XCTestCase {
         let addressField = app.textFields["server-address"]
         XCTAssertTrue(addressField.waitForExistence(timeout: 8))
         replaceText(in: addressField, with: server)
+        addressField.typeText("\n")
 
         let accessKeyField = app.secureTextFields["access-key"]
-        XCTAssertTrue(accessKeyField.exists)
-        accessKeyField.tap()
+        XCTAssertTrue(accessKeyField.waitForExistence(timeout: 3))
         accessKeyField.typeText(accessKey)
 
         app.buttons["connect-studio"].tap()
