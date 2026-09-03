@@ -83,6 +83,10 @@ final class StudioStore: ObservableObject {
         await perform { try await client.cancel(runID: run.id) }
     }
 
+    func wakeRunner() async {
+        await perform { try await client.wakeRunner() }
+    }
+
     func saveDraft(_ body: String) async {
         do {
             _ = try await client.saveDraft(threadID: selectedThreadID, body: body)

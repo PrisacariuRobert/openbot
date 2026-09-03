@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { Bot, Run } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
@@ -114,21 +115,69 @@ export interface OpenCodeRunnerOptions {
 
 export class OpenCodeRunner {
   private readonly running = new Map<string, ChildProcess>();
+  private readonly restartQueue = new Set<string>();
+  readonly instanceId = randomUUID();
   private queueTimer: NodeJS.Timeout | null = null;
+  private leadershipTimer: NodeJS.Timeout | null = null;
   private ticking = false;
+  private leader = false;
+  private stopping = false;
+  private readonly mode: "foreground" | "background" = process.env.OPENBOT_BACKGROUND_SERVICE === "1" ? "background" : "foreground";
 
   constructor(private readonly options: OpenCodeRunnerOptions) {}
 
   start() {
     if (this.queueTimer) return;
+    this.stopping = false;
+    this.maintainLeadership();
     this.queueTimer = setInterval(() => void this.tick(), 500);
+    this.leadershipTimer = setInterval(() => this.maintainLeadership(), 5_000);
     void this.tick();
   }
 
   stop() {
     if (this.queueTimer) clearInterval(this.queueTimer);
+    if (this.leadershipTimer) clearInterval(this.leadershipTimer);
+    this.queueTimer = null;
+    this.leadershipTimer = null;
+    this.stopping = true;
+    for (const runId of this.running.keys()) this.restartQueue.add(runId);
+    this.options.db.requeueWorkerRuns(this.instanceId);
+    if (this.leader) this.options.db.releaseRunnerLease(this.instanceId);
+    this.leader = false;
     for (const child of this.running.values()) child.kill("SIGTERM");
     this.running.clear();
+    this.options.onChange();
+  }
+
+  isLeader() {
+    return this.leader;
+  }
+
+  wake() {
+    this.maintainLeadership();
+    void this.tick();
+  }
+
+  private maintainLeadership() {
+    try {
+      const acquired = this.options.db.acquireRunnerLease(this.instanceId, this.mode);
+      if (!acquired) { this.leader = false; return; }
+      const becameLeader = !this.leader;
+      this.leader = true;
+      this.options.db.renewRunLeases(this.instanceId);
+      if (becameLeader) {
+        const recovered = this.options.db.recoverExpiredRuns();
+        this.options.db.recordRunnerRecovery(this.instanceId, recovered.length);
+        for (const run of recovered) this.options.db.addActivity({
+          runId: run.id, botId: run.botId, kind: "status", label: "Resuming after OpenBot restarted", detail: "The saved task and checklist were kept.",
+        });
+        if (recovered.length) this.options.onChange();
+      }
+    } catch (error) {
+      this.leader = false;
+      try { this.options.db.recordRunnerError(this.instanceId, error instanceof Error ? error.message : String(error)); } catch { /* Database may be closing. */ }
+    }
   }
 
   cancel(runId: string): boolean {
@@ -168,14 +217,14 @@ export class OpenCodeRunner {
   }
 
   private async tick() {
-    if (this.ticking) return;
+    if (this.ticking || !this.leader || this.stopping) return;
     this.ticking = true;
     try {
       for (const run of this.options.db.readyConsultationCoordinators()) this.resumeCoordinatorIfReady(run.id);
       const maximum = this.options.maxParallel || 3;
       while (this.running.size < maximum) {
         const excludedBotIds = [...this.running.keys()].map((runId) => this.options.db.getRun(runId)?.botId).filter((id): id is string => Boolean(id));
-        const run = this.options.db.nextQueuedRun(excludedBotIds);
+        const run = this.options.db.claimNextQueuedRun(excludedBotIds, this.instanceId);
         if (!run || this.running.has(run.id)) break;
         const budget = this.options.db.budgetAvailable(run.botId);
         if (!budget.allowed) {
@@ -186,8 +235,11 @@ export class OpenCodeRunner {
           this.options.onChange();
           continue;
         }
+        this.options.db.recordRunnerDispatch(this.instanceId);
         this.executeRun(run);
       }
+    } catch (error) {
+      this.options.db.recordRunnerError(this.instanceId, error instanceof Error ? error.message : String(error));
     } finally { this.ticking = false; }
   }
 
@@ -274,6 +326,7 @@ export class OpenCodeRunner {
     child.on("close", async (code, signal) => {
       if (stdoutBuffer) consumeLine(stdoutBuffer);
       this.running.delete(run.id);
+      if (this.restartQueue.delete(run.id) || this.stopping) return;
       if (sessionId) this.options.db.rememberSessionCapabilities(sessionId, capabilityFingerprint);
       const finishedAt = new Date().toISOString();
       const current = this.options.db.getRun(run.id);

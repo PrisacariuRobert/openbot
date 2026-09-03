@@ -8,6 +8,10 @@ const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8
 const database = readFileSync(new URL("../src/server/database.ts", import.meta.url), "utf8");
 const runtime = readFileSync(new URL("../src/server/runtime.ts", import.meta.url), "utf8");
 const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", import.meta.url), "utf8");
+const runner = readFileSync(new URL("../src/server/opencode.ts", import.meta.url), "utf8");
+const backgroundService = readFileSync(new URL("../src/server/background-service.ts", import.meta.url), "utf8");
+const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
+const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
 
@@ -55,6 +59,21 @@ if (!runtime.includes("importTaughtWorkflow") || !runtime.includes("assignTaught
 }
 if (!app.includes("skill-owner-switcher") || !app.includes("Import reviewed skill") || !app.includes("Useful starters") || !styles.includes(".skill-template-grid")) {
   failures.push("The responsive Skill Library management experience is incomplete.");
+}
+if (!database.includes("CREATE TABLE IF NOT EXISTS runner_state") || !database.includes("claimNextQueuedRun") || !database.includes("recoverExpiredRuns")) {
+  failures.push("The durable runner lease, exclusive claim, or restart recovery store is incomplete.");
+}
+if (!runner.includes("maintainLeadership") || !runner.includes("renewRunLeases") || !runner.includes("requeueWorkerRuns")) {
+  failures.push("The model runner must keep exclusive leadership, renewable job leases, and graceful handoff.");
+}
+if (!backgroundService.includes("com.openbot.runner") || !backgroundService.includes("KeepAlive") || !backgroundService.includes("RunAtLoad")) {
+  failures.push("The optional macOS background service is incomplete.");
+}
+if (!notifications.includes("sendNotification") || !database.includes("notification_outbox") || !serviceWorker.includes('addEventListener("push"')) {
+  failures.push("Durable background notification delivery is incomplete.");
+}
+if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep OpenBot running")) {
+  failures.push("The user-facing runner health and one-click protection experience is incomplete.");
 }
 
 if (failures.length) {

@@ -108,6 +108,7 @@ import type {
   ProviderLoginAttempt,
   ProviderStatus,
   Routine,
+  RunnerHealth,
   Run,
   SlackMessageSummary,
   SkillTemplate,
@@ -203,6 +204,14 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok)
     throw new ApiError(body.error || "Something went wrong.", response.status);
   return body;
+}
+
+function pushApplicationKey(value: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const decoded = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(new ArrayBuffer(decoded.length));
+  for (let index = 0; index < decoded.length; index += 1) bytes[index] = decoded.charCodeAt(index);
+  return bytes;
 }
 
 function relativeTime(value: string | null) {
@@ -2476,7 +2485,7 @@ function LiveStudioPanel({
       <div className="live-hero">
         <div>
           <span>
-            <i /> Live from this Mac
+            <i /> {state.runner.backgroundService === "installed" ? "Background protection active" : "Live from this Mac"}
           </span>
           <h3>
             {state.usage.activeRuns
@@ -2485,7 +2494,7 @@ function LiveStudioPanel({
           </h3>
           <p>
             Watch progress, step in when a website needs you, or redirect the
-            next move.
+            next move. Interrupted work resumes from its saved checkpoint.
           </p>
         </div>
         <RoomCluster bots={state.bots} hero />
@@ -6223,6 +6232,7 @@ function RoutinesPanel({
   routines,
   events,
   alerts,
+  runner,
   bots,
   onCreate,
   onUpdate,
@@ -6233,10 +6243,14 @@ function RoutinesPanel({
   onRotateSecret,
   onResolveAlert,
   onOpenResult,
+  onProtectRunner,
+  onUnprotectRunner,
+  onWakeRunner,
 }: {
   routines: Routine[];
   events: AutomationEvent[];
   alerts: AutomationAlert[];
+  runner: RunnerHealth;
   bots: Bot[];
   onCreate: (input: RoutineInput) => Promise<RoutineSaveResult>;
   onUpdate: (
@@ -6250,6 +6264,9 @@ function RoutinesPanel({
   onRotateSecret: (routine: Routine) => Promise<RoutineSaveResult>;
   onResolveAlert: (alert: AutomationAlert) => Promise<void>;
   onOpenResult: (routine: Routine) => void;
+  onProtectRunner: () => Promise<void>;
+  onUnprotectRunner: () => Promise<void>;
+  onWakeRunner: () => Promise<void>;
 }) {
   const [creating, setCreating] = useState(routines.length === 0),
     [name, setName] = useState(""),
@@ -6272,6 +6289,8 @@ function RoutinesPanel({
     [minutesBefore, setMinutesBefore] = useState(15);
   const [enabled, setEnabled] = useState(true),
     [saving, setSaving] = useState(false),
+    [runnerBusy, setRunnerBusy] = useState(false),
+    [runnerError, setRunnerError] = useState<string | null>(null),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
   const [createdHook, setCreatedHook] = useState<{
@@ -6281,6 +6300,7 @@ function RoutinesPanel({
     type: AutomationTriggerType;
   } | null>(null);
   const selectedBot = bots.find((item) => item.id === botId) || bots[0];
+  const managingFromThisMac = ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
   const unitMultiplier =
     customUnit === "days" ? 1440 : customUnit === "hours" ? 60 : 1;
   const intervalMinutes =
@@ -6394,6 +6414,13 @@ function RoutinesPanel({
       : routine.lastStatus === "failed"
         ? "Needs attention"
         : "Ready for its first event");
+  const runRunnerAction = async (action: () => Promise<void>) => {
+    setRunnerBusy(true);
+    setRunnerError(null);
+    try { await action(); }
+    catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not change the runner."); }
+    finally { setRunnerBusy(false); }
+  };
   return (
     <div className="routines-view">
       <section className="routine-hero">
@@ -6411,6 +6438,42 @@ function RoutinesPanel({
             understand.
           </p>
         </span>
+      </section>
+
+      <section className={`runner-card runner-${runner.status}`}>
+        <div className="runner-presence">
+          <span><Power size={18} /></span>
+          <i />
+        </div>
+        <div className="runner-copy">
+          <span className="runner-kicker">
+            {runner.status === "online" ? "Studio awake" : "Needs a restart"}
+            {runner.backgroundService === "installed" && <b><ShieldCheck size={11} /> Protected</b>}
+          </span>
+          <strong>{runner.status === "online" ? "Your automations have an active runner" : "Automations are saved, but nothing is picking them up"}</strong>
+          <p>{runner.backgroundServiceDetail}</p>
+          <small>Your Mac must be powered on and awake. Missed schedules are picked up safely when it returns.</small>
+          {runnerError && <em className="runner-error"><CircleAlert size={11} /> {runnerError}</em>}
+        </div>
+        <div className="runner-stats">
+          <span><b>{runner.runningRuns}</b> working</span>
+          <span><b>{runner.queuedRuns}</b> queued</span>
+          <span><b>{runner.waitingRuns}</b> waiting</span>
+          <span><b>{runner.recoveredRuns}</b> recovered</span>
+        </div>
+        <div className="runner-actions">
+          {runner.backgroundService === "not_installed" && managingFromThisMac && (
+            <button className="primary" disabled={runnerBusy} onClick={() => void runRunnerAction(onProtectRunner)}>{runnerBusy ? <LoaderCircle className="spinner" size={13} /> : <ShieldCheck size={13} />} Keep OpenBot running</button>
+          )}
+          {runner.backgroundService === "installed" && managingFromThisMac && (
+            <button disabled={runnerBusy} onClick={() => {
+              if (!window.confirm("Turn off background protection? Saved automations stay in place, but OpenBot will only run while you start it yourself.")) return;
+              void runRunnerAction(onUnprotectRunner);
+            }}><Power size={13} /> Turn off protection</button>
+          )}
+          <button disabled={runnerBusy} onClick={() => void runRunnerAction(onWakeRunner)}><RefreshCw size={13} /> Check now</button>
+          {!managingFromThisMac && runner.backgroundService === "not_installed" && <small>Turn on protection from your Mac</small>}
+        </div>
       </section>
 
       {alerts.length > 0 && (
@@ -7890,7 +7953,8 @@ export function App() {
   const urlParams = new URLSearchParams(window.location.search),
     googleResult = urlParams.get("google"),
     connectorResult = urlParams.get("status"),
-    connectorName = urlParams.get("connector");
+    connectorName = urlParams.get("connector"),
+    linkedThread = urlParams.get("thread") || "team-room";
   const callbackNotice =
     googleResult === "connected"
       ? "Google is connected"
@@ -7902,7 +7966,7 @@ export function App() {
             ? `${connectorName === "slack" ? "Slack" : "Notion"} needs another try`
             : null;
   const [state, setState] = useState<AppState | null>(null),
-    [activeThreadId, setActiveThreadId] = useState("team-room"),
+    [activeThreadId, setActiveThreadId] = useState(linkedThread),
     [selectedBotIds, setSelectedBotIds] = useState<string[]>([]),
     [provider, setProvider] = useState<ProviderStatus | null>(null),
     [connectors, setConnectors] = useState<ConnectorStatus | null>(null),
@@ -8060,6 +8124,7 @@ export function App() {
         prior !== run.status &&
         ["completed", "awaiting_approval", "failed"].includes(run.status) &&
         document.hidden &&
+        localStorage.getItem("openbot_push_enabled") !== "1" &&
         Notification.permission === "granted"
       ) {
         const message =
@@ -8080,6 +8145,7 @@ export function App() {
         previousAlerts.current &&
         !previousAlerts.current.has(alert.id) &&
         document.hidden &&
+        localStorage.getItem("openbot_push_enabled") !== "1" &&
         Notification.permission === "granted"
       )
         new Notification("OpenBot automation", {
@@ -8342,11 +8408,26 @@ export function App() {
               if (!("Notification" in window))
                 return setToast("Notifications are not supported here");
               const permission = await Notification.requestPermission();
-              setToast(
-                permission === "granted"
-                  ? "Notifications are on"
-                  : "Notifications stayed off",
-              );
+              if (permission !== "granted") return setToast("Notifications stayed off");
+              if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+                localStorage.removeItem("openbot_push_enabled");
+                return setToast("Notifications work while OpenBot is open on this device");
+              }
+              try {
+                const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
+                const { publicKey } = await api<{ publicKey: string }>("/api/notifications/key");
+                const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
+                  userVisibleOnly: true, applicationServerKey: pushApplicationKey(publicKey),
+                });
+                const saved = subscription.toJSON();
+                if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error("This device did not finish notification setup.");
+                await api("/api/notifications/subscriptions", { method: "POST", body: JSON.stringify({ endpoint: saved.endpoint, keys: saved.keys }) });
+                localStorage.setItem("openbot_push_enabled", "1");
+                setToast("Background notifications are on");
+              } catch (error) {
+                localStorage.removeItem("openbot_push_enabled");
+                setToast(error instanceof Error ? error.message : "OpenBot could not enable background notifications here");
+              }
             }}
             onOpenProvider={() => setPanel("provider")}
             onOpenRemote={() => setPanel("remote")}
@@ -8622,6 +8703,7 @@ export function App() {
             routines={state.routines}
             events={state.automationEvents}
             alerts={state.automationAlerts}
+            runner={state.runner}
             bots={state.bots}
             onCreate={async (input) => {
               const result = await api<RoutineSaveResult>("/api/routines", {
@@ -8695,6 +8777,21 @@ export function App() {
             onOpenResult={(routine) => {
               setPanel(null);
               selectThread(routine.threadId);
+            }}
+            onProtectRunner={async () => {
+              await api("/api/runner/background", { method: "POST" });
+              await loadState(activeThreadId, true);
+              setToast("Background protection is on");
+            }}
+            onUnprotectRunner={async () => {
+              await api("/api/runner/background", { method: "DELETE" });
+              await loadState(activeThreadId, true);
+              setToast("Background protection is off");
+            }}
+            onWakeRunner={async () => {
+              await api("/api/runner/wake", { method: "POST" });
+              await loadState(activeThreadId, true);
+              setToast("OpenBot checked for waiting work");
             }}
           />
         </Sheet>

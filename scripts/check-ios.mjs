@@ -29,8 +29,8 @@ const project = readFileSync(path.join(root, "ios/project.yml"), "utf8");
 const plist = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/Info.plist"), "utf8");
 const privacy = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/PrivacyInfo.xcprivacy"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
-if (!project.includes("MARKETING_VERSION: 0.19.0")) throw new Error("The iOS marketing version is not 0.19.0.");
-if (!project.includes("CURRENT_PROJECT_VERSION: 23")) throw new Error("The iOS build number is not 23.");
+if (!project.includes("MARKETING_VERSION: 0.20.0")) throw new Error("The iOS marketing version is not 0.20.0.");
+if (!project.includes("CURRENT_PROJECT_VERSION: 24")) throw new Error("The iOS build number is not 24.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");
 if (!privacy.includes("NSPrivacyAccessedAPICategoryUserDefaults") || !privacy.includes("CA92.1") || !privacy.includes("<false/>")) throw new Error("The iOS privacy manifest is incomplete.");
@@ -39,6 +39,7 @@ if (!swift.includes("ConnectionAddress.normalized") || !swift.includes("Bearer \
 if (!swift.includes("api/drafts") || !swift.includes("Continued from your Mac")) throw new Error("Native Mac/iPhone draft continuity is incomplete.");
 if (!swift.includes("NativeLiveStudioView") || !swift.includes('accessibilityLabel("Live Studio")') || !swift.includes("studioRuns")) throw new Error("The native Live Studio overview is incomplete.");
 if (!swift.includes("workflow.version ?? 1") || !swift.includes("let source: String?")) throw new Error("Native skill invocation is missing portable skill metadata.");
+if (!swift.includes("StudioRunner") || !swift.includes("wakeRunner") || !swift.includes("Resumed safely after OpenBot restarted")) throw new Error("Native background runner health and recovery are incomplete.");
 if (!swift.includes("accessibilityReduceMotion") || !swift.includes('status == "celebrating"') || !swift.includes("motionDelay")) throw new Error("Native mascot motion, celebration, or reduced-motion support is incomplete.");
 if (!swift.includes("characterBody") || !swift.includes("baseColor") || swift.includes('Image("Mascot')) throw new Error("Native mascots must remain code-drawn and use each teammate's saved color.");
 if (swift.includes("WKWebView") || swift.includes("StudioWebView")) throw new Error("The iPhone conversation experience must remain native SwiftUI, not a web view.");

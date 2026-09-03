@@ -51,6 +51,10 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runs/\(runID)/cancel", method: "POST")
     }
 
+    func wakeRunner() async throws {
+        _ = try await dataRequest("api/runner/wake", method: "POST")
+    }
+
     func listenForEvents(onEvent: @escaping () async -> Void) async throws {
         var request = try authorizedRequest(path: "api/events")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")

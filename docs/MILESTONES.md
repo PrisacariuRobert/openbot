@@ -389,3 +389,20 @@ Status: complete for the local-first 0.19.0 beta
 - The native iPhone skill picker continues to launch the same saved commands and now shows their version
 
 Verification: 83 automated tests pass, including export/import round trips, integrity tampering, embedded secrets, placeholders, bounded templates, real OpenCode and Claude skill-file generation, assignment, immutable version history, and non-destructive rollback. Type checking and the production build pass. Browser QA verifies the live library at desktop and 402×874 phone widths with zero page-level horizontal overflow and no console errors. This milestone does not claim a public executable plugin marketplace or safe third-party code installation.
+
+## M26 — Dependable background runner and remote notifications
+
+Status: complete for the local-first 0.20.0 beta
+
+- One renewable SQLite lease elects a single active studio runner across overlapping OpenBot processes
+- Every job is atomically claimed with its own short lease and durable attempt count, preventing two workers from taking the same queued task
+- Expired running jobs return to the queue after a crash with their original task contract, approvals, conversation, and recovery timestamp intact
+- Graceful shutdown returns active work to the queue before ending child model processes
+- An optional macOS LaunchAgent starts at login, restarts after unexpected exits, keeps private logs, and waits for a foreground OpenBot session before taking over
+- Runner health exposes online/background mode, heartbeat, queue, working, waiting, recovery, and next-schedule state without exposing machine credentials
+- A durable notification outbox feeds standards-based Web Push for results, approvals, failures, missed schedules, and rate limiting
+- VAPID keys stay in a local mode-0600 file; device subscriptions remain out of public app state, stale endpoints are removed, and payloads are bounded
+- Notification clicks deep-link to the relevant conversation or Automations screen
+- Web, phone-sized web, and native SwiftUI share the same awake/protected/recovered language and authenticated **Check now** control
+
+Verification: 86 automated tests pass, including competing-runner exclusion, atomic claims, lease expiry, safe recovery, graceful requeue primitives, LaunchAgent shell-avoidance, durable outbox state, and subscription privacy. Type checking, production build, responsive browser QA, real macOS service handoff, and native simulator tests form the final gate. The guarantee is explicit: OpenBot survives process exits and resumes after wake, but a powered-off or sleeping Mac does not execute work.

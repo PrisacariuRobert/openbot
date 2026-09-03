@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.19.0 local-first beta
+Release: 0.20.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run dependable automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run process-resilient automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; interrupted work resumes from a saved claim; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -26,6 +26,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
 10. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
 11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
+12. **A local studio that survives restarts.** One active runner owns each job, optional macOS background protection keeps the service alive, and secure installed web apps receive result and approval notifications.
 
 ## Available now
 
@@ -201,6 +202,9 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - In-app recurring messages when the user says “text me” without naming an external service
 - Demonstrated browser workflows saved as reusable local skills for both OpenCode and Claude Code
 - Skill Library with teaching, starter installation, import, teammate assignment, purpose/instruction editing, version history, rollback, export, chat launch, and deletion
+- Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, and visible recovery after process interruption
+- One-click macOS login/crash protection with safe foreground-to-background handoff and owner-removable setup
+- Durable notification outbox with standards-based Web Push and direct result/approval links
 
 ### Messages, files, voice, and phone use
 
@@ -218,7 +222,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Installable responsive PWA for phone check-ins
 - Guided private phone connection with live, reconnecting, and offline states
 - Authenticated remote mode for a trusted private network or encrypted tunnel
-- Finish and approval notifications where supported by the browser
+- Live in-app notifications plus background Web Push for secure installed web apps
 
 ### Safety, privacy, and accountability
 
@@ -251,11 +255,12 @@ These features are implemented, but marketing must explain their requirement.
 | Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
 | Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
 | Calendar automations | OpenBot polls the connected primary calendar while the local service is awake; the selected teammate needs Calendar permission. |
+| Background runner | On macOS, the owner must turn on **Keep OpenBot running**. The Mac must remain powered on and awake; process restart protection is not cloud execution. |
 | GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
-| Phone access | The native iOS app and PWA both require the Mac service to remain awake. Local Wi-Fi works directly; OpenBot detects and prioritizes a Tailscale address for private use over cellular or different Wi-Fi networks, while an HTTPS proxy remains another option. Native installation currently requires Xcode signing; it is not an App Store download yet. |
-| Notifications | Browser and operating-system notification support and permission are required. |
+| Phone access | The native iOS app and PWA both require the Mac to remain powered on and awake. Optional background protection survives app exits. Local Wi-Fi works directly; OpenBot detects and prioritizes a Tailscale address for private use over cellular or different Wi-Fi networks, while an HTTPS proxy remains another option. Native installation currently requires Xcode signing; it is not an App Store download yet. |
+| Notifications | Web Push requires an installed web app, notification permission, browser support, and a secure HTTPS address. Plain HTTP can show live updates only while the app is open. Native APNs is not included yet. |
 
 ## Useful launch workflows
 
@@ -296,7 +301,7 @@ Do not say OpenBot currently:
 ## Roadmap, not launch copy
 
 - Native push notifications, share-sheet ingestion, and polished voice sessions
-- Optional always-on self-hosted daemon or private cloud deployment
+- Optional private-VPS runner and encrypted cross-host handoff for execution while the Mac sleeps
 - Reviewed third-party connector SDK/marketplace plus task-manager and cloud-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools

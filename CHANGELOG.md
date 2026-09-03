@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.20.0 — 2026-09-03
+
+- Added exclusive renewable runner leadership so overlapping foreground/background processes cannot dispatch the same work
+- Added atomic per-job claims, heartbeat renewal, durable attempts, and visible working/queued/waiting health
+- Added restart recovery that returns expired work to the queue with its task contract, approval state, and recovery activity intact
+- Added graceful service handoff so app updates and shutdowns requeue active jobs instead of incorrectly cancelling them
+- Added one-click macOS login/crash protection through a bounded LaunchAgent and a launcher that waits for the foreground app before taking over
+- Added a polished runner-health card with protection state, recovery totals, manual check, clear host-awake limits, and responsive phone layout
+- Added a durable notification outbox, local VAPID keys, device subscriptions, Web Push delivery, stale-subscription cleanup, and result/approval deep links
+- Added matching native SwiftUI runner health, recovery language, and authenticated manual wake support
+- Expanded the automated product suite to 86 passing tests and added release guards for every new reliability layer
+
 ## 0.19.0 — 2026-09-03
 
 - Rebuilt learned browser workflows as a teammate-owned Skill Library with purpose, instructions, source, and visible version metadata

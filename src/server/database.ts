@@ -29,6 +29,7 @@ import type {
   ProviderInstance,
   Routine,
   RoutineTriggerConfig,
+  RunnerHealth,
   Run,
   RunStatus,
   SkillVersion,
@@ -378,6 +379,39 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL,
         resolved_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS runner_state (
+        id TEXT PRIMARY KEY CHECK(id='primary'),
+        instance_id TEXT,
+        mode TEXT NOT NULL DEFAULT 'foreground',
+        started_at TEXT,
+        heartbeat_at TEXT,
+        lease_expires_at TEXT,
+        last_cycle_at TEXT,
+        recovered_runs INTEGER NOT NULL DEFAULT 0,
+        dispatched_runs INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id TEXT PRIMARY KEY,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_success_at TEXT,
+        failure_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS notification_outbox (
+        id TEXT PRIMARY KEY,
+        dedupe_key TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        url TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
       CREATE TABLE IF NOT EXISTS memories (
         id TEXT PRIMARY KEY,
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
@@ -581,6 +615,10 @@ export class OpenBotDatabase {
     this.addColumn("routines", "last_success_at TEXT");
     this.addColumn("routines", "last_event_at TEXT");
     this.addColumn("runs", "automation_event_id TEXT");
+    this.addColumn("runs", "worker_id TEXT");
+    this.addColumn("runs", "lease_expires_at TEXT");
+    this.addColumn("runs", "attempt_count INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("runs", "recovered_at TEXT");
     this.addColumn("connectors", "credentials_ciphertext TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
     this.addColumn("taught_workflows", "description TEXT NOT NULL DEFAULT ''");
@@ -603,6 +641,7 @@ export class OpenBotDatabase {
     this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
+    this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
     this.db.prepare(`
       INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
       VALUES ('mac_access_enabled', CASE WHEN EXISTS(SELECT 1 FROM bots WHERE mac_access_enabled=1) THEN '1' ELSE '0' END, ?)
@@ -1029,6 +1068,7 @@ export class OpenBotDatabase {
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
+      attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
       attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),
       prompt: String(row.prompt), status: row.status as RunStatus,
@@ -1071,6 +1111,37 @@ export class OpenBotDatabase {
     return row ? this.runFromRow(row) : null;
   }
 
+  claimNextQueuedRun(excludedBotIds: string[], workerId: string, leaseMs = 45_000): Run | null {
+    const placeholders = excludedBotIds.length ? excludedBotIds.map(() => "?").join(",") : "''";
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const row = this.db.prepare(`SELECT id FROM runs WHERE status='queued' AND bot_id NOT IN (${placeholders}) ORDER BY created_at ASC LIMIT 1`).get(...excludedBotIds) as Row | undefined;
+      if (!row) return null;
+      const claimedAt = now(), leaseExpiresAt = new Date(Date.now() + leaseMs).toISOString();
+      const changed = this.db.prepare("UPDATE runs SET status='running',worker_id=?,lease_expires_at=?,attempt_count=attempt_count+1,started_at=COALESCE(started_at,?),progress_at=? WHERE id=? AND status='queued'").run(
+        workerId, leaseExpiresAt, claimedAt, claimedAt, String(row.id),
+      ).changes;
+      if (changed) return this.getRun(String(row.id));
+    }
+    return null;
+  }
+
+  renewRunLeases(workerId: string, leaseMs = 45_000): number {
+    return Number(this.db.prepare("UPDATE runs SET lease_expires_at=? WHERE worker_id=? AND status='running'").run(new Date(Date.now() + leaseMs).toISOString(), workerId).changes);
+  }
+
+  recoverExpiredRuns(): Run[] {
+    const expired = this.db.prepare(this.runSelect("WHERE r.status='running' AND (r.lease_expires_at IS NULL OR r.lease_expires_at<=?) ORDER BY r.created_at ASC")).all(now()) as Row[];
+    if (!expired.length) return [];
+    const recoveredAt = now();
+    this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)").run(recoveredAt, recoveredAt, recoveredAt);
+    return expired.map((row) => this.getRun(String(row.id))).filter((run): run is Run => Boolean(run));
+  }
+
+  requeueWorkerRuns(workerId: string): number {
+    const recoveredAt = now();
+    return Number(this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND worker_id=?").run(recoveredAt, recoveredAt, workerId).changes);
+  }
+
   updateRun(id: string, patch: Partial<{
     status: RunStatus; approvalReason: string | null; approvalId: string | null; startedAt: string | null; finishedAt: string | null;
     progressAt: string | null; partialText: string | null; summary: string | null; error: string | null; sessionId: string | null;
@@ -1085,8 +1156,15 @@ export class OpenBotDatabase {
       value("error", "error"), value("sessionId", "session_id"), value("inputTokens", "input_tokens"), value("outputTokens", "output_tokens"),
       value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), id,
     );
+    if (patch.status && patch.status !== "running") this.db.prepare("UPDATE runs SET worker_id=NULL,lease_expires_at=NULL WHERE id=?").run(id);
     if (patch.status === "running" || patch.status === "completed") this.db.prepare("UPDATE bots SET last_active_at=? WHERE id=?").run(now(), current.bot_id);
     const statusChanged = patch.status !== undefined && patch.status !== current.status;
+    if (statusChanged && !current.parent_run_id && ["completed", "failed", "awaiting_approval"].includes(String(patch.status))) {
+      const bot = this.getBot(String(current.bot_id));
+      const title = patch.status === "completed" ? `${bot?.name || "A teammate"} finished` : patch.status === "failed" ? `${bot?.name || "A teammate"} needs a hand` : `${bot?.name || "A teammate"} needs your okay`;
+      const body = patch.status === "completed" ? "Your result is ready to review." : patch.status === "failed" ? (patch.error || "OpenBot could not finish this task.") : (patch.approvalReason || String(current.approval_reason || "OpenBot is waiting for your decision."));
+      this.enqueueNotification({ dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title, body, url: `/?thread=${encodeURIComponent(String(current.thread_id))}` });
+    }
     if (statusChanged && current.automation_event_id) {
       const eventStatus: AutomationEventStatus | null = patch.status === "awaiting_approval" ? "waiting" : ["queued", "running", "completed", "failed", "cancelled"].includes(patch.status!) ? patch.status as AutomationEventStatus : null;
       if (eventStatus) this.db.prepare("UPDATE automation_events SET status=?,finished_at=?,error=? WHERE id=?").run(
@@ -2029,6 +2107,10 @@ export class OpenBotDatabase {
     this.db.prepare("INSERT INTO automation_alerts (id,routine_id,routine_name,run_id,event_id,kind,message,created_at) VALUES (?,?,?,?,?,?,?,?)").run(
       id, input.routineId, routine?.name || "Deleted automation", input.runId || null, input.eventId || null, input.kind, input.message.slice(0, 1_000), now(),
     );
+    if (!input.runId || input.kind === "missed" || input.kind === "rate_limit") this.enqueueNotification({
+      dedupeKey: `automation-alert:${id}`, kind: `automation_${input.kind}`, title: routine?.name || "OpenBot automation",
+      body: input.message, url: "/?panel=routines",
+    });
     return this.listAutomationAlerts().find((alert) => alert.id === id)!;
   }
 
@@ -2147,6 +2229,54 @@ export class OpenBotDatabase {
     return { skillPath: String(row.skill_path), botId: String(row.bot_id) };
   }
 
+  savePushSubscription(input: { endpoint: string; p256dh: string; auth: string }): string {
+    const existing = this.db.prepare("SELECT id FROM push_subscriptions WHERE endpoint=?").get(input.endpoint) as Row | undefined;
+    const id = existing?.id ? String(existing.id) : randomUUID();
+    this.db.prepare(`INSERT INTO push_subscriptions (id,endpoint,p256dh,auth,created_at,failure_count)
+      VALUES (?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,failure_count=0`).run(
+      id, input.endpoint, input.p256dh, input.auth, now(),
+    );
+    return id;
+  }
+
+  listPushSubscriptions(): Array<{ id: string; endpoint: string; p256dh: string; auth: string; failureCount: number }> {
+    return (this.db.prepare("SELECT * FROM push_subscriptions ORDER BY created_at DESC").all() as Row[]).map((row) => ({
+      id: String(row.id), endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth), failureCount: Number(row.failure_count || 0),
+    }));
+  }
+
+  deletePushSubscription(endpoint: string): boolean {
+    return this.db.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").run(endpoint).changes > 0;
+  }
+
+  recordPushSuccess(id: string) {
+    this.db.prepare("UPDATE push_subscriptions SET last_success_at=?,failure_count=0 WHERE id=?").run(now(), id);
+  }
+
+  recordPushFailure(id: string) {
+    this.db.prepare("UPDATE push_subscriptions SET failure_count=failure_count+1 WHERE id=?").run(id);
+  }
+
+  enqueueNotification(input: { dedupeKey: string; kind: string; title: string; body: string; url: string }) {
+    this.db.prepare("INSERT OR IGNORE INTO notification_outbox (id,dedupe_key,kind,title,body,url,created_at) VALUES (?,?,?,?,?,?,?)").run(
+      randomUUID(), input.dedupeKey, input.kind.slice(0, 80), input.title.slice(0, 160), input.body.replace(/\s+/g, " ").trim().slice(0, 500), input.url.slice(0, 500), now(),
+    );
+  }
+
+  pendingNotifications(limit = 20): Array<{ id: string; kind: string; title: string; body: string; url: string; attemptCount: number }> {
+    return (this.db.prepare("SELECT * FROM notification_outbox WHERE sent_at IS NULL AND attempt_count<5 ORDER BY created_at ASC LIMIT ?").all(Math.max(1, Math.min(limit, 50))) as Row[]).map((row) => ({
+      id: String(row.id), kind: String(row.kind), title: String(row.title), body: String(row.body), url: String(row.url), attemptCount: Number(row.attempt_count || 0),
+    }));
+  }
+
+  markNotificationSent(id: string) {
+    this.db.prepare("UPDATE notification_outbox SET sent_at=?,attempt_count=attempt_count+1,last_error=NULL WHERE id=?").run(now(), id);
+  }
+
+  markNotificationFailed(id: string, error: string) {
+    this.db.prepare("UPDATE notification_outbox SET attempt_count=attempt_count+1,last_error=? WHERE id=?").run(error.slice(0, 500), id);
+  }
+
   getUsageSummary(): UsageSummary {
     const row = this.db.prepare(`SELECT COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens,COALESCE(SUM(reasoning_tokens),0) reasoning_tokens,COALESCE(SUM(cache_read_tokens),0) cache_read_tokens,COALESCE(SUM(cost),0) cost,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_runs,SUM(CASE WHEN status IN ('queued','running','awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) active_runs FROM runs WHERE created_at>=datetime('now','-7 days')`).get() as Row;
     const inputTokens = Number(row.input_tokens || 0), outputTokens = Number(row.output_tokens || 0), reasoningTokens = Number(row.reasoning_tokens || 0), cacheReadTokens = Number(row.cache_read_tokens || 0);
@@ -2159,9 +2289,67 @@ export class OpenBotDatabase {
     return { allowed: bot.weeklyTokenBudget <= 0 || bot.tokensUsedThisWeek < bot.weeklyTokenBudget, used: bot.tokensUsedThisWeek, budget: bot.weeklyTokenBudget };
   }
 
+  acquireRunnerLease(instanceId: string, mode: RunnerHealth["mode"], leaseMs = 30_000): boolean {
+    const at = now(), expiresAt = new Date(Date.now() + leaseMs).toISOString();
+    const result = this.db.prepare(`UPDATE runner_state SET
+      instance_id=?,mode=?,started_at=CASE WHEN instance_id=? THEN COALESCE(started_at,?) ELSE ? END,
+      heartbeat_at=?,lease_expires_at=?,last_cycle_at=?,last_error=NULL
+      WHERE id='primary' AND (instance_id=? OR lease_expires_at IS NULL OR lease_expires_at<=?)`).run(
+      instanceId, mode, instanceId, at, at, at, expiresAt, at, instanceId, at,
+    );
+    return result.changes > 0;
+  }
+
+  heartbeatRunner(instanceId: string, leaseMs = 30_000): boolean {
+    const at = now();
+    return this.db.prepare("UPDATE runner_state SET heartbeat_at=?,lease_expires_at=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(
+      at, new Date(Date.now() + leaseMs).toISOString(), at, instanceId,
+    ).changes > 0;
+  }
+
+  recordRunnerDispatch(instanceId: string) {
+    this.db.prepare("UPDATE runner_state SET dispatched_runs=dispatched_runs+1,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(now(), instanceId);
+  }
+
+  recordRunnerRecovery(instanceId: string, count: number) {
+    if (count <= 0) return;
+    this.db.prepare("UPDATE runner_state SET recovered_runs=recovered_runs+?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(count, now(), instanceId);
+  }
+
+  recordRunnerError(instanceId: string, error: string) {
+    this.db.prepare("UPDATE runner_state SET last_error=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(error.slice(0, 1_000), now(), instanceId);
+  }
+
+  releaseRunnerLease(instanceId: string) {
+    this.db.prepare("UPDATE runner_state SET instance_id=NULL,heartbeat_at=?,lease_expires_at=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(now(), now(), now(), instanceId);
+  }
+
+  getRunnerHealth(): RunnerHealth {
+    const row = this.db.prepare("SELECT * FROM runner_state WHERE id='primary'").get() as Row | undefined;
+    const counts = this.db.prepare(`SELECT
+      SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) queued,
+      SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running,
+      SUM(CASE WHEN status IN ('awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) waiting
+      FROM runs`).get() as Row;
+    const next = this.db.prepare("SELECT MIN(next_run_at) next_at FROM routines WHERE enabled=1 AND trigger_type='schedule' AND next_run_at IS NOT NULL").get() as Row;
+    const expires = row?.lease_expires_at ? String(row.lease_expires_at) : null;
+    const online = Boolean(row?.instance_id && expires && new Date(expires).getTime() > Date.now());
+    return {
+      status: online ? "online" : "offline", mode: (row?.mode === "background" ? "background" : "foreground"),
+      instanceId: online && row?.instance_id ? String(row.instance_id) : null,
+      startedAt: row?.started_at ? String(row.started_at) : null, heartbeatAt: row?.heartbeat_at ? String(row.heartbeat_at) : null,
+      leaseExpiresAt: expires, lastCycleAt: row?.last_cycle_at ? String(row.last_cycle_at) : null,
+      recoveredRuns: Number(row?.recovered_runs || 0), dispatchedRuns: Number(row?.dispatched_runs || 0),
+      queuedRuns: Number(counts.queued || 0), runningRuns: Number(counts.running || 0), waitingRuns: Number(counts.waiting || 0),
+      nextRoutineAt: next.next_at ? String(next.next_at) : null, lastError: row?.last_error ? String(row.last_error) : null,
+      backgroundService: process.platform === "darwin" ? "not_installed" : "unsupported",
+      backgroundServiceDetail: process.platform === "darwin" ? "OpenBot is running in this app session." : "Background launch is currently available on macOS.",
+    };
+  }
+
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

@@ -178,6 +178,8 @@ export interface Run {
   steeredFromRunId: string | null;
   routineId: string | null;
   automationEventId: string | null;
+  attemptCount: number;
+  recoveredAt: string | null;
   consultationPending: boolean;
   attachmentIds: string[];
   prompt: string;
@@ -281,6 +283,28 @@ export interface AutomationAlert {
   repairHint: string | null;
   createdAt: string;
   resolvedAt: string | null;
+}
+
+export type RunnerStatus = "online" | "recovering" | "offline";
+export type BackgroundServiceStatus = "installed" | "not_installed" | "unsupported";
+
+export interface RunnerHealth {
+  status: RunnerStatus;
+  mode: "foreground" | "background";
+  instanceId: string | null;
+  startedAt: string | null;
+  heartbeatAt: string | null;
+  leaseExpiresAt: string | null;
+  lastCycleAt: string | null;
+  recoveredRuns: number;
+  dispatchedRuns: number;
+  queuedRuns: number;
+  runningRuns: number;
+  waitingRuns: number;
+  nextRoutineAt: string | null;
+  lastError: string | null;
+  backgroundService: BackgroundServiceStatus;
+  backgroundServiceDetail: string;
 }
 
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
@@ -721,6 +745,7 @@ export interface AppState {
   routines: Routine[];
   automationEvents: AutomationEvent[];
   automationAlerts: AutomationAlert[];
+  runner: RunnerHealth;
   workflows: TaughtWorkflow[];
   approvals: Approval[];
   agentMessages: AgentMessage[];

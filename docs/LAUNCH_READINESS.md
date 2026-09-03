@@ -1,6 +1,6 @@
-# OpenBot 0.19.0 Launch Readiness
+# OpenBot 0.20.0 Launch Readiness
 
-OpenBot 0.19.0 is ready for an open-source local-first beta launch with a compiled native iPhone experience, durable cross-device continuity, a verified customizable character system, Live Studio supervision, and a portable versioned Skill Library. It is not yet an honest drop-in replacement for Grok Bot's always-on hosted service, push delivery, App Store distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
+OpenBot 0.20.0 is ready for an open-source local-first beta launch with a compiled native iPhone experience, durable cross-device continuity, a verified customizable character system, Live Studio supervision, a portable versioned Skill Library, dependable background self-hosting, and secure web push. It is not yet an honest drop-in replacement for Grok Bot's powered-off cloud execution, hosted public ingress, App Store/APNs distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or wider plugin catalog.
 
 ## What is launch-ready
 
@@ -28,6 +28,9 @@ OpenBot 0.19.0 is ready for an open-source local-first beta launch with a compil
 - Notion OAuth with selected/shared-page search/read, separate per-teammate read/update grants, exact append approvals, connected preview, health, and private audits
 - Scheduled, Calendar, signed GitHub, and signed generic-webhook automations with narrow filters, explicit tests, pause/resume/edit/delete, encrypted rotating secrets, event receipts, linked results, and safe replay
 - Failure and approval attention inbox, missed-schedule notices, seven-day event deduplication, burst limits, loop headers, bounded redacted input, and automatic pause after three consecutive failures
+- Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, crash recovery, and graceful active-job handoff
+- Optional one-click macOS login/crash protection with foreground-session handoff and explicit powered-on/awake limits
+- Durable Web Push outbox, bounded notification payloads, device cleanup, and direct result/approval links for secure installed web apps
 - Studio-wide visible Mac-file access, protected hidden/system paths, and approval-only organization without deletion or overwriting
 - Safe Markdown messages and connector cards that keep status and capability text inside their borders
 - Durable job outcomes, deliverables, checklists, approval boundaries, and evidence-based final receipts across both supported agent runtimes
@@ -47,6 +50,7 @@ OpenBot 0.19.0 is ready for an open-source local-first beta launch with a compil
 | GitHub authority | Reading activity and creating issues are separate per teammate; every issue creation shows a durable one-time approval. |
 | Reusable work | Skills stay local, inspectable, portable, integrity-checked, secret-scanned, versioned, and reversible; assignment never copies the source teammate's private history. |
 | Automation safety | Signed event delivery, duplicate prevention before run creation, failure auto-pause, explicit tests, and explainable replay make unattended work inspectable. |
+| Runner recovery | Competing processes cannot claim the same job, interrupted work resumes from a saved lease/checklist, and every recovery stays visible. |
 | Cost control | Per-bot weekly token limits and provider-reported token/cache/cost data are visible. |
 | Completion trust | A claimed success is visibly distinguished from a checked result, and the supporting steps and checks can be inspected. |
 | Project authority | Each teammate gets explicit per-project read, edit, and test rights; no broad host filesystem permission is needed for coding. |
@@ -58,23 +62,23 @@ OpenBot 0.19.0 is ready for an open-source local-first beta launch with a compil
 
 | Gap | Honest status | Best next move |
 |---|---|---|
-| Always-on cloud work | OpenBot stops when the host Mac sleeps or the service exits. | Add an optional self-hosted daemon/VPS deployment with encrypted backup and health checks. |
-| Native distribution and push | The SwiftUI app builds, sends attachments, and passes live simulator QA, but still needs physical-device QA, App Store signing/delivery, rich artifact previews, and a push provider/always-on host. | Complete device QA and signing, then add previews and opt-in push only with an always-on runner. |
+| Always-on cloud work | The optional background runner survives app exits and crashes, but work still pauses when the host Mac sleeps or powers off. | Package a private VPS runner or encrypted cross-host handoff with an explicit data-location choice. |
+| Native distribution and push | Secure installed web apps can receive Web Push and the SwiftUI app shows live runner state, but native APNs still needs physical-device QA, signing, delivery infrastructure, and a notification privacy review. | Complete device QA and signing, then add native APNs and rich artifact previews. |
 | Large connector marketplace | Gmail, Drive, Calendar, GitHub, Slack, and Notion have real bounded tools; this is still a focused built-in set, not a marketplace. | Publish a connector security/review contract, then add task management and cloud storage through the same manifest. |
 | Full visual desktop takeover | OpenBot can now supervise and take over isolated bot browsers, while the macOS Accessibility bridge can inspect controls and approval-gate interactions; it still cannot reason over arbitrary desktop pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
-| Hosted remote dev environments | The local harness now isolates every coding task in its own Git worktree and supports parallel agents, but work still stops when the host is unavailable. | Add an encrypted always-on runner without weakening local mode. |
-| Hosted event ingress and execution | Schedule and Calendar triggers run only while the Mac and OpenBot are awake. Public webhook delivery requires an owner-managed HTTPS route to the local endpoint. | Add an optional always-on runner with encrypted leases, recovery, health checks, and hosted ingress without weakening local mode. |
+| Hosted remote dev environments | Local code jobs now recover across OpenBot restarts, but they still stop while the host is asleep or unavailable. | Add an encrypted private runner deployment without weakening local mode. |
+| Hosted event ingress and execution | Schedule and Calendar work survives service exits but still requires an awake Mac; public hooks need an owner-managed HTTPS route. | Add reviewed private-VPS packaging and optional hosted ingress as a separate trust mode. |
 | Broader event sources | Signed GitHub and generic hooks plus primary-Calendar polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.19 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.20 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 
 ## Release decision
 
-Ship 0.19.0 as a **local-first beta**, with the limitations above visible in the README. The native iPhone app is simulator-verified and ready for owner-signed device testing, not yet an App Store claim. Draft handoff and Live Studio require the owner's Mac service to remain reachable; draft handoff does not yet move unsent attachments. Portable skills cover reviewed browser workflows, not executable third-party plugins. Do not market OpenBot as always-on or imply that universal media understanding, OCR, native Office editing, or a public marketplace work.
+Ship 0.20.0 as a **local-first beta**, with the limitations above visible in the README. Background protection makes the Mac-hosted studio resilient to app exits and crashes, but it does not execute while the Mac sleeps or powers off. Secure installed web apps have Web Push; the native iPhone app remains simulator-verified and ready for owner-signed device testing, not yet an App Store/APNs claim. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
 
 ## Verified acceptance criteria
 
-- Automated tests: 83 passing
+- Automated tests: 86 passing
 - iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator; four unit tests and one live sign-in UI test pass; no `WKWebView` remains in the app source
 - Type safety: passing
 - Production build: passing
@@ -88,6 +92,7 @@ Ship 0.19.0 as a **local-first beta**, with the limitations above visible in the
 - Slack and Notion integrations: official response shapes, OAuth state/replay behavior, encrypted storage, token refresh/rotation paths, provider-version headers, bounded reads, approval-only writes, session revocation, and cross-runtime tool exposure passing; live account consent intentionally left to the owner
 - GitHub integration: official CLI account health, live notification preview, live issue search, response normalization, URL safety, per-teammate read/create separation, approval-gated creation, and connector activity records passing. A real DeepSeek V4 Flash teammate read the newest notification with read-only access and returned its title/repository; no test issue was created and all temporary test state was removed.
 - Skills and automations: slash parsing, unique skill slugs, cross-runtime files, package integrity, secret blocking, template bounds, import, assignment, immutable versions, rollback, trigger parsing, signed webhook verification, filters, encrypted secrets, event deduplication, rate limiting, lifecycle linkage, three-failure pausing, alerts, replay input, and preserved history passing
+- Runner and notifications: exclusive leadership, atomic claim, competing-worker rejection, lease expiry/recovery, graceful requeue, background plist safety, private subscriptions, durable outbox, secure push signing, and notification deep-link guards passing
 - Real automation: one signed event was accepted, ran with Muse Spark 1.2 Free, produced `build-event-confirmation.md`, and a repeated delivery returned the original event without creating another run
 - 0.16 UI: Slack and Notion managed/self-hosted setup, real service marks, health/status, connected previews, per-teammate grants, callback states, activity, and workflow cards inspected at desktop and 390×844 with zero page-level overflow or console errors
 - Automation security smoke: invalid/valid signatures, narrow matching, secret redaction, payload bounds, dedupe-before-dispatch, and three-failure pause are covered; the manual workflow confirmed one event, one run, and one duplicate stopped

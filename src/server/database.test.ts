@@ -241,6 +241,39 @@ test("keeps approvals pending across a full database restart", () => {
   }
 });
 
+test("leases background work, rejects a second runner, and safely recovers interrupted jobs", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-runner-recovery-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.equal(db.acquireRunnerLease("runner-one", "foreground", 30_000), true);
+    assert.equal(db.acquireRunnerLease("runner-two", "background", 30_000), false);
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Prepare and verify a morning brief.", status: "queued" });
+    const claimed = db.claimNextQueuedRun([], "runner-one", -1);
+    assert.equal(claimed?.id, run.id);
+    assert.equal(claimed?.status, "running");
+    assert.equal(claimed?.attemptCount, 1);
+    const recovered = db.recoverExpiredRuns();
+    assert.equal(recovered.map((item) => item.id).includes(run.id), true);
+    assert.equal(db.getRun(run.id)?.status, "queued");
+    assert.ok(db.getRun(run.id)?.recoveredAt);
+    const reclaimed = db.claimNextQueuedRun([], "runner-one", 30_000);
+    assert.equal(reclaimed?.attemptCount, 2);
+    db.recordRunnerDispatch("runner-one");
+    db.recordRunnerRecovery("runner-one", recovered.length);
+    const health = db.getRunnerHealth();
+    assert.equal(health.status, "online");
+    assert.equal(health.runningRuns, 1);
+    assert.equal(health.recoveredRuns, 1);
+    assert.equal(health.dispatchedRuns, 1);
+    assert.equal(db.requeueWorkerRuns("runner-one"), 1);
+    db.releaseRunnerLease("runner-one");
+    assert.equal(db.getRunnerHealth().status, "offline");
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("keeps a task contract, advances its checklist, and records verification", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-completion-test-"));
   try {

@@ -8,6 +8,7 @@ struct StudioState: Decodable {
     let studioRuns: [StudioRun]?
     let approvals: [StudioApproval]
     let workflows: [StudioWorkflow]
+    let runner: StudioRunner?
     let draft: StudioDraft?
     let usage: StudioUsage
     let activeThreadId: String
@@ -71,11 +72,24 @@ struct StudioRun: Decodable, Identifiable, Hashable {
     let botName: String
     let botMascot: String
     let botColor: String
+    let attemptCount: Int
+    let recoveredAt: String?
     let status: String
     let approvalReason: String?
     let partialText: String?
     let summary: String?
     let error: String?
+}
+
+struct StudioRunner: Decodable, Hashable {
+    let status: String
+    let mode: String
+    let recoveredRuns: Int
+    let queuedRuns: Int
+    let runningRuns: Int
+    let waitingRuns: Int
+    let backgroundService: String
+    let backgroundServiceDetail: String
 }
 
 struct StudioApproval: Decodable, Identifiable, Hashable {
@@ -105,7 +119,7 @@ struct StudioEvent: Decodable { let type: String }
 
 extension StudioState {
     static let empty = StudioState(
-        bots: [], threads: [], messages: [], runs: [], studioRuns: [], approvals: [], workflows: [],
+        bots: [], threads: [], messages: [], runs: [], studioRuns: [], approvals: [], workflows: [], runner: nil,
         draft: nil,
         usage: StudioUsage(totalTokens: 0, completedRuns: 0, activeRuns: 0),
         activeThreadId: "team-room"

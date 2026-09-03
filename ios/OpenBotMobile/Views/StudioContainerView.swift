@@ -501,13 +501,13 @@ private struct NativeLiveStudioView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("LIVE FROM YOUR MAC", systemImage: "circle.fill")
+                        Label(store.state.runner?.backgroundService == "installed" ? "BACKGROUND PROTECTION ACTIVE" : "LIVE FROM YOUR MAC", systemImage: "circle.fill")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.78))
                         Text(store.state.usage.activeRuns > 0 ? "Your team is moving work forward" : "Your team is ready")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("Watch every teammate, open the right conversation, and handle anything that needs you.")
+                        Text("Watch every teammate, handle anything that needs you, and trust interrupted work to resume from its saved checkpoint.")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.72))
                         MascotStack(bots: store.state.bots, large: true).frame(maxWidth: .infinity, minHeight: 82)
@@ -522,6 +522,26 @@ private struct NativeLiveStudioView: View {
                         liveStat(value: store.state.usage.activeRuns, label: "working", icon: "sparkles")
                         liveStat(value: attention.count, label: "attention", icon: "hand.raised.fill")
                         liveStat(value: store.state.usage.completedRuns, label: "finished", icon: "checkmark.circle.fill")
+                    }
+
+                    if let runner = store.state.runner {
+                        HStack(spacing: 11) {
+                            Image(systemName: runner.status == "online" ? "bolt.heart.fill" : "exclamationmark.arrow.triangle.2.circlepath")
+                                .foregroundStyle(runner.status == "online" ? OpenBotTheme.green : .orange)
+                                .font(.system(size: 19, weight: .semibold))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(runner.status == "online" ? "Studio runner is awake" : "Studio runner needs a restart")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                Text(runner.backgroundServiceDetail)
+                                    .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            Spacer(minLength: 4)
+                            Button("Check now") { Task { await store.wakeRunner() } }
+                                .buttonStyle(.bordered).controlSize(.small)
+                        }
+                        .padding(13)
+                        .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.black.opacity(0.055)))
                     }
 
                     if !attention.isEmpty {
@@ -604,6 +624,7 @@ private struct NativeLiveStudioView: View {
         if run.status == "failed" { return run.error ?? "Needs a hand" }
         if run.status == "completed" { return run.summary ?? "Recently finished" }
         if run.status == "awaiting_approval" { return run.approvalReason ?? "Waiting for your okay" }
+        if run.recoveredAt != nil { return "Resumed safely after OpenBot restarted" }
         return run.partialText ?? run.summary ?? run.status.openBotRunLabel
     }
 }

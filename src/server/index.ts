@@ -28,6 +28,8 @@ import { iosConnectURL, isTailscaleURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
 import { SKILL_TEMPLATES } from "./skill-library.js";
+import { BackgroundServiceManager } from "./background-service.js";
+import { NotificationService } from "./notifications.js";
 import type { AutomationEvent, Routine } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -45,6 +47,7 @@ const googleWorkspace = new GoogleWorkspaceConnector(db, `http://127.0.0.1:${por
 const slack = new SlackConnector(db, `http://127.0.0.1:${port}/api/connectors/slack/callback`);
 const notion = new NotionConnector(db, `http://127.0.0.1:${port}/api/connectors/notion/callback`);
 const attachmentsService = new AttachmentService(db);
+const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
 const codeProjects = new CodeProjectManager(db);
@@ -112,8 +115,10 @@ function broadcast(event: Record<string, unknown> = { type: "state", at: Date.no
 }
 
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
+const notifications = new NotificationService(db, () => runner.isLeader());
 const providerConnections = new ProviderConnectionManager(() => broadcast({ type: "provider", at: Date.now() }));
 runner.start();
+notifications.start();
 
 function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
@@ -136,7 +141,67 @@ app.get("/api/events", (request, response) => {
 
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
-  response.json(db.getState(threadId));
+  const state = db.getState(threadId);
+  response.json({ ...state, runner: { ...state.runner, ...backgroundService.status(state.runner) } });
+});
+
+app.get("/api/runner", (_request, response) => {
+  const health = db.getRunnerHealth();
+  response.json({ ...health, ...backgroundService.status(health) });
+});
+
+app.post("/api/runner/wake", (_request, response) => {
+  runner.wake();
+  dispatchDueRoutines();
+  const health = db.getRunnerHealth();
+  broadcast({ type: "runner", at: Date.now() });
+  response.json({ ...health, ...backgroundService.status(health) });
+});
+
+app.post("/api/runner/background", async (request, response) => {
+  if (!loopback(request)) return response.status(403).json({ error: "Background protection can only be changed from this Mac." });
+  try {
+    await backgroundService.install();
+    const health = db.getRunnerHealth();
+    broadcast({ type: "runner", at: Date.now() });
+    response.json({ ...health, ...backgroundService.status(health) });
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.delete("/api/runner/background", async (request, response) => {
+  if (!loopback(request)) return response.status(403).json({ error: "Background protection can only be changed from this Mac." });
+  try {
+    await backgroundService.uninstall();
+    const health = db.getRunnerHealth();
+    broadcast({ type: "runner", at: Date.now() });
+    response.json({ ...health, ...backgroundService.status(health) });
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.get("/api/notifications/key", (_request, response) => {
+  response.json({ publicKey: notifications.publicKey });
+});
+
+const pushSubscriptionInput = z.object({
+  endpoint: z.string().url().max(2_000).refine((value) => value.startsWith("https://"), "Push endpoints must use HTTPS."),
+  keys: z.object({ p256dh: z.string().min(20).max(500), auth: z.string().min(8).max(500) }),
+});
+app.post("/api/notifications/subscriptions", (request, response) => {
+  const parsed = pushSubscriptionInput.safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "This device did not provide a valid notification subscription." });
+  const id = db.savePushSubscription({ endpoint: parsed.data.endpoint, ...parsed.data.keys });
+  notifications.wake();
+  response.status(201).json({ id, connected: true });
+});
+app.delete("/api/notifications/subscriptions", (request, response) => {
+  const parsed = z.object({ endpoint: z.string().url().max(2_000) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a valid notification subscription." });
+  db.deletePushSubscription(parsed.data.endpoint);
+  response.json({ connected: false });
 });
 
 app.get("/api/search", (request, response) => {
@@ -1501,7 +1566,8 @@ app.post("/api/internal/tools", async (request, response) => {
   }
 });
 
-setInterval(() => {
+function dispatchDueRoutines() {
+  if (!runner.isLeader()) return false;
   let changed = false;
   for (const routine of db.dueRoutines()) {
     const scheduledFor = routine.nextRunAt || new Date().toISOString();
@@ -1511,11 +1577,13 @@ setInterval(() => {
     changed = true;
   }
   if (changed) broadcast();
-}, 15_000);
+  return changed;
+}
+setInterval(dispatchDueRoutines, 15_000);
 
 let calendarPollRunning = false;
 setInterval(async () => {
-  if (calendarPollRunning) return;
+  if (calendarPollRunning || !runner.isLeader()) return;
   const routines = db.listCalendarRoutines();
   if (!routines.length) return;
   calendarPollRunning = true;
@@ -1553,6 +1621,7 @@ const server = app.listen(port, host, () => {
 });
 
 async function shutdown() {
+  notifications.stop();
   runner.stop();
   providerConnections.stop();
   await browser.close();
