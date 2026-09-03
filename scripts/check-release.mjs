@@ -11,6 +11,8 @@ const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", impo
 const runner = readFileSync(new URL("../src/server/opencode.ts", import.meta.url), "utf8");
 const backgroundService = readFileSync(new URL("../src/server/background-service.ts", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
+const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
+const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
 const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
 const todoist = readFileSync(new URL("../src/server/todoist.ts", import.meta.url), "utf8");
 const dropbox = readFileSync(new URL("../src/server/dropbox.ts", import.meta.url), "utf8");
@@ -77,6 +79,15 @@ if (!backgroundService.includes("com.openbot.runner") || !backgroundService.incl
 }
 if (!notifications.includes("sendNotification") || !database.includes("notification_outbox") || !serviceWorker.includes('addEventListener("push"')) {
   failures.push("Durable background notification delivery is incomplete.");
+}
+if (!notifications.includes("nativeStatus") || !apns.includes("api.push.apple.com") || !database.includes("native_push_devices") || !server.includes("/api/notifications/native")) {
+  failures.push("Authenticated native APNs registration and durable delivery are incomplete.");
+}
+if (!server.includes("dispatchConnectorEvents") || !server.includes("todoist.activities") || !server.includes("dropbox.latestCursor") || !database.includes("automation_cursors")) {
+  failures.push("Proactive Todoist and Dropbox event automation is incomplete.");
+}
+if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifier") || !dropbox.includes('body.set("client_id"')) {
+  failures.push("Managed Dropbox OAuth must retain PKCE and public-client support.");
 }
 if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep OpenBot running")) {
   failures.push("The user-facing runner health and one-click protection experience is incomplete.");

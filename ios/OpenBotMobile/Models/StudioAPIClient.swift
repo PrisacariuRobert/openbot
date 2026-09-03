@@ -67,6 +67,13 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runner/wake", method: "POST")
     }
 
+    func registerNativePush(deviceToken: String, environment: String, bundleID: String) async throws -> NativePushRegistration {
+        let payload = try JSONEncoder().encode(NativePushRequest(deviceToken: deviceToken, environment: environment, bundleId: bundleID))
+        let data = try await dataRequest("api/notifications/native", method: "POST", body: payload)
+        do { return try JSONDecoder().decode(NativePushRegistration.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
     func listenForEvents(onEvent: @escaping () async -> Void) async throws {
         var request = try authorizedRequest(path: "api/events")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -134,6 +141,18 @@ private struct MessageRequest: Encodable {
 private struct DraftRequest: Encodable {
     let body: String
     let source: String
+}
+
+private struct NativePushRequest: Encodable {
+    let deviceToken: String
+    let environment: String
+    let bundleId: String
+}
+
+struct NativePushRegistration: Decodable {
+    let id: String
+    let connected: Bool
+    let deliveryReady: Bool
 }
 
 private struct ServerMessage: Decodable { let error: String }

@@ -419,3 +419,19 @@ Status: complete for the local-first 0.21.0 beta
 - Todoist and Dropbox use recognizable code-drawn service marks without adding static mascot artwork or weakening customizable character motion
 
 Verification: 88 automated tests pass, including live-shaped Todoist registration/token/task responses, Dropbox offline OAuth/search/download responses, rejection of unsupported Dropbox files, connector manifests, encrypted storage, and existing security boundaries. Type checking and the production build pass, and Xcode Beta compiles the native target for an iPhone 17 Pro simulator. Live third-party consent remains owner setup; native APNs, share-sheet ingestion from other apps, Slack/Notion event sources, and execution while the Mac is asleep remain explicit future work.
+
+## M28 — Proactive connector work and native handoff
+
+Status: complete in source for the local-first 0.22.0 beta
+
+- Todoist added, updated, and completed activity can start a selected teammate routine with an explicit activity filter
+- Dropbox delta polling can start work for changed or deleted items below one selected folder
+- Fresh enable-time baselines prevent historic connector data from unexpectedly starting jobs
+- Durable Dropbox cursors and Todoist timestamps survive restarts; existing receipts, dedupe, rate limits, approvals, alerts, and failure auto-pause remain in force
+- Dropbox OAuth now uses PKCE and supports a managed public client using only the release app key, while confidential and self-hosted clients remain compatible
+- The iPhone app registers authenticated sandbox/production APNs device tokens and opens notification deep links to the relevant conversation or approval
+- Notification delivery is recorded per web/native target, so retrying one device does not duplicate a delivery that already succeeded elsewhere
+- The embedded OpenBot Share extension accepts bounded text, links, images, and files, stores them atomically in the private App Group inbox, and removes them only after the main app sends them
+- Debug and Release configurations select the correct APNs environment; the extension ships its own privacy manifest
+
+Verification: 94 automated tests cover connector activity/delta contracts, duplicate-safe Todoist windows, public-client PKCE, durable cursor baselines, APNs JWT/payload/error handling, native token storage, and per-target delivery. Type checking and the production web build pass. XcodeGen regenerates the checked-in project and Xcode Beta compiles the native app with the OpenBot Share extension embedded for the iPhone 17 Pro simulator. Production APNs delivery and App Store distribution remain owner steps because they require a registered Apple App Group, Push capability, signing profile, physical device, and private `.p8` key.

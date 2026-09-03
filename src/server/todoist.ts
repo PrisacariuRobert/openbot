@@ -6,6 +6,15 @@ type FetchLike = typeof fetch;
 type Json = Record<string, unknown>;
 type TodoistCredentials = { accessToken: string; refreshToken?: string; expiresAt?: string };
 
+export type TodoistActivitySummary = {
+  id: string;
+  eventType: "added" | "updated" | "completed" | string;
+  objectId: string;
+  content: string;
+  occurredAt: string;
+  projectId: string;
+};
+
 const SCOPE = "data:read_write";
 
 function cleanText(value: unknown, limit = 2_000) {
@@ -86,6 +95,29 @@ export class TodoistConnector {
     const needle = cleanText(query, 500).toLocaleLowerCase();
     return rows.map((row) => this.taskSummary(row)).filter((row): row is TodoistTaskSummary => Boolean(row))
       .filter((row) => !needle || `${row.content}\n${row.description}`.toLocaleLowerCase().includes(needle)).slice(0, 20);
+  }
+
+  async activities(maxResults = 50): Promise<TodoistActivitySummary[]> {
+    const params = new URLSearchParams({ object_type: "item", limit: String(Math.max(1, Math.min(Math.round(maxResults), 200))) });
+    const result = await this.request(`/api/v1/activities?${params}`);
+    const rows = Array.isArray(result.results) ? result.results : Array.isArray(result) ? result : [];
+    return rows.map((value) => {
+      if (!value || typeof value !== "object") return null;
+      const row = value as Json;
+      const extra = row.extra_data && typeof row.extra_data === "object" ? row.extra_data as Json : {};
+      const id = cleanText(row.id || row.event_id, 240);
+      const objectId = cleanText(row.object_id || extra.id, 240);
+      const occurredAt = cleanText(row.event_date || row.occurred_at || row.event_time, 100);
+      if (!id || !occurredAt) return null;
+      return {
+        id,
+        eventType: cleanText(row.event_type || row.type, 80).toLowerCase(),
+        objectId,
+        content: cleanText(extra.content || extra.name || row.content, 500),
+        occurredAt,
+        projectId: cleanText(row.parent_project_id || extra.project_id, 240),
+      } satisfies TodoistActivitySummary;
+    }).filter((value): value is TodoistActivitySummary => Boolean(value));
   }
 
   async create(input: { content: string; description?: string; dueString?: string; projectId?: string; priority?: number }) {

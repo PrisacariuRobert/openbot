@@ -7,6 +7,9 @@ final class ConnectionSession: ObservableObject {
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
     @Published var suggestedAddress = ""
+    @Published private(set) var requestedThreadID: String?
+    @Published private(set) var nativePushReady = false
+    @Published private(set) var nativePushMessage: String?
 
     private let addressKey = "openbot.server.address"
     private var lastAuthenticatedAt: Date?
@@ -47,6 +50,34 @@ final class ConnectionSession: ObservableObject {
         guard let address = OpenBotDeepLink.serverAddress(from: url) else { return }
         suggestedAddress = address
         disconnect(keepAddress: true)
+    }
+
+    func handleNotificationPath(_ path: String) {
+        let value = path.hasPrefix("http") ? path : "https://openbot.local\(path.hasPrefix("/") ? path : "/\(path)")"
+        guard let components = URLComponents(string: value),
+              let threadID = components.queryItems?.first(where: { $0.name == "thread" })?.value,
+              !threadID.isEmpty else { return }
+        requestedThreadID = threadID
+    }
+
+    func consumeRequestedThread() { requestedThreadID = nil }
+
+    func registerPushDevice(_ deviceToken: String?) async {
+        guard isAuthenticated, let serverURL, let deviceToken, !deviceToken.isEmpty else { return }
+        do {
+            let result = try await StudioAPIClient(baseURL: serverURL).registerNativePush(
+                deviceToken: deviceToken,
+                environment: Self.pushEnvironment,
+                bundleID: Bundle.main.bundleIdentifier ?? "app.openbot.mobile"
+            )
+            nativePushReady = result.deliveryReady
+            nativePushMessage = result.deliveryReady
+                ? "This iPhone will receive finished-task and approval notifications."
+                : "Notifications are allowed here. Add the Apple push key on your Mac to deliver them."
+        } catch {
+            nativePushReady = false
+            nativePushMessage = (error as? LocalizedError)?.errorDescription ?? "OpenBot could not register this iPhone for notifications."
+        }
     }
 
     func sessionExpired() {
@@ -95,6 +126,14 @@ final class ConnectionSession: ObservableObject {
             isAuthenticated = false
             errorMessage = "OpenBot could not reach that address. Check that your Mac is awake and phone access is running."
         }
+    }
+
+    private static var pushEnvironment: String {
+        #if DEBUG
+        "sandbox"
+        #else
+        "production"
+        #endif
     }
 
 }

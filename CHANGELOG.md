@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.0 — 2026-09-03
+
+- Added proactive Todoist activity and Dropbox folder-change automations with explicit filters, fresh baselines, durable cursors, duplicate protection, rate limits, receipts, and ordinary approval boundaries
+- Upgraded Dropbox OAuth to PKCE and public-client support so a packaged release can provide one-click connection with only its registered app key
+- Added native APNs device registration, ES256 provider tokens, sandbox/production routing, bounded result/approval payloads, per-target retries, and stale-token cleanup
+- Added an embedded iOS Share extension for bounded text, links, images, and files with atomic private App Group handoff into the selected conversation
+- Added matching settings/status language, environment templates, privacy manifests, and Debug/Release notification entitlements
+- Expanded the product suite to 94 automated tests and compiled the app plus Share extension for the iPhone 17 Pro simulator
+- Kept physical APNs delivery and App Store distribution explicitly owner-dependent on Apple signing, App Group/Push capabilities, a physical device, and a host-side `.p8` key
+
 ## 0.21.0 — 2026-09-03
 
 - Added one-click Todoist OAuth registration, active-task reading, approval-gated task creation, per-teammate access, health checks, and audit receipts

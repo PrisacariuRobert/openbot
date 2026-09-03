@@ -1,6 +1,6 @@
-# OpenBot 0.21.0 Launch Readiness
+# OpenBot 0.22.0 Launch Readiness
 
-OpenBot 0.21.0 is ready for an open-source local-first beta launch with Todoist and read-only Dropbox, native iPhone artifact preview/sharing, durable cross-device continuity, a verified customizable character system, Live Studio supervision, a portable versioned Skill Library, dependable background self-hosting, and secure web push. It is not yet an honest drop-in replacement for Grok Bot's powered-off cloud execution, hosted public ingress, App Store/APNs distribution, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or a broad plugin catalog.
+OpenBot 0.22.0 is ready for an open-source local-first beta launch with proactive Todoist and Dropbox routines, native APNs delivery infrastructure, an embedded iOS Share extension, durable cross-device continuity, a verified customizable character system, Live Studio supervision, a portable versioned Skill Library, dependable background self-hosting, and secure web push. Native source and simulator builds are release-ready, while physical-device APNs and App Store distribution still require the owner's Apple team, App Group, signing profile, and `.p8` key. It is not yet an honest drop-in replacement for Grok Bot's powered-off cloud execution, hosted public ingress, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or broad plugin catalog.
 
 ## What is launch-ready
 
@@ -28,11 +28,13 @@ OpenBot 0.21.0 is ready for an open-source local-first beta launch with Todoist 
 - Notion OAuth with selected/shared-page search/read, separate per-teammate read/update grants, exact append approvals, connected preview, health, and private audits
 - Todoist one-click dynamic OAuth with active-task reading, separate per-teammate read/create grants, exact create approvals, connected preview, health, and private audits
 - Read-only Dropbox OAuth with file search, bounded supported text/code reading, separate per-teammate read grants, connected preview, health, and private audits
-- Scheduled, Calendar, signed GitHub, and signed generic-webhook automations with narrow filters, explicit tests, pause/resume/edit/delete, encrypted rotating secrets, event receipts, linked results, and safe replay
+- Scheduled, Calendar, proactive Todoist/Dropbox, signed GitHub, and signed generic-webhook automations with narrow filters, explicit tests, pause/resume/edit/delete, encrypted rotating secrets, durable connector cursors, event receipts, linked results, and safe replay
 - Failure and approval attention inbox, missed-schedule notices, seven-day event deduplication, burst limits, loop headers, bounded redacted input, and automatic pause after three consecutive failures
 - Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, crash recovery, and graceful active-job handoff
 - Optional one-click macOS login/crash protection with foreground-session handoff and explicit powered-on/awake limits
 - Durable Web Push outbox, bounded notification payloads, device cleanup, and direct result/approval links for secure installed web apps
+- Native APNs token registration, per-device delivery state, stale-token cleanup, and deep links to results or approvals
+- Embedded iOS Share extension with a bounded private App Group inbox for text, links, images, and files
 - Studio-wide visible Mac-file access, protected hidden/system paths, and approval-only organization without deletion or overwriting
 - Safe Markdown messages and connector cards that keep status and capability text inside their borders
 - Durable job outcomes, deliverables, checklists, approval boundaries, and evidence-based final receipts across both supported agent runtimes
@@ -65,23 +67,23 @@ OpenBot 0.21.0 is ready for an open-source local-first beta launch with Todoist 
 | Gap | Honest status | Best next move |
 |---|---|---|
 | Always-on cloud work | The optional background runner survives app exits and crashes, but work still pauses when the host Mac sleeps or powers off. | Package a private VPS runner or encrypted cross-host handoff with an explicit data-location choice. |
-| Native distribution and push | Secure installed web apps can receive Web Push and the SwiftUI app previews/shares authenticated artifacts, but native APNs still needs physical-device QA, signing, delivery infrastructure, and a notification privacy review. | Complete device QA and signing, then add native APNs and share-sheet ingestion. |
+| Native distribution | APNs registration/delivery and Share-sheet ingestion are implemented and simulator-compiled, but a physical-device delivery check and App Store signing still require the owner's Apple team and credentials. | Register the App Group and Push capability, provide the host-side `.p8` key, run device QA, then prepare TestFlight metadata. |
 | Large connector marketplace | Gmail, Drive, Calendar, GitHub, Slack, Notion, Todoist, and Dropbox have real bounded tools; this remains a focused built-in set, not a marketplace. | Publish a connector security/review contract, then add reviewed connectors one at a time. |
 | Full visual desktop takeover | OpenBot can now supervise and take over isolated bot browsers, while the macOS Accessibility bridge can inspect controls and approval-gate interactions; it still cannot reason over arbitrary desktop pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
 | Hosted remote dev environments | Local code jobs now recover across OpenBot restarts, but they still stop while the host is asleep or unavailable. | Add an encrypted private runner deployment without weakening local mode. |
 | Hosted event ingress and execution | Schedule and Calendar work survives service exits but still requires an awake Mac; public hooks need an owner-managed HTTPS route. | Add reviewed private-VPS packaging and optional hosted ingress as a separate trust mode. |
-| Broader event sources | Signed GitHub and generic hooks plus primary-Calendar polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.21 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Broader event sources | Signed GitHub and generic hooks plus Calendar, Todoist, and Dropbox polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.22 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 
 ## Release decision
 
-Ship 0.21.0 as a **local-first beta**, with the limitations above visible in the README. Background protection makes the Mac-hosted studio resilient to app exits and crashes, but it does not execute while the Mac sleeps or powers off. Secure installed web apps have Web Push; the native iPhone app remains simulator-verified and ready for owner-signed device testing, with authenticated artifact preview/sharing but not yet App Store/APNs delivery or share-sheet ingestion. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
+Ship 0.22.0 as a **local-first beta**, with the limitations above visible in the README. Background protection makes the Mac-hosted studio resilient to app exits and crashes, but it does not execute while the Mac sleeps or powers off. Secure installed web apps have Web Push; the native iPhone source now includes APNs and Share-sheet ingestion and remains simulator-verified, ready for owner-signed physical-device testing rather than claimed App Store distribution. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
 
 ## Verified acceptance criteria
 
-- Automated tests: 88 passing
-- iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator; four unit tests and one live sign-in UI test pass; no `WKWebView` remains in the app source
+- Automated tests: 94 passing
+- iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator with the Share extension embedded; four unit tests pass; the optional live sign-in UI test is present and skips safely when its private server/key variables are absent; no `WKWebView` remains in the app source
 - Type safety: passing
 - Production build: passing
 - Real model: DeepSeek V4 Flash Vision interpreted the supplied screenshot through the new media path; DeepSeek V4 Flash then created, linked, verified, revised, and re-linked one result as versions 1 and 2
@@ -92,10 +94,10 @@ Ship 0.21.0 as a **local-first beta**, with the limitations above visible in the
 - Idle state after verification: zero active runs and zero pending approvals
 - Google integration: mocked OAuth/PKCE, encrypted storage, Gmail, Drive, Calendar, safe message construction, tool exposure, and per-bot access passing; real account consent intentionally left to the owner
 - Slack and Notion integrations: official response shapes, OAuth state/replay behavior, encrypted storage, token refresh/rotation paths, provider-version headers, bounded reads, approval-only writes, session revocation, and cross-runtime tool exposure passing; live account consent intentionally left to the owner
-- Todoist and Dropbox integrations: official dynamic-registration/offline-OAuth shapes, encrypted storage, refresh behavior, bounded reads, approval-only Todoist writes, read-only Dropbox permissions, and cross-runtime tool exposure passing; live account consent intentionally left to the owner
+- Todoist and Dropbox integrations: official dynamic-registration/offline-OAuth shapes, Dropbox PKCE/public-client behavior, encrypted storage, refresh behavior, bounded reads, proactive activity/change polling, durable cursors, approval-only Todoist writes, read-only Dropbox permissions, and cross-runtime tool exposure passing; live account consent intentionally left to the owner
 - GitHub integration: official CLI account health, live notification preview, live issue search, response normalization, URL safety, per-teammate read/create separation, approval-gated creation, and connector activity records passing. A real DeepSeek V4 Flash teammate read the newest notification with read-only access and returned its title/repository; no test issue was created and all temporary test state was removed.
 - Skills and automations: slash parsing, unique skill slugs, cross-runtime files, package integrity, secret blocking, template bounds, import, assignment, immutable versions, rollback, trigger parsing, signed webhook verification, filters, encrypted secrets, event deduplication, rate limiting, lifecycle linkage, three-failure pausing, alerts, replay input, and preserved history passing
-- Runner and notifications: exclusive leadership, atomic claim, competing-worker rejection, lease expiry/recovery, graceful requeue, background plist safety, private subscriptions, durable outbox, secure push signing, and notification deep-link guards passing
+- Runner and notifications: exclusive leadership, atomic claim, competing-worker rejection, lease expiry/recovery, graceful requeue, background plist safety, private web/native registrations, durable per-target outbox delivery, VAPID/APNs signing, stale-device cleanup, and notification deep-link guards passing; production APNs delivery remains an owner-credential physical-device check
 - Real automation: one signed event was accepted, ran with Muse Spark 1.2 Free, produced `build-event-confirmation.md`, and a repeated delivery returned the original event without creating another run
 - 0.16 UI: Slack and Notion managed/self-hosted setup, real service marks, health/status, connected previews, per-teammate grants, callback states, activity, and workflow cards inspected at desktop and 390×844 with zero page-level overflow or console errors
 - Automation security smoke: invalid/valid signatures, narrow matching, secret redaction, payload bounds, dedupe-before-dispatch, and three-failure pause are covered; the manual workflow confirmed one event, one run, and one duplicate stopped

@@ -28,7 +28,7 @@ import { parseRoutineIntent } from "../shared/routine-intent.js";
 import { invokedWorkflow } from "../shared/skills.js";
 import { iosConnectURL, isTailscaleURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
-import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, verifyAutomationSignature } from "./automations.js";
+import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, todoistActivityWindow, verifyAutomationSignature } from "./automations.js";
 import { SKILL_TEMPLATES } from "./skill-library.js";
 import { BackgroundServiceManager } from "./background-service.js";
 import { NotificationService } from "./notifications.js";
@@ -62,8 +62,9 @@ const managedSlackClient = Boolean(process.env.OPENBOT_SLACK_CLIENT_ID?.trim() &
 if (managedSlackClient) db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", clientId: process.env.OPENBOT_SLACK_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_SLACK_CLIENT_SECRET!.trim() });
 const managedNotionClient = Boolean(process.env.OPENBOT_NOTION_CLIENT_ID?.trim() && process.env.OPENBOT_NOTION_CLIENT_SECRET?.trim());
 if (managedNotionClient) db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: process.env.OPENBOT_NOTION_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_NOTION_CLIENT_SECRET!.trim() });
-const managedDropboxClient = Boolean(process.env.OPENBOT_DROPBOX_CLIENT_ID?.trim() && process.env.OPENBOT_DROPBOX_CLIENT_SECRET?.trim());
-if (managedDropboxClient) db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", clientId: process.env.OPENBOT_DROPBOX_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_DROPBOX_CLIENT_SECRET!.trim() });
+const managedDropboxKey = process.env.OPENBOT_DROPBOX_APP_KEY?.trim() || process.env.OPENBOT_DROPBOX_CLIENT_ID?.trim() || "";
+const managedDropboxClient = Boolean(managedDropboxKey);
+if (managedDropboxClient) db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", clientId: managedDropboxKey, clientSecret: process.env.OPENBOT_DROPBOX_CLIENT_SECRET?.trim() || "" });
 const eventClients = new Set<express.Response>();
 
 function persistentAccessToken() {
@@ -159,6 +160,7 @@ app.get("/api/runner", (_request, response) => {
 app.post("/api/runner/wake", (_request, response) => {
   runner.wake();
   dispatchDueRoutines();
+  void dispatchConnectorEvents();
   const health = db.getRunnerHealth();
   broadcast({ type: "runner", at: Date.now() });
   response.json({ ...health, ...backgroundService.status(health) });
@@ -207,6 +209,26 @@ app.delete("/api/notifications/subscriptions", (request, response) => {
   const parsed = z.object({ endpoint: z.string().url().max(2_000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a valid notification subscription." });
   db.deletePushSubscription(parsed.data.endpoint);
+  response.json({ connected: false });
+});
+
+const nativePushInput = z.object({
+  deviceToken: z.string().trim().toLowerCase().regex(/^[a-f0-9]{64,200}$/),
+  environment: z.enum(["sandbox", "production"]),
+  bundleId: z.string().trim().min(3).max(200).regex(/^[A-Za-z0-9.-]+$/),
+});
+app.get("/api/notifications/native", (_request, response) => response.json(notifications.nativeStatus()));
+app.post("/api/notifications/native", (request, response) => {
+  const parsed = nativePushInput.safeParse(request.body), status = notifications.nativeStatus();
+  if (!parsed.success || parsed.data.bundleId !== status.bundleId) return response.status(400).json({ error: "This iPhone did not provide a valid OpenBot notification token." });
+  const id = db.saveNativePushDevice(parsed.data);
+  notifications.wake();
+  response.status(201).json({ id, connected: true, deliveryReady: status.configured });
+});
+app.delete("/api/notifications/native", (request, response) => {
+  const parsed = z.object({ deviceToken: z.string().trim().toLowerCase().regex(/^[a-f0-9]{64,200}$/) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a valid iPhone notification registration." });
+  db.deleteNativePushDevice(parsed.data.deviceToken);
   response.json({ connected: false });
 });
 
@@ -417,6 +439,7 @@ app.get("/api/connectors/github/issues", async (request, response) => {
 });
 
 const oauthConnectorConfig = z.object({ clientId: z.string().trim().min(5).max(500), clientSecret: z.string().trim().min(8).max(2_000) });
+const dropboxConnectorConfig = z.object({ clientId: z.string().trim().min(5).max(500), clientSecret: z.string().trim().max(2_000).optional().default("") });
 const oauthCallbackInput = z.object({
   state: z.string().min(10).max(500), code: z.string().min(1).max(4_000).optional(), error: z.string().trim().max(200).optional(), error_description: z.string().trim().max(1_000).optional(),
 }).refine((value) => Boolean(value.code || value.error));
@@ -572,8 +595,8 @@ app.post("/api/connectors/todoist/health", async (_request, response) => {
 
 app.post("/api/connectors/dropbox/config", (request, response) => {
   if (managedDropboxClient) return response.status(409).json({ error: "This OpenBot release already manages its Dropbox connection." });
-  const parsed = oauthConnectorConfig.safeParse(request.body);
-  if (!parsed.success) return response.status(400).json({ error: "Enter the Dropbox app key and app secret." });
+  const parsed = dropboxConnectorConfig.safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Enter a valid Dropbox app key. A secret is optional when PKCE is enabled." });
   const connection = db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", ...parsed.data });
   broadcast({ type: "connector", at: Date.now() }); response.json(connection);
 });
@@ -708,7 +731,7 @@ app.get("/api/access", (request, response) => {
   const urls = remoteEnabled ? Object.values(networkInterfaces()).flat().filter((address) => address?.family === "IPv4" && !address.internal).map((address) => `http://${address!.address}:${clientPort}`) : [];
   const uniqueURLs = [...new Set(urls)].sort((left, right) => Number(isTailscaleURL(right)) - Number(isTailscaleURL(left)));
   const tailscaleUrl = uniqueURLs.find(isTailscaleURL) || null;
-  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: uniqueURLs, iosConnectUrls: uniqueURLs.map(iosConnectURL), tailscaleUrl });
+  response.json({ host, port: clientPort, remoteEnabled, token: accessToken, urls: uniqueURLs, iosConnectUrls: uniqueURLs.map(iosConnectURL), tailscaleUrl, nativePush: notifications.nativeStatus() });
 });
 
 app.post("/api/access/tailscale/open", (request, response) => {
@@ -1057,10 +1080,11 @@ app.post("/api/providers", (request, response) => {
 const triggerConfigInput = z.object({
   eventName: z.string().trim().max(100).optional(), githubEvent: z.string().trim().max(80).optional(), githubAction: z.string().trim().max(80).optional(),
   repository: z.string().trim().max(200).regex(/^(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?$/).optional(), titleContains: z.string().trim().max(160).optional(), minutesBefore: z.number().int().min(0).max(1440).optional(),
+  todoistEvent: z.enum(["added", "updated", "completed", "any"]).optional(), dropboxPath: z.string().trim().max(1_000).optional(),
 });
 const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
-  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar"]).optional(), triggerConfig: triggerConfigInput.optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox"]).optional(), triggerConfig: triggerConfigInput.optional(),
 });
 
 function calendarAutomationReady(botId: string) {
@@ -1069,10 +1093,14 @@ function calendarAutomationReady(botId: string) {
   return connected && Boolean(db.getBotConnectorAccess(botId, "google-calendar")?.canRead);
 }
 
+function connectorAutomationReady(source: "todoist" | "dropbox", botId: string) {
+  return Boolean(db.getConnector(source)?.connected && db.getBotConnectorAccess(botId, source, source)?.canRead);
+}
+
 type DispatchResult = { event: AutomationEvent; run: ReturnType<OpenBotDatabase["createRun"]> | null; duplicate: boolean; rateLimited: boolean; ignored?: string };
 function dispatchRoutineEvent(routine: Routine, input: { source: AutomationEvent["source"]; payload: unknown; rawBody?: Buffer; headers?: Record<string, string | string[] | undefined>; externalId?: string; replayOfEventId?: string | null; attempt?: number; bypassDedupe?: boolean; skipMatch?: boolean; advanceSchedule?: boolean; rateLimit?: number }): DispatchResult {
   const headers = input.headers || {}, rawBody = input.rawBody || Buffer.from(JSON.stringify(input.payload)), safePayload = sanitizeAutomationPayload(input.payload);
-  if (!input.skipMatch && ["webhook", "github", "calendar"].includes(routine.triggerType)) {
+  if (!input.skipMatch && ["webhook", "github", "calendar", "todoist", "dropbox"].includes(routine.triggerType)) {
     const match = automationEventMatches(routine, safePayload, headers);
     if (!match.matches) return { event: null as unknown as AutomationEvent, run: null, duplicate: false, rateLimited: false, ignored: match.reason || "This event did not match the saved filter." };
   }
@@ -1100,6 +1128,7 @@ app.post("/api/routines", (request, response) => {
   const parsed = routineInput.safeParse(request.body);
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getThread(parsed.data.threadId)) return response.status(400).json({ error: "That routine needs a teammate, conversation and instruction." });
   if (parsed.data.triggerType === "calendar" && parsed.data.enabled !== false && !calendarAutomationReady(parsed.data.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
+  if ((parsed.data.triggerType === "todoist" || parsed.data.triggerType === "dropbox") && parsed.data.enabled !== false && !connectorAutomationReady(parsed.data.triggerType, parsed.data.botId)) return response.status(400).json({ error: `Connect ${parsed.data.triggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
   const needsSecret = parsed.data.triggerType === "webhook" || parsed.data.triggerType === "github";
   const webhookSecret = needsSecret ? randomBytes(32).toString("base64url") : null;
   const routine = db.createRoutine({ ...parsed.data, webhookSecret });
@@ -1115,6 +1144,7 @@ app.patch("/api/routines/:id", (request, response) => {
   const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, enabled: parsed.data.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: parsed.data.triggerConfig ?? current.triggerConfig };
   if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
   if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
+  if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
   const needsSecret = nextTriggerType === "webhook" || nextTriggerType === "github", webhookSecret = needsSecret && !current.hasWebhookSecret ? randomBytes(32).toString("base64url") : null;
   const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret });
   if (!routine) return response.status(404).json({ error: "Routine not found." });
@@ -1764,6 +1794,81 @@ setInterval(async () => {
     broadcast();
   } finally { calendarPollRunning = false; }
 }, 30_000);
+
+let connectorPollRunning = false;
+async function dispatchConnectorEvents() {
+  if (connectorPollRunning || !runner.isLeader()) return false;
+  const todoistRoutines = db.listConnectorRoutines("todoist");
+  const dropboxRoutines = db.listConnectorRoutines("dropbox");
+  if (!todoistRoutines.length && !dropboxRoutines.length) return false;
+  connectorPollRunning = true;
+  let changed = false;
+  try {
+    const todoistReady = todoistRoutines.filter((routine) => connectorAutomationReady("todoist", routine.botId));
+    for (const routine of todoistRoutines.filter((item) => !todoistReady.includes(item))) {
+      db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} cannot watch Todoist until it is connected and ${routine.botName} has read access.` });
+      changed = true;
+    }
+    if (todoistReady.length) {
+      try {
+        const activities = await todoist.activities(100);
+        for (const routine of todoistReady) {
+          const savedCursor = db.automationCursor(routine.id, "todoist");
+          const window = todoistActivityWindow(activities, routine.lastEventAt, savedCursor);
+          for (const activity of window.events) {
+            const result = dispatchRoutineEvent(routine, { source: "todoist", payload: activity, externalId: activity.id, rateLimit: 20 });
+            if (!result.ignored) changed = true;
+          }
+          db.saveAutomationCursor(routine.id, "todoist", window.cursor);
+        }
+        db.markConnectorHealthy("todoist");
+      } catch (error) {
+        const message = friendlyConnectorError("todoist", error);
+        for (const routine of todoistReady) db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} could not check Todoist: ${message}` });
+        changed = true;
+      }
+    }
+
+    for (const routine of dropboxRoutines) {
+      if (!connectorAutomationReady("dropbox", routine.botId)) {
+        db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} cannot watch Dropbox until it is connected and ${routine.botName} has read access.` });
+        changed = true;
+        continue;
+      }
+      try {
+        let cursor = db.automationCursor(routine.id, "dropbox");
+        if (!cursor) {
+          cursor = await dropbox.latestCursor(routine.triggerConfig.dropboxPath || "");
+          db.saveAutomationCursor(routine.id, "dropbox", cursor);
+          continue;
+        }
+        for (let page = 0; page < 4; page += 1) {
+          const result = await dropbox.changes(cursor);
+          for (const entry of result.entries) {
+            const dispatched = dispatchRoutineEvent(routine, {
+              source: "dropbox", payload: entry,
+              externalId: `${entry.id}:${entry.modifiedAt || entry.changeType}:${entry.path.toLowerCase()}`, rateLimit: 20,
+            });
+            if (!dispatched.ignored) changed = true;
+          }
+          cursor = result.cursor;
+          db.saveAutomationCursor(routine.id, "dropbox", cursor);
+          if (!result.hasMore) break;
+        }
+        db.markConnectorHealthy("dropbox");
+      } catch (error) {
+        db.createAutomationAlert({ routineId: routine.id, kind: "failure", message: `${routine.name} could not check Dropbox: ${friendlyConnectorError("dropbox", error)}` });
+        changed = true;
+      }
+    }
+  } finally {
+    connectorPollRunning = false;
+    if (changed) broadcast({ type: "automation", at: Date.now() });
+  }
+  return changed;
+}
+setInterval(() => void dispatchConnectorEvents(), 30_000);
+setTimeout(() => void dispatchConnectorEvents(), 4_000);
 
 const distDir = path.join(rootDir, "dist");
 if (process.env.NODE_ENV === "production" && existsSync(distDir)) {

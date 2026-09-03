@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 import type { DropboxFileDetail, DropboxFileSummary } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
@@ -6,6 +6,16 @@ import type { OpenBotDatabase } from "./database.js";
 type FetchLike = typeof fetch;
 type Json = Record<string, unknown>;
 type DropboxCredentials = { accessToken: string; refreshToken?: string; expiresAt?: string; accountId?: string };
+type OAuthAttempt = { createdAt: number; codeVerifier: string };
+
+export type DropboxChangeSummary = {
+  id: string;
+  name: string;
+  path: string;
+  changeType: "changed" | "deleted";
+  modifiedAt: string;
+  size: number;
+};
 
 const SCOPES = ["account_info.read", "files.metadata.read", "files.content.read"];
 const TEXT_EXTENSIONS = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".yaml", ".yml", ".xml", ".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".rb", ".go", ".rs", ".java", ".swift", ".kt", ".log"]);
@@ -20,7 +30,7 @@ function expiresAt(seconds: unknown) {
 }
 
 export class DropboxConnector {
-  private attempts = new Map<string, number>();
+  private attempts = new Map<string, OAuthAttempt>();
 
   constructor(private db: OpenBotDatabase, readonly redirectUri: string, private fetcher: FetchLike = fetch) {}
 
@@ -28,22 +38,26 @@ export class DropboxConnector {
 
   beginOAuth() {
     const configured = this.db.oauthConnectorCredentials<DropboxCredentials>("dropbox");
-    if (!configured) throw new Error("Add the Dropbox app key and secret first.");
+    if (!configured) throw new Error("Add the Dropbox app key first.");
     const state = randomBytes(24).toString("base64url");
-    this.attempts.set(state, Date.now());
+    const codeVerifier = randomBytes(48).toString("base64url");
+    const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+    this.attempts.set(state, { createdAt: Date.now(), codeVerifier });
     const params = new URLSearchParams({
       client_id: configured.clientId, redirect_uri: this.redirectUri, response_type: "code", state,
-      token_access_type: "offline", scope: SCOPES.join(" "),
+      token_access_type: "offline", scope: SCOPES.join(" "), code_challenge_method: "S256", code_challenge: codeChallenge,
     });
     return { url: `https://www.dropbox.com/oauth2/authorize?${params}`, state };
   }
 
   async completeOAuth(state: string, code: string) {
     this.pruneAttempts();
-    if (!this.attempts.delete(state)) throw new Error("That Dropbox sign-in expired. Start it again from OpenBot.");
+    const attempt = this.attempts.get(state);
+    if (!attempt) throw new Error("That Dropbox sign-in expired. Start it again from OpenBot.");
+    this.attempts.delete(state);
     const configured = this.db.oauthConnectorCredentials<DropboxCredentials>("dropbox");
     if (!configured) throw new Error("The Dropbox connection is missing.");
-    const result = await this.tokenRequest(configured.clientId, configured.clientSecret, { code, grant_type: "authorization_code", redirect_uri: this.redirectUri });
+    const result = await this.tokenRequest(configured.clientId, configured.clientSecret, { code, grant_type: "authorization_code", redirect_uri: this.redirectUri, code_verifier: attempt.codeVerifier });
     const accessToken = cleanText(result.access_token, 4_000);
     if (!accessToken) throw new Error("Dropbox did not return a usable access token.");
     const credentials: DropboxCredentials = {
@@ -98,6 +112,33 @@ export class DropboxConnector {
     return { ...summary, content, truncated: raw.length > content.length };
   }
 
+  async latestCursor(folderPath = ""): Promise<string> {
+    const result = await this.api("/2/files/list_folder/get_latest_cursor", {
+      path: this.folderPath(folderPath), recursive: true, include_deleted: true, include_non_downloadable_files: true,
+    });
+    const cursor = cleanText(result.cursor, 4_000);
+    if (!cursor) throw new Error("Dropbox did not return a change cursor.");
+    return cursor;
+  }
+
+  async changes(cursor: string): Promise<{ cursor: string; hasMore: boolean; entries: DropboxChangeSummary[] }> {
+    const safeCursor = cleanText(cursor, 4_000);
+    if (!safeCursor) throw new Error("Dropbox change tracking needs a valid cursor.");
+    const result = await this.api("/2/files/list_folder/continue", { cursor: safeCursor });
+    const entries = (Array.isArray(result.entries) ? result.entries : []).map((value) => {
+      if (!value || typeof value !== "object") return null;
+      const row = value as Json, tag = cleanText(row[".tag"], 40), filePath = cleanText(row.path_display || row.path_lower, 2_000), name = cleanText(row.name, 500);
+      if (!filePath || !name || !["file", "deleted"].includes(tag)) return null;
+      const modifiedAt = cleanText(row.server_modified || row.client_modified, 100);
+      return {
+        id: cleanText(row.id, 300) || `path:${filePath.toLowerCase()}`,
+        name, path: filePath, changeType: tag === "deleted" ? "deleted" : "changed", modifiedAt,
+        size: Math.max(0, Number(row.size) || 0),
+      } satisfies DropboxChangeSummary;
+    }).filter((value): value is DropboxChangeSummary => Boolean(value));
+    return { cursor: cleanText(result.cursor, 4_000) || safeCursor, hasMore: result.has_more === true, entries };
+  }
+
   async disconnect() { this.attempts.clear(); return this.db.disconnectOAuthConnector("dropbox"); }
 
   private fileSummary(value: unknown): DropboxFileSummary | null {
@@ -141,13 +182,22 @@ export class DropboxConnector {
   }
 
   private async tokenRequest(clientId: string, clientSecret: string, values: Record<string, string>) {
+    const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded" };
+    const body = new URLSearchParams(values);
+    if (clientSecret) headers.authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+    else body.set("client_id", clientId);
     const response = await this.fetcher("https://api.dropboxapi.com/oauth2/token", {
-      method: "POST", headers: { authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(values),
+      method: "POST", headers, body,
     });
     const result = await response.json().catch(() => ({})) as Json;
     if (!response.ok) throw new Error(`Dropbox sign-in failed (${cleanText(result.error_description || result.error, 300) || response.status}).`);
     return result;
   }
 
-  private pruneAttempts() { for (const [state, createdAt] of this.attempts) if (Date.now() - createdAt > 10 * 60_000) this.attempts.delete(state); }
+  private folderPath(value: string) {
+    const normalized = cleanText(value, 1_000).replace(/\\/g, "/");
+    return normalized && normalized !== "/" ? `/${normalized.replace(/^\/+|\/+$/g, "")}` : "";
+  }
+
+  private pruneAttempts() { for (const [state, attempt] of this.attempts) if (Date.now() - attempt.createdAt > 10 * 60_000) this.attempts.delete(state); }
 }

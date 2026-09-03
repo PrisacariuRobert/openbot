@@ -23,6 +23,16 @@ test("keeps notification subscriptions and delivery outbox durable without expos
     db.markNotificationSent(pending[0]!.id);
     assert.equal(db.pendingNotifications().length, 0);
     assert.equal(db.deletePushSubscription("https://push.example.test/device"), true);
+    const nativeId = db.saveNativePushDevice({ deviceToken: "ab".repeat(32), environment: "sandbox", bundleId: "app.openbot.mobile" });
+    assert.equal(db.listNativePushDevices()[0]?.id, nativeId);
+    const queued = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Prepare another result.", status: "queued" });
+    db.updateRun(queued.id, { status: "completed", summary: "Ready", finishedAt: new Date().toISOString() });
+    const nativeNotification = db.pendingNotifications()[0]!;
+    db.ensureNotificationDeliveries(nativeNotification.id, [{ channel: "apns", targetId: nativeId }]);
+    assert.equal(db.pendingNotificationDeliveries(nativeNotification.id).length, 1);
+    db.markNotificationDeliverySent(nativeNotification.id, "apns", nativeId);
+    assert.equal(db.notificationDeliveriesComplete(nativeNotification.id), true);
+    assert.equal(db.deleteNativePushDevice("ab".repeat(32)), true);
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });

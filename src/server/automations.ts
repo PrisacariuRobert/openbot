@@ -67,6 +67,15 @@ export function automationEventMatches(routine: Routine, payload: unknown, heade
     const title = normalizedText(body.title, 500).toLowerCase();
     if (!title.includes(config.titleContains.toLowerCase())) return { matches: false, reason: `Waiting for a calendar title containing “${config.titleContains}”.` };
   }
+  if (routine.triggerType === "todoist" && config.todoistEvent && config.todoistEvent !== "any") {
+    const eventType = normalizedText(body.eventType || body.event_type, 80).toLowerCase();
+    if (eventType !== config.todoistEvent.toLowerCase()) return { matches: false, reason: `Waiting for a Todoist task to be ${config.todoistEvent}.` };
+  }
+  if (routine.triggerType === "dropbox" && config.dropboxPath) {
+    const changedPath = normalizedText(body.path || body.path_display || body.path_lower, 2_000).toLowerCase();
+    const watchedPath = config.dropboxPath.toLowerCase().replace(/\/$/, "");
+    if (watchedPath && changedPath !== watchedPath && !changedPath.startsWith(`${watchedPath}/`)) return { matches: false, reason: `Waiting for a change inside ${config.dropboxPath}.` };
+  }
   return { matches: true, reason: null };
 }
 
@@ -80,6 +89,12 @@ export function summarizeAutomationPayload(source: AutomationTriggerType | "manu
   }
   if (source === "calendar") {
     return [normalizedText(body.title, 160) || "Calendar event", normalizedText(body.start, 80), normalizedText(body.location, 100)].filter(Boolean).join(" · ");
+  }
+  if (source === "todoist") {
+    return [normalizedText(body.content || body.title, 160) || "Todoist task", normalizedText(body.eventType || body.event_type, 60)].filter(Boolean).join(" · ");
+  }
+  if (source === "dropbox") {
+    return [normalizedText(body.name, 160) || "Dropbox file", normalizedText(body.path || body.path_display, 220), normalizedText(body.changeType || body[".tag"], 60)].filter(Boolean).join(" · ");
   }
   if (source === "schedule") return normalizedText(body.scheduledFor, 80) ? `Scheduled for ${normalizedText(body.scheduledFor, 80)}` : "Scheduled run";
   if (source === "manual") return "Started by you as a test run";
@@ -113,5 +128,42 @@ export function normalizedTriggerConfig(type: AutomationTriggerType, value: Rout
     ...(normalizedText(config.titleContains, 160) ? { titleContains: normalizedText(config.titleContains, 160) } : {}),
     minutesBefore: Math.max(0, Math.min(1_440, Math.round(Number(config.minutesBefore ?? 15)))),
   };
+  if (type === "todoist") {
+    const event = normalizedText(config.todoistEvent, 40);
+    return { todoistEvent: (["added", "updated", "completed", "any"].includes(event) ? event : "any") as RoutineTriggerConfig["todoistEvent"] };
+  }
+  if (type === "dropbox") {
+    const rawPath = normalizedText(config.dropboxPath, 1_000).replace(/\\/g, "/");
+    const dropboxPath = rawPath && rawPath !== "/" ? `/${rawPath.replace(/^\/+|\/+$/g, "")}` : "";
+    return dropboxPath ? { dropboxPath } : {};
+  }
   return {};
+}
+
+export function todoistActivityWindow<T extends { id: string; occurredAt: string }>(
+  activities: T[],
+  lastEventAt: string | null,
+  savedCursor: string | null,
+): { events: T[]; cursor: string } {
+  let seenIds = new Set<string>();
+  let cursorReadable = false;
+  if (savedCursor) {
+    try {
+      const values = JSON.parse(savedCursor);
+      if (Array.isArray(values)) {
+        seenIds = new Set(values.filter((value): value is string => typeof value === "string"));
+        cursorReadable = true;
+      }
+    } catch { /* an unreadable cursor safely becomes a fresh baseline */ }
+  }
+  const since = new Date(lastEventAt || new Date().toISOString()).getTime();
+  const events = activities.filter((item) => {
+    const at = new Date(item.occurredAt).getTime();
+    if (!Number.isFinite(at)) return false;
+    if (!savedCursor) return at > since;
+    if (!cursorReadable) return false;
+    return !seenIds.has(item.id) && at >= since - 60_000;
+  }).sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
+  const ids = [...new Set([...activities.map((item) => item.id.slice(0, 240)), ...seenIds])].slice(0, 120);
+  return { events, cursor: JSON.stringify(ids) };
 }

@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 3, 2026 after the 0.21 connector and native-artifact release.
+Updated September 3, 2026 after the 0.22 proactive-connector and native-handoff release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -116,12 +116,20 @@ Verified with 86 automated tests, production type/build checks, duplicate-runner
 - Calendar + task planning and cloud-file context starter workflows
 - Authenticated native artifact download, Quick Look preview, and message/file sharing
 
-## 0.22 — Events and physical-device delivery
+## Shipped in source in 0.22 — Proactive work and native handoff
 
-- Add Slack and Notion event sources with the same receipt, dedupe, replay, and rate-limit behavior as current hooks
-- Add native APNs only after device signing, an explicit delivery architecture, and a notification privacy review
-- Add share-sheet ingestion from other iPhone apps
-- Keep hosted ingress, encrypted cross-host recovery, and private VPS packaging as a separate deployment track
+- Todoist activity and Dropbox folder changes start bounded work through durable baselines/cursors, receipts, dedupe, rate limits, permissions, and ordinary approvals
+- Native APNs registration and host-side delivery use short private payloads, per-device retry records, sandbox/production separation, and result/approval deep links
+- The embedded OpenBot Share extension queues bounded text, links, images, and files in a private App Group before authenticated conversation import
+- Dropbox PKCE supports a managed public release client using only an app key while preserving self-hosted/confidential clients
+- Simulator compilation verifies the complete native target graph; physical APNs and distribution remain owner signing/credential checks
+
+## 0.23 — Availability, richer events, and voice
+
+- Add Slack and Notion event sources on the same receipt, dedupe, replay, and rate-limit contract
+- Package an optional private runner and encrypted cross-host recovery for execution while the primary Mac is unavailable
+- Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
+- Add a private, deliberate native voice-capture session rather than relying only on keyboard dictation
 
 ## Later, not implied by the beta
 

@@ -214,7 +214,7 @@ export interface Approval {
   decidedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox";
 
 export interface RoutineTriggerConfig {
   eventName?: string;
@@ -223,6 +223,8 @@ export interface RoutineTriggerConfig {
   repository?: string;
   titleContains?: string;
   minutesBefore?: number;
+  todoistEvent?: "added" | "updated" | "completed" | "any";
+  dropboxPath?: string;
 }
 
 export interface Routine {

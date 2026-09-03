@@ -175,6 +175,37 @@ test("deduplicates automation events, retains replay input, and pauses repeated 
   }
 });
 
+test("starts connector automations from a fresh baseline and keeps Dropbox cursors durable", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-connector-automation-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const routine = db.createRoutine({
+      name: "Dropbox project pulse", botId: "nova", threadId: "bot-nova", prompt: "Summarize the changed file.", intervalMinutes: 1440,
+      triggerType: "dropbox", triggerConfig: { dropboxPath: "Projects/Launch/" }, enabled: true,
+    });
+    assert.equal(routine.triggerConfig.dropboxPath, "/Projects/Launch");
+    assert.ok(routine.lastEventAt);
+    assert.equal(db.automationCursor(routine.id, "dropbox"), null);
+    db.saveAutomationCursor(routine.id, "dropbox", "cursor-1");
+    assert.equal(db.automationCursor(routine.id, "dropbox"), "cursor-1");
+    const paused = db.toggleRoutine(routine.id, false)!;
+    assert.equal(paused.enabled, false);
+    const resumed = db.toggleRoutine(routine.id, true)!;
+    assert.equal(resumed.enabled, true);
+    assert.equal(db.automationCursor(routine.id, "dropbox"), null);
+    const todoistRoutine = db.createRoutine({
+      name: "Task pulse", botId: "nova", threadId: "bot-nova", prompt: "Summarize the task.", intervalMinutes: 1440,
+      triggerType: "todoist", triggerConfig: { todoistEvent: "completed" }, enabled: true,
+    });
+    db.saveAutomationCursor(todoistRoutine.id, "todoist", JSON.stringify(["event-1", "event-2"]));
+    assert.deepEqual(JSON.parse(db.automationCursor(todoistRoutine.id, "todoist") || "[]"), ["event-1", "event-2"]);
+    db.toggleRoutine(todoistRoutine.id, false);
+    db.toggleRoutine(todoistRoutine.id, true);
+    assert.equal(db.automationCursor(todoistRoutine.id, "todoist"), null);
+    db.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("rate limits event floods without starting extra work", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-automation-rate-test-"));
   try {

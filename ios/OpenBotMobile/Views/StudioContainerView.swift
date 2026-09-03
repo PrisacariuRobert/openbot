@@ -4,6 +4,8 @@ import QuickLook
 
 struct StudioContainerView: View {
     @EnvironmentObject private var session: ConnectionSession
+    @EnvironmentObject private var push: PushRegistration
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store: StudioStore
     @StateObject private var network = NetworkMonitor()
     @State private var showingThreads = false
@@ -35,10 +37,21 @@ struct StudioContainerView: View {
             .background(OpenBotTheme.paper.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
         }
-        .task { await store.start() }
+        .task {
+            await store.start()
+            await openRequestedThread()
+            await store.importSharedInbox()
+        }
         .onDisappear { store.stop() }
         .onChange(of: store.needsAuthentication) { _, expired in
             if expired { session.sessionExpired() }
+        }
+        .onChange(of: session.requestedThreadID) { _, _ in
+            Task { await openRequestedThread() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await store.importSharedInbox() }
         }
         .sheet(isPresented: $showingThreads) {
             ThreadPickerView(store: store) { id in
@@ -53,6 +66,13 @@ struct StudioContainerView: View {
             }
         }
         .sheet(isPresented: $showingSettings) { ConnectionSettingsView() }
+    }
+
+    private func openRequestedThread() async {
+        guard let threadID = session.requestedThreadID,
+              store.state.threads.contains(where: { $0.id == threadID }) else { return }
+        await store.chooseThread(threadID)
+        session.consumeRequestedThread()
     }
 }
 
@@ -157,6 +177,14 @@ private struct NativeConversationView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
+                    if let notice = store.shareNotice {
+                        Label(notice, systemImage: "square.and.arrow.down.fill")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.14, green: 0.48, blue: 0.31))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 18).padding(.vertical, 8)
+                            .background(Color(red: 0.90, green: 0.98, blue: 0.93))
+                    }
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -720,6 +748,7 @@ private struct ThreadPickerView: View {
 private struct ConnectionSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: ConnectionSession
+    @EnvironmentObject private var push: PushRegistration
 
     var body: some View {
         NavigationStack {
@@ -729,6 +758,28 @@ private struct ConnectionSettingsView: View {
                         .font(.system(.subheadline, design: .rounded))
                     Label("The private key stays in this iPhone’s Keychain.", systemImage: "iphone.gen3")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("Notifications") {
+                    Label(
+                        session.nativePushReady ? "Native notifications are ready" : push.state == .denied ? "Notifications are off in iPhone Settings" : "Get results and approvals while OpenBot is closed",
+                        systemImage: session.nativePushReady ? "bell.badge.fill" : "bell"
+                    )
+                    .foregroundStyle(session.nativePushReady ? OpenBotTheme.green : .primary)
+                    if let message = session.nativePushMessage ?? push.errorMessage {
+                        Text(message).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if push.state == .denied {
+                        Button("Open iPhone Settings") { push.openSettings() }
+                    } else if !push.isAuthorized {
+                        Button("Turn on native notifications") {
+                            Task {
+                                await push.requestPermission()
+                                await session.registerPushDevice(push.deviceToken)
+                            }
+                        }
+                    } else if !session.nativePushReady {
+                        Button("Check notification setup") { Task { await session.registerPushDevice(push.deviceToken) } }
+                    }
                 }
                 Section {
                     Button("Connect to another studio") { session.disconnect(keepAddress: false); dismiss() }

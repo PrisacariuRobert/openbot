@@ -56,6 +56,7 @@ type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
 const DEFAULT_MODEL = "opencode/muse-spark-1.2-contributor-free";
 const DEFAULT_OWNER = "local-owner";
+const PUBLIC_OAUTH_CLIENT = "__OPENBOT_PUBLIC_OAUTH_CLIENT__";
 
 function asBoolean(value: string | number | null | undefined): boolean {
   return value === 1 || value === "1";
@@ -379,6 +380,13 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL,
         resolved_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS automation_cursors (
+        routine_id TEXT NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        cursor TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(routine_id,source)
+      );
       CREATE TABLE IF NOT EXISTS runner_state (
         id TEXT PRIMARY KEY CHECK(id='primary'),
         instance_id TEXT,
@@ -400,6 +408,15 @@ export class OpenBotDatabase {
         last_success_at TEXT,
         failure_count INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS native_push_devices (
+        id TEXT PRIMARY KEY,
+        device_token TEXT NOT NULL UNIQUE,
+        environment TEXT NOT NULL CHECK(environment IN ('sandbox','production')),
+        bundle_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_success_at TEXT,
+        failure_count INTEGER NOT NULL DEFAULT 0
+      );
       CREATE TABLE IF NOT EXISTS notification_outbox (
         id TEXT PRIMARY KEY,
         dedupe_key TEXT NOT NULL UNIQUE,
@@ -411,6 +428,16 @@ export class OpenBotDatabase {
         sent_at TEXT,
         attempt_count INTEGER NOT NULL DEFAULT 0,
         last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS notification_deliveries (
+        notification_id TEXT NOT NULL REFERENCES notification_outbox(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL CHECK(channel IN ('web','apns')),
+        target_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sent','failed')),
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(notification_id,channel,target_id)
       );
       CREATE TABLE IF NOT EXISTS memories (
         id TEXT PRIMARY KEY,
@@ -1484,7 +1511,7 @@ export class OpenBotDatabase {
   configureOAuthConnector(input: { id: "slack" | "notion" | "todoist" | "dropbox"; kind: "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
     const existing = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(input.id) as Row | undefined;
     const changedClient = Boolean(existing?.client_id && String(existing.client_id) !== input.clientId);
-    const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret);
+    const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret || PUBLIC_OAUTH_CLIENT);
     const status = changedClient || !existing?.credentials_ciphertext ? "configured" : String(existing.status || "configured");
     this.db.prepare(`INSERT INTO connectors
       (id,owner_id,kind,name,client_id,client_secret_ciphertext,credentials_ciphertext,scopes_json,account_email,status,created_at,updated_at)
@@ -1506,7 +1533,8 @@ export class OpenBotDatabase {
     if (row.credentials_ciphertext) {
       try { credentials = JSON.parse(this.vault.decrypt(String(row.credentials_ciphertext))) as T; } catch { credentials = null; }
     }
-    return { clientId: String(row.client_id), clientSecret: this.vault.decrypt(String(row.client_secret_ciphertext)), credentials };
+    const decryptedSecret = this.vault.decrypt(String(row.client_secret_ciphertext));
+    return { clientId: String(row.client_id), clientSecret: decryptedSecret === PUBLIC_OAUTH_CLIENT ? "" : decryptedSecret, credentials };
   }
 
   completeOAuthConnector(id: "slack" | "notion" | "todoist" | "dropbox", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
@@ -1959,8 +1987,9 @@ export class OpenBotDatabase {
     const triggerConfig = normalizedTriggerConfig(triggerType, input.triggerConfig);
     const enabled = input.enabled !== false;
     const nextRunAt = enabled && triggerType === "schedule" ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : null;
-    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt);
+    const lastEventAt = ["todoist", "dropbox"].includes(triggerType) ? now() : null;
+    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at,last_event_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt, lastEventAt);
     return this.getRoutine(id)!;
   }
 
@@ -1996,8 +2025,12 @@ export class OpenBotDatabase {
     const scheduleChanged = routine.intervalMinutes !== intervalMinutes || routine.enabled !== input.enabled || routine.triggerType !== triggerType;
     const nextRunAt = input.enabled && triggerType === "schedule" ? (scheduleChanged || !routine.nextRunAt ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : routine.nextRunAt) : null;
     const secret = input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : undefined;
-    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
-      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, input.enabled ? 1 : 0, id,
+    const connectorTriggerChanged = ["todoist", "dropbox"].includes(triggerType) && routine.triggerType !== triggerType;
+    const lastEventAt = connectorTriggerChanged ? now() : routine.lastEventAt;
+    if (connectorTriggerChanged) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+    else if (triggerType === "dropbox" && routine.triggerConfig.dropboxPath !== triggerConfig.dropboxPath) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=? AND source='dropbox'").run(id);
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
+      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, lastEventAt, input.enabled ? 1 : 0, id,
     );
     return this.getRoutine(id);
   }
@@ -2015,7 +2048,9 @@ export class OpenBotDatabase {
     const routine = this.getRoutine(id);
     if (!routine) return null;
     const delay = routineIntervalMs(routine.intervalMinutes);
-    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, enabled ? 1 : 0, id);
+    const lastEventAt = enabled && ["todoist", "dropbox"].includes(routine.triggerType) ? now() : routine.lastEventAt;
+    if (enabled && ["todoist", "dropbox"].includes(routine.triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, lastEventAt, enabled ? 1 : 0, id);
     return this.getRoutine(id);
   }
 
@@ -2036,6 +2071,20 @@ export class OpenBotDatabase {
 
   listCalendarRoutines(): Routine[] {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === "calendar");
+  }
+
+  listConnectorRoutines(source: "todoist" | "dropbox"): Routine[] {
+    return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === source);
+  }
+
+  automationCursor(routineId: string, source: "todoist" | "dropbox"): string | null {
+    const row = this.db.prepare("SELECT cursor FROM automation_cursors WHERE routine_id=? AND source=?").get(routineId, source) as Row | undefined;
+    return row?.cursor ? String(row.cursor) : null;
+  }
+
+  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox", cursor: string) {
+    this.db.prepare(`INSERT INTO automation_cursors (routine_id,source,cursor,updated_at) VALUES (?,?,?,?)
+      ON CONFLICT(routine_id,source) DO UPDATE SET cursor=excluded.cursor,updated_at=excluded.updated_at`).run(routineId, source, cursor.slice(0, 32_000), now());
   }
 
   routineWebhookSecret(id: string): string | null {
@@ -2258,6 +2307,35 @@ export class OpenBotDatabase {
     this.db.prepare("UPDATE push_subscriptions SET failure_count=failure_count+1 WHERE id=?").run(id);
   }
 
+  saveNativePushDevice(input: { deviceToken: string; environment: "sandbox" | "production"; bundleId: string }): string {
+    const existing = this.db.prepare("SELECT id FROM native_push_devices WHERE device_token=?").get(input.deviceToken) as Row | undefined;
+    const id = existing?.id ? String(existing.id) : randomUUID();
+    this.db.prepare(`INSERT INTO native_push_devices (id,device_token,environment,bundle_id,created_at,failure_count)
+      VALUES (?,?,?,?,?,0) ON CONFLICT(device_token) DO UPDATE SET environment=excluded.environment,bundle_id=excluded.bundle_id,failure_count=0`).run(
+      id, input.deviceToken, input.environment, input.bundleId.slice(0, 200), now(),
+    );
+    return id;
+  }
+
+  listNativePushDevices(): Array<{ id: string; deviceToken: string; environment: "sandbox" | "production"; bundleId: string; failureCount: number }> {
+    return (this.db.prepare("SELECT * FROM native_push_devices ORDER BY created_at DESC").all() as Row[]).map((row) => ({
+      id: String(row.id), deviceToken: String(row.device_token), environment: String(row.environment) as "sandbox" | "production",
+      bundleId: String(row.bundle_id), failureCount: Number(row.failure_count || 0),
+    }));
+  }
+
+  deleteNativePushDevice(deviceToken: string): boolean {
+    return this.db.prepare("DELETE FROM native_push_devices WHERE device_token=?").run(deviceToken).changes > 0;
+  }
+
+  recordNativePushSuccess(id: string) {
+    this.db.prepare("UPDATE native_push_devices SET last_success_at=?,failure_count=0 WHERE id=?").run(now(), id);
+  }
+
+  recordNativePushFailure(id: string) {
+    this.db.prepare("UPDATE native_push_devices SET failure_count=failure_count+1 WHERE id=?").run(id);
+  }
+
   enqueueNotification(input: { dedupeKey: string; kind: string; title: string; body: string; url: string }) {
     this.db.prepare("INSERT OR IGNORE INTO notification_outbox (id,dedupe_key,kind,title,body,url,created_at) VALUES (?,?,?,?,?,?,?)").run(
       randomUUID(), input.dedupeKey, input.kind.slice(0, 80), input.title.slice(0, 160), input.body.replace(/\s+/g, " ").trim().slice(0, 500), input.url.slice(0, 500), now(),
@@ -2276,6 +2354,34 @@ export class OpenBotDatabase {
 
   markNotificationFailed(id: string, error: string) {
     this.db.prepare("UPDATE notification_outbox SET attempt_count=attempt_count+1,last_error=? WHERE id=?").run(error.slice(0, 500), id);
+  }
+
+  ensureNotificationDeliveries(notificationId: string, targets: Array<{ channel: "web" | "apns"; targetId: string }>) {
+    const statement = this.db.prepare("INSERT OR IGNORE INTO notification_deliveries (notification_id,channel,target_id,status,attempt_count,updated_at) VALUES (?,?,?,'pending',0,?)");
+    const at = now();
+    for (const target of targets) statement.run(notificationId, target.channel, target.targetId, at);
+  }
+
+  pendingNotificationDeliveries(notificationId: string): Array<{ channel: "web" | "apns"; targetId: string; attemptCount: number }> {
+    return (this.db.prepare("SELECT channel,target_id,attempt_count FROM notification_deliveries WHERE notification_id=? AND status='pending' AND attempt_count<5 ORDER BY channel,target_id").all(notificationId) as Row[]).map((row) => ({
+      channel: String(row.channel) as "web" | "apns", targetId: String(row.target_id), attemptCount: Number(row.attempt_count || 0),
+    }));
+  }
+
+  markNotificationDeliverySent(notificationId: string, channel: "web" | "apns", targetId: string) {
+    this.db.prepare("UPDATE notification_deliveries SET status='sent',attempt_count=attempt_count+1,last_error=NULL,updated_at=? WHERE notification_id=? AND channel=? AND target_id=?").run(now(), notificationId, channel, targetId);
+  }
+
+  markNotificationDeliveryFailed(notificationId: string, channel: "web" | "apns", targetId: string, error: string, permanent = false) {
+    this.db.prepare(`UPDATE notification_deliveries SET status=CASE WHEN ? OR attempt_count+1>=5 THEN 'failed' ELSE 'pending' END,
+      attempt_count=attempt_count+1,last_error=?,updated_at=? WHERE notification_id=? AND channel=? AND target_id=?`).run(
+      permanent ? 1 : 0, error.slice(0, 500), now(), notificationId, channel, targetId,
+    );
+  }
+
+  notificationDeliveriesComplete(notificationId: string): boolean {
+    const row = this.db.prepare("SELECT COUNT(*) count FROM notification_deliveries WHERE notification_id=? AND status='pending' AND attempt_count<5").get(notificationId) as Row;
+    return Number(row.count || 0) === 0;
   }
 
   getUsageSummary(): UsageSummary {

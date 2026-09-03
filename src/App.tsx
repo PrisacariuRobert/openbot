@@ -3771,7 +3771,7 @@ function OAuthConnectorPanel({
           kicker: "CLOUD FILES",
           connectTitle: "Bring Dropbox into the studio",
           connectedCopy: "Find cloud files and read bounded text or code without changing anything in Dropbox.",
-          setupCopy: "Create one Dropbox app for this self-hosted release, then sign in through the official Dropbox page.",
+          setupCopy: "Use the release-managed Dropbox app, or add your own app key. PKCE keeps open-source installs from needing a bundled secret.",
           docs: "https://www.dropbox.com/developers/apps",
           readLabel: "Read",
           writeLabel: "",
@@ -3923,8 +3923,9 @@ function OAuthConnectorPanel({
             <div>
               <strong>Self-hosted setup</strong>
               <small>
-                The public release can bundle this once so everyone else gets
-                one-click sign-in.
+                {kind === "dropbox"
+                  ? "Use the public app key with PKCE, or add the secret for a private server deployment."
+                  : "The public release can bundle this once so everyone else gets one-click sign-in."}
               </small>
             </div>
             <a href={details.docs} target="_blank" rel="noreferrer">
@@ -3933,7 +3934,7 @@ function OAuthConnectorPanel({
           </div>
           <div className="oauth-fields">
             <label className="field">
-              <span>Client ID</span>
+              <span>{kind === "dropbox" ? "App key" : "Client ID"}</span>
               <input
                 value={clientId}
                 onChange={(event) => setClientId(event.target.value)}
@@ -3941,13 +3942,13 @@ function OAuthConnectorPanel({
               />
             </label>
             <label className="field">
-              <span>Client secret</span>
+              <span>Client secret {kind === "dropbox" && <small>optional with PKCE</small>}</span>
               <input
                 type="password"
                 value={clientSecret}
                 onChange={(event) => setClientSecret(event.target.value)}
                 autoComplete="new-password"
-                required
+                required={kind !== "dropbox"}
               />
             </label>
           </div>
@@ -5298,6 +5299,7 @@ type AccessInfo = {
   urls: string[];
   iosConnectUrls?: string[];
   tailscaleUrl?: string | null;
+  nativePush?: { configured: boolean; bundleId: string; devices: number };
 };
 function RemotePanel({
   bots,
@@ -5435,6 +5437,23 @@ function RemotePanel({
           </button>
         )}
       </section>
+      {localHost && access?.nativePush && (
+        <section>
+          <div className="panel-section-heading">
+            <div>
+              <h3>Native notifications</h3>
+              <p>Private APNs delivery from this Mac to the signed iPhone app</p>
+            </div>
+          </div>
+          <div className={`remote-status ${access.nativePush.configured ? "good" : ""}`}>
+            <Bell size={17} />
+            <span>
+              <strong>{access.nativePush.configured ? "Native push is ready" : "Add your Apple push key"}</strong>
+              <small>{access.nativePush.configured ? `${access.nativePush.devices} iPhone${access.nativePush.devices === 1 ? "" : "s"} registered` : "Set the APNs team ID, key ID and private-key path on this Mac"}</small>
+            </span>
+          </div>
+        </section>
+      )}
       <section>
         <div className="panel-section-heading">
           <div>
@@ -6360,6 +6379,12 @@ function routineTriggerLabel(routine: Routine) {
     return `GitHub · ${routine.triggerConfig.githubEvent || "event"}${routine.triggerConfig.githubAction ? ` / ${routine.triggerConfig.githubAction}` : ""}`;
   if (routine.triggerType === "calendar")
     return `${routine.triggerConfig.minutesBefore ?? 15} min before a Calendar event`;
+  if (routine.triggerType === "todoist")
+    return routine.triggerConfig.todoistEvent && routine.triggerConfig.todoistEvent !== "any"
+      ? `Todoist · task ${routine.triggerConfig.todoistEvent}`
+      : "Todoist · any task change";
+  if (routine.triggerType === "dropbox")
+    return routine.triggerConfig.dropboxPath ? `Dropbox · ${routine.triggerConfig.dropboxPath}` : "Dropbox · any file change";
   return routine.triggerConfig.eventName
     ? `Webhook · ${routine.triggerConfig.eventName}`
     : "Signed webhook";
@@ -6432,7 +6457,9 @@ function RoutinesPanel({
     [githubAction, setGithubAction] = useState("opened"),
     [repository, setRepository] = useState(""),
     [titleContains, setTitleContains] = useState(""),
-    [minutesBefore, setMinutesBefore] = useState(15);
+    [minutesBefore, setMinutesBefore] = useState(15),
+    [todoistEvent, setTodoistEvent] = useState<"added" | "updated" | "completed" | "any">("any"),
+    [dropboxPath, setDropboxPath] = useState("");
   const [enabled, setEnabled] = useState(true),
     [saving, setSaving] = useState(false),
     [runnerBusy, setRunnerBusy] = useState(false),
@@ -6470,6 +6497,8 @@ function RoutinesPanel({
     setRepository("");
     setTitleContains("");
     setMinutesBefore(15);
+    setTodoistEvent("any");
+    setDropboxPath("");
     setEnabled(true);
     setEditing(null);
     setCreating(false);
@@ -6494,6 +6523,8 @@ function RoutinesPanel({
     setRepository(routine.triggerConfig.repository || "");
     setTitleContains(routine.triggerConfig.titleContains || "");
     setMinutesBefore(routine.triggerConfig.minutesBefore ?? 15);
+    setTodoistEvent(routine.triggerConfig.todoistEvent ?? "any");
+    setDropboxPath(routine.triggerConfig.dropboxPath ?? "");
     const preset = [5, 60, 1440, 10080].includes(routine.intervalMinutes)
       ? (String(routine.intervalMinutes) as typeof schedule)
       : "custom";
@@ -6527,6 +6558,10 @@ function RoutinesPanel({
           ? { ...(eventName ? { eventName } : {}) }
           : triggerType === "calendar"
             ? { ...(titleContains ? { titleContains } : {}), minutesBefore }
+            : triggerType === "todoist"
+              ? { todoistEvent }
+              : triggerType === "dropbox"
+                ? { ...(dropboxPath ? { dropboxPath } : {}) }
             : {};
     try {
       const input = {
@@ -6580,8 +6615,7 @@ function RoutinesPanel({
           <b>Dependable automations</b>
           <h3>One event. One checked result.</h3>
           <p>
-            Schedules, Calendar and signed hooks—with retries you can
-            understand.
+            Schedules, connected apps and signed hooks—with retries you can understand.
           </p>
         </span>
       </section>
@@ -6969,6 +7003,16 @@ function RoutinesPanel({
                   icon: <GitBranch size={14} />,
                 },
                 {
+                  value: "todoist" as const,
+                  label: "Todoist",
+                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="todoist" /></span>,
+                },
+                {
+                  value: "dropbox" as const,
+                  label: "Dropbox",
+                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>,
+                },
+                {
                   value: "webhook" as const,
                   label: "Webhook",
                   icon: <Webhook size={14} />,
@@ -7125,6 +7169,35 @@ function RoutinesPanel({
               </small>
             </fieldset>
           )}
+          {triggerType === "todoist" && (
+            <fieldset className="routine-fieldset">
+              <legend>Which Todoist changes?</legend>
+              <div className="trigger-fields one">
+                <label>
+                  <span>Task activity</span>
+                  <select value={todoistEvent} onChange={(event) => setTodoistEvent(event.target.value as typeof todoistEvent)}>
+                    <option value="any">Any task change</option>
+                    <option value="added">Task added</option>
+                    <option value="updated">Task updated</option>
+                    <option value="completed">Task completed</option>
+                  </select>
+                </label>
+              </div>
+              <small className="routine-help">OpenBot checks Todoist in the background and keeps an event receipt, so a repeated delivery cannot start duplicate work.</small>
+            </fieldset>
+          )}
+          {triggerType === "dropbox" && (
+            <fieldset className="routine-fieldset">
+              <legend>Which Dropbox files?</legend>
+              <div className="trigger-fields one">
+                <label>
+                  <span>Folder path</span>
+                  <input value={dropboxPath} onChange={(event) => setDropboxPath(event.target.value)} placeholder="/Projects/Launch (optional)" />
+                </label>
+              </div>
+              <small className="routine-help">OpenBot starts from a fresh Dropbox cursor, so turning this on never floods the studio with old files.</small>
+            </fieldset>
+          )}
           <fieldset className="routine-fieldset">
             <legend>Who should do it?</legend>
             <div className="routine-teammates">
@@ -7181,6 +7254,10 @@ function RoutinesPanel({
               <Clock3 size={15} />
             ) : triggerType === "calendar" ? (
               <CalendarDays size={15} />
+            ) : triggerType === "todoist" ? (
+              <span className="trigger-connector-icon"><ConnectorIcon id="todoist" /></span>
+            ) : triggerType === "dropbox" ? (
+              <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>
             ) : (
               <Webhook size={15} />
             )}
@@ -7191,6 +7268,16 @@ function RoutinesPanel({
                 ? routineScheduleLabel(intervalMinutes).toLowerCase()
                 : triggerType === "calendar"
                   ? `a matching event is ${minutesBefore} minutes away`
+                  : triggerType === "todoist"
+                    ? todoistEvent === "any"
+                      ? "anything changes in Todoist"
+                      : todoistEvent === "added"
+                        ? "a task is added to Todoist"
+                        : todoistEvent === "updated"
+                          ? "a task is updated in Todoist"
+                          : "a task is completed in Todoist"
+                    : triggerType === "dropbox"
+                      ? `a file changes${dropboxPath ? ` inside ${dropboxPath}` : " in Dropbox"}`
                   : triggerType === "github"
                     ? "a signed GitHub event matches these filters"
                     : "a correctly signed webhook arrives"}

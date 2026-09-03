@@ -8,11 +8,13 @@ final class StudioStore: ObservableObject {
     @Published private(set) var isLive = false
     @Published private(set) var needsAuthentication = false
     @Published var errorMessage: String?
+    @Published var shareNotice: String?
     @Published var selectedThreadID = "team-room"
 
     private let client: StudioAPIClient
     private var eventTask: Task<Void, Never>?
     private var refreshInProgress = false
+    private var shareImportInProgress = false
 
     init(serverURL: URL) {
         client = StudioAPIClient(baseURL: serverURL)
@@ -102,6 +104,29 @@ final class StudioStore: ObservableObject {
         } catch {
             handle(error)
             return nil
+        }
+    }
+
+    func importSharedInbox() async {
+        guard !shareImportInProgress, isLive else { return }
+        let items = OpenBotSharedInbox.pending()
+        guard !items.isEmpty else { return }
+        shareImportInProgress = true
+        defer { shareImportInProgress = false }
+        var imported = 0
+        for item in items {
+            let files = OpenBotSharedInbox.fileURLs(for: item)
+            if await send(item.text, targetBotID: nil, files: files) {
+                OpenBotSharedInbox.remove(item)
+                imported += 1
+            } else { break }
+        }
+        if imported > 0 {
+            shareNotice = imported == 1 ? "Shared item added to this conversation" : "\(imported) shared items added to this conversation"
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                if !Task.isCancelled { shareNotice = nil }
+            }
         }
     }
 

@@ -5269,8 +5269,19 @@ select:focus-visible {
 }
 .trigger-presets {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+.trigger-connector-icon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+}
+.trigger-connector-icon svg {
+  width: 100%;
+  height: 100%;
 }
 .trigger-presets button {
   min-width: 0;
