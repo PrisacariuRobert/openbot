@@ -138,6 +138,15 @@ app.get("/api/state", (request, response) => {
   response.json(db.getState(threadId));
 });
 
+app.put("/api/drafts/:threadId", (request, response) => {
+  const parsed = z.object({ body: z.string().max(20_000), source: z.enum(["web", "ios"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "That draft is too long to hand off." });
+  const draft = db.saveDraft(request.params.threadId, parsed.data.body, parsed.data.source);
+  if (!draft) return response.status(404).json({ error: "That conversation is no longer available." });
+  broadcast({ type: "draft", threadId: request.params.threadId, source: parsed.data.source, at: Date.now() });
+  response.json(draft);
+});
+
 app.patch("/api/settings", (request, response) => {
   const parsed = z.object({ macAccessEnabled: z.boolean() }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose whether the studio can use visible files on this Mac." });

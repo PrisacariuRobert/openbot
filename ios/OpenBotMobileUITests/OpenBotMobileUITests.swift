@@ -39,7 +39,13 @@ final class OpenBotMobileUITests: XCTestCase {
         let didConnect = studioTitle.waitForExistence(timeout: 20)
         if !didConnect { XCTContext.runActivity(named: "Connection screen state") { _ in print(app.debugDescription) } }
         XCTAssertTrue(didConnect, "The native OpenBot conversation did not appear.")
-        XCTAssertTrue(app.textFields["native-message-field"].waitForExistence(timeout: 10), "The native message composer did not load.")
+        let messageField = app.textFields["native-message-field"]
+        XCTAssertTrue(messageField.waitForExistence(timeout: 10), "The native message composer did not load.")
+        if let expectedDraft = environment["OPENBOT_TEST_DRAFT"], !expectedDraft.isEmpty {
+            let continuedLabel = app.staticTexts["Continued from your Mac"]
+            XCTAssertTrue(continuedLabel.waitForExistence(timeout: 10), "The Mac-to-iPhone handoff cue did not appear.")
+            XCTAssertEqual(messageField.value as? String, expectedDraft, "The unfinished Mac message did not continue on iPhone.")
+        }
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "OpenBot connected studio"

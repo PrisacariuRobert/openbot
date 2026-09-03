@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.17.1 local-first beta
+Release: 0.17.2 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -22,6 +22,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
+8. **Continue on the device in your hand.** Start an unfinished message on the Mac and continue it on the native iPhone app, or return it to the web studio, while the owner's Mac remains the source of truth.
 8. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
 
 ## Available now

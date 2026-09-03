@@ -31,6 +31,10 @@ final class StudioStore: ObservableObject {
         state.runs.filter { ["awaiting_approval", "waiting_for_teammate", "queued", "running"].contains($0.status) }
     }
 
+    var activeDraft: StudioDraft {
+        state.draft ?? StudioDraft(threadId: selectedThreadID, body: "", source: nil, updatedAt: nil)
+    }
+
     func start() async {
         await refresh()
         eventTask?.cancel()
@@ -77,6 +81,14 @@ final class StudioStore: ObservableObject {
 
     func cancel(_ run: StudioRun) async {
         await perform { try await client.cancel(runID: run.id) }
+    }
+
+    func saveDraft(_ body: String) async {
+        do {
+            _ = try await client.saveDraft(threadID: selectedThreadID, body: body)
+        } catch {
+            if case StudioAPIError.unauthorized = error { handle(error) }
+        }
     }
 
     func refresh(silent: Bool = false) async {

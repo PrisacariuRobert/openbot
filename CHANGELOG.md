@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.2 — 2026-09-03
+
+- Unified the web and native iPhone studio around one visual and conversational language
+- Reused the exact same production mascot artwork across both clients instead of maintaining look-alike variants
+- Added durable Mac-to-iPhone and iPhone-to-Mac draft handoff through the authenticated owner-hosted service
+- Added live draft events and friendly handoff cues without exposing unfinished text in URLs
+- Prevented unchanged handoff drafts from echoing back as edits from the receiving device
+- Kept the updated iPhone client compatible with a Mac still running the previous state response
+- Expanded the automated product suite to 78 tests and re-verified the native build and live sign-in flow
+
 ## 0.17.1 — 2026-09-03
 
 - Replaced the iPhone web-view studio with a genuine SwiftUI conversation experience

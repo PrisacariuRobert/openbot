@@ -45,6 +45,23 @@ test("seeds persistent teammates and creates a routable task", () => {
   }
 });
 
+test("hands an unfinished draft between web and iPhone", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-draft-handoff-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.deepEqual(db.getDraft("team-room"), { threadId: "team-room", body: "", source: null, updatedAt: null });
+    const fromWeb = db.saveDraft("team-room", "Continue this on my phone", "web");
+    assert.equal(fromWeb?.body, "Continue this on my phone");
+    assert.equal(db.getState("team-room").draft.source, "web");
+    const fromPhone = db.saveDraft("team-room", "Finished on iPhone", "ios");
+    assert.equal(fromPhone?.source, "ios");
+    assert.equal(db.saveDraft("missing-thread", "No", "web"), null);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("stores and advances a five-minute enabled routine", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-test-"));
   try {

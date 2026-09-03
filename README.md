@@ -1,20 +1,18 @@
-# OpenBot 0.17.1
+# OpenBot 0.17.2
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.17.1
+## What's new in 0.17.2
 
-- Replaced the iPhone web-view studio with a real SwiftUI conversation experience: native messages, animated teammates, teammate targeting, sending, live runs, approvals, cancellation, settings, and offline state.
-- Added an authenticated native API client with bearer credentials from Keychain and server-sent event updates from the owner's Mac-hosted studio.
-- Added native file attachment intake plus premium mascot artwork shared by the web and iPhone apps.
-- Added a guided Tailscale away-access path that detects the private address, prioritizes it for pairing, and works over cellular or a different Wi-Fi network.
-- Compiled the app with Xcode Beta and added an iPhone 17 Pro UI test that signs in to a live local studio and verifies the native conversation header and composer.
-- Added safe one-tap address pairing through `openbot://connect` links; pairing links never carry the private access key.
-- Stores the private key with iPhone Keychain protection, reconnects on foreground, and removes it when the owner forgets the connection.
-- Requires HTTPS for public hostnames, permits plain HTTP only for private/local addresses, and keeps the Mac's loopback-only mode as the secure default.
-- Keeps artifact previews, push delivery, share-sheet input, and dedicated voice capture on the honest native roadmap rather than hiding the desktop site behind a phone shell.
+- Unified the responsive web studio and native iPhone app around the same room name, presence language, conversation hierarchy, composer geometry, and exact mascot artwork.
+- Added durable cross-device drafts: begin a message on the Mac and continue it on the iPhone, or move an unfinished iPhone message back to the web studio.
+- Sends draft changes through the owner's authenticated Mac-hosted studio and refreshes the other client live without copying conversations to a new cloud service.
+- Added clear “Continued from your Mac/iPhone” handoff cues and protected the handoff from bouncing an unchanged draft back to the other device.
+- Kept native compatibility with an older Mac service by treating cross-device drafts as an optional capability until both sides update.
+- Re-verified the native SwiftUI client, secure remote path, automated product suite, and matching phone-sized web experience.
+- Keeps attachment handoff, platform push, rich native artifact previews, share-sheet input, and dedicated voice capture on the honest roadmap.
 
 ## What is included
 

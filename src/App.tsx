@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type {
   AppState, Attachment, AutomationAlert, AutomationEvent, AutomationTriggerType, Bot, BotStatus, CalendarEventSummary, CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ComputerStatus, ConnectorStatus, DriveFileSummary, GmailMessageSummary,
-  GitHubIssueSummary, GitHubNotificationSummary, GoogleConnectorService, MascotKind, Message, NotionPageSummary, ProviderCatalogEntry, ProviderKind, ProviderLoginAttempt, ProviderStatus, Routine, Run, SlackMessageSummary,
+  GitHubIssueSummary, GitHubNotificationSummary, GoogleConnectorService, MascotKind, Message, NotionPageSummary, ProviderCatalogEntry, ProviderKind, ProviderLoginAttempt, ProviderStatus, Routine, Run, SlackMessageSummary, StudioDraft,
   TaughtWorkflow, WorkspaceFile,
 } from "./shared/types";
 import { mentionedBotIds, mentionSlug } from "./shared/routing";
@@ -141,7 +141,7 @@ function ConversationHeader({ threadTitle, activeBot, roomBots, onMenu, onOpenPa
     <button className="icon-button mobile-only" onClick={onMenu} aria-label="Open conversations"><Menu size={20} /></button>
     <button className="conversation-identity" onClick={() => onOpenPanel(activeBot ? "bot" : "control")}>
       {activeBot ? <Mascot bot={activeBot} size="medium" /> : <RoomCluster bots={roomBots} large />}
-      <div><h1>{threadTitle}</h1><p>{activeBot ? activeBot.status === "working" ? "Working right now" : activeBot.status === "waiting" ? "Waiting for your okay" : `${activeBot.role} · Ready` : `${roomBots.length} teammates · shared room`}</p></div><ChevronDown size={15} />
+      <div><h1>{threadTitle}</h1><p>{activeBot ? activeBot.status === "working" ? "Working right now" : activeBot.status === "waiting" ? "Waiting for your okay" : `${activeBot.role} · Ready` : connection === "online" ? "Live on your Mac" : connection === "reconnecting" ? "Syncing with your Mac…" : "Your Mac is offline"}</p></div><ChevronDown size={15} />
     </button>
     <div className="header-actions">
       <span className={`connection-indicator connection-${connection}`} title={connection === "online" ? "OpenBot is connected" : connection === "reconnecting" ? "Reconnecting" : "Offline"}><i />{connection === "online" ? "Live" : connection === "reconnecting" ? "Reconnecting" : "Offline"}</span>
@@ -248,7 +248,8 @@ function RunCard({ run, onApprove, onCancel }: { run: Run; onApprove: (id: strin
   </article>;
 }
 
-function Composer({ bots, apps = [], skills = [], isRoom, selectedBotIds, setSelectedBotIds, workingBotIds = [], onSend, sending, onNotice }: {
+function Composer({ threadId, sharedDraft, bots, apps = [], skills = [], isRoom, selectedBotIds, setSelectedBotIds, workingBotIds = [], onSend, sending, onNotice }: {
+  threadId: string; sharedDraft: StudioDraft;
   bots: Bot[]; isRoom: boolean; selectedBotIds: string[]; setSelectedBotIds: (ids: string[]) => void;
   apps?: ConnectorStatus["catalog"];
   skills?: TaughtWorkflow[];
@@ -257,6 +258,7 @@ function Composer({ bots, apps = [], skills = [], isRoom, selectedBotIds, setSel
 }) {
   const [body, setBody] = useState(""), [files, setFiles] = useState<File[]>([]), [mentionQuery, setMentionQuery] = useState<string | null>(null), [skillQuery, setSkillQuery] = useState<string | null>(null), [routingOpen, setRoutingOpen] = useState(false), [listening, setListening] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null), fileInput = useRef<HTMLInputElement>(null), recognition = useRef<SpeechRecognitionLike | null>(null);
+  const draftThread = useRef(""), seenDraft = useRef<string | null>(null), appliedDraftBody = useRef<string | null>(null);
   const mentionIds = useMemo(() => mentionedBotIds(body, bots), [body, bots]);
   const routedBots = mentionIds.length ? bots.filter((bot) => mentionIds.includes(bot.id)) : bots.filter((bot) => selectedBotIds.includes(bot.id));
   const steeringBots = routedBots.filter((bot) => workingBotIds.includes(bot.id));
@@ -266,6 +268,24 @@ function Composer({ bots, apps = [], skills = [], isRoom, selectedBotIds, setSel
   const availableSkills = skills.filter((skill) => bots.some((bot) => bot.id === skill.botId));
   const skillChoices = availableSkills.filter((skill) => !skillQuery || skill.skillSlug.startsWith(mentionSlug(skillQuery))).slice(0, 8);
   const resize = () => { const element = textarea.current; if (!element) return; element.style.height = "auto"; element.style.height = `${Math.min(element.scrollHeight, 132)}px`; };
+  useEffect(() => {
+    const changedThread = draftThread.current !== threadId;
+    const cameFromIPhone = sharedDraft.source === "ios" && sharedDraft.updatedAt !== seenDraft.current;
+    if (changedThread || cameFromIPhone) {
+      appliedDraftBody.current = sharedDraft.body;
+      setBody(sharedDraft.body);
+      requestAnimationFrame(resize);
+    }
+    draftThread.current = threadId;
+    seenDraft.current = sharedDraft.updatedAt;
+  }, [threadId, sharedDraft.body, sharedDraft.source, sharedDraft.updatedAt]);
+  useEffect(() => {
+    if (appliedDraftBody.current === body) { appliedDraftBody.current = null; return; }
+    const timer = window.setTimeout(() => {
+      void api<StudioDraft>(`/api/drafts/${encodeURIComponent(threadId)}`, { method: "PUT", body: JSON.stringify({ body, source: "web" }) }).catch(() => undefined);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [body, threadId]);
   const updateMention = (value: string, cursor: number | null) => {
     const before = value.slice(0, cursor ?? value.length), match = before.match(/(?:^|\s)@([\p{L}\p{N}_-]*)$/u);
     setMentionQuery(match ? match[1] : null);
@@ -324,10 +344,11 @@ function Composer({ bots, apps = [], skills = [], isRoom, selectedBotIds, setSel
   return <div className="composer-wrap" data-testid="composer-wrap">
     {isRoom && <div className="recipient-summary-wrap">
       <button className={`recipient-summary ${mentionIds.length ? "mentioned" : ""}`} onClick={() => { setRoutingOpen(!routingOpen); setMentionQuery(null); }} aria-expanded={routingOpen}>
-        <AtSign size={13} />{mentionIds.length ? `Mentioned: ${routedBots.map((bot) => bot.name).join(", ")}` : routedBots.length ? `To ${routedBots.map((bot) => bot.name).join(", ")}` : "Auto picks the best teammate"}<ChevronDown size={12} />
+        <AtSign size={13} />{mentionIds.length ? `Mentioned: ${routedBots.map((bot) => bot.name).join(", ")}` : routedBots.length ? `To ${routedBots.map((bot) => bot.name).join(", ")}` : "Auto-pick a teammate"}<ChevronDown size={12} />
       </button>
       <span>Use @ for teammates · / for skills</span>
     </div>}
+    {sharedDraft.source === "ios" && sharedDraft.body && body === sharedDraft.body && <div className="draft-handoff" role="status"><Smartphone size={12} />Continued from your iPhone</div>}
     {steeringBots.length > 0 && <div className="steering-note" role="status"><RefreshCw size={13} /><span><strong>{steeringBots.map((bot) => bot.name).join(" and ")} {steeringBots.length === 1 ? "is" : "are"} working</strong>Your next message updates the job in progress.</span></div>}
     {(routingOpen || mentionQuery !== null) && isRoom && <div className="routing-popover" role="listbox" aria-label={mentionQuery !== null ? "Mention a teammate" : "Choose who receives this"}>
       {mentionQuery === null && <><button className={!selectedBotIds.length ? "selected" : ""} onClick={() => { setSelectedBotIds([]); setRoutingOpen(false); }}><span className="route-symbol"><Sparkles size={15} /></span><span><strong>Auto</strong><small>Pick one teammate from the request</small></span>{!selectedBotIds.length && <Check size={14} />}</button><button onClick={() => { setSelectedBotIds(bots.map((bot) => bot.id)); setRoutingOpen(false); }}><span className="route-symbol"><Users size={15} /></span><span><strong>Everyone</strong><small>Work in parallel</small></span>{selectedBotIds.length === bots.length && <Check size={14} />}</button></>}
@@ -825,7 +846,7 @@ export function App() {
   const loadConnectors = useCallback(async () => { try { setConnectors(await api<ConnectorStatus>("/api/connectors")); } catch { /* the main connection indicator handles server outages */ } }, []);
   useEffect(() => { void loadState(activeThreadId); }, [activeThreadId, loadState]);
   useEffect(() => { if (!authRequired) { api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); void loadConnectors(); } }, [authRequired, loadConnectors]);
-  useEffect(() => { if (authRequired) return; const events = new EventSource("/api/events"); events.onopen = () => setConnection("online"); events.onerror = () => setConnection(navigator.onLine ? "reconnecting" : "offline"); events.onmessage = (event) => { const data = JSON.parse(event.data) as { type: string }; if (data.type === "state") void loadState(activeThreadId, true); if (data.type === "provider") api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); if (data.type === "connector") void loadConnectors(); }; return () => events.close(); }, [activeThreadId, authRequired, loadConnectors, loadState]);
+  useEffect(() => { if (authRequired) return; const events = new EventSource("/api/events"); events.onopen = () => setConnection("online"); events.onerror = () => setConnection(navigator.onLine ? "reconnecting" : "offline"); events.onmessage = (event) => { const data = JSON.parse(event.data) as { type: string }; if (data.type === "state" || data.type === "draft") void loadState(activeThreadId, true); if (data.type === "provider") api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); if (data.type === "connector") void loadConnectors(); }; return () => events.close(); }, [activeThreadId, authRequired, loadConnectors, loadState]);
   useEffect(() => { const online = () => setConnection("reconnecting"), offline = () => setConnection("offline"); window.addEventListener("online", online); window.addEventListener("offline", offline); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, []);
   useEffect(() => { const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPrompt); }; window.addEventListener("beforeinstallprompt", capture); return () => window.removeEventListener("beforeinstallprompt", capture); }, []);
   useEffect(() => { if (panel !== "provider" || authRequired) return; const refresh = () => api<ProviderStatus>("/api/provider").then(setProvider).catch(() => undefined); void refresh(); const timer = setInterval(refresh, 3_000); return () => clearInterval(timer); }, [panel, authRequired]);
@@ -867,7 +888,7 @@ export function App() {
 
   return <div className="app-shell">
     <Sidebar state={state} provider={provider} connectors={connectors} activeThreadId={activeThreadId} onSelectThread={selectThread} onCreateBot={() => setCreatingBot(true)} onOpenPanel={openPanel} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-    <main className="conversation"><ConversationHeader threadTitle={activeThread.title} activeBot={activeBot} roomBots={state.bots} onMenu={() => setSidebarOpen(true)} onOpenPanel={openPanel} connection={connection} /><div className="message-scroll"><div className="conversation-intro">{activeBot ? <><Mascot bot={activeBot} size="large" /><h2>{activeBot.name}</h2><p>{activeBot.role}</p><span>{shortModel(activeBot.model)}</span></> : <><div className="studio-stage"><RoomCluster bots={state.bots} hero /><span className="stage-spark">✦</span><span className="stage-spark stage-spark-small">·</span></div><h2>The studio</h2><p>Ask naturally. OpenBot can pick an owner, or use @name to choose.</p><span>{state.bots.map((bot) => bot.name).join(" · ")}</span></>}</div><div className="messages">{state.messages.map((message, index) => <MessageBubble key={message.id} message={message} previous={state.messages[index - 1]} macAccessEnabled={state.settings.macAccessEnabled} run={message.runId ? state.runs.find((run) => run.id === message.runId) : undefined} />)}<div className="run-list">{activeRuns.map((run) => <RunCard key={run.id} run={run} onApprove={(id) => void mutate(() => api(`/api/runs/${id}/approve`, { method: "POST" }))} onCancel={(id) => void mutate(() => api(`/api/runs/${id}/cancel`, { method: "POST" }))} />)}</div><div ref={messagesEnd} /></div></div><Composer bots={activeThread.kind === "room" ? state.bots : activeBot ? [activeBot] : []} apps={connectors?.catalog} skills={state.workflows} isRoom={activeThread.kind === "room"} selectedBotIds={selectedBotIds} setSelectedBotIds={setSelectedBotIds} workingBotIds={state.runs.filter((run) => ["running", "waiting_for_teammate"].includes(run.status)).map((run) => run.botId)} onNotice={setToast} onSend={async (body, files) => { setSending(true); try { const uploaded = await Promise.all(files.map((file) => api<Attachment>(`/api/attachments?threadId=${encodeURIComponent(activeThreadId)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "X-File-Type": file.type || "application/octet-stream" }, body: file }))); await mutate(() => api("/api/messages", { method: "POST", body: JSON.stringify({ threadId: activeThreadId, body, targetBotIds: selectedBotIds, attachmentIds: uploaded.map((attachment) => attachment.id) }) })); } finally { setSending(false); } }} sending={sending} /></main>
+    <main className="conversation"><ConversationHeader threadTitle={activeThread.title} activeBot={activeBot} roomBots={state.bots} onMenu={() => setSidebarOpen(true)} onOpenPanel={openPanel} connection={connection} /><div className="message-scroll"><div className="conversation-intro">{activeBot ? <><Mascot bot={activeBot} size="large" /><h2>{activeBot.name}</h2><p>{activeBot.role}</p><span>{shortModel(activeBot.model)}</span></> : <><div className="studio-stage"><RoomCluster bots={state.bots} hero /><span className="stage-spark">✦</span><span className="stage-spark stage-spark-small">·</span></div><h2>Your studio</h2><p>Ask naturally. OpenBot picks the right teammate, or you can choose one before sending.</p><span>{state.bots.map((bot) => bot.name).join(" · ")}</span></>}</div><div className="messages">{state.messages.map((message, index) => <MessageBubble key={message.id} message={message} previous={state.messages[index - 1]} macAccessEnabled={state.settings.macAccessEnabled} run={message.runId ? state.runs.find((run) => run.id === message.runId) : undefined} />)}<div className="run-list">{activeRuns.map((run) => <RunCard key={run.id} run={run} onApprove={(id) => void mutate(() => api(`/api/runs/${id}/approve`, { method: "POST" }))} onCancel={(id) => void mutate(() => api(`/api/runs/${id}/cancel`, { method: "POST" }))} />)}</div><div ref={messagesEnd} /></div></div><Composer threadId={activeThreadId} sharedDraft={state.draft} bots={activeThread.kind === "room" ? state.bots : activeBot ? [activeBot] : []} apps={connectors?.catalog} skills={state.workflows} isRoom={activeThread.kind === "room"} selectedBotIds={selectedBotIds} setSelectedBotIds={setSelectedBotIds} workingBotIds={state.runs.filter((run) => ["running", "waiting_for_teammate"].includes(run.status)).map((run) => run.botId)} onNotice={setToast} onSend={async (body, files) => { setSending(true); try { const uploaded = await Promise.all(files.map((file) => api<Attachment>(`/api/attachments?threadId=${encodeURIComponent(activeThreadId)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "X-File-Type": file.type || "application/octet-stream" }, body: file }))); await mutate(() => api("/api/messages", { method: "POST", body: JSON.stringify({ threadId: activeThreadId, body, targetBotIds: selectedBotIds, attachmentIds: uploaded.map((attachment) => attachment.id) }) })); } finally { setSending(false); } }} sending={sending} /></main>
     {panel === "control" && <Sheet title="Control center" subtitle="Your studio at a glance" onClose={() => setPanel(null)}><ControlPanel state={state} onNotify={async () => { if (!("Notification" in window)) return setToast("Notifications are not supported here"); const permission = await Notification.requestPermission(); setToast(permission === "granted" ? "Notifications are on" : "Notifications stayed off"); }} onOpenProvider={() => setPanel("provider")} onOpenRemote={() => setPanel("remote")} onOpenConnectors={() => setPanel("connectors")} onOpenProjects={() => setPanel("projects")} onSetMacAccess={async (enabled) => { await mutate(() => api("/api/settings", { method: "PATCH", body: JSON.stringify({ macAccessEnabled: enabled }) }), enabled ? "Every teammate can now use visible Mac files and apps" : "Mac access is off for the studio"); }} /></Sheet>}
     {panel === "connectors" && <Sheet wide title="Apps & tools" subtitle="Useful connections, under your control" onClose={() => setPanel(null)}><ConnectorPanel status={connectors} bots={state.bots} onRefresh={loadConnectors} onNotice={setToast} onStartWorkflow={async (prompt) => { try { setPanel(null); setActiveThreadId("team-room"); setSelectedBotIds([]); await api("/api/messages", { method: "POST", body: JSON.stringify({ threadId: "team-room", body: prompt, targetBotIds: [], attachmentIds: [] }) }); await loadState("team-room", true); setToast("Started in the studio"); } catch (reason) { setToast(reason instanceof Error ? reason.message : "Could not start that workflow."); } }} /></Sheet>}
     {panel === "projects" && <Sheet wide title="Code projects" subtitle="Approved folders for building and testing" onClose={() => setPanel(null)}><CodeProjectsPanel bots={state.bots} onNotice={setToast} /></Sheet>}

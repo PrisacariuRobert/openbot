@@ -126,6 +126,17 @@ private struct NativeConversationView: View {
             .onChange(of: store.activeRuns) { _, _ in
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("conversation-end", anchor: .bottom) }
             }
+            .task(id: store.isLoading) {
+                guard !store.isLoading else { return }
+                try? await Task.sleep(for: .milliseconds(120))
+                proxy.scrollTo("conversation-end", anchor: .bottom)
+            }
+            .onChange(of: store.selectedThreadID) { _, _ in
+                Task {
+                    try? await Task.sleep(for: .milliseconds(120))
+                    proxy.scrollTo("conversation-end", anchor: .bottom)
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
                     if let error = store.errorMessage {
@@ -289,6 +300,9 @@ private struct NativeComposer: View {
     @State private var targetBotID: String?
     @State private var pendingFiles: [URL] = []
     @State private var showingFiles = false
+    @State private var draftSaveTask: Task<Void, Never>?
+    @State private var appliedDraftRevision: String?
+    @State private var appliedDraftBody: String?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -310,6 +324,12 @@ private struct NativeComposer: View {
                     .padding(.horizontal, 10).padding(.vertical, 7)
                     .background(OpenBotTheme.purple.opacity(0.09), in: Capsule())
                 }
+            }
+            if store.activeDraft.source == "web", !draft.isEmpty, draft == store.activeDraft.body {
+                Label("Continued from your Mac", systemImage: "macbook.and.iphone")
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OpenBotTheme.green)
+                    .padding(.horizontal, 4)
             }
             if !pendingFiles.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -402,6 +422,19 @@ private struct NativeComposer: View {
         .padding(.horizontal, 12).padding(.top, 9).padding(.bottom, 7)
         .background(.ultraThinMaterial)
         .onChange(of: store.selectedThreadID) { _, _ in targetBotID = nil }
+        .onAppear { applySharedDraft(force: true) }
+        .onChange(of: store.activeDraft.threadId) { _, _ in applySharedDraft(force: true) }
+        .onChange(of: store.activeDraft.updatedAt) { _, _ in applySharedDraft() }
+        .onChange(of: draft) { _, next in
+            if appliedDraftBody == next { appliedDraftBody = nil; return }
+            draftSaveTask?.cancel()
+            draftSaveTask = Task {
+                try? await Task.sleep(for: .milliseconds(650))
+                guard !Task.isCancelled else { return }
+                await store.saveDraft(next)
+            }
+        }
+        .onDisappear { draftSaveTask?.cancel() }
         .fileImporter(isPresented: $showingFiles, allowedContentTypes: [.content, .data], allowsMultipleSelection: true) { result in
             if case .success(let files) = result {
                 pendingFiles = Array(files.prefix(max(0, 6 - pendingFiles.count))) + pendingFiles
@@ -418,6 +451,17 @@ private struct NativeComposer: View {
                 pendingFiles = []
             }
         }
+    }
+
+    private func applySharedDraft(force: Bool = false) {
+        let shared = store.activeDraft
+        guard shared.threadId == store.selectedThreadID else { return }
+        guard force || (shared.source == "web" && shared.updatedAt != appliedDraftRevision) else { return }
+        draftSaveTask?.cancel()
+        appliedDraftRevision = shared.updatedAt
+        guard draft != shared.body else { return }
+        appliedDraftBody = shared.body
+        draft = shared.body
     }
 }
 

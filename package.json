@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "private": true,
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",

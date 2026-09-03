@@ -315,7 +315,7 @@ Verification: 74 automated tests pass, including official Slack and Notion respo
 
 ## M22 — Native iPhone companion
 
-Status: complete for the local-first 0.17.1 native beta
+Status: complete for the local-first 0.17.2 native beta
 
 - A real SwiftUI iPhone app connects to the owner-hosted OpenBot studio with native conversations, message bubbles, teammate selection, sending, live work, approvals, cancellation, and settings
 - Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, live server events, and connection settings
@@ -326,5 +326,7 @@ Status: complete for the local-first 0.17.1 native beta
 - A premium three-teammate mascot set is shared by the native and web experiences, with independent status movement and blink timing
 - Native attachment selection uploads bounded files to the Mac before sending the message
 - Phone Remote detects a Tailscale address, prioritizes it for pairing, and can open Tailscale on the Mac for use across cellular or different Wi-Fi networks
+- Web and native use the same studio naming, presence language, conversation hierarchy, composer proportions, and exact mascot artwork
+- Unfinished text moves between Mac and iPhone through an authenticated durable draft, updates live, and identifies the originating device without echoing unchanged text back
 
-Verification: 77 automated web/server tests pass. The Xcode project is deterministically generated with XcodeGen and compiled using Xcode Beta. Four native unit tests pass on an iPhone 17 Pro simulator. A live UI test enters the address and private key, signs in to the running Mac studio, and verifies the native conversation header and composer. The live Tailscale address returns 401 without the private key and 200 with it. Release checks reject a return to `WKWebView`, embedded access keys, missing privacy declarations, or missing native API/event coverage. Physical-device/App Store distribution, rich native artifact previews, push, share-sheet input, dedicated voice capture, and an always-on host are not claimed.
+Verification: 78 automated web/server tests pass, including two-way durable draft handoff. The Xcode project is deterministically generated with XcodeGen and compiled using Xcode Beta. Four native unit tests pass on an iPhone 17 Pro simulator. A live UI test enters the address and private key, signs in to the running Mac studio, and verifies the native conversation header and composer. The live Tailscale address returns 401 without the private key and 200 with it. Phone-sized web QA confirms the matching room header, hero, messages, and composer. Release checks reject a return to `WKWebView`, embedded access keys, missing privacy declarations, or missing native API/event coverage. Physical-device/App Store distribution, unsent attachment handoff, rich native artifact previews, push, share-sheet input, dedicated voice capture, and an always-on host are not claimed.

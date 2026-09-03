@@ -32,6 +32,7 @@ import type {
   Run,
   RunStatus,
   StudioSettings,
+  StudioDraft,
   TaskContract,
   TaskStage,
   TaskStep,
@@ -214,6 +215,12 @@ export class OpenBotDatabase {
         thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         PRIMARY KEY(thread_id, bot_id)
+      );
+      CREATE TABLE IF NOT EXISTS thread_drafts (
+        thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+        body TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS messages (
         id TEXT PRIMARY KEY,
@@ -724,6 +731,26 @@ export class OpenBotDatabase {
 
   getThread(id: string): Thread | null {
     return this.listThreads().find((thread) => thread.id === id) || null;
+  }
+
+  getDraft(threadId: string): StudioDraft {
+    const row = this.db.prepare("SELECT * FROM thread_drafts WHERE thread_id=?").get(threadId) as Row | undefined;
+    return row ? {
+      threadId: String(row.thread_id),
+      body: String(row.body),
+      source: row.source === "ios" ? "ios" : "web",
+      updatedAt: String(row.updated_at),
+    } : { threadId, body: "", source: null, updatedAt: null };
+  }
+
+  saveDraft(threadId: string, body: string, source: "web" | "ios"): StudioDraft | null {
+    if (!this.getThread(threadId)) return null;
+    const updatedAt = now();
+    this.db.prepare(`
+      INSERT INTO thread_drafts (thread_id,body,source,updated_at) VALUES (?,?,?,?)
+      ON CONFLICT(thread_id) DO UPDATE SET body=excluded.body,source=excluded.source,updated_at=excluded.updated_at
+    `).run(threadId, body, source, updatedAt);
+    return this.getDraft(threadId);
   }
 
   getThreadBots(threadId: string): Bot[] {
@@ -1950,6 +1977,6 @@ export class OpenBotDatabase {
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

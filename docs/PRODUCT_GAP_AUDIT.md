@@ -1,10 +1,10 @@
 # OpenBot Product Gap Audit
 
-Updated for OpenBot 0.17.1. This audit compares the locally verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
+Updated for OpenBot 0.17.2. This audit compares the locally verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
 
 ## Current position
 
-OpenBot's strongest difference is owner control: local data, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.17.1 replaces the phone web shell with a compiled native SwiftUI conversation client without copying studio data or credentials into a hosted service. Grok Bot remains broader where a hosted product has an advantage: an always-on cloud computer, push delivery, general computer takeover, a larger connector marketplace, fidelity-preserving Office work, and organization administration.
+OpenBot's strongest difference is owner control: local data, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.17.2 makes the compiled native iPhone client and web studio feel like one continuous room, including durable unfinished-message handoff, without copying studio data or credentials into a hosted service. Grok Bot remains broader where a hosted product has an advantage: an always-on cloud computer, push delivery, general computer takeover, a larger connector marketplace, fidelity-preserving Office work, and organization administration.
 
 ## Highest-value gaps
 
@@ -29,7 +29,7 @@ OpenBot's strongest difference is owner control: local data, bring-your-own mode
 
 ## Release truth
 
-OpenBot 0.17.1 is a strong local-first beta, not feature parity with Grok Bot. It adds a simulator-verified native iPhone client while remaining differentiated for private model ownership, granular per-teammate authority, rich bounded inputs, one-voice consultation, exact-commit review, recoverable writes, and signed automations with explainable recovery. “Better” means more trustworthy and owner-controlled first; always-on infrastructure and breadth still need real permission, recovery, and verification behavior.
+OpenBot 0.17.2 is a strong local-first beta, not feature parity with Grok Bot. It adds a simulator-verified native iPhone client, matching cross-platform presentation, and Mac/iPhone draft continuity while remaining differentiated for private model ownership, granular per-teammate authority, rich bounded inputs, one-voice consultation, exact-commit review, recoverable writes, and signed automations with explainable recovery. “Better” means more trustworthy and owner-controlled first; always-on infrastructure and breadth still need real permission, recovery, and verification behavior.
 
 ## Primary comparison sources
 

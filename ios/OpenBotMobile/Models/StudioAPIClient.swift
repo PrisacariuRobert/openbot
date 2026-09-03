@@ -18,6 +18,13 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/messages", method: "POST", body: payload)
     }
 
+    func saveDraft(threadID: String, body: String) async throws -> StudioDraft {
+        let payload = try JSONEncoder().encode(DraftRequest(body: body, source: "ios"))
+        let data = try await dataRequest("api/drafts/\(threadID)", method: "PUT", body: payload)
+        do { return try JSONDecoder().decode(StudioDraft.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
     func upload(threadID: String, fileURL: URL) async throws -> StudioAttachment {
         let accessed = fileURL.startAccessingSecurityScopedResource()
         defer { if accessed { fileURL.stopAccessingSecurityScopedResource() } }
@@ -106,6 +113,11 @@ private struct MessageRequest: Encodable {
     let body: String
     let targetBotIds: [String]
     let attachmentIds: [String]
+}
+
+private struct DraftRequest: Encodable {
+    let body: String
+    let source: String
 }
 
 private struct ServerMessage: Decodable { let error: String }

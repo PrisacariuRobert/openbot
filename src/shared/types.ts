@@ -642,6 +642,13 @@ export interface StudioSettings {
   macAccessEnabled: boolean;
 }
 
+export interface StudioDraft {
+  threadId: string;
+  body: string;
+  source: "web" | "ios" | null;
+  updatedAt: string | null;
+}
+
 export interface AppState {
   bots: Bot[];
   threads: Thread[];
@@ -655,6 +662,7 @@ export interface AppState {
   agentMessages: AgentMessage[];
   providers: ProviderInstance[];
   settings: StudioSettings;
+  draft: StudioDraft;
   usage: UsageSummary;
   activeThreadId: string;
 }
