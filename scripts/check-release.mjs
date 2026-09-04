@@ -128,7 +128,7 @@ if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy",
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
   failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
 }
-if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics")) {
+if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics") || !verifyWorkflow.includes('require("./package.json").version')) {
   failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
 }
 if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {

@@ -46,7 +46,7 @@ jobs:
               curl --fail --silent \
                 --header "Authorization: Bearer ${access_token}" \
                 http://127.0.0.1:4311/api/runner/diagnostics \
-                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.27.0" || result.checks?.length !== 6 || result.alerts?.enabled !== false || result.heartbeat?.configured !== false || result.heartbeat?.enabled !== false) process.exit(1); });'
+                | node -e 'const expected = require("./package.json").version; let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== expected || result.checks?.length !== 6 || result.alerts?.enabled !== false || result.heartbeat?.configured !== false || result.heartbeat?.enabled !== false) process.exit(1); });'
               exit 0
             fi
             sleep 1
