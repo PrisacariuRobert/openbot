@@ -1,4 +1,6 @@
-# OpenBot 0.29.0 Launch Readiness
+# OpenBot 0.30.0 Launch Readiness
+
+0.30 adds bounded execution and reported-usage protection; see [current validation](QA_0.30.md). The historical evidence below is not a new end-to-end certification. The application remains an owner-operated development beta; broad launch gates remain open.
 
 OpenBot 0.29.0 is a development beta, **not approved here for broad unattended production use**. The [product audit](PRODUCT_GAP_AUDIT.md) identifies unresolved runtime/egress boundaries, incomplete native settings, setup friction and insufficient repeated workflow evidence. The [current validation record](QA_0.29.md) separates fixtures, live-model checks and untested release gates. Historical 0.28 observations below are retained as engineering context, not newly verified launch certification.
 

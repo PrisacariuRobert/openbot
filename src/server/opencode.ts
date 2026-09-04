@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { Bot, Run } from "../shared/types.js";
@@ -8,6 +8,7 @@ import { connectedAppsText, prepareWorkspace } from "./workspace.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { modelBelongsToConnection } from "../shared/provider-config.js";
 import { toolAvailability } from "./tool-availability.js";
+import { ExecutionMeter, executionLimits, executionStopMessage, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
 
 const CLAUDE_MCP_PATH = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
 
@@ -147,11 +148,16 @@ export interface OpenCodeRunnerOptions {
   internalToken: string;
   attachments: AttachmentService;
   maxParallel?: number;
+  limits?: ExecutionLimits;
+  // Allows real-process fault fixtures without invoking a model account.
+  spawnProcess?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 }
 
 export class OpenCodeRunner {
   private readonly running = new Map<string, ChildProcess>();
   private readonly restartQueue = new Set<string>();
+  private readonly processControls = new Map<string, { checkpoint: () => void; terminate: () => void }>();
+  private readonly limits: ExecutionLimits;
   readonly instanceId = randomUUID();
   private queueTimer: NodeJS.Timeout | null = null;
   private leadershipTimer: NodeJS.Timeout | null = null;
@@ -160,7 +166,7 @@ export class OpenCodeRunner {
   private stopping = false;
   private readonly mode: "foreground" | "background" = process.env.OPENBOT_BACKGROUND_SERVICE === "1" ? "background" : "foreground";
 
-  constructor(private readonly options: OpenCodeRunnerOptions) {}
+  constructor(private readonly options: OpenCodeRunnerOptions) { this.limits = options.limits || executionLimits(); }
 
   start() {
     if (this.queueTimer) return;
@@ -171,17 +177,24 @@ export class OpenCodeRunner {
     void this.tick();
   }
 
-  stop() {
+  async stop() {
     if (this.queueTimer) clearInterval(this.queueTimer);
     if (this.leadershipTimer) clearInterval(this.leadershipTimer);
     this.queueTimer = null;
     this.leadershipTimer = null;
     this.stopping = true;
+    for (const control of this.processControls.values()) control.checkpoint();
     for (const runId of this.running.keys()) this.restartQueue.add(runId);
+    const exits = [...this.running.values()].map((child) => new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, this.limits.terminationGraceMs + 1000);
+      child.once("close", () => { clearTimeout(timer); resolve(); });
+    }));
+    for (const control of this.processControls.values()) control.terminate();
+    if (exits.length) await Promise.all(exits);
+    // Do not offer the job to another worker while the old process is alive.
     this.options.db.requeueWorkerRuns(this.instanceId);
     if (this.leader) this.options.db.releaseRunnerLease(this.instanceId);
     this.leader = false;
-    for (const child of this.running.values()) child.kill("SIGTERM");
     this.running.clear();
     this.options.onChange();
   }
@@ -217,10 +230,20 @@ export class OpenCodeRunner {
   }
 
   cancel(runId: string): boolean {
-    const child = this.running.get(runId);
-    if (!child) return false;
-    child.kill("SIGTERM");
+    const control = this.processControls.get(runId);
+    if (!control) return false;
+    control.checkpoint();
+    control.terminate();
     return true;
+  }
+
+  cancelTask(runId: string): boolean {
+    // A user stops an outcome, not just the coordinator's current process.
+    let changed = false;
+    for (const child of this.options.db.listChildRuns(runId)) changed = this.cancelTask(child.id) || changed;
+    if (this.options.db.cancelRun(runId)) changed = true;
+    if (this.processControls.has(runId)) { this.cancel(runId); changed = true; }
+    return changed;
   }
 
   private resumeCoordinatorIfReady(runId: string): boolean {
@@ -315,6 +338,10 @@ export class OpenCodeRunner {
       this.failBeforeStart(run, "This model is not configured for your teammate’s connection. Choose a model in AI connections.");
       return;
     }
+    const meter = new ExecutionMeter(this.limits, run.activeDurationMs, run.modelSteps);
+    const previousTokens = run.inputTokens + run.outputTokens + run.reasoningTokens;
+    const initialStop = meter.reason(previousTokens, !this.options.db.budgetAvailable(bot.id).allowed);
+    if (initialStop) { this.failBeforeStart(run, executionStopMessage[initialStop]); return; }
     const workspace = prepareWorkspace(this.options.db, bot);
     const useClaude = provider?.runtime === "claude_code";
     const capabilityFingerprint = this.options.db.botSessionFingerprint(bot.id);
@@ -336,77 +363,143 @@ export class OpenCodeRunner {
     const args = useClaude
       ? ["-p", "--output-format", "stream-json", "--verbose", "--model", bot.model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", claudeTools, ...(previousSession ? ["--resume", previousSession] : []), prompt]
       : ["run", "--auto", "--format", "json", "--model", bot.model, "--dir", workspace, ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
-    const child = spawn(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"] });
+    const child = (this.options.spawnProcess || spawn)(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
     this.running.set(run.id, child);
     let stdoutBuffer = "", stderr = "", responseText = "", sessionId: string | null = previousSession, lastTool = "";
     const usageAccumulator = new UsageAccumulator();
     let usage: Usage = zeroUsage();
+    let stoppedFor: ExecutionStop | null = null;
+    let killTimer: NodeJS.Timeout | null = null;
+    let processClosed = false;
+    const terminate = () => {
+      if (killTimer || processClosed) return;
+      const signal = (value: NodeJS.Signals) => {
+        try {
+          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, value);
+          else child.kill(value);
+        } catch { /* The process may already have exited. */ }
+      };
+      signal("SIGTERM");
+      killTimer = setTimeout(() => signal("SIGKILL"), this.limits.terminationGraceMs);
+      killTimer.unref();
+    };
+    const usagePatch = () => ({
+      inputTokens: run.inputTokens + usage.inputTokens,
+      outputTokens: run.outputTokens + usage.outputTokens,
+      reasoningTokens: run.reasoningTokens + usage.reasoningTokens,
+      cacheReadTokens: run.cacheReadTokens + usage.cacheReadTokens,
+      cost: run.cost + usage.cost,
+      activeDurationMs: Math.floor(meter.activeMs), modelSteps: meter.steps,
+      ...(sessionId ? { sessionId } : {}),
+    });
+    const checkpoint = () => this.options.db.updateRun(run.id, usagePatch());
+    const enforce = () => {
+      if (stoppedFor || this.stopping) return;
+      const currentStatus = this.options.db.getRun(run.id)?.status;
+      if (currentStatus === "cancelled" || currentStatus === "failed") { terminate(); return; }
+      if (currentStatus !== "running") return;
+      const reason = meter.reason(previousTokens + usage.inputTokens + usage.outputTokens + usage.reasoningTokens, !this.options.db.budgetAvailable(bot.id).allowed);
+      if (!reason) return;
+      stoppedFor = reason;
+      checkpoint();
+      // Revoke tool access immediately, before waiting for process exit.
+      const error = executionStopMessage[reason];
+      this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error, partialText: responseText || null });
+      this.options.db.finishRunTask(run.id, "failed", error);
+      for (const childRun of this.options.db.listChildRuns(run.id)) this.cancelTask(childRun.id);
+      this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Stopped to protect your usage", detail: error });
+      terminate();
+      this.options.onChange();
+    };
+    this.processControls.set(run.id, { checkpoint, terminate });
+    const watchdog = setInterval(() => {
+      if (this.stopping) return;
+      checkpoint();
+      enforce();
+    }, 1_000);
+    watchdog.unref();
 
     const consumeLine = (line: string) => {
-      if (!line.trim()) return;
+      if (!line.trim() || stoppedFor) return;
       try {
         const event = JSON.parse(line) as Record<string, unknown>;
+        if (!event || typeof event !== "object" || Array.isArray(event)) return;
         sessionId = eventSessionId(event) || sessionId;
         const text = event.type === "result" && responseText ? null : eventText(event);
         if (text) {
-          responseText = appendModelText(responseText, text);
+          meter.progress();
+          const nextText = appendModelText(responseText, text);
+          if (nextText.length > 512_000) { meter.output(this.limits.maxOutputBytes + 1); enforce(); return; }
+          responseText = nextText;
           this.options.db.updateRun(run.id, { partialText: responseText, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
           this.options.onChange();
         }
         usage = usageAccumulator.add(event);
+        meter.event(event);
+        if (eventUsage(event)) { checkpoint(); this.options.onChange(); }
         const tool = toolActivity(event);
+        const toolState = (event.part as { state?: { status?: string } } | undefined)?.state?.status;
+        if (tool && ["completed", "error"].includes(toolState || "")) meter.progress();
         if (tool && tool.label !== lastTool) {
           lastTool = tool.label;
           this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: tool.kind, label: tool.label, detail: tool.detail });
           this.options.onChange();
         }
-      } catch { if (!line.startsWith("[")) responseText += line; }
+        enforce();
+      } catch { stderr = (stderr + "\n" + line).slice(-20_000); }
     };
 
-    child.stdout.on("data", (chunk) => {
+    child.stdout!.on("data", (chunk) => {
+      meter.output(Buffer.byteLength(chunk));
+      enforce();
+      if (stoppedFor) return;
       stdoutBuffer += String(chunk);
       const lines = stdoutBuffer.split(/\r?\n/);
       stdoutBuffer = lines.pop() || "";
       for (const line of lines) consumeLine(line);
     });
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)));
-    child.on("error", (error) => (stderr += error.message));
+    child.stderr!.on("data", (chunk) => { meter.output(Buffer.byteLength(chunk)); stderr = (stderr + String(chunk)).slice(-20_000); enforce(); });
+    child.on("error", (error) => { stderr = (stderr + error.message).slice(-20_000); });
     child.on("close", async (code, signal) => {
-      if (stdoutBuffer) consumeLine(stdoutBuffer);
+      processClosed = true;
+      clearInterval(watchdog);
+      if (killTimer) clearTimeout(killTimer);
+      if (stdoutBuffer && !this.stopping) consumeLine(stdoutBuffer);
       this.running.delete(run.id);
+      this.processControls.delete(run.id);
       if (this.restartQueue.delete(run.id) || this.stopping) return;
       if (sessionId) this.options.db.rememberSessionCapabilities(sessionId, capabilityFingerprint);
       const finishedAt = new Date().toISOString();
       const current = this.options.db.getRun(run.id);
       const waiting = current?.status === "awaiting_approval";
       const cancelled = signal === "SIGTERM" || current?.status === "cancelled";
-      const usagePatch = {
-        inputTokens: (current?.inputTokens || 0) + usage.inputTokens,
-        outputTokens: (current?.outputTokens || 0) + usage.outputTokens,
-        reasoningTokens: (current?.reasoningTokens || 0) + usage.reasoningTokens,
-        cacheReadTokens: (current?.cacheReadTokens || 0) + usage.cacheReadTokens,
-        cost: (current?.cost || 0) + usage.cost,
+      const finalUsage = {
+        ...usagePatch(),
         progressAt: finishedAt,
         ...(sessionId ? { sessionId } : {}),
       };
-      if (waiting) {
-        this.options.db.updateRun(run.id, { ...usagePatch, partialText: responseText || current?.partialText || "" });
+      if (stoppedFor) {
+        this.options.db.updateRun(run.id, finalUsage);
+        this.shareChildOutcome(run, bot, `I could not finish the private consultation: ${executionStopMessage[stoppedFor]}`, true);
+      } else if (waiting) {
+        this.options.db.updateRun(run.id, { ...finalUsage, partialText: responseText || current?.partialText || "" });
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Waiting for you", detail: current?.approvalReason || null });
       } else if (cancelled) {
-        if (current?.status === "cancelled") this.options.db.updateRun(run.id, usagePatch);
+        if (current?.status === "cancelled") this.options.db.updateRun(run.id, finalUsage);
         else {
-          this.options.db.updateRun(run.id, { ...usagePatch, status: "cancelled", finishedAt });
+          this.options.db.updateRun(run.id, { ...finalUsage, status: "cancelled", finishedAt });
           this.options.db.finishRunTask(run.id, "cancelled");
         }
+        this.shareChildOutcome(run, bot, "My part of the consultation was stopped before completion.", true);
       } else if (current?.consultationPending) {
-        this.options.db.updateRun(run.id, usagePatch);
+        this.options.db.updateRun(run.id, finalUsage);
         this.options.db.pauseRunForConsultation(run.id);
         const pendingNames = [...new Set(this.options.db.listChildRuns(run.id).filter((childRun) => !["completed", "failed", "cancelled"].includes(childRun.status)).map((childRun) => childRun.botName))];
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "handoff", label: pendingNames.length ? `Waiting for ${pendingNames.join(" and ")}` : "Bringing the team's ideas together", detail: null });
         this.resumeCoordinatorIfReady(run.id);
       } else if (code === 0 && responseText.trim()) {
         const summary = responseText.trim();
-        this.options.db.updateRun(run.id, { ...usagePatch, status: "completed", finishedAt, summary, partialText: null, error: null });
+        this.options.db.updateRun(run.id, { ...finalUsage, status: "completed", finishedAt, summary, partialText: null, error: null });
         this.options.db.finishRunTask(run.id, "completed");
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
         if (!shouldPublishRunMessage(run)) {
@@ -420,7 +513,7 @@ export class OpenCodeRunner {
         }
       } else {
         const error = cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
-        this.options.db.updateRun(run.id, { ...usagePatch, status: "failed", finishedAt, error, partialText: responseText || null });
+        this.options.db.updateRun(run.id, { ...finalUsage, status: "failed", finishedAt, error, partialText: responseText || null });
         this.options.db.finishRunTask(run.id, "failed", error);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Couldn’t finish", detail: error });
         this.shareChildOutcome(run, bot, `I could not finish the private consultation: ${error}`, true);

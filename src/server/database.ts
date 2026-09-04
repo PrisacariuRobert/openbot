@@ -673,6 +673,8 @@ export class OpenBotDatabase {
     if (!hadRoutineInterval) this.db.exec("UPDATE routines SET interval_minutes=CASE cadence WHEN 'hourly' THEN 60 ELSE 1440 END");
     this.addColumn("provider_instances", "runtime TEXT NOT NULL DEFAULT 'opencode'");
     this.addColumn("provider_instances", "api_config_json TEXT");
+    this.addColumn("runs", "active_duration_ms INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("runs", "model_steps INTEGER NOT NULL DEFAULT 0");
     this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
@@ -1235,6 +1237,7 @@ export class OpenBotDatabase {
       summary: row.summary ? String(row.summary) : null, error: row.error ? String(row.error) : null,
       inputTokens: Number(row.input_tokens || 0), outputTokens: Number(row.output_tokens || 0), reasoningTokens: Number(row.reasoning_tokens || 0),
       cacheReadTokens: Number(row.cache_read_tokens || 0), cost: Number(row.cost || 0), activities, task,
+      activeDurationMs: Number(row.active_duration_ms || 0), modelSteps: Number(row.model_steps || 0),
     };
   }
 
@@ -1290,19 +1293,20 @@ export class OpenBotDatabase {
     const expired = this.db.prepare(this.runSelect("WHERE r.status='running' AND (r.lease_expires_at IS NULL OR r.lease_expires_at<=?) ORDER BY r.created_at ASC")).all(now()) as Row[];
     if (!expired.length) return [];
     const recoveredAt = now();
-    this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)").run(recoveredAt, recoveredAt, recoveredAt);
+    this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=? WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)").run(recoveredAt, recoveredAt, recoveredAt);
     return expired.map((row) => this.getRun(String(row.id))).filter((run): run is Run => Boolean(run));
   }
 
   requeueWorkerRuns(workerId: string): number {
     const recoveredAt = now();
-    return Number(this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND worker_id=?").run(recoveredAt, recoveredAt, workerId).changes);
+    return Number(this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=? WHERE status='running' AND worker_id=?").run(recoveredAt, recoveredAt, workerId).changes);
   }
 
   updateRun(id: string, patch: Partial<{
     status: RunStatus; approvalReason: string | null; approvalId: string | null; startedAt: string | null; finishedAt: string | null;
     progressAt: string | null; partialText: string | null; summary: string | null; error: string | null; sessionId: string | null;
     inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number; taskStage: TaskStage;
+    activeDurationMs: number; modelSteps: number;
   }>) {
     const current = this.db.prepare("SELECT * FROM runs WHERE id=?").get(id) as Row | undefined;
     if (!current) return;
@@ -1312,6 +1316,9 @@ export class OpenBotDatabase {
       value("finishedAt", "finished_at"), value("progressAt", "progress_at"), value("partialText", "partial_text"), value("summary", "summary"),
       value("error", "error"), value("sessionId", "session_id"), value("inputTokens", "input_tokens"), value("outputTokens", "output_tokens"),
       value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), id,
+    );
+    if (patch.activeDurationMs !== undefined || patch.modelSteps !== undefined) this.db.prepare("UPDATE runs SET active_duration_ms=?,model_steps=? WHERE id=?").run(
+      patch.activeDurationMs ?? current.active_duration_ms, patch.modelSteps ?? current.model_steps, id,
     );
     if (patch.status && patch.status !== "running") this.db.prepare("UPDATE runs SET worker_id=NULL,lease_expires_at=NULL WHERE id=?").run(id);
     if (patch.status === "running" || patch.status === "completed") this.db.prepare("UPDATE bots SET last_active_at=? WHERE id=?").run(now(), current.bot_id);

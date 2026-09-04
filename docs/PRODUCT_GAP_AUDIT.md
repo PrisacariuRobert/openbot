@@ -2,6 +2,8 @@
 
 Audit date: 4 September 2026. Baseline: 0.28.0, commit `88b8de9`. Remediation: **0.29.0 development branch**, not a published release.
 
+Follow-up, 5 September 2026: 0.30 adds bounded execution and live reported-usage checkpoints. It leaves the visual design unchanged. See [the functional validation record](QA_0.30.md). The broader workflow and security milestones below remain open.
+
 ## Verdict
 
 OpenBot is a substantial prototype with useful local-first foundations, not yet a dependable, general-purpose Grok Bot replacement. Its largest gap is **reliable completion with low setup effort**, not the number of buttons or mascots. Earlier documentation treated source presence, fixture tests, historical demos, and model-reported checks too interchangeably. Those are different levels of evidence.
@@ -29,7 +31,7 @@ Individual users describe useful recurring inbox/calendar summaries, invoice fil
 | P1 | Custom provider form had no endpoint, protocol or models. Unknown key presets exposed unrelated catalogue models. | “Bring your own provider” could be a saved secret with no usable route. | Typed endpoint/protocol/model configuration, loopback local models, connection-specific runtime config and model validation. Real OpenCode transport fixture included. Custom tool support still depends on the provider/model. |
 | P1 | API connections were “ready” just because a secret existed. Sign-in assumed OAuth method 0 and did not finish automatic callbacks. | False readiness and sign-in flows that could stay waiting. | Separate “saved, not tested” from a discovered sign-in; select an advertised OAuth method and complete auto callbacks. Real subscription consent remains account-dependent, not certified by mock tests. |
 | P1 | Provider API accepted arbitrary environment variable names. | A key form could inject process configuration rather than a model credential. | Restrict legacy names to reviewed API presets; custom keys use a fixed environment slot. |
-| P1 | `opencode.ts` replaced usage on each step instead of accumulating it. | Multi-tool jobs underreported usage and weakened budget visibility. | Sum steps, deduplicate identified events, handle Claude cumulative totals, reject invalid numeric usage. Budgets remain admission limits, not exact hard spend caps. |
+| P1 | `opencode.ts` replaced usage on each step instead of accumulating it. | Multi-tool jobs underreported usage and weakened budget visibility. | Sum steps, deduplicate identified events, handle Claude cumulative totals, reject invalid numbers. 0.30 checkpoints and enforces reported usage while running; reporting delays still prevent an exact hard billing cap. |
 | P1 | Every generated tool schema was exposed, including disconnected apps and disabled browser/computer access. | Simple jobs carried irrelevant tool context and offered unavailable actions. | Build capability-aware tool availability for both runtimes. Backend grant checks remain authoritative; context filtering is not a new security boundary. |
 | P1 | Background PATH missed standard user-installed CLIs; every settings poll launched repeated probes. | “App missing” despite installation; unnecessary latency and processes. | Discover common install directories, coalesce/cache probes, bound discovery output/time and invalidate after changed connections/login state. |
 | P1 | `task_verify` accepts model-supplied checks; UI labelled them “Finished and checked.” | A confident model could look like an independent verifier. | Label the receipt “Checks reported by teammate.” Next: evidence-backed file, test and external-action oracles. A second model review is not an independent deterministic test. |
@@ -44,7 +46,7 @@ Individual users describe useful recurring inbox/calendar summaries, invoice fil
 - Bot Docker terminals retain outbound network access. Command-word detection cannot reliably classify arbitrary programs. Do not promise that every possible external write is intercepted.
 - Browser URL validation is lexical, not a full DNS-resolution/redirect/subresource egress policy. Loopback is intentionally permitted. Private-network isolation needs dedicated enforcement and adversarial tests.
 - Browser approval fingerprints detect changed URL/control metadata, not arbitrary changes in nearby form data or all page scripts. Old approvals without a fingerprint now require renewed inspection.
-- Model loops need stronger wall-clock, idle, step and in-flight spending controls. Process recovery is not equivalent to exactly-once external effects; an action accepted remotely just before a crash needs reconciliation, not blind replay.
+- 0.30 adds active-time, idle, step, output and reported-token enforcement. Usage is checkpointed while running. Unreported in-flight usage can overshoot; individual child runs do not share a whole-job cap. Process recovery is not equivalent to exactly-once external effects; an action accepted remotely just before a crash needs reconciliation, not blind replay.
 - Coding checks use a constrained Linux toolchain. A simple JavaScript fixture does not establish support for arbitrary native dependencies, Python toolchains, mobile builds or large repositories.
 
 These are blockers to advertising unattended, unrestricted computer autonomy. Expanding permissions would hide the gap, not close it.

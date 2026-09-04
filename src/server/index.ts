@@ -186,8 +186,7 @@ if (deployment.mode === "private_runner") externalHeartbeat.start();
 function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
   if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return false;
-  if (!db.cancelRun(run.id)) return false;
-  if (run.status === "running") runner.cancel(run.id);
+  if (!runner.cancelTask(run.id)) return false;
   db.addActivity({ runId: run.id, botId: run.botId, kind: "status", label, detail: null });
   return true;
 }
@@ -2069,7 +2068,7 @@ async function shutdown() {
   runnerCareMonitor.stop();
   externalHeartbeat.stop();
   notifications.stop();
-  runner.stop();
+  await runner.stop();
   providerConnections.stop();
   await browser.close();
   server.close(() => { db.close(); process.exit(0); });

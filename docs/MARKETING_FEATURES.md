@@ -1,7 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
-Last verified: September 4, 2026
-Release: 0.29.0 development beta — not yet published
+Last verified: September 5, 2026
+Release: 0.30.0 development beta — not yet published
+
+New in this pass: execution deadlines, idle/step/output limits, provider-reported in-flight token checks, saved usage across resumes, and stop controls covering nested consultations. These reduce runaway execution; they are not guaranteed monetary caps, exactly-once effects, or a full process/network sandbox. See [validation and remaining limits](QA_0.30.md). No new end-to-end live-model productivity claim is made in this pass.
 
 Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 
@@ -124,7 +126,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - OpenCode and Claude Code runtime discovery in background-service environments; cached/coalesced status probes
 - Different teammates can use different connections and models
 - Provider-reported input, output, reasoning, cache, and cost accounting when available
-- Per-teammate weekly token admission budgets; not guaranteed hard in-flight spend caps
+- Per-teammate weekly and per-run reported-token enforcement, with persisted usage; provider reporting delays mean these are not guaranteed hard billing caps
 - No pooled or resold model access
 
 ### Private computers and web work

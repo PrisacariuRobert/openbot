@@ -198,6 +198,8 @@ export interface Run {
   cacheReadTokens: number;
   cost: number;
   activities: Activity[];
+  activeDurationMs: number;
+  modelSteps: number;
   task: TaskContract;
 }
 

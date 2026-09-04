@@ -1,10 +1,25 @@
-# OpenBot 0.29.0
+# OpenBot 0.30.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.29.0
+## What's new in 0.30.0
+
+This development beta focuses on finishing or stopping work predictably, without changing the visual design. It does not establish Grok Bot parity or unattended-production readiness.
+
+- Stop now cancels the whole consultation tree, including queued subtasks and their pending approvals.
+- Model runs have active-time, idle, step, reported-token and output limits. Unresponsive local model processes receive a stop request followed by forced termination if necessary.
+- Provider-reported usage is saved during a run, not only when it ends. Resumes carry forward recorded tokens, steps and active time without double counting.
+- Shutdown waits for model-process termination before making unfinished jobs available to another runner. Recorded progress, files and pending decisions are retained.
+- Runtime diagnostic text is no longer treated as a successful model answer.
+- New deterministic tests launch real local processes that hang, ignore stops or exceed limits. These tests use no model account or allowance.
+
+Default limits: **30 active minutes, 5 idle minutes, 64 model steps, 100,000 reported tokens per run**, plus a 4 MiB output ceiling per model invocation. Approval/consultation waiting time outside a running model process is not counted. Host administrators can set `OPENBOT_RUN_MAX_MINUTES`, `OPENBOT_RUN_IDLE_MINUTES`, `OPENBOT_RUN_MAX_STEPS` and `OPENBOT_RUN_MAX_TOKENS` before starting OpenBot; invalid values fail startup. A teammate's smaller weekly allowance also applies.
+
+These are execution safeguards, **not exact provider billing caps**: in-flight requests can exceed a threshold before usage is reported; a hard crash can lose unreported usage; stopping cannot undo an external action already accepted. Each teammate's child task has its own per-run allowance, not a shared whole-job spending cap. See [execution validation and limits](docs/QA_0.30.md).
+
+### Previously in 0.29.0
 
 This development version focuses on trustworthy foundations, not a larger feature checklist. OpenBot remains an **owner-operated beta**, not yet a drop-in Grok Bot replacement. See the [product audit and delivery plan](docs/PRODUCT_GAP_AUDIT.md) and [validation record](docs/QA_0.29.md).
 
