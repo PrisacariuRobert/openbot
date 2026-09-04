@@ -6594,7 +6594,6 @@ select:focus-visible {
       transparent 35%
     ),
     linear-gradient(135deg, #292637, #5749b3 66%, #7362d9);
-  box-shadow: 0 18px 45px rgba(57, 44, 118, 0.17);
 }
 .connector-hero-copy {
   position: relative;
