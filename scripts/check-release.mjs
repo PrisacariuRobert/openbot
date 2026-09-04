@@ -23,6 +23,7 @@ const privateRunnerDockerfile = readFileSync(new URL("../deploy/private-runner/D
 const privateRunnerCompose = readFileSync(new URL("../deploy/private-runner/docker-compose.yml", import.meta.url), "utf8");
 const privateRunnerCaddy = readFileSync(new URL("../deploy/private-runner/Caddyfile", import.meta.url), "utf8");
 const privateRunnerGuide = readFileSync(new URL("../deploy/private-runner/README.md", import.meta.url), "utf8");
+const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
 const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
 const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
 const version = packageJson.version;
@@ -108,6 +109,9 @@ if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy",
 }
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
   failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
+}
+if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz")) {
+  failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
 }
 if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {
   failures.push("The private-runner HTTPS and ownership guidance is incomplete.");

@@ -30,6 +30,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.4",
+    "tsx": "^4.23.13",
     "web-push": "^3.6.7",
     "zod": "^4.5.4"
   },
@@ -41,7 +42,6 @@
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
-    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
   }

@@ -21,3 +21,29 @@ jobs:
         run: docker compose --env-file deploy/private-runner/.env.example -f deploy/private-runner/docker-compose.yml config --quiet
       - name: Build private runner image
         run: docker build --file deploy/private-runner/Dockerfile --tag openbot-private-runner:verify .
+      - name: Smoke test private runner image
+        run: |
+          docker run --detach --name openbot-private-runner-smoke \
+            --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --publish 127.0.0.1:4311:4311 \
+            --env OPENBOT_DEPLOYMENT_MODE=private_runner \
+            --env OPENBOT_APP_URL=https://studio.example.com/ \
+            --env OPENBOT_DATA_DIR=/srv/openbot/data \
+            --env OPENBOT_HOST=0.0.0.0 \
+            openbot-private-runner:verify
+          cleanup() {
+            docker logs openbot-private-runner-smoke
+            docker rm --force openbot-private-runner-smoke >/dev/null
+          }
+          trap cleanup EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4311/api/healthz; then
+              docker exec openbot-private-runner-smoke opencode --version
+              docker exec openbot-private-runner-smoke chromium --version
+              docker exec openbot-private-runner-smoke docker info --format '{{.ServerVersion}}'
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
