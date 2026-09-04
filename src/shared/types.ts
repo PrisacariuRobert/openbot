@@ -379,6 +379,12 @@ export interface RunnerCareStatus extends RunnerCareSnapshot {
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
 export type ProviderRuntime = "opencode" | "claude_code";
 
+export interface ApiConnectionConfig {
+  baseUrl: string;
+  protocol: "openai-compatible" | "openai" | "anthropic";
+  modelIds: string[];
+}
+
 export interface ProviderInstance {
   id: string;
   ownerId: string;
@@ -388,6 +394,7 @@ export interface ProviderInstance {
   runtime: ProviderRuntime;
   envName: string | null;
   hasSecret: boolean;
+  apiConfig?: ApiConnectionConfig | null;
   createdAt: string;
   updatedAt: string;
   connected?: boolean;

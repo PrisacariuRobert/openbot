@@ -6,6 +6,8 @@ import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
 import { connectedAppsText, prepareWorkspace } from "./workspace.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
+import { modelBelongsToConnection } from "../shared/provider-config.js";
+import { toolAvailability } from "./tool-availability.js";
 
 const CLAUDE_MCP_PATH = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
 
@@ -86,6 +88,38 @@ export function toolActivity(event: Record<string, unknown>): ToolActivity | nul
 
 export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number };
 
+const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0 });
+const usageNumber = (value: unknown): number => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+
+// OpenCode reports completed steps; Claude reports messages followed by one
+// cumulative result. Replacing the total on every step undercounts tool loops.
+export class UsageAccumulator {
+  private readonly entries = new Map<string, Usage>();
+  private result: Usage | null = null;
+  private anonymous = 0;
+
+  add(event: Record<string, unknown>): Usage {
+    const usage = eventUsage(event);
+    if (!usage) return this.total();
+    const part = event.part as Record<string, unknown> | undefined;
+    const message = event.message as Record<string, unknown> | undefined;
+    if (event.type === "result") this.result = usage;
+    else {
+      const id = part?.id ?? message?.id;
+      const key = typeof id === "string" ? `${event.type}:${id}` : `anonymous:${this.anonymous++}`;
+      this.entries.set(key, usage);
+    }
+    return this.total();
+  }
+
+  total(): Usage {
+    if (this.result) return { ...this.result };
+    const total = zeroUsage();
+    for (const usage of this.entries.values()) for (const key of Object.keys(total) as (keyof Usage)[]) total[key] += usage[key];
+    return total;
+  }
+}
+
 export function shouldPublishRunMessage(run: Pick<Run, "parentRunId">): boolean {
   return run.parentRunId === null;
 }
@@ -97,8 +131,8 @@ export function eventUsage(event: Record<string, unknown>): Usage | null {
   if (!tokens) return null;
   const cache = tokens.cache as Record<string, unknown> | undefined;
   return {
-    inputTokens: Number(tokens.input || tokens.input_tokens || 0), outputTokens: Number(tokens.output || tokens.output_tokens || 0), reasoningTokens: Number(tokens.reasoning || 0),
-    cacheReadTokens: Number(cache?.read || tokens.cacheRead || tokens.cache_read_input_tokens || 0), cost: Number(event.cost || event.total_cost_usd || part?.cost || 0),
+    inputTokens: usageNumber(tokens.input ?? tokens.input_tokens), outputTokens: usageNumber(tokens.output ?? tokens.output_tokens), reasoningTokens: usageNumber(tokens.reasoning),
+    cacheReadTokens: usageNumber(cache?.read ?? tokens.cacheRead ?? tokens.cache_read_input_tokens), cost: usageNumber(event.cost ?? event.total_cost_usd ?? part?.cost),
   };
 }
 
@@ -218,6 +252,15 @@ export class OpenCodeRunner {
     this.resumeCoordinatorIfReady(parent.id);
   }
 
+  private failBeforeStart(run: Run, error: string, label = "Couldn’t start") {
+    this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error });
+    this.options.db.finishRunTask(run.id, "failed", error);
+    this.options.db.addActivity({ runId: run.id, botId: run.botId, kind: "error", label, detail: error });
+    const bot = this.options.db.getBot(run.botId);
+    if (bot) this.shareChildOutcome(run, bot, `I could not start the private consultation: ${error}`, true);
+    this.options.onChange();
+  }
+
   private async tick() {
     if (this.ticking || !this.leader || this.stopping) return;
     this.ticking = true;
@@ -231,14 +274,12 @@ export class OpenCodeRunner {
         const budget = this.options.db.budgetAvailable(run.botId);
         if (!budget.allowed) {
           const error = `Weekly token limit reached (${budget.used.toLocaleString()} of ${budget.budget.toLocaleString()}). Raise the limit in this teammate's settings.`;
-          this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error });
-          this.options.db.finishRunTask(run.id, "failed", error);
-          this.options.db.addActivity({ runId: run.id, botId: run.botId, kind: "error", label: "Paused by budget", detail: error });
-          this.options.onChange();
+          this.failBeforeStart(run, error, "Paused by budget");
           continue;
         }
         this.options.db.recordRunnerDispatch(this.instanceId);
-        this.executeRun(run);
+        try { this.executeRun(run); }
+        catch (error) { this.failBeforeStart(run, cleanError(error instanceof Error ? error.message : String(error))); }
       }
     } catch (error) {
       this.options.db.recordRunnerError(this.instanceId, error instanceof Error ? error.message : String(error));
@@ -269,8 +310,12 @@ export class OpenCodeRunner {
   private executeRun(run: Run) {
     const bot = this.options.db.getBot(run.botId);
     if (!bot) return;
-    const workspace = prepareWorkspace(this.options.db, bot);
     const provider = this.options.db.providerForBot(bot.id);
+    if (!provider || !modelBelongsToConnection(bot.model, provider)) {
+      this.failBeforeStart(run, "This model is not configured for your teammate’s connection. Choose a model in AI connections.");
+      return;
+    }
+    const workspace = prepareWorkspace(this.options.db, bot);
     const useClaude = provider?.runtime === "claude_code";
     const capabilityFingerprint = this.options.db.botSessionFingerprint(bot.id);
     const previousSession = this.options.db.previousSession(run.threadId, bot.id, capabilityFingerprint);
@@ -282,6 +327,7 @@ export class OpenCodeRunner {
     const extraEnvironment = {
       ...this.options.db.providerEnvironment(bot.id), OPENBOT_INTERNAL_URL: this.options.internalUrl,
       OPENBOT_INTERNAL_TOKEN: this.options.internalToken, OPENBOT_BOT_ID: bot.id, OPENBOT_RUN_ID: run.id, OPENBOT_WORKSPACE: workspace,
+      OPENBOT_TOOL_AVAILABILITY: JSON.stringify(toolAvailability(this.options.db, bot)),
     };
     const prompt = this.buildPrompt(run, bot, Boolean(previousSession));
     const attachedFiles = modelAttachmentFiles(this.options.db, run);
@@ -293,7 +339,8 @@ export class OpenCodeRunner {
     const child = spawn(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"] });
     this.running.set(run.id, child);
     let stdoutBuffer = "", stderr = "", responseText = "", sessionId: string | null = previousSession, lastTool = "";
-    let usage: Usage = { inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0 };
+    const usageAccumulator = new UsageAccumulator();
+    let usage: Usage = zeroUsage();
 
     const consumeLine = (line: string) => {
       if (!line.trim()) return;
@@ -306,8 +353,7 @@ export class OpenCodeRunner {
           this.options.db.updateRun(run.id, { partialText: responseText, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
           this.options.onChange();
         }
-        const nextUsage = eventUsage(event);
-        if (nextUsage) usage = nextUsage;
+        usage = usageAccumulator.add(event);
         const tool = toolActivity(event);
         if (tool && tool.label !== lastTool) {
           lastTool = tool.label;

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import type { BrowserTarget } from "./safety.js";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
@@ -43,15 +45,19 @@ function run(command: string, args: string[], timeoutMs = 30_000, extraEnvironme
   });
 }
 
-export function safeHostEnvironment(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+export function safeHostEnvironment(extra: Record<string, string> = {}, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const allowed = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM", "SHELL", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "SSH_AUTH_SOCK"];
-  const env: NodeJS.ProcessEnv = { NO_COLOR: "1", ...extra };
-  for (const key of allowed) if (process.env[key]) env[key] = process.env[key];
-  const dockerHelpers = "/Applications/Docker.app/Contents/Resources/bin";
-  if (existsSync(dockerHelpers) && !String(env.PATH || "").split(path.delimiter).includes(dockerHelpers)) {
-    env.PATH = `${env.PATH || "/usr/bin:/bin"}${path.delimiter}${dockerHelpers}`;
-  }
-  return env;
+  const env: NodeJS.ProcessEnv = { NO_COLOR: "1" };
+  for (const key of allowed) if (source[key]) env[key] = source[key];
+  // GUI/background services do not inherit a login shell's PATH. Discover
+  // standard user installs without running a shell or reading shell profiles.
+  const paths = (env.PATH || "/usr/bin:/bin").split(path.delimiter).filter(Boolean);
+  const candidates = [
+    ...(env.HOME ? [path.join(env.HOME, ".opencode/bin"), path.join(env.HOME, ".local/bin")] : []),
+    "/opt/homebrew/bin", "/usr/local/bin", "/Applications/Docker.app/Contents/Resources/bin",
+  ];
+  env.PATH = [...new Set([...paths, ...candidates.filter((entry) => existsSync(entry))])].join(path.delimiter);
+  return { ...env, ...extra };
 }
 
 export class ComputerManager {
@@ -304,14 +310,41 @@ export class BrowserManager {
     return { url: page.url(), title: await page.title(), text: text.slice(0, 30_000) };
   }
 
-  async click(botId: string, selector: string) {
+  async describeTarget(botId: string, selector: string): Promise<BrowserTarget & { fingerprint: string }> {
     const page = await this.page(botId);
+    const details = await page.locator(selector).first().evaluate((element) => {
+      const node = element.closest("button,a,input,textarea,select,[role=button],[role=link]") || element;
+      const input = node as HTMLInputElement;
+      const form = input.form || node.closest("form");
+      return {
+        tag: node.tagName.toLowerCase(), role: node.getAttribute("role") || "",
+        label: (node.getAttribute("aria-label") || [...(input.labels || [])].map((label) => label.textContent || "").join(" ") || node.textContent || node.getAttribute("name") || "").trim().slice(0, 240),
+        inputType: node instanceof HTMLInputElement || node instanceof HTMLButtonElement ? node.type : "",
+        autocomplete: node.getAttribute("autocomplete") || "", href: node instanceof HTMLAnchorElement ? node.href : "",
+        formMethod: form?.method.toLowerCase() || "",
+        searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
+      };
+    }, undefined, { timeout: 12_000 });
+    const target = { url: page.url(), ...details };
+    return { ...target, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
+  }
+
+  private async assertTarget(botId: string, selector: string, fingerprint?: string) {
+    if (fingerprint && (await this.describeTarget(botId, selector)).fingerprint !== fingerprint) {
+      throw new Error("The page or control changed after review. Inspect it again and request a new approval.");
+    }
+  }
+
+  async click(botId: string, selector: string, fingerprint?: string) {
+    const page = await this.page(botId);
+    await this.assertTarget(botId, selector, fingerprint);
     await page.locator(selector).first().click({ timeout: 12_000 });
     return { url: page.url(), title: await page.title() };
   }
 
-  async type(botId: string, selector: string, value: string) {
+  async type(botId: string, selector: string, value: string, fingerprint?: string) {
     const page = await this.page(botId);
+    await this.assertTarget(botId, selector, fingerprint);
     const locator = page.locator(selector).first();
     await locator.fill(value, { timeout: 12_000 });
     return { url: page.url(), title: await page.title() };

@@ -1,7 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 4, 2026
-Release: 0.28.0 owner-controlled beta
+Release: 0.29.0 development beta — not yet published
+
+Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -17,7 +19,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 1. **Bring your own AI.** Assign a different supported model connection to every teammate instead of buying model access from OpenBot.
 2. **Review-first coding without a broad host shell.** Clone or share one project, let multiple teammates work safely in parallel, inspect every diff, restore an unchanged agent edit, and publish only after checks and an independent teammate review pass.
-3. **Finished means checked.** Real jobs have a durable outcome, deliverable, checklist, approval boundary, and verification receipt.
+3. **Show the work behind the answer.** Real jobs retain their outcome, deliverable, checklist and teammate-reported checks. These are not independent verification unless a workflow-specific oracle also checked the result.
 4. **A team that speaks with one voice.** Teammates consult privately, every signal stays inspectable, and one coordinator combines the result instead of making the user reconcile duplicate replies. Conversations remain limited to three hops and eight related runs.
 5. **You choose where it lives.** Keep conversations, permissions, routines, encrypted connector credentials, and audit trails on the Mac, or move the whole studio deliberately to your own always-on host.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
@@ -71,14 +73,14 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - New user instructions queue safely while a teammate is working
 - Natural follow-ups redirect active non-code work while preserving one visible continuation; coding work queues safely on its task branch
 
-### Verifiable completion
+### Inspectable completion
 
 - Durable job outcome and reviewable deliverable for substantial requests
 - Three-to-eight meaningful work steps with live progress
 - Explicit connected-app and approval requirements
 - Persistent state across restarts and approval pauses
 - Final passed, partial, or blocked verification with concrete checks
-- Compact “Finished and checked” receipt with expandable evidence
+- Compact “Checks reported by teammate” receipt with expandable steps; no independent-certification claim
 - Honest downgrade when a verification check fails
 - Lightweight ordinary conversation without unnecessary project-management UI
 
@@ -117,10 +119,12 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - OpenCode account support, including free and Go models available through the user's OpenCode setup
 - Official Claude Code runtime and login path for supported Claude accounts
 - ChatGPT/OpenAI, GitHub Copilot, GitLab Duo, and SuperGrok/xAI connection paths through supported OpenCode provider flows
-- Optional encrypted API-key connections with provider-specific model discovery
+- Encrypted API-key connections; custom API address, protocol and exact model IDs for compatible servers, plus key-optional loopback local models
+- Explicit saved-not-tested state; configuring a model is not proof of availability or tool-use quality
+- OpenCode and Claude Code runtime discovery in background-service environments; cached/coalesced status probes
 - Different teammates can use different connections and models
 - Provider-reported input, output, reasoning, cache, and cost accounting when available
-- Per-teammate weekly token budgets
+- Per-teammate weekly token admission budgets; not guaranteed hard in-flight spend caps
 - No pooled or resold model access
 
 ### Private computers and web work
@@ -129,7 +133,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Separate persistent Chrome profile for every teammate
 - Terminal, page navigation, readable page snapshots, clicks, field entry, and screenshots
 - No silent fallback from an unavailable container to the host shell
-- Web navigation blocks unsafe schemes, credential-bearing URLs, cloud metadata endpoints, and private LAN targets other than local test pages
+- Initial browser URL checks reject certain unsafe addresses; complete DNS/redirect/subresource network enforcement remains unfinished
+- Browser action review uses observed controls, not only CSS selector names; changed page/control approvals require a fresh review
 - Live computer and browser preview in the teammate panel
 - Visible teach mode that records a demonstrated browser workflow
 - Generated browser skills are readable and editable rather than opaque macros
@@ -265,6 +270,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Local activity, usage, connector, teammate-message, task-verification, and code-edit records
 - Reduced-motion support and responsive overflow protection
 - MIT-licensed source code
+- Verbatim historical assistant messages; no presentation-layer substitutions that turn failures into promises
 
 ## Setup-dependent claims
 
@@ -333,6 +339,8 @@ Do not say OpenBot currently:
 - handles Gmail attachments, labels, or rich HTML sending;
 - edits Office documents or spreadsheets with layout fidelity;
 - guarantees that model-driven automation is risk-free;
+- independently verifies every result, supports every model/subscription, or guarantees runtime-level credential isolation;
+- has proven higher success rates or lower cost than Grok Bot in controlled head-to-head trials;
 - includes or resells Claude, ChatGPT, Copilot, SuperGrok, or other paid subscriptions.
 
 ## Roadmap, not launch copy

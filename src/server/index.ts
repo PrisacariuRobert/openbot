@@ -10,6 +10,7 @@ import { OpenBotDatabase } from "./database.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
+import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
 import { BrowserManager, ComputerManager } from "./runtime.js";
 import { buildRawEmail, connectorCatalog, GoogleWorkspaceConnector } from "./google-workspace.js";
 import { friendlyGoogleError, googleApiRecovery, googleCallbackPage, googleCloudProjectFromClientId, googleReturnUrl } from "./google-callback.js";
@@ -41,7 +42,7 @@ import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, ve
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-if (existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
+if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const deployment = readDeploymentConfig(process.env, { port, production: process.env.NODE_ENV === "production" });
 const db = new OpenBotDatabase(rootDir);
@@ -1057,12 +1058,14 @@ async function performApprovedAction(action: unknown): Promise<string> {
   }
   if (parsed.data.type === "browser_click") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
-    const result = await browser.click(parsed.data.botId, String(args.selector || ""));
+    if (typeof args.targetFingerprint !== "string") throw new Error("This browser approval needs a fresh page inspection. Ask the teammate to try again.");
+    const result = await browser.click(parsed.data.botId, String(args.selector || ""), args.targetFingerprint);
     return `The approved click completed on ${result.title} (${result.url}).`;
   }
   if (parsed.data.type === "browser_type") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
-    const result = await browser.type(parsed.data.botId, String(args.selector || ""), String(args.value || ""));
+    if (typeof args.targetFingerprint !== "string") throw new Error("This browser approval needs a fresh page inspection. Ask the teammate to try again.");
+    const result = await browser.type(parsed.data.botId, String(args.selector || ""), String(args.value || ""), args.targetFingerprint);
     return `The approved field entry completed on ${result.title} (${result.url}).`;
   }
   if (parsed.data.type === "gmail_send") {
@@ -1216,16 +1219,6 @@ app.post("/api/bots/:id/duplicate", (request, response) => {
   response.status(201).json(bot);
 });
 
-function modelBelongsToConnection(model: string, provider: ProviderInstance): boolean {
-  if (provider.runtime === "claude_code") return model.startsWith("claude-code/");
-  if (provider.provider === "custom") return !model.startsWith("claude-code/");
-  const prefix: Record<Exclude<ProviderInstance["provider"], "custom">, string[]> = {
-    opencode: ["opencode/", "opencode-go/"], claude: ["anthropic/"], openai: ["openai/"],
-    "github-copilot": ["github-copilot/"], gitlab: ["gitlab/"], xai: ["xai/"],
-  };
-  return prefix[provider.provider].some((value) => model.startsWith(value));
-}
-
 app.patch("/api/bots/:id", (request, response) => {
   const parsed = botInput.partial().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Those bot settings are not valid." });
@@ -1241,13 +1234,18 @@ app.patch("/api/bots/:id", (request, response) => {
   response.json(bot);
 });
 
-const providerInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), provider: z.enum(["opencode", "claude", "openai", "github-copilot", "gitlab", "xai", "custom"]).optional(), authMode: z.enum(["cli", "subscription", "api_key"]), runtime: z.enum(["opencode", "claude_code"]).optional(), envName: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/).nullable().optional(), secret: z.string().max(10_000).nullable().optional() });
 app.post("/api/providers", (request, response) => {
   const parsed = providerInput.safeParse(request.body);
-  if (!parsed.success || (parsed.data.authMode === "api_key" && !parsed.data.envName)) return response.status(400).json({ error: "API key connections need a valid environment variable name." });
-  const provider = db.upsertProvider(parsed.data);
-  broadcast();
-  response.status(201).json(provider);
+  if (!parsed.success) return response.status(400).json({ error: parsed.error.issues[0]?.message || "Check your connection details." });
+  if (parsed.data.authMode !== "api_key" || parsed.data.id?.startsWith("local-")) return response.status(400).json({ error: "Use the sign-in action to manage a subscription connection." });
+  if (parsed.data.id && !db.getProvider(parsed.data.id)) return response.status(404).json({ error: "That connection no longer exists. Add a new one instead." });
+  try {
+    const provider = db.upsertProvider(parsed.data);
+    broadcast();
+    response.status(201).json(provider);
+  } catch {
+    response.status(400).json({ error: "Could not save this connection. Check the API address, model IDs and key." });
+  }
 });
 
 const triggerConfigInput = z.object({
@@ -1658,14 +1656,16 @@ app.post("/api/internal/tools", async (request, response) => {
     if (action === "browser_open") return response.json(await browser.open(botId, String(args.url || "")));
     if (action === "browser_snapshot") return response.json(await browser.snapshot(botId));
     if (action === "browser_click") {
-      const selector = String(args.selector || ""), reason = browserApprovalReason("click", selector);
-      if (reason) return holdForApproval("browser", reason, `Click ${selector}`);
-      return response.json(await browser.click(botId, selector));
+      const selector = String(args.selector || ""), target = await browser.describeTarget(botId, selector);
+      const reason = browserApprovalReason("click", selector, target);
+      if (reason) return holdForApproval("browser", reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint });
+      return response.json(await browser.click(botId, selector, target.fingerprint));
     }
     if (action === "browser_type") {
-      const selector = String(args.selector || ""), value = String(args.value || ""), reason = browserApprovalReason("type", `${selector} ${value}`);
-      if (reason) return holdForApproval("browser", reason, `Enter information in ${selector}`);
-      return response.json(await browser.type(botId, selector, value));
+      const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
+      const reason = browserApprovalReason("type", `${selector} ${value}`, target);
+      if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint });
+      return response.json(await browser.type(botId, selector, value, target.fingerprint));
     }
     if (action.startsWith("mac_")) {
       if (!db.getStudioSettings().macAccessEnabled) return response.status(403).json({ error: "Mac files and apps are turned off for the studio. The user can turn them on in Control center." });

@@ -126,6 +126,7 @@ import { mentionedBotIds, mentionSlug } from "./shared/routing";
 import { presentBotMessage, signalKindLabels } from "./shared/presentation";
 import { routineScheduleLabel, routineStartsInLabel } from "./shared/routines";
 import { ProviderIcon } from "./ProviderIcon";
+import { useModalFocus } from "./components/useModalFocus";
 import { ConnectorIcon } from "./ConnectorIcon";
 
 const MarkdownMessage = lazy(() =>
@@ -133,6 +134,8 @@ const MarkdownMessage = lazy(() =>
     default: module.MarkdownMessage,
   })),
 );
+
+const ProviderPanel = lazy(() => import("./components/ProviderPanel").then((module) => ({ default: module.ProviderPanel })));
 
 type Panel =
   | "provider"
@@ -237,6 +240,8 @@ function compactDuration(seconds: number) {
   return `${Math.floor(hours / 24)} days`;
 }
 function shortModel(model: string) {
+  // Custom model IDs are user-entered labels, not generated connection names.
+  if (/^openbot-[^/]+\//.test(model)) return model.slice(model.indexOf("/") + 1);
   return model
     .replace(
       /^(opencode|opencode-go|claude-code|openai|github-copilot|gitlab|xai)\//,
@@ -969,7 +974,7 @@ function ResultReceipt({ run }: { run: Run }) {
         <span>{passed ? <ShieldCheck size={13} /> : <Check size={13} />}</span>
         <strong>
           {passed
-            ? "Finished and checked"
+            ? "Checks reported by teammate"
             : partial
               ? "Finished with a note"
               : "Result delivered"}
@@ -1852,17 +1857,21 @@ function Sheet({
   onClose: () => void;
   wide?: boolean;
 }) {
+  const { layer, dialog } = useModalFocus(onClose);
+  const titleId = useId();
   return (
-    <div className="sheet-layer">
+    <div className="sheet-layer" ref={layer}>
       <button
         className="sheet-scrim"
         onClick={onClose}
         aria-label="Close panel"
+        tabIndex={-1}
+        aria-hidden="true"
       />
-      <aside className={`sheet ${wide ? "sheet-wide" : ""}`}>
+      <aside className={`sheet ${wide ? "sheet-wide" : ""}`} ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <div className="sheet-header">
           <div>
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
           <button
@@ -5778,343 +5787,6 @@ function RemotePanel({
   );
 }
 
-function ProviderPanel({
-  provider,
-  bots,
-  onUpdateBot,
-  onAdd,
-  onConnect,
-  onFinish,
-}: {
-  provider: ProviderStatus | null;
-  bots: Bot[];
-  onUpdateBot: (id: string, patch: Partial<Bot>) => Promise<void>;
-  onAdd: (input: {
-    name: string;
-    provider: ProviderKind;
-    authMode: "api_key";
-    runtime: "opencode";
-    envName: string;
-    secret: string;
-  }) => Promise<void>;
-  onConnect: (
-    providerId: ProviderCatalogEntry["id"],
-  ) => Promise<ProviderLoginAttempt>;
-  onFinish: (attemptId: string, code: string) => Promise<void>;
-}) {
-  const [adding, setAdding] = useState(false),
-    [name, setName] = useState("My OpenAI API"),
-    [envName, setEnvName] = useState("OPENAI_API_KEY"),
-    [secret, setSecret] = useState(""),
-    [apiProvider, setApiProvider] = useState<ProviderKind>("openai"),
-    [apiPreset, setApiPreset] = useState("openai"),
-    [activeAttempt, setActiveAttempt] = useState<ProviderLoginAttempt | null>(
-      null,
-    ),
-    [code, setCode] = useState(""),
-    [busyProvider, setBusyProvider] = useState<string | null>(null);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    await onAdd({
-      name,
-      provider: apiProvider,
-      authMode: "api_key",
-      runtime: "opencode",
-      envName,
-      secret,
-    });
-    setSecret("");
-    setAdding(false);
-  };
-  const connect = async (entry: ProviderCatalogEntry) => {
-    setBusyProvider(entry.id);
-    try {
-      const attempt = await onConnect(entry.id);
-      setActiveAttempt(attempt);
-      if (attempt.url)
-        window.open(attempt.url, "_blank", "noopener,noreferrer");
-    } finally {
-      setBusyProvider(null);
-    }
-  };
-  const chooseApi = (value: string) => {
-    setApiPreset(value);
-    setApiProvider(
-      value === "openai" ? "openai" : value === "claude" ? "claude" : "custom",
-    );
-    if (value === "openai") {
-      setName("My OpenAI API");
-      setEnvName("OPENAI_API_KEY");
-    } else if (value === "claude") {
-      setName("My Anthropic API");
-      setEnvName("ANTHROPIC_API_KEY");
-    } else if (value === "openrouter") {
-      setName("My OpenRouter API");
-      setEnvName("OPENROUTER_API_KEY");
-    } else {
-      setName("My provider");
-      setEnvName("PROVIDER_API_KEY");
-    }
-  };
-  return (
-    <div className="settings-stack">
-      <div className="connection-hero">
-        <span>
-          <Sparkles size={15} /> Bring your own AI
-        </span>
-        <h3>One studio, the accounts you already trust.</h3>
-        <p>
-          Subscriptions sign in with their official tools. API keys stay
-          encrypted on this Mac.
-        </p>
-      </div>
-      <section>
-        <div className="setting-section-title">
-          <h3>Subscriptions and accounts</h3>
-          <p>Pick any mix. Every teammate can use a different connection.</p>
-        </div>
-        <div className="provider-catalog">
-          {provider?.catalog.map((entry) => (
-            <article
-              key={entry.id}
-              className={`provider-choice provider-choice-${entry.id} ${entry.connected ? "is-connected" : ""}`}
-            >
-              <div className="provider-choice-top">
-                <span className="provider-logo">
-                  <ProviderIcon id={entry.id} />
-                </span>
-                <div>
-                  <h4>{entry.name}</h4>
-                  <small>{entry.badge}</small>
-                </div>
-                <span
-                  className={`connection-state ${entry.connected ? "connected" : ""}`}
-                >
-                  <i />
-                  {entry.connected
-                    ? "Ready"
-                    : entry.installed
-                      ? "Available"
-                      : "Needs app"}
-                </span>
-              </div>
-              <p>{entry.description}</p>
-              <footer>
-                <small>{entry.note}</small>
-                {entry.connected ? (
-                  <Check size={16} />
-                ) : entry.canConnect ? (
-                  <button
-                    onClick={() => void connect(entry)}
-                    disabled={busyProvider === entry.id}
-                  >
-                    {busyProvider === entry.id ? (
-                      <LoaderCircle className="spinner" size={14} />
-                    ) : (
-                      "Connect"
-                    )}
-                  </button>
-                ) : null}
-              </footer>
-            </article>
-          ))}
-        </div>
-      </section>
-      {activeAttempt?.status === "waiting" &&
-        !provider?.catalog.find(
-          (entry) => entry.id === activeAttempt.providerId,
-        )?.connected && (
-          <div className="login-progress">
-            <div className="login-pulse">
-              <i />
-              <i />
-              <i />
-            </div>
-            <span>
-              <strong>Finish the secure sign-in</strong>
-              <small>{activeAttempt.instructions}</small>
-            </span>
-            {activeAttempt.url && (
-              <button
-                onClick={() =>
-                  window.open(
-                    activeAttempt.url!,
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }
-              >
-                Open again
-              </button>
-            )}
-            {activeAttempt.callbackMode === "code" && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void onFinish(activeAttempt.id, code);
-                }}
-              >
-                <input
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  placeholder="Paste sign-in code"
-                />
-                <button className="button-primary">Finish</button>
-              </form>
-            )}
-          </div>
-        )}
-      <div className="friendly-note">
-        <ShieldCheck size={17} />
-        <p>
-          <strong>No passwords pass through OpenBot.</strong>
-          <br />
-          Claude uses Claude Code; supported subscription providers use
-          OpenCode. Provider rules and metering still apply.
-        </p>
-      </div>
-      <section>
-        <div className="setting-section-title">
-          <h3>Models and ownership</h3>
-          <p>Each teammate uses only the connection assigned here.</p>
-        </div>
-        <div className="model-bot-list">
-          {bots.map((bot) => {
-            const connection = provider?.instances.find(
-              (instance) => instance.id === bot.providerInstanceId,
-            );
-            const choices = connection?.models?.length
-              ? connection.models
-              : [bot.model];
-            const models = choices.includes(bot.model)
-              ? choices
-              : [bot.model, ...choices];
-            return (
-              <div key={bot.id} className="provider-bot-block">
-                <div className="model-bot-row">
-                  <Mascot bot={bot} size="small" />
-                  <span>
-                    <strong>{bot.name}</strong>
-                    <small>{connection?.name || bot.role}</small>
-                  </span>
-                  <select
-                    value={bot.model}
-                    onChange={(event) =>
-                      void onUpdateBot(bot.id, { model: event.target.value })
-                    }
-                  >
-                    {models.map((model) => (
-                      <option key={model} value={model}>
-                        {shortModel(model)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="provider-owner">
-                  <span>Connection</span>
-                  <select
-                    value={bot.providerInstanceId || ""}
-                    onChange={(event) => {
-                      const next = provider?.instances.find(
-                        (instance) => instance.id === event.target.value,
-                      );
-                      void onUpdateBot(bot.id, {
-                        providerInstanceId: event.target.value,
-                        ...(next?.defaultModel
-                          ? { model: next.defaultModel }
-                          : {}),
-                      });
-                    }}
-                  >
-                    {provider?.instances.map((instance) => (
-                      <option key={instance.id} value={instance.id}>
-                        {instance.name}
-                        {instance.hasSecret
-                          ? " · encrypted"
-                          : instance.connected
-                            ? " · ready"
-                            : " · check"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      {adding ? (
-        <form className="routine-form api-key-form" onSubmit={submit}>
-          <label className="field">
-            <span>Provider</span>
-            <select
-              value={apiPreset}
-              onChange={(event) => chooseApi(event.target.value)}
-            >
-              <option value="openai">OpenAI API</option>
-              <option value="claude">Anthropic API</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="custom">Other compatible provider</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Connection name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Environment variable</span>
-            <input
-              value={envName}
-              onChange={(e) => setEnvName(e.target.value.toUpperCase())}
-              placeholder="OPENAI_API_KEY"
-            />
-          </label>
-          <label className="field">
-            <span>API key</span>
-            <input
-              type="password"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              autoComplete="new-password"
-              required
-            />
-          </label>
-          <p className="field-help">
-            <KeyRound size={13} /> Encrypted with AES-256-GCM before it reaches
-            local storage.
-          </p>
-          <div className="form-actions">
-            <button
-              type="button"
-              className="button-secondary"
-              onClick={() => setAdding(false)}
-            >
-              Cancel
-            </button>
-            <button className="button-primary">Save privately</button>
-          </div>
-        </form>
-      ) : (
-        <button className="add-routine" onClick={() => setAdding(true)}>
-          <Plus size={17} /> Add an API-key connection
-        </button>
-      )}
-      <div className="claude-boundary">
-        <strong>About Claude subscriptions</strong>
-        <p>
-          OpenBot uses Anthropic’s official Claude Code login, never an
-          unofficial OpenCode subscription plug-in. Depending on Anthropic’s
-          current policy and your account, third-party use may count toward plan
-          limits or usage credits.
-        </p>
-      </div>
-      <div className="tiny-details">
-        <span>OpenCode {provider?.version || "not found"}</span>
-        <span>Local owner · isolated per teammate</span>
-      </div>
-    </div>
-  );
-}
 
 function BotPanel({
   bot,
@@ -9263,9 +8935,12 @@ export function App() {
           subtitle="Bring your own models and subscriptions"
           onClose={() => setPanel(null)}
         >
+          <Suspense fallback={<p role="status">Loading your connections…</p>}>
           <ProviderPanel
             provider={provider}
             bots={state.bots}
+            mascot={(bot) => <Mascot bot={bot} size="small" />}
+            modelLabel={shortModel}
             onUpdateBot={updateBot}
             onAdd={async (input) => {
               await mutate(
@@ -9292,9 +8967,10 @@ export function App() {
                 body: JSON.stringify({ code }),
               });
               setProvider(await api("/api/provider"));
-              setToast("Connection ready");
+              setToast("Sign-in completed");
             }}
           />
+          </Suspense>
         </Sheet>
       )}
       {panel === "bot" && activeBot && (

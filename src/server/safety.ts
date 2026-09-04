@@ -27,8 +27,28 @@ export function commandApprovalReason(command: string): string | null {
   return commandRisks.find(([pattern]) => pattern.test(command))?.[1] || null;
 }
 
-export function browserApprovalReason(action: "open" | "click" | "type", value: string): string | null {
-  if (action === "type" && /password|passcode|secret|token|credit.?card|checkout|payment/i.test(value)) return "This browser action may enter private or payment information.";
-  if (action === "click" && /send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(value)) return "This click may create an external or irreversible action.";
+export interface BrowserTarget {
+  url: string;
+  tag: string;
+  role: string;
+  label: string;
+  inputType: string;
+  autocomplete: string;
+  href: string;
+  formMethod: string;
+  searchForm: boolean;
+}
+
+export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
+  const description = `${value} ${target?.label || ""} ${target?.inputType || ""} ${target?.autocomplete || ""}`;
+  if (action === "type" && /password|passcode|secret|token|credit.?card|checkout|payment|one-time-code|cc-/i.test(description)) return "This browser action may enter private or payment information.";
+  if (action === "click") {
+    if (/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(description)) return "This click may create an external or irreversible action.";
+    // A CSS selector is not evidence of intent: #primary can mean Send.
+    // Permit observed navigation/search; review other controls by default.
+    if (target?.tag === "a" && /^https?:/i.test(target.href)) return null;
+    if (target?.searchForm && target.formMethod === "get" && /^(search|find)$/i.test(target.label.trim())) return null;
+    return "Review this browser control before it runs; it may change data or send information.";
+  }
   return null;
 }

@@ -12,6 +12,19 @@ test("passes only allowlisted host environment values to model processes", () =>
   assert.equal("GITHUB_TOKEN" in env, false);
 });
 
+test("discovers user CLIs with a background-service PATH without inheriting secrets", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-cli-path-"));
+  try {
+    mkdirSync(path.join(root, ".opencode/bin"), { recursive: true });
+    mkdirSync(path.join(root, ".local/bin"), { recursive: true });
+    const env = safeHostEnvironment({}, { HOME: root, PATH: "/usr/bin:/bin", AWS_SECRET_ACCESS_KEY: "never-inherit" });
+    assert.ok(env.PATH?.split(path.delimiter).includes(path.join(root, ".opencode/bin")));
+    assert.ok(env.PATH?.split(path.delimiter).includes(path.join(root, ".local/bin")));
+    assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
+    assert.equal(safeHostEnvironment({ PATH: "/test/bin" }, { PATH: "/usr/bin" }).PATH, "/test/bin");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("browser URL guard allows local tests and blocks metadata/private hosts", () => {
   assert.equal(safeUrl("http://127.0.0.1:4322/page").hostname, "127.0.0.1");
   assert.throws(() => safeUrl("http://169.254.169.254/latest/meta-data"));

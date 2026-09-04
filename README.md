@@ -1,10 +1,24 @@
-# OpenBot 0.28.0
+# OpenBot 0.29.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.28.0
+## What's new in 0.29.0
+
+This development version focuses on trustworthy foundations, not a larger feature checklist. OpenBot remains an **owner-operated beta**, not yet a drop-in Grok Bot replacement. See the [product audit and delivery plan](docs/PRODUCT_GAP_AUDIT.md) and [validation record](docs/QA_0.29.md).
+
+- Connect a compatible API using its actual address, API format and model IDs. Local Ollama/LM Studio endpoints can omit a key; custom model choices are scoped to the saved connection.
+- A calmer AI-connections panel separates accounts from API/local models, keeps the animated characters, and says **saved, not tested** instead of treating a key as proof of access.
+- Historical replies are no longer rewritten into new promises. Completion receipts identify checks as teammate-reported, not independently certified.
+- Fixed multi-step token/cost accounting, background runtime discovery, repeated status-probe churn, OAuth method selection and automatic sign-in callback completion.
+- Teammate startup failures now report back privately so the coordinating bot receives the failure instead of proceeding without an explanation.
+- Disconnected app tools and disabled computer/browser tools no longer need to appear in the model’s tool context. Server-side permission checks still apply.
+- Browser approvals inspect the actual control and reject changed page/control targets. This hardens a boundary; it is not a complete network or process sandbox.
+- Settings sheets now have dialog semantics, keyboard focus containment, Escape dismissal and focus restoration.
+- Added a real OpenCode transport contract test and opt-in live-model workflow checks with independent artifact and consultation assertions.
+
+### Previously in 0.28.0
 
 - Slack mentions, messages, and reactions can now wake a selected teammate through Slack's signed Events API requests.
 - Notion page, comment, and database activity can now start a teammate routine through verified, signed webhook delivery.
@@ -30,7 +44,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Three-hop/eight-task teamwork limits that prevent accidental agent loops
 - Live streaming text, activity history, token/cache/cost usage, and a studio control center
 - A persistent completion contract for real jobs: clear outcome, deliverable, live checklist, approval boundary, and recorded final checks
-- Compact result receipts that show whether the work was checked and let the user expand the supporting steps and evidence
+- Compact result receipts with teammate-reported checks and expandable steps; independent verification depends on the specific workflow
 - One-click GitHub cloning or local code-project connections with separate read-only, code-and-test, or no-access choices for every teammate
 - Project-aware code listing, search, reading, exact edits, atomic file creation, per-task Git worktrees, bounded diffs, scoped commits, and network-isolated checks
 - A recoverable local code-change trail; restore points refuse to overwrite newer work, and disconnecting never deletes project files
@@ -38,7 +52,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - A persistent, constrained Docker computer for every bot
 - A persistent Chrome profile for every bot with open, read, click, type, and screenshot tools
 - A versioned Skill Library with visible teach mode, editable instructions, starter templates, teammate assignment, portable integrity-checked import/export, secret scanning, rollback, chat discovery, and OpenCode/Claude Code generation
-- Dependable automations with five-minute/hourly/daily schedules, signed generic, GitHub, Slack, and Notion events, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
+- Durable automations with five-minute/hourly/daily schedules, signed generic, GitHub, Slack, and Notion events, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
 - Proactive Todoist task and Dropbox folder-change triggers with durable cursors, fresh-start baselines, and connector-specific filters
 - Duplicate-event protection, rate limits, loop headers, bounded retained inputs, visible failure guidance, approval-wait alerts, missed-schedule notices, and automatic pausing after three consecutive failures
 - A durable single-leader runner with atomic job claims, renewable leases, graceful shutdown handoff, crash recovery, visible health, optional macOS login/crash protection, and an optional private always-on Linux home with backup-first updates and opt-in internal and outside health signals

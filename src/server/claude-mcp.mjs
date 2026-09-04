@@ -72,6 +72,9 @@ const tools = [
   { name: "request_approval", description: "Pause and ask the user before a sensitive external action.", action: "request_approval", properties: { reason: { type: "string" }, actionLabel: { type: "string" } }, required: ["reason", "actionLabel"] },
 ];
 
+const availability = JSON.parse(process.env.OPENBOT_TOOL_AVAILABILITY || "{}");
+const availableTools = tools.filter((tool) => availability[tool.action || tool.name] !== false);
+
 function send(message) { process.stdout.write(`${JSON.stringify(message)}\n`); }
 
 async function callTool(tool, args) {
@@ -140,10 +143,10 @@ async function handle(message) {
       return send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: message.params?.protocolVersion || "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "openbot", version: "0.7.0" } } });
     }
     if (message.method === "tools/list") {
-      return send({ jsonrpc: "2.0", id: message.id, result: { tools: tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: { type: "object", properties: tool.properties, required: tool.required, additionalProperties: false } })) } });
+      return send({ jsonrpc: "2.0", id: message.id, result: { tools: availableTools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: { type: "object", properties: tool.properties, required: tool.required, additionalProperties: false } })) } });
     }
     if (message.method === "tools/call") {
-      const tool = tools.find((candidate) => candidate.name === message.params?.name);
+      const tool = availableTools.find((candidate) => candidate.name === message.params?.name);
       if (!tool) throw new Error("Unknown OpenBot tool.");
       const result = await callTool(tool, message.params?.arguments);
       return send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false } });

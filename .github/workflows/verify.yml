@@ -40,6 +40,7 @@ jobs:
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:4311/api/healthz; then
               docker exec openbot-private-runner-smoke opencode --version
+              docker exec openbot-private-runner-smoke npx tsx scripts/test-provider-runtime.ts
               docker exec openbot-private-runner-smoke chromium --version
               docker exec openbot-private-runner-smoke docker info --format '{{.ServerVersion}}'
               access_token="$(docker exec openbot-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"

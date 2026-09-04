@@ -1,6 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approvalReason, commandApprovalReason } from "./safety.js";
+import { approvalReason, browserApprovalReason, commandApprovalReason, type BrowserTarget } from "./safety.js";
+
+const target: BrowserTarget = { url: "https://example.com", tag: "button", role: "", label: "Send", inputType: "submit", autocomplete: "", href: "", formMethod: "post", searchForm: false };
+test("browser approvals inspect real controls, not just selectors chosen by the model", () => {
+  assert.ok(browserApprovalReason("click", "#primary", target));
+  assert.ok(browserApprovalReason("click", "button:nth-child(1)", { ...target, label: "Continue", inputType: "button" }));
+  assert.ok(browserApprovalReason("click", "#x"));
+  assert.ok(browserApprovalReason("type", "#field 123", { ...target, label: "Verification", inputType: "text", autocomplete: "one-time-code" }));
+  assert.ok(browserApprovalReason("type", "#field 123", { ...target, label: "Card", inputType: "text", autocomplete: "cc-number" }));
+  assert.equal(browserApprovalReason("click", "#docs", { ...target, tag: "a", label: "Documentation", inputType: "", href: "https://example.com/docs" }), null);
+  assert.equal(browserApprovalReason("click", "#search", { ...target, label: "Search", inputType: "button", formMethod: "get", searchForm: true }), null);
+  assert.ok(browserApprovalReason("click", "#search", { ...target, label: "Search", inputType: "button", formMethod: "post", searchForm: true }));
+});
 
 test("ordinary local work does not require an extra approval", () => {
   assert.equal(approvalReason("Create a friendly project plan in notes.md"), null);

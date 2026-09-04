@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Bot } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { toolAvailability } from "./tool-availability.js";
 
 function toolFile(name: string, description: string, fields: string, action: string) {
   return `import { tool } from "@opencode-ai/plugin";
@@ -147,6 +148,7 @@ ${codeProjectsText(db, bot)}
   writeFileSync(path.join(root, "opencode.json"), JSON.stringify({
     $schema: "https://opencode.ai/config.json",
     permission: { "*": "allow", external_directory: "deny" },
+    tools: toolAvailability(db, bot),
     instructions: ["AGENTS.md"],
   }, null, 2), "utf8");
   writeFileSync(path.join(toolsDir, "bash.ts"), toolFile("bash", "Run a command inside this bot's persistent, isolated computer.", `command: tool.schema.string().describe("The shell command to run")`, "bash"), "utf8");

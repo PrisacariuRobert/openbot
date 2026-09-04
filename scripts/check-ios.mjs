@@ -41,7 +41,9 @@ const entitlements = readFileSync(path.join(root, "ios/OpenBotMobile/OpenBotMobi
 const sharePlist = readFileSync(path.join(root, "ios/OpenBotShare/Info.plist"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
 if (!project.includes(`MARKETING_VERSION: ${packageJson.version}`)) throw new Error(`The iOS marketing version is not ${packageJson.version}.`);
-if (!project.includes("CURRENT_PROJECT_VERSION: 32")) throw new Error("The iOS build number is not 32.");
+const buildNumber = project.match(/CURRENT_PROJECT_VERSION:\s*(\d+)/)?.[1];
+const generatedProject = readFileSync(path.join(root, "ios/OpenBotMobile.xcodeproj/project.pbxproj"), "utf8");
+if (!buildNumber || !generatedProject.includes(`CURRENT_PROJECT_VERSION = ${buildNumber};`) || !generatedProject.includes(`MARKETING_VERSION = ${packageJson.version};`)) throw new Error("The generated iOS project version is out of sync with project.yml and package.json.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("NSMicrophoneUsageDescription") || !plist.includes("NSSpeechRecognitionUsageDescription")) throw new Error("The iOS app is missing its deliberate voice-capture permission descriptions.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");
@@ -70,4 +72,4 @@ if (/access[_ -]?key\s*[=:]\s*[\"'][A-Za-z0-9_-]{12,}/i.test(swift)) throw new E
 const swiftFiles = required.filter((file) => file.endsWith(".swift")).map((file) => path.join(root, file));
 const parse = spawnSync("swiftc", ["-frontend", "-parse", ...swiftFiles], { encoding: "utf8" });
 if (!parse.error && parse.status !== 0) throw new Error(`Swift syntax validation failed:\n${parse.stderr || parse.stdout}`);
-console.log("Native SwiftUI studio, deliberate voice capture, APNs registration, share-sheet ingestion, privacy declarations, Keychain storage, API streaming, draft continuity, Live Studio, private-home heartbeat and transfer guidance, customizable code-drawn mascot motion, and UI coverage are present.");
+console.log("iOS source-contract checks passed. This checks file presence, source patterns and available Swift syntax parsing; it does not compile, exercise UI, or verify physical-device delivery.");

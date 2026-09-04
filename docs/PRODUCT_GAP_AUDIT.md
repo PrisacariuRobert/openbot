@@ -1,46 +1,108 @@
-# OpenBot Product Gap Audit
+# OpenBot: product audit and alternative strategy
 
-Updated for OpenBot 0.28.0. This audit compares the verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
+Audit date: 4 September 2026. Baseline: 0.28.0, commit `88b8de9`. Remediation: **0.29.0 development branch**, not a published release.
 
-## Current position
+## Verdict
 
-OpenBot's strongest difference is owner control: an explicit local-or-private-host data location, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.28.0 adds signed Slack and Notion event triggers, natural app-event routine creation, private rotating provider addresses, and connector manifest v2. The local Mac remains the default and no data moves silently. Grok Bot remains easier because Cursor operates the cloud service, and it still has broader connectors, fidelity-preserving Office work, App Store distribution, and organization administration.
+OpenBot is a substantial prototype with useful local-first foundations, not yet a dependable, general-purpose Grok Bot replacement. Its largest gap is **reliable completion with low setup effort**, not the number of buttons or mascots. Earlier documentation treated source presence, fixture tests, historical demos, and model-reported checks too interchangeably. Those are different levels of evidence.
 
-## Highest-value gaps
+The product should be an open, owner-controlled **work system**: one request becomes a useful artifact or a reviewed action, can survive interruptions, and can continue from a phone. Keep the playful teammates; compete on outcomes, portability, and control. Do not copy another product's identity or claim universal subscription compatibility.
 
-| Priority | Experience gap | Why it matters | Product direction |
+Scope: inspected orchestration, provider configuration, tool boundaries, persistence, web/native surfaces, deployment, tests and release claims; exercised the local application; consulted current competitor documentation and individual user reports. No authenticated head-to-head Grok Bot run, physical-device test, external penetration test, or real VPS deployment was performed. This is a prioritized engineering audit, not a security certification.
+
+## What Grok Bot actually offers
+
+Cursor documents a managed persistent computer, cloud routines, messaging and steering, skills, artifacts, plugin references, and parallel work. Bots within an account share its computer and sign-ins; per-bot screens are not separate security boundaries. Its main advantage is having these parts operated together for the user. OpenBot has related primitives, but assembling and maintaining them is still the owner's job. [Work with Grok Bot](https://cursor.com/docs/grok-bot/work).
+
+Its published use cases center on source-backed deliverables: operational digests, expense reconciliation, research, and bug reproduction, with consequential changes reviewed. That is a better comparison target than avatar similarity or a connector count. [Grok Bot use cases](https://cursor.com/docs/grok-bot/use-cases).
+
+Enterprise adds identity and policy administration that this single-owner application does not implement. These controls are not all available on every Cursor plan. [Teams and Enterprise](https://cursor.com/docs/grok-bot/teams).
+
+Individual users describe useful recurring inbox/calendar summaries, invoice filing, research and alerts, but also consumption limits. Other reports describe timeouts, forgotten work and formulaic writing. These are **anecdotes, not measured failure rates**; they suggest test cases, not grounds to declare OpenBot better. [Workflow reports](https://www.reddit.com/r/cursor/comments/1vvx2fg/is_grok_bot_worth_it/), [critical review](https://www.reddit.com/r/cursor/comments/1vxjipg/grok_bot_review/).
+
+## Concrete weak points and “AI slop”
+
+| Priority | Baseline evidence | User impact | Remediation / remaining work |
 |---|---|---|---|
-| P1 | Managed availability | The private runner continues when the Mac is off; setup, backup-first updates, diagnostics, device alerts, outside check-ins, and encrypted migration are guided. OpenBot still does not sell or operate a zero-setup managed cloud. | Simplify host bootstrap and recovery without hiding ownership, location, or the third-party heartbeat dependency. |
-| P2 | Connector breadth | Google Workspace, GitHub, Slack, Notion, Todoist, and Dropbox cover the core personal context loop and all six app families can start focused proactive work, but CRM, project-management suites, and a reviewed install ecosystem remain absent. | Continue one reviewed connector at a time under manifest v2; do not execute unknown packages until provenance and isolation are designed. |
-| P2 | Fidelity editing, OCR, and transcription | OpenBot understands common PDF/Office/sheet/text files and forwards media to compatible models, but scanned documents, guaranteed local transcription, and layout-safe Office edits remain uneven. | Add opt-in OCR/local speech models and dedicated document/workbook engines with rendered before/after review. |
-| P2 | Connector-event convenience | Calendar, Todoist, Dropbox, signed GitHub/generic hooks, and signed Slack/Notion events are durable and can run continuously on a private host. Owners still configure public HTTPS ingress and provider subscriptions themselves. | Add guided provider setup checks and configurable retry backoff without pretending owner-operated ingress is managed cloud. |
-| P2 | General visual computer use | Live Studio now supports visible owner takeover of isolated bot browsers, but Accessibility controls still cannot understand arbitrary macOS canvases, images, remote desktops, or video; CAPTCHA steps still require a person. | Add opt-in bounded screen understanding and per-action policy. Never make this a silent global permission. |
-| P2 | Native phone distribution | SwiftUI now includes deliberate voice capture, APNs registration, and Share-sheet ingestion, but production delivery still needs owner-signed physical-device QA and App Store/TestFlight work. | Complete the Apple-team/App Group/APNs credential setup, physical-device tests, and distribution metadata. |
-| P3 | Multi-user administration | A local single-owner product does not yet have SSO, central policies, audit export, deployment templates, or offboarding. | Design tenancy, policy inheritance, network rules, connector allowlists, and key rotation as a separate architecture milestone. |
+| P0 | `shared/presentation.ts` replaced old workspace/routine refusals and teamwork receipts with invented commitments. Tests asserted these substitutions. | The visible conversation did not reliably represent what happened. | Removed semantic rewriting; regressions now preserve failures, technical text and one-way receipts exactly. Improve wording at generation and structured-activity level. |
+| P0 | `server/safety.ts` checked a browser selector for words such as “send”; `#primary` bypassed that heuristic. | A generic selector could trigger an unreviewed external action. | Inspect the actual control, review ambiguous clicks, bind approval to the observed page/control and reject changed targets. Still not an adversarial browser sandbox. |
+| P1 | Custom provider form had no endpoint, protocol or models. Unknown key presets exposed unrelated catalogue models. | “Bring your own provider” could be a saved secret with no usable route. | Typed endpoint/protocol/model configuration, loopback local models, connection-specific runtime config and model validation. Real OpenCode transport fixture included. Custom tool support still depends on the provider/model. |
+| P1 | API connections were “ready” just because a secret existed. Sign-in assumed OAuth method 0 and did not finish automatic callbacks. | False readiness and sign-in flows that could stay waiting. | Separate “saved, not tested” from a discovered sign-in; select an advertised OAuth method and complete auto callbacks. Real subscription consent remains account-dependent, not certified by mock tests. |
+| P1 | Provider API accepted arbitrary environment variable names. | A key form could inject process configuration rather than a model credential. | Restrict legacy names to reviewed API presets; custom keys use a fixed environment slot. |
+| P1 | `opencode.ts` replaced usage on each step instead of accumulating it. | Multi-tool jobs underreported usage and weakened budget visibility. | Sum steps, deduplicate identified events, handle Claude cumulative totals, reject invalid numeric usage. Budgets remain admission limits, not exact hard spend caps. |
+| P1 | Every generated tool schema was exposed, including disconnected apps and disabled browser/computer access. | Simple jobs carried irrelevant tool context and offered unavailable actions. | Build capability-aware tool availability for both runtimes. Backend grant checks remain authoritative; context filtering is not a new security boundary. |
+| P1 | Background PATH missed standard user-installed CLIs; every settings poll launched repeated probes. | “App missing” despite installation; unnecessary latency and processes. | Discover common install directories, coalesce/cache probes, bound discovery output/time and invalidate after changed connections/login state. |
+| P1 | `task_verify` accepts model-supplied checks; UI labelled them “Finished and checked.” | A confident model could look like an independent verifier. | Label the receipt “Checks reported by teammate.” Next: evidence-backed file, test and external-action oracles. A second model review is not an independent deterministic test. |
+| P1 | Pre-spawn failures and budget rejection did not share a child failure with its coordinator. | A resumed coordinator could lack the reason a consultation failed. | Route startup failures through a private failure outcome and resume the coordinator; regression checks no second public reply. |
+| P1 | `App.tsx` was ~9,500 lines; `styles.css` ~10,900, including repeated settings/hero overrides. | Design drift, regressions, difficult maintenance and large initial bundles. | Extract the provider screen and scoped styles; remove its obsolete rules. Continue module-by-module, not another appended global CSS layer. |
+| P1 | Sheets lacked dialog semantics, focus containment and restoration. Native models do not expose full provider administration. | Keyboard access and cross-platform completeness lag the visual promise. | Web dialog/focus repair and responsive connection form. Native feature parity requires a separate implementation/test pass. |
+| P1 | Release scripts use many source-text assertions; benchmark rows mixed fixtures and historical demonstrations. | Green checks were easy to overinterpret as product reliability. | Explicit evidence labels, executable real-runtime transport test, opt-in live-model workflow oracles. Source checks are smoke checks, not behavior certification. |
 
-## Next release sequence
+### High-risk boundaries still open
 
-1. **0.19 — Shipped:** versioned, integrity-checked, secret-scanned skill packages; immutable history; non-destructive rollback; starter templates; and safe assignment between teammates.
-2. **0.20 — Shipped:** exclusive self-hosted runner leases, atomic job claims, crash recovery, macOS login/crash protection, health, secure Web Push, and notification deep links without changing local-only mode.
-3. **0.21 — Shipped:** Todoist, read-only Dropbox, cross-app starter workflows, and authenticated native artifact preview/sharing.
-4. **0.22 — Shipped in source:** proactive Todoist/Dropbox events, native APNs registration/delivery, Share-sheet ingestion, and managed Dropbox PKCE. Physical APNs verification remains owner setup.
-5. **0.23 — Shipped:** deliberate native voice capture and recovery-focused product polish.
-6. **0.24 — Shipped in source:** optional owner-operated private runner with HTTPS ingress, durable data/model/browser storage, public callbacks, health/readiness, backups, and matching web/native visibility.
-7. **0.25 — Shipped in source:** real authenticated Home checks, backup freshness receipts, domain-guided setup, and consistent Mac/private location language on web and iPhone.
-8. **0.26 — Shipped in source:** opt-in durable health/recovery notifications plus backup-first, fail-closed private-runner updates with replacement health checks and previous-image recovery.
-9. **0.27 — Shipped in source:** privacy-preserving outside check-ins plus encrypted whole-home export/import with authentication, staging, health verification, and rollback.
-10. **0.28 — Shipped in source:** signed Slack/Notion event triggers, natural app-event routines, private rotating addresses, and connector manifest v2 with a reviewed admission contract.
-11. **Next — Connected-work polish:** provider setup diagnostics, configurable retry backoff, and the next narrow productivity source under the v2 contract.
-12. **Later — Fidelity tools:** OCR, local transcription, and format-aware Office editing after their model, privacy, and rendered-review boundaries are proven.
+- Host model processes can inherit runtime-level configuration, plugins and account access. Per-bot workspaces and filtered environment variables do **not** constitute a complete process/credential sandbox.
+- Bot Docker terminals retain outbound network access. Command-word detection cannot reliably classify arbitrary programs. Do not promise that every possible external write is intercepted.
+- Browser URL validation is lexical, not a full DNS-resolution/redirect/subresource egress policy. Loopback is intentionally permitted. Private-network isolation needs dedicated enforcement and adversarial tests.
+- Browser approval fingerprints detect changed URL/control metadata, not arbitrary changes in nearby form data or all page scripts. Old approvals without a fingerprint now require renewed inspection.
+- Model loops need stronger wall-clock, idle, step and in-flight spending controls. Process recovery is not equivalent to exactly-once external effects; an action accepted remotely just before a crash needs reconciliation, not blind replay.
+- Coding checks use a constrained Linux toolchain. A simple JavaScript fixture does not establish support for arbitrary native dependencies, Python toolchains, mobile builds or large repositories.
 
-## Release truth
+These are blockers to advertising unattended, unrestricted computer autonomy. Expanding permissions would hide the gap, not close it.
 
-OpenBot 0.28.0 closes the most useful built-in event gap: connected Slack and Notion activity can wake a selected teammate through provider-authenticated delivery and the same permission, dedupe, receipt, replay, rate, failure-pause, and approval system as earlier automations. Setup remains honest: the owner must expose a trusted HTTPS private host, register provider subscriptions, and grant each teammate read access. Manifest v2 documents how future connectors must declare events and authenticity, but OpenBot does not yet execute third-party connector packages. OpenBot remains differentiated by explicit data location, model ownership, granular teammate authority, one-voice consultation, exact-commit review, recoverable writes, durable approvals, and inspectable signed automations. Managed cloud convenience, connector breadth, signed native distribution, fidelity tools, and organization administration remain real gaps.
+## Capability comparison: present, partial, missing
 
-## Primary comparison sources
+| Outcome | OpenBot evidence / limitation | Next acceptance gate |
+|---|---|---|
+| Persistent assistant and private consultation | Durable data and bounded coordinator/child orchestration exist. Quality depends on the model; synthetic tests are not business-work evidence. | Repeated real tasks produce one sourced answer after actual consultation; child failures remain visible. |
+| Bring your own models | Two runtimes; account-specific sign-in; 0.29 adds custom Chat Completions, Responses and Messages configurations. Not every subscription is eligible. | Provider contract suite plus real tool-use task per supported runtime; clear unsupported states and reconnect tests. |
+| Morning brief / inbox triage | Read connectors, schedules and draft artifacts exist. End-to-end account setup and source freshness remain uneven. | Fresh inbox + calendar + task inputs produce a ranked digest with source links, no duplicates and no unsent message marked sent. |
+| Invoice / document work | Bounded extraction and artifact revisions exist; OCR, transcription and layout-preserving editing are incomplete. | Mixed receipt fixtures, exact reconciled totals, missing-data flags, editable workbook and rendered visual review. |
+| Browser/admin work | Persistent profiles, readable pages, owner takeover and browser skills exist. General visual app control is limited. | Ten controlled site workflows, changed selectors, login expiry and stopped actions; zero unauthorized mutations. |
+| Engineering work | Worktrees, project grants, diffs and reviews exist. General dependency provisioning and reproducible builds are incomplete. | Fix a real fixture bug in separate JS and Python projects; run independent tests; preserve the original checkout. |
+| Laptop closed / phone away | Private-host source and health/transfer tooling exist. No managed service; native distribution and physical APNs proof incomplete. | Fresh-host install, restart/restore, Wi-Fi-to-cellular continuity and physical push delivery with an owner-configured host. |
+| Community / team ecosystem | MIT source and portable browser skills exist. No reviewed executable marketplace, multi-user tenancy, SSO or offboarding. | Published extension contract, contributor setup/CI, compatibility matrix; later design tenancy before organization claims. |
 
-- [Grok Bot overview](https://cursor.com/docs/grok-bot)
-- [Work with Grok Bot](https://cursor.com/docs/grok-bot/work)
-- [Grok Bot use cases](https://cursor.com/docs/grok-bot/use-cases)
-- [Grok Bot for teams and enterprise](https://cursor.com/docs/grok-bot/teams)
-- [Cursor agent computer use](https://cursor.com/blog/agent-computer-use)
+## Different in useful ways
+
+These are design advantages to prove, not performance wins already measured:
+
+1. **Portable ownership:** move data and readable, versioned skills between machines without moving to a proprietary service. Include tested recovery and clear export contents.
+2. **Model choice with honest cost:** mix local, API and permitted subscription runtimes; show capabilities and measured usage. Never silently fall back to a paid model or pool somebody else's account.
+3. **One answer, inspectable work:** private consultation, linked sources, files and actual tool outcomes. Technical internals can be collapsed; history must not be rewritten.
+4. **Scoped access instead of one shared account soup:** separate browser profiles and explicit app/project grants. Complete the runtime/egress boundary before claiming security isolation.
+5. **Recoverable actions:** preview changes, retain revisions and reconcile uncertain external results. A trustworthy stop/resume is more valuable than another integration logo.
+
+OpenCode's provider documentation distinguishes account credentials from provider configuration and describes local/compatible endpoints; OpenBot now reflects that distinction rather than equating a key with an integration. [OpenCode providers](https://opencode.ai/docs/providers/).
+
+The supplied `t3code/docs/internals/providers.md` offers a useful architectural reference: validated runtime drivers, instance registries and event ingestion rather than provider-specific branches throughout orchestration. Adopt that separation incrementally; do not import its product wholesale.
+
+Hermes' computer-use documentation suggests a next research track: application-scoped observations, numbered targets and bounded screenshot retention. Its backend and platform constraints are explicit. OpenBot should adopt the discipline of observe → act → verify, not just add a screenshot button. [Hermes computer use](https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use).
+
+## Design direction
+
+Calm work surface, playful teammates. Warm neutral canvas, readable graphite text, one restrained violet action colour, consistent 8/12/16/24 spacing and hairline separation. Animation belongs to small independently moving characters, not every card. Preserve colour controls, blinks, expression states and reduced-motion support.
+
+Use three primary destinations: **Conversations**, **Work**, **Settings**. Keep model setup, host maintenance and permissions out of the everyday message flow. Prefer a clear result card to an oversized chat bubble full of process narration. Avoid sales slogans and gradient hero banners inside settings. Show one useful next action for each error; put technical detail behind disclosure without hiding the original failure.
+
+The new connection panel is the first reference implementation: grouped account rows, API/local setup, real provider marks, explicit saved status, restrained mascot, accessible fields and mobile containment. This is **not** a claim that every existing web/native screen has been redesigned.
+
+## Ordered delivery plan
+
+| Milestone | Deliverable | Done only when |
+|---|---|---|
+| M1 · Trust and usable connections | 0.29 foundation fixes above; evidence inventory; compact settings reference | Regression tests, actual runtime transport, responsive/keyboard QA and honest documentation pass. |
+| M2 · Three dependable jobs | Morning brief, inbox-to-review queue, engineering bug fix | Fresh setup; 10 runs per workflow across two supported model classes; source/artifact oracles; latency/usage/human interventions reported; failures retained. |
+| M3 · Safe unattended execution | Runtime/plugin isolation, network policy, deadlines, recoverable external-action ledger | Adversarial fixtures; worker crash at each action stage; no duplicate effect or cross-bot credential access. |
+| M4 · Daily-use web + native parity | Shared terminology, result/approval states, accessible controls; full provider management on iPhone | Desktop + narrow web + Dynamic Type/VoiceOver + physical-device tests; shared protocol fixtures; no missing core controls. |
+| M5 · Setup and always-on delivery | Guided runtime/connector/host checks, signed distribution and restore guide | New user reaches first useful result without developer tools; fresh-host restore and cellular handoff tested. |
+| M6 · Broader open ecosystem | Reviewed adapters/MCP admission, document engines, community contribution fixtures | Each new capability includes permissions, lifecycle, reconnect/failure tests and reproducible outcome evidence. |
+
+Do not add another connector until at least one complete workflow using existing connectors meets M2. Do not call the beta launch-ready because its feature checklist is long. Maintain README and marketing qualifiers with every version.
+
+## Evidence commands
+
+- `npm run verify`: unit/integration fixtures, TypeScript, build and source-contract smoke checks; it is not a competitor benchmark or a physical iPhone test.
+- `npm run test:provider-runtime`: installed OpenCode against a disposable local model endpoint. Checks real transport, scoped credentials, model IDs and streamed output. No real account usage.
+- `OPENBOT_BENCHMARK_MODEL=opencode/<model-id> npm run benchmark:workflows`: explicit live-model allowance usage, isolated database, source-to-artifact and consultation checks with independent oracles. Two bounded workflows do not establish broad parity.
+
+See [0.29 validation record](QA_0.29.md) for results and remaining release gates. Historical demo claims are retained separately in [Workflow Benchmark](WORKFLOW_BENCHMARK.md), not promoted to current head-to-head results.

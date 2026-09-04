@@ -1,0 +1,371 @@
+.provider-settings {
+  --ai-text: #29272f;
+  --ai-muted: #706d77;
+  --ai-line: #e7e5eb;
+  color: var(--ai-text);
+  display: grid;
+  gap: 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.provider-settings :is(h3, h4, p) {
+  margin: 0;
+}
+.provider-settings :is(button, input, select, textarea) {
+  font: inherit;
+}
+.provider-settings
+  :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 3px solid #9587e9;
+  outline-offset: 3px;
+}
+.provider-settings button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.ai-intro {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 0 0;
+}
+.ai-intro > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+.ai-intro h3 {
+  font-size: 23px;
+  font-weight: 680;
+  letter-spacing: -0.7px;
+  line-height: 1.2;
+}
+.ai-intro p {
+  margin-top: 8px;
+  color: var(--ai-muted);
+}
+.ai-intro-mascot {
+  flex: none;
+  padding: 8px;
+  transform: scale(1.35);
+}
+.ai-mode-switch {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--ai-line);
+  border-radius: 13px;
+  background: #eeedf1;
+}
+.ai-mode-switch button {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--ai-muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-mode-switch button[aria-pressed="true"] {
+  background: white;
+  color: var(--ai-text);
+  box-shadow: 0 1px 3px #20173510;
+}
+.ai-list {
+  border: 1px solid var(--ai-line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: white;
+}
+.ai-account {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 16px;
+}
+.ai-account + .ai-account {
+  border-top: 1px solid var(--ai-line);
+}
+.ai-brand {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  color: #36333e;
+  background: #f2f1f5;
+}
+.ai-brand svg {
+  width: 21px;
+  height: 21px;
+}
+.ai-brand-claude {
+  color: #b65a3a;
+  background: #fff2ec;
+}
+.ai-account-copy {
+  min-width: 0;
+  flex: 1;
+}
+.ai-account-copy h4 {
+  font-size: 14px;
+  font-weight: 650;
+}
+.ai-account-copy p {
+  color: var(--ai-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ai-account-copy details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ai-account-copy details p {
+  padding-top: 6px;
+}
+.provider-settings summary {
+  cursor: pointer;
+  color: var(--ai-muted);
+}
+.ai-state,
+.ai-signed-in {
+  flex: none;
+  max-width: 92px;
+  padding-top: 5px;
+  color: var(--ai-muted);
+  font-size: 11px;
+  text-align: right;
+}
+.ai-signed-in {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #26734f;
+  white-space: nowrap;
+}
+.ai-action {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--ai-line);
+  border-radius: 10px;
+  background: #fff;
+  color: #5341ab;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  cursor: pointer;
+}
+.ai-primary {
+  background: #6752cf;
+  border-color: #6752cf;
+  color: white;
+}
+.ai-more {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.ai-more > .ai-list {
+  margin-top: 12px;
+}
+.provider-settings .ai-help {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ai-muted);
+}
+.ai-feedback,
+.ai-login {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid #d5e5dc;
+  border-radius: 12px;
+  background: #f3f8f5;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.ai-feedback > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.ai-error {
+  color: #933a32;
+  border-color: #edd4d0;
+  background: #fcf4f2;
+}
+.ai-login {
+  display: grid;
+  margin-top: 14px;
+  border-color: #e0daf3;
+  background: #f7f5fd;
+}
+.ai-login a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #5947b0;
+}
+.ai-login form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.ai-login label {
+  flex: 1;
+  min-width: 0;
+}
+.ai-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px dashed #c6bedf;
+  border-radius: 12px;
+  color: #5947b0;
+  background: #f8f7fc;
+  cursor: pointer;
+}
+.ai-list + .ai-add,
+.ai-list + .ai-form {
+  margin-top: 16px;
+}
+.ai-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--ai-line);
+  border-radius: 16px;
+  background: white;
+}
+.ai-form h4 {
+  font-size: 16px;
+}
+.provider-settings label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #5d5866;
+  font-size: 12px;
+  font-weight: 600;
+}
+.provider-settings :is(input, select, textarea) {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #dad6e2;
+  border-radius: 10px;
+  color: var(--ai-text);
+  background: white;
+  font-size: 14px;
+  font-weight: 400;
+}
+.provider-settings textarea {
+  resize: vertical;
+}
+.ai-form .ai-help {
+  margin-top: -8px;
+}
+.ai-advanced {
+  font-size: 12px;
+}
+.ai-advanced label {
+  margin-top: 12px;
+}
+.ai-key-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.ai-key-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.ai-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ai-team {
+  border-top: 1px solid var(--ai-line);
+  padding-top: 22px;
+}
+.ai-team header h3 {
+  font-size: 16px;
+  font-weight: 650;
+}
+.ai-team header p {
+  margin-top: 4px;
+  color: var(--ai-muted);
+  font-size: 12px;
+}
+.ai-teammate {
+  margin-top: 20px;
+}
+.ai-teammate-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.ai-teammate-title strong {
+  font-size: 13px;
+}
+.ai-teammate-title > span {
+  margin-left: auto;
+  color: var(--ai-muted);
+  font-size: 12px;
+}
+.ai-teammate-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ai-footnote {
+  color: var(--ai-muted);
+  font-size: 11px;
+  border-top: 1px solid var(--ai-line);
+  padding-top: 16px;
+}
+@media (max-width: 480px) {
+  .provider-settings {
+    gap: 20px;
+  }
+  .ai-intro h3 {
+    font-size: 22px;
+  }
+  .ai-intro-mascot {
+    padding: 3px;
+  }
+  .ai-account {
+    gap: 10px;
+    padding: 16px 12px;
+    flex-wrap: wrap;
+  }
+  .ai-account-copy {
+    flex-basis: calc(100% - 54px);
+  }
+  .ai-account > :is(.ai-action, .ai-signed-in, .ai-state) {
+    margin-left: 46px;
+    max-width: none;
+    text-align: left;
+  }
+  .ai-teammate-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ai-form {
+    padding: 16px;
+  }
+  .provider-settings :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}

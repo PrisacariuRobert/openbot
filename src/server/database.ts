@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
+import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
 import type {
   Activity,
   AgentMessage,
@@ -671,6 +672,7 @@ export class OpenBotDatabase {
     this.addColumn("code_project_edits", "restored_at TEXT");
     if (!hadRoutineInterval) this.db.exec("UPDATE routines SET interval_minutes=CASE cadence WHEN 'hourly' THEN 60 ELSE 1440 END");
     this.addColumn("provider_instances", "runtime TEXT NOT NULL DEFAULT 'opencode'");
+    this.addColumn("provider_instances", "api_config_json TEXT");
     this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
@@ -1492,6 +1494,7 @@ export class OpenBotDatabase {
     const serviceErrors = this.listConnectorServiceErrors().map((item) => item.service).sort();
     return JSON.stringify({
       bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled } : null,
+      providerConfig: bot ? this.providerForBot(bot.id)?.apiConfig || null : null,
       macAccessEnabled: this.getStudioSettings().macAccessEnabled,
       connectors, serviceErrors,
       codeProjects,
@@ -1578,6 +1581,7 @@ export class OpenBotDatabase {
       id: String(row.id), ownerId: String(row.owner_id), provider: row.provider as ProviderInstance["provider"], name: String(row.name),
       authMode: row.auth_mode as ProviderInstance["authMode"], envName: row.env_name ? String(row.env_name) : null,
       runtime: (row.runtime || "opencode") as ProviderInstance["runtime"], hasSecret: Boolean(row.secret_ciphertext),
+      apiConfig: row.api_config_json ? JSON.parse(String(row.api_config_json)) : null,
       createdAt: String(row.created_at), updatedAt: String(row.updated_at),
     }));
   }
@@ -1591,28 +1595,31 @@ export class OpenBotDatabase {
     return bot?.providerInstanceId ? this.getProvider(bot.providerInstanceId) : null;
   }
 
-  upsertProvider(input: { id?: string; name: string; provider?: ProviderInstance["provider"]; authMode: ProviderInstance["authMode"]; runtime?: ProviderInstance["runtime"]; envName?: string | null; secret?: string | null }): ProviderInstance {
+  upsertProvider(rawInput: ProviderInput): ProviderInstance {
+    const input = providerInput.parse(rawInput);
     const id = input.id || randomUUID();
     const existing = this.db.prepare("SELECT * FROM provider_instances WHERE id=?").get(id) as Row | undefined;
     const encrypted = input.secret ? this.vault.encrypt(input.secret) : existing?.secret_ciphertext || null;
     const at = now();
-    this.db.prepare(`INSERT INTO provider_instances (id,owner_id,provider,name,auth_mode,runtime,env_name,secret_ciphertext,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET name=excluded.name,provider=excluded.provider,auth_mode=excluded.auth_mode,runtime=excluded.runtime,env_name=excluded.env_name,secret_ciphertext=excluded.secret_ciphertext,updated_at=excluded.updated_at`).run(
-      id, DEFAULT_OWNER, input.provider || "custom", input.name, input.authMode, input.runtime || "opencode", input.envName || null, encrypted, existing?.created_at || at, at,
+    const apiConfig = input.apiConfig === undefined ? existing?.api_config_json || null : input.apiConfig ? JSON.stringify(input.apiConfig) : null;
+    if (apiConfig && !encrypted && !isLocalModelUrl(JSON.parse(String(apiConfig)).baseUrl)) throw new Error("Add an API key for this hosted provider.");
+    this.db.prepare(`INSERT INTO provider_instances (id,owner_id,provider,name,auth_mode,runtime,env_name,secret_ciphertext,created_at,updated_at,api_config_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,provider=excluded.provider,auth_mode=excluded.auth_mode,runtime=excluded.runtime,env_name=excluded.env_name,secret_ciphertext=excluded.secret_ciphertext,updated_at=excluded.updated_at,api_config_json=excluded.api_config_json`).run(
+      id, DEFAULT_OWNER, input.provider || "custom", input.name, input.authMode, input.runtime || "opencode", apiConfig ? MODEL_KEY_ENV : input.envName || null, encrypted, existing?.created_at || at, at, apiConfig,
     );
     return this.listProviders().find((provider) => provider.id === id)!;
   }
 
   providerEnvironment(botId: string): Record<string, string> {
-    const row = this.db.prepare(`SELECT p.env_name,p.secret_ciphertext FROM bots b JOIN provider_instances p ON p.id=b.provider_instance_id WHERE b.id=?`).get(botId) as Row | undefined;
-    if (!row?.env_name || !row.secret_ciphertext) return {};
-    return { [String(row.env_name)]: this.vault.decrypt(String(row.secret_ciphertext)) };
+    const provider = this.providerForBot(botId);
+    return provider ? this.providerEnvironmentById(provider.id) : {};
   }
 
   providerEnvironmentById(providerId: string): Record<string, string> {
-    const row = this.db.prepare("SELECT env_name,secret_ciphertext FROM provider_instances WHERE id=?").get(providerId) as Row | undefined;
-    if (!row?.env_name || !row.secret_ciphertext) return {};
-    return { [String(row.env_name)]: this.vault.decrypt(String(row.secret_ciphertext)) };
+    const provider = this.getProvider(providerId);
+    if (!provider || provider.authMode !== "api_key") return {};
+    const row = this.db.prepare("SELECT secret_ciphertext FROM provider_instances WHERE id=?").get(providerId) as Row;
+    return apiRuntimeEnvironment(provider, row.secret_ciphertext ? this.vault.decrypt(String(row.secret_ciphertext)) : null);
   }
 
   private connectorFromRow(row: Row): ConnectorConnection {

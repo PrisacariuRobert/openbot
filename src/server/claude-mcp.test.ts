@@ -1,12 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 const bridgePath = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
+
+test("Claude bridge omits disabled tools and rejects direct calls to them", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "openbot-claude-capabilities-"));
+  try {
+    const requests = [
+      { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "workspace_write", arguments: { path: "blocked.txt", content: "must not write" } } },
+    ];
+    const result = spawnSync(process.execPath, [bridgePath], {
+      env: { OPENBOT_WORKSPACE: workspace, OPENBOT_TOOL_AVAILABILITY: JSON.stringify({ gmail_search: false, workspace_write: false }) },
+      input: requests.map((request) => JSON.stringify(request)).join("\n") + "\n",
+      encoding: "utf8", timeout: 4_000,
+    });
+    assert.equal(result.status, 0, result.error?.message || result.stderr);
+    const responses = result.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    const exposed = responses.find((response) => response.id === 1)?.result.tools.map((tool: { name: string }) => tool.name);
+    assert.ok(exposed.includes("workspace_read"));
+    assert.ok(!exposed.includes("gmail_search"));
+    assert.ok(!exposed.includes("workspace_write"));
+    assert.equal(responses.find((response) => response.id === 2)?.result.isError, true);
+    assert.equal(existsSync(path.join(workspace, "blocked.txt")), false);
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+});
 
 test("Claude bridge exposes tools while keeping file access inside the bot workspace", async () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "openbot-claude-workspace-"));

@@ -1,8 +1,10 @@
 # Workflow Benchmark
 
+> Historical implementation/demo inventory through 0.28.0. These rows combine past local demos, mocked connectors and source/fixture checks. They are **not fresh, repeated head-to-head measurements**. “Pass” below describes the reported historical observation, not general workflow reliability. Comparative phrases such as “stronger” are design hypotheses, not measured superiority. Use [the current product audit](PRODUCT_GAP_AUDIT.md) and [0.29 validation](QA_0.29.md) for release decisions.
+
 This benchmark uses workflows repeatedly highlighted in Grok Bot's official use cases and community feedback: async one-shot work, engineering review, persistent browser/admin work, routines, team handoffs, and document/file reconciliation.
 
-## Results
+## Historical observations — not a parity score
 
 | Workflow | OpenBot result | Evidence | Current comparison |
 |---|---|---|---|
