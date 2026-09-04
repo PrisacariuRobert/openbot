@@ -59,7 +59,9 @@ test(
   async () => {
     const f = fixture(
       'process.on("SIGTERM", () => {}); console.log(JSON.stringify({type:"text",text:"Partial work"})); setInterval(()=>{},1000)',
-      { maxIdleMs: 100 },
+      // Allow process startup under concurrent CI load, then exercise the idle
+      // kill path. A 100 ms total window can expire before Node prints at all.
+      { maxIdleMs: 500 },
     );
     try {
       const run = await f.start();

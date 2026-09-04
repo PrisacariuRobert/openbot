@@ -139,6 +139,9 @@ test("keeps simultaneous coding tasks in isolated Git worktrees", () => {
     assert.equal(db.getCodeProjectEdit(firstEdit.editId)?.workspaceRunId, firstRun.id);
 
     manager.commit("nova", project.id, "Finish first task", ["value.ts"], firstRun.id);
+    assert.throws(() => manager.prepareIndependentReview("nova", project.id, firstRun.id), /Run project checks/);
+    // Storage-level fixture for review binding; real commands are covered by code-checks.test.ts.
+    db.saveCodeCheck({ id: "fixture-check", runId: firstRun.id, projectId: project.id, command: "fixture", headCommit: manager.currentCommit("nova", project.id, firstRun.id), status: "passed", exitCode: 0, startedAt: "2026-09-05T00:00:00Z", finishedAt: "2026-09-05T00:00:01Z", detail: "Test fixture" });
     const preparedReview = manager.prepareIndependentReview("nova", project.id, firstRun.id);
     assert.match(preparedReview.review.diff, /Committed task changes/);
     assert.match(preparedReview.review.diff, /value = 'first'/);

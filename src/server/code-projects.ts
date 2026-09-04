@@ -5,6 +5,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import type { CodeProject, CodeProjectReview, CodeProjectSuggestion } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { passingCodeChecks } from "../shared/code-checks.js";
+import { githubCliEnvironment } from "./github.js";
 
 const SKIP_DIRECTORIES = new Set([".git", ".openbot", "node_modules", "dist", "build", "coverage", ".next", ".turbo", "vendor"]);
 const SAFE_HIDDEN_DIRECTORIES = new Set([".github"]);
@@ -75,14 +77,14 @@ export class CodeProjectManager {
   }
 
   private git(project: CodeProject, args: string[], timeout = 15_000) {
-    const result = spawnSync("git", args, { cwd: project.rootPath, encoding: "utf8", timeout, maxBuffer: 1_500_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+    const result = spawnSync("git", args, { cwd: project.rootPath, encoding: "utf8", timeout, maxBuffer: 1_500_000, env: githubCliEnvironment() });
     if (result.error || result.status !== 0) throw new Error(safeGitError(result.stderr || result.error?.message));
     return String(result.stdout || "");
   }
 
   private async command(command: string, args: string[], options: { cwd: string; timeout?: number; env?: NodeJS.ProcessEnv }) {
     return await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      const child = spawn(command, args, { cwd: options.cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GH_PROMPT_DISABLED: "1", ...options.env }, stdio: ["ignore", "pipe", "pipe"] });
+      const child = spawn(command, args, { cwd: options.cwd, env: { ...githubCliEnvironment(), ...options.env }, stdio: ["ignore", "pipe", "pipe"] });
       let stdout = "", stderr = "", settled = false;
       const timer = setTimeout(() => { child.kill("SIGKILL"); if (!settled) { settled = true; reject(new Error(`${command} took too long and was stopped.`)); } }, options.timeout || 120_000);
       child.stdout.on("data", (chunk) => { if (stdout.length < 1_500_000) stdout += String(chunk); });
@@ -143,6 +145,17 @@ export class CodeProjectManager {
 
   forRun(botId: string, projectId: string, runId?: string): CodeProject {
     return this.project(botId, projectId, "run", runId);
+  }
+
+  checkIdentity(botId: string, projectId: string, runId: string) {
+    const project = this.project(botId, projectId, "read", runId);
+    return { headCommit: this.git(project, ["rev-parse", "HEAD"]).trim(), clean: !this.git(project, ["status", "--porcelain", "--untracked-files=all"]).trim() };
+  }
+
+  assertCheckedCommit(botId: string, projectId: string, runId: string) {
+    const identity = this.checkIdentity(botId, projectId, runId);
+    if (!identity.clean) throw new Error("The code changed since its checks. Commit the intended files and rerun checks before review or publishing.");
+    return passingCodeChecks(this.db.listCodeChecks(runId).filter((receipt) => receipt.projectId === projectId), identity.headCommit);
   }
 
   private resolveFile(project: CodeProject, requested = "", allowMissing = false): { target: string; relative: string } {
@@ -281,7 +294,8 @@ export class CodeProjectManager {
     const review = this.review(botId, projectId, runId);
     if (!review.diff) throw new Error("No visible code changes are available for review.");
     if (review.truncated) throw new Error("This change is too large for one bounded independent review. Split it into a smaller task first.");
-    return { project, workspace, review, headCommit, base };
+    const checks = this.assertCheckedCommit(botId, projectId, runId);
+    return { project, workspace, review, headCommit, base, checks };
   }
 
   currentCommit(botId: string, projectId: string, runId: string) {
@@ -372,12 +386,17 @@ export class CodeProjectManager {
     return { project, repository, branch, base };
   }
 
-  async publishPullRequest(botId: string, projectId: string, input: { title: string; body: string; base?: string; draft?: boolean }, runId?: string) {
+  async publishPullRequest(botId: string, projectId: string, input: { title: string; body: string; base?: string; draft?: boolean; expectedHeadCommit?: string }, runId?: string) {
     const prepared = this.preparePublish(botId, projectId, input.base, runId), title = input.title.trim(), body = input.body.trim();
+    if (!runId || !input.expectedHeadCommit || this.currentCommit(botId, projectId, runId) !== input.expectedHeadCommit) throw new Error("The code no longer matches the commit approved for publishing. Review and approve the new commit first.");
+    this.assertCheckedCommit(botId, projectId, runId);
+    const review = this.db.latestCodeTaskReview(runId);
+    if (!review || review.verdict !== "approved" || review.headCommit !== input.expectedHeadCommit) throw new Error("This exact commit still needs an independent code review.");
     if (!title || title.length > 160 || !body || body.length > 10_000) throw new Error("Give the pull request a clear title and review summary.");
     const repo = `${prepared.repository.owner}/${prepared.repository.name}`;
     await this.command("gh", ["auth", "status", "--hostname", "github.com"], { cwd: prepared.project.rootPath, timeout: 15_000 });
-    await this.command("git", ["-c", "core.hooksPath=/dev/null", "push", "--no-verify", "--set-upstream", "origin", prepared.branch], { cwd: prepared.project.rootPath, timeout: 120_000 });
+    // Push the approved object, never a movable local branch/HEAD reference.
+    await this.command("git", ["-c", "core.hooksPath=/dev/null", "push", "--no-verify", "origin", `${input.expectedHeadCommit}:refs/heads/${prepared.branch}`], { cwd: prepared.project.rootPath, timeout: 120_000 });
     try {
       const existing = await this.command("gh", ["pr", "view", prepared.branch, "--repo", repo, "--json", "url"], { cwd: prepared.project.rootPath, timeout: 20_000 });
       const url = (JSON.parse(existing.stdout) as { url?: string }).url;

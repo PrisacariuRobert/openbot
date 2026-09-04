@@ -2,7 +2,7 @@
 
 Audit date: 4 September 2026. Baseline: 0.28.0, commit `88b8de9`. Remediation: **0.29.0 development branch**, not a published release.
 
-Follow-up, 5 September 2026: 0.30 adds bounded execution and live reported-usage checkpoints. It leaves the visual design unchanged. See [the functional validation record](QA_0.30.md). The broader workflow and security milestones below remain open.
+Follow-up, 5 September 2026: 0.31 turns briefs/follow-ups into source-backed report workflows and adds host-recorded code checks bound to an exact clean commit. 0.30's execution/usage safeguards remain in place. See [current functional validation](QA_0.31.md). These changes advance M2; they do not complete its two-model repeated acceptance gate or the remaining security milestones.
 
 ## Verdict
 
@@ -105,6 +105,7 @@ Do not add another connector until at least one complete workflow using existing
 
 - `npm run verify`: unit/integration fixtures, TypeScript, build and source-contract smoke checks; it is not a competitor benchmark or a physical iPhone test.
 - `npm run test:provider-runtime`: installed OpenCode against a disposable local model endpoint. Checks real transport, scoped credentials, model IDs and streamed output. No real account usage.
+- `npm run test:productivity-runtime`: installed OpenCode, generated tools, report validation/storage and automatic result attachment against scripted local model replies and synthetic app data. Integration evidence, not a model reasoning score.
 - `OPENBOT_BENCHMARK_MODEL=opencode/<model-id> npm run benchmark:workflows`: explicit live-model allowance usage, isolated database, source-to-artifact and consultation checks with independent oracles. Two bounded workflows do not establish broad parity.
 
 See [0.29 validation record](QA_0.29.md) for results and remaining release gates. Historical demo claims are retained separately in [Workflow Benchmark](WORKFLOW_BENCHMARK.md), not promoted to current head-to-head results.

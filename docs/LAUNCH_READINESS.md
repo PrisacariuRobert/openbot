@@ -1,4 +1,6 @@
-# OpenBot 0.30.0 Launch Readiness
+# OpenBot 0.31.0 Launch Readiness
+
+0.31 adds source-backed brief/follow-up reports and host-recorded coding checks bound to the published commit. See [current validation](QA_0.31.md). These are functional improvements with bounded fixtures, not completion of the repeated two-model acceptance gate. Google consent/setup, fresh-user onboarding, full native settings, stronger runtime/egress isolation, crash-safe external-action reconciliation, signed distribution and physical-device/cellular checks remain open.
 
 0.30 adds bounded execution and reported-usage protection; see [current validation](QA_0.30.md). The historical evidence below is not a new end-to-end certification. The application remains an owner-operated development beta; broad launch gates remain open.
 

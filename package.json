@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "private": true,
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",
@@ -14,6 +14,7 @@
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "test": "tsx --test src/**/*.test.ts",
     "test:provider-runtime": "tsx scripts/test-provider-runtime.ts",
+    "test:productivity-runtime": "tsx scripts/test-productivity-runtime.ts",
     "benchmark:workflows": "tsx scripts/benchmark-workflows.ts",
     "check": "tsc --noEmit",
     "check:ios": "node scripts/check-ios.mjs",

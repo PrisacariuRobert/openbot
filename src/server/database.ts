@@ -51,6 +51,8 @@ import { SecretVault } from "./vault.js";
 import { legacyCadence, normalizeRoutineInterval, routineIntervalMs } from "../shared/routines.js";
 import { skillSlug } from "../shared/skills.js";
 import type { AttachmentAnalysis } from "./attachments.js";
+import type { WorkSnapshot, WorkReport } from "../shared/work-reports.js";
+import type { CodeCheckReceipt } from "../shared/code-checks.js";
 import { automationRepairHint, normalizedTriggerConfig } from "./automations.js";
 
 type Row = Record<string, string | number | null>;
@@ -123,6 +125,38 @@ export class OpenBotDatabase {
 
   close() {
     this.db.close();
+  }
+
+  saveWorkSnapshot(snapshot: WorkSnapshot) {
+    this.db.prepare("INSERT INTO work_snapshots (id, run_id, created_at, snapshot_encrypted) VALUES (?, ?, ?, ?)")
+      .run(snapshot.id, snapshot.runId, snapshot.fetchedAt, this.vault.encrypt(JSON.stringify(snapshot)));
+  }
+
+  listWorkSnapshots(runId: string): WorkSnapshot[] {
+    return (this.db.prepare("SELECT snapshot_encrypted FROM work_snapshots WHERE run_id=? ORDER BY created_at DESC, rowid DESC LIMIT 3").all(runId) as Row[])
+      .map((row) => JSON.parse(this.vault.decrypt(String(row.snapshot_encrypted))) as WorkSnapshot);
+  }
+
+  getWorkReport(snapshotId: string): WorkReport | null {
+    const row = this.db.prepare("SELECT report_encrypted FROM work_snapshots WHERE id=?").get(snapshotId) as Row | undefined;
+    return row?.report_encrypted ? JSON.parse(this.vault.decrypt(String(row.report_encrypted))) as WorkReport : null;
+  }
+
+  saveWorkReport(report: WorkReport) {
+    // A retry cannot silently replace a result already delivered.
+    const result = this.db.prepare("UPDATE work_snapshots SET report_encrypted=? WHERE id=? AND report_encrypted IS NULL")
+      .run(this.vault.encrypt(JSON.stringify(report)), report.snapshotId);
+    if (result.changes !== 1) throw new Error("That result is already saved or its source snapshot is missing.");
+  }
+
+  saveCodeCheck(receipt: CodeCheckReceipt) {
+    this.db.prepare("INSERT INTO code_check_receipts (id, run_id, receipt_encrypted) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET receipt_encrypted=excluded.receipt_encrypted")
+      .run(receipt.id, receipt.runId, this.vault.encrypt(JSON.stringify(receipt)));
+  }
+
+  listCodeChecks(runId: string): CodeCheckReceipt[] {
+    return (this.db.prepare("SELECT receipt_encrypted FROM code_check_receipts WHERE run_id=? ORDER BY rowid DESC LIMIT 100").all(runId) as Row[])
+      .map((row) => JSON.parse(this.vault.decrypt(String(row.receipt_encrypted))) as CodeCheckReceipt);
   }
 
   private hasColumn(table: string, column: string): boolean {
@@ -575,6 +609,20 @@ export class OpenBotDatabase {
         head_commit TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS code_check_receipts (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        receipt_encrypted TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS code_check_receipts_run ON code_check_receipts(run_id);
+      CREATE TABLE IF NOT EXISTS work_snapshots (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        snapshot_encrypted TEXT NOT NULL,
+        report_encrypted TEXT
+      );
+      CREATE INDEX IF NOT EXISTS work_snapshots_run ON work_snapshots(run_id, created_at);
       CREATE INDEX IF NOT EXISTS messages_thread_created ON messages(thread_id, created_at);
       CREATE INDEX IF NOT EXISTS message_reactions_message ON message_reactions(message_id, created_at);
       CREATE INDEX IF NOT EXISTS attachments_message_created ON attachments(message_id, created_at);

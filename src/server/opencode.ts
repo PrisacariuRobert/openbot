@@ -64,6 +64,7 @@ function friendlyToolActivity(rawName: string, title: string | null): ToolActivi
     code_projects: "Checking shared code projects", code_list: "Reading the project structure", code_search: "Searching the code", code_read: "Reading a project file",
     code_write: "Saving a code change", code_replace: "Applying a focused code change", code_status: "Reviewing project changes", code_diff: "Reading the code diff",
     code_branch: "Starting an isolated work branch", code_commit: "Saving a reviewed checkpoint", code_request_review: "Asking for an independent code review", code_review_result: "Recording the independent review", code_publish_pr: "Preparing a pull request for your approval", code_run: "Running project checks",
+    work_collect: "Gathering your briefing sources", work_report: "Preparing your source-linked result",
     task_plan: "Setting the finish line", task_progress: "Moving the job forward", task_verify: "Checking the finished work",
     routine_create: "Setting up your routine",
     message_teammate: "Checking in with a teammate", request_approval: "Checking with you first",
@@ -361,7 +362,7 @@ export class OpenCodeRunner {
     const mcpConfig = JSON.stringify({ mcpServers: { openbot: { command: process.execPath, args: [CLAUDE_MCP_PATH] } } });
     const claudeTools = ["mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_calendar_agenda", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__slack_search", "mcp__openbot__slack_read", "mcp__openbot__slack_post", "mcp__openbot__notion_search", "mcp__openbot__notion_read", "mcp__openbot__notion_update", "mcp__openbot__todoist_tasks", "mcp__openbot__todoist_task_create", "mcp__openbot__dropbox_search", "mcp__openbot__dropbox_read", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__routine_create", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval"].join(",");
     const args = useClaude
-      ? ["-p", "--output-format", "stream-json", "--verbose", "--model", bot.model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", claudeTools, ...(previousSession ? ["--resume", previousSession] : []), prompt]
+      ? ["-p", "--output-format", "stream-json", "--verbose", "--model", bot.model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", `${claudeTools},mcp__openbot__work_collect,mcp__openbot__work_report`, ...(previousSession ? ["--resume", previousSession] : []), prompt]
       : ["run", "--auto", "--format", "json", "--model", bot.model, "--dir", workspace, ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
     const child = (this.options.spawnProcess || spawn)(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
     this.running.set(run.id, child);
@@ -498,7 +499,12 @@ export class OpenCodeRunner {
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "handoff", label: pendingNames.length ? `Waiting for ${pendingNames.join(" and ")}` : "Bringing the team's ideas together", detail: null });
         this.resumeCoordinatorIfReady(run.id);
       } else if (code === 0 && responseText.trim()) {
-        const summary = responseText.trim();
+        const reports = this.options.db.listWorkSnapshots(run.id).filter((snapshot) => this.options.db.getWorkReport(snapshot.id));
+        const receipt = reports.length ? "\n\n" + reports.map((snapshot) => {
+          const report = this.options.db.getWorkReport(snapshot.id)!;
+          return `**Sources:** ${snapshot.sources.length} checked · ${snapshot.coverage.some((entry) => entry.state !== "complete") ? "some coverage is missing" : "checked within the saved scope"}${report.drafts.length ? ` · ${report.drafts.length} unsent reply draft${report.drafts.length === 1 ? "" : "s"}` : ""}. [Saved report](/api/work-reports/${snapshot.id}). OpenBot checked the source links and recipients; please review the recommendations. The report itself did not change anything in your connected apps.`;
+        }).join("\n\n") : "";
+        const summary = responseText.trim() + receipt;
         this.options.db.updateRun(run.id, { ...finalUsage, status: "completed", finishedAt, summary, partialText: null, error: null });
         this.options.db.finishRunTask(run.id, "completed");
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
@@ -507,7 +513,8 @@ export class OpenCodeRunner {
         } else {
           const message = this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id });
           try {
-            const artifacts = await this.options.attachments.captureArtifacts(bot, message, summary);
+            const workArtifacts = await this.options.attachments.captureWorkReports(message);
+            const artifacts = [...workArtifacts, ...await this.options.attachments.captureArtifacts(bot, message, summary)];
             if (artifacts.length) this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "file", label: artifacts.length === 1 ? "Prepared your result file" : `Prepared ${artifacts.length} result files`, detail: artifacts.map((artifact) => artifact.name).join(", ") });
           } catch { /* A finished answer remains useful even if a result card cannot be prepared. */ }
         }

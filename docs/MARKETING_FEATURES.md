@@ -1,9 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 5, 2026
-Release: 0.30.0 development beta — not yet published
+Release: 0.31.0 development beta — not yet published
 
-New in this pass: execution deadlines, idle/step/output limits, provider-reported in-flight token checks, saved usage across resumes, and stop controls covering nested consultations. These reduce runaway execution; they are not guaranteed monetary caps, exactly-once effects, or a full process/network sandbox. See [validation and remaining limits](QA_0.30.md). No new end-to-end live-model productivity claim is made in this pass.
+New in this pass: bounded source-backed Gmail/Calendar briefs, local unsent reply drafts with source-bound recipients, encrypted source snapshots, automatic report attachments, and coding-command evidence tied to the reviewed/published commit. See [validation and remaining limits](QA_0.31.md). Safe claim: **“See the sources, review the drafts, and know which code checks actually ran.”** Do not claim complete inbox coverage, independently verified AI advice, guaranteed bug fixes, or comparative model-quality superiority.
 
 Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 

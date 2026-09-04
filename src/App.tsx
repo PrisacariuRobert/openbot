@@ -5098,17 +5098,17 @@ function ConnectorPanel({
               <div>
                 <h3>Ready-made jobs</h3>
                 <p>
-                  Each one gathers the facts, produces something useful, and
-                  checks its own work.
+                  Useful starting points. Briefs and inbox follow-ups save their
+                  sources and show what could—and couldn’t—be checked.
                 </p>
               </div>
             </div>
             <div className="workflow-starters">
               <button
-                disabled={!gmailReady || !calendarReady}
+                disabled={!gmailReady && !calendarReady}
                 onClick={() =>
                   void onStartWorkflow(
-                    "Use @calendar and @gmail to create my morning brief for the next 24 hours. Deliver one concise brief with: today’s schedule, important unread mail, decisions I owe, preparation needed, and direct source links. Check dates, remove duplicates, and confirm every claim comes from a calendar event or email. Do not send or change anything.",
+                    `Prepare my morning brief for the next 24 hours in ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Check my primary calendar and unread inbox conversations from the past seven days. Give me a short schedule and source-linked priorities, save a report, and tell me if anything could not be checked. Separate suggestions from facts. Do not send or change anything.`,
                   )
                 }
               >
@@ -5118,7 +5118,7 @@ function ConnectorPanel({
                 <div>
                   <strong>Morning brief</strong>
                   <small>
-                    A checked plan for today, with every source linked
+                    Your schedule and priorities, with sources and coverage
                   </small>
                 </div>
                 <ArrowUp size={14} />
@@ -5146,7 +5146,7 @@ function ConnectorPanel({
                 disabled={!gmailReady}
                 onClick={() =>
                   void onStartWorkflow(
-                    "Use @gmail to find important messages from the last seven days that are genuinely waiting on me. Read the full relevant messages, group them by urgency, explain the evidence for each choice, and deliver short reply drafts in my voice. Verify dates and recipients and exclude anything already answered. Do not send anything unless I separately approve the exact email.",
+                    `Prepare my inbox follow-ups in ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Check inbox conversations from the past seven days. Suggest source-linked priorities and save useful reply drafts for me to review. Skip conversations I have already answered and flag any missing or shortened context. Save the report. Do not send or change anything.`,
                   )
                 }
               >
@@ -5154,9 +5154,9 @@ function ConnectorPanel({
                   <Mail size={16} />
                 </span>
                 <div>
-                  <strong>Clear my follow-ups</strong>
+                  <strong>Prepare my follow-ups</strong>
                   <small>
-                    Verified open loops with reviewable reply drafts
+                    Suggested priorities and reply drafts—nothing sent
                   </small>
                 </div>
                 <ArrowUp size={14} />

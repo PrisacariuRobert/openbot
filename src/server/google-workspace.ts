@@ -7,6 +7,42 @@ type GoogleTokenResponse = { access_token?: string; refresh_token?: string; expi
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = { mimeType?: string; body?: { data?: string; attachmentId?: string }; parts?: GmailPart[]; headers?: GmailHeader[] };
 type GmailMessage = { id?: string; threadId?: string; labelIds?: string[]; snippet?: string; internalDate?: string; payload?: GmailPart };
+export interface WorkMailThread {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  text: string;
+  truncated: boolean;
+  replyState: "received_last" | "sent_last" | "unknown";
+  replyTo: string | null;
+}
+
+function singleReplyAddress(value: string): string | null {
+  // Ambiguous/group addresses require manual review; never invent a recipient.
+  const match = value.trim().match(/^(?:[^<>\r\n]*<([^<>\s,;]+)>|([^<>\s,;]+))$/);
+  const address = match?.[1] || match?.[2] || "";
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address) ? address : null;
+}
+
+export function decodeWorkThread(id: string, messages: GmailMessage[]): WorkMailThread {
+  const visible = messages.filter((message) => !message.labelIds?.includes("DRAFT"));
+  const knownOrder = visible.length > 0 && visible.every((message) => Number(message.internalDate) > 0);
+  const sorted = [...visible].sort((a, b) => Number(a.internalDate || 0) - Number(b.internalDate || 0));
+  const last = sorted.at(-1);
+  const detail = decodeGmailMessage(last || {});
+  const excerpts = sorted.slice(-4).map((message) => {
+    const decoded = decodeGmailMessage(message);
+    return `${decoded.from.slice(0, 160)} · ${decoded.date.slice(0, 100)}\n${(decoded.body || decoded.snippet).slice(0, 700)}`;
+  }).join("\n\n---\n\n");
+  return {
+    id, subject: detail.subject, from: detail.from, date: detail.date,
+    text: excerpts.slice(0, 4_000),
+    truncated: sorted.length > 4 || excerpts.length > 4_000 || sorted.slice(-4).some((message) => !plainText(message.payload) || plainText(message.payload).length > 700),
+    replyState: !knownOrder || !last?.labelIds ? "unknown" : last.labelIds.includes("SENT") ? "sent_last" : "received_last",
+    replyTo: singleReplyAddress(header(last?.payload, "Reply-To") || detail.from),
+  };
+}
 
 const CONNECTOR_ID = "google-workspace";
 function serviceForGoogleUrl(url: string): GoogleConnectorService {
@@ -48,6 +84,31 @@ function header(part: GmailPart | undefined, name: string) {
 
 function decodeBase64Url(value = "") {
   try { return Buffer.from(value, "base64url").toString("utf8"); } catch { return ""; }
+}
+
+async function boundedGoogleJson<T>(response: Response): Promise<T> {
+  const maximum = 2 * 1024 * 1024;
+  if (Number(response.headers.get("content-length")) > maximum) {
+    await response.body?.cancel();
+    throw new Error("This Google response is too large for one check. Narrow the request.");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Google returned an empty response.");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maximum) {
+        await reader.cancel();
+        throw new Error("This Google response is too large for one check. Narrow the request.");
+      }
+      chunks.push(value);
+    }
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
+  } finally { reader.releaseLock(); }
 }
 
 function htmlText(value: string) {
@@ -191,6 +252,31 @@ export class GoogleWorkspaceConnector {
     return decoded;
   }
 
+  async workInbox(query: string, signal: AbortSignal): Promise<{ ids: string[]; hasMore: boolean }> {
+    const result = await this.request<{ threads?: { id: string }[]; nextPageToken?: string }>(`/gmail/v1/users/me/threads?${new URLSearchParams({ q: query, maxResults: "8" })}`, { signal });
+    return { ids: [...new Set((result.threads || []).map((thread) => thread.id))].slice(0, 8), hasMore: Boolean(result.nextPageToken) };
+  }
+
+  async workThread(id: string, signal: AbortSignal): Promise<WorkMailThread> {
+    if (!/^[A-Za-z0-9_-]{4,200}$/.test(id)) throw new Error("Choose a valid Gmail conversation.");
+    const thread = await this.request<{ id?: string; messages?: GmailMessage[] }>(`/gmail/v1/users/me/threads/${encodeURIComponent(id)}?format=full`, { signal });
+    if (thread.id !== id || !thread.messages?.length) throw new Error("That conversation could not be read.");
+    return decodeWorkThread(id, thread.messages);
+  }
+
+  async workCalendar(from: string, until: string, timeZone: string, signal: AbortSignal) {
+    const params = new URLSearchParams({ timeMin: from, timeMax: until, timeZone, singleEvents: "true", orderBy: "startTime", maxResults: "20" });
+    const result = await this.request<{ nextPageToken?: string; items?: Array<{ id?: string; status?: string; summary?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string }; description?: string; htmlLink?: string; location?: string }> }>(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, { signal });
+    return {
+      hasMore: Boolean(result.nextPageToken),
+      events: (result.items || []).filter((event) => event.id && event.status !== "cancelled").slice(0, 20).map((event) => ({
+        id: event.id!, title: (event.summary || "Busy").slice(0, 300), start: event.start?.dateTime || event.start?.date || "", end: event.end?.dateTime || event.end?.date || "",
+        allDay: Boolean(event.start?.date && !event.start.dateTime), description: (event.description || "").slice(0, 1500), truncated: (event.description || "").length > 1500,
+        location: (event.location || "").slice(0, 300), webLink: event.htmlLink || "",
+      })),
+    };
+  }
+
   async send(input: { to: string; cc?: string; subject: string; body: string }): Promise<{ id: string; threadId: string }> {
     const result = await this.request<{ id?: string; threadId?: string }>("/gmail/v1/users/me/messages/send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ raw: buildRawEmail(input) }) });
     if (!result.id) throw new Error("Gmail did not confirm that the message was sent.");
@@ -234,7 +320,7 @@ export class GoogleWorkspaceConnector {
   }
 
   private async tokenRequest(parameters: Record<string, string>) {
-    const response = await this.fetcher("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(parameters) });
+    const response = await this.fetcher("https://oauth2.googleapis.com/token", { method: "POST", signal: AbortSignal.timeout(15_000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(parameters) });
     const result = await response.json().catch(() => ({})) as GoogleTokenResponse;
     if (!response.ok) throw new Error(result.error_description || result.error || "Google sign-in could not be completed.");
     return result;
@@ -260,9 +346,9 @@ export class GoogleWorkspaceConnector {
   private async request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
     const token = await this.accessToken(retried);
     const url = /^https:\/\//.test(path) ? path : `https://gmail.googleapis.com${path}`;
-    const response = await this.fetcher(url, { ...init, headers: { authorization: `Bearer ${token}`, ...init.headers } });
+    const response = await this.fetcher(url, { ...init, signal: init.signal || AbortSignal.timeout(20_000), headers: { authorization: `Bearer ${token}`, ...init.headers } });
     if (response.status === 401 && !retried) return this.request<T>(path, init, true);
-    const body = await response.json().catch(() => ({})) as T & { error?: { message?: string } };
+    const body = await boundedGoogleJson<T & { error?: { message?: string } }>(response);
     const service = serviceForGoogleUrl(url);
     if (!response.ok) {
       const message = body.error?.message || `Gmail returned ${response.status}.`;

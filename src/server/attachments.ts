@@ -309,4 +309,31 @@ export class AttachmentService {
     }
     return captured;
   }
+
+  async captureWorkReports(message: Message): Promise<Attachment[]> {
+    if (!message.runId) return [];
+    const captured: Attachment[] = [];
+    for (const snapshot of this.db.listWorkSnapshots(message.runId)) {
+      const report = this.db.getWorkReport(snapshot.id);
+      if (!report) continue;
+      const name = `${snapshot.kind === "morning" ? "morning-brief" : "inbox-follow-ups"}-${snapshot.fetchedAt.slice(0, 10)}.md`;
+      const directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, report.markdown, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(report.markdown), storagePath: destination, analysis, source: "artifact", artifactKey: `work-report:${snapshot.id}`, revision: 1 }));
+    }
+    const checks = this.db.listCodeChecks(message.runId);
+    if (checks.length) {
+      const name = "code-checks.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      const content = ["# Recorded code checks", "Host-recorded command results, newest first. A pass records an exit status against a clean commit, not proof of meaningful test coverage. Compare the exact commit with the code you plan to use; old checks do not cover later changes.", ...checks.map((check) => `## ${check.status} · ${check.headCommit.slice(0, 12)}\n\n${check.finishedAt || "Not finished"} · Exit: ${check.exitCode ?? "not available"}\n\n    ${check.command.replace(/\n/g, "\n    ")}\n\n${check.detail}`)].join("\n\n");
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `code-checks:${message.runId}`, revision: 1 }));
+    }
+    return captured;
+  }
 }

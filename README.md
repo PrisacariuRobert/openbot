@@ -1,10 +1,23 @@
-# OpenBot 0.30.0
+# OpenBot 0.31.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.30.0
+## What's new in 0.31.0
+
+This functional beta strengthens three everyday jobs: morning briefs, inbox follow-ups, and checked code changes. It preserves the existing animated, recolorable mascots. It is **not yet a verified drop-in Grok Bot replacement**; see [the validation record](docs/QA_0.31.md).
+
+- **Source-backed briefs:** a bounded Gmail/primary-calendar snapshot, a stated time zone and 24-hour window, direct source links, and explicit missing/shortened coverage. Start from **Apps & Tools → Morning brief**, or ask naturally in chat.
+- **Inbox follow-ups:** suggested priorities and local reply drafts, saved for review. Already-answered, ambiguous and shortened conversations cannot receive a draft through this path. Recipients come from the source headers, not the model. Nothing is sent or saved to Gmail Drafts.
+- **Durable results:** source snapshots and reports are encrypted in the host database. Completed jobs attach a Markdown report automatically, even if the model forgets a file link; authenticated report downloads remain available from database storage. Downloadable files and chat are private local data, not end-to-end encrypted.
+- **Less repeated work:** one collection batches up to eight mail conversations and twenty calendar events. A task can reuse its snapshot for fifteen minutes; at most three collections are saved per task. Partial reads are never presented as an empty inbox.
+- **Coding checks with evidence:** actual command results are recorded against a clean Git commit. Review and publishing reject missing checks, failed reruns and changed code. Publishing rechecks the approved commit and pushes that exact object. A successful command is not proof of meaningful test coverage; the independent reviewer must assess it.
+- **Background GitHub discovery:** standard CLI installations are found even when OpenBot starts outside your login shell. Completed coding jobs attach a readable command/commit check record.
+
+Google setup and per-teammate read permission are still required. Briefs cover a bounded seven-day inbox search and the primary calendar only; attachments and long conversations need separate review. Source matching does not independently verify AI advice. Coding checks still require a working code computer and installed project dependencies. [Current gaps and release gates](docs/PRODUCT_GAP_AUDIT.md) remain explicit.
+
+### Previously in 0.30.0
 
 This development beta focuses on finishing or stopping work predictably, without changing the visual design. It does not establish Grok Bot parity or unattended-production readiness.
 

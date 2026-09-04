@@ -94,6 +94,7 @@ export function toolAvailability(
     set(app.read, connected && Boolean(access?.canRead));
     set(app.write, connected && Boolean(access?.canSend));
   }
+  set(["work_collect", "work_report"], Boolean(flags.gmail_read || flags.google_calendar_agenda));
   const projects = db.listCodeProjects(bot.id);
   set(
     ["code_list", "code_search", "code_read", "code_status", "code_diff"],
