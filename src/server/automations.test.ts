@@ -58,6 +58,28 @@ test("filters proactive Todoist and Dropbox events without trusting their conten
   assert.equal(automationEventMatches(dropbox, { path: "/Personal/brief.md" }, {}).matches, false);
 });
 
+test("filters signed Slack and Notion activity on the normalized provider envelope", () => {
+  const slack = routine("slack", normalizedTriggerConfig("slack", { slackEvent: "mention", slackChannel: "C123" }));
+  const mention = { event_id: "Ev1", event: { type: "app_mention", channel: "C123", text: "Please check the launch" } };
+  assert.equal(automationEventMatches(slack, mention, {}).matches, true);
+  assert.equal(automationEventMatches(slack, { ...mention, event: { ...mention.event, channel: "C999" } }, {}).matches, false);
+  assert.equal(automationEventMatches(slack, { ...mention, event: { ...mention.event, type: "message" } }, {}).matches, false);
+  assert.match(summarizeAutomationPayload("slack", mention), /Mentioned in Slack · C123 · Please check the launch/);
+  const reaction = routine("slack", normalizedTriggerConfig("slack", { slackEvent: "reaction", slackChannel: "C123" }));
+  assert.equal(automationEventMatches(reaction, { event_id: "Ev2", event: { type: "reaction_added", item: { channel: "C123", ts: "1.2" } } }, {}).matches, true);
+  assert.equal(automationEventMatches(reaction, { event_id: "Ev3", event: { type: "reaction_added", item: { channel: "C999", ts: "1.3" } } }, {}).matches, false);
+
+  const notion = routine("notion", normalizedTriggerConfig("notion", { notionEvent: "page_updated", notionEntityId: "abc-def" }));
+  const page = { id: "event-1", type: "page.content_updated", workspace_name: "Studio", entity: { id: "abcdef", type: "page" } };
+  assert.equal(automationEventMatches(notion, page, {}).matches, true);
+  assert.equal(automationEventMatches(notion, { ...page, entity: { id: "another", type: "page" } }, {}).matches, false);
+  assert.equal(automationEventMatches(notion, { ...page, type: "comment.created" }, {}).matches, false);
+  assert.match(summarizeAutomationPayload("notion", page), /page content updated · Studio · page · abcdef/);
+  const comment = routine("notion", normalizedTriggerConfig("notion", { notionEvent: "comment", notionEntityId: "abc-def" }));
+  assert.equal(automationEventMatches(comment, { id: "event-2", type: "comment.created", entity: { id: "comment-1", type: "comment" }, data: { page_id: "abcdef" } }, {}).matches, true);
+  assert.equal(automationEventMatches(comment, { id: "event-3", type: "comment.created", entity: { id: "comment-2", type: "comment" }, data: { page_id: "another" } }, {}).matches, false);
+});
+
 test("advances a durable Todoist activity window without replaying filtered or equal-time events", () => {
   const initial = todoistActivityWindow([
     { id: "old", occurredAt: "2026-09-03T09:59:00.000Z" },

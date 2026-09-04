@@ -513,6 +513,16 @@ test("encrypts reusable OAuth connectors and revokes stale model capabilities", 
     db.completeOAuthConnector("slack", { bot: { accessToken: "slack-bot-private" }, user: { accessToken: "slack-user-private" }, teamId: "T1", teamName: "Studio" }, "Studio", ["search:read", "chat:write"]);
     db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: "notion-client", clientSecret: "notion-secret-private" });
     db.completeOAuthConnector("notion", { accessToken: "notion-token-private", workspaceId: "W1", workspaceName: "Notes", botId: "B1" }, "Notes", ["read_content", "insert_content"]);
+    const slackEvents = db.configureConnectorEventSecret("slack", "slack-signing-secret-private");
+    db.markConnectorEventsVerified("slack");
+    const notionEvents = db.connectorEventConfig("notion");
+    db.markConnectorEventsVerified("notion", "notion-verification-token-private");
+    assert.equal(db.connectorEventSecret("slack"), "slack-signing-secret-private");
+    assert.equal(db.connectorEventConfig("slack").verifiedAt !== null, true);
+    assert.equal(db.connectorEventConfig("notion").secretConfigured, true);
+    assert.notEqual(db.rotateConnectorEventPath("notion").pathToken, notionEvents.pathToken);
+    assert.equal(db.connectorEventSecret("notion"), null);
+    assert.ok(slackEvents.pathToken.length >= 32);
     db.setBotConnectorAccess("nova", { canRead: true, canSend: true }, "slack", "slack");
     db.setBotConnectorAccess("nova", { canRead: true, canSend: false }, "notion", "notion");
     assert.match(connectedAppsText(db, db.getBot("nova")!), /Slack search and conversation reading are available now/);
@@ -522,7 +532,7 @@ test("encrypts reusable OAuth connectors and revokes stale model capabilities", 
     assert.equal(db.getBotConnectorAccess("nova", "notion", "notion")?.canSend, false);
     db.close();
     const stored = readFileSync(path.join(root, ".openbot", "openbot.sqlite"));
-    for (const secret of ["slack-secret-private", "slack-bot-private", "slack-user-private", "notion-secret-private", "notion-token-private"]) assert.equal(stored.includes(Buffer.from(secret)), false);
+    for (const secret of ["slack-secret-private", "slack-bot-private", "slack-user-private", "notion-secret-private", "notion-token-private", "slack-signing-secret-private", "notion-verification-token-private", slackEvents.pathToken, notionEvents.pathToken]) assert.equal(stored.includes(Buffer.from(secret)), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0 — 2026-09-04
+
+- Added signed Slack Events API triggers for mentions, messages, and reactions, with optional channel filtering and bot-message loop prevention
+- Added verified Notion webhook triggers for page, comment, and database activity, with optional entity filtering
+- Added private rotating provider event addresses, encrypted event secrets, verification state, HMAC checks, Slack replay-window enforcement, bounded attempts, and the existing durable dedupe/rate/replay contract
+- Added responsive Apps & Tools setup for copying event addresses, saving the Slack signing secret, completing Notion verification, and rotating compromised addresses
+- Added Slack and Notion cards to the automation builder and extended natural in-chat routine creation across both OpenCode and Claude Code runtimes
+- Upgraded built-in connector manifests to version 2 with explicit event capability and authenticity declarations, plus a documented reviewed connector admission contract
+- Expanded the complete suite to 113 passing tests covering provider signatures, event matching, encrypted configuration, address rotation, manifest validation, and natural routine schemas
+- Kept arbitrary executable connector installation, hosted ingress, provider account consent, and live third-party delivery as explicit owner-setup or future work
+
 ## 0.27.0 — 2026-09-04
 
 - Added an opt-in five-minute external heartbeat so an owner-selected dead-man service can detect complete private-host or network loss

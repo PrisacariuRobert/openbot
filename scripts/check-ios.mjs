@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const root = path.resolve(import.meta.dirname, "..");
+const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 const required = [
   "ios/project.yml",
   "ios/OpenBotMobile.xcodeproj/project.pbxproj",
@@ -39,8 +40,8 @@ const privacy = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/Privac
 const entitlements = readFileSync(path.join(root, "ios/OpenBotMobile/OpenBotMobile.entitlements"), "utf8");
 const sharePlist = readFileSync(path.join(root, "ios/OpenBotShare/Info.plist"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
-if (!project.includes("MARKETING_VERSION: 0.27.0")) throw new Error("The iOS marketing version is not 0.27.0.");
-if (!project.includes("CURRENT_PROJECT_VERSION: 31")) throw new Error("The iOS build number is not 31.");
+if (!project.includes(`MARKETING_VERSION: ${packageJson.version}`)) throw new Error(`The iOS marketing version is not ${packageJson.version}.`);
+if (!project.includes("CURRENT_PROJECT_VERSION: 32")) throw new Error("The iOS build number is not 32.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("NSMicrophoneUsageDescription") || !plist.includes("NSSpeechRecognitionUsageDescription")) throw new Error("The iOS app is missing its deliberate voice-capture permission descriptions.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");

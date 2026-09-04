@@ -214,7 +214,7 @@ export interface Approval {
   decidedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion";
 
 export interface RoutineTriggerConfig {
   eventName?: string;
@@ -225,6 +225,10 @@ export interface RoutineTriggerConfig {
   minutesBefore?: number;
   todoistEvent?: "added" | "updated" | "completed" | "any";
   dropboxPath?: string;
+  slackEvent?: "mention" | "message" | "reaction" | "any";
+  slackChannel?: string;
+  notionEvent?: "page_updated" | "page_created" | "comment" | "database" | "any";
+  notionEntityId?: string;
 }
 
 export interface Routine {
@@ -435,7 +439,7 @@ export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | 
 export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
 
 export interface ConnectorManifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   connectorId: string;
   service: ConnectorServiceId;
   name: string;
@@ -444,6 +448,8 @@ export interface ConnectorManifest {
   readCapability: string;
   writeCapability: string | null;
   writeRequiresApproval: boolean;
+  eventCapability: string | null;
+  eventAuth: "provider_hmac" | "signed_secret" | "cursor" | null;
   dataBoundary: string;
   docsUrl: string;
 }
@@ -487,7 +493,7 @@ export interface ConnectorEvent {
 export interface ConnectorCatalogEntry {
   id: ConnectorServiceId;
   connectorId?: string;
-  manifestVersion?: 1;
+  manifestVersion?: 2;
   name: string;
   description: string;
   badge: string;
@@ -506,6 +512,12 @@ export interface OAuthConnectorStatus {
   callbackUrl: string;
   accountName: string | null;
   lastError: string | null;
+  events?: {
+    url: string;
+    secretConfigured: boolean;
+    verified: boolean;
+    verificationTokenReady: boolean;
+  };
 }
 
 export interface SlackMessageSummary {

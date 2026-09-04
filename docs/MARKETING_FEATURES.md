@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 4, 2026
-Release: 0.27.0 owner-controlled beta
+Release: 0.28.0 owner-controlled beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -32,6 +32,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 15. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
 16. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
 17. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
+18. **Let conversations and knowledge wake the right teammate.** Signed Slack and Notion events can start one permissioned, inspectable routine without bypassing ordinary approvals.
 
 ## Available now
 
@@ -204,15 +205,18 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 ### Automations and reusable work
 
-- Schedule, Google Calendar, Todoist activity, Dropbox folder-change, signed GitHub webhook, and signed generic webhook triggers
+- Schedule, Google Calendar, Todoist activity, Dropbox folder-change, signed Slack and Notion events, signed GitHub webhook, and signed generic webhook triggers
 - Natural recurring requests, including intervals as short as five minutes, plus hourly, daily, and weekly phrasing
-- Narrow Calendar title/minutes-before, Todoist activity-type, Dropbox folder, GitHub event/action/repository, and generic event-name filters
+- Narrow Calendar title/minutes-before, Todoist activity-type, Dropbox folder, Slack event/channel, Notion event/entity, GitHub event/action/repository, and generic event-name filters
 - Persistent automation name, prompt, teammate, conversation, trigger, enabled state, event receipt, linked run, last outcome, health, and run count
 - Explicit **Test** confirmation because a test can use real tools and create real approvals
 - Pause, resume, edit, delete, secret rotation, and preserved event/run history
 - Attention inbox for failures, approval waits, missed schedules, repair guidance, retry, and alert clearing
 - Seven-day delivery-ID deduplication, per-automation burst limits, origin-loop headers, bounded replay input, and automatic pause after three consecutive failures
 - HMAC-SHA256 webhook verification with encrypted secrets shown only after creation or rotation
+- Provider-specific Slack timestamp replay protection, bot-message loop suppression, Notion verification-token bootstrap, and private rotating event addresses
+- Natural in-chat creation of scheduled, Slack, Notion, Calendar, Todoist, and Dropbox routines through the same validated server action
+- Connector manifest v2 with explicit event capability, authenticity, approval, and data-boundary declarations, backed by a published admission contract
 - Secret-redacted, size-bounded payload retention and an explicit untrusted-event boundary before model use
 - Inspect event history, open linked results, and safely replay failed, cancelled, or rate-limited deliveries
 - In-app recurring messages when the user says “text me” without naming an external service
@@ -275,8 +279,8 @@ These features are implemented, but marketing must explain their requirement.
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
 | Portable skills | Import/export covers bounded browser-oriented OpenBot skills. Imported definitions are inspected and secret-scanned, but this is not a public executable plugin marketplace. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
-| Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
-| Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
+| Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Live events require a publicly reachable HTTPS request URL, Slack event subscriptions, and the app signing secret. Public managed distribution requires provider review. |
+| Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Live events require a publicly reachable HTTPS URL, a webhook subscription, and completion of Notion's verification-token step. Public managed distribution requires provider review. |
 | Todoist and Dropbox | Todoist registers a local OAuth client automatically. Dropbox needs a registered release app key or the self-hoster's app key; public-client PKCE needs no bundled secret. Provider consent is still required. |
 | Calendar automations | The selected teammate needs Calendar permission, and the chosen Mac or private host must be online. |
 | Todoist/Dropbox automations | The selected teammate needs matching read permission and the chosen host must be online. Fresh baselines prevent old account history from starting work when a routine is enabled. |
@@ -284,6 +288,7 @@ These features are implemented, but marketing must explain their requirement.
 | Outside heartbeat | Private-runner only and opt-in. The owner supplies a private URL from an external heartbeat service; OpenBot sends an empty HTTPS GET every five minutes. That outside service—not OpenBot—delivers outage alerts. |
 | Encrypted home transfer | Export/import runs from the owner's host terminal and requires a passphrase of at least 12 characters. It is a deliberate copy-and-switch operation, not continuous synchronization. Existing Mac-only absolute project paths may need reconnecting on Linux. |
 | GitHub and generic webhooks | The sender needs the one-time secret and a secure route. Private-runner mode includes Caddy HTTPS; local mode needs a trusted tunnel or reverse proxy. |
+| Slack and Notion events | The selected teammate needs matching read permission, the connector must show **Live events ready**, and the chosen host must stay reachable. OpenBot verifies provider signatures but does not operate the public ingress or provider app. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
 | Phone access | A Mac-hosted studio requires the Mac to stay awake; a private runner remains reachable while it is off. Local Wi-Fi/Tailscale and private-host HTTPS are supported. Native installation still requires Xcode signing plus the registered App Group; it is not an App Store download yet. |
@@ -308,6 +313,7 @@ These features are implemented, but marketing must explain their requirement.
 - **React to a repository event:** filter a signed GitHub webhook to one repository, event, and action; inspect its receipt and linked checked result, with duplicate deliveries stopped automatically.
 - **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events whenever the chosen host is online.
 - **React to changing work:** ask a teammate to summarize a newly completed Todoist task or explain changed files below a selected Dropbox project folder.
+- **Respond to a live team signal:** let one Slack mention or selected Notion change wake the right teammate, create a durable receipt, and return a checked result without bypassing approvals.
 - **Send context from iPhone:** share a link, screenshot, or document to OpenBot from another app, then continue in the selected conversation.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
 - **Talk naturally, send deliberately:** tap the native microphone, watch editable words appear, stop when ready, and choose Send only after the message looks right.
@@ -322,7 +328,7 @@ Do not say OpenBot currently:
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
 - reads Slack content the connected member cannot access or Notion pages that were not selected/shared;
-- provides complete Slack administration/event automation or general Notion database editing;
+- provides complete Slack administration or general Notion database editing;
 - creates or edits Calendar events;
 - handles Gmail attachments, labels, or rich HTML sending;
 - edits Office documents or spreadsheets with layout fidelity;
@@ -332,8 +338,8 @@ Do not say OpenBot currently:
 ## Roadmap, not launch copy
 
 - Physical-device voice/APNs/Share-extension QA and TestFlight distribution
-- Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
-- Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
+- Reviewed third-party executable connector packages plus CRM and team-storage connectors
+- Hosted event ingress, richer Calendar selection, provider setup diagnostics, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
 - Threaded replies and reactions
