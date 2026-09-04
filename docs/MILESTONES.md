@@ -448,3 +448,19 @@ Status: complete in source for the local-first 0.23.0 beta
 - Apps & Tools keeps self-hosted OAuth credentials behind deliberate disclosures and raises essential connector typography while preserving real service marks and animated code-drawn mascots
 
 Verification: the 94-test web/server suite, TypeScript check, production build, and release checks pass. XcodeGen regenerates the project, Xcode Beta compiles the native app and embedded Share extension for an iPhone 17 Pro simulator, and the native UI contract includes the new voice action. Browser QA at 390×844 confirms a full-width sheet, zero document overflow, seven contained connector cards, three collapsed developer setup disclosures, and readable connection copy. Physical speech recognition, APNs delivery, and TestFlight remain owner-signed device checks.
+
+## M30 — Private always-on runner
+
+Status: complete in source for the owner-operated 0.24.0 release
+
+- Local Mac hosting remains the default; private hosting is an explicit owner choice and never silently uploads a studio
+- A reviewed Docker Compose bundle packages OpenBot, OpenCode, Chromium, Git, the Docker client, and Caddy for a dedicated Linux host
+- Caddy is the only public entry point and provides HTTPS, HSTS, compression, anti-framing, and MIME protections; the plain OpenBot port remains internal
+- Private mode refuses to start without a canonical HTTPS domain and an absolute durable data directory, then uses that origin for every OAuth callback and signed webhook
+- Studio data, the vault key, provider login state, browser profiles, and server-side projects persist across image or host restarts
+- Existing runner leadership, job claims, lease recovery, approvals, budgets, event dedupe, and one-voice teamwork work unchanged on the always-on host
+- Login attempts are throttled, cookies become Secure through one trusted proxy, and a public health endpoint reveals readiness without credentials, data, or URLs
+- Web and native iPhone surfaces use the same **Private always-on home** language and show the data-location/readiness boundary
+- Setup, model sign-in, project paths, migration, updates, and consistent owner-only backup procedures are documented beside the deployment
+
+Verification: 100 automated tests cover private-mode validation, canonical callback URLs, readiness, and login throttling alongside all earlier product contracts. TypeScript, production web build, release checks, iOS source checks, shell syntax, and Compose structure pass. Public DNS/TLS issuance, a real VPS restart, live provider/OAuth consent, and physical iPhone distribution remain owner-environment checks.

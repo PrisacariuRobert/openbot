@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 after the first 0.23 availability and native-voice release.
+Updated September 4, 2026 for the 0.24 private-runner release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -133,10 +133,22 @@ Verified with 86 automated tests, production type/build checks, duplicate-runner
 - Developer-only Slack, Notion, and Dropbox credentials stay collapsed until requested; essential connector copy and controls use readable type sizes
 - Xcode Beta compiles the app and embedded Share extension for the iPhone 17 Pro simulator with the new Speech and microphone privacy declarations
 
-## Remaining 0.23 work — Availability and richer events
+## Shipped in 0.24 — Private always-on home
 
-- Add Slack and Notion event sources on the same receipt, dedupe, replay, and rate-limit contract
-- Package an optional private runner and encrypted cross-host recovery for execution while the primary Mac is unavailable
+- Added an optional Docker Compose deployment for a dedicated Linux VPS or home server while preserving local Mac mode as the default
+- Added Caddy-managed HTTPS, automatic service restart, a non-root OpenBot process, durable studio/model/browser/project mounts, Chromium, OpenCode, and isolated-computer Docker access
+- Made deployment trust explicit: private mode requires a canonical HTTPS public address and absolute durable storage, trusts exactly one reverse proxy, and drives every OAuth callback and webhook from that address
+- Added proxy-aware Secure cookies, a narrow no-secret health endpoint, repeated-login throttling, HSTS, anti-framing and MIME protections, and no published plain-HTTP app port
+- Added web and native status that distinguishes **This Mac** from a **Private always-on home**, explains the selected data location, and avoids obsolete Mac-awake guidance
+- Added owner-only setup and consistent backup scripts plus migration guidance that requires moving the complete vault and choosing one authoritative data location
+
+Verified by 100 automated web/server tests, TypeScript and production builds, native release checks, deployment schema/shell checks, and responsive browser acceptance. A real VPS, public DNS/certificate issuance, live third-party OAuth callbacks, and physical iPhone/APNs distribution remain owner-environment checks rather than simulated claims.
+
+## Next — Open connections and richer events
+
+- Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
+- Define a reviewed custom MCP/connector install contract with visible permissions and revocation
+- Add health notifications and guided upgrades for private runners
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
 
 ## Later, not implied by the beta

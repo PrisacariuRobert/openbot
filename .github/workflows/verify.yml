@@ -17,3 +17,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: npm ci
       - run: npm run verify
+      - name: Validate private runner Compose bundle
+        run: docker compose --env-file deploy/private-runner/.env.example -f deploy/private-runner/docker-compose.yml config --quiet
+      - name: Build private runner image
+        run: docker build --file deploy/private-runner/Dockerfile --tag openbot-private-runner:verify .

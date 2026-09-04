@@ -1,0 +1,67 @@
+name: openbot-private-runner
+
+services:
+  openbot:
+    build:
+      context: ../..
+      dockerfile: deploy/private-runner/Dockerfile
+      args:
+        OPENCODE_VERSION: ${OPENCODE_VERSION:-1.18.28}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      OPENBOT_DEPLOYMENT_MODE: private_runner
+      OPENBOT_HOST: 0.0.0.0
+      OPENBOT_PORT: 4311
+      OPENBOT_APP_URL: https://${OPENBOT_DOMAIN}/
+      OPENBOT_DATA_DIR: ${OPENBOT_HOST_ROOT:-/srv/openbot}/data
+      OPENBOT_CHROME_PATH: /usr/bin/chromium
+      OPENBOT_CHROME_NO_SANDBOX: "1"
+      OPENBOT_GOOGLE_CLIENT_ID: ${OPENBOT_GOOGLE_CLIENT_ID:-}
+      OPENBOT_GOOGLE_CLIENT_SECRET: ${OPENBOT_GOOGLE_CLIENT_SECRET:-}
+      OPENBOT_SLACK_CLIENT_ID: ${OPENBOT_SLACK_CLIENT_ID:-}
+      OPENBOT_SLACK_CLIENT_SECRET: ${OPENBOT_SLACK_CLIENT_SECRET:-}
+      OPENBOT_NOTION_CLIENT_ID: ${OPENBOT_NOTION_CLIENT_ID:-}
+      OPENBOT_NOTION_CLIENT_SECRET: ${OPENBOT_NOTION_CLIENT_SECRET:-}
+      OPENBOT_DROPBOX_APP_KEY: ${OPENBOT_DROPBOX_APP_KEY:-}
+      OPENBOT_DROPBOX_CLIENT_SECRET: ${OPENBOT_DROPBOX_CLIENT_SECRET:-}
+    volumes:
+      - ${OPENBOT_HOST_ROOT:-/srv/openbot}/data:${OPENBOT_HOST_ROOT:-/srv/openbot}/data
+      - ${OPENBOT_HOST_ROOT:-/srv/openbot}/home:/srv/openbot/home
+      - ${OPENBOT_HOST_ROOT:-/srv/openbot}/projects:${OPENBOT_HOST_ROOT:-/srv/openbot}/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-0}"
+    expose:
+      - "4311"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4311/api/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    depends_on:
+      openbot:
+        condition: service_healthy
+    environment:
+      OPENBOT_DOMAIN: ${OPENBOT_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:

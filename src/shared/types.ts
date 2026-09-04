@@ -289,6 +289,23 @@ export interface AutomationAlert {
 
 export type RunnerStatus = "online" | "recovering" | "offline";
 export type BackgroundServiceStatus = "installed" | "not_installed" | "unsupported";
+export type DeploymentMode = "local" | "private_runner";
+
+export interface DeploymentCheck {
+  id: "https" | "storage" | "access" | "runner";
+  label: string;
+  status: "ready" | "action";
+  detail: string;
+}
+
+export interface DeploymentStatus {
+  mode: DeploymentMode;
+  label: string;
+  alwaysOn: boolean;
+  publicUrl: string | null;
+  dataLocation: "this_mac" | "private_volume";
+  checks: DeploymentCheck[];
+}
 
 export interface RunnerHealth {
   status: RunnerStatus;
@@ -307,6 +324,7 @@ export interface RunnerHealth {
   lastError: string | null;
   backgroundService: BackgroundServiceStatus;
   backgroundServiceDetail: string;
+  deployment?: DeploymentStatus;
 }
 
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";

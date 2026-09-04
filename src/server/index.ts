@@ -31,25 +31,30 @@ import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, todoistActivityWindow, verifyAutomationSignature } from "./automations.js";
 import { SKILL_TEMPLATES } from "./skill-library.js";
 import { BackgroundServiceManager } from "./background-service.js";
+import { LoginAttemptGate } from "./auth-security.js";
+import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
-import type { AutomationEvent, Routine } from "../shared/types.js";
+import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
+const port = Number(process.env.OPENBOT_PORT || 4311);
+const deployment = readDeploymentConfig(process.env, { port, production: process.env.NODE_ENV === "production" });
 const db = new OpenBotDatabase(rootDir);
 const app = express();
-const port = Number(process.env.OPENBOT_PORT || 4311);
+app.disable("x-powered-by");
+if (deployment.trustProxy) app.set("trust proxy", 1);
 const host = process.env.OPENBOT_HOST || "127.0.0.1";
-const appUrl = process.env.OPENBOT_APP_URL?.trim() || `http://127.0.0.1:${process.env.NODE_ENV === "production" ? port : 4310}/`;
+const appUrl = deployment.appUrl;
 const internalUrl = `http://127.0.0.1:${port}`;
 const internalToken = randomBytes(32).toString("base64url");
 const computer = new ComputerManager(db);
 const browser = new BrowserManager(db);
-const googleWorkspace = new GoogleWorkspaceConnector(db, `http://127.0.0.1:${port}/api/connectors/google/callback`);
-const slack = new SlackConnector(db, `http://127.0.0.1:${port}/api/connectors/slack/callback`);
-const notion = new NotionConnector(db, `http://127.0.0.1:${port}/api/connectors/notion/callback`);
-const todoist = new TodoistConnector(db, `http://localhost:${port}/api/connectors/todoist/callback`);
-const dropbox = new DropboxConnector(db, `http://127.0.0.1:${port}/api/connectors/dropbox/callback`);
+const googleWorkspace = new GoogleWorkspaceConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/google/callback"));
+const slack = new SlackConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/slack/callback"));
+const notion = new NotionConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/notion/callback"));
+const todoist = new TodoistConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/todoist/callback"));
+const dropbox = new DropboxConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/dropbox/callback"));
 const attachmentsService = new AttachmentService(db);
 const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
@@ -74,6 +79,14 @@ function persistentAccessToken() {
   return readFileSync(tokenPath, "utf8").trim();
 }
 const accessToken = persistentAccessToken();
+const loginGate = new LoginAttemptGate();
+
+function runnerPayload(health: RunnerHealth) {
+  const background = deployment.mode === "private_runner"
+    ? { backgroundService: "installed" as const, backgroundServiceDetail: health.status === "online" ? "Your private host is online and keeps working when this Mac closes." : "Your private host needs a restart." }
+    : backgroundService.status(health);
+  return { ...health, ...background, deployment: deploymentStatus(deployment, health) };
+}
 
 function accessTokenMatches(value: string | null | undefined) {
   if (!value) return false;
@@ -87,6 +100,12 @@ app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "same-origin");
   next();
+});
+
+app.get("/api/healthz", (_request, response) => {
+  const health = runnerPayload(db.getRunnerHealth());
+  response.setHeader("Cache-Control", "no-store");
+  response.status(health.status === "online" ? 200 : 503).json({ ok: health.status === "online", runner: health.status, deployment: health.deployment?.mode });
 });
 
 function loopback(request: express.Request) {
@@ -104,8 +123,18 @@ function cookie(request: express.Request, key: string) {
 }
 
 app.post("/api/auth/login", (request, response) => {
+  const attemptKey = request.ip || request.socket.remoteAddress || "unknown";
+  const allowed = loginGate.check(attemptKey);
+  if (!allowed.allowed) {
+    response.setHeader("Retry-After", String(allowed.retryAfterSeconds));
+    return response.status(429).json({ error: "Too many tries. Wait a little, then use your private access key again." });
+  }
   const parsed = z.object({ token: z.string() }).safeParse(request.body);
-  if (!parsed.success || !accessTokenMatches(parsed.data.token)) return response.status(401).json({ error: "That access key is not valid." });
+  if (!parsed.success || !accessTokenMatches(parsed.data.token)) {
+    loginGate.failed(attemptKey);
+    return response.status(401).json({ error: "That access key is not valid." });
+  }
+  loginGate.succeeded(attemptKey);
   response.setHeader("Set-Cookie", `openbot_access=${encodeURIComponent(accessToken)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000${request.secure ? "; Secure" : ""}`);
   response.json({ ok: true });
 });
@@ -149,12 +178,12 @@ app.get("/api/events", (request, response) => {
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runner: { ...state.runner, ...backgroundService.status(state.runner) } });
+  response.json({ ...state, runner: runnerPayload(state.runner) });
 });
 
 app.get("/api/runner", (_request, response) => {
   const health = db.getRunnerHealth();
-  response.json({ ...health, ...backgroundService.status(health) });
+  response.json(runnerPayload(health));
 });
 
 app.post("/api/runner/wake", (_request, response) => {
@@ -163,28 +192,30 @@ app.post("/api/runner/wake", (_request, response) => {
   void dispatchConnectorEvents();
   const health = db.getRunnerHealth();
   broadcast({ type: "runner", at: Date.now() });
-  response.json({ ...health, ...backgroundService.status(health) });
+  response.json(runnerPayload(health));
 });
 
 app.post("/api/runner/background", async (request, response) => {
+  if (deployment.mode === "private_runner") return response.status(409).json({ error: "This studio already has always-on protection from its private host." });
   if (!loopback(request)) return response.status(403).json({ error: "Background protection can only be changed from this Mac." });
   try {
     await backgroundService.install();
     const health = db.getRunnerHealth();
     broadcast({ type: "runner", at: Date.now() });
-    response.json({ ...health, ...backgroundService.status(health) });
+    response.json(runnerPayload(health));
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
 app.delete("/api/runner/background", async (request, response) => {
+  if (deployment.mode === "private_runner") return response.status(409).json({ error: "Always-on protection is managed on the private host." });
   if (!loopback(request)) return response.status(403).json({ error: "Background protection can only be changed from this Mac." });
   try {
     await backgroundService.uninstall();
     const health = db.getRunnerHealth();
     broadcast({ type: "runner", at: Date.now() });
-    response.json({ ...health, ...backgroundService.status(health) });
+    response.json(runnerPayload(health));
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
@@ -1877,7 +1908,8 @@ if (process.env.NODE_ENV === "production" && existsSync(distDir)) {
 }
 
 const server = app.listen(port, host, () => {
-  console.log(`OpenBot is awake at http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`);
+  console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
+  if (deployment.mode === "private_runner") console.log("Private runner mode is active with HTTPS, durable storage, and proxy-aware secure cookies.");
   if (host !== "127.0.0.1" && host !== "localhost") console.log(`Remote access is enabled. The private access key is stored at ${path.join(db.dataDir, "access.token")}`);
 });
 

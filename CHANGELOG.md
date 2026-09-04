@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.24.0 — 2026-09-04
+
+- Added an optional owner-operated private Linux runner that continues schedules, connectors, browser work, and code jobs while the Mac is asleep or off
+- Packaged Caddy HTTPS, automatic restart, durable studio/model/browser/project mounts, Chromium, OpenCode, and Docker-backed isolated teammate computers
+- Made private mode fail closed without a canonical HTTPS origin and absolute durable data path, and used that origin for every OAuth callback and signed hook
+- Added proxy-aware Secure cookies, repeated-login throttling, a narrow no-secret health check, HSTS/anti-framing headers, and no public plain OpenBot port
+- Added matching web and native **Private always-on home** status, readiness, data-location language, and calmer setup guidance
+- Added owner-only setup and consistent backup scripts with explicit whole-studio migration and one-authoritative-location rules
+- Expanded the automated suite to 101 passing tests while preserving all 0.23 native voice, connectors, approvals, teamwork, coding, and animated-character contracts
+- Kept managed hosting, encrypted live Mac/server synchronization, Slack/Notion events, physical-device APNs/TestFlight, broad connectors, and fidelity editing as honest future work
+
 ## 0.23.0 — 2026-09-04
 
 - Added deliberate native iPhone voice capture with editable partial transcription, explicit start/stop controls, permission recovery, and no OpenBot audio retention

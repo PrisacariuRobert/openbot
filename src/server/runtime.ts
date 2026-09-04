@@ -266,9 +266,10 @@ export class BrowserManager {
     if (!executablePath) throw new Error("Chrome or Chromium is required for browser work.");
     const profile = path.join(this.db.computersDir, botId, headless ? "browser" : "teaching");
     mkdirSync(profile, { recursive: true });
+    const containerArgs = process.env.OPENBOT_CHROME_NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
     const context = await chromium.launchPersistentContext(profile, {
       executablePath, headless, viewport: { width: 1280, height: 820 },
-      args: ["--disable-background-networking", "--disable-sync", "--no-default-browser-check"],
+      args: ["--disable-background-networking", "--disable-sync", "--no-default-browser-check", ...containerArgs],
     });
     context.on("close", () => this.contexts.delete(botId));
     this.contexts.set(botId, context);

@@ -1,0 +1,10 @@
+.git
+.github
+.openbot
+dist
+node_modules
+ios
+*.log
+.env
+deploy/private-runner/.env
+deploy/private-runner/backups
