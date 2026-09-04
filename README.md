@@ -1,18 +1,18 @@
-# OpenBot 0.25.0
+# OpenBot 0.26.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.25.0
+## What's new in 0.26.0
 
-- Added an authenticated **Home check** that verifies real free storage, backup freshness, OpenCode, Chromium, and Docker access instead of relying on decorative readiness badges.
-- Added the same private-home check to the native iPhone Live Studio, with one calm summary and specific attention items.
-- Rebuilt local private-host onboarding around one domain field and one copyable setup command, while keeping migration a separate owner decision.
-- Private backups now live in the protected host data root and record their successful time and size for health reporting.
-- Corrected studio headers, Live Studio, and location badges so a private deployment never describes itself as running on the Mac.
-- Kept diagnostics bounded and private: only fixed read-only commands run, the detailed endpoint requires authentication, and no credentials appear in health results.
-- Preserved the 0.24 always-on runner, native voice, connectors, approvals, one-voice teamwork, isolated coding, and animated customizable characters.
+- Added opt-in **private-home health alerts** that check every 15 minutes and send one quiet Web Push or iPhone alert when storage, backup, model runtime, browser, or bot-computer health needs attention.
+- Added a separate recovery notification when every Home check returns to ready, with durable state that prevents restart spam and limits unchanged reminders to once per day.
+- Added a guided `update.sh` workflow that refuses dirty or diverged source, creates an owner-only backup first, builds while the current service stays online, and verifies the replacement before declaring success.
+- Added automatic container recovery: if the new OpenBot image does not become healthy, the updater restores the previously running image and points the owner to the fresh backup.
+- Home check now includes the installed software release and the last successful backup-first update receipt.
+- Added matching health-alert controls to the responsive web app and native SwiftUI Live Studio, reusing the existing private Web Push and APNs delivery paths.
+- Preserved the 0.25 guided private-home setup, real diagnostics, local-first default, connector permissions, approvals, isolated coding, and animated customizable characters.
 
 ## What is included
 
@@ -41,7 +41,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Dependable automations with five-minute/hourly/daily schedules, signed generic and GitHub webhooks, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
 - Proactive Todoist task and Dropbox folder-change triggers with durable cursors, fresh-start baselines, and connector-specific filters
 - Duplicate-event protection, rate limits, loop headers, bounded retained inputs, visible failure guidance, approval-wait alerts, missed-schedule notices, and automatic pausing after three consecutive failures
-- A durable single-leader runner with atomic job claims, renewable leases, graceful shutdown handoff, crash recovery, visible health, optional macOS login/crash protection, and an optional private always-on Linux home
+- A durable single-leader runner with atomic job claims, renewable leases, graceful shutdown handoff, crash recovery, visible health, optional macOS login/crash protection, and an optional private always-on Linux home with backup-first updates and opt-in health alerts
 - A durable notification outbox plus standards-based Web Push for installed secure web apps, including direct links to results and approval waits
 - Native iPhone APNs registration and delivery with per-device retries, stale-token cleanup, and conversation/approval deep links
 - Persistent approvals for destructive, publishing, communication, purchasing, credential, and system actions
@@ -177,7 +177,7 @@ Generic hooks use `X-OpenBot-Signature: sha256=<HMAC>` and an optional `X-OpenBo
 
 Every delivery is retained as a bounded, secret-redacted event receipt and treated as untrusted input. Duplicate IDs do not create a second run, bursts are limited, explicit tests warn that real tools and approvals are available, and three consecutive failures pause the automation. OpenBot also surfaces approval waits, missed schedules detected when it wakes, retryable failures, and linked results.
 
-Each active job is claimed atomically and renews a short lease; a second OpenBot process cannot dispatch it. After a crash or update, an expired job returns to the queue with its task contract and approval state intact. On macOS, **Keep OpenBot running** installs an owner-visible LaunchAgent, but the Mac must remain awake. Version 0.24 adds a separate private-host mode with Docker restart policy and durable storage, allowing the same runner to continue when the Mac is unavailable.
+Each active job is claimed atomically and renews a short lease; a second OpenBot process cannot dispatch it. After a crash or update, an expired job returns to the queue with its task contract and approval state intact. On macOS, **Keep OpenBot running** installs an owner-visible LaunchAgent, but the Mac must remain awake. Private-host mode adds Docker restart policy and durable storage, allowing the same runner to continue when the Mac is unavailable. Its Home check can send opt-in alerts through registered Web Push or iPhone destinations, while the guided updater creates a backup and preserves a recoverable running image before replacement.
 
 ## Remote and phone access
 

@@ -122,6 +122,17 @@ struct StudioRunnerCare: Decodable, Hashable {
     let overall: String
     let summary: String
     let checks: [StudioRunnerCareCheck]
+    let alerts: StudioRunnerHealthAlerts
+}
+
+struct StudioRunnerHealthAlerts: Decodable, Hashable {
+    let enabled: Bool
+    let intervalMinutes: Int
+    let destinationCount: Int
+    let deliveryReady: Bool
+    let lastCheckedAt: String?
+    let lastNotifiedAt: String?
+    let lastStatus: String?
 }
 
 struct StudioRunnerCareCheck: Decodable, Identifiable, Hashable {

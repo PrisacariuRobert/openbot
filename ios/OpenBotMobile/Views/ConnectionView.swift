@@ -22,7 +22,7 @@ struct ConnectionView: View {
                             .font(.system(size: 31, weight: .bold, design: .rounded))
                             .foregroundStyle(OpenBotTheme.ink)
                             .multilineTextAlignment(.center)
-                        Text("Connect to the OpenBot running on your Mac. Your conversations, teammates and approvals stay there.")
+                        Text("Connect to your OpenBot home on a Mac or private host. Your conversations, teammates and approvals stay there.")
                             .font(.system(size: 15, weight: .regular, design: .rounded))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -38,7 +38,7 @@ struct ConnectionView: View {
                             .accessibilityIdentifier("server-address")
                             .openBotField()
                         fieldLabel("Private access key", icon: "key.fill")
-                        SecureField("Paste the key from your Mac", text: $accessKey)
+                        SecureField("Paste the key from your OpenBot home", text: $accessKey)
                             .textContentType(.oneTimeCode).focused($focusedField, equals: .key)
                             .submitLabel(.go)
                             .onSubmit { connect() }
@@ -74,7 +74,7 @@ struct ConnectionView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         reassurance("The access key is protected in this iPhone’s Keychain.", icon: "lock.shield.fill")
                         reassurance("With Tailscale on both devices, OpenBot works over cellular or any Wi-Fi.", icon: "globe.americas.fill")
-                        reassurance("Other public addresses must use HTTPS; never expose the Mac’s plain port.", icon: "checkmark.shield.fill")
+                        reassurance("Other public addresses must use HTTPS; never expose OpenBot’s plain port.", icon: "checkmark.shield.fill")
                         reassurance("Use your Mac, or choose a private always-on host that keeps working when it is off.", icon: "server.rack")
                     }
                     Spacer(minLength: 20)

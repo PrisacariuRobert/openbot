@@ -328,14 +328,24 @@ export interface RunnerHealth {
 }
 
 export interface RunnerCareCheck {
-  id: "storage" | "backup" | "opencode" | "browser" | "computers";
+  id: "storage" | "backup" | "software" | "opencode" | "browser" | "computers";
   label: string;
   status: "ready" | "attention";
   value: string;
   detail: string;
 }
 
-export interface RunnerCareStatus {
+export interface RunnerHealthAlerts {
+  enabled: boolean;
+  intervalMinutes: number;
+  destinationCount: number;
+  deliveryReady: boolean;
+  lastCheckedAt: string | null;
+  lastNotifiedAt: string | null;
+  lastStatus: "ready" | "attention" | null;
+}
+
+export interface RunnerCareSnapshot {
   checkedAt: string;
   mode: DeploymentMode;
   version: string;
@@ -345,6 +355,10 @@ export interface RunnerCareStatus {
   overall: "ready" | "attention";
   summary: string;
   checks: RunnerCareCheck[];
+}
+
+export interface RunnerCareStatus extends RunnerCareSnapshot {
+  alerts: RunnerHealthAlerts;
 }
 
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";

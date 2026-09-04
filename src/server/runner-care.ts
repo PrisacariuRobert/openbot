@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync, statfsSync, statSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { RunnerCareCheck, RunnerCareStatus } from "../shared/types.js";
+import type { RunnerCareCheck, RunnerCareSnapshot } from "../shared/types.js";
 import type { DeploymentConfig } from "./deployment.js";
 
 const execFileAsync = promisify(execFile);
@@ -14,6 +14,13 @@ type MaintenanceRecord = {
   lastBackupBytes: number;
   lastBackupFile: string;
   release: string;
+};
+
+type UpdateRecord = {
+  lastUpdateAt: string;
+  fromVersion: string;
+  toVersion: string;
+  revision: string;
 };
 
 function compactVersion(value: string): string {
@@ -64,6 +71,22 @@ function maintenanceRecord(dataDir: string): MaintenanceRecord | null {
   }
 }
 
+function updateRecord(dataDir: string): UpdateRecord | null {
+  const recordPath = path.join(dataDir, "runner-update.json");
+  try {
+    if (!existsSync(recordPath) || statSync(recordPath).size > 4_096) return null;
+    const value = JSON.parse(readFileSync(recordPath, "utf8")) as Partial<UpdateRecord>;
+    const semver = /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/;
+    if (!value.lastUpdateAt || !Number.isFinite(Date.parse(value.lastUpdateAt))) return null;
+    if (typeof value.fromVersion !== "string" || !semver.test(value.fromVersion)) return null;
+    if (typeof value.toVersion !== "string" || !semver.test(value.toVersion)) return null;
+    if (typeof value.revision !== "string" || !/^[a-f0-9]{7,40}$/.test(value.revision)) return null;
+    return { lastUpdateAt: value.lastUpdateAt, fromVersion: value.fromVersion, toVersion: value.toVersion, revision: value.revision };
+  } catch {
+    return null;
+  }
+}
+
 function storageCheck(dataDir: string): RunnerCareCheck {
   try {
     const stats = statfsSync(dataDir, { bigint: true });
@@ -96,6 +119,19 @@ function backupCheck(dataDir: string, now: number): RunnerCareCheck {
   };
 }
 
+function softwareCheck(dataDir: string, version: string): RunnerCareCheck {
+  const record = updateRecord(dataDir);
+  if (!record) return { id: "software", label: "Software", status: "ready", value: `OpenBot ${version}`, detail: "Ready for a guided update with a backup first" };
+  const updateDay = new Date(record.lastUpdateAt).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
+  return {
+    id: "software",
+    label: "Software",
+    status: "ready",
+    value: `OpenBot ${version}`,
+    detail: `${record.fromVersion} → ${record.toVersion} updated ${updateDay} after a successful backup`,
+  };
+}
+
 function toolCheck(id: RunnerCareCheck["id"], label: string, result: CommandResult, readyDetail: string, missingDetail: string): RunnerCareCheck {
   return {
     id,
@@ -113,7 +149,7 @@ export async function inspectRunnerCare(input: {
   chromePath?: string;
   run?: CommandRunner;
   now?: number;
-}): Promise<RunnerCareStatus> {
+}): Promise<RunnerCareSnapshot> {
   const run = input.run || execute;
   const packageJson = JSON.parse(readFileSync(path.join(input.rootDir, "package.json"), "utf8")) as { version?: string };
   const [openCode, browser, docker] = await Promise.all([
@@ -121,9 +157,11 @@ export async function inspectRunnerCare(input: {
     run(input.chromePath || "chromium", ["--version"]),
     run("docker", ["info", "--format", "{{.ServerVersion}}"]),
   ]);
+  const version = packageJson.version || "unknown";
   const checks: RunnerCareCheck[] = [
     storageCheck(input.dataDir),
     backupCheck(input.dataDir, input.now ?? Date.now()),
+    softwareCheck(input.dataDir, version),
     toolCheck("opencode", "OpenCode", openCode, "Model runtime is available", "Reconnect or reinstall OpenCode on this host"),
     toolCheck("browser", "Browser", browser, "Chromium is available for browser work", "Chromium is missing or cannot start on this host"),
     toolCheck("computers", "Bot computers", docker, "Docker can create isolated teammate computers", "Docker is unavailable to the OpenBot service"),
@@ -132,7 +170,7 @@ export async function inspectRunnerCare(input: {
   return {
     checkedAt: new Date(input.now ?? Date.now()).toISOString(),
     mode: input.config.mode,
-    version: packageJson.version || "unknown",
+    version,
     uptimeSeconds: Math.max(0, Math.floor(process.uptime())),
     publicUrl: input.config.mode === "private_runner" ? input.config.appUrl : null,
     dataPath: input.dataDir,

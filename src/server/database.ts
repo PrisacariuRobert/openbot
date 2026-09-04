@@ -673,6 +673,13 @@ export class OpenBotDatabase {
       INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
       VALUES ('mac_access_enabled', CASE WHEN EXISTS(SELECT 1 FROM bots WHERE mac_access_enabled=1) THEN '1' ELSE '0' END, ?)
     `).run(now());
+    const insertSetting = this.db.prepare("INSERT OR IGNORE INTO app_settings (setting_key,setting_value,updated_at) VALUES (?,?,?)");
+    const settingsAt = now();
+    insertSetting.run("runner_health_alerts_enabled", "0", settingsAt);
+    insertSetting.run("runner_health_last_checked_at", "", settingsAt);
+    insertSetting.run("runner_health_last_notified_at", "", settingsAt);
+    insertSetting.run("runner_health_last_status", "", settingsAt);
+    insertSetting.run("runner_health_last_signature", "", settingsAt);
     this.db.exec(`UPDATE bots SET mac_access_enabled=CAST((SELECT setting_value FROM app_settings WHERE setting_key='mac_access_enabled') AS INTEGER)`);
   }
 
@@ -793,6 +800,51 @@ export class OpenBotDatabase {
       throw error;
     }
     return this.getStudioSettings();
+  }
+
+  getRunnerHealthMonitorState(): {
+    enabled: boolean;
+    lastCheckedAt: string | null;
+    lastNotifiedAt: string | null;
+    lastStatus: "ready" | "attention" | null;
+    lastSignature: string;
+  } {
+    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key LIKE 'runner_health_%'").all() as Row[];
+    const values = new Map(rows.map((row) => [String(row.setting_key), String(row.setting_value || "")]));
+    const status = values.get("runner_health_last_status");
+    return {
+      enabled: values.get("runner_health_alerts_enabled") === "1",
+      lastCheckedAt: values.get("runner_health_last_checked_at") || null,
+      lastNotifiedAt: values.get("runner_health_last_notified_at") || null,
+      lastStatus: status === "ready" || status === "attention" ? status : null,
+      lastSignature: values.get("runner_health_last_signature") || "",
+    };
+  }
+
+  setRunnerHealthAlertsEnabled(enabled: boolean) {
+    this.db.prepare("UPDATE app_settings SET setting_value=?,updated_at=? WHERE setting_key='runner_health_alerts_enabled'").run(enabled ? "1" : "0", now());
+    return this.getRunnerHealthMonitorState();
+  }
+
+  recordRunnerHealthMonitorResult(input: {
+    checkedAt: string;
+    status: "ready" | "attention";
+    signature: string;
+    notifiedAt?: string;
+  }) {
+    const update = this.db.prepare("UPDATE app_settings SET setting_value=?,updated_at=? WHERE setting_key=?");
+    this.db.exec("BEGIN");
+    try {
+      update.run(input.checkedAt, input.checkedAt, "runner_health_last_checked_at");
+      update.run(input.status, input.checkedAt, "runner_health_last_status");
+      update.run(input.signature.slice(0, 300), input.checkedAt, "runner_health_last_signature");
+      if (input.notifiedAt) update.run(input.notifiedAt, input.checkedAt, "runner_health_last_notified_at");
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getRunnerHealthMonitorState();
   }
 
   createBot(input: {

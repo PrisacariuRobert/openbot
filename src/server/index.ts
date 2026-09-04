@@ -35,6 +35,7 @@ import { LoginAttemptGate } from "./auth-security.js";
 import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
+import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -153,9 +154,18 @@ function broadcast(event: Record<string, unknown> = { type: "state", at: Date.no
 
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
 const notifications = new NotificationService(db, () => runner.isLeader());
+const inspectPrivateHome = () => inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
+const runnerCareMonitor = new RunnerCareMonitor({
+  db,
+  inspect: inspectPrivateHome,
+  canCheck: () => deployment.mode === "private_runner" && runner.isLeader(),
+  destinationCount: () => db.listPushSubscriptions().length + (notifications.nativeStatus().configured ? db.listNativePushDevices().length : 0),
+  wakeNotifications: () => notifications.wake(),
+});
 const providerConnections = new ProviderConnectionManager(() => broadcast({ type: "provider", at: Date.now() }));
 runner.start();
 notifications.start();
+if (deployment.mode === "private_runner") runnerCareMonitor.start();
 
 function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
@@ -188,9 +198,21 @@ app.get("/api/runner", (_request, response) => {
 });
 
 app.get("/api/runner/diagnostics", async (_request, response) => {
-  const status = await inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
+  const status = await inspectPrivateHome();
   response.setHeader("Cache-Control", "no-store");
-  response.json(status);
+  response.json({ ...status, alerts: runnerCareMonitor.status() });
+});
+
+app.patch("/api/runner/diagnostics/alerts", async (request, response) => {
+  if (deployment.mode !== "private_runner") return response.status(409).json({ error: "Private-home health alerts are available when OpenBot is running on a private host." });
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose whether private-home health alerts are on or off." });
+  const current = runnerCareMonitor.status();
+  if (parsed.data.enabled && !current.deliveryReady) return response.status(409).json({ error: "Turn on OpenBot notifications on this browser or iPhone first." });
+  runnerCareMonitor.setEnabled(parsed.data.enabled);
+  if (parsed.data.enabled) await runnerCareMonitor.checkNow();
+  broadcast({ type: "runner-care", at: Date.now() });
+  response.json(runnerCareMonitor.status());
 });
 
 app.post("/api/runner/wake", (_request, response) => {
@@ -1921,6 +1943,7 @@ const server = app.listen(port, host, () => {
 });
 
 async function shutdown() {
+  runnerCareMonitor.stop();
   notifications.stop();
   runner.stop();
   providerConnections.stop();

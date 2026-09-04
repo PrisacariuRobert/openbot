@@ -39,8 +39,8 @@ const privacy = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/Privac
 const entitlements = readFileSync(path.join(root, "ios/OpenBotMobile/OpenBotMobile.entitlements"), "utf8");
 const sharePlist = readFileSync(path.join(root, "ios/OpenBotShare/Info.plist"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
-if (!project.includes("MARKETING_VERSION: 0.25.0")) throw new Error("The iOS marketing version is not 0.25.0.");
-if (!project.includes("CURRENT_PROJECT_VERSION: 29")) throw new Error("The iOS build number is not 29.");
+if (!project.includes("MARKETING_VERSION: 0.26.0")) throw new Error("The iOS marketing version is not 0.26.0.");
+if (!project.includes("CURRENT_PROJECT_VERSION: 30")) throw new Error("The iOS build number is not 30.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("NSMicrophoneUsageDescription") || !plist.includes("NSSpeechRecognitionUsageDescription")) throw new Error("The iOS app is missing its deliberate voice-capture permission descriptions.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");
@@ -56,6 +56,7 @@ if (!swift.includes("StudioRunner") || !swift.includes("wakeRunner") || !swift.i
 if (!swift.includes("StudioDeployment") || !swift.includes("PRIVATE ALWAYS-ON HOME") || !swift.includes("server.rack")) throw new Error("Native private-runner location and status are incomplete.");
 if (!swift.includes("StudioRunnerCare") || !swift.includes("checkRunnerCare") || !swift.includes('Button(runner.deployment?.mode == "private_runner" ? "Home check"')) throw new Error("Native private-home diagnostics are incomplete.");
 if (!swift.includes("Live from your private home")) throw new Error("Native private-home location wording is incomplete.");
+if (!swift.includes("StudioRunnerHealthAlerts") || !swift.includes("setRunnerHealthAlerts") || !swift.includes("Health alerts are on")) throw new Error("Native private-home health alerts are incomplete.");
 if (!swift.includes("quickLookPreview") || !swift.includes("api/attachments/\\(attachment.id)") || !swift.includes("ShareLink")) throw new Error("Native authenticated artifact preview and sharing are incomplete.");
 if (!swift.includes("registerForRemoteNotifications") || !swift.includes("api/notifications/native") || !swift.includes("OpenBotSharedInbox") || !swift.includes("importSharedInbox")) throw new Error("Native push registration or share-sheet ingestion is incomplete.");
 if (!swift.includes("SFSpeechAudioBufferRecognitionRequest") || !swift.includes('accessibilityLabel(voice.isListening ? "Stop voice capture" : "Start voice capture")') || !swift.includes("supportsOnDeviceRecognition")) throw new Error("Native deliberate voice capture, editable transcription, or its composer action is incomplete.");

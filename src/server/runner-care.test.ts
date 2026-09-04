@@ -18,12 +18,18 @@ test("reports real private-runner tools and a recent backup", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-runner-care-"));
   const dataDir = path.join(root, "data");
   mkdirSync(dataDir);
-  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.25.0" }));
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.26.0" }));
   writeFileSync(path.join(dataDir, "runner-maintenance.json"), JSON.stringify({
     lastBackupAt: "2026-09-04T12:00:00.000Z",
     lastBackupBytes: 2_048,
     lastBackupFile: "openbot-20260904T120000Z.tar.gz",
     release: "0.25.0",
+  }));
+  writeFileSync(path.join(dataDir, "runner-update.json"), JSON.stringify({
+    lastUpdateAt: "2026-09-03T12:00:00.000Z",
+    fromVersion: "0.24.0",
+    toVersion: "0.26.0",
+    revision: "abcdef1234567",
   }));
   try {
     const result = await inspectRunnerCare({
@@ -33,10 +39,11 @@ test("reports real private-runner tools and a recent backup", async () => {
       now: Date.parse("2026-09-04T18:00:00.000Z"),
       run: async (command) => ({ ok: true, output: command === "docker" ? "28.0.4" : "1.2.3" }),
     });
-    assert.equal(result.version, "0.25.0");
+    assert.equal(result.version, "0.26.0");
     assert.equal(result.publicUrl, "https://studio.example.com/");
     assert.equal(result.overall, "ready");
     assert.equal(result.checks.find((check) => check.id === "backup")?.value, "Today · 2 KB");
+    assert.match(result.checks.find((check) => check.id === "software")?.detail || "", /0\.24\.0 → 0\.26\.0/);
     assert.ok(result.checks.every((check) => check.status === "ready"));
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -47,7 +54,7 @@ test("turns missing tools and an old backup into friendly attention items", asyn
   const root = mkdtempSync(path.join(tmpdir(), "openbot-runner-care-"));
   const dataDir = path.join(root, "data");
   mkdirSync(dataDir);
-  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.25.0" }));
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.26.0" }));
   writeFileSync(path.join(dataDir, "runner-maintenance.json"), JSON.stringify({
     lastBackupAt: "2026-08-01T12:00:00.000Z",
     lastBackupBytes: 1_024,

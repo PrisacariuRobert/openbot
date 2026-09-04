@@ -477,3 +477,17 @@ Status: complete in source for the owner-operated 0.25.0 release
 - Sidebar, conversation, Live Studio, and Automations location language stays consistent between Mac and private-host modes
 
 Verification: 103 automated tests cover healthy and degraded Home checks alongside every earlier product contract. TypeScript, production build, release checks, iOS simulator checks, shell syntax, live local/private server behavior, desktop/phone browser QA, and a Linux private-runner build/boot/Home-check smoke test form the release gate.
+
+## M32 — Private-home maintenance and alerts
+
+Status: complete in source for the owner-operated 0.26.0 release
+
+- Health monitoring remains off until the owner opts in and a real Web Push or APNs destination is registered
+- The private leader checks storage, backup, software, model runtime, browser, and Docker every 15 minutes without exposing credentials or arbitrary command execution
+- A changed attention signature sends one durable alert, unchanged trouble repeats no more than daily, and recovery sends one separate notification
+- Web and native iPhone Live Studio show the saved alert state, interval, destination count, and a plain-language on/off control
+- The guided updater accepts only `origin/main` or a release tag, refuses dirty/diverged source, and creates a consistent backup before advancing
+- Builds occur while the existing service remains available; the replacement must become healthy or the previous image is restored automatically
+- Successful update receipts record the old/new release and exact revision for the authenticated Home check
+
+Verification: 105 automated tests cover durable alert transitions, restart-safe dedupe, recovery notifications, opt-in behavior, update-receipt parsing, and every earlier product contract. TypeScript, production build, release/native checks, iOS simulator tests, shell syntax, invalid-ref rejection, desktop/phone visual QA, and the Linux private-runner build/boot/Home-check CI gate form the release gate.

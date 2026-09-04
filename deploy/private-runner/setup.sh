@@ -45,3 +45,5 @@ docker compose --env-file "${env_file}" -f "${runner_dir}/docker-compose.yml" up
 echo "OpenBot is starting at https://${domain}/"
 echo "After the health check passes, read the private key with:"
 echo "  sudo cat ${host_root}/data/access.token"
+echo "Future releases can be applied safely with:"
+echo "  ./deploy/private-runner/update.sh"

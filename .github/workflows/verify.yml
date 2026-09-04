@@ -46,9 +46,11 @@ jobs:
               curl --fail --silent \
                 --header "Authorization: Bearer ${access_token}" \
                 http://127.0.0.1:4311/api/runner/diagnostics \
-                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.25.0" || result.checks?.length !== 5) process.exit(1); });'
+                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.26.0" || result.checks?.length !== 6 || result.alerts?.enabled !== false) process.exit(1); });'
               exit 0
             fi
             sleep 1
           done
           exit 1
+      - name: Validate private runner maintenance scripts
+        run: bash -n deploy/private-runner/setup.sh deploy/private-runner/backup.sh deploy/private-runner/update.sh

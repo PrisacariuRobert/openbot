@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 for the 0.25 runner-care release.
+Updated September 4, 2026 for the 0.26 private-home maintenance release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -155,11 +155,22 @@ Verified by 101 automated web/server tests, TypeScript and production builds, na
 
 Verified by 103 automated tests, TypeScript and production builds, native simulator checks, shell syntax, live local/private server inspection, responsive desktop/phone browser acceptance, and a Linux private-runner build/boot/Home-check smoke test in CI.
 
+## Shipped in 0.26 — Backup-first updates and health alerts
+
+- Added a guarded private-runner updater that accepts only `origin/main` or explicit release tags and refuses dirty or diverged source
+- Created a consistent owner-only backup before advancing source, while keeping the current service available during the replacement build
+- Added replacement-container health verification and automatic recovery of the previously running image after failed startup
+- Recorded successful update time, versions, and revision in a bounded private receipt shown by Home check
+- Added opt-in 15-minute health checks with changed-state attention alerts, once-daily unchanged reminders, and one recovery alert
+- Reused registered Web Push and APNs destinations, kept monitoring disabled by default, and exposed the same control on responsive web and native iPhone Live Studio
+
+Verified by 105 automated tests, TypeScript and production builds, native simulator checks, shell syntax, guarded-script validation, live private-server behavior, responsive desktop/phone browser acceptance, and the Linux private-runner build/boot/Home-check CI gate.
+
 ## Next — Open connections and richer events
 
 - Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
 - Define a reviewed custom MCP/connector install contract with visible permissions and revocation
-- Add opt-in external health notifications and guided, backup-first upgrades for private runners
+- Add encrypted private-home export/import and an optional privacy-preserving outside-in reachability check
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
 
 ## Later, not implied by the beta
