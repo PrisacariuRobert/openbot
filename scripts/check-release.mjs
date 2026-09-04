@@ -25,6 +25,7 @@ const privateRunnerCompose = readFileSync(new URL("../deploy/private-runner/dock
 const privateRunnerCaddy = readFileSync(new URL("../deploy/private-runner/Caddyfile", import.meta.url), "utf8");
 const privateRunnerGuide = readFileSync(new URL("../deploy/private-runner/README.md", import.meta.url), "utf8");
 const privateRunnerBackup = readFileSync(new URL("../deploy/private-runner/backup.sh", import.meta.url), "utf8");
+const privateRunnerUpdate = readFileSync(new URL("../deploy/private-runner/update.sh", import.meta.url), "utf8");
 const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
 const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
 const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
@@ -126,6 +127,12 @@ if (!server.includes('/api/runner/diagnostics') || !runnerCare.includes('statfsS
 }
 if (!privateRunnerBackup.includes('lastBackupAt') || !privateRunnerBackup.includes('lastBackupBytes') || !privateRunnerBackup.includes('runner-maintenance.json') || !nativeModels.includes('StudioRunnerCare') || !nativeStudio.includes('checkRunnerCare')) {
   failures.push("Backup health receipts and matching native private-home care are incomplete.");
+}
+if (!privateRunnerUpdate.includes('backup.sh') || !privateRunnerUpdate.includes('merge-base --is-ancestor') || !privateRunnerUpdate.includes('status --porcelain') || !privateRunnerUpdate.includes('previous_image') || !privateRunnerUpdate.includes('wait_for_healthy') || privateRunnerUpdate.indexOf('backup.sh') > privateRunnerUpdate.indexOf('merge --ff-only')) {
+  failures.push("Private-runner updates must refuse unsafe source state, back up before advancing, verify health, and retain automatic container recovery.");
+}
+if (!server.includes('/api/runner/diagnostics/alerts') || !app.includes('runner-health-alerts') || !nativeModels.includes('StudioRunnerHealthAlerts') || !nativeStudio.includes('setRunnerHealthAlerts')) {
+  failures.push("Opt-in private-home health alerts must remain available on web and native clients.");
 }
 if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");

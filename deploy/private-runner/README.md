@@ -51,16 +51,16 @@ Clone server-side code projects under `/srv/openbot/projects`, then add those ex
 
 ## Updates and backups
 
-Create a consistent owner-only backup before updating:
+Use the guided updater from a clean checkout:
 
 ```bash
-./deploy/private-runner/backup.sh
-git pull --ff-only
-docker compose --env-file deploy/private-runner/.env -f deploy/private-runner/docker-compose.yml up -d --build
+./deploy/private-runner/update.sh
 ```
 
-Backups are stored under `/srv/openbot/backups` with owner-only permissions. The script also records the successful backup time and size so **Automations → Home check** can warn when protection is missing or stale. The archive includes the encryption key, connector tokens, model logins, browser profiles, and studio history. Protect it like a password vault. Projects are intentionally not included because they can be large; back them up separately.
+The updater accepts `origin/main` by default or an explicit release tag such as `v0.26.0`. It refuses a dirty or diverged checkout, creates a consistent backup before changing source, builds while the current service remains available, waits for the replacement to become healthy, and restores the previous container image if that check fails. Successful updates appear in **Automations → Home check**.
+
+Backups are stored under `/srv/openbot/backups` with owner-only permissions. The backup script records the successful time and size so Home check can warn when protection is missing or stale. The archive includes the encryption key, connector tokens, model logins, browser profiles, and studio history. Protect it like a password vault. Projects are intentionally not included because they can be large; back them up separately.
 
 ## Move an existing local studio
 
-Stop OpenBot on the Mac before copying `.openbot` to `/srv/openbot/data`. Copy the whole directory, including `keys/vault.key`; individual encrypted token files are not portable without that key. Existing absolute Mac project paths will not work on Linux, so re-add projects from `/srv/openbot/projects`. Do not run local and private copies against separate copies of the same studio and expect them to synchronize—0.24 has one authoritative data location, chosen by the owner.
+Stop OpenBot on the Mac before copying `.openbot` to `/srv/openbot/data`. Copy the whole directory, including `keys/vault.key`; individual encrypted token files are not portable without that key. Existing absolute Mac project paths will not work on Linux, so re-add projects from `/srv/openbot/projects`. Do not run local and private copies against separate copies of the same studio and expect them to synchronize—OpenBot has one authoritative data location, chosen by the owner.

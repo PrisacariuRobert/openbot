@@ -7,7 +7,7 @@ enum ConnectionAddressError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .empty: return "Enter the address shown by OpenBot on your Mac."
+        case .empty: return "Enter the address shown by your OpenBot home."
         case .invalid: return "That does not look like an OpenBot address."
         case .insecureRemote: return "Use HTTPS away from your private network. Plain HTTP is allowed only for local addresses."
         }

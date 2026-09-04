@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 4, 2026
-Release: 0.25.0 owner-controlled beta
+Release: 0.26.0 owner-controlled beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -29,6 +29,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 12. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
 13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
 14. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
+15. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
 
 ## Available now
 
@@ -217,7 +218,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Skill Library with teaching, starter installation, import, teammate assignment, purpose/instruction editing, version history, rollback, export, chat launch, and deletion
 - Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, and visible recovery after process interruption
 - One-click macOS login/crash protection with safe foreground-to-background handoff and owner-removable setup
-- Optional private Linux runner with Caddy HTTPS, automatic restart, durable studio/model/browser/project storage, public OAuth/webhook callbacks, health state, and owner-only backup tooling
+- Optional private Linux runner with Caddy HTTPS, automatic restart, durable studio/model/browser/project storage, public OAuth/webhook callbacks, health state, owner-only backups, and guarded release updates
+- Opt-in private-home checks every 15 minutes with changed-state attention alerts, one recovery alert, durable anti-spam state, and delivery through registered Web Push or APNs destinations
 - Durable per-target notification outbox with standards-based Web Push, native APNs, stale-device cleanup, and direct result/approval links
 
 ### Messages, files, voice, and phone use
@@ -323,13 +325,11 @@ Do not say OpenBot currently:
 ## Roadmap, not launch copy
 
 - Physical-device voice/APNs/Share-extension QA and TestFlight distribution
-- Guided private-runner upgrades, health alerts, and encrypted cross-host export/import
+- Encrypted cross-host export/import and optional privacy-preserving outside-in reachability checks
 - Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
-- Full-text search across conversations and projects
-- Roster pinning, sections, templates, duplication, and sharing
 - Threaded replies and reactions
 - Multi-user organizations, SSO, policy administration, and audit export
 

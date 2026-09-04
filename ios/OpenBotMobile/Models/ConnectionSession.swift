@@ -73,7 +73,7 @@ final class ConnectionSession: ObservableObject {
             nativePushReady = result.deliveryReady
             nativePushMessage = result.deliveryReady
                 ? "This iPhone will receive finished-task and approval notifications."
-                : "Notifications are allowed here. Add the Apple push key on your Mac to deliver them."
+                : "Notifications are allowed here. Add the Apple push key on your OpenBot host to deliver them."
         } catch {
             nativePushReady = false
             nativePushMessage = (error as? LocalizedError)?.errorDescription ?? "OpenBot could not register this iPhone for notifications."
@@ -149,7 +149,7 @@ private enum SessionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingKey: return "Enter the private access key shown by OpenBot on your Mac."
+        case .missingKey: return "Enter the private access key shown by your OpenBot home."
         case .wrongKey: return "That access key did not match this OpenBot studio."
         case .unreachable: return "OpenBot did not answer. Check that your studio host is online."
         case .server(let message): return message

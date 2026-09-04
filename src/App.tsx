@@ -6511,6 +6511,7 @@ function RoutinesPanel({
   onProtectRunner,
   onUnprotectRunner,
   onWakeRunner,
+  onEnableNotifications,
 }: {
   routines: Routine[];
   events: AutomationEvent[];
@@ -6532,6 +6533,7 @@ function RoutinesPanel({
   onProtectRunner: () => Promise<void>;
   onUnprotectRunner: () => Promise<void>;
   onWakeRunner: () => Promise<void>;
+  onEnableNotifications: () => Promise<boolean>;
 }) {
   const [creating, setCreating] = useState(routines.length === 0),
     [name, setName] = useState(""),
@@ -6563,6 +6565,7 @@ function RoutinesPanel({
     [runnerCareAttempted, setRunnerCareAttempted] = useState(false),
     [privateDomain, setPrivateDomain] = useState(""),
     [setupCopied, setSetupCopied] = useState(false),
+    [updateCopied, setUpdateCopied] = useState(false),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
   const [createdHook, setCreatedHook] = useState<{
@@ -6713,6 +6716,20 @@ function RoutinesPanel({
     catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not check this private home."); }
     finally { setRunnerCareBusy(false); }
   }, []);
+  const setHealthAlerts = async (enabled: boolean) => {
+    if (runnerCareBusy) return;
+    setRunnerCareBusy(true);
+    setRunnerError(null);
+    try {
+      if (enabled && !runnerCare?.alerts.deliveryReady && !(await onEnableNotifications())) return;
+      await api("/api/runner/diagnostics/alerts", { method: "PATCH", body: JSON.stringify({ enabled }) });
+      setRunnerCare(await api<RunnerCareStatus>("/api/runner/diagnostics"));
+    } catch (error) {
+      setRunnerError(error instanceof Error ? error.message : "OpenBot could not change private-home alerts.");
+    } finally {
+      setRunnerCareBusy(false);
+    }
+  };
   useEffect(() => {
     if (privateRunner && !runnerCareAttempted) void checkPrivateHome();
   }, [checkPrivateHome, privateRunner, runnerCareAttempted]);
@@ -6796,7 +6813,7 @@ function RoutinesPanel({
           <div className="runner-care-grid">
             {runnerCare.checks.map((check) => (
               <article className={check.status} key={check.id}>
-                <span>{check.id === "storage" ? <HardDrive size={15} /> : check.id === "backup" ? <FileArchive size={15} /> : check.id === "opencode" ? <Sparkles size={15} /> : check.id === "browser" ? <Globe2 size={15} /> : <Cpu size={15} />}</span>
+                <span>{check.id === "storage" ? <HardDrive size={15} /> : check.id === "backup" ? <FileArchive size={15} /> : check.id === "software" ? <RefreshCw size={15} /> : check.id === "opencode" ? <Sparkles size={15} /> : check.id === "browser" ? <Globe2 size={15} /> : <Cpu size={15} />}</span>
                 <div><b>{check.label}</b><strong>{check.value}</strong><small>{check.detail}</small></div>
                 {check.status === "ready" ? <Check size={13} /> : <CircleAlert size={13} />}
               </article>
@@ -6806,6 +6823,16 @@ function RoutinesPanel({
             <div><b>Private data home</b><code>{runnerCare.dataPath}</code></div>
             <div><b>Create a fresh backup</b><code>./deploy/private-runner/backup.sh</code></div>
           </footer>
+          <div className="runner-maintenance-actions">
+            <span><RefreshCw size={15} /><span><b>Backup-first updates</b><small>Refuses unsafe source changes and restores the previous service if health checks fail.</small></span></span>
+            <code>./deploy/private-runner/update.sh</code>
+            <button onClick={() => { copy("./deploy/private-runner/update.sh"); setUpdateCopied(true); }}><Copy size={12} /> {updateCopied ? "Copied" : "Copy update"}</button>
+          </div>
+          <div className={`runner-health-alerts ${runnerCare.alerts.enabled ? "enabled" : ""}`}>
+            <span className="runner-health-alert-icon"><Bell size={16} /></span>
+            <span><b>{runnerCare.alerts.enabled ? "Health alerts are on" : "Alert me if this home needs attention"}</b><small>{runnerCare.alerts.enabled ? `Checked every ${runnerCare.alerts.intervalMinutes} minutes · ${runnerCare.alerts.destinationCount} ready device${runnerCare.alerts.destinationCount === 1 ? "" : "s"}` : "A quiet push when storage, backups, tools, or bot computers need you—and once when they recover."}</small></span>
+            <button disabled={runnerCareBusy} onClick={() => void setHealthAlerts(!runnerCare.alerts.enabled)}>{runnerCare.alerts.enabled ? "Turn off" : "Turn on"}</button>
+          </div>
         </section>
       )}
 
@@ -8604,6 +8631,40 @@ export function App() {
       throw error;
     }
   };
+  const enableNotifications = async (): Promise<boolean> => {
+    if (!("Notification" in window)) {
+      setToast("Notifications are not supported here");
+      return false;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      setToast("Notifications stayed off");
+      return false;
+    }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      localStorage.removeItem("openbot_push_enabled");
+      setToast("Notifications work while OpenBot is open on this device");
+      return false;
+    }
+    try {
+      const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
+      const { publicKey } = await api<{ publicKey: string }>("/api/notifications/key");
+      const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: pushApplicationKey(publicKey),
+      });
+      const saved = subscription.toJSON();
+      if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error("This device did not finish notification setup.");
+      await api("/api/notifications/subscriptions", { method: "POST", body: JSON.stringify({ endpoint: saved.endpoint, keys: saved.keys }) });
+      localStorage.setItem("openbot_push_enabled", "1");
+      setToast("Background notifications are on");
+      return true;
+    } catch (error) {
+      localStorage.removeItem("openbot_push_enabled");
+      setToast(error instanceof Error ? error.message : "OpenBot could not enable background notifications here");
+      return false;
+    }
+  };
   const selectThread = (id: string) => {
     setActiveThreadId(id);
     setSidebarOpen(false);
@@ -8843,31 +8904,7 @@ export function App() {
         >
           <ControlPanel
             state={state}
-            onNotify={async () => {
-              if (!("Notification" in window))
-                return setToast("Notifications are not supported here");
-              const permission = await Notification.requestPermission();
-              if (permission !== "granted") return setToast("Notifications stayed off");
-              if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-                localStorage.removeItem("openbot_push_enabled");
-                return setToast("Notifications work while OpenBot is open on this device");
-              }
-              try {
-                const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
-                const { publicKey } = await api<{ publicKey: string }>("/api/notifications/key");
-                const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
-                  userVisibleOnly: true, applicationServerKey: pushApplicationKey(publicKey),
-                });
-                const saved = subscription.toJSON();
-                if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error("This device did not finish notification setup.");
-                await api("/api/notifications/subscriptions", { method: "POST", body: JSON.stringify({ endpoint: saved.endpoint, keys: saved.keys }) });
-                localStorage.setItem("openbot_push_enabled", "1");
-                setToast("Background notifications are on");
-              } catch (error) {
-                localStorage.removeItem("openbot_push_enabled");
-                setToast(error instanceof Error ? error.message : "OpenBot could not enable background notifications here");
-              }
-            }}
+            onNotify={() => void enableNotifications()}
             onOpenProvider={() => setPanel("provider")}
             onOpenRemote={() => setPanel("remote")}
             onOpenConnectors={() => setPanel("connectors")}
@@ -9233,6 +9270,7 @@ export function App() {
               await loadState(activeThreadId, true);
               setToast("OpenBot checked for waiting work");
             }}
+            onEnableNotifications={enableNotifications}
           />
         </Sheet>
       )}

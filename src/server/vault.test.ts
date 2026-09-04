@@ -25,7 +25,10 @@ test("rejects altered ciphertext", () => {
   try {
     const vault = new SecretVault(root);
     const encrypted = vault.encrypt("secret");
-    assert.throws(() => vault.decrypt(`${encrypted.slice(0, -1)}x`));
+    const parts = encrypted.split(".");
+    const tag = parts[2]!;
+    parts[2] = `${tag[0] === "A" ? "B" : "A"}${tag.slice(1)}`;
+    assert.throws(() => vault.decrypt(parts.join(".")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

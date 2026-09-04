@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.0 — 2026-09-04
+
+- Added opt-in private-home health monitoring with durable 15-minute checks, changed-state alerts, once-daily unchanged reminders, and a separate recovery notification
+- Reused the existing Web Push and APNs outbox so health alerts reach registered browsers and signed iPhones without adding a third-party monitoring account
+- Added matching web and native controls with real destination counts and clear notification-setup recovery
+- Added a backup-first private-runner updater that refuses dirty/diverged checkouts and accepts only `origin/main` or explicit release tags
+- Kept the current service available during builds, verified replacement-container health, and restored the prior image automatically on failed startup
+- Added bounded update receipts and a sixth Home-check item showing the installed release and latest protected update
+- Expanded the automated suite to 105 passing tests and strengthened Linux image CI to verify the new health-alert contract and maintenance scripts
+
 ## 0.25.0 — 2026-09-04
 
 - Added authenticated private-home diagnostics for storage capacity, backup freshness, OpenCode, Chromium, Docker access, release version, and uptime

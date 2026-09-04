@@ -100,6 +100,17 @@ final class StudioStore: ObservableObject {
         catch { handle(error) }
     }
 
+    func setRunnerHealthAlerts(_ enabled: Bool) async {
+        guard !isCheckingRunner else { return }
+        isCheckingRunner = true
+        errorMessage = nil
+        defer { isCheckingRunner = false }
+        do {
+            try await client.setRunnerHealthAlerts(enabled)
+            runnerCare = try await client.runnerCare()
+        } catch { handle(error) }
+    }
+
     func saveDraft(_ body: String) async {
         do {
             _ = try await client.saveDraft(threadID: selectedThreadID, body: body)

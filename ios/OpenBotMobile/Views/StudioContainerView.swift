@@ -628,6 +628,8 @@ private struct NativeComposer: View {
 
 private struct NativeLiveStudioView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: ConnectionSession
+    @EnvironmentObject private var push: PushRegistration
     @ObservedObject var store: StudioStore
     let onSelect: (String) -> Void
 
@@ -669,7 +671,7 @@ private struct NativeLiveStudioView: View {
                                     .foregroundStyle(runner.status == "online" ? OpenBotTheme.green : .orange)
                                     .font(.system(size: 19, weight: .semibold))
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(runner.deployment?.mode == "private_runner" && runner.status == "online" ? "Your studio works when this Mac closes" : runner.status == "online" ? "Studio runner is awake" : "Studio runner needs a restart")
+                                    Text(runner.deployment?.mode == "private_runner" && runner.status == "online" ? "Your private home keeps working" : runner.status == "online" ? "Studio runner is awake" : "Studio runner needs a restart")
                                         .font(.system(size: 13, weight: .bold, design: .rounded))
                                     Text(runner.backgroundServiceDetail)
                                         .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
@@ -710,6 +712,33 @@ private struct NativeLiveStudioView: View {
                                                 Spacer(minLength: 6)
                                                 Text(check.value).font(.system(size: 9, design: .rounded)).foregroundStyle(.secondary).lineLimit(1)
                                             }
+                                        }
+                                        Divider().opacity(0.55)
+                                        HStack(spacing: 8) {
+                                            Image(systemName: care.alerts.enabled ? "bell.badge.fill" : "bell")
+                                                .foregroundStyle(care.alerts.enabled ? OpenBotTheme.green : OpenBotTheme.purple)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(care.alerts.enabled ? "Health alerts are on" : "Private-home health alerts")
+                                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                Text(care.alerts.enabled ? "Every \(care.alerts.intervalMinutes) min · \(care.alerts.destinationCount) ready device\(care.alerts.destinationCount == 1 ? "" : "s")" : "A quiet alert when this home needs you, and once when it recovers.")
+                                                    .font(.system(size: 8.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                            }
+                                            Spacer(minLength: 4)
+                                            Button(care.alerts.enabled ? "Turn off" : "Turn on") {
+                                                Task {
+                                                    if !care.alerts.enabled && !care.alerts.deliveryReady {
+                                                        if !push.isAuthorized { await push.requestPermission() }
+                                                        await session.registerPushDevice(push.deviceToken)
+                                                        await store.checkRunnerCare()
+                                                    }
+                                                    await store.setRunnerHealthAlerts(!care.alerts.enabled)
+                                                }
+                                            }
+                                            .buttonStyle(.borderedProminent).tint(care.alerts.enabled ? .gray : OpenBotTheme.purple).controlSize(.mini)
+                                            .disabled(store.isCheckingRunner)
+                                        }
+                                        if let error = store.errorMessage {
+                                            Text(error).font(.system(size: 8.5, design: .rounded)).foregroundStyle(.orange)
                                         }
                                     }
                                     .padding(10)

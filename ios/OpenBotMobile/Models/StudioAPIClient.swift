@@ -71,6 +71,11 @@ struct StudioAPIClient {
         try await request("api/runner/diagnostics")
     }
 
+    func setRunnerHealthAlerts(_ enabled: Bool) async throws {
+        let payload = try JSONEncoder().encode(RunnerHealthAlertsRequest(enabled: enabled))
+        _ = try await dataRequest("api/runner/diagnostics/alerts", method: "PATCH", body: payload)
+    }
+
     func registerNativePush(deviceToken: String, environment: String, bundleID: String) async throws -> NativePushRegistration {
         let payload = try JSONEncoder().encode(NativePushRequest(deviceToken: deviceToken, environment: environment, bundleId: bundleID))
         let data = try await dataRequest("api/notifications/native", method: "POST", body: payload)
@@ -153,6 +158,8 @@ private struct NativePushRequest: Encodable {
     let bundleId: String
 }
 
+private struct RunnerHealthAlertsRequest: Encodable { let enabled: Bool }
+
 struct NativePushRegistration: Decodable {
     let id: String
     let connected: Bool
@@ -170,7 +177,7 @@ enum StudioAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized: return "This studio needs its private access key again."
-        case .unreachable: return "Your Mac did not answer. Check that OpenBot is running."
+        case .unreachable: return "Your OpenBot home did not answer. Check that it is running."
         case .invalidResponse: return "OpenBot sent something this app could not read. Update both apps and try again."
         case .server(let message): return message
         }

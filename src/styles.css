@@ -2516,6 +2516,82 @@ select:focus-visible {
 }
 .runner-care > footer b { display: block; color: #77727f; font-size: 6.8px; }
 .runner-care > footer code { margin-top: 3px; display: block; overflow: hidden; color: #5b52a0; font-size: 6.8px; text-overflow: ellipsis; white-space: nowrap; }
+.runner-maintenance-actions {
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid rgba(91, 80, 161, 0.08);
+  background: linear-gradient(115deg, rgba(247, 246, 255, 0.8), rgba(255, 255, 255, 0.7));
+}
+.runner-maintenance-actions > span {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #6b61ad;
+}
+.runner-maintenance-actions > span > svg { flex: none; margin-top: 1px; }
+.runner-maintenance-actions b,
+.runner-maintenance-actions small { display: block; }
+.runner-maintenance-actions b { color: #4a4653; font-size: 8.5px; }
+.runner-maintenance-actions small { margin-top: 2px; color: #8e8993; font-size: 7px; line-height: 1.35; }
+.runner-maintenance-actions code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 7px 8px;
+  color: #594fa2;
+  border-radius: 8px;
+  background: #ebe9f8;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.runner-maintenance-actions button,
+.runner-health-alerts button {
+  min-height: 29px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #fff;
+  border: 0;
+  border-radius: 9px;
+  background: #6657c2;
+  font-size: 7.2px;
+  font-weight: 750;
+}
+.runner-health-alerts {
+  margin: 10px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(101, 89, 178, 0.11);
+  border-radius: 13px;
+  background: #fbfaff;
+}
+.runner-health-alerts.enabled { border-color: rgba(60, 146, 96, 0.18); background: #f6fcf8; }
+.runner-health-alert-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: #6758bc;
+  border-radius: 10px;
+  background: #ece9ff;
+}
+.runner-health-alerts.enabled .runner-health-alert-icon { color: #3d865e; background: #e0f4e8; }
+.runner-health-alerts b,
+.runner-health-alerts small { display: block; }
+.runner-health-alerts b { color: #46424a; font-size: 8.7px; }
+.runner-health-alerts small { margin-top: 2px; color: #8c8890; font-size: 6.9px; line-height: 1.35; }
+.runner-health-alerts.enabled button { color: #4b715a; background: #e2f1e8; }
+.runner-health-alerts button:disabled,
+.runner-maintenance-actions button:disabled { opacity: 0.55; cursor: wait; }
 .private-runner-guide {
   overflow: hidden;
   border: 1px solid rgba(100, 88, 182, 0.14);
@@ -10550,6 +10626,10 @@ select:focus-visible {
   .runner-actions button { width: 100%; }
   .runner-care-grid,
   .runner-care > footer { grid-template-columns: 1fr; }
+  .runner-maintenance-actions { grid-template-columns: 1fr; }
+  .runner-maintenance-actions button { min-height: 34px; }
+  .runner-health-alerts { grid-template-columns: 30px minmax(0, 1fr); }
+  .runner-health-alerts button { grid-column: 1 / -1; min-height: 34px; }
   .private-runner-guide-body { padding-left: 13px; }
   .private-runner-guide-body ol { grid-template-columns: 1fr; }
   .private-setup-command { grid-template-columns: 1fr; }
