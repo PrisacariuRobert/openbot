@@ -75,7 +75,7 @@ struct ConnectionView: View {
                         reassurance("The access key is protected in this iPhone’s Keychain.", icon: "lock.shield.fill")
                         reassurance("With Tailscale on both devices, OpenBot works over cellular or any Wi-Fi.", icon: "globe.americas.fill")
                         reassurance("Other public addresses must use HTTPS; never expose the Mac’s plain port.", icon: "checkmark.shield.fill")
-                        reassurance("Your Mac remains the host and must be awake to do work.", icon: "macbook")
+                        reassurance("Use your Mac, or choose a private always-on host that keeps working when it is off.", icon: "server.rack")
                     }
                     Spacer(minLength: 20)
                 }

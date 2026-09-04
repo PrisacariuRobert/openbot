@@ -10,6 +10,8 @@ const runtime = readFileSync(new URL("../src/server/runtime.ts", import.meta.url
 const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", import.meta.url), "utf8");
 const runner = readFileSync(new URL("../src/server/opencode.ts", import.meta.url), "utf8");
 const backgroundService = readFileSync(new URL("../src/server/background-service.ts", import.meta.url), "utf8");
+const deployment = readFileSync(new URL("../src/server/deployment.ts", import.meta.url), "utf8");
+const authSecurity = readFileSync(new URL("../src/server/auth-security.ts", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
@@ -17,6 +19,13 @@ const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", i
 const todoist = readFileSync(new URL("../src/server/todoist.ts", import.meta.url), "utf8");
 const dropbox = readFileSync(new URL("../src/server/dropbox.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+const privateRunnerDockerfile = readFileSync(new URL("../deploy/private-runner/Dockerfile", import.meta.url), "utf8");
+const privateRunnerCompose = readFileSync(new URL("../deploy/private-runner/docker-compose.yml", import.meta.url), "utf8");
+const privateRunnerCaddy = readFileSync(new URL("../deploy/private-runner/Caddyfile", import.meta.url), "utf8");
+const privateRunnerGuide = readFileSync(new URL("../deploy/private-runner/README.md", import.meta.url), "utf8");
+const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
+const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
+const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
 
@@ -91,6 +100,24 @@ if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifi
 }
 if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep OpenBot running")) {
   failures.push("The user-facing runner health and one-click protection experience is incomplete.");
+}
+if (!deployment.includes('requestedMode === "private_runner"') || !deployment.includes('url.protocol !== "https:"') || !deployment.includes("path.isAbsolute") || !server.includes("deploymentCallbackUrl")) {
+  failures.push("Private runner mode must fail closed and use its canonical HTTPS address for public callbacks.");
+}
+if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy", 1)') || !server.includes("loginGate") || !authSecurity.includes("maximumFailures")) {
+  failures.push("Private-host health, proxy-aware Secure cookies, or login throttling is incomplete.");
+}
+if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
+  failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
+}
+if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz")) {
+  failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
+}
+if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {
+  failures.push("The private-runner HTTPS and ownership guidance is incomplete.");
+}
+if (!app.includes("Private always-on home") || !styles.includes(".private-runner-guide") || !nativeModels.includes("StudioDeployment") || !nativeStudio.includes("PRIVATE ALWAYS-ON HOME")) {
+  failures.push("Web and native apps must share the private-runner status and data-location experience.");
 }
 if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");

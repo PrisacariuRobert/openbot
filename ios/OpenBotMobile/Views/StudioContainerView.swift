@@ -637,7 +637,7 @@ private struct NativeLiveStudioView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Label(store.state.runner?.backgroundService == "installed" ? "BACKGROUND PROTECTION ACTIVE" : "LIVE FROM YOUR MAC", systemImage: "circle.fill")
+                        Label(store.state.runner?.deployment?.mode == "private_runner" ? "PRIVATE ALWAYS-ON HOME" : store.state.runner?.backgroundService == "installed" ? "BACKGROUND PROTECTION ACTIVE" : "LIVE FROM YOUR MAC", systemImage: "circle.fill")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.78))
                         Text(store.state.usage.activeRuns > 0 ? "Your team is moving work forward" : "Your team is ready")
@@ -661,19 +661,31 @@ private struct NativeLiveStudioView: View {
                     }
 
                     if let runner = store.state.runner {
-                        HStack(spacing: 11) {
-                            Image(systemName: runner.status == "online" ? "bolt.heart.fill" : "exclamationmark.arrow.triangle.2.circlepath")
-                                .foregroundStyle(runner.status == "online" ? OpenBotTheme.green : .orange)
-                                .font(.system(size: 19, weight: .semibold))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(runner.status == "online" ? "Studio runner is awake" : "Studio runner needs a restart")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                Text(runner.backgroundServiceDetail)
-                                    .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack(spacing: 11) {
+                                Image(systemName: runner.deployment?.mode == "private_runner" ? "server.rack" : runner.status == "online" ? "bolt.heart.fill" : "exclamationmark.arrow.triangle.2.circlepath")
+                                    .foregroundStyle(runner.status == "online" ? OpenBotTheme.green : .orange)
+                                    .font(.system(size: 19, weight: .semibold))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(runner.deployment?.mode == "private_runner" && runner.status == "online" ? "Your studio works when this Mac closes" : runner.status == "online" ? "Studio runner is awake" : "Studio runner needs a restart")
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    Text(runner.backgroundServiceDetail)
+                                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                }
+                                Spacer(minLength: 4)
+                                Button("Check now") { Task { await store.wakeRunner() } }
+                                    .buttonStyle(.bordered).controlSize(.small)
                             }
-                            Spacer(minLength: 4)
-                            Button("Check now") { Task { await store.wakeRunner() } }
-                                .buttonStyle(.bordered).controlSize(.small)
+                            if let deployment = runner.deployment, deployment.mode == "private_runner" {
+                                HStack(spacing: 6) {
+                                    ForEach(deployment.checks.prefix(3), id: \.id) { check in
+                                        Label(check.label, systemImage: check.status == "ready" ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                            .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(check.status == "ready" ? OpenBotTheme.green : .orange)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            }
                         }
                         .padding(13)
                         .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))

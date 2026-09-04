@@ -390,8 +390,8 @@ function StudioStartup({
           </span>
           <h1>The page is open, but your studio isn’t answering.</h1>
           <p>
-            Make sure OpenBot is running and your Mac is awake. We’ll keep
-            trying in the background.
+            Make sure the Mac or private host running OpenBot is online. We’ll
+            keep trying in the background.
           </p>
           <div className="splash-actions">
             <button className="button-primary" onClick={onRetry}>
@@ -5382,11 +5382,13 @@ type AccessInfo = {
 };
 function RemotePanel({
   bots,
+  runner,
   installPrompt,
   onInstalled,
   onNotice,
 }: {
   bots: Bot[];
+  runner: RunnerHealth;
   installPrompt: InstallPrompt | null;
   onInstalled: () => void;
   onNotice: (message: string) => void;
@@ -5397,6 +5399,7 @@ function RemotePanel({
   const localHost = ["127.0.0.1", "localhost", "::1"].includes(
     window.location.hostname,
   );
+  const privateRunner = runner.deployment?.mode === "private_runner";
   const nativeIOS =
     new URLSearchParams(window.location.search).get("native") === "ios" ||
     navigator.userAgent.includes("OpenBot-iOS/");
@@ -5538,7 +5541,7 @@ function RemotePanel({
           <div>
             <h3>Private connection</h3>
             <p>
-              Your Mac remains the host; the access key protects other devices
+              {privateRunner ? "Your private host stays in control; the access key protects every new device" : "Your Mac remains the host; the access key protects other devices"}
             </p>
           </div>
         </div>
@@ -6553,6 +6556,7 @@ function RoutinesPanel({
   } | null>(null);
   const selectedBot = bots.find((item) => item.id === botId) || bots[0];
   const managingFromThisMac = ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
+  const privateRunner = runner.deployment?.mode === "private_runner";
   const unitMultiplier =
     customUnit === "days" ? 1440 : customUnit === "hours" ? 60 : 1;
   const intervalMinutes =
@@ -6699,19 +6703,31 @@ function RoutinesPanel({
         </span>
       </section>
 
-      <section className={`runner-card runner-${runner.status}`}>
+      <section className={`runner-card runner-${runner.status}${privateRunner ? " runner-private" : ""}`}>
         <div className="runner-presence">
           <span><Power size={18} /></span>
           <i />
         </div>
         <div className="runner-copy">
           <span className="runner-kicker">
-            {runner.status === "online" ? "Studio awake" : "Needs a restart"}
-            {runner.backgroundService === "installed" && <b><ShieldCheck size={11} /> Protected</b>}
+            {privateRunner ? "Private always-on home" : runner.status === "online" ? "Studio awake" : "Needs a restart"}
+            {privateRunner ? <b><Globe2 size={11} /> Always on</b> : runner.backgroundService === "installed" && <b><ShieldCheck size={11} /> Protected</b>}
           </span>
-          <strong>{runner.status === "online" ? "Your automations have an active runner" : "Automations are saved, but nothing is picking them up"}</strong>
+          <strong>{privateRunner
+            ? runner.status === "online" ? "Your studio keeps working when this Mac closes" : "Your private home needs a restart"
+            : runner.status === "online" ? "Your automations have an active runner" : "Automations are saved, but nothing is picking them up"}</strong>
           <p>{runner.backgroundServiceDetail}</p>
-          <small>Your Mac must be powered on and awake. Missed schedules are picked up safely when it returns.</small>
+          <small>{privateRunner ? "Studio history, connections and files stay on the private host you chose." : "Your Mac must be powered on and awake. Missed schedules are picked up safely when it returns."}</small>
+          {privateRunner && runner.deployment && (
+            <div className="runner-readiness">
+              {runner.deployment.checks.map((check) => (
+                <span className={check.status} key={check.id} title={check.detail}>
+                  {check.id === "https" ? <Globe2 size={10} /> : check.id === "storage" ? <HardDrive size={10} /> : check.id === "access" ? <KeyRound size={10} /> : <Power size={10} />}
+                  {check.label}
+                </span>
+              ))}
+            </div>
+          )}
           {runnerError && <em className="runner-error"><CircleAlert size={11} /> {runnerError}</em>}
         </div>
         <div className="runner-stats">
@@ -6721,19 +6737,42 @@ function RoutinesPanel({
           <span><b>{runner.recoveredRuns}</b> recovered</span>
         </div>
         <div className="runner-actions">
-          {runner.backgroundService === "not_installed" && managingFromThisMac && (
+          {!privateRunner && runner.backgroundService === "not_installed" && managingFromThisMac && (
             <button className="primary" disabled={runnerBusy} onClick={() => void runRunnerAction(onProtectRunner)}>{runnerBusy ? <LoaderCircle className="spinner" size={13} /> : <ShieldCheck size={13} />} Keep OpenBot running</button>
           )}
-          {runner.backgroundService === "installed" && managingFromThisMac && (
+          {!privateRunner && runner.backgroundService === "installed" && managingFromThisMac && (
             <button disabled={runnerBusy} onClick={() => {
               if (!window.confirm("Turn off background protection? Saved automations stay in place, but OpenBot will only run while you start it yourself.")) return;
               void runRunnerAction(onUnprotectRunner);
             }}><Power size={13} /> Turn off protection</button>
           )}
           <button disabled={runnerBusy} onClick={() => void runRunnerAction(onWakeRunner)}><RefreshCw size={13} /> Check now</button>
-          {!managingFromThisMac && runner.backgroundService === "not_installed" && <small>Turn on protection from your Mac</small>}
+          {!privateRunner && !managingFromThisMac && runner.backgroundService === "not_installed" && <small>Turn on protection from your Mac</small>}
         </div>
       </section>
+
+      {!privateRunner && (
+        <details className="private-runner-guide">
+          <summary>
+            <span><Globe2 size={16} /></span>
+            <div>
+              <strong>Keep working when this Mac is off</strong>
+              <small>Optional private hosting, with the same studio and safety rules</small>
+            </div>
+            <ChevronDown size={15} />
+          </summary>
+          <div className="private-runner-guide-body">
+            <p>Run OpenBot on a small Linux server you control. Your Mac stays local unless you deliberately move the studio.</p>
+            <ol>
+              <li><b>Choose a host</b><span>A private VPS or home server with Docker</span></li>
+              <li><b>Point a domain</b><span>OpenBot sets up encrypted HTTPS</span></li>
+              <li><b>Start your home</b><span>Follow the reviewed private-runner guide</span></li>
+            </ol>
+            <code>./deploy/private-runner/setup.sh studio.example.com</code>
+            <small>Full setup, migration and backup notes: deploy/private-runner/README.md</small>
+          </div>
+        </details>
+      )}
 
       {alerts.length > 0 && (
         <section className="automation-inbox">
@@ -8891,6 +8930,7 @@ export function App() {
         >
           <RemotePanel
             bots={state.bots}
+            runner={state.runner}
             installPrompt={installPrompt}
             onInstalled={() => setInstallPrompt(null)}
             onNotice={setToast}

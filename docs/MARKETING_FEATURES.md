@@ -1,13 +1,13 @@
 # OpenBot Marketing Capability Catalog
 
-Last verified: September 3, 2026
-Release: 0.23.0 local-first beta
+Last verified: September 4, 2026
+Release: 0.24.0 owner-controlled beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
 ## Product in one sentence
 
-OpenBot is the open-source, local-first studio where persistent AI teammates use your models, connected context, browsers, and approved code projects to finish work together—and show you how they checked it.
+OpenBot is the open-source studio where persistent AI teammates use your models, connected context, browsers, and approved code projects to finish work together—locally or on your own always-on host—and show you how they checked it.
 
 ## Short launch pitch
 
@@ -19,14 +19,14 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 2. **Review-first coding without a broad host shell.** Clone or share one project, let multiple teammates work safely in parallel, inspect every diff, restore an unchanged agent edit, and publish only after checks and an independent teammate review pass.
 3. **Finished means checked.** Real jobs have a durable outcome, deliverable, checklist, approval boundary, and verification receipt.
 4. **A team that speaks with one voice.** Teammates consult privately, every signal stays inspectable, and one coordinator combines the result instead of making the user reconcile duplicate replies. Conversations remain limited to three hops and eight related runs.
-5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
+5. **You choose where it lives.** Keep conversations, permissions, routines, encrypted connector credentials, and audit trails on the Mac, or move the whole studio deliberately to your own always-on host.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
-8. **Continue on the device in your hand.** Start an unfinished message on the Mac, share a file or link from another iPhone app, follow result/approval notifications, or return to the web studio while the owner's Mac remains the source of truth.
+8. **Continue on the device in your hand.** Share a file or link from another iPhone app, dictate an editable message, follow result/approval notifications, or return to the web studio from anywhere the chosen host is reachable.
 9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
-10. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
+10. **A real iPhone app without a data grab.** The compiled SwiftUI client protects the key in Keychain and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, approvals, and host status to the phone without embedding the desktop website.
 11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
-12. **A local studio that survives restarts.** One active runner owns each job, optional macOS background protection keeps the service alive, and secure installed web apps receive result and approval notifications.
+12. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
 13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
 
 ## Available now
@@ -216,6 +216,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Skill Library with teaching, starter installation, import, teammate assignment, purpose/instruction editing, version history, rollback, export, chat launch, and deletion
 - Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, and visible recovery after process interruption
 - One-click macOS login/crash protection with safe foreground-to-background handoff and owner-removable setup
+- Optional private Linux runner with Caddy HTTPS, automatic restart, durable studio/model/browser/project storage, public OAuth/webhook callbacks, health state, and owner-only backup tooling
 - Durable per-target notification outbox with standards-based Web Push, native APNs, stale-device cleanup, and direct result/approval links
 
 ### Messages, files, voice, and phone use
@@ -234,6 +235,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Installable responsive PWA for phone check-ins
 - Guided private phone connection with live, reconnecting, and offline states
 - Authenticated remote mode for a trusted private network or encrypted tunnel
+- Matching web/native **This Mac** and **Private always-on home** status with explicit data location
 - Live in-app notifications, background Web Push for secure installed web apps, and native APNs registration/deep links
 - Embedded iOS Share extension with a bounded private handoff for text, links, images, and files
 
@@ -241,6 +243,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 - Loopback-only service by default
 - Private access key and HTTP-only SameSite Strict cookie for non-local access
+- Private-host Secure cookies behind one trusted proxy, repeated-login throttling, HSTS, anti-framing headers, and a no-secret health endpoint
 - SQLite WAL persistence for conversations, work, permissions, and audit records
 - AES-256-GCM encryption for API keys and Google, Slack, Notion, Todoist, and Dropbox credentials
 - Machine-local vault key stored with mode `0600`
@@ -268,13 +271,13 @@ These features are implemented, but marketing must explain their requirement.
 | Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
 | Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
 | Todoist and Dropbox | Todoist registers a local OAuth client automatically. Dropbox needs a registered release app key or the self-hoster's app key; public-client PKCE needs no bundled secret. Provider consent is still required. |
-| Calendar automations | OpenBot polls the connected primary calendar while the local service is awake; the selected teammate needs Calendar permission. |
-| Todoist/Dropbox automations | OpenBot polls only while the Mac service is awake; the selected teammate needs the matching read permission. Fresh baselines prevent old account history from starting work when a routine is enabled. |
-| Background runner | On macOS, the owner must turn on **Keep OpenBot running**. The Mac must remain powered on and awake; process restart protection is not cloud execution. |
-| GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
+| Calendar automations | The selected teammate needs Calendar permission, and the chosen Mac or private host must be online. |
+| Todoist/Dropbox automations | The selected teammate needs matching read permission and the chosen host must be online. Fresh baselines prevent old account history from starting work when a routine is enabled. |
+| Runner location | Mac background protection still requires an awake Mac. The optional private runner requires a dedicated Linux host, Docker, a domain, owner-operated security/updates/backups, and an explicit whole-studio migration. |
+| GitHub and generic webhooks | The sender needs the one-time secret and a secure route. Private-runner mode includes Caddy HTTPS; local mode needs a trusted tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
-| Phone access | The native iOS app and PWA both require the Mac to remain powered on and awake. Optional background protection survives app exits. Local Wi-Fi works directly; OpenBot detects and prioritizes a Tailscale address for private use over cellular or different Wi-Fi networks, while an HTTPS proxy remains another option. Native installation currently requires Xcode signing plus the registered App Group; it is not an App Store download yet. |
+| Phone access | A Mac-hosted studio requires the Mac to stay awake; a private runner remains reachable while it is off. Local Wi-Fi/Tailscale and private-host HTTPS are supported. Native installation still requires Xcode signing plus the registered App Group; it is not an App Store download yet. |
 | Notifications | Web Push requires an installed web app, permission, browser support, and secure HTTPS. Native APNs requires an owner-signed physical app plus team ID, key ID, and host-side `.p8` key. Simulator compilation does not prove production delivery. |
 
 ## Useful launch workflows
@@ -294,7 +297,7 @@ These features are implemented, but marketing must explain their requirement.
 - **Turn a discussion into a durable brief:** combine current Slack context with selected Notion pages, then approve the exact Notion update only after reviewing it.
 - **Project pulse:** combine GitHub activity, Slack decisions, and a Notion project page into one checked status report.
 - **React to a repository event:** filter a signed GitHub webhook to one repository, event, and action; inspect its receipt and linked checked result, with duplicate deliveries stopped automatically.
-- **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events while OpenBot is awake.
+- **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events whenever the chosen host is online.
 - **React to changing work:** ask a teammate to summarize a newly completed Todoist task or explain changed files below a selected Dropbox project folder.
 - **Send context from iPhone:** share a link, screenshot, or document to OpenBot from another app, then continue in the selected conversation.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
@@ -304,7 +307,7 @@ These features are implemented, but marketing must explain their requirement.
 
 Do not say OpenBot currently:
 
-- runs continuously in the cloud when the owner's computer is off;
+- is a managed zero-maintenance cloud service or silently synchronizes Mac and server data;
 - is already distributed through the iOS App Store or available for Android;
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
@@ -319,7 +322,7 @@ Do not say OpenBot currently:
 ## Roadmap, not launch copy
 
 - Physical-device voice/APNs/Share-extension QA and TestFlight distribution
-- Optional private-VPS runner and encrypted cross-host handoff for execution while the Mac sleeps
+- Guided private-runner upgrades, health alerts, and encrypted cross-host export/import
 - Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools

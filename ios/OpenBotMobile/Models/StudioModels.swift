@@ -93,6 +93,23 @@ struct StudioRunner: Decodable, Hashable {
     let waitingRuns: Int
     let backgroundService: String
     let backgroundServiceDetail: String
+    let deployment: StudioDeployment?
+}
+
+struct StudioDeployment: Decodable, Hashable {
+    let mode: String
+    let label: String
+    let alwaysOn: Bool
+    let publicUrl: String?
+    let dataLocation: String
+    let checks: [StudioDeploymentCheck]
+}
+
+struct StudioDeploymentCheck: Decodable, Hashable {
+    let id: String
+    let label: String
+    let status: String
+    let detail: String
 }
 
 struct StudioApproval: Decodable, Identifiable, Hashable {

@@ -124,7 +124,7 @@ final class ConnectionSession: ObservableObject {
             errorMessage = error.errorDescription ?? "OpenBot could not connect."
         } catch {
             isAuthenticated = false
-            errorMessage = "OpenBot could not reach that address. Check that your Mac is awake and phone access is running."
+            errorMessage = "OpenBot could not reach that address. Check that your studio host is online."
         }
     }
 
@@ -151,7 +151,7 @@ private enum SessionError: LocalizedError {
         switch self {
         case .missingKey: return "Enter the private access key shown by OpenBot on your Mac."
         case .wrongKey: return "That access key did not match this OpenBot studio."
-        case .unreachable: return "OpenBot did not answer. Check that the Mac is awake and phone access is running."
+        case .unreachable: return "OpenBot did not answer. Check that your studio host is online."
         case .server(let message): return message
         }
     }
