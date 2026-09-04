@@ -1,9 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 5, 2026
-Release: 0.32.0 development beta — not yet published
+Release: 0.33.0 development beta — not yet published
 
-New in this pass: the native SwiftUI iPhone app has a first-class Work destination for Morning Brief, Meeting Prep, and Inbox Follow-ups, backed by live connector readiness, one-tap Google recovery, and the same source/no-write requirements as the web app. See [validation and remaining limits](QA_0.32.md). Safe claim: **“Start the same source-backed jobs from your iPhone and follow them in the team room.”** Do not claim full native settings, physical-device/cellular proof, complete inbox coverage, independently verified AI advice, guaranteed bug fixes, or comparative model-quality superiority.
+New in this pass: every approved command, email, post, issue, and connected-app update gets a durable single-claim receipt before execution. If OpenBot restarts while the destination may be processing it, web and native Live Studio ask the owner what happened and do not replay it. See [validation and remaining limits](QA_0.33.md). Safe claim: **“OpenBot never blindly repeats an approved action after an uncertain restart.”** Do not claim universal provider-level exactly-once delivery, automatic reconciliation for every service, full native settings, physical-device/cellular proof, independently verified AI advice, guaranteed task success, or comparative model-quality superiority.
 
 Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 
@@ -31,12 +31,13 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 10. **A real iPhone app without a data grab.** The compiled SwiftUI client protects the key in Keychain and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, approvals, and host status to the phone without embedding the desktop website.
 11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
 12. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
-13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
-14. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
-15. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
-16. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
-17. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
-18. **Let conversations and knowledge wake the right teammate.** Signed Slack and Notion events can start one permissioned, inspectable routine without bypassing ordinary approvals.
+13. **Approved once means dispatched once locally.** Every approved action is fingerprinted and recorded before execution. Interrupted remote outcomes wait for your confirmation instead of being guessed or replayed.
+14. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
+15. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
+16. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
+17. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
+18. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
+19. **Let conversations and knowledge wake the right teammate.** Signed Slack and Notion events can start one permissioned, inspectable routine without bypassing ordinary approvals.
 
 ## Available now
 
@@ -77,6 +78,10 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 ### Inspectable completion
 
+- Durable pre-execution receipts for approved commands, emails, posts, issues, browser/app interactions, and connected-app updates
+- Atomic single-process claims so simultaneous or repeated approval requests cannot dispatch one saved action twice
+- Restart recovery that distinguishes safe-to-start prepared work from uncertain in-flight work
+- Web and native reconciliation controls plus a recent action history that omits private request bodies from the public state payload
 - Durable job outcome and reviewable deliverable for substantial requests
 - Three-to-eight meaningful work steps with live progress
 - Explicit connected-app and approval requirements

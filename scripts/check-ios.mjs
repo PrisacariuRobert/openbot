@@ -55,6 +55,7 @@ if (!swift.includes("ConnectionAddress.normalized") || !swift.includes("Bearer \
 if (!swift.includes("api/drafts") || !swift.includes("Continued from your Mac")) throw new Error("Native Mac/iPhone draft continuity is incomplete.");
 if (!swift.includes("NativeLiveStudioView") || !swift.includes('accessibilityLabel("Live Studio")') || !swift.includes("studioRuns")) throw new Error("The native Live Studio overview is incomplete.");
 if (!swift.includes("NativeWorkView") || !swift.includes('accessibilityLabel("Work")') || !swift.includes("StudioStarter.all") || !swift.includes("api/connectors")) throw new Error("The native connector-aware Work surface is incomplete.");
+if (!swift.includes("StudioApprovedAction") || !swift.includes("resolveApprovedAction") || !swift.includes("Action history") || !swift.includes("It didn’t happen")) throw new Error("Native approved-action history or restart reconciliation is incomplete.");
 if (!swift.includes("workflow.version ?? 1") || !swift.includes("let source: String?")) throw new Error("Native skill invocation is missing portable skill metadata.");
 if (!swift.includes("StudioRunner") || !swift.includes("wakeRunner") || !swift.includes("Resumed safely after OpenBot restarted")) throw new Error("Native background runner health and recovery are incomplete.");
 if (!swift.includes("StudioDeployment") || !swift.includes("PRIVATE ALWAYS-ON HOME") || !swift.includes("server.rack")) throw new Error("Native private-runner location and status are incomplete.");

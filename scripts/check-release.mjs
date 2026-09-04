@@ -89,6 +89,9 @@ if (!app.includes("skill-owner-switcher") || !app.includes("Import reviewed skil
 if (!database.includes("CREATE TABLE IF NOT EXISTS runner_state") || !database.includes("claimNextQueuedRun") || !database.includes("recoverExpiredRuns")) {
   failures.push("The durable runner lease, exclusive claim, or restart recovery store is incomplete.");
 }
+if (!database.includes("CREATE TABLE IF NOT EXISTS approved_actions") || !database.includes("claimApprovedAction") || !database.includes("recoverInterruptedApprovedActions") || !server.includes('/api/approved-actions/:id/resolve') || !app.includes("Action history")) {
+  failures.push("Approved actions must keep a durable single-claim ledger, uncertain-restart recovery, and visible reconciliation.");
+}
 if (!runner.includes("maintainLeadership") || !runner.includes("renewRunLeases") || !runner.includes("requeueWorkerRuns")) {
   failures.push("The model runner must keep exclusive leadership, renewable job leases, and graceful handoff.");
 }

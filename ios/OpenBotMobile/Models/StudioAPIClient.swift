@@ -78,6 +78,11 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runs/\(runID)/cancel", method: "POST")
     }
 
+    func resolveApprovedAction(actionID: String, completed: Bool) async throws {
+        let payload = try JSONEncoder().encode(ApprovedActionResolutionRequest(outcome: completed ? "completed" : "not_completed"))
+        _ = try await dataRequest("api/approved-actions/\(actionID)/resolve", method: "POST", body: payload)
+    }
+
     func wakeRunner() async throws {
         _ = try await dataRequest("api/runner/wake", method: "POST")
     }
@@ -180,6 +185,7 @@ private struct NativePushRequest: Encodable {
 
 private struct RunnerHealthAlertsRequest: Encodable { let enabled: Bool }
 private struct RunnerExternalHeartbeatRequest: Encodable { let enabled: Bool; let url: String? }
+private struct ApprovedActionResolutionRequest: Encodable { let outcome: String }
 
 struct NativePushRegistration: Decodable {
     let id: String

@@ -2494,6 +2494,7 @@ function LiveStudioPanel({
   onOpenThread,
   onApprove,
   onCancel,
+  onResolveAction,
   onUpdateThread,
   onOpenControl,
   onNotice,
@@ -2502,6 +2503,10 @@ function LiveStudioPanel({
   onOpenThread: (threadId: string) => void;
   onApprove: (runId: string) => Promise<void>;
   onCancel: (runId: string) => Promise<void>;
+  onResolveAction: (
+    actionId: string,
+    outcome: "completed" | "not_completed",
+  ) => Promise<void>;
   onUpdateThread: (
     threadId: string,
     patch: Partial<Pick<Thread, "section" | "pinned" | "hidden">>,
@@ -2556,6 +2561,10 @@ function LiveStudioPanel({
   const attentionRuns = state.studioRuns.filter((run) =>
     ["awaiting_approval", "failed"].includes(run.status),
   );
+  const approvedActions = state.approvedActions || [];
+  const uncertainActions = approvedActions.filter(
+    (action) => action.status === "uncertain",
+  );
   const currentRun = (bot: Bot) =>
     state.studioRuns.find(
       (run) =>
@@ -2599,8 +2608,8 @@ function LiveStudioPanel({
         </div>
         <div>
           <ShieldCheck size={17} />
-          <strong>{state.approvals.length}</strong>
-          <span>waiting for you</span>
+          <strong>{state.approvals.length + uncertainActions.length}</strong>
+          <span>need your decision</span>
         </div>
         <div>
           <Check size={17} />
@@ -2611,7 +2620,7 @@ function LiveStudioPanel({
           <Settings2 size={16} /> Studio access
         </button>
       </div>
-      {(attentionRuns.length > 0 || state.automationAlerts.length > 0) && (
+      {(attentionRuns.length > 0 || state.automationAlerts.length > 0 || uncertainActions.length > 0) && (
         <section className="live-attention">
           <header>
             <span>
@@ -2622,6 +2631,24 @@ function LiveStudioPanel({
               <small>Nothing disappears until you decide</small>
             </div>
           </header>
+          {uncertainActions.map((action) => (
+            <article key={action.id} className="uncertain-action">
+              <span className="live-alert-mark">
+                <CircleAlert size={15} />
+              </span>
+              <span>
+                <strong>Check before OpenBot continues</strong>
+                <small>{action.actionLabel} may have completed during a restart. It will not be repeated automatically.</small>
+              </span>
+              <button
+                className="allow"
+                onClick={() => void onResolveAction(action.id, "completed")}
+              >
+                <Check size={13} /> It happened
+              </button>
+              <button onClick={() => void onResolveAction(action.id, "not_completed")}>It didn’t happen</button>
+            </article>
+          ))}
           {attentionRuns.slice(0, 5).map((run) => (
             <article key={run.id}>
               <Mascot
@@ -2665,6 +2692,45 @@ function LiveStudioPanel({
               </span>
             </article>
           ))}
+        </section>
+      )}
+      {approvedActions.length > 0 && (
+        <section className="action-history">
+          <div className="panel-section-heading">
+            <div>
+              <h3>Action history</h3>
+              <p>A durable receipt for every approved command, post, email and update</p>
+            </div>
+            <span className="bounded-badge">Recorded</span>
+          </div>
+          <div className="action-history-list">
+            {approvedActions.slice(0, 8).map((action) => {
+              const completed = ["completed", "confirmed_completed"].includes(action.status);
+              const pending = ["prepared", "running"].includes(action.status);
+              return (
+                <article key={action.id}>
+                  <span className={`action-history-icon ${completed ? "done" : pending ? "working" : "attention"}`}>
+                    {completed ? <Check size={14} /> : pending ? <LoaderCircle size={14} /> : <CircleAlert size={14} />}
+                  </span>
+                  <span>
+                    <strong>{action.actionLabel}</strong>
+                    <small>
+                      {completed
+                        ? "Completed once and recorded"
+                        : action.status === "confirmed_not_completed"
+                          ? "Confirmed not completed — a fresh approval is required to try again"
+                          : action.status === "failed"
+                            ? action.lastError || "The approved action failed"
+                            : action.status === "uncertain"
+                              ? "Waiting for you to confirm what happened"
+                              : "Approved and safely queued"}
+                    </small>
+                  </span>
+                  <time>{relativeTime(action.finishedAt || action.createdAt)}</time>
+                </article>
+              );
+            })}
+          </div>
         </section>
       )}
       <section>
@@ -8836,6 +8902,17 @@ export function App() {
             onCancel={async (runId) => {
               await mutate(() =>
                 api(`/api/runs/${runId}/cancel`, { method: "POST" }),
+              );
+            }}
+            onResolveAction={async (actionId, outcome) => {
+              await mutate(() =>
+                api(`/api/approved-actions/${actionId}/resolve`, {
+                  method: "POST",
+                  body: JSON.stringify({ outcome }),
+                }),
+                outcome === "completed"
+                  ? "Recorded as completed — OpenBot will not repeat it"
+                  : "Recorded as not completed — another attempt needs fresh approval",
               );
             }}
             onUpdateThread={updateThread}

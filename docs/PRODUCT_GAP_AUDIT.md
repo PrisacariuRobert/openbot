@@ -2,7 +2,7 @@
 
 Audit date: 4 September 2026. Baseline: 0.28.0, commit `88b8de9`. Remediation: **0.29.0 development branch**, not a published release.
 
-Follow-up, 5 September 2026: 0.32 exposes the same source-backed brief, meeting-prep, and follow-up jobs in the native SwiftUI app, gated by live connector state. 0.31's reports and commit-bound code checks plus 0.30's execution/usage safeguards remain in place. See [current native validation](QA_0.32.md). This advances daily-use native parity; it does not complete full native administration, the two-model repeated acceptance gate, physical-device/cellular validation, or the remaining security milestones.
+Follow-up, 5 September 2026: 0.33 adds a durable, single-claim action ledger and human reconciliation for approved work interrupted during a remote call. Web and native Live Studio show recent receipts and never blindly replay an uncertain action. 0.32's native source-backed jobs, 0.31's reports and commit-bound code checks, and 0.30's execution/usage safeguards remain in place. See [current action validation](QA_0.33.md). This closes a meaningful crash-replay gap; it does not create a universal provider-level exactly-once guarantee, automatic provider reconciliation, full native administration, the two-model repeated acceptance gate, physical-device/cellular validation, or the remaining isolation milestones.
 
 ## Verdict
 
@@ -46,7 +46,7 @@ Individual users describe useful recurring inbox/calendar summaries, invoice fil
 - Bot Docker terminals retain outbound network access. Command-word detection cannot reliably classify arbitrary programs. Do not promise that every possible external write is intercepted.
 - Browser URL validation is lexical, not a full DNS-resolution/redirect/subresource egress policy. Loopback is intentionally permitted. Private-network isolation needs dedicated enforcement and adversarial tests.
 - Browser approval fingerprints detect changed URL/control metadata, not arbitrary changes in nearby form data or all page scripts. Old approvals without a fingerprint now require renewed inspection.
-- 0.30 adds active-time, idle, step, output and reported-token enforcement. Usage is checkpointed while running. Unreported in-flight usage can overshoot; individual child runs do not share a whole-job cap. Process recovery is not equivalent to exactly-once external effects; an action accepted remotely just before a crash needs reconciliation, not blind replay.
+- 0.30 adds active-time, idle, step, output and reported-token enforcement. Usage is checkpointed while running. Unreported in-flight usage can overshoot; individual child runs do not share a whole-job cap. 0.33 records and single-claims approved actions, then stops for human reconciliation after an interrupted remote call. This prevents blind local replay but is not provider-level exactly-once delivery; automatic reconciliation still needs a stable provider identifier or safe lookup contract.
 - Coding checks use a constrained Linux toolchain. A simple JavaScript fixture does not establish support for arbitrary native dependencies, Python toolchains, mobile builds or large repositories.
 
 These are blockers to advertising unattended, unrestricted computer autonomy. Expanding permissions would hide the gap, not close it.
@@ -61,7 +61,7 @@ These are blockers to advertising unattended, unrestricted computer autonomy. Ex
 | Invoice / document work | Bounded extraction and artifact revisions exist; OCR, transcription and layout-preserving editing are incomplete. | Mixed receipt fixtures, exact reconciled totals, missing-data flags, editable workbook and rendered visual review. |
 | Browser/admin work | Persistent profiles, readable pages, owner takeover and browser skills exist. General visual app control is limited. | Ten controlled site workflows, changed selectors, login expiry and stopped actions; zero unauthorized mutations. |
 | Engineering work | Worktrees, project grants, diffs and reviews exist. General dependency provisioning and reproducible builds are incomplete. | Fix a real fixture bug in separate JS and Python projects; run independent tests; preserve the original checkout. |
-| Laptop closed / phone away | Private-host source and health/transfer tooling exist, and native Work can start the three dependable jobs. No managed service; native distribution and physical APNs/cellular proof are incomplete. | Fresh-host install, restart/restore, Wi-Fi-to-cellular continuity and physical push delivery with an owner-configured host. |
+| Laptop closed / phone away | Private-host source and health/transfer tooling exist, native Work can start the three dependable jobs, and approved actions now stop for reconciliation instead of replaying after an uncertain restart. No managed service; native distribution and physical APNs/cellular proof are incomplete. | Fresh-host install, restart/restore, Wi-Fi-to-cellular continuity and physical push delivery with an owner-configured host. |
 | Community / team ecosystem | MIT source and portable browser skills exist. No reviewed executable marketplace, multi-user tenancy, SSO or offboarding. | Published extension contract, contributor setup/CI, compatibility matrix; later design tenancy before organization claims. |
 
 ## Different in useful ways
@@ -72,7 +72,7 @@ These are design advantages to prove, not performance wins already measured:
 2. **Model choice with honest cost:** mix local, API and permitted subscription runtimes; show capabilities and measured usage. Never silently fall back to a paid model or pool somebody else's account.
 3. **One answer, inspectable work:** private consultation, linked sources, files and actual tool outcomes. Technical internals can be collapsed; history must not be rewritten.
 4. **Scoped access instead of one shared account soup:** separate browser profiles and explicit app/project grants. Complete the runtime/egress boundary before claiming security isolation.
-5. **Recoverable actions:** preview changes, retain revisions and reconcile uncertain external results. A trustworthy stop/resume is more valuable than another integration logo.
+5. **Recoverable actions:** preview changes, retain revisions, single-claim approved work, and ask the owner to reconcile uncertain external results. Next add provider-specific automatic reconciliation where a stable remote identifier exists. A trustworthy stop/resume is more valuable than another integration logo.
 
 OpenCode's provider documentation distinguishes account credentials from provider configuration and describes local/compatible endpoints; OpenBot now reflects that distinction rather than equating a key with an integration. [OpenCode providers](https://opencode.ai/docs/providers/).
 
@@ -94,7 +94,7 @@ The new connection panel is the first reference implementation: grouped account 
 |---|---|---|
 | M1 · Trust and usable connections | 0.29 foundation fixes above; evidence inventory; compact settings reference | Regression tests, actual runtime transport, responsive/keyboard QA and honest documentation pass. |
 | M2 · Three dependable jobs | Morning brief, inbox-to-review queue, engineering bug fix | Fresh setup; 10 runs per workflow across two supported model classes; source/artifact oracles; latency/usage/human interventions reported; failures retained. |
-| M3 · Safe unattended execution | Runtime/plugin isolation, network policy, deadlines, recoverable external-action ledger | Adversarial fixtures; worker crash at each action stage; no duplicate effect or cross-bot credential access. |
+| M3 · Safe unattended execution | 0.33 adds the recoverable external-action ledger; runtime/plugin isolation, network policy, and provider-specific reconciliation remain | Adversarial fixtures; worker crash at each action stage; no duplicate effect or cross-bot credential access. |
 | M4 · Daily-use web + native parity | Shared terminology, result/approval states, accessible controls; full provider management on iPhone | Desktop + narrow web + Dynamic Type/VoiceOver + physical-device tests; shared protocol fixtures; no missing core controls. |
 | M5 · Setup and always-on delivery | Guided runtime/connector/host checks, signed distribution and restore guide | New user reaches first useful result without developer tools; fresh-host restore and cellular handoff tested. |
 | M6 · Broader open ecosystem | Reviewed adapters/MCP admission, document engines, community contribution fixtures | Each new capability includes permissions, lifecycle, reconnect/failure tests and reproducible outcome evidence. |

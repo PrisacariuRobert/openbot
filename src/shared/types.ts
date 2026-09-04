@@ -216,6 +216,33 @@ export interface Approval {
   decidedAt: string | null;
 }
 
+export type ApprovedActionStatus =
+  | "prepared"
+  | "running"
+  | "completed"
+  | "failed"
+  | "uncertain"
+  | "confirmed_completed"
+  | "confirmed_not_completed";
+
+export interface ApprovedActionReceipt {
+  id: string;
+  approvalId: string;
+  runId: string;
+  botId: string;
+  botName: string;
+  actionType: string;
+  actionLabel: string;
+  status: ApprovedActionStatus;
+  attemptCount: number;
+  resultSummary: string | null;
+  lastError: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  reviewedAt: string | null;
+}
+
 export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion";
 
 export interface RoutineTriggerConfig {
@@ -862,6 +889,7 @@ export interface AppState {
   runner: RunnerHealth;
   workflows: TaughtWorkflow[];
   approvals: Approval[];
+  approvedActions: ApprovedActionReceipt[];
   agentMessages: AgentMessage[];
   providers: ProviderInstance[];
   settings: StudioSettings;

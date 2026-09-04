@@ -1,4 +1,6 @@
-# OpenBot 0.32.0 Launch Readiness
+# OpenBot 0.33.0 Launch Readiness
+
+0.33 adds a durable, single-claim ledger around approved external and computer actions. A prepared action survives restart; an in-flight action becomes visibly uncertain and is never replayed until the owner confirms whether it happened. Web and native Live Studio expose the same reconciliation and recent history. See [current validation](QA_0.33.md). This materially improves unattended safety, but third-party services do not provide one universal exactly-once contract. Provider-specific reconciliation, encrypted legacy approval payloads, adversarial sandbox-provider testing, the repeated two-model workflow gate, stronger runtime/egress isolation, managed deployment convenience, and physical-device distribution remain open.
 
 0.32 adds native, connector-aware entry points for the source-backed Morning Brief, Meeting Prep, and Inbox Follow-up jobs. See [current validation](QA_0.32.md). This was compiled and exercised against the running studio on an iPhone 17 Pro simulator; it is not a physical-device, cellular, APNs, App Store, or complete native-settings certification. Google consent/setup, fresh-user onboarding, full native provider and connector administration, the repeated two-model workflow gate, stronger runtime/egress isolation, crash-safe external-action reconciliation, and signed distribution remain open.
 
@@ -24,7 +26,7 @@ OpenBot 0.29.0 is a development beta, **not approved here for broad unattended p
 - Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
 - Voice typing, deliberate native speech-to-editable-text capture, an installable PWA, authenticated remote access, and a native SwiftUI iPhone app with Keychain-backed API access, conversations, teammate routing, live work, and approvals
 - Matching web and native studio geometry, language, code-drawn runtime-colored mascots, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
-- Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
+- Durable approval cards, single-claim action receipts, restart reconciliation, recent web/native action history, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
 - One-click release-managed Google OAuth or a self-hosted credentials-file flow, encrypted local tokens, per-teammate app access, previews, and a private activity trail
@@ -61,7 +63,7 @@ OpenBot 0.29.0 is a development beta, **not approved here for broad unattended p
 | Privacy | Loopback-only by default, local database, isolated per-bot workspaces/computers, and inspectable encrypted secrets. |
 | Team safety | Consultations are privately inspectable, deduplicated, capped at three hops/eight related runs, and synthesized by one coordinator instead of producing noisy duplicate replies. |
 | Supervision | One Live Studio exposes work, persistent attention, browser state, and owner takeover without handing credentials to a model. |
-| Approval durability | Approval decisions persist without short expiry windows. |
+| Approval durability | Approval decisions persist without short expiry windows; approved actions are fingerprinted, claimed once locally, and never blindly replayed after an uncertain restart. |
 | Email authority | Reading and sending are separate per teammate; every send shows a durable one-time approval before execution. |
 | App least privilege | Gmail, Drive, Calendar, Slack, and Notion read/write capabilities can be enabled independently for each teammate even when the studio shares one connected account. |
 | GitHub authority | Reading activity and creating issues are separate per teammate; every issue creation shows a durable one-time approval. |

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.33.0 — 2026-09-05
+
+- Added durable pre-execution receipts and immutable fingerprints for approved commands, messages, issues, browser/app interactions, and connected-app updates
+- Added atomic single-process claims, first-writer-wins approval decisions, safe prepared-action restart, and denied-action cleanup
+- Added conservative crash recovery: in-flight remote outcomes become uncertain and can never be blindly reclaimed or replayed
+- Added matching web and native Live Studio reconciliation controls and recent action history without exposing saved request bodies in public state
+- Added deterministic restart/race/privacy fixtures and a native receipt-decoding check
+- Kept universal provider-level exactly-once delivery and automatic reconciliation as explicit future work
+
+## 0.32.0 — 2026-09-05
+
+- Added native SwiftUI Work starters for source-backed briefs, meeting preparation, and inbox follow-ups
+- Added live Gmail/Calendar/Drive readiness, one-tap Google recovery, Dynamic Type layouts, and Simulator UI validation
+
+## 0.31.0 — 2026-09-05
+
+- Added encrypted source snapshots, source-linked productivity reports, unsent follow-up drafts, and commit-bound coding checks
+- Added deterministic runtime fixtures without consuming a real model allowance
+
+## 0.30.0 — 2026-09-05
+
+- Added active-time, idle, model-step, reported-token, and output limits with checkpointed usage and forced stop escalation
+- Added whole-consultation cancellation and deterministic stalled-process recovery tests
+
+## 0.29.0 — 2026-09-04
+
+- Added usable custom provider endpoints/models, safer environment handling, corrected usage accounting, and capability-aware tool exposure
+- Removed misleading message rewriting and separated teammate-reported checks from independent verification
+
 ## 0.28.0 — 2026-09-04
 
 - Added signed Slack Events API triggers for mentions, messages, and reactions, with optional channel filtering and bot-message loop prevention

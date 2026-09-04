@@ -49,4 +49,13 @@ final class ConnectionAddressTests: XCTestCase {
         XCTAssertTrue(status.canStartGoogleOAuth)
         XCTAssertEqual(status.googleRecoveryURL(for: "google-calendar")?.host, "console.cloud.google.com")
     }
+
+    func testNativeActionReceiptDecodesWithoutThePrivateRequestBody() throws {
+        let data = Data(#"{"id":"action-1","approvalId":"approval-1","runId":"run-1","botId":"nova","botName":"Nova","actionType":"gmail_send","actionLabel":"Send approved email","status":"uncertain","attemptCount":1,"resultSummary":null,"lastError":"Restarted during delivery","createdAt":"2026-09-05T00:00:00.000Z","startedAt":"2026-09-05T00:00:01.000Z","finishedAt":"2026-09-05T00:00:02.000Z","reviewedAt":null}"#.utf8)
+        let receipt = try JSONDecoder().decode(StudioApprovedAction.self, from: data)
+        XCTAssertEqual(receipt.status, "uncertain")
+        XCTAssertEqual(receipt.actionLabel, "Send approved email")
+        XCTAssertEqual(receipt.attemptCount, 1)
+        XCTAssertFalse(String(data: data, encoding: .utf8)!.contains("private body"))
+    }
 }

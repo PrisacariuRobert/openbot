@@ -90,6 +90,10 @@ final class StudioStore: ObservableObject {
         await perform { try await client.cancel(runID: run.id) }
     }
 
+    func resolveApprovedAction(_ action: StudioApprovedAction, completed: Bool) async {
+        await perform { try await client.resolveApprovedAction(actionID: action.id, completed: completed) }
+    }
+
     func wakeRunner() async {
         await perform { try await client.wakeRunner() }
     }

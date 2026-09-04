@@ -9997,6 +9997,75 @@ select:focus-visible {
   color: #fff;
   background: #4e9e70;
 }
+.action-history {
+  min-width: 0;
+  padding: 2px 0 0;
+}
+.action-history-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.84);
+}
+.action-history-list article {
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 11px;
+  display: grid;
+  grid-template-columns: 29px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid rgba(72, 62, 49, 0.07);
+}
+.action-history-list article:last-child {
+  border-bottom: 0;
+}
+.action-history-icon {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+.action-history-icon.done {
+  color: #347d58;
+  background: #e6f5ec;
+}
+.action-history-icon.working {
+  color: #6658c3;
+  background: #efecff;
+}
+.action-history-icon.working svg {
+  animation: spin 1.2s linear infinite;
+}
+.action-history-icon.attention {
+  color: #9b6421;
+  background: #fff0d7;
+}
+.action-history-list article > span:nth-child(2) {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.action-history-list strong,
+.action-history-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action-history-list strong {
+  color: #35312d;
+  font-size: 9px;
+}
+.action-history-list small,
+.action-history-list time {
+  color: #958e86;
+  font-size: 7.5px;
+}
+.action-history-list time {
+  white-space: nowrap;
+}
 .live-desk-grid {
   min-width: 0;
   display: grid;
@@ -10612,14 +10681,21 @@ select:focus-visible {
     display: none;
   }
   .live-summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .live-summary > div {
     padding: 8px;
     grid-template-columns: 17px minmax(0, 1fr);
   }
+  .live-summary > button {
+    grid-column: auto;
+  }
   .live-summary strong {
     font-size: 12px;
+  }
+  .live-summary span,
+  .live-summary > button {
+    font-size: 8.5px;
   }
   .live-attention article {
     flex-wrap: wrap;
@@ -10632,6 +10708,38 @@ select:focus-visible {
   }
   .live-attention article > button + button {
     margin-left: 0;
+  }
+  .live-attention article strong,
+  .live-attention article small {
+    overflow: visible;
+    white-space: normal;
+  }
+  .live-attention article small {
+    line-height: 1.4;
+  }
+  .panel-section-heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .panel-section-heading > div {
+    min-width: 0;
+  }
+  .panel-section-heading p {
+    line-height: 1.35;
+  }
+  .action-history-list article {
+    grid-template-columns: 29px minmax(0, 1fr);
+  }
+  .action-history-list small {
+    overflow: visible;
+    display: -webkit-box;
+    line-height: 1.35;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .action-history-list time {
+    grid-column: 2;
   }
   .takeover-controls form {
     height: auto;

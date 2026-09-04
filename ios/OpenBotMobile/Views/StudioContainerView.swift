@@ -902,6 +902,8 @@ private struct NativeLiveStudioView: View {
 
     private var runs: [StudioRun] { store.state.studioRuns ?? store.state.runs }
     private var attention: [StudioRun] { runs.filter { ["awaiting_approval", "failed"].contains($0.status) } }
+    private var approvedActions: [StudioApprovedAction] { store.state.approvedActions ?? [] }
+    private var uncertainActions: [StudioApprovedAction] { approvedActions.filter { $0.status == "uncertain" } }
 
     var body: some View {
         NavigationStack {
@@ -927,7 +929,7 @@ private struct NativeLiveStudioView: View {
 
                     HStack(spacing: 8) {
                         liveStat(value: store.state.usage.activeRuns, label: "working", icon: "sparkles")
-                        liveStat(value: attention.count, label: "attention", icon: "hand.raised.fill")
+                        liveStat(value: attention.count + uncertainActions.count, label: "attention", icon: "hand.raised.fill")
                         liveStat(value: store.state.usage.completedRuns, label: "finished", icon: "checkmark.circle.fill")
                     }
 
@@ -1076,11 +1078,34 @@ private struct NativeLiveStudioView: View {
                         }
                     }
 
-                    if !attention.isEmpty {
+                    if !attention.isEmpty || !uncertainActions.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("Needs your attention", systemImage: "bell.badge.fill")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color(red: 0.55, green: 0.37, blue: 0.13))
+                            ForEach(uncertainActions) { action in
+                                VStack(alignment: .leading, spacing: 9) {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                                            .foregroundStyle(.orange)
+                                            .font(.system(size: 17, weight: .semibold))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Check before OpenBot continues")
+                                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                            Text("\(action.actionLabel) may have completed during a restart. OpenBot has not repeated it.")
+                                                .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    HStack(spacing: 8) {
+                                        Button("It happened") { Task { await store.resolveApprovedAction(action, completed: true) } }
+                                            .buttonStyle(.borderedProminent).tint(OpenBotTheme.green).controlSize(.small)
+                                        Button("It didn’t happen") { Task { await store.resolveApprovedAction(action, completed: false) } }
+                                            .buttonStyle(.bordered).controlSize(.small)
+                                    }
+                                }
+                                .padding(11)
+                                .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            }
                             ForEach(attention.prefix(5)) { run in
                                 HStack(spacing: 10) {
                                     BotMascotView(colorHex: run.botColor, variant: run.botMascot, status: run.status == "failed" ? "failed" : "waiting", size: 38)
@@ -1098,6 +1123,47 @@ private struct NativeLiveStudioView: View {
                         }
                         .padding(14)
                         .background(Color(red: 1, green: 0.97, blue: 0.90), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+
+                    if !approvedActions.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Action history")
+                                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                                    Text("Every approved command, post, email and update leaves a durable receipt.")
+                                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Label("Recorded", systemImage: "checkmark.shield.fill")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .foregroundStyle(OpenBotTheme.green)
+                            }
+                            VStack(spacing: 0) {
+                                ForEach(Array(approvedActions.prefix(8).enumerated()), id: \.element.id) { index, action in
+                                    let completed = ["completed", "confirmed_completed"].contains(action.status)
+                                    let working = ["prepared", "running"].contains(action.status)
+                                    HStack(spacing: 10) {
+                                        Image(systemName: completed ? "checkmark.circle.fill" : working ? "clock.arrow.circlepath" : "exclamationmark.circle.fill")
+                                            .foregroundStyle(completed ? OpenBotTheme.green : working ? OpenBotTheme.purple : .orange)
+                                            .font(.system(size: 17, weight: .semibold))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(action.actionLabel)
+                                                .font(.system(size: 11.5, weight: .bold, design: .rounded)).lineLimit(1)
+                                            Text(action.status == "confirmed_not_completed" ? "Confirmed not completed — a fresh approval is required" : completed ? "Completed once and recorded" : action.status == "failed" ? action.lastError ?? "The action failed" : action.status == "uncertain" ? "Waiting for you to confirm what happened" : "Approved and safely queued")
+                                                .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                        }
+                                        Spacer(minLength: 4)
+                                        Text((action.finishedAt ?? action.createdAt).openBotRelativeTime)
+                                            .font(.system(size: 8.5, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                                    }
+                                    .padding(11)
+                                    if index < min(approvedActions.count, 8) - 1 { Divider().padding(.leading, 38) }
+                                }
+                            }
+                            .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.black.opacity(0.055)))
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {

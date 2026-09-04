@@ -2,6 +2,20 @@
 
 Historical milestones below were implemented in the repository. The current milestone was verified on September 5, 2026; older verification dates remain attached to their original evidence.
 
+## M36 — Crash-safe approved actions
+
+Status: complete in source for the owner-operated 0.33.0 development beta
+
+- Every approved command, email, post, issue, browser/app interaction, and connected-app update receives a durable receipt and immutable payload fingerprint before execution
+- One atomic claim prevents competing processes or repeated decisions from dispatching the same saved action twice
+- Approved but unstarted actions survive restart and run before model work resumes
+- A restart during the remote call records an uncertain outcome, blocks the task, and never retries automatically
+- Web and native Live Studio let the owner confirm **It happened** or **It didn’t happen**, then resume with outcome-specific instructions that prohibit a false success or duplicate retry
+- Recent action history is available on both clients without including the private saved request body in the public state payload
+- Approval decisions are now first-writer-wins, and denying an action removes any prepared dispatch
+
+Verification: deterministic database fixtures cover single claim, decision races, changed payloads, prepared-action restart, uncertain-action restart, immutable reconciliation, denied-action cleanup, and public-state privacy. The complete release gate passed with 164 TypeScript tests, type checking, and the production build; the native iPhone Simulator build and all 7 native tests passed. Desktop and 390 px Live Studio layouts were reviewed with completed, failed, and uncertain receipts. See [QA_0.33](QA_0.33.md).
+
 ## M35 — Native dependable Work
 
 Status: complete in source for the owner-operated 0.32.0 native beta

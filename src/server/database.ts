@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
 import type {
   Activity,
@@ -9,6 +9,7 @@ import type {
   AgentMessageKind,
   AppState,
   Approval,
+  ApprovedActionReceipt,
   Attachment,
   AutomationAlert,
   AutomationEvent,
@@ -363,6 +364,22 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL,
         decided_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS approved_actions (
+        id TEXT PRIMARY KEY,
+        approval_id TEXT NOT NULL UNIQUE REFERENCES approvals(id) ON DELETE CASCADE,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        action_type TEXT NOT NULL,
+        action_digest TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'prepared',
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        result_summary TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        finished_at TEXT,
+        reviewed_at TEXT
+      );
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -629,6 +646,7 @@ export class OpenBotDatabase {
       CREATE INDEX IF NOT EXISTS runs_status_created ON runs(status, created_at);
       CREATE INDEX IF NOT EXISTS runs_bot_created ON runs(bot_id, created_at);
       CREATE INDEX IF NOT EXISTS approvals_status_created ON approvals(status, created_at);
+      CREATE INDEX IF NOT EXISTS approved_actions_status_created ON approved_actions(status, created_at);
       CREATE INDEX IF NOT EXISTS agent_messages_thread_created ON agent_messages(thread_id, created_at);
       CREATE INDEX IF NOT EXISTS agent_messages_to_created ON agent_messages(to_bot_id, created_at);
       CREATE INDEX IF NOT EXISTS connector_events_created ON connector_events(connector_id, created_at);
@@ -1600,6 +1618,83 @@ export class OpenBotDatabase {
     try { return JSON.parse(String(row.action_json)); } catch { return null; }
   }
 
+  private approvedActionFromRow(row: Row): ApprovedActionReceipt {
+    return {
+      id: String(row.id), approvalId: String(row.approval_id), runId: String(row.run_id), botId: String(row.bot_id),
+      botName: String(row.bot_name), actionType: String(row.action_type), actionLabel: String(row.action_label),
+      status: String(row.status) as ApprovedActionReceipt["status"], attemptCount: Number(row.attempt_count || 0),
+      resultSummary: row.result_summary ? String(row.result_summary) : null, lastError: row.last_error ? String(row.last_error) : null,
+      createdAt: String(row.created_at), startedAt: row.started_at ? String(row.started_at) : null,
+      finishedAt: row.finished_at ? String(row.finished_at) : null, reviewedAt: row.reviewed_at ? String(row.reviewed_at) : null,
+    };
+  }
+
+  private approvedActionSelect(where = "", limit = ""): string {
+    return `SELECT aa.*,a.action_label,b.name bot_name FROM approved_actions aa JOIN approvals a ON a.id=aa.approval_id JOIN bots b ON b.id=aa.bot_id ${where} ${limit}`;
+  }
+
+  prepareApprovedAction(input: { approvalId: string; runId: string; botId: string; actionType: string; action: unknown }): ApprovedActionReceipt {
+    const approval = this.getApproval(input.approvalId);
+    if (!approval || approval.runId !== input.runId || approval.botId !== input.botId) throw new Error("That approved action is not linked to this task.");
+    const actionDigest = createHash("sha256").update(JSON.stringify(input.action)).digest("hex");
+    this.db.prepare(`INSERT OR IGNORE INTO approved_actions (id,approval_id,run_id,bot_id,action_type,action_digest,status,created_at)
+      VALUES (?,?,?,?,?,?,'prepared',?)`).run(randomUUID(), input.approvalId, input.runId, input.botId, input.actionType, actionDigest, now());
+    const row = this.db.prepare(this.approvedActionSelect("WHERE aa.approval_id=?")).get(input.approvalId) as Row | undefined;
+    if (!row || String(row.action_type) !== input.actionType || String(row.action_digest) !== actionDigest) throw new Error("The approved action changed after it was prepared. Review it again.");
+    return this.approvedActionFromRow(row);
+  }
+
+  getApprovedAction(idOrApprovalId: string): ApprovedActionReceipt | null {
+    const row = this.db.prepare(this.approvedActionSelect("WHERE aa.id=? OR aa.approval_id=?")).get(idOrApprovalId, idOrApprovalId) as Row | undefined;
+    return row ? this.approvedActionFromRow(row) : null;
+  }
+
+  listApprovedActions(limit = 30): ApprovedActionReceipt[] {
+    return (this.db.prepare(this.approvedActionSelect("ORDER BY aa.created_at DESC", "LIMIT ?")).all(Math.max(1, Math.min(limit, 100))) as Row[])
+      .map((row) => this.approvedActionFromRow(row));
+  }
+
+  listPreparedApprovedActions(): ApprovedActionReceipt[] {
+    return (this.db.prepare(this.approvedActionSelect("WHERE aa.status='prepared' AND a.status='approved' ORDER BY aa.created_at ASC")).all() as Row[])
+      .map((row) => this.approvedActionFromRow(row));
+  }
+
+  claimApprovedAction(approvalId: string): ApprovedActionReceipt | null {
+    const result = this.db.prepare(`UPDATE approved_actions SET status='running',attempt_count=attempt_count+1,started_at=?,finished_at=NULL,last_error=NULL
+      WHERE approval_id=? AND status='prepared' AND EXISTS (SELECT 1 FROM approvals WHERE id=? AND status='approved')`).run(now(), approvalId, approvalId);
+    return result.changes === 1 ? this.getApprovedAction(approvalId) : null;
+  }
+
+  completeApprovedAction(approvalId: string, resultSummary: string): ApprovedActionReceipt | null {
+    const result = this.db.prepare("UPDATE approved_actions SET status='completed',result_summary=?,last_error=NULL,finished_at=? WHERE approval_id=? AND status='running'")
+      .run(resultSummary.slice(0, 2_000), now(), approvalId);
+    if (result.changes !== 1) return null;
+    return this.getApprovedAction(approvalId);
+  }
+
+  failApprovedAction(approvalId: string, error: string): ApprovedActionReceipt | null {
+    const result = this.db.prepare("UPDATE approved_actions SET status='failed',last_error=?,finished_at=? WHERE approval_id=? AND status='running'")
+      .run(error.slice(0, 1_000), now(), approvalId);
+    if (result.changes !== 1) return null;
+    return this.getApprovedAction(approvalId);
+  }
+
+  recoverInterruptedApprovedActions(): ApprovedActionReceipt[] {
+    const rows = this.db.prepare(this.approvedActionSelect("WHERE aa.status='running' ORDER BY aa.created_at ASC")).all() as Row[];
+    if (!rows.length) return [];
+    const recoveredAt = now();
+    this.db.prepare("UPDATE approved_actions SET status='uncertain',last_error=?,finished_at=? WHERE status='running'")
+      .run("OpenBot restarted while the approved action was in progress. It will not be repeated until you confirm what happened.", recoveredAt);
+    return rows.map((row) => this.getApprovedAction(String(row.id))!).filter(Boolean);
+  }
+
+  resolveUncertainApprovedAction(id: string, outcome: "completed" | "not_completed"): ApprovedActionReceipt | null {
+    const status = outcome === "completed" ? "confirmed_completed" : "confirmed_not_completed";
+    const result = this.db.prepare("UPDATE approved_actions SET status=?,result_summary=?,last_error=NULL,reviewed_at=?,finished_at=COALESCE(finished_at,?) WHERE id=? AND status='uncertain'")
+      .run(status, outcome === "completed" ? "You confirmed this action completed." : "You confirmed this action did not complete.", now(), now(), id);
+    return result.changes === 1 ? this.getApprovedAction(id) : null;
+  }
+
   listApprovals(): Approval[] {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.status='pending' ORDER BY a.created_at ASC").all() as Row[]).map((row) => this.approvalFromRow(row));
   }
@@ -1607,12 +1702,14 @@ export class OpenBotDatabase {
   decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
     const approval = this.getApproval(id);
     if (!approval || approval.status !== "pending") return null;
-    this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=?").run(decision, now(), id);
+    const result = this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=? AND status='pending'").run(decision, now(), id);
+    if (result.changes !== 1) return null;
     if (decision === "approved") {
       this.updateRun(approval.runId, { status: "queued", approvalReason: null, taskStage: "working", progressAt: now() });
       this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE run_id=? AND kind='approval' AND resolved_at IS NULL").run(now(), approval.runId);
     }
     else {
+      this.db.prepare("DELETE FROM approved_actions WHERE approval_id=? AND status='prepared'").run(id);
       this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
       this.finishRunTask(approval.runId, "cancelled");
     }
@@ -2686,6 +2783,6 @@ export class OpenBotDatabase {
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), approvedActions: this.listApprovedActions(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

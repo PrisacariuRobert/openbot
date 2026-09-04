@@ -167,6 +167,14 @@ function broadcast(event: Record<string, unknown> = { type: "state", at: Date.no
   for (const response of eventClients) response.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
+const interruptedApprovedActions = db.recoverInterruptedApprovedActions();
+for (const receipt of interruptedApprovedActions) {
+  const detail = `${receipt.actionLabel} may or may not have completed before OpenBot restarted. It has not been repeated.`;
+  db.updateRun(receipt.runId, { status: "failed", error: detail, finishedAt: new Date().toISOString(), taskStage: "blocked" });
+  db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Check what happened before retrying", detail });
+}
+for (const receipt of db.listPreparedApprovedActions()) await executeApprovedAction(receipt.approvalId);
+
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
 const notifications = new NotificationService(db, () => runner.isLeader());
 const inspectPrivateHome = () => inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
@@ -1147,35 +1155,64 @@ async function performApprovedAction(action: unknown): Promise<string> {
   return "Approval recorded.";
 }
 
-async function decideApproval(approvalId: string, decision: "approved" | "denied") {
-  const approval = db.getApproval(approvalId);
-  if (!approval || approval.status !== "pending") return null;
-  const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string } | null;
-  const decided = db.decideApproval(approval.id, decision);
-  const connectorAction = action?.type ? ({
+function connectorActionFor(actionType: string) {
+  return ({
     gmail_send: { connectorId: "google-workspace", denied: "Email was not sent because you chose Not now" },
     github_issue_create: { connectorId: "github-cli", denied: "The issue was not created because you chose Not now" },
     slack_post: { connectorId: "slack", denied: "The Slack message was not posted because you chose Not now" },
     notion_update: { connectorId: "notion", denied: "Nothing was added to Notion because you chose Not now" },
     todoist_task_create: { connectorId: "todoist", denied: "The Todoist task was not created because you chose Not now" },
-  } as const)[action.type as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"] : undefined;
+  } as const)[actionType as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"];
+}
+
+async function executeApprovedAction(approvalId: string) {
+  const receipt = db.claimApprovedAction(approvalId);
+  if (!receipt) return db.getApprovedAction(approvalId);
+  const approval = db.getApproval(approvalId);
+  const action = db.getApprovalAction(approvalId);
+  const connectorAction = connectorActionFor(receipt.actionType);
+  if (!approval || !action) {
+    const message = "The approved action could not be restored safely. Prepare it again for a fresh review.";
+    db.failApprovedAction(approvalId, message);
+    db.updateRun(receipt.runId, { status: "failed", error: message, finishedAt: new Date().toISOString(), taskStage: "blocked" });
+    return db.getApprovedAction(approvalId);
+  }
+  db.updateRun(approval.runId, { status: "running", progressAt: new Date().toISOString(), taskStage: "working", error: null, finishedAt: null });
+  try {
+    const result = await performApprovedAction(action);
+    db.completeApprovedAction(approvalId, result);
+    db.setRunPrompt(approval.runId, `The user approved the requested action and OpenBot performed it. Result:\n${result}\n\nContinue the task from here without repeating that action.`);
+    db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Approved and completed", detail: result.slice(0, 180) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    db.failApprovedAction(approvalId, message);
+    if (connectorAction) {
+      db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: receipt.botId, action: receipt.actionType, status: "failed", summary: message });
+      broadcast({ type: "connector", at: Date.now() });
+    }
+    db.setRunPrompt(approval.runId, `The user approved the action, but it failed with: ${message}. Continue safely or explain the blocker. Do not claim it completed.`);
+    db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "error", label: "The approved action needs attention", detail: message.slice(0, 180) });
+  }
+  db.updateRun(approval.runId, { status: "queued", taskStage: "working", error: null, finishedAt: null });
+  return db.getApprovedAction(approvalId);
+}
+
+async function decideApproval(approvalId: string, decision: "approved" | "denied") {
+  const approval = db.getApproval(approvalId);
+  if (!approval || approval.status !== "pending") return null;
+  const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string } | null;
+  if (decision === "approved" && action?.type && action.type !== "run") {
+    db.prepareApprovedAction({ approvalId: approval.id, runId: approval.runId, botId: approval.botId, actionType: action.type, action });
+  }
+  const decided = db.decideApproval(approval.id, decision);
+  if (!decided) return null;
+  const connectorAction = action?.type ? connectorActionFor(action.type) : undefined;
   if (decision === "denied" && action?.type && connectorAction) {
     db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: action.botId || approval.botId, action: action.type, status: "failed", summary: connectorAction.denied });
     broadcast({ type: "connector", at: Date.now() });
   }
   if (decision === "approved" && action?.type && action.type !== "run") {
-    db.updateRun(approval.runId, { status: "running", progressAt: new Date().toISOString(), taskStage: "working" });
-    try {
-      const result = await performApprovedAction(action);
-      db.setRunPrompt(approval.runId, `The user approved the requested action and OpenBot performed it. Result:\n${result}\n\nContinue the task from here without repeating that action.`);
-      db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Approved and completed", detail: result.slice(0, 180) });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (connectorAction) { db.addConnectorEvent({ connectorId: connectorAction.connectorId, botId: action.botId || approval.botId, action: action.type, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
-      db.setRunPrompt(approval.runId, `The user approved the action, but it failed with: ${message}. Continue safely or explain the blocker.`);
-      db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "error", label: "The approved action needs attention", detail: message.slice(0, 180) });
-    }
-    db.updateRun(approval.runId, { status: "queued", taskStage: "working" });
+    await executeApprovedAction(approval.id);
   }
   return decided;
 }
@@ -1197,6 +1234,21 @@ app.post("/api/runs/:id/approve", async (request, response) => {
   db.addActivity({ runId: run.id, botId: run.botId, kind: "status", label: "Approved by you", detail: null });
   broadcast();
   response.json({ ok: true });
+});
+
+app.post("/api/approved-actions/:id/resolve", (request, response) => {
+  const parsed = z.object({ outcome: z.enum(["completed", "not_completed"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Confirm whether the action completed or did not complete." });
+  const receipt = db.resolveUncertainApprovedAction(request.params.id, parsed.data.outcome);
+  if (!receipt) return response.status(409).json({ error: "This action no longer needs confirmation." });
+  const completed = parsed.data.outcome === "completed";
+  db.setRunPrompt(receipt.runId, completed
+    ? `OpenBot restarted while the approved action was in progress. The user checked the destination and confirmed it completed. Continue without repeating the action: ${receipt.actionLabel}.`
+    : `OpenBot restarted while the approved action was in progress. The user checked the destination and confirmed it did not complete. Do not claim success. If the action is still needed, prepare it again for a fresh approval: ${receipt.actionLabel}.`);
+  db.updateRun(receipt.runId, { status: "queued", taskStage: "working", error: null, finishedAt: null, progressAt: new Date().toISOString() });
+  db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "status", label: completed ? "You confirmed the action completed" : "You confirmed the action did not complete", detail: completed ? "OpenBot will continue without repeating it." : "A new approval will be required before another attempt." });
+  broadcast();
+  response.json(receipt);
 });
 
 app.post("/api/runs/:id/cancel", async (request, response) => {

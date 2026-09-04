@@ -1,10 +1,23 @@
-# OpenBot 0.32.0
+# OpenBot 0.33.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.32.0
+## What's new in 0.33.0
+
+This reliability beta adds a durable action ledger for every approved command, email, post, issue, and connected-app update. Its purpose is simple: a restart must never make OpenBot blindly repeat an action whose remote result is unknown. See [the crash-recovery validation record](docs/QA_0.33.md).
+
+- **Prepared before execution:** the exact approved payload is fingerprinted and a durable receipt is created before OpenBot calls the destination.
+- **One local dispatch:** only one process can claim the receipt. Concurrent or repeated approval requests cannot dispatch the same saved action twice.
+- **No blind replay after a crash:** an action interrupted while its destination may be processing it becomes **Needs confirmation**. OpenBot blocks the task and does not try again automatically.
+- **Human reconciliation:** web and native Live Studio ask whether the action happened. Confirming success continues without repeating it; confirming failure requires a newly prepared approval before another attempt.
+- **Inspectable history:** recent approved actions show a calm, readable status trail on desktop and iPhone without exposing the private request body in the public state payload.
+- **Restart-safe queue:** an approved action that was durably prepared but never started is recovered and executed before model work resumes.
+
+This is stronger failure handling, not a mathematical exactly-once guarantee from third-party services. If a remote provider accepts a request immediately before the OpenBot process stops, the result remains uncertain until the owner or a future provider-specific reconciliation check confirms it. Full network/process isolation, managed hosting, physical-device validation, and the repeated two-model workflow gate remain open.
+
+### Previously in 0.32.0
 
 This native-continuity beta brings OpenBot's three dependable starting points to the real SwiftUI iPhone app. It keeps the existing source and approval boundaries; it does not claim physical-device, cellular, APNs, App Store, or full native-settings completion. See [the iPhone Simulator validation record](docs/QA_0.32.md).
 
