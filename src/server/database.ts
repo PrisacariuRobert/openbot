@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type {
   Activity,
   AgentMessage,
@@ -168,6 +168,9 @@ export class OpenBotDatabase {
         access_token_ciphertext TEXT,
         refresh_token_ciphertext TEXT,
         credentials_ciphertext TEXT,
+        event_path_ciphertext TEXT,
+        event_secret_ciphertext TEXT,
+        event_verified_at TEXT,
         token_expires_at TEXT,
         scopes_json TEXT NOT NULL DEFAULT '[]',
         account_email TEXT,
@@ -647,6 +650,9 @@ export class OpenBotDatabase {
     this.addColumn("runs", "attempt_count INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "recovered_at TEXT");
     this.addColumn("connectors", "credentials_ciphertext TEXT");
+    this.addColumn("connectors", "event_path_ciphertext TEXT");
+    this.addColumn("connectors", "event_secret_ciphertext TEXT");
+    this.addColumn("connectors", "event_verified_at TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
     this.addColumn("taught_workflows", "description TEXT NOT NULL DEFAULT ''");
     this.addColumn("taught_workflows", "instructions TEXT NOT NULL DEFAULT ''");
@@ -1630,6 +1636,45 @@ export class OpenBotDatabase {
     return row ? this.connectorFromRow(row) : null;
   }
 
+  connectorEventConfig(id: "slack" | "notion"): { pathToken: string; secretConfigured: boolean; verifiedAt: string | null } {
+    let row = this.db.prepare("SELECT event_path_ciphertext,event_secret_ciphertext,event_verified_at FROM connectors WHERE id=?").get(id) as Row | undefined;
+    if (!row) throw new Error(`Connect ${id === "slack" ? "Slack" : "Notion"} before setting up events.`);
+    if (!row.event_path_ciphertext) {
+      const pathToken = randomBytes(24).toString("base64url");
+      this.db.prepare("UPDATE connectors SET event_path_ciphertext=?,updated_at=? WHERE id=?").run(this.vault.encrypt(pathToken), now(), id);
+      row = this.db.prepare("SELECT event_path_ciphertext,event_secret_ciphertext,event_verified_at FROM connectors WHERE id=?").get(id) as Row;
+    }
+    return {
+      pathToken: this.vault.decrypt(String(row.event_path_ciphertext)),
+      secretConfigured: Boolean(row.event_secret_ciphertext),
+      verifiedAt: row.event_verified_at ? String(row.event_verified_at) : null,
+    };
+  }
+
+  connectorEventSecret(id: "slack" | "notion"): string | null {
+    const row = this.db.prepare("SELECT event_secret_ciphertext FROM connectors WHERE id=?").get(id) as Row | undefined;
+    return row?.event_secret_ciphertext ? this.vault.decrypt(String(row.event_secret_ciphertext)) : null;
+  }
+
+  configureConnectorEventSecret(id: "slack" | "notion", secret: string) {
+    if (!this.getConnector(id)) throw new Error(`Connect ${id === "slack" ? "Slack" : "Notion"} first.`);
+    const current = this.connectorEventSecret(id);
+    this.db.prepare("UPDATE connectors SET event_secret_ciphertext=?,event_verified_at=CASE WHEN ? THEN event_verified_at ELSE NULL END,updated_at=? WHERE id=?").run(this.vault.encrypt(secret), current === secret ? 1 : 0, now(), id);
+    return this.connectorEventConfig(id);
+  }
+
+  markConnectorEventsVerified(id: "slack" | "notion", secret?: string) {
+    if (secret) this.db.prepare("UPDATE connectors SET event_secret_ciphertext=?,event_verified_at=?,updated_at=? WHERE id=?").run(this.vault.encrypt(secret), now(), now(), id);
+    else this.db.prepare("UPDATE connectors SET event_verified_at=?,updated_at=? WHERE id=?").run(now(), now(), id);
+    return this.connectorEventConfig(id);
+  }
+
+  rotateConnectorEventPath(id: "slack" | "notion") {
+    const pathToken = randomBytes(24).toString("base64url");
+    this.db.prepare("UPDATE connectors SET event_path_ciphertext=?,event_secret_ciphertext=NULL,event_verified_at=NULL,updated_at=? WHERE id=?").run(this.vault.encrypt(pathToken), now(), id);
+    return this.connectorEventConfig(id);
+  }
+
   configureOAuthConnector(input: { id: "slack" | "notion" | "todoist" | "dropbox"; kind: "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
     const existing = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(input.id) as Row | undefined;
     const changedClient = Boolean(existing?.client_id && String(existing.client_id) !== input.clientId);
@@ -2109,7 +2154,7 @@ export class OpenBotDatabase {
     const triggerConfig = normalizedTriggerConfig(triggerType, input.triggerConfig);
     const enabled = input.enabled !== false;
     const nextRunAt = enabled && triggerType === "schedule" ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : null;
-    const lastEventAt = ["todoist", "dropbox"].includes(triggerType) ? now() : null;
+    const lastEventAt = ["todoist", "dropbox", "slack", "notion"].includes(triggerType) ? now() : null;
     this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at,last_event_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
       .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt, lastEventAt);
     return this.getRoutine(id)!;
@@ -2170,7 +2215,7 @@ export class OpenBotDatabase {
     const routine = this.getRoutine(id);
     if (!routine) return null;
     const delay = routineIntervalMs(routine.intervalMinutes);
-    const lastEventAt = enabled && ["todoist", "dropbox"].includes(routine.triggerType) ? now() : routine.lastEventAt;
+    const lastEventAt = enabled && ["todoist", "dropbox", "slack", "notion"].includes(routine.triggerType) ? now() : routine.lastEventAt;
     if (enabled && ["todoist", "dropbox"].includes(routine.triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
     this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, lastEventAt, enabled ? 1 : 0, id);
     return this.getRoutine(id);
@@ -2195,7 +2240,7 @@ export class OpenBotDatabase {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === "calendar");
   }
 
-  listConnectorRoutines(source: "todoist" | "dropbox"): Routine[] {
+  listConnectorRoutines(source: "todoist" | "dropbox" | "slack" | "notion"): Routine[] {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === source);
   }
 

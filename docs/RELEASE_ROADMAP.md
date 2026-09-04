@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 for the 0.27 resilient private-home release.
+Updated September 4, 2026 for the 0.28 connections-that-act release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -177,11 +177,22 @@ Verified by 105 automated tests, TypeScript and production builds, native simula
 
 Verified by 110 automated tests, TypeScript and production builds, native simulator checks, shell/Node syntax, transfer tamper and wrong-passphrase tests, live private-server behavior, responsive desktop/phone browser acceptance, and the Linux private-runner build/boot/Home-check CI gate.
 
-## Next — Open connections and richer events
+## Shipped in 0.28 — Connections that act
 
-- Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
-- Define a reviewed custom MCP/connector install contract with visible permissions and revocation
+- Added signed Slack Events API triggers for mentions, messages, and reactions, with optional channel filtering and bot/app event suppression
+- Added verified Notion webhook triggers for page, comment, and database activity, with optional entity filtering
+- Reused the durable event receipt, dedupe, rate, replay, permission, approval, failure-pause, and private-host contracts rather than creating a second automation system
+- Added private rotating provider addresses, encrypted event verification material, visible setup state, and responsive setup controls in Apps & Tools
+- Added Slack and Notion choices to the routine builder and to natural in-chat routine creation for both supported agent runtimes
+- Upgraded every built-in connector to manifest v2 with explicit event capability and authenticity declarations
+- Published the connector review/admission contract while deliberately keeping arbitrary third-party executable packages disabled
+
+## Next — Connected-work polish
+
+- Add provider-specific setup diagnostics and safe retry/backoff controls for webhook delivery
+- Add the next high-value productivity source one at a time under connector manifest v2
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
+- Design signed provenance, dependency isolation, network allowlists, permission diffs, and revocation before enabling third-party connector packages
 
 ## Later, not implied by the beta
 

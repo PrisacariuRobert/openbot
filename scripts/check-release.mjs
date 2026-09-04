@@ -18,6 +18,8 @@ const notifications = readFileSync(new URL("../src/server/notifications.ts", imp
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
 const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
+const connectorEvents = readFileSync(new URL("../src/server/connector-events.ts", import.meta.url), "utf8");
+const connectorContract = readFileSync(new URL("../docs/CONNECTOR_CONTRACT.md", import.meta.url), "utf8");
 const todoist = readFileSync(new URL("../src/server/todoist.ts", import.meta.url), "utf8");
 const dropbox = readFileSync(new URL("../src/server/dropbox.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
@@ -101,6 +103,15 @@ if (!notifications.includes("nativeStatus") || !apns.includes("api.push.apple.co
 }
 if (!server.includes("dispatchConnectorEvents") || !server.includes("todoist.activities") || !server.includes("dropbox.latestCursor") || !database.includes("automation_cursors")) {
   failures.push("Proactive Todoist and Dropbox event automation is incomplete.");
+}
+if (!server.includes('/api/connector-hooks/slack/') || !server.includes('/api/connector-hooks/notion/') || !connectorEvents.includes('verifySlackEventRequest') || !connectorEvents.includes('verifyNotionEventRequest')) {
+  failures.push("Signed Slack and Notion event ingress is incomplete.");
+}
+if (!connectorManifests.includes('schemaVersion: 2') || !connectorManifests.includes('eventAuth: "provider_hmac"') || !connectorContract.includes("OpenBot Connector Contract v2") || !connectorContract.includes("does not download or execute arbitrary connector packages")) {
+  failures.push("Connector manifest v2 or its reviewed admission boundary is incomplete.");
+}
+if (!app.includes('triggerType === "slack"') || !app.includes('triggerType === "notion"') || !styles.includes(".connector-event-setup")) {
+  failures.push("Slack and Notion event setup must remain available in the responsive product UI.");
 }
 if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifier") || !dropbox.includes('body.set("client_id"')) {
   failures.push("Managed Dropbox OAuth must retain PKCE and public-client support.");

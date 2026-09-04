@@ -3866,6 +3866,7 @@ function OAuthConnectorPanel({
     connection = status?.connections.find((item) => item.id === kind);
   const [clientId, setClientId] = useState(""),
     [clientSecret, setClientSecret] = useState(""),
+    [signingSecret, setSigningSecret] = useState(""),
     [query, setQuery] = useState(details.defaultQuery);
   const [busy, setBusy] = useState<string | null>(null),
     [error, setError] = useState(""),
@@ -3950,6 +3951,32 @@ function OAuthConnectorPanel({
     await navigator.clipboard.writeText(connector.callbackUrl);
     onNotice("Callback address copied");
   };
+  const copyEventUrl = async () => {
+    if (!connector?.events?.url) return;
+    await navigator.clipboard.writeText(connector.events.url);
+    onNotice(`${details.name} event address copied`);
+  };
+  const configureSlackEvents = (event: FormEvent) => {
+    event.preventDefault();
+    void run("events", async () => {
+      await api("/api/connectors/slack/events/config", { method: "POST", body: JSON.stringify({ signingSecret }) });
+      setSigningSecret("");
+      await onRefresh();
+      onNotice("Slack live events are ready for verification");
+    });
+  };
+  const copyNotionToken = () =>
+    run("notion-token", async () => {
+      const result = await api<{ verificationToken: string }>("/api/connectors/notion/events/token");
+      await navigator.clipboard.writeText(result.verificationToken);
+      onNotice("Notion verification token copied");
+    });
+  const rotateEventAddress = () =>
+    run("event-rotate", async () => {
+      await api(`/api/connectors/${kind}/events/rotate`, { method: "POST" });
+      await onRefresh();
+      onNotice(`${details.name} received a new private event address`);
+    });
   if (!status || !connector) return null;
   return (
     <section
@@ -4183,6 +4210,56 @@ function OAuthConnectorPanel({
             <ShieldCheck size={14} />
             <span>{details.boundary}</span>
           </div>
+          {(kind === "slack" || kind === "notion") && connector.events && (
+            <section className={`connector-event-setup ${connector.events.verified ? "ready" : ""}`}>
+              <div className="connector-event-heading">
+                <span><Webhook size={15} /></span>
+                <div>
+                  <strong>{connector.events.verified ? "Live activity is ready" : kind === "notion" && connector.events.verificationTokenReady ? "Finish in Notion" : `Let ${details.name} wake a teammate`}</strong>
+                  <small>{kind === "slack" ? "Mentions and subscribed conversation activity can start an automation." : "Page, database and comment changes can start an automation."}</small>
+                </div>
+                {connector.events.verified && <i><Check size={11} /> Ready</i>}
+                {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && <i className="pending">Verify in Notion</i>}
+              </div>
+              <div className="callback-row event-address-row">
+                <span>
+                  <strong>Event address</strong>
+                  <code>{connector.events.url}</code>
+                </span>
+                <button type="button" onClick={() => void copyEventUrl()}><Copy size={14} /> Copy</button>
+              </div>
+              {kind === "slack" && !connector.events.secretConfigured && (
+                <form className="connector-event-secret" onSubmit={configureSlackEvents}>
+                  <label className="field">
+                    <span>Slack signing secret</span>
+                    <input type="password" value={signingSecret} onChange={(event) => setSigningSecret(event.target.value)} minLength={16} autoComplete="new-password" required />
+                  </label>
+                  <button className="button-primary" disabled={busy === "events"}><ShieldCheck size={14} /> Save privately</button>
+                </form>
+              )}
+              {kind === "slack" && connector.events.secretConfigured && !connector.events.verified && (
+                <p className="event-setup-note">Add the event address under <strong>Event Subscriptions</strong> in Slack. OpenBot will answer Slack’s signed verification check automatically.</p>
+              )}
+              {kind === "notion" && !connector.events.verificationTokenReady && (
+                <p className="event-setup-note">Create a webhook subscription in Notion using this event address. Return here after Notion sends its verification token.</p>
+              )}
+              {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && (
+                <div className="event-token-ready">
+                  <span><Check size={13} /> Token received. Copy it into Notion, then choose <strong>Verify subscription</strong>.</span>
+                  <button type="button" onClick={() => void copyNotionToken()} disabled={busy === "notion-token"}><Copy size={13} /> Copy token</button>
+                </div>
+              )}
+              {kind === "notion" && connector.events.verified && (
+                <p className="event-setup-note event-setup-verified"><Check size={13} /> A signed Notion event reached OpenBot successfully.</p>
+              )}
+              <div className="event-setup-footer">
+                <small>The private address and signing material never enter teammate prompts.</small>
+                <button type="button" onClick={() => {
+                  if (window.confirm(`Replace the ${details.name} event address? The previous address will stop working immediately.`)) void rotateEventAddress();
+                }} disabled={busy === "event-rotate"}><RotateCcw size={12} /> New address</button>
+              </div>
+            </section>
+          )}
           <div className="github-access oauth-access">
             <div className="panel-section-heading">
               <div>
@@ -6479,6 +6556,10 @@ function routineTriggerLabel(routine: Routine) {
       : "Todoist · any task change";
   if (routine.triggerType === "dropbox")
     return routine.triggerConfig.dropboxPath ? `Dropbox · ${routine.triggerConfig.dropboxPath}` : "Dropbox · any file change";
+  if (routine.triggerType === "slack")
+    return `Slack · ${routine.triggerConfig.slackEvent === "any" || !routine.triggerConfig.slackEvent ? "any subscribed activity" : routine.triggerConfig.slackEvent}${routine.triggerConfig.slackChannel ? ` · ${routine.triggerConfig.slackChannel}` : ""}`;
+  if (routine.triggerType === "notion")
+    return `Notion · ${(routine.triggerConfig.notionEvent || "any change").replace("_", " ")}`;
   return routine.triggerConfig.eventName
     ? `Webhook · ${routine.triggerConfig.eventName}`
     : "Signed webhook";
@@ -6555,7 +6636,11 @@ function RoutinesPanel({
     [titleContains, setTitleContains] = useState(""),
     [minutesBefore, setMinutesBefore] = useState(15),
     [todoistEvent, setTodoistEvent] = useState<"added" | "updated" | "completed" | "any">("any"),
-    [dropboxPath, setDropboxPath] = useState("");
+    [dropboxPath, setDropboxPath] = useState(""),
+    [slackEvent, setSlackEvent] = useState<"mention" | "message" | "reaction" | "any">("mention"),
+    [slackChannel, setSlackChannel] = useState(""),
+    [notionEvent, setNotionEvent] = useState<"page_updated" | "page_created" | "comment" | "database" | "any">("page_updated"),
+    [notionEntityId, setNotionEntityId] = useState("");
   const [enabled, setEnabled] = useState(true),
     [saving, setSaving] = useState(false),
     [runnerBusy, setRunnerBusy] = useState(false),
@@ -6608,6 +6693,10 @@ function RoutinesPanel({
     setMinutesBefore(15);
     setTodoistEvent("any");
     setDropboxPath("");
+    setSlackEvent("mention");
+    setSlackChannel("");
+    setNotionEvent("page_updated");
+    setNotionEntityId("");
     setEnabled(true);
     setEditing(null);
     setCreating(false);
@@ -6634,6 +6723,10 @@ function RoutinesPanel({
     setMinutesBefore(routine.triggerConfig.minutesBefore ?? 15);
     setTodoistEvent(routine.triggerConfig.todoistEvent ?? "any");
     setDropboxPath(routine.triggerConfig.dropboxPath ?? "");
+    setSlackEvent(routine.triggerConfig.slackEvent ?? "mention");
+    setSlackChannel(routine.triggerConfig.slackChannel ?? "");
+    setNotionEvent(routine.triggerConfig.notionEvent ?? "page_updated");
+    setNotionEntityId(routine.triggerConfig.notionEntityId ?? "");
     const preset = [5, 60, 1440, 10080].includes(routine.intervalMinutes)
       ? (String(routine.intervalMinutes) as typeof schedule)
       : "custom";
@@ -6671,6 +6764,10 @@ function RoutinesPanel({
               ? { todoistEvent }
               : triggerType === "dropbox"
                 ? { ...(dropboxPath ? { dropboxPath } : {}) }
+              : triggerType === "slack"
+                ? { slackEvent, ...(slackChannel ? { slackChannel } : {}) }
+              : triggerType === "notion"
+                ? { notionEvent, ...(notionEntityId ? { notionEntityId } : {}) }
             : {};
     try {
       const input = {
@@ -7282,6 +7379,16 @@ function RoutinesPanel({
                   icon: <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>,
                 },
                 {
+                  value: "slack" as const,
+                  label: "Slack",
+                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="slack" /></span>,
+                },
+                {
+                  value: "notion" as const,
+                  label: "Notion",
+                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="notion" /></span>,
+                },
+                {
                   value: "webhook" as const,
                   label: "Webhook",
                   icon: <Webhook size={14} />,
@@ -7467,6 +7574,49 @@ function RoutinesPanel({
               <small className="routine-help">OpenBot starts from a fresh Dropbox cursor, so turning this on never floods the studio with old files.</small>
             </fieldset>
           )}
+          {triggerType === "slack" && (
+            <fieldset className="routine-fieldset">
+              <legend>Which Slack activity?</legend>
+              <div className="trigger-fields">
+                <label>
+                  <span>Activity</span>
+                  <select value={slackEvent} onChange={(event) => setSlackEvent(event.target.value as typeof slackEvent)}>
+                    <option value="mention">Someone mentions the app</option>
+                    <option value="message">A subscribed message arrives</option>
+                    <option value="reaction">A reaction changes</option>
+                    <option value="any">Any subscribed activity</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Channel ID</span>
+                  <input value={slackChannel} onChange={(event) => setSlackChannel(event.target.value)} placeholder="C012345 (optional)" />
+                </label>
+              </div>
+              <small className="routine-help">Slack verifies every delivery. Retries share the same receipt and cannot start duplicate work.</small>
+            </fieldset>
+          )}
+          {triggerType === "notion" && (
+            <fieldset className="routine-fieldset">
+              <legend>Which Notion changes?</legend>
+              <div className="trigger-fields">
+                <label>
+                  <span>Change</span>
+                  <select value={notionEvent} onChange={(event) => setNotionEvent(event.target.value as typeof notionEvent)}>
+                    <option value="page_updated">A page changes</option>
+                    <option value="page_created">A page is created</option>
+                    <option value="comment">A comment changes</option>
+                    <option value="database">A database changes</option>
+                    <option value="any">Any subscribed change</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Page or database ID</span>
+                  <input value={notionEntityId} onChange={(event) => setNotionEntityId(event.target.value)} placeholder="Optional" />
+                </label>
+              </div>
+              <small className="routine-help">The webhook is only a signal. Your teammate still needs explicit Notion read access to fetch current content.</small>
+            </fieldset>
+          )}
           <fieldset className="routine-fieldset">
             <legend>Who should do it?</legend>
             <div className="routine-teammates">
@@ -7527,6 +7677,10 @@ function RoutinesPanel({
               <span className="trigger-connector-icon"><ConnectorIcon id="todoist" /></span>
             ) : triggerType === "dropbox" ? (
               <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>
+            ) : triggerType === "slack" ? (
+              <span className="trigger-connector-icon"><ConnectorIcon id="slack" /></span>
+            ) : triggerType === "notion" ? (
+              <span className="trigger-connector-icon"><ConnectorIcon id="notion" /></span>
             ) : (
               <Webhook size={15} />
             )}
@@ -7547,6 +7701,10 @@ function RoutinesPanel({
                           : "a task is completed in Todoist"
                     : triggerType === "dropbox"
                       ? `a file changes${dropboxPath ? ` inside ${dropboxPath}` : " in Dropbox"}`
+                    : triggerType === "slack"
+                      ? `${slackEvent === "any" ? "subscribed activity" : `a ${slackEvent}`} arrives${slackChannel ? ` in ${slackChannel}` : " from Slack"}`
+                    : triggerType === "notion"
+                      ? `${notionEvent === "any" ? "a subscribed change" : notionEvent.replace("_", " ")} arrives from Notion`
                   : triggerType === "github"
                     ? "a signed GitHub event matches these filters"
                     : "a correctly signed webhook arrives"}

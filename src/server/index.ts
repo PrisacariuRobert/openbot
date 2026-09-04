@@ -37,6 +37,7 @@ import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
+import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -68,8 +69,10 @@ const managedGoogleClient = Boolean(process.env.OPENBOT_GOOGLE_CLIENT_ID?.trim()
 if (managedGoogleClient) db.configureGoogleConnector({ clientId: process.env.OPENBOT_GOOGLE_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_GOOGLE_CLIENT_SECRET?.trim() || null });
 const managedSlackClient = Boolean(process.env.OPENBOT_SLACK_CLIENT_ID?.trim() && process.env.OPENBOT_SLACK_CLIENT_SECRET?.trim());
 if (managedSlackClient) db.configureOAuthConnector({ id: "slack", kind: "slack_oauth", name: "Slack", clientId: process.env.OPENBOT_SLACK_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_SLACK_CLIENT_SECRET!.trim() });
+if (managedSlackClient && process.env.OPENBOT_SLACK_SIGNING_SECRET?.trim()) db.configureConnectorEventSecret("slack", process.env.OPENBOT_SLACK_SIGNING_SECRET.trim());
 const managedNotionClient = Boolean(process.env.OPENBOT_NOTION_CLIENT_ID?.trim() && process.env.OPENBOT_NOTION_CLIENT_SECRET?.trim());
 if (managedNotionClient) db.configureOAuthConnector({ id: "notion", kind: "notion_oauth", name: "Notion", clientId: process.env.OPENBOT_NOTION_CLIENT_ID!.trim(), clientSecret: process.env.OPENBOT_NOTION_CLIENT_SECRET!.trim() });
+if (managedNotionClient && process.env.OPENBOT_NOTION_VERIFICATION_TOKEN?.trim()) db.configureConnectorEventSecret("notion", process.env.OPENBOT_NOTION_VERIFICATION_TOKEN.trim());
 const managedDropboxKey = process.env.OPENBOT_DROPBOX_APP_KEY?.trim() || process.env.OPENBOT_DROPBOX_CLIENT_ID?.trim() || "";
 const managedDropboxClient = Boolean(managedDropboxKey);
 if (managedDropboxClient) db.configureOAuthConnector({ id: "dropbox", kind: "dropbox_oauth", name: "Dropbox", clientId: managedDropboxKey, clientSecret: process.env.OPENBOT_DROPBOX_CLIENT_SECRET?.trim() || "" });
@@ -94,6 +97,12 @@ function runnerPayload(health: RunnerHealth) {
 function accessTokenMatches(value: string | null | undefined) {
   if (!value) return false;
   const actual = Buffer.from(accessToken), candidate = Buffer.from(value);
+  return actual.length === candidate.length && timingSafeEqual(actual, candidate);
+}
+
+function privateValueMatches(expected: string, value: string | null | undefined) {
+  if (!expected || !value) return false;
+  const actual = Buffer.from(expected), candidate = Buffer.from(value);
   return actual.length === candidate.length && timingSafeEqual(actual, candidate);
 }
 
@@ -143,7 +152,7 @@ app.post("/api/auth/login", (request, response) => {
 });
 
 app.use("/api", (request, response, next) => {
-  if (request.path === "/auth/login" || request.path.startsWith("/automation-hooks/") || loopback(request)) return next();
+  if (request.path === "/auth/login" || request.path.startsWith("/automation-hooks/") || request.path.startsWith("/connector-hooks/") || loopback(request)) return next();
   const bearer = request.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (accessTokenMatches(bearer) || accessTokenMatches(cookie(request, "openbot_access"))) return next();
   response.status(401).json({ error: "OpenBot needs your private access key." });
@@ -453,6 +462,8 @@ function readConnectorStatus(): ConnectorStatus {
   const githubStatus = github.status();
   db.ensureLocalConnector("github-cli", "github_cli", "GitHub", githubStatus.connected, githubStatus.accountLogin);
   const slackConnection = db.getConnector("slack"), notionConnection = db.getConnector("notion"), todoistConnection = db.getConnector("todoist"), dropboxConnection = db.getConnector("dropbox");
+  const slackEvents = slackConnection ? db.connectorEventConfig("slack") : null;
+  const notionEvents = notionConnection ? db.connectorEventConfig("notion") : null;
   const saved = new Map(db.listBotConnectorAccess().map((access) => [`${access.botId}:${access.service}`, access]));
   const githubSaved = new Map(db.listBotConnectorAccess("github-cli").map((access) => [access.botId, access]));
   const slackSaved = new Map(db.listBotConnectorAccess("slack").map((access) => [access.botId, access]));
@@ -462,8 +473,8 @@ function readConnectorStatus(): ConnectorStatus {
   const baseCatalog = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []);
   const catalog = [...baseCatalog, manifestCatalogEntry("todoist", Boolean(todoistConnection?.connected), todoistConnection?.connected ? "Connected" : "One-click connect", ["See active tasks", "Approval-safe creating"]), manifestCatalogEntry("dropbox", Boolean(dropboxConnection?.connected), dropboxConnection?.connected ? "Connected" : dropboxConnection?.configured ? "Ready to connect" : "Available now", ["Search files", "Read supported text"])].map((entry) => {
     if (entry.id === "github") return manifestCatalogEntry("github", githubStatus.connected, githubStatus.connected ? "Connected" : githubStatus.installed ? "Available now" : "Needs GitHub CLI", ["Notifications", "Search issues", "Approval-safe creating"]);
-    if (entry.id === "slack") return manifestCatalogEntry("slack", Boolean(slackConnection?.connected), slackConnection?.connected ? "Connected" : slackConnection?.configured ? "Ready to connect" : "Available now", ["Search messages", "Read context", "Approval-safe posting"]);
-    if (entry.id === "notion") return manifestCatalogEntry("notion", Boolean(notionConnection?.connected), notionConnection?.connected ? "Connected" : notionConnection?.configured ? "Ready to connect" : "Available now", ["Search pages", "Read content", "Approval-safe updates"]);
+    if (entry.id === "slack") return manifestCatalogEntry("slack", Boolean(slackConnection?.connected), slackConnection?.connected ? "Connected" : slackConnection?.configured ? "Ready to connect" : "Available now", ["Search messages", "Read context", "Approval-safe posting", ...(slackEvents?.verifiedAt ? ["Live event triggers"] : [])]);
+    if (entry.id === "notion") return manifestCatalogEntry("notion", Boolean(notionConnection?.connected), notionConnection?.connected ? "Connected" : notionConnection?.configured ? "Ready to connect" : "Available now", ["Search pages", "Read content", "Approval-safe updates", ...(notionEvents?.verifiedAt ? ["Live event triggers"] : [])]);
     const manifest = CONNECTOR_MANIFESTS.find((item) => item.service === entry.id)!;
     return { ...entry, connectorId: manifest.connectorId, manifestVersion: manifest.schemaVersion, writeRequiresApproval: manifest.writeRequiresApproval, ...(unavailableServices.has(entry.id as GoogleConnectorService) ? { connected: false, badge: "Needs setup" } : {}) };
   });
@@ -473,8 +484,8 @@ function readConnectorStatus(): ConnectorStatus {
     callbackUrl: googleWorkspace.redirectUri, managedGoogleClient, oauthInProgress: googleWorkspace.oauthInProgress(),
     googleProjectId: googleCloudProjectFromClientId(credentials?.clientId), googleApiRecovery: googleIssue, googleApiRecoveries: serviceRecoveries,
     github: githubStatus,
-    slack: { connectorId: "slack", configured: Boolean(slackConnection?.configured), connected: Boolean(slackConnection?.connected), managedClient: managedSlackClient, oauthInProgress: slack.oauthInProgress(), callbackUrl: slack.redirectUri, accountName: slackConnection?.accountEmail || null, lastError: slackConnection?.lastError ? friendlyConnectorError("slack", slackConnection.lastError) : null },
-    notion: { connectorId: "notion", configured: Boolean(notionConnection?.configured), connected: Boolean(notionConnection?.connected), managedClient: managedNotionClient, oauthInProgress: notion.oauthInProgress(), callbackUrl: notion.redirectUri, accountName: notionConnection?.accountEmail || null, lastError: notionConnection?.lastError ? friendlyConnectorError("notion", notionConnection.lastError) : null },
+    slack: { connectorId: "slack", configured: Boolean(slackConnection?.configured), connected: Boolean(slackConnection?.connected), managedClient: managedSlackClient, oauthInProgress: slack.oauthInProgress(), callbackUrl: slack.redirectUri, accountName: slackConnection?.accountEmail || null, lastError: slackConnection?.lastError ? friendlyConnectorError("slack", slackConnection.lastError) : null, ...(slackEvents ? { events: { url: `${appUrl.replace(/\/$/, "")}/api/connector-hooks/slack/${slackEvents.pathToken}`, secretConfigured: slackEvents.secretConfigured, verified: Boolean(slackEvents.verifiedAt), verificationTokenReady: false } } : {}) },
+    notion: { connectorId: "notion", configured: Boolean(notionConnection?.configured), connected: Boolean(notionConnection?.connected), managedClient: managedNotionClient, oauthInProgress: notion.oauthInProgress(), callbackUrl: notion.redirectUri, accountName: notionConnection?.accountEmail || null, lastError: notionConnection?.lastError ? friendlyConnectorError("notion", notionConnection.lastError) : null, ...(notionEvents ? { events: { url: `${appUrl.replace(/\/$/, "")}/api/connector-hooks/notion/${notionEvents.pathToken}`, secretConfigured: notionEvents.secretConfigured, verified: Boolean(notionEvents.verifiedAt), verificationTokenReady: notionEvents.secretConfigured } } : {}) },
     todoist: { connectorId: "todoist", configured: Boolean(todoistConnection?.configured), connected: Boolean(todoistConnection?.connected), managedClient: true, oauthInProgress: todoist.oauthInProgress(), callbackUrl: todoist.redirectUri, accountName: todoistConnection?.accountEmail || null, lastError: todoistConnection?.lastError ? friendlyConnectorError("todoist", todoistConnection.lastError) : null },
     dropbox: { connectorId: "dropbox", configured: Boolean(dropboxConnection?.configured), connected: Boolean(dropboxConnection?.connected), managedClient: managedDropboxClient, oauthInProgress: dropbox.oauthInProgress(), callbackUrl: dropbox.redirectUri, accountName: dropboxConnection?.accountEmail || null, lastError: dropboxConnection?.lastError ? friendlyConnectorError("dropbox", dropboxConnection.lastError) : null },
     catalog,
@@ -579,6 +590,14 @@ app.post("/api/connectors/slack/health", async (_request, response) => {
   try { const health = await slack.health(); db.markConnectorHealthy("slack"); response.json(health); }
   catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("slack", message); response.status(400).json({ error: friendlyConnectorError("slack", message) }); }
 });
+app.post("/api/connectors/slack/events/config", (request, response) => {
+  const parsed = z.object({ signingSecret: z.string().trim().min(16).max(500) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Paste the Slack signing secret from Basic Information in your Slack app." });
+  if (!db.getConnector("slack")?.connected) return response.status(409).json({ error: "Connect Slack before turning on live events." });
+  db.configureConnectorEventSecret("slack", parsed.data.signingSecret);
+  broadcast({ type: "connector", at: Date.now() });
+  response.json(readConnectorStatus().slack.events);
+});
 
 app.post("/api/connectors/notion/config", (request, response) => {
   if (managedNotionClient) return response.status(409).json({ error: "This OpenBot release already manages its Notion connection." });
@@ -629,6 +648,80 @@ app.get("/api/connectors/notion/preview", async (request, response) => {
 app.post("/api/connectors/notion/health", async (_request, response) => {
   try { const health = await notion.health(); db.markConnectorHealthy("notion"); response.json(health); }
   catch (error) { const message = error instanceof Error ? error.message : String(error); db.markConnectorError("notion", message); response.status(400).json({ error: friendlyConnectorError("notion", message) }); }
+});
+
+app.get("/api/connectors/notion/events/token", (_request, response) => {
+  const secret = db.connectorEventSecret("notion");
+  if (!secret) return response.status(404).json({ error: "Add the Notion event URL first, then wait for its verification token." });
+  response.setHeader("Cache-Control", "no-store");
+  response.json({ verificationToken: secret });
+});
+
+app.post("/api/connectors/:connector/events/rotate", (request, response) => {
+  const parsed = z.enum(["slack", "notion"]).safeParse(request.params.connector);
+  if (!parsed.success || !db.getConnector(parsed.data)?.connected) return response.status(400).json({ error: "Choose a connected Slack or Notion app." });
+  db.rotateConnectorEventPath(parsed.data);
+  broadcast({ type: "connector", at: Date.now() });
+  response.json(readConnectorStatus()[parsed.data].events);
+});
+
+function connectorHookAllowed(connector: "slack" | "notion", pathToken: string) {
+  const connection = db.getConnector(connector);
+  if (!connection?.connected) return false;
+  return privateValueMatches(db.connectorEventConfig(connector).pathToken, pathToken);
+}
+
+app.post("/api/connector-hooks/slack/:pathToken", (request, response) => {
+  if (!connectorHookAllowed("slack", request.params.pathToken)) return response.status(404).end();
+  const rawBody = (request as RawBodyRequest).rawBody || Buffer.from(JSON.stringify(request.body || {}));
+  const secret = db.connectorEventSecret("slack");
+  if (!secret) return response.status(409).json({ error: "Slack events are not configured." });
+  if (!verifySlackEventRequest(secret, rawBody, request.header("x-slack-request-timestamp") || undefined, request.header("x-slack-signature") || undefined)) return response.status(401).json({ error: "Slack could not be verified." });
+  const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
+  if (body.type === "url_verification") {
+    const challenge = typeof body.challenge === "string" ? body.challenge.slice(0, 500) : "";
+    if (!challenge) return response.status(400).json({ error: "Slack did not include its verification challenge." });
+    db.markConnectorEventsVerified("slack");
+    broadcast({ type: "connector", at: Date.now() });
+    return response.json({ challenge });
+  }
+  if (body.type !== "event_callback" || slackEventIsFromApp(body)) return response.status(202).json({ ok: true, ignored: true });
+  let started = 0;
+  for (const routine of db.listConnectorRoutines("slack")) {
+    if (!connectorAutomationReady("slack", routine.botId)) continue;
+    const result = dispatchRoutineEvent(routine, { source: "slack", payload: body, rawBody, externalId: typeof body.event_id === "string" ? body.event_id : undefined, rateLimit: 30 });
+    if (!result.ignored && !result.duplicate && !result.rateLimited) started += 1;
+  }
+  if (started) broadcast({ type: "automation", at: Date.now() });
+  response.status(202).json({ ok: true, started });
+});
+
+app.post("/api/connector-hooks/notion/:pathToken", (request, response) => {
+  if (!connectorHookAllowed("notion", request.params.pathToken)) return response.status(404).end();
+  const rawBody = (request as RawBodyRequest).rawBody || Buffer.from(JSON.stringify(request.body || {}));
+  const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
+  if (typeof body.verification_token === "string") {
+    if (db.connectorEventSecret("notion")) return response.status(409).json({ error: "Rotate the Notion event address before replacing its verification token." });
+    const token = body.verification_token.trim();
+    if (token.length < 16 || token.length > 500) return response.status(400).json({ error: "Notion sent an invalid verification token." });
+    db.configureConnectorEventSecret("notion", token);
+    broadcast({ type: "connector", at: Date.now() });
+    return response.status(200).json({ ok: true });
+  }
+  const secret = db.connectorEventSecret("notion");
+  if (!secret || !verifyNotionEventRequest(secret, rawBody, request.header("x-notion-signature") || undefined)) return response.status(401).json({ error: "Notion could not be verified." });
+  if (!db.connectorEventConfig("notion").verifiedAt) {
+    db.markConnectorEventsVerified("notion");
+    broadcast({ type: "connector", at: Date.now() });
+  }
+  let started = 0;
+  for (const routine of db.listConnectorRoutines("notion")) {
+    if (!connectorAutomationReady("notion", routine.botId)) continue;
+    const result = dispatchRoutineEvent(routine, { source: "notion", payload: body, rawBody, externalId: typeof body.id === "string" ? body.id : undefined, attempt: providerEventAttempt(body), rateLimit: 30 });
+    if (!result.ignored && !result.duplicate && !result.rateLimited) started += 1;
+  }
+  if (started) broadcast({ type: "automation", at: Date.now() });
+  response.status(202).json({ ok: true, started });
 });
 
 app.post("/api/connectors/todoist/connect", async (_request, response) => {
@@ -1161,10 +1254,12 @@ const triggerConfigInput = z.object({
   eventName: z.string().trim().max(100).optional(), githubEvent: z.string().trim().max(80).optional(), githubAction: z.string().trim().max(80).optional(),
   repository: z.string().trim().max(200).regex(/^(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?$/).optional(), titleContains: z.string().trim().max(160).optional(), minutesBefore: z.number().int().min(0).max(1440).optional(),
   todoistEvent: z.enum(["added", "updated", "completed", "any"]).optional(), dropboxPath: z.string().trim().max(1_000).optional(),
+  slackEvent: z.enum(["mention", "message", "reaction", "any"]).optional(), slackChannel: z.string().trim().max(200).optional(),
+  notionEvent: z.enum(["page_updated", "page_created", "comment", "database", "any"]).optional(), notionEntityId: z.string().trim().max(200).optional(),
 });
 const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
-  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox"]).optional(), triggerConfig: triggerConfigInput.optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion"]).optional(), triggerConfig: triggerConfigInput.optional(),
 });
 
 function calendarAutomationReady(botId: string) {
@@ -1173,14 +1268,16 @@ function calendarAutomationReady(botId: string) {
   return connected && Boolean(db.getBotConnectorAccess(botId, "google-calendar")?.canRead);
 }
 
-function connectorAutomationReady(source: "todoist" | "dropbox", botId: string) {
-  return Boolean(db.getConnector(source)?.connected && db.getBotConnectorAccess(botId, source, source)?.canRead);
+function connectorAutomationReady(source: "todoist" | "dropbox" | "slack" | "notion", botId: string) {
+  if (!db.getConnector(source)?.connected) return false;
+  const eventsReady = source === "slack" ? Boolean(db.connectorEventConfig(source).verifiedAt) : source === "notion" ? db.connectorEventConfig(source).secretConfigured : true;
+  return Boolean(eventsReady && db.getBotConnectorAccess(botId, source, source)?.canRead);
 }
 
 type DispatchResult = { event: AutomationEvent; run: ReturnType<OpenBotDatabase["createRun"]> | null; duplicate: boolean; rateLimited: boolean; ignored?: string };
 function dispatchRoutineEvent(routine: Routine, input: { source: AutomationEvent["source"]; payload: unknown; rawBody?: Buffer; headers?: Record<string, string | string[] | undefined>; externalId?: string; replayOfEventId?: string | null; attempt?: number; bypassDedupe?: boolean; skipMatch?: boolean; advanceSchedule?: boolean; rateLimit?: number }): DispatchResult {
   const headers = input.headers || {}, rawBody = input.rawBody || Buffer.from(JSON.stringify(input.payload)), safePayload = sanitizeAutomationPayload(input.payload);
-  if (!input.skipMatch && ["webhook", "github", "calendar", "todoist", "dropbox"].includes(routine.triggerType)) {
+  if (!input.skipMatch && ["webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion"].includes(routine.triggerType)) {
     const match = automationEventMatches(routine, safePayload, headers);
     if (!match.matches) return { event: null as unknown as AutomationEvent, run: null, duplicate: false, rateLimited: false, ignored: match.reason || "This event did not match the saved filter." };
   }
@@ -1209,6 +1306,7 @@ app.post("/api/routines", (request, response) => {
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getThread(parsed.data.threadId)) return response.status(400).json({ error: "That routine needs a teammate, conversation and instruction." });
   if (parsed.data.triggerType === "calendar" && parsed.data.enabled !== false && !calendarAutomationReady(parsed.data.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
   if ((parsed.data.triggerType === "todoist" || parsed.data.triggerType === "dropbox") && parsed.data.enabled !== false && !connectorAutomationReady(parsed.data.triggerType, parsed.data.botId)) return response.status(400).json({ error: `Connect ${parsed.data.triggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
+  if ((parsed.data.triggerType === "slack" || parsed.data.triggerType === "notion") && parsed.data.enabled !== false && !connectorAutomationReady(parsed.data.triggerType, parsed.data.botId)) return response.status(400).json({ error: `Connect ${parsed.data.triggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.` });
   const needsSecret = parsed.data.triggerType === "webhook" || parsed.data.triggerType === "github";
   const webhookSecret = needsSecret ? randomBytes(32).toString("base64url") : null;
   const routine = db.createRoutine({ ...parsed.data, webhookSecret });
@@ -1225,6 +1323,7 @@ app.patch("/api/routines/:id", (request, response) => {
   if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
   if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
   if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
+  if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.` });
   const needsSecret = nextTriggerType === "webhook" || nextTriggerType === "github", webhookSecret = needsSecret && !current.hasWebhookSecret ? randomBytes(32).toString("base64url") : null;
   const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret });
   if (!routine) return response.status(404).json({ error: "Routine not found." });
@@ -1774,15 +1873,19 @@ app.post("/api/internal/tools", async (request, response) => {
     }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;
+      const requestedTrigger = typeof args.triggerType === "string" ? args.triggerType : "schedule";
       const routine = routineInput.safeParse({
         name: args.name, botId, threadId: sourceRun.threadId, prompt: args.prompt,
-        intervalMinutes: args.intervalMinutes, enabled: args.enabled !== false,
+        intervalMinutes: requestedTrigger === "schedule" ? args.intervalMinutes : 1440, enabled: args.enabled !== false,
+        triggerType: requestedTrigger, triggerConfig: args.triggerConfig,
       });
       if (!routine.success) return response.status(400).json({ error: "Choose a name, what should happen, and a repeat time of at least 5 minutes." });
+      if (routine.data.enabled !== false && routine.data.triggerType === "calendar" && !calendarAutomationReady(botId)) return response.status(409).json({ error: "Calendar is not ready for this teammate. Connect it or create the automation as a paused draft." });
+      if (routine.data.enabled !== false && routine.data.triggerType && ["todoist", "dropbox", "slack", "notion"].includes(routine.data.triggerType) && !connectorAutomationReady(routine.data.triggerType as "todoist" | "dropbox" | "slack" | "notion", botId)) return response.status(409).json({ error: "That app or its live events are not ready for this teammate. Finish setup in Apps & Tools or create the automation as a paused draft." });
       const created = db.createRoutine(routine.data);
       db.addActivity({ runId, botId, kind: "tool", label: `Set up ${created.name}`, detail: null });
       broadcast();
-      return response.status(201).json({ ok: true, name: created.name, schedule: created.intervalMinutes, enabled: created.enabled });
+      return response.status(201).json({ ok: true, name: created.name, trigger: created.triggerType === "schedule" ? `every ${created.intervalMinutes} minutes` : created.triggerType, enabled: created.enabled });
     }
     if (action === "remember") { db.remember(botId, String(args.key || "preference"), String(args.content || "")); return response.json({ saved: true }); }
     if (action === "handoff") {

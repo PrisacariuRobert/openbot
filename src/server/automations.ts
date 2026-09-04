@@ -32,6 +32,14 @@ export function automationExternalId(source: AutomationTriggerType | "manual", h
     const event = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
     return `${normalizedText(event.id, 240) || "calendar"}:${normalizedText(event.start, 80) || createHash("sha256").update(rawBody).digest("hex")}`;
   }
+  if (source === "slack") {
+    const event = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    return normalizedText(event.event_id, 240) || createHash("sha256").update(rawBody).digest("hex");
+  }
+  if (source === "notion") {
+    const event = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    return normalizedText(event.id, 240) || createHash("sha256").update(rawBody).digest("hex");
+  }
   return createHash("sha256").update(`${source}:${Date.now()}:${rawBody.toString("base64")}`).digest("hex");
 }
 
@@ -76,6 +84,22 @@ export function automationEventMatches(routine: Routine, payload: unknown, heade
     const watchedPath = config.dropboxPath.toLowerCase().replace(/\/$/, "");
     if (watchedPath && changedPath !== watchedPath && !changedPath.startsWith(`${watchedPath}/`)) return { matches: false, reason: `Waiting for a change inside ${config.dropboxPath}.` };
   }
+  if (routine.triggerType === "slack") {
+    const event = objectAt(body, "event"), type = normalizedText(event.type, 100).toLowerCase();
+    const requested = config.slackEvent || "any";
+    const kind = type === "app_mention" ? "mention" : type === "message" ? "message" : type.startsWith("reaction_") ? "reaction" : "other";
+    if (requested !== "any" && requested !== kind) return { matches: false, reason: `Waiting for a Slack ${requested}.` };
+    const channel = normalizedText(event.channel || objectAt(event, "item").channel, 200).toLowerCase();
+    if (config.slackChannel && channel !== config.slackChannel.toLowerCase()) return { matches: false, reason: `Waiting for activity in ${config.slackChannel}.` };
+  }
+  if (routine.triggerType === "notion") {
+    const type = normalizedText(body.type, 120).toLowerCase(), requested = config.notionEvent || "any";
+    const kind = type === "page.created" ? "page_created" : type.startsWith("page.") ? "page_updated" : type.startsWith("comment.") ? "comment" : /^(?:database|data_source)\./.test(type) ? "database" : "other";
+    if (requested !== "any" && requested !== kind) return { matches: false, reason: `Waiting for a matching Notion ${requested.replace("_", " ")} event.` };
+    const data = objectAt(body, "data"), wanted = config.notionEntityId?.replace(/-/g, "").toLowerCase();
+    const entities = [objectAt(body, "entity").id, data.page_id, objectAt(data, "parent").id].map((value) => normalizedText(value, 200).replace(/-/g, "").toLowerCase()).filter(Boolean);
+    if (wanted && !entities.includes(wanted)) return { matches: false, reason: "Waiting for a change to the selected Notion item." };
+  }
   return { matches: true, reason: null };
 }
 
@@ -95,6 +119,15 @@ export function summarizeAutomationPayload(source: AutomationTriggerType | "manu
   }
   if (source === "dropbox") {
     return [normalizedText(body.name, 160) || "Dropbox file", normalizedText(body.path || body.path_display, 220), normalizedText(body.changeType || body[".tag"], 60)].filter(Boolean).join(" · ");
+  }
+  if (source === "slack") {
+    const event = objectAt(body, "event");
+    const type = normalizedText(event.type, 100) || "activity", channel = normalizedText(event.channel || objectAt(event, "item").channel, 120), text = normalizedText(event.text, 160);
+    return [type === "app_mention" ? "Mentioned in Slack" : `Slack ${type.replace(/_/g, " ")}`, channel, text].filter(Boolean).join(" · ");
+  }
+  if (source === "notion") {
+    const entity = objectAt(body, "entity"), type = normalizedText(body.type, 120).replace(/[._]/g, " ") || "Notion change";
+    return [type, normalizedText(body.workspace_name, 120), normalizedText(entity.type, 60), normalizedText(entity.id, 80)].filter(Boolean).join(" · ");
   }
   if (source === "schedule") return normalizedText(body.scheduledFor, 80) ? `Scheduled for ${normalizedText(body.scheduledFor, 80)}` : "Scheduled run";
   if (source === "manual") return "Started by you as a test run";
@@ -136,6 +169,20 @@ export function normalizedTriggerConfig(type: AutomationTriggerType, value: Rout
     const rawPath = normalizedText(config.dropboxPath, 1_000).replace(/\\/g, "/");
     const dropboxPath = rawPath && rawPath !== "/" ? `/${rawPath.replace(/^\/+|\/+$/g, "")}` : "";
     return dropboxPath ? { dropboxPath } : {};
+  }
+  if (type === "slack") {
+    const event = normalizedText(config.slackEvent, 40);
+    return {
+      slackEvent: (["mention", "message", "reaction", "any"].includes(event) ? event : "any") as RoutineTriggerConfig["slackEvent"],
+      ...(normalizedText(config.slackChannel, 200) ? { slackChannel: normalizedText(config.slackChannel, 200) } : {}),
+    };
+  }
+  if (type === "notion") {
+    const event = normalizedText(config.notionEvent, 40), entityId = normalizedText(config.notionEntityId, 200).replace(/[^a-f0-9-]/gi, "");
+    return {
+      notionEvent: (["page_updated", "page_created", "comment", "database", "any"].includes(event) ? event : "any") as RoutineTriggerConfig["notionEvent"],
+      ...(entityId ? { notionEntityId: entityId } : {}),
+    };
   }
   return {};
 }

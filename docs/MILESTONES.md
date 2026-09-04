@@ -504,3 +504,19 @@ Status: complete in source for the owner-operated 0.27.0 release
 - The replacement must become healthy; partial or failed imports restore the prior home and keep a recoverable copy instead of silently losing data
 
 Verification: 110 automated tests cover safe URL parsing, private/reserved address rejection, mixed public/private DNS rejection, encrypted durable heartbeat state, success/failure receipts, disabled silence, secret-free authenticated export, complete restore, incorrect-passphrase rejection, and ciphertext tamper rejection alongside every earlier product contract. TypeScript, production build, release/native checks, iOS simulator tests, shell/Node syntax, responsive desktop/phone visual QA, and the Linux private-runner build/boot/Home-check CI gate form the release gate.
+
+## M34 — Connections that act
+
+Status: complete in source for the owner-operated 0.28.0 release
+
+- Slack mentions, messages, and reactions can wake a selected teammate through a provider-signed Events API request, with an optional exact-channel filter
+- Notion page, comment, and database activity can wake a selected teammate through a verified and signed webhook, with an optional page/data-source entity filter
+- Both providers use a private rotating event address, encrypted verification material, provider HMAC checks, bounded inputs, stable delivery IDs, burst limits, durable receipts, replay, failure attention, and automatic pause after repeated failure
+- Slack requests enforce the provider timestamp replay window and bot-authored messages are ignored to prevent feedback loops
+- Apps & Tools explains provider setup in plain language, shows when live events are ready, copies only the values the owner needs, and rotates compromised addresses in one action
+- The responsive automation builder exposes provider-specific choices without technical request fields; connected-app readiness and each teammate's read permission are checked before enabling the routine
+- OpenCode and Claude Code teammates can create Slack and Notion event routines naturally in chat through the same validated server action
+- Connector manifest v2 declares event capability and authenticity for every built-in app, and the published admission contract defines permission, approval, provenance, payload, revocation, and test expectations
+- Third-party executable connector installation remains disabled until signed provenance, dependency isolation, network allowlists, permission diffs, and update/revocation behavior are implemented
+
+Verification: 113 automated tests cover provider signatures, replay-window and loop prevention, reaction/comment filters, encrypted secrets, private-address rotation, manifest validation, and natural-routine contracts alongside every earlier product boundary. TypeScript, production build, release/native checks, signed live-shaped Slack/Notion delivery, duplicate replay, and responsive 1280×800/390×844 visual QA pass. Real Slack/Notion account consent and publicly reachable provider delivery remain owner-environment checks.
