@@ -1,6 +1,6 @@
-# OpenBot 0.22.0 Launch Readiness
+# OpenBot 0.23.0 Launch Readiness
 
-OpenBot 0.22.0 is ready for an open-source local-first beta launch with proactive Todoist and Dropbox routines, native APNs delivery infrastructure, an embedded iOS Share extension, durable cross-device continuity, a verified customizable character system, Live Studio supervision, a portable versioned Skill Library, dependable background self-hosting, and secure web push. Native source and simulator builds are release-ready, while physical-device APNs and App Store distribution still require the owner's Apple team, App Group, signing profile, and `.p8` key. It is not yet an honest drop-in replacement for Grok Bot's powered-off cloud execution, hosted public ingress, guaranteed transcription/OCR, fidelity-preserving Office editing, organization controls, or broad plugin catalog.
+OpenBot 0.23.0 is ready for an open-source local-first beta launch with deliberate native voice capture, graceful startup recovery, a calmer connector experience, proactive Todoist and Dropbox routines, native APNs delivery infrastructure, an embedded iOS Share extension, durable cross-device continuity, a verified customizable character system, Live Studio supervision, a portable versioned Skill Library, dependable background self-hosting, and secure web push. Native source and simulator builds are release-ready, while physical-device APNs and App Store distribution still require the owner's Apple team, App Group, signing profile, and `.p8` key. It is not yet an honest drop-in replacement for Grok Bot's powered-off cloud execution, hosted public ingress, guaranteed offline transcription/OCR, fidelity-preserving Office editing, organization controls, or broad plugin catalog.
 
 ## What is launch-ready
 
@@ -16,7 +16,7 @@ OpenBot 0.22.0 is ready for an open-source local-first beta launch with proactiv
 - Rich PDF, Word, workbook, CSV/TSV, PowerPoint, text, JSON/YAML/notebook/email/source, image, audio, and video ingestion with format-specific bounds
 - Original media forwarded to compatible OpenCode models, contained image/PDF and extracted-text previews, friendly unsupported-format recovery, and hardened downloads
 - Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
-- Voice typing, an installable PWA, authenticated remote access, and a native SwiftUI iPhone app with Keychain-backed API access, conversations, teammate routing, live work, and approvals
+- Voice typing, deliberate native speech-to-editable-text capture, an installable PWA, authenticated remote access, and a native SwiftUI iPhone app with Keychain-backed API access, conversations, teammate routing, live work, and approvals
 - Matching web and native studio geometry, language, code-drawn runtime-colored mascots, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
 - Durable approval cards, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
@@ -74,16 +74,16 @@ OpenBot 0.22.0 is ready for an open-source local-first beta launch with proactiv
 | Hosted remote dev environments | Local code jobs now recover across OpenBot restarts, but they still stop while the host is asleep or unavailable. | Add an encrypted private runner deployment without weakening local mode. |
 | Hosted event ingress and execution | Schedule and Calendar work survives service exits but still requires an awake Mac; public hooks need an owner-managed HTTPS route. | Add reviewed private-VPS packaging and optional hosted ingress as a separate trust mode. |
 | Broader event sources | Signed GitHub and generic hooks plus Calendar, Todoist, and Dropbox polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.22 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.23 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 
 ## Release decision
 
-Ship 0.22.0 as a **local-first beta**, with the limitations above visible in the README. Background protection makes the Mac-hosted studio resilient to app exits and crashes, but it does not execute while the Mac sleeps or powers off. Secure installed web apps have Web Push; the native iPhone source now includes APNs and Share-sheet ingestion and remains simulator-verified, ready for owner-signed physical-device testing rather than claimed App Store distribution. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
+Ship 0.23.0 as a **local-first beta**, with the limitations above visible in the README. Background protection makes the Mac-hosted studio resilient to app exits and crashes, but it does not execute while the Mac sleeps or powers off. Secure installed web apps have Web Push; the native iPhone source now includes deliberate voice capture, APNs, and Share-sheet ingestion and remains simulator-verified, ready for owner-signed physical-device testing rather than claimed App Store distribution. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
 
 ## Verified acceptance criteria
 
 - Automated tests: 94 passing
-- iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator with the Share extension embedded; four unit tests pass; the optional live sign-in UI test is present and skips safely when its private server/key variables are absent; no `WKWebView` remains in the app source
+- iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator with the Share extension embedded; deliberate voice capture and its privacy descriptions compile in the native target; four unit tests pass; the optional live sign-in UI test checks the voice action and skips safely when its private server/key variables are absent; no `WKWebView` remains in the app source
 - Type safety: passing
 - Production build: passing
 - Real model: DeepSeek V4 Flash Vision interpreted the supplied screenshot through the new media path; DeepSeek V4 Flash then created, linked, verified, revised, and re-linked one result as versions 1 and 2

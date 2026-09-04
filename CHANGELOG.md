@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.0 — 2026-09-04
+
+- Added deliberate native iPhone voice capture with editable partial transcription, explicit start/stop controls, permission recovery, and no OpenBot audio retention
+- Preferred on-device Apple speech recognition whenever the active device and language support it, while keeping system-service fallback honest
+- Replaced the indefinite web startup spinner with an animated teammate recovery screen, automatic retry, actionable Mac/Tailscale guidance, and a local background-studio escape hatch
+- Recovered invalid or stale conversation links to the shared studio instead of leaving the product on its loading surface
+- Collapsed self-hosted OAuth credentials behind clear disclosures and increased connector typography for a calmer, more readable Apps & Tools experience
+- Rebuilt and simulator-compiled the native app plus Share extension, and retained the 94-test web/server release suite
+- Kept Slack/Notion event sources, powered-off private hosting, physical-device APNs verification, and TestFlight distribution as honest remaining work
+
 ## 0.22.0 — 2026-09-03
 
 - Added proactive Todoist activity and Dropbox folder-change automations with explicit filters, fresh baselines, durable cursors, duplicate protection, rate limits, receipts, and ordinary approval boundaries

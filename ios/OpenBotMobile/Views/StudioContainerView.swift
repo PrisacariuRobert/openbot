@@ -385,7 +385,9 @@ private struct NativeRunCard: View {
 
 private struct NativeComposer: View {
     @ObservedObject var store: StudioStore
+    @StateObject private var voice = VoiceCapture()
     @State private var draft = ""
+    @State private var voiceDraftPrefix = ""
     @State private var targetBotID: String?
     @State private var pendingFiles: [URL] = []
     @State private var showingFiles = false
@@ -396,6 +398,47 @@ private struct NativeComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if voice.isListening {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle().fill(Color.red.opacity(0.12))
+                        Image(systemName: "waveform")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.red)
+                            .symbolEffect(.variableColor.iterative, options: .repeating)
+                    }
+                    .frame(width: 32, height: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Listening…")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                        Text("OpenBot doesn’t save the recording. Review the text before sending.")
+                            .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Button("Done") { voice.finish() }
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(Color.red.opacity(0.1), in: Capsule())
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.red.opacity(0.12)))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if let voiceError = voice.errorMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "mic.slash.fill").foregroundStyle(.orange)
+                    Text(voiceError)
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Button { voice.clearError() } label: { Image(systemName: "xmark") }
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
             if store.activeThread?.kind == "room" {
                 Menu {
                     Button("Auto-pick the best teammate") { targetBotID = nil }
@@ -483,13 +526,21 @@ private struct NativeComposer: View {
                     .onSubmit { send() }
                     .accessibilityIdentifier("native-message-field")
 
-                Button { focused = true } label: {
-                    Image(systemName: "mic")
-                        .font(.system(size: 17, weight: .medium))
-                        .frame(width: 27, height: 38)
-                        .foregroundStyle(OpenBotTheme.lavender)
+                Button {
+                    if voice.isListening {
+                        voice.finish()
+                    } else {
+                        voiceDraftPrefix = draft
+                        Task { await voice.start() }
+                    }
+                } label: {
+                    Image(systemName: voice.isListening ? "stop.fill" : "mic.fill")
+                        .font(.system(size: voice.isListening ? 13 : 16, weight: .bold))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(voice.isListening ? .white : OpenBotTheme.lavender)
+                        .background(voice.isListening ? Color.red : Color.clear, in: Circle())
                 }
-                .accessibilityLabel("Use iPhone dictation")
+                .accessibilityLabel(voice.isListening ? "Stop voice capture" : "Start voice capture")
 
                 Button(action: send) {
                     Group {
@@ -515,7 +566,17 @@ private struct NativeComposer: View {
         }
         .padding(.horizontal, 12).padding(.top, 9).padding(.bottom, 7)
         .background(.ultraThinMaterial)
-        .onChange(of: store.selectedThreadID) { _, _ in targetBotID = nil }
+        .animation(.easeOut(duration: 0.2), value: voice.isListening)
+        .onChange(of: store.selectedThreadID) { _, _ in
+            targetBotID = nil
+            voice.cancel()
+        }
+        .onChange(of: voice.transcript) { _, words in
+            let cleanWords = words.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanWords.isEmpty else { return }
+            let prefix = voiceDraftPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            draft = prefix.isEmpty ? cleanWords : "\(prefix) \(cleanWords)"
+        }
         .onAppear { applySharedDraft(force: true) }
         .onChange(of: store.activeDraft.threadId) { _, _ in applySharedDraft(force: true) }
         .onChange(of: store.activeDraft.updatedAt) { _, _ in applySharedDraft() }
@@ -528,7 +589,10 @@ private struct NativeComposer: View {
                 await store.saveDraft(next)
             }
         }
-        .onDisappear { draftSaveTask?.cancel() }
+        .onDisappear {
+            draftSaveTask?.cancel()
+            voice.cancel()
+        }
         .fileImporter(isPresented: $showingFiles, allowedContentTypes: [.content, .data], allowsMultipleSelection: true) { result in
             if case .success(let files) = result {
                 pendingFiles = Array(files.prefix(max(0, 6 - pendingFiles.count))) + pendingFiles
@@ -539,6 +603,7 @@ private struct NativeComposer: View {
 
     private func send() {
         let message = draft
+        voice.finish()
         Task {
             if await store.send(message, targetBotID: targetBotID, files: pendingFiles) {
                 draft = ""

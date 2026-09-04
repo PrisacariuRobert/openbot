@@ -435,3 +435,16 @@ Status: complete in source for the local-first 0.22.0 beta
 - Debug and Release configurations select the correct APNs environment; the extension ships its own privacy manifest
 
 Verification: 94 automated tests cover connector activity/delta contracts, duplicate-safe Todoist windows, public-client PKCE, durable cursor baselines, APNs JWT/payload/error handling, native token storage, and per-target delivery. Type checking and the production web build pass. XcodeGen regenerates the checked-in project and Xcode Beta compiles the native app with the OpenBot Share extension embedded for the iPhone 17 Pro simulator. Production APNs delivery and App Store distribution remain owner steps because they require a registered Apple App Group, Push capability, signing profile, physical device, and private `.p8` key.
+
+## M29 — Native voice and recovery polish
+
+Status: complete in source for the local-first 0.23.0 beta
+
+- The native iPhone composer now has an explicit start/stop microphone session with live editable transcription and a visible listening state
+- Transcribed text is never sent automatically; the owner can edit it, add files or a teammate, and choose Send normally
+- OpenBot does not retain microphone audio, prefers Apple's on-device recognition when available, and shows calm recovery guidance when Speech or Microphone permission is unavailable
+- The web startup experience now retries automatically, explains an unreachable Mac without technical noise, and links a stale local development page back to the running background studio
+- Invalid conversation deep links fall back to the shared studio instead of leaving a permanent loading screen
+- Apps & Tools keeps self-hosted OAuth credentials behind deliberate disclosures and raises essential connector typography while preserving real service marks and animated code-drawn mascots
+
+Verification: the 94-test web/server suite, TypeScript check, production build, and release checks pass. XcodeGen regenerates the project, Xcode Beta compiles the native app and embedded Share extension for an iPhone 17 Pro simulator, and the native UI contract includes the new voice action. Browser QA at 390×844 confirms a full-width sheet, zero document overflow, seven contained connector cards, three collapsed developer setup disclosures, and readable connection copy. Physical speech recognition, APNs delivery, and TestFlight remain owner-signed device checks.

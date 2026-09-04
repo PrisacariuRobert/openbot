@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 3, 2026 after the 0.22 proactive-connector and native-handoff release.
+Updated September 4, 2026 after the first 0.23 availability and native-voice release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -124,12 +124,20 @@ Verified with 86 automated tests, production type/build checks, duplicate-runner
 - Dropbox PKCE supports a managed public release client using only an app key while preserving self-hosted/confidential clients
 - Simulator compilation verifies the complete native target graph; physical APNs and distribution remain owner signing/credential checks
 
-## 0.23 — Availability, richer events, and voice
+## Shipped in 0.23 — Native voice and graceful recovery
+
+- A deliberate native microphone session turns speech into an editable draft and never sends without the owner pressing Send
+- The app prefers on-device Apple recognition when available, does not retain microphone audio, and provides clear permission/unavailable fallbacks
+- Stale or disconnected web sessions now show a complete animated recovery state, retry automatically, and can return from the development address to the running background studio
+- Invalid thread deep links recover to the shared studio instead of remaining on a loading surface
+- Developer-only Slack, Notion, and Dropbox credentials stay collapsed until requested; essential connector copy and controls use readable type sizes
+- Xcode Beta compiles the app and embedded Share extension for the iPhone 17 Pro simulator with the new Speech and microphone privacy declarations
+
+## Remaining 0.23 work — Availability and richer events
 
 - Add Slack and Notion event sources on the same receipt, dedupe, replay, and rate-limit contract
 - Package an optional private runner and encrypted cross-host recovery for execution while the primary Mac is unavailable
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
-- Add a private, deliberate native voice-capture session rather than relying only on keyboard dictation
 
 ## Later, not implied by the beta
 

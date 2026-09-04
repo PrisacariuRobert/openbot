@@ -255,6 +255,7 @@ const GOOGLE_API_SETUP = [
 ];
 
 type MascotBot = {
+  id?: string;
   name: string;
   color: string;
   mascot: MascotKind;
@@ -351,12 +352,78 @@ function Logo() {
   );
 }
 
+const STARTUP_MASCOTS: MascotBot[] = [
+  { id: "startup-nova", name: "Nova", color: "#6757d9", mascot: "nova", status: "ready" },
+  { id: "startup-pixel", name: "Pixel", color: "#ef6a8a", mascot: "blob", status: "working" },
+  { id: "startup-scout", name: "Scout", color: "#27a67a", mascot: "sprout", status: "ready" },
+];
+
+function localStudioRecoveryUrl() {
+  if (!["127.0.0.1", "localhost"].includes(window.location.hostname))
+    return null;
+  if (window.location.port !== "4310") return null;
+  const url = new URL(window.location.href);
+  url.port = "4311";
+  return url.toString();
+}
+
+function StudioStartup({
+  error,
+  onRetry,
+}: {
+  error: string | null;
+  onRetry: () => void;
+}) {
+  const recoveryUrl = localStudioRecoveryUrl();
+  return (
+    <main className={`splash ${error ? "splash-attention" : ""}`}>
+      <div className="splash-glow" aria-hidden="true" />
+      <div className="splash-stage">
+        <RoomCluster bots={STARTUP_MASCOTS} hero />
+        <span className="splash-spark splash-spark-one">✦</span>
+        <span className="splash-spark splash-spark-two">·</span>
+      </div>
+      {error ? (
+        <div className="splash-copy">
+          <span className="splash-kicker">
+            <WifiOff size={13} /> Your studio is still safe
+          </span>
+          <h1>The page is open, but your studio isn’t answering.</h1>
+          <p>
+            Make sure OpenBot is running and your Mac is awake. We’ll keep
+            trying in the background.
+          </p>
+          <div className="splash-actions">
+            <button className="button-primary" onClick={onRetry}>
+              <RefreshCw size={15} /> Try again
+            </button>
+            {recoveryUrl && (
+              <a className="button-secondary" href={recoveryUrl}>
+                Open the running studio <ArrowUp size={14} />
+              </a>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="splash-copy splash-copy-loading">
+          <span className="splash-kicker">
+            <span className="splash-live-dot" /> Private studio
+          </span>
+          <h1>Waking up your teammates…</h1>
+          <p>Bringing back your conversations, tools and ongoing work.</p>
+          <LoaderCircle className="spinner" />
+        </div>
+      )}
+    </main>
+  );
+}
+
 function RoomCluster({
   bots,
   large = false,
   hero = false,
 }: {
-  bots: Bot[];
+  bots: MascotBot[];
   large?: boolean;
   hero?: boolean;
 }) {
@@ -370,7 +437,7 @@ function RoomCluster({
     >
       {bots.slice(0, 3).map((bot) => (
         <Mascot
-          key={bot.id}
+          key={bot.id || bot.name}
           bot={bot}
           size={hero ? "large" : large ? "medium" : "tiny"}
         />
@@ -3915,7 +3982,18 @@ function OAuthConnectorPanel({
         ) : null}
       </div>
       {!connector.configured && !connector.managedClient && !details.oneClick && (
-        <form className="oauth-setup-form" onSubmit={configure}>
+        <details className="oauth-setup-disclosure">
+          <summary>
+            <span>
+              <ShieldCheck size={15} />
+              <span>
+                <strong>Set up {details.name} on this Mac</strong>
+                <small>For self-hosted and developer installs</small>
+              </span>
+            </span>
+            <ChevronDown size={16} />
+          </summary>
+          <form className="oauth-setup-form" onSubmit={configure}>
           <div className="oauth-setup-intro">
             <span>
               <ShieldCheck size={15} />
@@ -3969,7 +4047,8 @@ function OAuthConnectorPanel({
             )}{" "}
             Save privately
           </button>
-        </form>
+          </form>
+        </details>
       )}
       {connector.connected && (
         <>
@@ -8212,6 +8291,7 @@ export function App() {
     [searchQuery, setSearchQuery] = useState(""),
     [toast, setToast] = useState<string | null>(callbackNotice),
     [authRequired, setAuthRequired] = useState(false),
+    [bootError, setBootError] = useState<string | null>(null),
     [connection, setConnection] = useState<ConnectionState>(
       navigator.onLine ? "reconnecting" : "offline",
     ),
@@ -8237,15 +8317,21 @@ export function App() {
         );
         setState(next);
         setAuthRequired(false);
+        setBootError(null);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401)
           setAuthRequired(true);
-        else if (!quiet)
+        else {
+          setBootError(
+            error instanceof Error ? error.message : "OpenBot could not wake up.",
+          );
+          if (!quiet)
           setToast(
             error instanceof Error
               ? error.message
               : "OpenBot could not wake up.",
           );
+        }
       }
     },
     [activeThreadId],
@@ -8260,6 +8346,14 @@ export function App() {
   useEffect(() => {
     void loadState(activeThreadId);
   }, [activeThreadId, loadState]);
+  useEffect(() => {
+    if (state || authRequired) return;
+    const timer = window.setInterval(
+      () => void loadState(activeThreadId, true),
+      3_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [activeThreadId, authRequired, loadState, state]);
   useEffect(() => {
     if (!authRequired) {
       api<ProviderStatus>("/api/provider")
@@ -8412,7 +8506,10 @@ export function App() {
     setSelectedBotIds(thread?.botId ? [thread.botId] : []);
   };
   const activeThread =
-    state?.threads.find((thread) => thread.id === activeThreadId) || null;
+    state?.threads.find((thread) => thread.id === activeThreadId) ||
+    state?.threads.find((thread) => thread.id === "team-room") ||
+    state?.threads[0] ||
+    null;
   const activeBot = activeThread?.botId
     ? state?.bots.find((bot) => bot.id === activeThread.botId) || null
     : null;
@@ -8469,11 +8566,13 @@ export function App() {
     );
   if (!state || !activeThread)
     return (
-      <main className="splash">
-        <Logo />
-        <h1>Waking up your studio…</h1>
-        <LoaderCircle className="spinner" />
-      </main>
+      <StudioStartup
+        error={bootError}
+        onRetry={() => {
+          setBootError(null);
+          void loadState(activeThreadId);
+        }}
+      />
     );
 
   return (

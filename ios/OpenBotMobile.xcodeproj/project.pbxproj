@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		05768E35E7D1E1AB96C3EE32 /* ConnectionAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F26D0E29F0D7E7DB32DEC8 /* ConnectionAddress.swift */; };
 		0D8D5D8F46CFE933E1BE3902 /* OpenBotSharedInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BEDA125B3C4EA944F2AF5A2 /* OpenBotSharedInbox.swift */; };
+		27AB5FDC1BC93485969685DB /* VoiceCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C224A2A3D16012AD99ED8151 /* VoiceCapture.swift */; };
 		317F8BEDC8E398E1E30D5BA8 /* OpenBotSharedInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BEDA125B3C4EA944F2AF5A2 /* OpenBotSharedInbox.swift */; };
 		33065AD9AAEF6DFDCD84D7C6 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E80C244DD0AC56003E1039 /* NetworkMonitor.swift */; };
 		71307A9366A036321DAF3FDC /* StudioContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3682D6F0A28601E71C264117 /* StudioContainerView.swift */; };
@@ -89,6 +90,7 @@
 		B75B068FBED5C05BF62154FB /* OpenBotShare.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OpenBotShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB539F661436BBF791E22079 /* OpenBotMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenBotMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BBB4F0F29D096280E4F3E975 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C224A2A3D16012AD99ED8151 /* VoiceCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCapture.swift; sourceTree = "<group>"; };
 		C2F10D09F0E8D1FEBF4C0CB2 /* OpenBotShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OpenBotShare.entitlements; sourceTree = "<group>"; };
 		D0021919D35B7A28D682FD69 /* OpenBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D68867F381BFD41C3E1B3B47 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				FBA986E72E299631DAB6B40D /* StudioAPIClient.swift */,
 				00B31E0E08E3736F3B7F7EEA /* StudioModels.swift */,
 				95833809056894928443FB90 /* StudioStore.swift */,
+				C224A2A3D16012AD99ED8151 /* VoiceCapture.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -381,6 +384,7 @@
 				71307A9366A036321DAF3FDC /* StudioContainerView.swift in Sources */,
 				90F942290D40D7F8597690F9 /* StudioModels.swift in Sources */,
 				7D6859D3AA0D868B8E73535F /* StudioStore.swift in Sources */,
+				27AB5FDC1BC93485969685DB /* VoiceCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -523,7 +527,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -542,7 +546,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.22.0;
+				MARKETING_VERSION = 0.23.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -624,7 +628,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -637,7 +641,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.22.0;
+				MARKETING_VERSION = 0.23.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

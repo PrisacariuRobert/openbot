@@ -2864,29 +2864,137 @@ select:focus-visible {
   }
 }
 .splash {
+  min-height: 100dvh;
   height: 100vh;
+  padding: 32px 22px;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
   align-items: center;
   justify-content: center;
-  color: #756f68;
-  background: #f5f3ef;
+  color: #302d29;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(111, 92, 218, 0.1), transparent 28%),
+    linear-gradient(150deg, #f8f6f2, #f2efe9);
 }
-.splash .brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  transform: scale(1.2);
+.splash-glow {
+  width: min(540px, 88vw);
+  height: min(540px, 88vw);
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  border: 1px solid rgba(111, 92, 218, 0.08);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 52px rgba(111, 92, 218, 0.025),
+    0 0 0 104px rgba(111, 92, 218, 0.018);
+  transform: translate(-50%, -50%);
+}
+.splash-stage {
+  width: 220px;
+  height: 116px;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 42px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 24px 70px rgba(62, 49, 127, 0.12);
+  backdrop-filter: blur(14px);
+}
+.splash-stage .room-cluster {
+  transform: scale(1.05);
+}
+.splash-spark {
+  position: absolute;
+  color: #7565d7;
+  animation: splash-spark 2.8s ease-in-out infinite;
+}
+.splash-spark-one {
+  right: 25px;
+  top: 17px;
+  font-size: 16px;
+}
+.splash-spark-two {
+  left: 27px;
+  bottom: 19px;
+  font-size: 21px;
+  animation-delay: -1.1s;
+}
+@keyframes splash-spark {
+  50% { opacity: 0.35; transform: translateY(-4px) scale(0.86); }
+}
+.splash-copy {
+  width: min(460px, 100%);
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.splash-kicker {
+  width: fit-content;
+  margin: 0 auto 10px;
+  padding: 6px 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b5fc0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(103, 87, 217, 0.09);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.splash-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #37a874;
+  box-shadow: 0 0 0 4px rgba(55, 168, 116, 0.12);
 }
 .splash h1 {
-  margin: 4px 0 0;
-  font-size: 15px;
-  font-weight: 600;
+  margin: 0;
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1.08;
+  letter-spacing: -1.1px;
 }
-.splash > .spinner {
+.splash p {
+  max-width: 410px;
+  margin: 12px auto 0;
+  color: #827c74;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.splash-copy-loading > .spinner {
+  margin-top: 18px;
   color: #7566d9;
 }
+.splash-actions {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.splash-actions .button-primary,
+.splash-actions .button-secondary {
+  min-height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 13px;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.splash-actions a svg { transform: rotate(45deg); }
 .mobile-only {
   display: none;
 }
@@ -6458,20 +6566,22 @@ select:focus-visible {
   overflow-x: clip;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 30px;
 }
 .connector-panel section {
   min-width: 0;
 }
 .connector-hero {
   min-height: 240px;
-  margin: -22px -22px 0;
+  margin: 2px 0 0;
   padding: 34px 30px;
   overflow: hidden;
   position: relative;
   display: flex;
   align-items: center;
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 25px;
   background:
     radial-gradient(
       circle at 88% 14%,
@@ -6484,6 +6594,7 @@ select:focus-visible {
       transparent 35%
     ),
     linear-gradient(135deg, #292637, #5749b3 66%, #7362d9);
+  box-shadow: 0 18px 45px rgba(57, 44, 118, 0.17);
 }
 .connector-hero-copy {
   position: relative;
@@ -7803,6 +7914,66 @@ select:focus-visible {
   border-radius: 16px;
   background: rgba(248, 246, 255, 0.76);
 }
+.oauth-setup-disclosure {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(103, 87, 217, 0.12);
+  border-radius: 16px;
+  background: rgba(248, 246, 255, 0.66);
+}
+.oauth-setup-disclosure > summary {
+  min-height: 58px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #6256aa;
+  list-style: none;
+  cursor: pointer;
+}
+.oauth-setup-disclosure > summary::-webkit-details-marker { display: none; }
+.oauth-setup-disclosure > summary > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.oauth-setup-disclosure > summary > span > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.oauth-setup-disclosure > summary strong { font-size: 11px; }
+.oauth-setup-disclosure > summary small { color: #99928c; font-size: 9px; }
+.oauth-setup-disclosure > summary > svg {
+  flex: none;
+  transition: transform 0.18s ease;
+}
+.oauth-setup-disclosure[open] > summary > svg { transform: rotate(180deg); }
+.oauth-setup-disclosure .oauth-setup-form {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid rgba(103, 87, 217, 0.1);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* Keep connection setup readable instead of shrinking important copy into labels. */
+.connector-card h4 { font-size: 13.5px; }
+.connector-card-title > b { padding: 5px 7px; font-size: 9px; }
+.connector-card p { font-size: 10.5px; line-height: 1.48; }
+.connector-capabilities span { padding: 4px 6px; font-size: 8.5px; }
+.connector-ready { padding: 6px 9px; font-size: 9.5px; }
+.oauth-connector-head small { font-size: 8.5px; }
+.oauth-connector-head h3 { font-size: 15px; }
+.oauth-connector-head p { font-size: 10.5px; line-height: 1.5; }
+.oauth-connector-head > .button-primary { min-height: 39px; font-size: 10px; }
+.oauth-setup-intro strong { font-size: 10.5px; }
+.oauth-setup-intro small { font-size: 9px; }
+.oauth-setup-intro a { font-size: 9.5px; }
+.oauth-setup-form > .button-primary { min-height: 39px; font-size: 10px; }
 .oauth-setup-intro {
   min-width: 0;
   display: flex;
@@ -8066,9 +8237,9 @@ select:focus-visible {
   }
   .connector-hero {
     min-height: 230px;
-    margin-left: -19px;
-    margin-right: -19px;
-    padding: 28px 20px;
+    margin: 1px 0 0;
+    padding: 28px 22px;
+    border-radius: 22px;
   }
   .connector-hero-copy {
     width: 100%;

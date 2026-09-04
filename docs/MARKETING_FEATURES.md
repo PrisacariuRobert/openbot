@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 3, 2026
-Release: 0.22.0 local-first beta
+Release: 0.23.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -298,6 +298,7 @@ These features are implemented, but marketing must explain their requirement.
 - **React to changing work:** ask a teammate to summarize a newly completed Todoist task or explain changed files below a selected Dropbox project folder.
 - **Send context from iPhone:** share a link, screenshot, or document to OpenBot from another app, then continue in the selected conversation.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
+- **Talk naturally, send deliberately:** tap the native microphone, watch editable words appear, stop when ready, and choose Send only after the message looks right.
 
 ## Claims to avoid
 
@@ -317,7 +318,7 @@ Do not say OpenBot currently:
 
 ## Roadmap, not launch copy
 
-- Physical-device/TestFlight distribution and polished native voice sessions
+- Physical-device voice/APNs/Share-extension QA and TestFlight distribution
 - Optional private-VPS runner and encrypted cross-host handoff for execution while the Mac sleeps
 - Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff

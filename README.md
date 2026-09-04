@@ -1,18 +1,18 @@
-# OpenBot 0.22.0
+# OpenBot 0.23.0
 
 OpenBot is an open-source, local-first home for persistent AI teammates. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.22.0
+## What's new in 0.23.0
 
-- Added **proactive Todoist and Dropbox routines**: a teammate can react to new, changed, or completed tasks and to changes inside a chosen Dropbox folder without waiting for a chat prompt.
-- Added durable connector cursors, fresh-start baselines, duplicate protection, rate limits, failure alerts, and the same approval boundaries used by scheduled work.
-- Added authenticated **native iPhone push registration and APNs delivery** with result/approval deep links, per-device retry records, stale-token cleanup, and production/sandbox separation.
-- Added an embedded **OpenBot Share** extension. Text, links, images, and files shared from another iPhone app are kept in the private App Group inbox and imported into the selected conversation when OpenBot opens.
-- Upgraded Dropbox to OAuth PKCE, including public-client support so packaged builds need only a release-managed app key for a one-click connection; self-hosted credentials remain supported.
-- Preserved native SwiftUI, customizable code-drawn teammates, Quick Look, Tailscale access, resilient local execution, Web Push, and the full approval system.
-- Expanded the verified product suite to 94 tests plus a simulator build that embeds the native Share extension.
+- Added a deliberate **native iPhone voice session**: tap the microphone, watch editable speech appear in the composer, stop when ready, review it, and choose Send yourself.
+- Prefers Apple’s on-device recognition when the current language and device support it. OpenBot never stores the recording, and denied/unavailable permissions fall back to ordinary typing with clear guidance.
+- Rebuilt startup recovery so a disconnected or stale page no longer spins forever. It explains the problem, retries automatically, and offers the healthy local background studio when appropriate.
+- Simplified **Apps & Tools** by collapsing self-hosted developer credentials until requested, increasing important type sizes, and preserving recognizable service marks and animated teammates.
+- Fixed invalid conversation links so they recover to the studio instead of becoming trapped on the loading screen.
+- Preserved proactive Todoist/Dropbox work, APNs, the Share extension, Tailscale access, durable execution, Web Push, and the complete approval system from 0.22.
+- Recompiled the native app and embedded Share extension on the iPhone 17 Pro simulator, with the 94-test web/server suite retained.
 
 ## What is included
 
@@ -25,7 +25,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Rich file attachments (up to six files, 25 MB each) with bounded PDF/Office/spreadsheet/text extraction, media handoff to compatible models, and copies in only the selected teammates' private inboxes
 - Contained image/PDF previews, extracted-text previews, accurate file-kind icons, friendly unsupported-file recovery, and hardened downloads
 - Automatic result cards for teammate-created files, including revision numbers and preserved earlier versions
-- Browser voice typing for quick phone tasks; OpenBot stores the transcript, not the microphone audio
+- Browser voice typing plus deliberate native iPhone speech capture with an editable transcript; OpenBot stores the text, not the microphone recording
 - Private bot-to-bot questions, findings, replies, and deduplicated handoffs, with one coordinator-owned final answer and an inspectable Team signals feed
 - Three-hop/eight-task teamwork limits that prevent accidental agent loops
 - Live streaming text, activity history, token/cache/cost usage, and a studio control center
@@ -50,7 +50,7 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - An official Claude Code runtime adapter with the same isolated workspace, browser, memory, approval, and teamwork tools
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
-- Native SwiftUI iPhone app with conversations, teammate targeting, message sending, live task/approval state, Keychain-backed API access, offline/reconnect state, and address-only deep linking
+- Native SwiftUI iPhone app with conversations, teammate targeting, voice-to-editable-text capture, message sending, live task/approval state, Keychain-backed API access, offline/reconnect state, and address-only deep linking
 - Embedded iOS Share extension for securely handing text, links, images, and files into the active OpenBot conversation
 - Customizable code-drawn mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
@@ -226,7 +226,7 @@ The design borrows the strongest ideas from [Hermes Agent's architecture](https:
 
 ## Current boundary
 
-OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. Skill import/export currently covers OpenBot's browser-oriented saved workflows; it is not a public third-party executable plugin marketplace. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed local voice transcription are not bundled yet. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. Todoist support covers active-task reading, new-task creation, and activity-triggered routines rather than full project administration; Dropbox is deliberately read-only and supports bounded text/code reading plus change-triggered routines rather than arbitrary document conversion. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar and connector triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or powers off. Without background protection it also stops when the foreground service exits. The native iPhone app accepts attachments, previews and shares results, registers for APNs, and imports Share-sheet items, but still needs owner signing, an APNs key, and a physical-device check before App Store distribution; dedicated in-app voice capture is not included. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
+OpenBot controls its own private bot containers and Chrome profiles. Its code harness works only in project folders the owner explicitly connects; it is not unrestricted host shell access or a replacement for reviewing changes before shipping. Live takeover controls a teammate's isolated browser, not arbitrary macOS pixels. Skill import/export currently covers OpenBot's browser-oriented saved workflows; it is not a public third-party executable plugin marketplace. PDF and Office extraction is designed for understanding and preview—not fidelity-preserving editing—and image/audio/video understanding depends on the selected model accepting that medium. Scanned-document OCR and guaranteed offline voice transcription are not bundled; native speech capture prefers on-device recognition when Apple reports it available and otherwise uses the system speech service. Slack support is message search/read/post rather than a complete Slack marketplace app or event listener; Notion support is selected-page search/read/append rather than database automation or a general editor. Todoist support covers active-task reading, new-task creation, and activity-triggered routines rather than full project administration; Dropbox is deliberately read-only and supports bounded text/code reading plus change-triggered routines rather than arbitrary document conversion. On macOS, the owner can enable a bounded Accessibility bridge that lists apps, reads visible controls, opens apps, and pauses for approval before clicks, typing, or key presses; it is not unrestricted visual desktop control. Calendar and connector triggers use local polling, public webhooks require an owner-configured secure route to the local service, and automation stops when the Mac sleeps or powers off. Without background protection it also stops when the foreground service exits. The native iPhone app accepts attachments, previews and shares results, registers for APNs, imports Share-sheet items, and captures editable speech, but still needs owner signing, an APNs key, and a physical-device check before App Store distribution. An always-on hosted service, App Store distribution, organization administration, and a broad third-party connector marketplace remain future work.
 
 ## License
 

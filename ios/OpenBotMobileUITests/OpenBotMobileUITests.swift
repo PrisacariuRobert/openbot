@@ -41,6 +41,7 @@ final class OpenBotMobileUITests: XCTestCase {
         XCTAssertTrue(didConnect, "The native OpenBot conversation did not appear.")
         let messageField = app.textFields["native-message-field"]
         XCTAssertTrue(messageField.waitForExistence(timeout: 10), "The native message composer did not load.")
+        XCTAssertTrue(app.buttons["Start voice capture"].exists, "The native voice action is missing from the composer.")
         if let expectedDraft = environment["OPENBOT_TEST_DRAFT"], !expectedDraft.isEmpty {
             let continuedLabel = app.staticTexts["Continued from your Mac"]
             XCTAssertTrue(continuedLabel.waitForExistence(timeout: 10), "The Mac-to-iPhone handoff cue did not appear.")

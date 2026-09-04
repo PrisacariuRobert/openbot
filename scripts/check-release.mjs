@@ -92,6 +92,12 @@ if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifi
 if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep OpenBot running")) {
   failures.push("The user-facing runner health and one-click protection experience is incomplete.");
 }
+if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
+  failures.push("The friendly automatic startup-recovery experience is incomplete.");
+}
+if (!app.includes("oauth-setup-disclosure") || !styles.includes(".oauth-setup-disclosure")) {
+  failures.push("Developer connector credentials must remain progressively disclosed instead of overwhelming the main app catalog.");
+}
 
 if (failures.length) {
   console.error(`Release documentation check failed:\n- ${failures.join("\n- ")}`);
