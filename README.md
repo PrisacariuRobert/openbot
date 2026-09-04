@@ -1,18 +1,18 @@
-# OpenBot 0.24.0
+# OpenBot 0.25.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.24.0
+## What's new in 0.25.0
 
-- Added an optional **private always-on runner** for a Linux VPS or home server, so schedules, connectors, browser work, and code jobs can continue when the owner's Mac is asleep or off.
-- Added a reviewed Docker Compose package with Caddy-managed HTTPS, automatic restarts, persistent studio/model/browser storage, Chromium, OpenCode, and access to isolated teammate computers.
-- Private-runner mode now fails closed unless it has a canonical HTTPS address and absolute durable data path. Every OAuth callback and signed webhook uses that public address.
-- Added a minimal unauthenticated health check, proxy-aware secure login cookies, repeated-login throttling, HSTS/security headers, and no public plain-text app port.
-- Added matching web and native status language that distinguishes **This Mac** from a **Private always-on home** and shows where data lives.
-- Added owner-only setup and consistent backup scripts plus honest migration guidance. Moving a local studio is explicit; OpenBot never silently uploads or synchronizes it.
-- Preserved native voice, proactive Todoist/Dropbox work, APNs, Share-sheet handoff, durable approvals, one-voice agent consultation, model choice, and the animated customizable character system from 0.23.
+- Added an authenticated **Home check** that verifies real free storage, backup freshness, OpenCode, Chromium, and Docker access instead of relying on decorative readiness badges.
+- Added the same private-home check to the native iPhone Live Studio, with one calm summary and specific attention items.
+- Rebuilt local private-host onboarding around one domain field and one copyable setup command, while keeping migration a separate owner decision.
+- Private backups now live in the protected host data root and record their successful time and size for health reporting.
+- Corrected studio headers, Live Studio, and location badges so a private deployment never describes itself as running on the Mac.
+- Kept diagnostics bounded and private: only fixed read-only commands run, the detailed endpoint requires authentication, and no credentials appear in health results.
+- Preserved the 0.24 always-on runner, native voice, connectors, approvals, one-voice teamwork, isolated coding, and animated customizable characters.
 
 ## What is included
 

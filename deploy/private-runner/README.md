@@ -59,7 +59,7 @@ git pull --ff-only
 docker compose --env-file deploy/private-runner/.env -f deploy/private-runner/docker-compose.yml up -d --build
 ```
 
-The archive includes the encryption key, connector tokens, model logins, browser profiles, and studio history. Protect it like a password vault. Projects are intentionally not included because they can be large; back them up separately.
+Backups are stored under `/srv/openbot/backups` with owner-only permissions. The script also records the successful backup time and size so **Automations → Home check** can warn when protection is missing or stale. The archive includes the encryption key, connector tokens, model logins, browser profiles, and studio history. Protect it like a password vault. Projects are intentionally not included because they can be large; back them up separately.
 
 ## Move an existing local studio
 

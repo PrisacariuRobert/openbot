@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 for the 0.24 private-runner release.
+Updated September 4, 2026 for the 0.25 runner-care release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -142,13 +142,24 @@ Verified with 86 automated tests, production type/build checks, duplicate-runner
 - Added web and native status that distinguishes **This Mac** from a **Private always-on home**, explains the selected data location, and avoids obsolete Mac-awake guidance
 - Added owner-only setup and consistent backup scripts plus migration guidance that requires moving the complete vault and choosing one authoritative data location
 
-Verified by 100 automated web/server tests, TypeScript and production builds, native release checks, deployment schema/shell checks, and responsive browser acceptance. A real VPS, public DNS/certificate issuance, live third-party OAuth callbacks, and physical iPhone/APNs distribution remain owner-environment checks rather than simulated claims.
+Verified by 101 automated web/server tests, TypeScript and production builds, native release checks, deployment schema/shell checks, responsive browser acceptance, and a Linux container build/boot smoke test. A real VPS, public DNS/certificate issuance, live third-party OAuth callbacks, and physical iPhone/APNs distribution remain owner-environment checks rather than simulated claims.
+
+## Shipped in 0.25 — Private-home setup and care
+
+- Added a domain-aware local setup assistant with a valid, copyable one-command handoff to the reviewed host script
+- Added an authenticated Home check for real free storage, backup freshness, OpenCode, Chromium, Docker, release, and uptime state
+- Added the same concise health summary and attention list to native iPhone Live Studio
+- Made successful backups create a bounded atomic maintenance receipt while keeping archives in an owner-only host directory
+- Corrected shared headers and status surfaces so private deployments never claim to be live on the Mac
+- Kept diagnostics read-only through fixed commands, bounded output, short timeouts, and no credential or environment disclosure
+
+Verified by 103 automated tests, TypeScript and production builds, native simulator checks, shell syntax, live local/private server inspection, responsive desktop/phone browser acceptance, and a Linux private-runner build/boot/Home-check smoke test in CI.
 
 ## Next — Open connections and richer events
 
 - Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
 - Define a reviewed custom MCP/connector install contract with visible permissions and revocation
-- Add health notifications and guided upgrades for private runners
+- Add opt-in external health notifications and guided, backup-first upgrades for private runners
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
 
 ## Later, not implied by the beta

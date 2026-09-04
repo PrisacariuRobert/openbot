@@ -67,6 +67,10 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runner/wake", method: "POST")
     }
 
+    func runnerCare() async throws -> StudioRunnerCare {
+        try await request("api/runner/diagnostics")
+    }
+
     func registerNativePush(deviceToken: String, environment: String, bundleID: String) async throws -> NativePushRegistration {
         let payload = try JSONEncoder().encode(NativePushRequest(deviceToken: deviceToken, environment: environment, bundleId: bundleID))
         let data = try await dataRequest("api/notifications/native", method: "POST", body: payload)

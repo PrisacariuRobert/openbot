@@ -7,6 +7,8 @@ final class StudioStore: ObservableObject {
     @Published private(set) var isSending = false
     @Published private(set) var isLive = false
     @Published private(set) var needsAuthentication = false
+    @Published private(set) var runnerCare: StudioRunnerCare?
+    @Published private(set) var isCheckingRunner = false
     @Published var errorMessage: String?
     @Published var shareNotice: String?
     @Published var selectedThreadID = "team-room"
@@ -87,6 +89,15 @@ final class StudioStore: ObservableObject {
 
     func wakeRunner() async {
         await perform { try await client.wakeRunner() }
+    }
+
+    func checkRunnerCare() async {
+        guard !isCheckingRunner else { return }
+        isCheckingRunner = true
+        errorMessage = nil
+        defer { isCheckingRunner = false }
+        do { runnerCare = try await client.runnerCare() }
+        catch { handle(error) }
     }
 
     func saveDraft(_ body: String) async {

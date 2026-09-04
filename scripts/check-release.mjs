@@ -12,6 +12,7 @@ const runner = readFileSync(new URL("../src/server/opencode.ts", import.meta.url
 const backgroundService = readFileSync(new URL("../src/server/background-service.ts", import.meta.url), "utf8");
 const deployment = readFileSync(new URL("../src/server/deployment.ts", import.meta.url), "utf8");
 const authSecurity = readFileSync(new URL("../src/server/auth-security.ts", import.meta.url), "utf8");
+const runnerCare = readFileSync(new URL("../src/server/runner-care.ts", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
@@ -23,6 +24,7 @@ const privateRunnerDockerfile = readFileSync(new URL("../deploy/private-runner/D
 const privateRunnerCompose = readFileSync(new URL("../deploy/private-runner/docker-compose.yml", import.meta.url), "utf8");
 const privateRunnerCaddy = readFileSync(new URL("../deploy/private-runner/Caddyfile", import.meta.url), "utf8");
 const privateRunnerGuide = readFileSync(new URL("../deploy/private-runner/README.md", import.meta.url), "utf8");
+const privateRunnerBackup = readFileSync(new URL("../deploy/private-runner/backup.sh", import.meta.url), "utf8");
 const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
 const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
 const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
@@ -110,7 +112,7 @@ if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy",
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
   failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
 }
-if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz")) {
+if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics")) {
   failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
 }
 if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {
@@ -118,6 +120,12 @@ if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerC
 }
 if (!app.includes("Private always-on home") || !styles.includes(".private-runner-guide") || !nativeModels.includes("StudioDeployment") || !nativeStudio.includes("PRIVATE ALWAYS-ON HOME")) {
   failures.push("Web and native apps must share the private-runner status and data-location experience.");
+}
+if (!server.includes('/api/runner/diagnostics') || !runnerCare.includes('statfsSync') || !runnerCare.includes('timeout: 5_000') || !runnerCare.includes('runner-maintenance.json') || !app.includes('runner-care-grid') || !app.includes('private-domain-field')) {
+  failures.push("Authenticated private-home storage, backup, tool diagnostics, and guided setup are incomplete.");
+}
+if (!privateRunnerBackup.includes('lastBackupAt') || !privateRunnerBackup.includes('lastBackupBytes') || !privateRunnerBackup.includes('runner-maintenance.json') || !nativeModels.includes('StudioRunnerCare') || !nativeStudio.includes('checkRunnerCare')) {
+  failures.push("Backup health receipts and matching native private-home care are incomplete.");
 }
 if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");

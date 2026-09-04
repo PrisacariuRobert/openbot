@@ -20,7 +20,7 @@ if [[ ! -S /var/run/docker.sock ]]; then
 fi
 
 docker_gid="$(stat -c '%g' /var/run/docker.sock)"
-install_command=(install -d -m 0700 -o 1000 -g 1000 "${host_root}/data" "${host_root}/home" "${host_root}/projects")
+install_command=(install -d -m 0700 -o 1000 -g 1000 "${host_root}/data" "${host_root}/home" "${host_root}/projects" "${host_root}/backups")
 if [[ "${EUID}" -eq 0 ]]; then "${install_command[@]}"; else sudo "${install_command[@]}"; fi
 
 if [[ ! -e "${env_file}" ]]; then

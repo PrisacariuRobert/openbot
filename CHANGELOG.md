@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.25.0 — 2026-09-04
+
+- Added authenticated private-home diagnostics for storage capacity, backup freshness, OpenCode, Chromium, Docker access, release version, and uptime
+- Added a matching native iPhone Home check inside Live Studio
+- Replaced generic private-host instructions with a domain-aware, copyable setup assistant and explicit no-automatic-migration guidance
+- Moved private backups into the protected host root and added an atomic maintenance receipt with successful time, size, archive, and release
+- Corrected global Mac/private location language across the conversation header, sidebar, Automations, and Live Studio
+- Added fixed-command, bounded-output, timeout-protected diagnostics with friendly recovery guidance
+- Expanded the automated suite to 103 passing tests while retaining the complete 0.24 private-runner container build and boot smoke gate
+
 ## 0.24.0 — 2026-09-04
 
 - Added an optional owner-operated private Linux runner that continues schedules, connectors, browser work, and code jobs while the Mac is asleep or off

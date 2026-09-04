@@ -463,4 +463,17 @@ Status: complete in source for the owner-operated 0.24.0 release
 - Web and native iPhone surfaces use the same **Private always-on home** language and show the data-location/readiness boundary
 - Setup, model sign-in, project paths, migration, updates, and consistent owner-only backup procedures are documented beside the deployment
 
-Verification: 100 automated tests cover private-mode validation, canonical callback URLs, readiness, and login throttling alongside all earlier product contracts. TypeScript, production web build, release checks, iOS source checks, shell syntax, and Compose structure pass. Public DNS/TLS issuance, a real VPS restart, live provider/OAuth consent, and physical iPhone distribution remain owner-environment checks.
+Verification: 101 automated tests cover private-mode validation, canonical callback URLs, readiness, and login throttling alongside all earlier product contracts. TypeScript, production web build, release checks, iOS source checks, shell syntax, Compose structure, and a Linux container build/boot smoke test pass. Public DNS/TLS issuance, a real VPS restart, live provider/OAuth consent, and physical iPhone distribution remain owner-environment checks.
+
+## M31 — Private-home setup and care
+
+Status: complete in source for the owner-operated 0.25.0 release
+
+- Local onboarding accepts one private domain, validates it, and produces one copyable setup command without implying that studio data moves automatically
+- The authenticated Home check reports actual free storage, backup freshness, OpenCode, Chromium, Docker access, version, uptime, public address, and private data location
+- Fixed diagnostics commands use short timeouts, bounded output, and a minimal environment; failures become specific non-technical recovery items
+- Successful host backups are stored outside the source checkout with owner-only permissions and leave an atomic bounded receipt for the running studio
+- Native iPhone Live Studio displays the same Home check summary and real attention list as the web app
+- Sidebar, conversation, Live Studio, and Automations location language stays consistent between Mac and private-host modes
+
+Verification: 103 automated tests cover healthy and degraded Home checks alongside every earlier product contract. TypeScript, production build, release checks, iOS simulator checks, shell syntax, live local/private server behavior, desktop/phone browser QA, and a Linux private-runner build/boot/Home-check smoke test form the release gate.

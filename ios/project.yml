@@ -11,8 +11,8 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 28
-    MARKETING_VERSION: 0.24.0
+    CURRENT_PROJECT_VERSION: 29
+    MARKETING_VERSION: 0.25.0
   configs:
     Debug:
       APS_ENVIRONMENT: development
