@@ -29,9 +29,13 @@ import type {
   ProviderInstance,
   Routine,
   RoutineTriggerConfig,
+  RunnerHealth,
   Run,
   RunStatus,
+  SkillVersion,
   StudioSettings,
+  StudioSearchResult,
+  StudioDraft,
   TaskContract,
   TaskStage,
   TaskStep,
@@ -52,6 +56,7 @@ type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
 const DEFAULT_MODEL = "opencode/muse-spark-1.2-contributor-free";
 const DEFAULT_OWNER = "local-owner";
+const PUBLIC_OAUTH_CLIENT = "__OPENBOT_PUBLIC_OAUTH_CLIENT__";
 
 function asBoolean(value: string | number | null | undefined): boolean {
   return value === 1 || value === "1";
@@ -207,6 +212,9 @@ export class OpenBotDatabase {
         title TEXT NOT NULL,
         kind TEXT NOT NULL CHECK(kind IN ('direct', 'room')),
         bot_id TEXT REFERENCES bots(id) ON DELETE CASCADE,
+        section_name TEXT,
+        pinned INTEGER NOT NULL DEFAULT 0,
+        hidden INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -215,6 +223,12 @@ export class OpenBotDatabase {
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         PRIMARY KEY(thread_id, bot_id)
       );
+      CREATE TABLE IF NOT EXISTS thread_drafts (
+        thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+        body TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS messages (
         id TEXT PRIMARY KEY,
         thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -222,7 +236,15 @@ export class OpenBotDatabase {
         sender_id TEXT,
         body TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        run_id TEXT
+        run_id TEXT,
+        reply_to_id TEXT REFERENCES messages(id) ON DELETE SET NULL
+      );
+      CREATE TABLE IF NOT EXISTS message_reactions (
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(message_id, emoji, actor)
       );
       CREATE TABLE IF NOT EXISTS attachments (
         id TEXT PRIMARY KEY,
@@ -358,6 +380,65 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL,
         resolved_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS automation_cursors (
+        routine_id TEXT NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        cursor TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(routine_id,source)
+      );
+      CREATE TABLE IF NOT EXISTS runner_state (
+        id TEXT PRIMARY KEY CHECK(id='primary'),
+        instance_id TEXT,
+        mode TEXT NOT NULL DEFAULT 'foreground',
+        started_at TEXT,
+        heartbeat_at TEXT,
+        lease_expires_at TEXT,
+        last_cycle_at TEXT,
+        recovered_runs INTEGER NOT NULL DEFAULT 0,
+        dispatched_runs INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id TEXT PRIMARY KEY,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_success_at TEXT,
+        failure_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS native_push_devices (
+        id TEXT PRIMARY KEY,
+        device_token TEXT NOT NULL UNIQUE,
+        environment TEXT NOT NULL CHECK(environment IN ('sandbox','production')),
+        bundle_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_success_at TEXT,
+        failure_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS notification_outbox (
+        id TEXT PRIMARY KEY,
+        dedupe_key TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        url TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS notification_deliveries (
+        notification_id TEXT NOT NULL REFERENCES notification_outbox(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL CHECK(channel IN ('web','apns')),
+        target_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sent','failed')),
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(notification_id,channel,target_id)
+      );
       CREATE TABLE IF NOT EXISTS memories (
         id TEXT PRIMARY KEY,
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
@@ -370,10 +451,28 @@ export class OpenBotDatabase {
         id TEXT PRIMARY KEY,
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        instructions TEXT NOT NULL DEFAULT '',
         start_url TEXT NOT NULL,
         steps_json TEXT NOT NULL,
         skill_path TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        skill_slug TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        source TEXT NOT NULL DEFAULT 'taught',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS workflow_versions (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL REFERENCES taught_workflows(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        instructions TEXT NOT NULL,
+        start_url TEXT NOT NULL,
+        steps_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(workflow_id, version)
       );
       CREATE TABLE IF NOT EXISTS dedupe_keys (
         dedupe_key TEXT PRIMARY KEY,
@@ -473,6 +572,7 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS messages_thread_created ON messages(thread_id, created_at);
+      CREATE INDEX IF NOT EXISTS message_reactions_message ON message_reactions(message_id, created_at);
       CREATE INDEX IF NOT EXISTS attachments_message_created ON attachments(message_id, created_at);
       CREATE INDEX IF NOT EXISTS runs_status_created ON runs(status, created_at);
       CREATE INDEX IF NOT EXISTS runs_bot_created ON runs(bot_id, created_at);
@@ -483,6 +583,7 @@ export class OpenBotDatabase {
       CREATE INDEX IF NOT EXISTS code_project_edits_created ON code_project_edits(project_id, created_at);
       CREATE INDEX IF NOT EXISTS code_task_workspaces_project_updated ON code_task_workspaces(project_id, updated_at);
       CREATE INDEX IF NOT EXISTS code_task_reviews_source_created ON code_task_reviews(source_run_id, created_at);
+      CREATE INDEX IF NOT EXISTS workflow_versions_workflow_version ON workflow_versions(workflow_id, version DESC);
     `);
 
     this.addColumn("bots", "owner_id TEXT");
@@ -492,6 +593,10 @@ export class OpenBotDatabase {
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
+    this.addColumn("threads", "section_name TEXT");
+    this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("threads", "hidden INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("messages", "reply_to_id TEXT");
     this.addColumn("runs", "approval_id TEXT");
     this.addColumn("runs", "partial_text TEXT");
     this.addColumn("runs", "progress_at TEXT");
@@ -537,8 +642,17 @@ export class OpenBotDatabase {
     this.addColumn("routines", "last_success_at TEXT");
     this.addColumn("routines", "last_event_at TEXT");
     this.addColumn("runs", "automation_event_id TEXT");
+    this.addColumn("runs", "worker_id TEXT");
+    this.addColumn("runs", "lease_expires_at TEXT");
+    this.addColumn("runs", "attempt_count INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("runs", "recovered_at TEXT");
     this.addColumn("connectors", "credentials_ciphertext TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
+    this.addColumn("taught_workflows", "description TEXT NOT NULL DEFAULT ''");
+    this.addColumn("taught_workflows", "instructions TEXT NOT NULL DEFAULT ''");
+    this.addColumn("taught_workflows", "version INTEGER NOT NULL DEFAULT 1");
+    this.addColumn("taught_workflows", "source TEXT NOT NULL DEFAULT 'taught'");
+    this.addColumn("taught_workflows", "updated_at TEXT");
     const hadRoutineInterval = this.hasColumn("routines", "interval_minutes");
     this.addColumn("routines", "interval_minutes INTEGER NOT NULL DEFAULT 1440");
     this.addColumn("code_projects", "connected INTEGER NOT NULL DEFAULT 1");
@@ -551,6 +665,10 @@ export class OpenBotDatabase {
     this.addColumn("code_project_edits", "restored_at TEXT");
     if (!hadRoutineInterval) this.db.exec("UPDATE routines SET interval_minutes=CASE cadence WHEN 'hourly' THEN 60 ELSE 1440 END");
     this.addColumn("provider_instances", "runtime TEXT NOT NULL DEFAULT 'opencode'");
+    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
+      SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
+    this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
     this.db.prepare(`
       INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
       VALUES ('mac_access_enabled', CASE WHEN EXISTS(SELECT 1 FROM bots WHERE mac_access_enabled=1) THEN '1' ELSE '0' END, ?)
@@ -702,12 +820,12 @@ export class OpenBotDatabase {
     return this.getBot(id)!;
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "computerEnabled" | "browserEnabled" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
-    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, computer_enabled=?, browser_enabled=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
+    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
       patch.name ?? current.name, patch.role ?? current.role, patch.instructions ?? current.instructions, patch.model ?? current.model,
-      patch.mascot ?? current.mascot, (patch.computerEnabled ?? current.computerEnabled) ? 1 : 0,
+      patch.mascot ?? current.mascot, patch.color ?? current.color, (patch.computerEnabled ?? current.computerEnabled) ? 1 : 0,
       (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );
@@ -715,15 +833,65 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
+  duplicateBot(id: string): Bot | null {
+    const source = this.getBot(id);
+    if (!source) return null;
+    const copy = this.createBot({
+      name: `${source.name} copy`.slice(0, 30), emoji: source.emoji, mascot: source.mascot, color: source.color,
+      role: source.role, instructions: source.instructions, model: source.model, providerInstanceId: source.providerInstanceId,
+      weeklyTokenBudget: source.weeklyTokenBudget,
+    });
+    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled });
+    this.db.prepare("DELETE FROM bot_connector_access WHERE bot_id=?").run(copy.id);
+    this.db.prepare(`INSERT INTO bot_connector_access (bot_id,connector_id,service,can_read,can_send,created_at,updated_at)
+      SELECT ?,connector_id,service,can_read,can_send,?,? FROM bot_connector_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
+    this.db.prepare(`INSERT INTO bot_project_access (bot_id,project_id,can_read,can_write,can_run,created_at,updated_at)
+      SELECT ?,project_id,can_read,can_write,can_run,?,? FROM bot_project_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
+    const sourceThread = this.getThread(source.threadId);
+    if (sourceThread) this.updateThread(copy.threadId, { section: sourceThread.section });
+    return this.getBot(copy.id);
+  }
+
   listThreads(): Thread[] {
-    return (this.db.prepare("SELECT * FROM threads ORDER BY CASE kind WHEN 'room' THEN 0 ELSE 1 END, updated_at DESC").all() as Row[]).map((row) => ({
+    return (this.db.prepare("SELECT * FROM threads ORDER BY CASE kind WHEN 'room' THEN 0 ELSE 1 END, pinned DESC, COALESCE(section_name,''), updated_at DESC").all() as Row[]).map((row) => ({
       id: String(row.id), title: String(row.title), kind: row.kind as Thread["kind"], botId: row.bot_id ? String(row.bot_id) : null,
+      section: row.section_name ? String(row.section_name) : null, pinned: asBoolean(row.pinned), hidden: asBoolean(row.hidden),
       createdAt: String(row.created_at), updatedAt: String(row.updated_at), unreadCount: 0,
     }));
   }
 
   getThread(id: string): Thread | null {
     return this.listThreads().find((thread) => thread.id === id) || null;
+  }
+
+  updateThread(id: string, patch: Partial<Pick<Thread, "section" | "pinned" | "hidden">>): Thread | null {
+    const current = this.getThread(id);
+    if (!current || current.kind === "room") return null;
+    const section = patch.section === undefined ? current.section : patch.section?.replace(/\s+/g, " ").trim().slice(0, 40) || null;
+    this.db.prepare("UPDATE threads SET section_name=?,pinned=?,hidden=?,updated_at=? WHERE id=?").run(
+      section, (patch.pinned ?? current.pinned) ? 1 : 0, (patch.hidden ?? current.hidden) ? 1 : 0, now(), id,
+    );
+    return this.getThread(id);
+  }
+
+  getDraft(threadId: string): StudioDraft {
+    const row = this.db.prepare("SELECT * FROM thread_drafts WHERE thread_id=?").get(threadId) as Row | undefined;
+    return row ? {
+      threadId: String(row.thread_id),
+      body: String(row.body),
+      source: row.source === "ios" ? "ios" : "web",
+      updatedAt: String(row.updated_at),
+    } : { threadId, body: "", source: null, updatedAt: null };
+  }
+
+  saveDraft(threadId: string, body: string, source: "web" | "ios"): StudioDraft | null {
+    if (!this.getThread(threadId)) return null;
+    const updatedAt = now();
+    this.db.prepare(`
+      INSERT INTO thread_drafts (thread_id,body,source,updated_at) VALUES (?,?,?,?)
+      ON CONFLICT(thread_id) DO UPDATE SET body=excluded.body,source=excluded.source,updated_at=excluded.updated_at
+    `).run(threadId, body, source, updatedAt);
+    return this.getDraft(threadId);
   }
 
   getThreadBots(threadId: string): Bot[] {
@@ -734,10 +902,12 @@ export class OpenBotDatabase {
     return rows.map((row) => this.getBot(String(row.bot_id))).filter((bot): bot is Bot => Boolean(bot));
   }
 
-  addMessage(input: { threadId: string; senderType: Message["senderType"]; senderId: string | null; body: string; runId?: string | null }): Message {
+  addMessage(input: { threadId: string; senderType: Message["senderType"]; senderId: string | null; body: string; runId?: string | null; replyToId?: string | null }): Message {
     const id = randomUUID();
     const createdAt = now();
-    this.db.prepare("INSERT INTO messages (id,thread_id,sender_type,sender_id,body,created_at,run_id) VALUES (?,?,?,?,?,?,?)").run(id, input.threadId, input.senderType, input.senderId, input.body, createdAt, input.runId ?? null);
+    const reply = input.replyToId ? this.getMessage(input.replyToId) : null;
+    if (input.replyToId && (!reply || reply.threadId !== input.threadId)) throw new Error("That message is no longer available to reply to.");
+    this.db.prepare("INSERT INTO messages (id,thread_id,sender_type,sender_id,body,created_at,run_id,reply_to_id) VALUES (?,?,?,?,?,?,?,?)").run(id, input.threadId, input.senderType, input.senderId, input.body, createdAt, input.runId ?? null, reply?.id || null);
     this.db.prepare("UPDATE threads SET updated_at=? WHERE id=?").run(createdAt, input.threadId);
     return this.getMessage(id)!;
   }
@@ -750,18 +920,69 @@ export class OpenBotDatabase {
       senderEmoji: row.bot_emoji ? String(row.bot_emoji) : null, senderColor: row.bot_color ? String(row.bot_color) : null,
       senderMascot: row.bot_mascot ? String(row.bot_mascot) as MascotKind : null,
       body: String(row.body), createdAt: String(row.created_at), runId: row.run_id ? String(row.run_id) : null,
+      replyTo: row.reply_id ? {
+        id: String(row.reply_id),
+        senderName: row.reply_sender_type === "user" ? "You" : row.reply_sender_type === "system" ? "OpenBot" : String(row.reply_bot_name || "Teammate"),
+        body: String(row.reply_body || "").replace(/\s+/g, " ").trim().slice(0, 220),
+      } : null,
+      reactions: (this.db.prepare("SELECT emoji,COUNT(*) count,MAX(CASE WHEN actor='owner' THEN 1 ELSE 0 END) reacted FROM message_reactions WHERE message_id=? GROUP BY emoji ORDER BY MIN(created_at)").all(String(row.id)) as Row[]).map((reaction) => ({ emoji: String(reaction.emoji), count: Number(reaction.count), reactedByYou: asBoolean(reaction.reacted) })),
       attachments: this.listMessageAttachments(String(row.id)),
     };
   }
 
-  private getMessage(id: string): Message | null {
-    const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.id=?`).get(id) as Row | undefined;
+  getMessage(id: string): Message | null {
+    const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.id=?`).get(id) as Row | undefined;
     return row ? this.messageFromRow(row) : null;
   }
 
   listMessages(threadId: string, limit = 120): Message[] {
-    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit) as Row[];
+    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit) as Row[];
     return rows.map((row) => this.messageFromRow(row));
+  }
+
+  toggleMessageReaction(messageId: string, emoji: string): Message | null {
+    const message = this.getMessage(messageId);
+    if (!message) return null;
+    const existing = this.db.prepare("SELECT 1 present FROM message_reactions WHERE message_id=? AND emoji=? AND actor='owner'").get(messageId, emoji) as Row | undefined;
+    if (existing) this.db.prepare("DELETE FROM message_reactions WHERE message_id=? AND emoji=? AND actor='owner'").run(messageId, emoji);
+    else this.db.prepare("INSERT INTO message_reactions (message_id,emoji,actor,created_at) VALUES (?,?,'owner',?)").run(messageId, emoji, now());
+    return this.getMessage(messageId);
+  }
+
+  searchStudio(rawQuery: string, limit = 40): StudioSearchResult[] {
+    const query = rawQuery.replace(/\s+/g, " ").trim().slice(0, 100);
+    if (query.length < 2) return [];
+    const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const results: StudioSearchResult[] = [];
+    for (const bot of this.listBots().filter((item) => `${item.name} ${item.role} ${item.instructions}`.toLowerCase().includes(query.toLowerCase())).slice(0, 8)) {
+      results.push({ id: bot.id, kind: "teammate", title: bot.name, subtitle: bot.role, snippet: bot.instructions.slice(0, 220), threadId: bot.threadId, botId: bot.id, createdAt: bot.lastActiveAt || bot.createdAt });
+    }
+    const messages = this.db.prepare(`SELECT m.id,m.thread_id,m.body,m.created_at,m.sender_type,b.id bot_id,b.name bot_name,t.title thread_title
+      FROM messages m LEFT JOIN bots b ON b.id=m.sender_id JOIN threads t ON t.id=m.thread_id
+      WHERE m.body LIKE ? ESCAPE '\\' ORDER BY m.created_at DESC LIMIT 18`).all(pattern) as Row[];
+    for (const row of messages) results.push({
+      id: String(row.id), kind: "message", title: row.sender_type === "user" ? "You" : row.sender_type === "system" ? "OpenBot" : String(row.bot_name || "Teammate"),
+      subtitle: String(row.thread_title), snippet: String(row.body).replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id),
+      botId: row.bot_id ? String(row.bot_id) : null, createdAt: String(row.created_at),
+    });
+    const files = this.db.prepare(`SELECT a.id,a.thread_id,a.name,a.summary,a.extracted_text,a.created_at,t.title thread_title,t.bot_id
+      FROM attachments a JOIN threads t ON t.id=a.thread_id
+      WHERE a.name LIKE ? ESCAPE '\\' OR COALESCE(a.summary,'') LIKE ? ESCAPE '\\' OR COALESCE(a.extracted_text,'') LIKE ? ESCAPE '\\'
+      ORDER BY a.created_at DESC LIMIT 12`).all(pattern, pattern, pattern) as Row[];
+    for (const row of files) results.push({
+      id: String(row.id), kind: "file", title: String(row.name), subtitle: String(row.thread_title),
+      snippet: String(row.summary || row.extracted_text || "Saved file").replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id),
+      botId: row.bot_id ? String(row.bot_id) : null, createdAt: String(row.created_at),
+    });
+    const routines = this.db.prepare(`SELECT r.id,r.name,r.prompt,r.thread_id,r.bot_id,r.last_run_at,r.next_run_at,b.name bot_name
+      FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.name LIKE ? ESCAPE '\\' OR r.prompt LIKE ? ESCAPE '\\'
+      ORDER BY COALESCE(r.last_run_at,r.next_run_at) DESC LIMIT 10`).all(pattern, pattern) as Row[];
+    for (const row of routines) results.push({ id: String(row.id), kind: "routine", title: String(row.name), subtitle: `${row.bot_name} · Automation`, snippet: String(row.prompt).replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id), botId: String(row.bot_id), createdAt: String(row.last_run_at || row.next_run_at || "1970-01-01T00:00:00.000Z") });
+    const skills = this.db.prepare(`SELECT w.id,w.name,w.start_url,w.created_at,w.bot_id,b.name bot_name,t.id thread_id
+      FROM taught_workflows w JOIN bots b ON b.id=w.bot_id JOIN threads t ON t.bot_id=b.id AND t.kind='direct'
+      WHERE w.name LIKE ? ESCAPE '\\' OR w.start_url LIKE ? ESCAPE '\\' ORDER BY w.created_at DESC LIMIT 10`).all(pattern, pattern) as Row[];
+    for (const row of skills) results.push({ id: String(row.id), kind: "skill", title: String(row.name), subtitle: `${row.bot_name} · Learned skill`, snippet: String(row.start_url), threadId: String(row.thread_id), botId: String(row.bot_id), createdAt: String(row.created_at) });
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, Math.max(1, Math.min(limit, 60)));
   }
 
   createAttachment(input: { threadId: string; messageId?: string | null; name: string; mime: string; size: number; storagePath: string; analysis?: AttachmentAnalysis; source?: Attachment["source"]; artifactKey?: string | null; revision?: number; replacesAttachmentId?: string | null }): Attachment {
@@ -874,6 +1095,7 @@ export class OpenBotDatabase {
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
+      attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
       attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),
       prompt: String(row.prompt), status: row.status as RunStatus,
@@ -900,6 +1122,11 @@ export class OpenBotDatabase {
     return rows.map((row) => this.runFromRow(row));
   }
 
+  listStudioRuns(limit = 30): Run[] {
+    const rows = this.db.prepare(this.runSelect(`WHERE r.status IN ('queued','running','awaiting_approval','waiting_for_teammate','failed') OR r.finished_at>=datetime('now','-1 day') ORDER BY CASE r.status WHEN 'awaiting_approval' THEN 0 WHEN 'waiting_for_teammate' THEN 1 WHEN 'running' THEN 2 WHEN 'queued' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END,r.created_at DESC LIMIT ?`)).all(Math.max(1, Math.min(limit, 80))) as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
   runningRun(threadId: string, botId: string): Run | null {
     const row = this.db.prepare(this.runSelect("WHERE r.thread_id=? AND r.bot_id=? AND r.status IN ('running','waiting_for_teammate') ORDER BY r.created_at DESC LIMIT 1")).get(threadId, botId) as Row | undefined;
     return row ? this.runFromRow(row) : null;
@@ -909,6 +1136,37 @@ export class OpenBotDatabase {
     const placeholders = excludedBotIds.length ? excludedBotIds.map(() => "?").join(",") : "''";
     const row = this.db.prepare(this.runSelect(`WHERE r.status='queued' AND r.bot_id NOT IN (${placeholders}) ORDER BY r.created_at ASC LIMIT 1`)).get(...excludedBotIds) as Row | undefined;
     return row ? this.runFromRow(row) : null;
+  }
+
+  claimNextQueuedRun(excludedBotIds: string[], workerId: string, leaseMs = 45_000): Run | null {
+    const placeholders = excludedBotIds.length ? excludedBotIds.map(() => "?").join(",") : "''";
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const row = this.db.prepare(`SELECT id FROM runs WHERE status='queued' AND bot_id NOT IN (${placeholders}) ORDER BY created_at ASC LIMIT 1`).get(...excludedBotIds) as Row | undefined;
+      if (!row) return null;
+      const claimedAt = now(), leaseExpiresAt = new Date(Date.now() + leaseMs).toISOString();
+      const changed = this.db.prepare("UPDATE runs SET status='running',worker_id=?,lease_expires_at=?,attempt_count=attempt_count+1,started_at=COALESCE(started_at,?),progress_at=? WHERE id=? AND status='queued'").run(
+        workerId, leaseExpiresAt, claimedAt, claimedAt, String(row.id),
+      ).changes;
+      if (changed) return this.getRun(String(row.id));
+    }
+    return null;
+  }
+
+  renewRunLeases(workerId: string, leaseMs = 45_000): number {
+    return Number(this.db.prepare("UPDATE runs SET lease_expires_at=? WHERE worker_id=? AND status='running'").run(new Date(Date.now() + leaseMs).toISOString(), workerId).changes);
+  }
+
+  recoverExpiredRuns(): Run[] {
+    const expired = this.db.prepare(this.runSelect("WHERE r.status='running' AND (r.lease_expires_at IS NULL OR r.lease_expires_at<=?) ORDER BY r.created_at ASC")).all(now()) as Row[];
+    if (!expired.length) return [];
+    const recoveredAt = now();
+    this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)").run(recoveredAt, recoveredAt, recoveredAt);
+    return expired.map((row) => this.getRun(String(row.id))).filter((run): run is Run => Boolean(run));
+  }
+
+  requeueWorkerRuns(workerId: string): number {
+    const recoveredAt = now();
+    return Number(this.db.prepare("UPDATE runs SET status='queued',worker_id=NULL,lease_expires_at=NULL,recovered_at=?,progress_at=?,partial_text=NULL WHERE status='running' AND worker_id=?").run(recoveredAt, recoveredAt, workerId).changes);
   }
 
   updateRun(id: string, patch: Partial<{
@@ -925,8 +1183,15 @@ export class OpenBotDatabase {
       value("error", "error"), value("sessionId", "session_id"), value("inputTokens", "input_tokens"), value("outputTokens", "output_tokens"),
       value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), id,
     );
+    if (patch.status && patch.status !== "running") this.db.prepare("UPDATE runs SET worker_id=NULL,lease_expires_at=NULL WHERE id=?").run(id);
     if (patch.status === "running" || patch.status === "completed") this.db.prepare("UPDATE bots SET last_active_at=? WHERE id=?").run(now(), current.bot_id);
     const statusChanged = patch.status !== undefined && patch.status !== current.status;
+    if (statusChanged && !current.parent_run_id && ["completed", "failed", "awaiting_approval"].includes(String(patch.status))) {
+      const bot = this.getBot(String(current.bot_id));
+      const title = patch.status === "completed" ? `${bot?.name || "A teammate"} finished` : patch.status === "failed" ? `${bot?.name || "A teammate"} needs a hand` : `${bot?.name || "A teammate"} needs your okay`;
+      const body = patch.status === "completed" ? "Your result is ready to review." : patch.status === "failed" ? (patch.error || "OpenBot could not finish this task.") : (patch.approvalReason || String(current.approval_reason || "OpenBot is waiting for your decision."));
+      this.enqueueNotification({ dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title, body, url: `/?thread=${encodeURIComponent(String(current.thread_id))}` });
+    }
     if (statusChanged && current.automation_event_id) {
       const eventStatus: AutomationEventStatus | null = patch.status === "awaiting_approval" ? "waiting" : ["queued", "running", "completed", "failed", "cancelled"].includes(patch.status!) ? patch.status as AutomationEventStatus : null;
       if (eventStatus) this.db.prepare("UPDATE automation_events SET status=?,finished_at=?,error=? WHERE id=?").run(
@@ -1243,10 +1508,10 @@ export class OpenBotDatabase {
     return row ? this.connectorFromRow(row) : null;
   }
 
-  configureOAuthConnector(input: { id: "slack" | "notion"; kind: "slack_oauth" | "notion_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
+  configureOAuthConnector(input: { id: "slack" | "notion" | "todoist" | "dropbox"; kind: "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth"; name: string; clientId: string; clientSecret: string }): ConnectorConnection {
     const existing = this.db.prepare("SELECT * FROM connectors WHERE id=?").get(input.id) as Row | undefined;
     const changedClient = Boolean(existing?.client_id && String(existing.client_id) !== input.clientId);
-    const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret);
+    const at = now(), encryptedSecret = this.vault.encrypt(input.clientSecret || PUBLIC_OAUTH_CLIENT);
     const status = changedClient || !existing?.credentials_ciphertext ? "configured" : String(existing.status || "configured");
     this.db.prepare(`INSERT INTO connectors
       (id,owner_id,kind,name,client_id,client_secret_ciphertext,credentials_ciphertext,scopes_json,account_email,status,created_at,updated_at)
@@ -1261,25 +1526,27 @@ export class OpenBotDatabase {
     return this.getConnector(input.id)!;
   }
 
-  oauthConnectorCredentials<T extends Record<string, unknown> = Record<string, unknown>>(id: "slack" | "notion"): { clientId: string; clientSecret: string; credentials: T | null } | null {
+  oauthConnectorCredentials<T extends Record<string, unknown> = Record<string, unknown>>(id: "slack" | "notion" | "todoist" | "dropbox"): { clientId: string; clientSecret: string; credentials: T | null } | null {
     const row = this.db.prepare("SELECT client_id,client_secret_ciphertext,credentials_ciphertext FROM connectors WHERE id=?").get(id) as Row | undefined;
     if (!row?.client_id || !row.client_secret_ciphertext) return null;
     let credentials: T | null = null;
     if (row.credentials_ciphertext) {
       try { credentials = JSON.parse(this.vault.decrypt(String(row.credentials_ciphertext))) as T; } catch { credentials = null; }
     }
-    return { clientId: String(row.client_id), clientSecret: this.vault.decrypt(String(row.client_secret_ciphertext)), credentials };
+    const decryptedSecret = this.vault.decrypt(String(row.client_secret_ciphertext));
+    return { clientId: String(row.client_id), clientSecret: decryptedSecret === PUBLIC_OAUTH_CLIENT ? "" : decryptedSecret, credentials };
   }
 
-  completeOAuthConnector(id: "slack" | "notion", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
-    if (!this.getConnector(id)) throw new Error(`Configure ${id === "slack" ? "Slack" : "Notion"} before connecting it.`);
+  completeOAuthConnector(id: "slack" | "notion" | "todoist" | "dropbox", credentials: Record<string, unknown>, accountName: string, scopes: string[]): ConnectorConnection {
+    const names = { slack: "Slack", notion: "Notion", todoist: "Todoist", dropbox: "Dropbox" } as const;
+    if (!this.getConnector(id)) throw new Error(`Configure ${names[id]} before connecting it.`);
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,account_email=?,scopes_json=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
       this.vault.encrypt(JSON.stringify(credentials)), accountName.slice(0, 200), JSON.stringify([...new Set(scopes)]), now(), now(), id,
     );
     return this.getConnector(id)!;
   }
 
-  updateOAuthConnectorCredentials(id: "slack" | "notion", credentials: Record<string, unknown>): ConnectorConnection {
+  updateOAuthConnectorCredentials(id: "slack" | "notion" | "todoist" | "dropbox", credentials: Record<string, unknown>): ConnectorConnection {
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=?,status='connected',last_error=NULL,last_used_at=?,updated_at=? WHERE id=?").run(
       this.vault.encrypt(JSON.stringify(credentials)), now(), now(), id,
     );
@@ -1288,7 +1555,7 @@ export class OpenBotDatabase {
     return connector;
   }
 
-  disconnectOAuthConnector(id: "slack" | "notion"): ConnectorConnection | null {
+  disconnectOAuthConnector(id: "slack" | "notion" | "todoist" | "dropbox"): ConnectorConnection | null {
     this.db.prepare("UPDATE connectors SET credentials_ciphertext=NULL,scopes_json='[]',account_email=NULL,status=CASE WHEN client_id IS NULL THEN 'unconfigured' ELSE 'configured' END,last_error=NULL,updated_at=? WHERE id=?").run(now(), id);
     return this.getConnector(id);
   }
@@ -1720,8 +1987,9 @@ export class OpenBotDatabase {
     const triggerConfig = normalizedTriggerConfig(triggerType, input.triggerConfig);
     const enabled = input.enabled !== false;
     const nextRunAt = enabled && triggerType === "schedule" ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : null;
-    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt);
+    const lastEventAt = ["todoist", "dropbox"].includes(triggerType) ? now() : null;
+    this.db.prepare("INSERT INTO routines (id,name,bot_id,thread_id,prompt,cadence,interval_minutes,trigger_type,trigger_config_json,webhook_secret_ciphertext,enabled,next_run_at,last_event_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(id, input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : null, enabled ? 1 : 0, nextRunAt, lastEventAt);
     return this.getRoutine(id)!;
   }
 
@@ -1757,8 +2025,12 @@ export class OpenBotDatabase {
     const scheduleChanged = routine.intervalMinutes !== intervalMinutes || routine.enabled !== input.enabled || routine.triggerType !== triggerType;
     const nextRunAt = input.enabled && triggerType === "schedule" ? (scheduleChanged || !routine.nextRunAt ? new Date(Date.now() + routineIntervalMs(intervalMinutes)).toISOString() : routine.nextRunAt) : null;
     const secret = input.webhookSecret ? this.vault.encrypt(input.webhookSecret) : undefined;
-    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
-      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, input.enabled ? 1 : 0, id,
+    const connectorTriggerChanged = ["todoist", "dropbox"].includes(triggerType) && routine.triggerType !== triggerType;
+    const lastEventAt = connectorTriggerChanged ? now() : routine.lastEventAt;
+    if (connectorTriggerChanged) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+    else if (triggerType === "dropbox" && routine.triggerConfig.dropboxPath !== triggerConfig.dropboxPath) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=? AND source='dropbox'").run(id);
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
+      input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, lastEventAt, input.enabled ? 1 : 0, id,
     );
     return this.getRoutine(id);
   }
@@ -1776,7 +2048,9 @@ export class OpenBotDatabase {
     const routine = this.getRoutine(id);
     if (!routine) return null;
     const delay = routineIntervalMs(routine.intervalMinutes);
-    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, enabled ? 1 : 0, id);
+    const lastEventAt = enabled && ["todoist", "dropbox"].includes(routine.triggerType) ? now() : routine.lastEventAt;
+    if (enabled && ["todoist", "dropbox"].includes(routine.triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, enabled && routine.triggerType === "schedule" ? new Date(Date.now() + delay).toISOString() : null, lastEventAt, enabled ? 1 : 0, id);
     return this.getRoutine(id);
   }
 
@@ -1797,6 +2071,20 @@ export class OpenBotDatabase {
 
   listCalendarRoutines(): Routine[] {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === "calendar");
+  }
+
+  listConnectorRoutines(source: "todoist" | "dropbox"): Routine[] {
+    return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === source);
+  }
+
+  automationCursor(routineId: string, source: "todoist" | "dropbox"): string | null {
+    const row = this.db.prepare("SELECT cursor FROM automation_cursors WHERE routine_id=? AND source=?").get(routineId, source) as Row | undefined;
+    return row?.cursor ? String(row.cursor) : null;
+  }
+
+  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox", cursor: string) {
+    this.db.prepare(`INSERT INTO automation_cursors (routine_id,source,cursor,updated_at) VALUES (?,?,?,?)
+      ON CONFLICT(routine_id,source) DO UPDATE SET cursor=excluded.cursor,updated_at=excluded.updated_at`).run(routineId, source, cursor.slice(0, 32_000), now());
   }
 
   routineWebhookSecret(id: string): string | null {
@@ -1869,6 +2157,10 @@ export class OpenBotDatabase {
     this.db.prepare("INSERT INTO automation_alerts (id,routine_id,routine_name,run_id,event_id,kind,message,created_at) VALUES (?,?,?,?,?,?,?,?)").run(
       id, input.routineId, routine?.name || "Deleted automation", input.runId || null, input.eventId || null, input.kind, input.message.slice(0, 1_000), now(),
     );
+    if (!input.runId || input.kind === "missed" || input.kind === "rate_limit") this.enqueueNotification({
+      dedupeKey: `automation-alert:${id}`, kind: `automation_${input.kind}`, title: routine?.name || "OpenBot automation",
+      body: input.message, url: "/?panel=routines",
+    });
     return this.listAutomationAlerts().find((alert) => alert.id === id)!;
   }
 
@@ -1901,31 +2193,83 @@ export class OpenBotDatabase {
     return `${base}-${suffix}`;
   }
 
-  saveWorkflow(input: { botId: string; name: string; startUrl: string; steps: unknown[]; skillPath: string; skillSlug: string }): TaughtWorkflow {
-    const id = randomUUID();
-    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,start_url,steps_json,skill_path,skill_slug,created_at) VALUES (?,?,?,?,?,?,?,?)").run(id, input.botId, input.name, input.startUrl, JSON.stringify(input.steps), input.skillPath, input.skillSlug, now());
+  saveWorkflow(input: { botId: string; name: string; description?: string; instructions?: string; startUrl: string; steps: unknown[]; skillPath: string; skillSlug: string; source?: TaughtWorkflow["source"] }): TaughtWorkflow {
+    const id = randomUUID(), createdAt = now();
+    const description = input.description?.trim() || `Repeat the saved ${input.name} workflow.`;
+    const instructions = input.instructions?.trim() || `Start at ${input.startUrl}, follow the demonstrated steps, and verify the result.`;
+    this.db.prepare("INSERT INTO taught_workflows (id,bot_id,name,description,instructions,start_url,steps_json,skill_path,skill_slug,version,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?)").run(
+      id, input.botId, input.name, description, instructions, input.startUrl, JSON.stringify(input.steps), input.skillPath, input.skillSlug, input.source || "taught", createdAt, createdAt,
+    );
+    this.db.prepare("INSERT INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at) VALUES (?,?,1,?,?,?,?,?,?)").run(
+      randomUUID(), id, input.name, description, instructions, input.startUrl, JSON.stringify(input.steps), createdAt,
+    );
     return this.listWorkflows(input.botId).find((workflow) => workflow.id === id)!;
+  }
+
+  private workflowFromRow(row: Row): TaughtWorkflow {
+    return {
+      id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name),
+      skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)),
+      description: String(row.description || `Repeat the saved ${row.name} workflow.`),
+      instructions: String(row.instructions || `Start at ${row.start_url}, follow the demonstrated steps, and verify the result.`),
+      startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, version: Number(row.version || 1),
+      source: (["taught", "imported", "template", "assigned"].includes(String(row.source)) ? String(row.source) : "taught") as TaughtWorkflow["source"],
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at || row.created_at),
+    };
   }
 
   listWorkflows(botId?: string): TaughtWorkflow[] {
     const rows = botId
-      ? this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.bot_id=? ORDER BY w.created_at DESC").all(botId) as Row[]
-      : this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id ORDER BY w.created_at DESC").all() as Row[];
-    return rows.map((row) => ({
-      id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url),
-      stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at),
-    }));
+      ? this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.bot_id=? ORDER BY w.updated_at DESC,w.created_at DESC").all(botId) as Row[]
+      : this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id ORDER BY w.updated_at DESC,w.created_at DESC").all() as Row[];
+    return rows.map((row) => this.workflowFromRow(row));
   }
 
   getWorkflowRecord(id: string): { workflow: TaughtWorkflow; steps: unknown[]; skillPath: string } | null {
     const row = this.db.prepare("SELECT w.*,b.name bot_name FROM taught_workflows w JOIN bots b ON b.id=w.bot_id WHERE w.id=?").get(id) as Row | undefined;
     if (!row) return null;
-    return { workflow: { id: String(row.id), botId: String(row.bot_id), botName: String(row.bot_name), name: String(row.name), skillSlug: row.skill_slug ? String(row.skill_slug) : skillSlug(String(row.name)), startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at) }, steps: jsonArray<unknown>(row.steps_json), skillPath: String(row.skill_path) };
+    return { workflow: this.workflowFromRow(row), steps: jsonArray<unknown>(row.steps_json), skillPath: String(row.skill_path) };
   }
 
-  updateWorkflowRecord(id: string, input: { name: string; startUrl: string; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
-    this.db.prepare("UPDATE taught_workflows SET name=?,start_url=?,skill_slug=?,skill_path=? WHERE id=?").run(input.name, input.startUrl, input.skillSlug, input.skillPath, id);
-    return this.listWorkflows().find((workflow) => workflow.id === id) || null;
+  reviseWorkflowRecord(id: string, input: { name: string; description: string; instructions: string; startUrl: string; steps: unknown[]; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
+    const current = this.getWorkflowRecord(id);
+    if (!current) return null;
+    const version = current.workflow.version + 1, updatedAt = now();
+    this.db.prepare("UPDATE taught_workflows SET name=?,description=?,instructions=?,start_url=?,steps_json=?,skill_slug=?,skill_path=?,version=?,updated_at=? WHERE id=?").run(
+      input.name, input.description, input.instructions, input.startUrl, JSON.stringify(input.steps), input.skillSlug, input.skillPath, version, updatedAt, id,
+    );
+    this.db.prepare("INSERT INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at) VALUES (?,?,?,?,?,?,?,?,?)").run(
+      randomUUID(), id, version, input.name, input.description, input.instructions, input.startUrl, JSON.stringify(input.steps), updatedAt,
+    );
+    return this.getWorkflowRecord(id)?.workflow || null;
+  }
+
+  updateWorkflowRecord(id: string, input: { name: string; description?: string; instructions?: string; startUrl: string; skillSlug: string; skillPath: string }): TaughtWorkflow | null {
+    const current = this.getWorkflowRecord(id);
+    if (!current) return null;
+    return this.reviseWorkflowRecord(id, {
+      ...input, description: input.description?.trim() || current.workflow.description,
+      instructions: input.instructions?.trim() || current.workflow.instructions, steps: current.steps,
+    });
+  }
+
+  listWorkflowVersions(workflowId: string): SkillVersion[] {
+    const rows = this.db.prepare("SELECT * FROM workflow_versions WHERE workflow_id=? ORDER BY version DESC").all(workflowId) as Row[];
+    return rows.map((row) => ({
+      id: String(row.id), workflowId: String(row.workflow_id), version: Number(row.version), name: String(row.name),
+      description: String(row.description), instructions: String(row.instructions), startUrl: String(row.start_url),
+      stepCount: jsonArray<unknown>(row.steps_json).length, createdAt: String(row.created_at),
+    }));
+  }
+
+  getWorkflowVersion(workflowId: string, version: number): (SkillVersion & { steps: unknown[] }) | null {
+    const row = this.db.prepare("SELECT * FROM workflow_versions WHERE workflow_id=? AND version=?").get(workflowId, version) as Row | undefined;
+    if (!row) return null;
+    return {
+      id: String(row.id), workflowId: String(row.workflow_id), version: Number(row.version), name: String(row.name),
+      description: String(row.description), instructions: String(row.instructions), startUrl: String(row.start_url),
+      stepCount: jsonArray<unknown>(row.steps_json).length, steps: jsonArray<unknown>(row.steps_json), createdAt: String(row.created_at),
+    };
   }
 
   deleteWorkflowRecord(id: string): { skillPath: string; botId: string } | null {
@@ -1933,6 +2277,111 @@ export class OpenBotDatabase {
     if (!row) return null;
     this.db.prepare("DELETE FROM taught_workflows WHERE id=?").run(id);
     return { skillPath: String(row.skill_path), botId: String(row.bot_id) };
+  }
+
+  savePushSubscription(input: { endpoint: string; p256dh: string; auth: string }): string {
+    const existing = this.db.prepare("SELECT id FROM push_subscriptions WHERE endpoint=?").get(input.endpoint) as Row | undefined;
+    const id = existing?.id ? String(existing.id) : randomUUID();
+    this.db.prepare(`INSERT INTO push_subscriptions (id,endpoint,p256dh,auth,created_at,failure_count)
+      VALUES (?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,failure_count=0`).run(
+      id, input.endpoint, input.p256dh, input.auth, now(),
+    );
+    return id;
+  }
+
+  listPushSubscriptions(): Array<{ id: string; endpoint: string; p256dh: string; auth: string; failureCount: number }> {
+    return (this.db.prepare("SELECT * FROM push_subscriptions ORDER BY created_at DESC").all() as Row[]).map((row) => ({
+      id: String(row.id), endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth), failureCount: Number(row.failure_count || 0),
+    }));
+  }
+
+  deletePushSubscription(endpoint: string): boolean {
+    return this.db.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").run(endpoint).changes > 0;
+  }
+
+  recordPushSuccess(id: string) {
+    this.db.prepare("UPDATE push_subscriptions SET last_success_at=?,failure_count=0 WHERE id=?").run(now(), id);
+  }
+
+  recordPushFailure(id: string) {
+    this.db.prepare("UPDATE push_subscriptions SET failure_count=failure_count+1 WHERE id=?").run(id);
+  }
+
+  saveNativePushDevice(input: { deviceToken: string; environment: "sandbox" | "production"; bundleId: string }): string {
+    const existing = this.db.prepare("SELECT id FROM native_push_devices WHERE device_token=?").get(input.deviceToken) as Row | undefined;
+    const id = existing?.id ? String(existing.id) : randomUUID();
+    this.db.prepare(`INSERT INTO native_push_devices (id,device_token,environment,bundle_id,created_at,failure_count)
+      VALUES (?,?,?,?,?,0) ON CONFLICT(device_token) DO UPDATE SET environment=excluded.environment,bundle_id=excluded.bundle_id,failure_count=0`).run(
+      id, input.deviceToken, input.environment, input.bundleId.slice(0, 200), now(),
+    );
+    return id;
+  }
+
+  listNativePushDevices(): Array<{ id: string; deviceToken: string; environment: "sandbox" | "production"; bundleId: string; failureCount: number }> {
+    return (this.db.prepare("SELECT * FROM native_push_devices ORDER BY created_at DESC").all() as Row[]).map((row) => ({
+      id: String(row.id), deviceToken: String(row.device_token), environment: String(row.environment) as "sandbox" | "production",
+      bundleId: String(row.bundle_id), failureCount: Number(row.failure_count || 0),
+    }));
+  }
+
+  deleteNativePushDevice(deviceToken: string): boolean {
+    return this.db.prepare("DELETE FROM native_push_devices WHERE device_token=?").run(deviceToken).changes > 0;
+  }
+
+  recordNativePushSuccess(id: string) {
+    this.db.prepare("UPDATE native_push_devices SET last_success_at=?,failure_count=0 WHERE id=?").run(now(), id);
+  }
+
+  recordNativePushFailure(id: string) {
+    this.db.prepare("UPDATE native_push_devices SET failure_count=failure_count+1 WHERE id=?").run(id);
+  }
+
+  enqueueNotification(input: { dedupeKey: string; kind: string; title: string; body: string; url: string }) {
+    this.db.prepare("INSERT OR IGNORE INTO notification_outbox (id,dedupe_key,kind,title,body,url,created_at) VALUES (?,?,?,?,?,?,?)").run(
+      randomUUID(), input.dedupeKey, input.kind.slice(0, 80), input.title.slice(0, 160), input.body.replace(/\s+/g, " ").trim().slice(0, 500), input.url.slice(0, 500), now(),
+    );
+  }
+
+  pendingNotifications(limit = 20): Array<{ id: string; kind: string; title: string; body: string; url: string; attemptCount: number }> {
+    return (this.db.prepare("SELECT * FROM notification_outbox WHERE sent_at IS NULL AND attempt_count<5 ORDER BY created_at ASC LIMIT ?").all(Math.max(1, Math.min(limit, 50))) as Row[]).map((row) => ({
+      id: String(row.id), kind: String(row.kind), title: String(row.title), body: String(row.body), url: String(row.url), attemptCount: Number(row.attempt_count || 0),
+    }));
+  }
+
+  markNotificationSent(id: string) {
+    this.db.prepare("UPDATE notification_outbox SET sent_at=?,attempt_count=attempt_count+1,last_error=NULL WHERE id=?").run(now(), id);
+  }
+
+  markNotificationFailed(id: string, error: string) {
+    this.db.prepare("UPDATE notification_outbox SET attempt_count=attempt_count+1,last_error=? WHERE id=?").run(error.slice(0, 500), id);
+  }
+
+  ensureNotificationDeliveries(notificationId: string, targets: Array<{ channel: "web" | "apns"; targetId: string }>) {
+    const statement = this.db.prepare("INSERT OR IGNORE INTO notification_deliveries (notification_id,channel,target_id,status,attempt_count,updated_at) VALUES (?,?,?,'pending',0,?)");
+    const at = now();
+    for (const target of targets) statement.run(notificationId, target.channel, target.targetId, at);
+  }
+
+  pendingNotificationDeliveries(notificationId: string): Array<{ channel: "web" | "apns"; targetId: string; attemptCount: number }> {
+    return (this.db.prepare("SELECT channel,target_id,attempt_count FROM notification_deliveries WHERE notification_id=? AND status='pending' AND attempt_count<5 ORDER BY channel,target_id").all(notificationId) as Row[]).map((row) => ({
+      channel: String(row.channel) as "web" | "apns", targetId: String(row.target_id), attemptCount: Number(row.attempt_count || 0),
+    }));
+  }
+
+  markNotificationDeliverySent(notificationId: string, channel: "web" | "apns", targetId: string) {
+    this.db.prepare("UPDATE notification_deliveries SET status='sent',attempt_count=attempt_count+1,last_error=NULL,updated_at=? WHERE notification_id=? AND channel=? AND target_id=?").run(now(), notificationId, channel, targetId);
+  }
+
+  markNotificationDeliveryFailed(notificationId: string, channel: "web" | "apns", targetId: string, error: string, permanent = false) {
+    this.db.prepare(`UPDATE notification_deliveries SET status=CASE WHEN ? OR attempt_count+1>=5 THEN 'failed' ELSE 'pending' END,
+      attempt_count=attempt_count+1,last_error=?,updated_at=? WHERE notification_id=? AND channel=? AND target_id=?`).run(
+      permanent ? 1 : 0, error.slice(0, 500), now(), notificationId, channel, targetId,
+    );
+  }
+
+  notificationDeliveriesComplete(notificationId: string): boolean {
+    const row = this.db.prepare("SELECT COUNT(*) count FROM notification_deliveries WHERE notification_id=? AND status='pending' AND attempt_count<5").get(notificationId) as Row;
+    return Number(row.count || 0) === 0;
   }
 
   getUsageSummary(): UsageSummary {
@@ -1947,9 +2396,67 @@ export class OpenBotDatabase {
     return { allowed: bot.weeklyTokenBudget <= 0 || bot.tokensUsedThisWeek < bot.weeklyTokenBudget, used: bot.tokensUsedThisWeek, budget: bot.weeklyTokenBudget };
   }
 
+  acquireRunnerLease(instanceId: string, mode: RunnerHealth["mode"], leaseMs = 30_000): boolean {
+    const at = now(), expiresAt = new Date(Date.now() + leaseMs).toISOString();
+    const result = this.db.prepare(`UPDATE runner_state SET
+      instance_id=?,mode=?,started_at=CASE WHEN instance_id=? THEN COALESCE(started_at,?) ELSE ? END,
+      heartbeat_at=?,lease_expires_at=?,last_cycle_at=?,last_error=NULL
+      WHERE id='primary' AND (instance_id=? OR lease_expires_at IS NULL OR lease_expires_at<=?)`).run(
+      instanceId, mode, instanceId, at, at, at, expiresAt, at, instanceId, at,
+    );
+    return result.changes > 0;
+  }
+
+  heartbeatRunner(instanceId: string, leaseMs = 30_000): boolean {
+    const at = now();
+    return this.db.prepare("UPDATE runner_state SET heartbeat_at=?,lease_expires_at=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(
+      at, new Date(Date.now() + leaseMs).toISOString(), at, instanceId,
+    ).changes > 0;
+  }
+
+  recordRunnerDispatch(instanceId: string) {
+    this.db.prepare("UPDATE runner_state SET dispatched_runs=dispatched_runs+1,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(now(), instanceId);
+  }
+
+  recordRunnerRecovery(instanceId: string, count: number) {
+    if (count <= 0) return;
+    this.db.prepare("UPDATE runner_state SET recovered_runs=recovered_runs+?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(count, now(), instanceId);
+  }
+
+  recordRunnerError(instanceId: string, error: string) {
+    this.db.prepare("UPDATE runner_state SET last_error=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(error.slice(0, 1_000), now(), instanceId);
+  }
+
+  releaseRunnerLease(instanceId: string) {
+    this.db.prepare("UPDATE runner_state SET instance_id=NULL,heartbeat_at=?,lease_expires_at=?,last_cycle_at=? WHERE id='primary' AND instance_id=?").run(now(), now(), now(), instanceId);
+  }
+
+  getRunnerHealth(): RunnerHealth {
+    const row = this.db.prepare("SELECT * FROM runner_state WHERE id='primary'").get() as Row | undefined;
+    const counts = this.db.prepare(`SELECT
+      SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) queued,
+      SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running,
+      SUM(CASE WHEN status IN ('awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) waiting
+      FROM runs`).get() as Row;
+    const next = this.db.prepare("SELECT MIN(next_run_at) next_at FROM routines WHERE enabled=1 AND trigger_type='schedule' AND next_run_at IS NOT NULL").get() as Row;
+    const expires = row?.lease_expires_at ? String(row.lease_expires_at) : null;
+    const online = Boolean(row?.instance_id && expires && new Date(expires).getTime() > Date.now());
+    return {
+      status: online ? "online" : "offline", mode: (row?.mode === "background" ? "background" : "foreground"),
+      instanceId: online && row?.instance_id ? String(row.instance_id) : null,
+      startedAt: row?.started_at ? String(row.started_at) : null, heartbeatAt: row?.heartbeat_at ? String(row.heartbeat_at) : null,
+      leaseExpiresAt: expires, lastCycleAt: row?.last_cycle_at ? String(row.last_cycle_at) : null,
+      recoveredRuns: Number(row?.recovered_runs || 0), dispatchedRuns: Number(row?.dispatched_runs || 0),
+      queuedRuns: Number(counts.queued || 0), runningRuns: Number(counts.running || 0), waitingRuns: Number(counts.waiting || 0),
+      nextRoutineAt: next.next_at ? String(next.next_at) : null, lastError: row?.last_error ? String(row.last_error) : null,
+      backgroundService: process.platform === "darwin" ? "not_installed" : "unsupported",
+      backgroundServiceDetail: process.platform === "darwin" ? "OpenBot is running in this app session." : "Background launch is currently available on macOS.",
+    };
+  }
+
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
     const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
-    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), usage: this.getUsageSummary(), activeThreadId };
+    return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), agentMessages: this.listAgentMessages(activeThreadId), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

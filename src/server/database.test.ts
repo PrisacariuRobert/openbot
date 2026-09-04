@@ -22,6 +22,9 @@ test("seeds persistent teammates and creates a routable task", () => {
     assert.equal(db.listBots().every((bot) => bot.macAccessEnabled), true);
     const newBot = db.createBot({ name: "Mochi", emoji: "•", color: "#6757d9", role: "Helper", instructions: "Help clearly." });
     assert.equal(newBot.macAccessEnabled, true);
+    const restyled = db.updateBot("nova", { mascot: "sunny", color: "#3187dc" });
+    assert.equal(restyled?.mascot, "sunny");
+    assert.equal(restyled?.color, "#3187dc");
     const novaWorkspace = prepareWorkspace(db, state.bots[0]!);
     assert.equal(existsSync(path.join(novaWorkspace, ".opencode", "skills", "use-mac-apps", "SKILL.md")), true);
     assert.equal(existsSync(path.join(novaWorkspace, ".claude", "skills", "use-mac-apps", "SKILL.md")), true);
@@ -39,6 +42,50 @@ test("seeds persistent teammates and creates a routable task", () => {
       status: "queued",
     });
     assert.equal(db.nextQueuedRun([])?.id, run.id);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hands an unfinished draft between web and iPhone", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-draft-handoff-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.deepEqual(db.getDraft("team-room"), { threadId: "team-room", body: "", source: null, updatedAt: null });
+    const fromWeb = db.saveDraft("team-room", "Continue this on my phone", "web");
+    assert.equal(fromWeb?.body, "Continue this on my phone");
+    assert.equal(db.getState("team-room").draft.source, "web");
+    const fromPhone = db.saveDraft("team-room", "Finished on iPhone", "ios");
+    assert.equal(fromPhone?.source, "ios");
+    assert.equal(db.saveDraft("missing-thread", "No", "web"), null);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("organizes the studio, searches durable work, and keeps replies and reactions", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-live-studio-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const organized = db.updateThread("bot-nova", { section: "Launch", pinned: true });
+    assert.equal(organized?.section, "Launch");
+    assert.equal(organized?.pinned, true);
+    const source = db.addMessage({ threadId: "bot-nova", senderType: "bot", senderId: "nova", body: "The launch brief is ready to review." });
+    const reply = db.addMessage({ threadId: "bot-nova", senderType: "user", senderId: null, body: "Please tighten the opening.", replyToId: source.id });
+    assert.equal(reply.replyTo?.senderName, "Nova");
+    assert.match(reply.replyTo?.body || "", /launch brief/i);
+    assert.throws(() => db.addMessage({ threadId: "bot-pixel", senderType: "user", senderId: null, body: "Wrong room", replyToId: source.id }), /no longer available/i);
+    assert.equal(db.toggleMessageReaction(source.id, "✅")?.reactions[0]?.reactedByYou, true);
+    assert.equal(db.toggleMessageReaction(source.id, "✅")?.reactions.length, 0);
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Finish the launch brief", status: "running" });
+    assert.equal(db.listStudioRuns().some((item) => item.id === run.id), true);
+    assert.equal(db.searchStudio("launch").some((item) => item.kind === "message" && item.threadId === "bot-nova"), true);
+    const duplicate = db.duplicateBot("nova");
+    assert.equal(duplicate?.role, "Researcher");
+    assert.equal(db.getThread(duplicate!.threadId)?.section, "Launch");
+    assert.equal(db.updateThread("bot-nova", { hidden: true })?.hidden, true);
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -128,6 +175,37 @@ test("deduplicates automation events, retains replay input, and pauses repeated 
   }
 });
 
+test("starts connector automations from a fresh baseline and keeps Dropbox cursors durable", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-connector-automation-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const routine = db.createRoutine({
+      name: "Dropbox project pulse", botId: "nova", threadId: "bot-nova", prompt: "Summarize the changed file.", intervalMinutes: 1440,
+      triggerType: "dropbox", triggerConfig: { dropboxPath: "Projects/Launch/" }, enabled: true,
+    });
+    assert.equal(routine.triggerConfig.dropboxPath, "/Projects/Launch");
+    assert.ok(routine.lastEventAt);
+    assert.equal(db.automationCursor(routine.id, "dropbox"), null);
+    db.saveAutomationCursor(routine.id, "dropbox", "cursor-1");
+    assert.equal(db.automationCursor(routine.id, "dropbox"), "cursor-1");
+    const paused = db.toggleRoutine(routine.id, false)!;
+    assert.equal(paused.enabled, false);
+    const resumed = db.toggleRoutine(routine.id, true)!;
+    assert.equal(resumed.enabled, true);
+    assert.equal(db.automationCursor(routine.id, "dropbox"), null);
+    const todoistRoutine = db.createRoutine({
+      name: "Task pulse", botId: "nova", threadId: "bot-nova", prompt: "Summarize the task.", intervalMinutes: 1440,
+      triggerType: "todoist", triggerConfig: { todoistEvent: "completed" }, enabled: true,
+    });
+    db.saveAutomationCursor(todoistRoutine.id, "todoist", JSON.stringify(["event-1", "event-2"]));
+    assert.deepEqual(JSON.parse(db.automationCursor(todoistRoutine.id, "todoist") || "[]"), ["event-1", "event-2"]);
+    db.toggleRoutine(todoistRoutine.id, false);
+    db.toggleRoutine(todoistRoutine.id, true);
+    assert.equal(db.automationCursor(todoistRoutine.id, "todoist"), null);
+    db.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("rate limits event floods without starting extra work", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-automation-rate-test-"));
   try {
@@ -156,7 +234,11 @@ test("keeps learned skills globally discoverable with unique slash commands", ()
     assert.equal(first.skillSlug, "morning-brief");
     assert.equal(second.skillSlug, "morning-brief-pixel");
     assert.equal(db.getState("team-room").workflows.length, 2);
-    assert.equal(db.updateWorkflowRecord(first.id, { name: "Daily brief", startUrl: "https://example.net", skillSlug: "daily-brief", skillPath: "/tmp/daily-brief/SKILL.md" })?.skillSlug, "daily-brief");
+    const revised = db.updateWorkflowRecord(first.id, { name: "Daily brief", description: "A clearer brief.", instructions: "Gather and verify today's updates.", startUrl: "https://example.net", skillSlug: "daily-brief", skillPath: "/tmp/daily-brief/SKILL.md" });
+    assert.equal(revised?.skillSlug, "daily-brief");
+    assert.equal(revised?.version, 2);
+    assert.equal(db.listWorkflowVersions(first.id).length, 2);
+    assert.equal(db.getWorkflowVersion(first.id, 1)?.name, "Morning brief");
     assert.equal(db.deleteWorkflowRecord(second.id)?.botId, "pixel");
     assert.equal(db.listWorkflows().length, 1);
     db.close();
@@ -185,6 +267,39 @@ test("keeps approvals pending across a full database restart", () => {
     assert.equal(reopened.cancelRun(run.id)?.status, "cancelled");
     assert.equal(reopened.listApprovals().length, 0);
     reopened.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("leases background work, rejects a second runner, and safely recovers interrupted jobs", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-runner-recovery-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.equal(db.acquireRunnerLease("runner-one", "foreground", 30_000), true);
+    assert.equal(db.acquireRunnerLease("runner-two", "background", 30_000), false);
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Prepare and verify a morning brief.", status: "queued" });
+    const claimed = db.claimNextQueuedRun([], "runner-one", -1);
+    assert.equal(claimed?.id, run.id);
+    assert.equal(claimed?.status, "running");
+    assert.equal(claimed?.attemptCount, 1);
+    const recovered = db.recoverExpiredRuns();
+    assert.equal(recovered.map((item) => item.id).includes(run.id), true);
+    assert.equal(db.getRun(run.id)?.status, "queued");
+    assert.ok(db.getRun(run.id)?.recoveredAt);
+    const reclaimed = db.claimNextQueuedRun([], "runner-one", 30_000);
+    assert.equal(reclaimed?.attemptCount, 2);
+    db.recordRunnerDispatch("runner-one");
+    db.recordRunnerRecovery("runner-one", recovered.length);
+    const health = db.getRunnerHealth();
+    assert.equal(health.status, "online");
+    assert.equal(health.runningRuns, 1);
+    assert.equal(health.recoveredRuns, 1);
+    assert.equal(health.dispatchedRuns, 1);
+    assert.equal(db.requeueWorkerRuns("runner-one"), 1);
+    db.releaseRunnerLease("runner-one");
+    assert.equal(db.getRunnerHealth().status, "offline");
+    db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

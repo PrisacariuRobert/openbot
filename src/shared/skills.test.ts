@@ -3,7 +3,11 @@ import test from "node:test";
 import type { TaughtWorkflow } from "./types.js";
 import { invokedSkillSlug, invokedWorkflow, skillSlug } from "./skills.js";
 
-const workflow: TaughtWorkflow = { id: "workflow-1", botId: "nova", botName: "Nova", name: "Morning brief", skillSlug: "morning-brief", startUrl: "https://example.com", stepCount: 3, createdAt: new Date(0).toISOString() };
+const workflow: TaughtWorkflow = {
+  id: "workflow-1", botId: "nova", botName: "Nova", name: "Morning brief", skillSlug: "morning-brief",
+  description: "Prepare the morning brief.", instructions: "Collect current information and verify it.", startUrl: "https://example.com",
+  stepCount: 3, version: 1, source: "taught", createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(),
+};
 
 test("skill names become stable composer commands", () => {
   assert.equal(skillSlug("  Café Morning Brief! "), "cafe-morning-brief");

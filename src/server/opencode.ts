@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { Bot, Run } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
@@ -55,6 +56,8 @@ function friendlyToolActivity(rawName: string, title: string | null): ToolActivi
     github_notifications: "Checking your GitHub updates", github_issues: "Looking through GitHub issues", github_issue_create: "Preparing a GitHub issue for your approval",
     slack_search: "Looking through Slack", slack_read: "Reading the Slack conversation", slack_post: "Preparing a Slack message for your approval",
     notion_search: "Looking through shared Notion pages", notion_read: "Reading the Notion page", notion_update: "Preparing a Notion update for your approval",
+    todoist_tasks: "Checking your Todoist tasks", todoist_task_create: "Preparing a Todoist task for your approval",
+    dropbox_search: "Looking through Dropbox", dropbox_read: "Reading the Dropbox file",
     code_projects: "Checking shared code projects", code_list: "Reading the project structure", code_search: "Searching the code", code_read: "Reading a project file",
     code_write: "Saving a code change", code_replace: "Applying a focused code change", code_status: "Reviewing project changes", code_diff: "Reading the code diff",
     code_branch: "Starting an isolated work branch", code_commit: "Saving a reviewed checkpoint", code_request_review: "Asking for an independent code review", code_review_result: "Recording the independent review", code_publish_pr: "Preparing a pull request for your approval", code_run: "Running project checks",
@@ -114,21 +117,69 @@ export interface OpenCodeRunnerOptions {
 
 export class OpenCodeRunner {
   private readonly running = new Map<string, ChildProcess>();
+  private readonly restartQueue = new Set<string>();
+  readonly instanceId = randomUUID();
   private queueTimer: NodeJS.Timeout | null = null;
+  private leadershipTimer: NodeJS.Timeout | null = null;
   private ticking = false;
+  private leader = false;
+  private stopping = false;
+  private readonly mode: "foreground" | "background" = process.env.OPENBOT_BACKGROUND_SERVICE === "1" ? "background" : "foreground";
 
   constructor(private readonly options: OpenCodeRunnerOptions) {}
 
   start() {
     if (this.queueTimer) return;
+    this.stopping = false;
+    this.maintainLeadership();
     this.queueTimer = setInterval(() => void this.tick(), 500);
+    this.leadershipTimer = setInterval(() => this.maintainLeadership(), 5_000);
     void this.tick();
   }
 
   stop() {
     if (this.queueTimer) clearInterval(this.queueTimer);
+    if (this.leadershipTimer) clearInterval(this.leadershipTimer);
+    this.queueTimer = null;
+    this.leadershipTimer = null;
+    this.stopping = true;
+    for (const runId of this.running.keys()) this.restartQueue.add(runId);
+    this.options.db.requeueWorkerRuns(this.instanceId);
+    if (this.leader) this.options.db.releaseRunnerLease(this.instanceId);
+    this.leader = false;
     for (const child of this.running.values()) child.kill("SIGTERM");
     this.running.clear();
+    this.options.onChange();
+  }
+
+  isLeader() {
+    return this.leader;
+  }
+
+  wake() {
+    this.maintainLeadership();
+    void this.tick();
+  }
+
+  private maintainLeadership() {
+    try {
+      const acquired = this.options.db.acquireRunnerLease(this.instanceId, this.mode);
+      if (!acquired) { this.leader = false; return; }
+      const becameLeader = !this.leader;
+      this.leader = true;
+      this.options.db.renewRunLeases(this.instanceId);
+      if (becameLeader) {
+        const recovered = this.options.db.recoverExpiredRuns();
+        this.options.db.recordRunnerRecovery(this.instanceId, recovered.length);
+        for (const run of recovered) this.options.db.addActivity({
+          runId: run.id, botId: run.botId, kind: "status", label: "Resuming after OpenBot restarted", detail: "The saved task and checklist were kept.",
+        });
+        if (recovered.length) this.options.onChange();
+      }
+    } catch (error) {
+      this.leader = false;
+      try { this.options.db.recordRunnerError(this.instanceId, error instanceof Error ? error.message : String(error)); } catch { /* Database may be closing. */ }
+    }
   }
 
   cancel(runId: string): boolean {
@@ -168,14 +219,14 @@ export class OpenCodeRunner {
   }
 
   private async tick() {
-    if (this.ticking) return;
+    if (this.ticking || !this.leader || this.stopping) return;
     this.ticking = true;
     try {
       for (const run of this.options.db.readyConsultationCoordinators()) this.resumeCoordinatorIfReady(run.id);
       const maximum = this.options.maxParallel || 3;
       while (this.running.size < maximum) {
         const excludedBotIds = [...this.running.keys()].map((runId) => this.options.db.getRun(runId)?.botId).filter((id): id is string => Boolean(id));
-        const run = this.options.db.nextQueuedRun(excludedBotIds);
+        const run = this.options.db.claimNextQueuedRun(excludedBotIds, this.instanceId);
         if (!run || this.running.has(run.id)) break;
         const budget = this.options.db.budgetAvailable(run.botId);
         if (!budget.allowed) {
@@ -186,8 +237,11 @@ export class OpenCodeRunner {
           this.options.onChange();
           continue;
         }
+        this.options.db.recordRunnerDispatch(this.instanceId);
         this.executeRun(run);
       }
+    } catch (error) {
+      this.options.db.recordRunnerError(this.instanceId, error instanceof Error ? error.message : String(error));
     } finally { this.ticking = false; }
   }
 
@@ -232,7 +286,7 @@ export class OpenCodeRunner {
     const prompt = this.buildPrompt(run, bot, Boolean(previousSession));
     const attachedFiles = modelAttachmentFiles(this.options.db, run);
     const mcpConfig = JSON.stringify({ mcpServers: { openbot: { command: process.execPath, args: [CLAUDE_MCP_PATH] } } });
-    const claudeTools = ["mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_calendar_agenda", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__slack_search", "mcp__openbot__slack_read", "mcp__openbot__slack_post", "mcp__openbot__notion_search", "mcp__openbot__notion_read", "mcp__openbot__notion_update", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__routine_create", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval"].join(",");
+    const claudeTools = ["mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_calendar_agenda", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__slack_search", "mcp__openbot__slack_read", "mcp__openbot__slack_post", "mcp__openbot__notion_search", "mcp__openbot__notion_read", "mcp__openbot__notion_update", "mcp__openbot__todoist_tasks", "mcp__openbot__todoist_task_create", "mcp__openbot__dropbox_search", "mcp__openbot__dropbox_read", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__routine_create", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval"].join(",");
     const args = useClaude
       ? ["-p", "--output-format", "stream-json", "--verbose", "--model", bot.model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", claudeTools, ...(previousSession ? ["--resume", previousSession] : []), prompt]
       : ["run", "--auto", "--format", "json", "--model", bot.model, "--dir", workspace, ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
@@ -274,6 +328,7 @@ export class OpenCodeRunner {
     child.on("close", async (code, signal) => {
       if (stdoutBuffer) consumeLine(stdoutBuffer);
       this.running.delete(run.id);
+      if (this.restartQueue.delete(run.id) || this.stopping) return;
       if (sessionId) this.options.db.rememberSessionCapabilities(sessionId, capabilityFingerprint);
       const finishedAt = new Date().toISOString();
       const current = this.options.db.getRun(run.id);

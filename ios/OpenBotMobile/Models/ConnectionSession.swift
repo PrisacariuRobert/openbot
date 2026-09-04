@@ -1,5 +1,4 @@
 import Foundation
-import WebKit
 
 @MainActor
 final class ConnectionSession: ObservableObject {
@@ -8,12 +7,14 @@ final class ConnectionSession: ObservableObject {
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
     @Published var suggestedAddress = ""
+    @Published private(set) var requestedThreadID: String?
+    @Published private(set) var nativePushReady = false
+    @Published private(set) var nativePushMessage: String?
 
     private let addressKey = "openbot.server.address"
     private var lastAuthenticatedAt: Date?
 
     var displayAddress: String { serverURL?.absoluteString ?? suggestedAddress }
-    var studioURL: URL? { serverURL.map(ConnectionAddress.appURL) }
 
     func restore() async {
         guard !isAuthenticated, !isConnecting else { return }
@@ -34,7 +35,6 @@ final class ConnectionSession: ObservableObject {
     }
 
     func disconnect(keepAddress: Bool = true) {
-        let oldURL = serverURL
         isAuthenticated = false
         serverURL = nil
         lastAuthenticatedAt = nil
@@ -44,12 +44,6 @@ final class ConnectionSession: ObservableObject {
             UserDefaults.standard.removeObject(forKey: addressKey)
             suggestedAddress = ""
         }
-        guard let host = oldURL?.host else { return }
-        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-            for cookie in cookies where cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")) == host {
-                WKWebsiteDataStore.default().httpCookieStore.delete(cookie)
-            }
-        }
     }
 
     func handleDeepLink(_ url: URL) {
@@ -58,7 +52,35 @@ final class ConnectionSession: ObservableObject {
         disconnect(keepAddress: true)
     }
 
-    func webSessionExpired() {
+    func handleNotificationPath(_ path: String) {
+        let value = path.hasPrefix("http") ? path : "https://openbot.local\(path.hasPrefix("/") ? path : "/\(path)")"
+        guard let components = URLComponents(string: value),
+              let threadID = components.queryItems?.first(where: { $0.name == "thread" })?.value,
+              !threadID.isEmpty else { return }
+        requestedThreadID = threadID
+    }
+
+    func consumeRequestedThread() { requestedThreadID = nil }
+
+    func registerPushDevice(_ deviceToken: String?) async {
+        guard isAuthenticated, let serverURL, let deviceToken, !deviceToken.isEmpty else { return }
+        do {
+            let result = try await StudioAPIClient(baseURL: serverURL).registerNativePush(
+                deviceToken: deviceToken,
+                environment: Self.pushEnvironment,
+                bundleID: Bundle.main.bundleIdentifier ?? "app.openbot.mobile"
+            )
+            nativePushReady = result.deliveryReady
+            nativePushMessage = result.deliveryReady
+                ? "This iPhone will receive finished-task and approval notifications."
+                : "Notifications are allowed here. Add the Apple push key on your Mac to deliver them."
+        } catch {
+            nativePushReady = false
+            nativePushMessage = (error as? LocalizedError)?.errorDescription ?? "OpenBot could not register this iPhone for notifications."
+        }
+    }
+
+    func sessionExpired() {
         isAuthenticated = false
         errorMessage = "Unlocking your private session again…"
         Task { await restore() }
@@ -89,12 +111,6 @@ final class ConnectionSession: ObservableObject {
                 let message = (try? JSONDecoder().decode(ServerError.self, from: data).error) ?? "OpenBot could not unlock this connection."
                 throw SessionError.server(message)
             }
-            let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
-                result[String(describing: item.key)] = String(describing: item.value)
-            }
-            let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: normalized)
-            guard !cookies.isEmpty else { throw SessionError.missingSession }
-            for cookie in cookies { await setCookie(cookie) }
             if remember {
                 try KeychainStore.save(cleanAccessKey)
                 UserDefaults.standard.set(normalized.absoluteString, forKey: addressKey)
@@ -112,11 +128,14 @@ final class ConnectionSession: ObservableObject {
         }
     }
 
-    private func setCookie(_ cookie: HTTPCookie) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            WKWebsiteDataStore.default().httpCookieStore.setCookie(cookie) { continuation.resume() }
-        }
+    private static var pushEnvironment: String {
+        #if DEBUG
+        "sandbox"
+        #else
+        "production"
+        #endif
     }
+
 }
 
 private struct LoginRequest: Encodable { let token: String }
@@ -126,7 +145,6 @@ private enum SessionError: LocalizedError {
     case missingKey
     case wrongKey
     case unreachable
-    case missingSession
     case server(String)
 
     var errorDescription: String? {
@@ -134,7 +152,6 @@ private enum SessionError: LocalizedError {
         case .missingKey: return "Enter the private access key shown by OpenBot on your Mac."
         case .wrongKey: return "That access key did not match this OpenBot studio."
         case .unreachable: return "OpenBot did not answer. Check that the Mac is awake and phone access is running."
-        case .missingSession: return "OpenBot answered without creating a private session. Update the Mac app and try again."
         case .server(let message): return message
         }
     }

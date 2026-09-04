@@ -1,5 +1,110 @@
 # Changelog
 
+## 0.23.0 — 2026-09-04
+
+- Added deliberate native iPhone voice capture with editable partial transcription, explicit start/stop controls, permission recovery, and no OpenBot audio retention
+- Preferred on-device Apple speech recognition whenever the active device and language support it, while keeping system-service fallback honest
+- Replaced the indefinite web startup spinner with an animated teammate recovery screen, automatic retry, actionable Mac/Tailscale guidance, and a local background-studio escape hatch
+- Recovered invalid or stale conversation links to the shared studio instead of leaving the product on its loading surface
+- Collapsed self-hosted OAuth credentials behind clear disclosures and increased connector typography for a calmer, more readable Apps & Tools experience
+- Rebuilt and simulator-compiled the native app plus Share extension, and retained the 94-test web/server release suite
+- Kept Slack/Notion event sources, powered-off private hosting, physical-device APNs verification, and TestFlight distribution as honest remaining work
+
+## 0.22.0 — 2026-09-03
+
+- Added proactive Todoist activity and Dropbox folder-change automations with explicit filters, fresh baselines, durable cursors, duplicate protection, rate limits, receipts, and ordinary approval boundaries
+- Upgraded Dropbox OAuth to PKCE and public-client support so a packaged release can provide one-click connection with only its registered app key
+- Added native APNs device registration, ES256 provider tokens, sandbox/production routing, bounded result/approval payloads, per-target retries, and stale-token cleanup
+- Added an embedded iOS Share extension for bounded text, links, images, and files with atomic private App Group handoff into the selected conversation
+- Added matching settings/status language, environment templates, privacy manifests, and Debug/Release notification entitlements
+- Expanded the product suite to 94 automated tests and compiled the app plus Share extension for the iPhone 17 Pro simulator
+- Kept physical APNs delivery and App Store distribution explicitly owner-dependent on Apple signing, App Group/Push capabilities, a physical device, and a host-side `.p8` key
+
+## 0.21.0 — 2026-09-03
+
+- Added one-click Todoist OAuth registration, active-task reading, approval-gated task creation, per-teammate access, health checks, and audit receipts
+- Added Dropbox OAuth, encrypted refresh tokens, read-only file search, bounded text/code reading, per-teammate access, health checks, and audit receipts
+- Added both connectors to the manifest, web setup, real service-icon system, natural activity language, OpenCode tools, and Claude Code MCP bridge
+- Added Calendar + Todoist and Dropbox project-context starter workflows
+- Added native authenticated artifact downloads, Quick Look previews, content summaries, and share actions for messages and downloaded files
+- Expanded the automated suite to 88 passing tests and compiled the native app against the iPhone 17 Pro simulator
+
+## 0.20.0 — 2026-09-03
+
+- Added exclusive renewable runner leadership so overlapping foreground/background processes cannot dispatch the same work
+- Added atomic per-job claims, heartbeat renewal, durable attempts, and visible working/queued/waiting health
+- Added restart recovery that returns expired work to the queue with its task contract, approval state, and recovery activity intact
+- Added graceful service handoff so app updates and shutdowns requeue active jobs instead of incorrectly cancelling them
+- Added one-click macOS login/crash protection through a bounded LaunchAgent and a launcher that waits for the foreground app before taking over
+- Added a polished runner-health card with protection state, recovery totals, manual check, clear host-awake limits, and responsive phone layout
+- Added a durable notification outbox, local VAPID keys, device subscriptions, Web Push delivery, stale-subscription cleanup, and result/approval deep links
+- Added matching native SwiftUI runner health, recovery language, and authenticated manual wake support
+- Expanded the automated product suite to 86 passing tests and added release guards for every new reliability layer
+
+## 0.19.0 — 2026-09-03
+
+- Rebuilt learned browser workflows as a teammate-owned Skill Library with purpose, instructions, source, and visible version metadata
+- Added portable `.openbot-skill.json` export packages with a strict format and SHA-256 integrity verification
+- Added bounded import with web-address validation, credential and private-key detection, placeholder support, and tamper rejection
+- Added immutable skill versions and non-destructive rollback; every edit or restore produces a new retained version
+- Added setup-only skill assignment across teammates without copying conversations, memories, browser profiles, credentials, or workspace files
+- Added three editable starter skills for website QA, current research, and approval-safe browser administration
+- Added a polished responsive library for teammate switching, teaching, installing, importing, editing, sharing, exporting, launching, and restoring skills
+- Kept native iPhone skill launch metadata aligned and expanded the automated product suite to 83 passing tests
+
+## 0.18.0 — 2026-09-03
+
+- Added a studio-wide Live Studio with teammate desks, current and recent work, durable attention items, progress, stop controls, browser previews, and direct conversation links
+- Added a matching native SwiftUI Live Studio overview for checking every teammate, attention item, and recent job from iPhone
+- Added owner browser takeover with click, private typing, common keys, fresh screenshots, and masking for password, token, secret, and one-time-code fields in model-visible snapshots
+- Added local search across messages, result files, automations, learned skills, and teammates, opening every result in its original conversation
+- Added persistent reply references and lightweight message reactions
+- Added sidebar sections, pins, reversible hide/restore, and safe teammate duplication that excludes history, memory, credentials, and browser state
+- Unified the new controls with the customizable animated mascot system and verified Live Studio, search, and takeover at a 402-point iPhone width with zero horizontal overflow
+- Expanded the automated product suite to 79 passing tests and kept the full production and native release gates green
+
+## 0.17.4 — 2026-09-03
+
+- Replaced web and native mascot image rendering with code-drawn, runtime-colored characters
+- Restored independent blinking, floating, work, wait, celebration, and failure expressions across both clients
+- Added six shape choices, six color presets, and a custom color picker to every existing teammate's settings
+- Fixed teammate color updates so they persist in the local database and immediately flow into conversations and the iPhone client
+- Improved the native connection form with reliable Next-to-key and Go-to-connect keyboard actions
+- Added release guards for recolorable web layers, native SwiftUI shapes, saved appearance changes, and reduced-motion behavior
+- Rebuilt and visually verified the responsive web studio and native iPhone onboarding at matching dimensions
+
+## 0.17.3 — 2026-09-03
+
+- Unified web and native layout tokens for the studio header, live status, conversation, bubbles, composer, routing pill, and controls
+- Replaced the static shared-room image with three independently animated production mascots in both clients
+- Added deliberately offset float and blink timing instead of synchronized character movement
+- Added matching ready, working, waiting, offline, failed, and celebration treatments with status dots, happy eyes, and sparkles
+- Matched native and web message gradients, bot surfaces, icon colors, direct-chat mascot sizing, and composer language
+- Preserved reduced-motion behavior and verified both clients at a 402-point iPhone layout width
+
+## 0.17.2 — 2026-09-03
+
+- Unified the web and native iPhone studio around one visual and conversational language
+- Reused the exact same production mascot artwork across both clients instead of maintaining look-alike variants
+- Added durable Mac-to-iPhone and iPhone-to-Mac draft handoff through the authenticated owner-hosted service
+- Added live draft events and friendly handoff cues without exposing unfinished text in URLs
+- Prevented unchanged handoff drafts from echoing back as edits from the receiving device
+- Kept the updated iPhone client compatible with a Mac still running the previous state response
+- Expanded the automated product suite to 78 tests and re-verified the native build and live sign-in flow
+
+## 0.17.1 — 2026-09-03
+
+- Replaced the iPhone web-view studio with a genuine SwiftUI conversation experience
+- Added native conversation switching, animated teammate identity, teammate targeting, message sending, live run state, approvals, cancellation, and connection settings
+- Added native file selection and bounded attachment upload before a message is sent
+- Added one premium three-character mascot system shared by the web and native apps, with native status, blink, and movement overlays
+- Added Tailscale detection, an away-access address, address-only iPhone pairing, and one-click Mac app launch in Phone Remote
+- Added Keychain-backed bearer authentication and server-sent event refreshes without placing credentials in URLs or source
+- Compiled and launched the app with Xcode Beta on an iPhone 17 Pro simulator
+- Added a live native UI test that signs in to the running Mac studio and verifies the conversation header and message composer
+- Fixed the generated unit-test host/module configuration and verified all native connection tests
+- Kept native artifact previews, push, share-sheet input, and dedicated voice capture explicitly out of the current claim
+
 ## 0.17.0 — 2026-09-02
 
 - Added a native SwiftUI iPhone companion with secure onboarding, animated mascots, offline state, pull-to-refresh, and the complete responsive studio experience

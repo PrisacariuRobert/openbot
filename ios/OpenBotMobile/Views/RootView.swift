@@ -5,7 +5,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isAuthenticated, let url = session.studioURL {
+            if session.isAuthenticated, let url = session.serverURL {
                 StudioContainerView(url: url)
             } else {
                 ConnectionView()

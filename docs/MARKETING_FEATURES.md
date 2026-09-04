@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
-Last verified: September 2, 2026
-Release: 0.17 local-first beta
+Last verified: September 3, 2026
+Release: 0.23.0 local-first beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -11,7 +11,7 @@ OpenBot is the open-source, local-first studio where persistent AI teammates use
 
 ## Short launch pitch
 
-Give every AI teammate a name, role, model, memory, private workspace, browser, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run dependable automations, connect Google Workspace, GitHub, Slack, and Notion, and let approved teammates build and test real code. Important actions wait for you; substantial work ends with visible checks instead of an unexplained “done.”
+Give every AI teammate a name, role, model, memory, private workspace, browser, reusable skill library, and only the access it needs. Talk naturally in direct messages or a shared studio, let specialists consult behind one calm answer, run process-resilient automations, connect Google Workspace, GitHub, Slack, Notion, Todoist, and Dropbox, and let approved teammates build and test real code. Important actions wait for you; interrupted work resumes from a saved claim; substantial work ends with visible checks instead of an unexplained “done.”
 
 ## Best differentiators
 
@@ -22,18 +22,35 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 5. **Local-first control.** Conversations, permissions, routines, encrypted connector credentials, and audit trails remain in the local OpenBot data store.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
-8. **A real iPhone companion without a data grab.** The native SwiftUI app keeps the Mac as host, protects the key in Keychain, and brings chat, progress, artifacts, and approvals to the phone.
+8. **Continue on the device in your hand.** Start an unfinished message on the Mac, share a file or link from another iPhone app, follow result/approval notifications, or return to the web studio while the owner's Mac remains the source of truth.
+9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
+10. **A real iPhone app without a data grab.** The compiled SwiftUI client keeps the Mac as host, protects the key in Keychain, and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, and approvals to the phone without embedding the desktop website.
+11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
+12. **A local studio that survives restarts.** One active runner owns each job, optional macOS background protection keeps the service alive, and secure installed web apps receive result and approval notifications.
+13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
 
 ## Available now
 
 ### Persistent AI teammates
 
-- Named teammates with a stable role, working style, mascot, model, connection, token budget, and durable memory
+- Named teammates with a stable role, working style, customizable code-drawn mascot, model, connection, token budget, and durable memory
 - Separate direct conversations plus one shared studio room
 - Persistent private workspace and model session for every teammate
 - Live ready, working, waiting, success, and failure states
-- Independent mascot blink and idle timing with working, waiting, celebration/laugh, and failure expressions
+- Six mascot shapes, six color presets, a custom color picker, and independent blink/idle timing with working, waiting, celebration/laugh, and failure expressions
 - Add, edit, and remove teammates without recreating the whole studio
+- Pin teammates, group them into custom sidebar sections, hide and restore them, or duplicate only their setup and permissions
+
+### Live Studio and retrieval
+
+- One live desk per teammate with status, current or recent job, real checklist progress, browser preview, and direct Message/Watch actions
+- One durable attention area for approvals, failures, and automation alerts
+- Stop active work from the desk or open the original conversation for context
+- Enter an isolated teammate browser, click its visible screen, type through a private non-chat keyboard, and send common navigation keys
+- Password-, token-, secret-, and one-time-code-like fields masked in snapshots before model inspection
+- Local cross-studio search across messages, result files, automations, learned skills, and teammates
+- Search results return to their original conversation instead of creating copied or detached records
+- Persistent reply context and lightweight reactions across refreshes
 
 ### Natural teamwork
 
@@ -111,6 +128,11 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Live computer and browser preview in the teammate panel
 - Visible teach mode that records a demonstrated browser workflow
 - Generated browser skills are readable and editable rather than opaque macros
+- Teammate-owned Skill Library with editable purpose, instructions, starting page, source, and visible current version
+- Three transparent starter skills for website QA, research, and approval-safe browser administration
+- Strict `.openbot-skill.json` export with SHA-256 integrity plus import limits, supported-address checks, secret scanning, and tamper rejection
+- Immutable version history and non-destructive rollback, where restoring an old version retains the version being replaced
+- One-click assignment to another teammate without copying conversations, memory, browser state, credentials, or workspace data
 - Password, token, key, and secret-like demonstrated inputs are redacted
 
 ### Google Workspace
@@ -153,6 +175,17 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Connected previews, health/reconnect guidance, natural `@slack` and `@notion` suggestions, multi-app workflow starters, and private local audit activity
 - Encrypted connector credentials that never enter model prompts, with immediate model-session invalidation after revocation
 
+### Todoist and Dropbox
+
+- One-click Todoist sign-in backed by official runtime OAuth client registration for local AI agents
+- Active-task reading with title, description, due date, priority, project, and normal task link
+- Task creation only after a durable approval shows the exact title, notes, due phrase, and priority
+- Official Dropbox offline OAuth with PKCE, encrypted refresh credentials, a one-click managed public-client path, and a clear self-hosted setup
+- Read-only Dropbox file search plus bounded reading for supported text and code files up to 1 MB
+- Separate **See tasks**, **Create tasks**, and **Read Dropbox** permissions for every teammate
+- Connected previews, health/reconnect guidance, recognizable service marks, private local audit activity, and OpenCode/Claude Code support
+- Proactive Todoist added/updated/completed activity triggers and Dropbox folder-change triggers with fresh baselines and durable cursors
+
 ### Files and visible Mac apps
 
 - One owner-controlled **Files & apps on this Mac** switch for the studio
@@ -167,9 +200,9 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 ### Automations and reusable work
 
-- Schedule, Google Calendar, signed GitHub webhook, and signed generic webhook triggers
+- Schedule, Google Calendar, Todoist activity, Dropbox folder-change, signed GitHub webhook, and signed generic webhook triggers
 - Natural recurring requests, including intervals as short as five minutes, plus hourly, daily, and weekly phrasing
-- Narrow Calendar title/minutes-before, GitHub event/action/repository, and generic event-name filters
+- Narrow Calendar title/minutes-before, Todoist activity-type, Dropbox folder, GitHub event/action/repository, and generic event-name filters
 - Persistent automation name, prompt, teammate, conversation, trigger, enabled state, event receipt, linked run, last outcome, health, and run count
 - Explicit **Test** confirmation because a test can use real tools and create real approvals
 - Pause, resume, edit, delete, secret rotation, and preserved event/run history
@@ -180,7 +213,10 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Inspect event history, open linked results, and safely replay failed, cancelled, or rate-limited deliveries
 - In-app recurring messages when the user says “text me” without naming an external service
 - Demonstrated browser workflows saved as reusable local skills for both OpenCode and Claude Code
-- Learned-skill manager with use, rename, starting-page edit, and delete actions
+- Skill Library with teaching, starter installation, import, teammate assignment, purpose/instruction editing, version history, rollback, export, chat launch, and deletion
+- Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, and visible recovery after process interruption
+- One-click macOS login/crash protection with safe foreground-to-background handoff and owner-removable setup
+- Durable per-target notification outbox with standards-based Web Push, native APNs, stale-device cleanup, and direct result/approval links
 
 ### Messages, files, voice, and phone use
 
@@ -198,14 +234,15 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Installable responsive PWA for phone check-ins
 - Guided private phone connection with live, reconnecting, and offline states
 - Authenticated remote mode for a trusted private network or encrypted tunnel
-- Finish and approval notifications where supported by the browser
+- Live in-app notifications, background Web Push for secure installed web apps, and native APNs registration/deep links
+- Embedded iOS Share extension with a bounded private handoff for text, links, images, and files
 
 ### Safety, privacy, and accountability
 
 - Loopback-only service by default
 - Private access key and HTTP-only SameSite Strict cookie for non-local access
 - SQLite WAL persistence for conversations, work, permissions, and audit records
-- AES-256-GCM encryption for API keys and Google, Slack, and Notion credentials
+- AES-256-GCM encryption for API keys and Google, Slack, Notion, Todoist, and Dropbox credentials
 - Machine-local vault key stored with mode `0600`
 - Small allowlisted environment passed to model processes instead of the full server environment
 - Durable approvals that do not silently expire
@@ -226,15 +263,19 @@ These features are implemented, but marketing must explain their requirement.
 | Code and terminal checks | Docker must be installed and running; dependencies must already be available because project checks have no network. |
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
+| Portable skills | Import/export covers bounded browser-oriented OpenBot skills. Imported definitions are inspected and secret-scanned, but this is not a public executable plugin marketplace. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
 | Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Public managed distribution requires provider review. |
 | Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Public managed distribution requires provider review. |
+| Todoist and Dropbox | Todoist registers a local OAuth client automatically. Dropbox needs a registered release app key or the self-hoster's app key; public-client PKCE needs no bundled secret. Provider consent is still required. |
 | Calendar automations | OpenBot polls the connected primary calendar while the local service is awake; the selected teammate needs Calendar permission. |
+| Todoist/Dropbox automations | OpenBot polls only while the Mac service is awake; the selected teammate needs the matching read permission. Fresh baselines prevent old account history from starting work when a routine is enabled. |
+| Background runner | On macOS, the owner must turn on **Keep OpenBot running**. The Mac must remain powered on and awake; process restart protection is not cloud execution. |
 | GitHub and generic webhooks | The sender needs a secure route to OpenBot plus the one-time secret. Public delivery requires an owner-managed HTTPS tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
-| Phone access | The native iOS companion source and PWA both require the Mac service to remain awake and reachable through a trusted private network, Tailscale, or HTTPS proxy. Native installation currently requires Xcode signing; it is not an App Store download yet. |
-| Notifications | Browser and operating-system notification support and permission are required. |
+| Phone access | The native iOS app and PWA both require the Mac to remain powered on and awake. Optional background protection survives app exits. Local Wi-Fi works directly; OpenBot detects and prioritizes a Tailscale address for private use over cellular or different Wi-Fi networks, while an HTTPS proxy remains another option. Native installation currently requires Xcode signing plus the registered App Group; it is not an App Store download yet. |
+| Notifications | Web Push requires an installed web app, permission, browser support, and secure HTTPS. Native APNs requires an owner-signed physical app plus team ID, key ID, and host-side `.p8` key. Simulator compilation does not prove production delivery. |
 
 ## Useful launch workflows
 
@@ -247,13 +288,17 @@ These features are implemented, but marketing must explain their requirement.
 - **Review a screenshot:** send a design or error screenshot to a vision-capable teammate and keep the visual next to the answer.
 - **Organize the Desktop:** inspect visible files, propose sensible folders, and approve the exact no-delete/no-overwrite move plan.
 - **Teach a recurring browser task:** demonstrate the flow once, review the generated skill, and run it again from chat.
+- **Reuse a proven workflow safely:** export an integrity-checked skill, review the readable file, assign or import it for another teammate, and restore an earlier version if an edit performs worse.
 - **Triage GitHub work:** ask a permitted teammate to summarize current notifications or search open issues, then approve a carefully prepared issue only when it is ready.
 - **Catch up without channel hopping:** ask a Slack-enabled teammate to search a topic, read the relevant conversation, and return one linked summary without posting.
 - **Turn a discussion into a durable brief:** combine current Slack context with selected Notion pages, then approve the exact Notion update only after reviewing it.
 - **Project pulse:** combine GitHub activity, Slack decisions, and a Notion project page into one checked status report.
 - **React to a repository event:** filter a signed GitHub webhook to one repository, event, and action; inspect its receipt and linked checked result, with duplicate deliveries stopped automatically.
 - **Prepare before an event:** run a teammate a chosen number of minutes before matching Calendar events while OpenBot is awake.
+- **React to changing work:** ask a teammate to summarize a newly completed Todoist task or explain changed files below a selected Dropbox project folder.
+- **Send context from iPhone:** share a link, screenshot, or document to OpenBot from another app, then continue in the selected conversation.
 - **Check in from the gym:** open the installed phone experience, dictate a task, follow progress, and approve sensitive actions remotely over a trusted connection.
+- **Talk naturally, send deliberately:** tap the native microphone, watch editable words appear, stop when ready, and choose Send only after the message looks right.
 
 ## Claims to avoid
 
@@ -273,9 +318,9 @@ Do not say OpenBot currently:
 
 ## Roadmap, not launch copy
 
-- Native push notifications, share-sheet ingestion, and polished voice sessions
-- Optional always-on self-hosted daemon or private cloud deployment
-- Reviewed third-party connector SDK/marketplace plus task-manager and cloud-storage connectors
+- Physical-device voice/APNs/Share-extension QA and TestFlight distribution
+- Optional private-VPS runner and encrypted cross-host handoff for execution while the Mac sleeps
+- Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools
 - Optional bounded screenshot understanding for visual Mac interfaces
@@ -298,7 +343,7 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 - **A studio, not a chatbot tab.** Specialists can work in parallel, ask each other questions, and hand off focused jobs.
 - **Your subscriptions, your choice.** Mix supported OpenCode, Claude Code, and provider connections across teammates.
 - **Progress you can trust.** See the outcome, steps, approvals, checks, and final result for every substantial job.
-- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub, Slack, Notion, files, browser work, and durable memory—only for the teammates you choose.
+- **Useful context in one conversation.** Bring in Gmail, Drive, Calendar, GitHub, Slack, Notion, Todoist, Dropbox, local files, browser work, and durable memory—only for the teammates you choose.
 - **From attachment to finished file.** Read PDFs, Office files, sheets, screenshots, and source; return a previewable result without making the user search a workspace.
 - **Local-first by default.** Your OpenBot data lives on your machine, with encrypted secrets and visible permission boundaries.
 

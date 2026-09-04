@@ -6,3 +6,11 @@ export function iosConnectURL(serverURL: string) {
   link.searchParams.set("server", origin);
   return link.toString();
 }
+
+export function isTailscaleURL(serverURL: string) {
+  let host: string;
+  try { host = new URL(serverURL).hostname; }
+  catch { return false; }
+  const parts = host.split(".").map(Number);
+  return parts.length === 4 && parts.every(Number.isInteger) && parts[0] === 100 && parts[1]! >= 64 && parts[1]! <= 127;
+}

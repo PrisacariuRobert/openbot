@@ -315,14 +315,136 @@ Verification: 74 automated tests pass, including official Slack and Notion respo
 
 ## M22 — Native iPhone companion
 
-Status: complete for the local-first 0.17 source release
+Status: complete for the local-first 0.17.2 native beta
 
-- A real SwiftUI iPhone companion connects to the owner-hosted OpenBot studio and presents chat, approvals, attachments, artifacts, and live progress through the existing responsive experience
-- Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, refresh, external links, and connection settings
-- The access key is stored with device-only-when-unlocked Keychain protection and exchanged for an HttpOnly cookie before WebKit loads the studio
+- A real SwiftUI iPhone app connects to the owner-hosted OpenBot studio with native conversations, message bubbles, teammate selection, sending, live work, approvals, cancellation, and settings
+- Native onboarding explains the Mac-hosted boundary, uses independently blinking playful mascots, and handles offline, reconnect, live server events, and connection settings
+- The access key is stored with device-only-when-unlocked Keychain protection and used only as an authenticated API header
 - Public plain-HTTP hosts and URL credentials are rejected; certificate validation is never bypassed
 - Mac-generated `openbot://connect` links prefill only the normalized studio origin and never contain the access key
-- Native mode unregisters stale service workers, while the installable PWA remains available as a fallback
-- A production two-teammate mascot icon now represents both the iOS and installed web experiences
+- The iPhone app no longer embeds the responsive website or depends on service-worker state; the installable PWA remains a separate fallback
+- A premium three-teammate mascot set is shared by the native and web experiences, with independent status movement and blink timing
+- Native attachment selection uploads bounded files to the Mac before sending the message
+- Phone Remote detects a Tailscale address, prioritizes it for pairing, and can open Tailscale on the Mac for use across cellular or different Wi-Fi networks
+- Web and native use the same studio naming, presence language, conversation hierarchy, composer proportions, and exact mascot artwork
+- Unfinished text moves between Mac and iPhone through an authenticated durable draft, updates live, and identifies the originating device without echoing unchanged text back
 
-Verification: 76 automated tests pass. The Xcode project is deterministically generated with XcodeGen. Release checks validate required sources and assets, the privacy manifest and local-network declaration, address-only deep links, Keychain protection, cookie handoff, absence of embedded keys, and Swift syntax. The 390×844 native-mode web surface has zero horizontal overflow. A signed simulator/device build remains pending because this Mac has Command Line Tools rather than the full Xcode application; App Store distribution, push, share-sheet input, and an always-on host are not claimed.
+Verification: 78 automated web/server tests pass, including two-way durable draft handoff. The Xcode project is deterministically generated with XcodeGen and compiled using Xcode Beta. Four native unit tests pass on an iPhone 17 Pro simulator. A live UI test enters the address and private key, signs in to the running Mac studio, and verifies the native conversation header and composer. The live Tailscale address returns 401 without the private key and 200 with it. Phone-sized web QA confirms the matching room header, hero, messages, and composer. Release checks reject a return to `WKWebView`, embedded access keys, missing privacy declarations, or missing native API/event coverage. Physical-device/App Store distribution, unsent attachment handoff, rich native artifact previews, push, share-sheet input, dedicated voice capture, and an always-on host are not claimed.
+
+## M23 — One studio design across web and iPhone
+
+Status: complete for the local-first 0.17.3 native beta
+
+- Web and SwiftUI share the same paper, ink, bot bubble, message gradient, presence, and accent colors
+- The room header matches at 402 points: menu, 78-point teammate group, title, live dot and subtitle, flexible space, and settings action
+- Message typography, bubble radii, horizontal insets, sender spacing, and avatar sizes use the same values on phone-sized web and native screens
+- Routing and composer controls share the same capsule, 56-point input surface, attachment/mention/skill/voice order, icon colors, and circular send action
+- The studio trio is composed from the exact same three production image files rather than a static web/native group approximation
+- Every mascot floats and blinks on its own offset timing, changes its presence color with work state, and briefly celebrates successful work with happy eyes and sparkles
+- Web media queries and native Accessibility settings both honor reduced motion without removing readable status cues
+
+Verification: type checking and production builds pass for the shared web client, and the native SwiftUI target compiles with Xcode Beta. Browser QA at 402×874 verifies the aligned header, studio hero, messages, routing pill, and composer without horizontal overflow; two captured frames differ while the conversation is otherwise idle, confirming live mascot motion. Native simulator QA uses the same 402-point viewport and production assets. The full 78-test product suite plus native unit and live UI tests remain the final release gate.
+
+## Milestone 18 — Customizable code-drawn mascots
+
+Status: complete for the local-first 0.17.4 native beta
+
+- Live mascots are built from HTML/CSS layers and SwiftUI shapes instead of fixed character images
+- Six shapes, six color presets, and a full custom color picker are available for new and existing teammates
+- Shape and color updates persist in the local database and automatically flow into every chat surface and the iPhone client
+- Each teammate keeps independent blink and float timing plus working, waiting, celebration, failure, and offline state cues
+- Web reduced-motion CSS and native Reduce Motion behavior remain supported
+
+Verification: the live browser reports zero image elements inside mascots, separately captured frames differ during idle motion, the appearance preview updates before saving, the database test covers shape and color persistence, and the native SwiftUI target compiles and renders the same three-character studio on the iPhone simulator.
+
+## M24 — Find, organize, and supervise
+
+Status: complete for the local-first 0.18.0 beta
+
+- Live Studio shows every teammate's active or recent job, real checklist progress, persistent failure/approval attention, browser preview, stop control, and direct conversation link
+- The owner can enter a teammate's browser, click its visible screenshot, type through a private non-chat keyboard, send common keys, and return to the full studio
+- Password-, token-, secret-, and one-time-code-like inputs are masked before browser snapshots are exposed to a model
+- Local studio search covers messages, result attachments, automations, learned skills, and teammates, and opens the durable source conversation
+- Messages support durable reply references and lightweight reactions
+- Direct conversations support custom sidebar sections, pinning, reversible hide/restore, and setup-only teammate duplication
+- Duplicated teammates inherit role, working style, model, budget, appearance, capability switches, connector permissions, and code-project grants without inheriting history, memory, credentials, browser state, or workspaces
+- The new surfaces reuse the same code-drawn, independently animated character system on desktop and phone
+- The native iPhone client adds a matching Live Studio overview for every teammate, attention item, and recent job
+
+Verification: 79 automated tests pass, including durable organization, search, reply, reaction, global run visibility, duplication boundaries, and restore behavior. Type checking and the production build pass. Live browser QA verified the complete Live Studio, search results, and private takeover controls at 402×874 with no page-level horizontal overflow; a second responsive width also remained contained. The native Xcode build and release checks remain part of the final gate. Always-on hosting, push delivery, arbitrary-pixel macOS takeover, private skill export/import, and a broad connector marketplace are not claimed.
+
+## M25 — Portable Skill Library
+
+Status: complete for the local-first 0.19.0 beta
+
+- Every learned browser skill has a visible owner, purpose, instructions, starting page, source, and current version
+- Every edit creates an immutable version snapshot; restoring an older snapshot creates another version instead of deleting newer history
+- Exported `.openbot-skill.json` packages contain the reusable definition without teammate IDs, conversation history, memory, credentials, browser profiles, or workspace files
+- SHA-256 integrity verification rejects packages changed after export
+- Import applies strict field, length, step-count, action-type, and web-address limits before any teammate files are written
+- Private keys, common provider credentials, bearer tokens, credential-like values, URL credentials, and sensitive query parameters are rejected; explicit placeholders such as `{{secret}}` remain allowed
+- Any skill can be assigned to another teammate as a new independently owned copy
+- Three readable starter skills cover website QA, current research, and approval-safe browser administration
+- The desktop library supports teammate switching, teaching, starter installation, import, edit, history, rollback, export, launch, and deletion without losing the animated character system
+- The native iPhone skill picker continues to launch the same saved commands and now shows their version
+
+Verification: 83 automated tests pass, including export/import round trips, integrity tampering, embedded secrets, placeholders, bounded templates, real OpenCode and Claude skill-file generation, assignment, immutable version history, and non-destructive rollback. Type checking and the production build pass. Browser QA verifies the live library at desktop and 402×874 phone widths with zero page-level horizontal overflow and no console errors. This milestone does not claim a public executable plugin marketplace or safe third-party code installation.
+
+## M26 — Dependable background runner and remote notifications
+
+Status: complete for the local-first 0.20.0 beta
+
+- One renewable SQLite lease elects a single active studio runner across overlapping OpenBot processes
+- Every job is atomically claimed with its own short lease and durable attempt count, preventing two workers from taking the same queued task
+- Expired running jobs return to the queue after a crash with their original task contract, approvals, conversation, and recovery timestamp intact
+- Graceful shutdown returns active work to the queue before ending child model processes
+- An optional macOS LaunchAgent starts at login, restarts after unexpected exits, keeps private logs, and waits for a foreground OpenBot session before taking over
+- Runner health exposes online/background mode, heartbeat, queue, working, waiting, recovery, and next-schedule state without exposing machine credentials
+- A durable notification outbox feeds standards-based Web Push for results, approvals, failures, missed schedules, and rate limiting
+- VAPID keys stay in a local mode-0600 file; device subscriptions remain out of public app state, stale endpoints are removed, and payloads are bounded
+- Notification clicks deep-link to the relevant conversation or Automations screen
+- Web, phone-sized web, and native SwiftUI share the same awake/protected/recovered language and authenticated **Check now** control
+
+Verification: 86 automated tests pass, including competing-runner exclusion, atomic claims, lease expiry, safe recovery, graceful requeue primitives, LaunchAgent shell-avoidance, durable outbox state, and subscription privacy. Type checking, production build, responsive browser QA, real macOS service handoff, and native simulator tests form the final gate. The guarantee is explicit: OpenBot survives process exits and resumes after wake, but a powered-off or sleeping Mac does not execute work.
+
+## M27 — Task, cloud-file, and native artifact delivery
+
+Status: complete for the local-first 0.21.0 beta
+
+- Todoist uses official dynamic client registration for one-click local OAuth, encrypted tokens, active-task reading, and approval-gated task creation
+- Dropbox uses official offline OAuth, encrypted refresh credentials, read-only metadata/search scopes, and bounded supported text/code reading
+- Both connectors share the versioned manifest, per-teammate permission, health, audit, friendly recovery, OpenCode, and Claude Code contracts
+- Calendar + Todoist planning and Dropbox project-context starters turn the new sources into practical multi-app workflows
+- The native SwiftUI app downloads artifacts with the private bearer credential, opens them in Quick Look, shows bounded summaries, and shares messages or downloaded files through native controls
+- Todoist and Dropbox use recognizable code-drawn service marks without adding static mascot artwork or weakening customizable character motion
+
+Verification: 88 automated tests pass, including live-shaped Todoist registration/token/task responses, Dropbox offline OAuth/search/download responses, rejection of unsupported Dropbox files, connector manifests, encrypted storage, and existing security boundaries. Type checking and the production build pass, and Xcode Beta compiles the native target for an iPhone 17 Pro simulator. Live third-party consent remains owner setup; native APNs, share-sheet ingestion from other apps, Slack/Notion event sources, and execution while the Mac is asleep remain explicit future work.
+
+## M28 — Proactive connector work and native handoff
+
+Status: complete in source for the local-first 0.22.0 beta
+
+- Todoist added, updated, and completed activity can start a selected teammate routine with an explicit activity filter
+- Dropbox delta polling can start work for changed or deleted items below one selected folder
+- Fresh enable-time baselines prevent historic connector data from unexpectedly starting jobs
+- Durable Dropbox cursors and Todoist timestamps survive restarts; existing receipts, dedupe, rate limits, approvals, alerts, and failure auto-pause remain in force
+- Dropbox OAuth now uses PKCE and supports a managed public client using only the release app key, while confidential and self-hosted clients remain compatible
+- The iPhone app registers authenticated sandbox/production APNs device tokens and opens notification deep links to the relevant conversation or approval
+- Notification delivery is recorded per web/native target, so retrying one device does not duplicate a delivery that already succeeded elsewhere
+- The embedded OpenBot Share extension accepts bounded text, links, images, and files, stores them atomically in the private App Group inbox, and removes them only after the main app sends them
+- Debug and Release configurations select the correct APNs environment; the extension ships its own privacy manifest
+
+Verification: 94 automated tests cover connector activity/delta contracts, duplicate-safe Todoist windows, public-client PKCE, durable cursor baselines, APNs JWT/payload/error handling, native token storage, and per-target delivery. Type checking and the production web build pass. XcodeGen regenerates the checked-in project and Xcode Beta compiles the native app with the OpenBot Share extension embedded for the iPhone 17 Pro simulator. Production APNs delivery and App Store distribution remain owner steps because they require a registered Apple App Group, Push capability, signing profile, physical device, and private `.p8` key.
+
+## M29 — Native voice and recovery polish
+
+Status: complete in source for the local-first 0.23.0 beta
+
+- The native iPhone composer now has an explicit start/stop microphone session with live editable transcription and a visible listening state
+- Transcribed text is never sent automatically; the owner can edit it, add files or a teammate, and choose Send normally
+- OpenBot does not retain microphone audio, prefers Apple's on-device recognition when available, and shows calm recovery guidance when Speech or Microphone permission is unavailable
+- The web startup experience now retries automatically, explains an unreachable Mac without technical noise, and links a stale local development page back to the running background studio
+- Invalid conversation deep links fall back to the shared studio instead of leaving a permanent loading screen
+- Apps & Tools keeps self-hosted OAuth credentials behind deliberate disclosures and raises essential connector typography while preserving real service marks and animated code-drawn mascots
+
+Verification: the 94-test web/server suite, TypeScript check, production build, and release checks pass. XcodeGen regenerates the project, Xcode Beta compiles the native app and embedded Share extension for an iPhone 17 Pro simulator, and the native UI contract includes the new voice action. Browser QA at 390×844 confirms a full-width sheet, zero document overflow, seven contained connector cards, three collapsed developer setup disclosures, and readable connection copy. Physical speech recognition, APNs delivery, and TestFlight remain owner-signed device checks.

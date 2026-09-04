@@ -65,9 +65,24 @@ export interface Thread {
   title: string;
   kind: "direct" | "room";
   botId: string | null;
+  section: string | null;
+  pinned: boolean;
+  hidden: boolean;
   createdAt: string;
   updatedAt: string;
   unreadCount: number;
+}
+
+export interface MessageReplyPreview {
+  id: string;
+  senderName: string;
+  body: string;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  reactedByYou: boolean;
 }
 
 export interface Message {
@@ -82,7 +97,20 @@ export interface Message {
   body: string;
   createdAt: string;
   runId: string | null;
+  replyTo: MessageReplyPreview | null;
+  reactions: MessageReaction[];
   attachments: Attachment[];
+}
+
+export interface StudioSearchResult {
+  id: string;
+  kind: "message" | "file" | "routine" | "skill" | "teammate";
+  title: string;
+  subtitle: string;
+  snippet: string;
+  threadId: string;
+  botId: string | null;
+  createdAt: string;
 }
 
 export interface Attachment {
@@ -150,6 +178,8 @@ export interface Run {
   steeredFromRunId: string | null;
   routineId: string | null;
   automationEventId: string | null;
+  attemptCount: number;
+  recoveredAt: string | null;
   consultationPending: boolean;
   attachmentIds: string[];
   prompt: string;
@@ -184,7 +214,7 @@ export interface Approval {
   decidedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox";
 
 export interface RoutineTriggerConfig {
   eventName?: string;
@@ -193,6 +223,8 @@ export interface RoutineTriggerConfig {
   repository?: string;
   titleContains?: string;
   minutesBefore?: number;
+  todoistEvent?: "added" | "updated" | "completed" | "any";
+  dropboxPath?: string;
 }
 
 export interface Routine {
@@ -255,6 +287,28 @@ export interface AutomationAlert {
   resolvedAt: string | null;
 }
 
+export type RunnerStatus = "online" | "recovering" | "offline";
+export type BackgroundServiceStatus = "installed" | "not_installed" | "unsupported";
+
+export interface RunnerHealth {
+  status: RunnerStatus;
+  mode: "foreground" | "background";
+  instanceId: string | null;
+  startedAt: string | null;
+  heartbeatAt: string | null;
+  leaseExpiresAt: string | null;
+  lastCycleAt: string | null;
+  recoveredRuns: number;
+  dispatchedRuns: number;
+  queuedRuns: number;
+  runningRuns: number;
+  waitingRuns: number;
+  nextRoutineAt: string | null;
+  lastError: string | null;
+  backgroundService: BackgroundServiceStatus;
+  backgroundServiceDetail: string;
+}
+
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
 export type ProviderRuntime = "opencode" | "claude_code";
 
@@ -313,8 +367,8 @@ export interface ProviderStatus {
   loginAttempts: ProviderLoginAttempt[];
 }
 
-export type ConnectorKind = "google_workspace" | "github_cli" | "slack_oauth" | "notion_oauth";
-export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github";
+export type ConnectorKind = "google_workspace" | "github_cli" | "slack_oauth" | "notion_oauth" | "todoist_oauth" | "dropbox_oauth";
+export type ConnectorServiceId = "gmail" | "google-drive" | "google-calendar" | "slack" | "notion" | "github" | "todoist" | "dropbox";
 export type GoogleConnectorService = "gmail" | "google-drive" | "google-calendar";
 
 export interface ConnectorManifest {
@@ -381,7 +435,7 @@ export interface ConnectorCatalogEntry {
 }
 
 export interface OAuthConnectorStatus {
-  connectorId: "slack" | "notion";
+  connectorId: "slack" | "notion" | "todoist" | "dropbox";
   configured: boolean;
   connected: boolean;
   managedClient: boolean;
@@ -418,6 +472,32 @@ export interface NotionPageDetail extends NotionPageSummary {
   truncated: boolean;
 }
 
+export interface TodoistTaskSummary {
+  id: string;
+  content: string;
+  description: string;
+  projectId: string;
+  priority: number;
+  due: string | null;
+  completed: boolean;
+  url: string;
+}
+
+export interface DropboxFileSummary {
+  id: string;
+  path: string;
+  name: string;
+  modifiedAt: string;
+  size: number;
+  isDownloadable: boolean;
+  webUrl: string | null;
+}
+
+export interface DropboxFileDetail extends DropboxFileSummary {
+  content: string;
+  truncated: boolean;
+}
+
 export interface GoogleApiRecovery {
   service: "gmail" | "google-drive" | "google-calendar";
   serviceName: string;
@@ -438,6 +518,8 @@ export interface ConnectorStatus {
   github: GitHubConnectorStatus;
   slack: OAuthConnectorStatus;
   notion: OAuthConnectorStatus;
+  todoist: OAuthConnectorStatus;
+  dropbox: OAuthConnectorStatus;
   catalog: ConnectorCatalogEntry[];
   access: BotConnectorAccess[];
   events: ConnectorEvent[];
@@ -541,9 +623,44 @@ export interface TaughtWorkflow {
   botName: string;
   name: string;
   skillSlug: string;
+  description: string;
+  instructions: string;
+  startUrl: string;
+  stepCount: number;
+  version: number;
+  source: "taught" | "imported" | "template" | "assigned";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillStep {
+  type: "navigate" | "click" | "input" | "submit";
+  url: string;
+  selector?: string;
+  value?: string;
+  label?: string;
+}
+
+export interface SkillVersion {
+  id: string;
+  workflowId: string;
+  version: number;
+  name: string;
+  description: string;
+  instructions: string;
   startUrl: string;
   stepCount: number;
   createdAt: string;
+}
+
+export interface SkillTemplate {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  startUrl: string;
+  category: string;
+  stepCount: number;
 }
 
 export interface CodeProjectAccess {
@@ -642,19 +759,29 @@ export interface StudioSettings {
   macAccessEnabled: boolean;
 }
 
+export interface StudioDraft {
+  threadId: string;
+  body: string;
+  source: "web" | "ios" | null;
+  updatedAt: string | null;
+}
+
 export interface AppState {
   bots: Bot[];
   threads: Thread[];
   messages: Message[];
   runs: Run[];
+  studioRuns: Run[];
   routines: Routine[];
   automationEvents: AutomationEvent[];
   automationAlerts: AutomationAlert[];
+  runner: RunnerHealth;
   workflows: TaughtWorkflow[];
   approvals: Approval[];
   agentMessages: AgentMessage[];
   providers: ProviderInstance[];
   settings: StudioSettings;
+  draft: StudioDraft;
   usage: UsageSummary;
   activeThreadId: string;
 }

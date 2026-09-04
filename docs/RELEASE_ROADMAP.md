@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 2, 2026 after the 0.17 native-companion release.
+Updated September 4, 2026 after the first 0.23 availability and native-voice release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -41,41 +41,103 @@ Goal: add breadth without weakening per-teammate authority.
 
 Verified that revoking one teammate's access invalidates its active session without removing another teammate's grant. Public OAuth app review and a third-party connector review process remain prerequisites for a marketplace claim.
 
-## Shipped in 0.17 — Native iPhone companion
+## Shipped in 0.17.4 — Customizable living characters
+
+- Replaced mascot image rendering with code-drawn layers on the web and native SwiftUI shapes on iPhone
+- Restored independent float, blink, work, wait, celebration, and failure motion without synchronizing teammates
+- Added six editable character shapes, six color presets, and a full custom color picker for existing teammates
+- Persisted appearance edits so every conversation and connected iPhone sees the same character identity
+- Added release guards that reject image-backed live mascots or lost color persistence
+
+## Shipped in 0.17.3 — Native iPhone continuity and shared design
 
 Goal: make phone check-ins feel like a real product without moving private studio data to a new cloud.
 
-- Added a SwiftUI companion with premium playful onboarding and the complete responsive studio in a native WebKit shell
-- Stored the access key in the iPhone Keychain and handed an HttpOnly session cookie to the web view
-- Added address-only deep-link pairing, foreground reauthentication, pull-to-refresh, offline state, and external-link handoff
+- Added a genuine SwiftUI conversation experience with native messages, animated teammates, routing, sending, progress, approvals, cancellation, and settings
+- Stored the access key in the iPhone Keychain and used it only for authenticated native API requests
+- Added address-only deep-link pairing, foreground reauthentication, server-sent event updates, and offline state
+- Added native attachment intake and shared premium mascot artwork across the web and iPhone apps
+- Matched the web and native studio presentation and added durable, live Mac/iPhone text-draft handoff
+- Unified header, conversation, bubble, routing, composer, and icon geometry at the same phone width
+- Composed the exact shared mascot art as three independently floating and blinking teammates with matching status and celebration moods
+- Added detected Tailscale away access for use over cellular or different Wi-Fi networks
 - Required HTTPS for public hosts while keeping private-network development practical and loopback-only hosting as the default
-- Added native release structure, privacy, secret, and Swift-syntax checks plus a production mascot app icon
+- Added native release structure, privacy and secret checks, a production mascot app icon, and a release guard that rejects a return to WebKit
 
-Verified structurally on this Mac. A signed device/simulator build still requires the full Xcode app and an Apple development team; push, share-sheet capture, and App Store delivery are not claimed.
+Compiled with Xcode Beta and verified on an iPhone 17 Pro simulator with four native unit tests, a live sign-in UI test, and two-way draft persistence in the 78-test product suite. The authenticated API was also verified over the detected Tailscale address. Physical-device signing, unsent attachment handoff, rich artifact previews, push, share-sheet capture, dedicated voice capture, and App Store delivery are not claimed.
 
-## 0.18 — Find, organize, and share
+## Shipped in 0.18 — Find, organize, and supervise
 
 Goal: keep a growing studio understandable.
 
-- Add local full-text search across conversations, files, links, routines, and results
-- Add reply context and lightweight reactions
-- Add sidebar pins, sections, hide/restore, and bot duplication
-- Add private skill manifests, versions, import/export, tests, and secret scanning
-- Add owner-controlled bot templates without sharing history, credentials, or browser state
+- Added local search across conversations, result files, routines, learned skills, and teammates
+- Added reply context and lightweight reactions
+- Added sidebar pins, sections, reversible hide/restore, and setup-only teammate duplication
+- Added a Live Studio with global run visibility, persistent attention, teammate desks, progress, browser previews, stop controls, and direct conversation links
+- Added visible owner takeover of each teammate's private browser with private typing and common navigation keys
+- Masked password-like fields in model-visible browser snapshots
+- Kept copies free of conversation history, memory, credentials, browser profiles, and workspace files
 
-Ship only when exported skills and bot templates contain no secrets and imported versions remain reviewable and reversible.
+Verified with 79 automated tests, the production build, native release checks, and responsive browser acceptance at 402×874 with zero horizontal overflow. Private skill import/export remains deliberately unclaimed until versioning, secret scanning, and rollback exist.
 
-## 0.19 — Always-on work
+## Shipped in 0.19 — Reusable, portable skills
+
+Goal: make successful browser work safely reusable instead of trapping it inside one teammate.
+
+- Rebuilt taught workflows as a teammate-owned Skill Library with editable purpose, instructions, starting page, source, and version
+- Added strict `.openbot-skill.json` packages with SHA-256 integrity verification
+- Added bounded import with schema validation, supported-address checks, embedded-secret detection, placeholder support, and tamper rejection
+- Added immutable version history and non-destructive rollback, where restoring an older version creates a new retained version
+- Added one-click assignment between teammates without copying private conversation, memory, credentials, browser profile, or workspace data
+- Added three transparent starter skills and a responsive library for teaching, installing, importing, exporting, editing, launching, and restoring
+- Kept `/` chat invocation and the native iPhone skill picker aligned with the saved owner and current version
+
+Verified with 83 automated tests, including real workspace file generation, package integrity, secret blocking, template bounds, import, assignment, versioning, and rollback. This remains a browser-oriented private skill format rather than a public executable plugin marketplace.
+
+## Shipped in 0.20 — Dependable self-hosted work
 
 Goal: make remote and mobile use reliable while preserving local-only mode.
 
-- Add an optional signed-in self-hosted runner or private VPS deployment
-- Add encrypted synchronization, job leases, recovery, health checks, and push delivery
-- Add push delivery, share-sheet capture, and native voice sessions to the existing iPhone companion
-- Keep the current loopback-only local mode as a first-class zero-cloud choice
-- Prototype bounded screenshot understanding and visible human takeover for interfaces the structured tools cannot operate
+- Added exclusive renewable runner leadership across overlapping OpenBot processes
+- Added atomic per-job claims, short leases, durable attempt counts, crash recovery, and graceful shutdown handoff
+- Preserved task contracts, approvals, conversation context, and recovery history when interrupted work resumes
+- Added an optional macOS LaunchAgent with login start, crash restart, safe foreground-to-background handoff, private logs, and one-click removal
+- Added visible runner health, queue/wait totals, recovery count, manual wake, and clear powered-on/awake boundaries
+- Added a durable local notification outbox, standards-based Web Push, VAPID signing, stale-device cleanup, and deep links to the correct result or automation
+- Added native iPhone runner health, recovery language, and manual wake through the authenticated owner connection
+- Kept loopback-only local mode as the default and made background protection explicitly opt-in
 
-Ship only after threat modeling, encrypted recovery testing, offline/duplicate-job testing, and a clear data-location choice during setup.
+Verified with 86 automated tests, production type/build checks, duplicate-runner exclusion, lease expiry/reclaim tests, private subscription-state tests, real macOS service installation/handoff checks, responsive browser QA, and native simulator tests. This is dependable self-hosting while the Mac is powered on and awake; it is not cloud execution during sleep or power-off.
+
+## Shipped in 0.21 — Focused connector breadth and native artifacts
+
+- Todoist through the existing manifest, encrypted OAuth, per-teammate permission, audit, and write-approval contract
+- Read-only Dropbox search and bounded text/code reading through the same connector contract
+- Calendar + task planning and cloud-file context starter workflows
+- Authenticated native artifact download, Quick Look preview, and message/file sharing
+
+## Shipped in source in 0.22 — Proactive work and native handoff
+
+- Todoist activity and Dropbox folder changes start bounded work through durable baselines/cursors, receipts, dedupe, rate limits, permissions, and ordinary approvals
+- Native APNs registration and host-side delivery use short private payloads, per-device retry records, sandbox/production separation, and result/approval deep links
+- The embedded OpenBot Share extension queues bounded text, links, images, and files in a private App Group before authenticated conversation import
+- Dropbox PKCE supports a managed public release client using only an app key while preserving self-hosted/confidential clients
+- Simulator compilation verifies the complete native target graph; physical APNs and distribution remain owner signing/credential checks
+
+## Shipped in 0.23 — Native voice and graceful recovery
+
+- A deliberate native microphone session turns speech into an editable draft and never sends without the owner pressing Send
+- The app prefers on-device Apple recognition when available, does not retain microphone audio, and provides clear permission/unavailable fallbacks
+- Stale or disconnected web sessions now show a complete animated recovery state, retry automatically, and can return from the development address to the running background studio
+- Invalid thread deep links recover to the shared studio instead of remaining on a loading surface
+- Developer-only Slack, Notion, and Dropbox credentials stay collapsed until requested; essential connector copy and controls use readable type sizes
+- Xcode Beta compiles the app and embedded Share extension for the iPhone 17 Pro simulator with the new Speech and microphone privacy declarations
+
+## Remaining 0.23 work — Availability and richer events
+
+- Add Slack and Notion event sources on the same receipt, dedupe, replay, and rate-limit contract
+- Package an optional private runner and encrypted cross-host recovery for execution while the primary Mac is unavailable
+- Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
 
 ## Later, not implied by the beta
 
