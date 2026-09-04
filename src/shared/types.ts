@@ -327,6 +327,26 @@ export interface RunnerHealth {
   deployment?: DeploymentStatus;
 }
 
+export interface RunnerCareCheck {
+  id: "storage" | "backup" | "opencode" | "browser" | "computers";
+  label: string;
+  status: "ready" | "attention";
+  value: string;
+  detail: string;
+}
+
+export interface RunnerCareStatus {
+  checkedAt: string;
+  mode: DeploymentMode;
+  version: string;
+  uptimeSeconds: number;
+  publicUrl: string | null;
+  dataPath: string;
+  overall: "ready" | "attention";
+  summary: string;
+  checks: RunnerCareCheck[];
+}
+
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
 export type ProviderRuntime = "opencode" | "claude_code";
 

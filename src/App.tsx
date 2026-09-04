@@ -110,6 +110,7 @@ import type {
   ProviderLoginAttempt,
   ProviderStatus,
   Routine,
+  RunnerCareStatus,
   RunnerHealth,
   Run,
   SlackMessageSummary,
@@ -226,6 +227,14 @@ function relativeTime(value: string | null) {
   if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}h`;
   return `${Math.floor(seconds / 86_400)}d`;
+}
+
+function compactDuration(seconds: number) {
+  const minutes = Math.max(0, Math.floor(seconds / 60));
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} hr`;
+  return `${Math.floor(hours / 24)} days`;
 }
 function shortModel(model: string) {
   return model
@@ -517,7 +526,7 @@ function Sidebar({
           <div className="brand-lockup">
             <Logo />
             <span>OpenBot</span>
-            <small>local</small>
+            <small>{state.runner.deployment?.mode === "private_runner" ? "private" : "local"}</small>
           </div>
           <button className="icon-button mobile-only" onClick={onClose}>
             <X size={18} />
@@ -693,6 +702,7 @@ function ConversationHeader({
   threadTitle,
   activeBot,
   roomBots,
+  runner,
   onMenu,
   onOpenPanel,
   connection = "online",
@@ -700,10 +710,12 @@ function ConversationHeader({
   threadTitle: string;
   activeBot: Bot | null;
   roomBots: Bot[];
+  runner: RunnerHealth;
   onMenu: () => void;
   onOpenPanel: (panel: Panel) => void;
   connection?: ConnectionState;
 }) {
+  const privateRunner = runner.deployment?.mode === "private_runner";
   return (
     <header className="conversation-header">
       <button
@@ -727,10 +739,10 @@ function ConversationHeader({
           <p>
             <i className={`header-live-dot header-live-${connection}`} />
             {connection === "online"
-              ? "Live on your Mac"
+              ? privateRunner ? "Live from your private home" : "Live on your Mac"
               : connection === "reconnecting"
-                ? "Syncing with your Mac…"
-                : "Your Mac is offline"}
+                ? privateRunner ? "Reconnecting to your private home…" : "Syncing with your Mac…"
+                : privateRunner ? "Your private home is offline" : "Your Mac is offline"}
           </p>
         </div>
         <ChevronDown size={15} />
@@ -2554,7 +2566,7 @@ function LiveStudioPanel({
       <div className="live-hero">
         <div>
           <span>
-            <i /> {state.runner.backgroundService === "installed" ? "Background protection active" : "Live from this Mac"}
+            <i /> {state.runner.deployment?.mode === "private_runner" ? "Private home online" : state.runner.backgroundService === "installed" ? "Background protection active" : "Live from this Mac"}
           </span>
           <h3>
             {state.usage.activeRuns
@@ -6546,6 +6558,11 @@ function RoutinesPanel({
     [saving, setSaving] = useState(false),
     [runnerBusy, setRunnerBusy] = useState(false),
     [runnerError, setRunnerError] = useState<string | null>(null),
+    [runnerCare, setRunnerCare] = useState<RunnerCareStatus | null>(null),
+    [runnerCareBusy, setRunnerCareBusy] = useState(false),
+    [runnerCareAttempted, setRunnerCareAttempted] = useState(false),
+    [privateDomain, setPrivateDomain] = useState(""),
+    [setupCopied, setSetupCopied] = useState(false),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
   const [createdHook, setCreatedHook] = useState<{
@@ -6557,6 +6574,9 @@ function RoutinesPanel({
   const selectedBot = bots.find((item) => item.id === botId) || bots[0];
   const managingFromThisMac = ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
   const privateRunner = runner.deployment?.mode === "private_runner";
+  const cleanPrivateDomain = privateDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const privateDomainValid = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(cleanPrivateDomain) && cleanPrivateDomain.includes(".");
+  const setupCommand = `./deploy/private-runner/setup.sh ${privateDomainValid ? cleanPrivateDomain : "studio.example.com"}`;
   const unitMultiplier =
     customUnit === "days" ? 1440 : customUnit === "hours" ? 60 : 1;
   const intervalMinutes =
@@ -6685,6 +6705,17 @@ function RoutinesPanel({
     catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not change the runner."); }
     finally { setRunnerBusy(false); }
   };
+  const checkPrivateHome = useCallback(async () => {
+    setRunnerCareAttempted(true);
+    setRunnerCareBusy(true);
+    setRunnerError(null);
+    try { setRunnerCare(await api<RunnerCareStatus>("/api/runner/diagnostics")); }
+    catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not check this private home."); }
+    finally { setRunnerCareBusy(false); }
+  }, []);
+  useEffect(() => {
+    if (privateRunner && !runnerCareAttempted) void checkPrivateHome();
+  }, [checkPrivateHome, privateRunner, runnerCareAttempted]);
   return (
     <div className="routines-view">
       <section className="routine-hero">
@@ -6747,9 +6778,36 @@ function RoutinesPanel({
             }}><Power size={13} /> Turn off protection</button>
           )}
           <button disabled={runnerBusy} onClick={() => void runRunnerAction(onWakeRunner)}><RefreshCw size={13} /> Check now</button>
+          {privateRunner && <button className="primary" disabled={runnerCareBusy} onClick={() => void checkPrivateHome()}>{runnerCareBusy ? <LoaderCircle className="spinner" size={13} /> : <ShieldCheck size={13} />} Home check</button>}
           {!privateRunner && !managingFromThisMac && runner.backgroundService === "not_installed" && <small>Turn on protection from your Mac</small>}
         </div>
       </section>
+
+      {privateRunner && runnerCare && (
+        <section className={`runner-care runner-care-${runnerCare.overall}`}>
+          <header>
+            <span className="runner-care-mark">{runnerCare.overall === "ready" ? <Check size={16} /> : <CircleAlert size={16} />}</span>
+            <div>
+              <b>{runnerCare.summary}</b>
+              <small>OpenBot {runnerCare.version} · awake for {compactDuration(runnerCare.uptimeSeconds)} · checked just now</small>
+            </div>
+            <button disabled={runnerCareBusy} onClick={() => void checkPrivateHome()} aria-label="Check private home again"><RefreshCw className={runnerCareBusy ? "spinner" : ""} size={14} /></button>
+          </header>
+          <div className="runner-care-grid">
+            {runnerCare.checks.map((check) => (
+              <article className={check.status} key={check.id}>
+                <span>{check.id === "storage" ? <HardDrive size={15} /> : check.id === "backup" ? <FileArchive size={15} /> : check.id === "opencode" ? <Sparkles size={15} /> : check.id === "browser" ? <Globe2 size={15} /> : <Cpu size={15} />}</span>
+                <div><b>{check.label}</b><strong>{check.value}</strong><small>{check.detail}</small></div>
+                {check.status === "ready" ? <Check size={13} /> : <CircleAlert size={13} />}
+              </article>
+            ))}
+          </div>
+          <footer>
+            <div><b>Private data home</b><code>{runnerCare.dataPath}</code></div>
+            <div><b>Create a fresh backup</b><code>./deploy/private-runner/backup.sh</code></div>
+          </footer>
+        </section>
+      )}
 
       {!privateRunner && (
         <details className="private-runner-guide">
@@ -6768,8 +6826,17 @@ function RoutinesPanel({
               <li><b>Point a domain</b><span>OpenBot sets up encrypted HTTPS</span></li>
               <li><b>Start your home</b><span>Follow the reviewed private-runner guide</span></li>
             </ol>
-            <code>./deploy/private-runner/setup.sh studio.example.com</code>
-            <small>Full setup, migration and backup notes: deploy/private-runner/README.md</small>
+            <label className="private-domain-field">
+              <span>Your private address</span>
+              <div><Globe2 size={13} /><input value={privateDomain} onChange={(event) => { setPrivateDomain(event.target.value); setSetupCopied(false); }} placeholder="studio.example.com" spellCheck={false} /></div>
+              {privateDomain && !privateDomainValid && <small>Use a domain such as studio.example.com</small>}
+            </label>
+            <div className="private-setup-command">
+              <code>{setupCommand}</code>
+              <button disabled={!privateDomainValid} onClick={() => { copy(setupCommand); setSetupCopied(true); }}><Copy size={12} /> {setupCopied ? "Copied" : "Copy setup"}</button>
+            </div>
+            <div className="private-ownership-note"><ShieldCheck size={13} /><span><b>Nothing moves by itself.</b> Setup creates a new private home; migration stays a separate owner decision.</span></div>
+            <small>Complete server, DNS, migration and backup steps: deploy/private-runner/README.md</small>
           </div>
         </details>
       )}
@@ -8633,6 +8700,7 @@ export function App() {
           threadTitle={activeThread.title}
           activeBot={activeBot}
           roomBots={state.bots}
+          runner={state.runner}
           onMenu={() => setSidebarOpen(true)}
           onOpenPanel={openPanel}
           connection={connection}

@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 4, 2026
-Release: 0.24.0 owner-controlled beta
+Release: 0.25.0 owner-controlled beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -28,6 +28,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
 12. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
 13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
+14. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
 
 ## Available now
 

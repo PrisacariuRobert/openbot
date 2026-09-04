@@ -1,6 +1,6 @@
-# OpenBot 0.24.0 Launch Readiness
+# OpenBot 0.25.0 Launch Readiness
 
-OpenBot 0.24.0 is ready as an owner-controlled beta with two honest locations: local on a Mac by default, or always on through an optional private Linux host. The private runner packages HTTPS ingress, durable storage, automatic restart, OpenCode, Chromium, isolated Docker computers, public OAuth callbacks, health/readiness, login hardening, backups, and matching web/native status without silently moving a studio. Native source and simulator builds remain release-ready, while physical-device APNs and App Store distribution still require the owner's Apple team, App Group, signing profile, and `.p8` key. OpenBot now closes Grok Bot's powered-off execution gap for users willing to operate a private host, but it is not a zero-setup managed cloud and still trails in broad connectors, fidelity tools, store distribution, and organization controls.
+OpenBot 0.25.0 is ready as an owner-controlled beta with two honest locations: local on a Mac by default, or always on through an optional private Linux host. Private setup now begins with one domain-aware command, and authenticated web/native Home checks report actual storage, backup, OpenCode, Chromium, Docker, version, and uptime state. Native source and simulator builds remain release-ready, while physical-device APNs and App Store distribution still require the owner's Apple team, App Group, signing profile, and `.p8` key. OpenBot closes Grok Bot's powered-off execution gap for users willing to operate a private host, but it is not a zero-setup managed cloud and still trails in broad connectors, fidelity tools, store distribution, and organization controls.
 
 ## What is launch-ready
 
@@ -33,6 +33,7 @@ OpenBot 0.24.0 is ready as an owner-controlled beta with two honest locations: l
 - Exclusive runner leadership, atomic job claims, renewable leases, durable attempt counts, crash recovery, and graceful active-job handoff
 - Optional one-click macOS login/crash protection with foreground-session handoff and explicit powered-on/awake limits
 - Optional private Linux runner with Caddy HTTPS, restart policy, durable studio/model/browser/project storage, public callbacks, and explicit one-location ownership
+- Authenticated private-home diagnostics and recorded backup freshness on responsive web and native iPhone Live Studio
 - Durable Web Push outbox, bounded notification payloads, device cleanup, and direct result/approval links for secure installed web apps
 - Native APNs token registration, per-device delivery state, stale-token cleanup, and deep links to results or approvals
 - Embedded iOS Share extension with a bounded private App Group inbox for text, links, images, and files
@@ -68,23 +69,23 @@ OpenBot 0.24.0 is ready as an owner-controlled beta with two honest locations: l
 
 | Gap | Honest status | Best next move |
 |---|---|---|
-| Managed cloud convenience | OpenBot now runs while the Mac is off on an optional owner-operated private host, but Cursor still operates Grok Bot's infrastructure for the user. | Improve guided setup, updates, encrypted migration, and health alerts without hiding ownership or location. |
+| Managed cloud convenience | OpenBot runs while the Mac is off, and setup plus Home checks are guided, but Cursor still operates Grok Bot's infrastructure for the user. | Add backup-first updates, encrypted migration, and external health alerts without hiding ownership or location. |
 | Native distribution | APNs registration/delivery and Share-sheet ingestion are implemented and simulator-compiled, but a physical-device delivery check and App Store signing still require the owner's Apple team and credentials. | Register the App Group and Push capability, provide the host-side `.p8` key, run device QA, then prepare TestFlight metadata. |
 | Large connector marketplace | Gmail, Drive, Calendar, GitHub, Slack, Notion, Todoist, and Dropbox have real bounded tools; this remains a focused built-in set, not a marketplace. | Publish a connector security/review contract, then add reviewed connectors one at a time. |
 | Full visual desktop takeover | OpenBot can now supervise and take over isolated bot browsers, while the macOS Accessibility bridge can inspect controls and approval-gate interactions; it still cannot reason over arbitrary desktop pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
 | Remote dev convenience | Private-host code jobs can continue without the Mac, but the owner must clone projects on the host and operate Docker. | Add reviewed encrypted project sync or repository bootstrap without granting broad host access. |
-| Managed event ingress | A private runner provides HTTPS ingress and continuous execution, but public DNS, OAuth registration, uptime, and patching remain owner responsibilities. | Add guided diagnostics and upgrade/backup health without turning OpenBot into an opaque hosted service. |
+| Managed event ingress | A private runner provides HTTPS ingress, continuous execution, and real local health diagnostics, but public DNS, OAuth registration, outside-in uptime, and patching remain owner responsibilities. | Add external monitoring and guided upgrades without turning OpenBot into an opaque hosted service. |
 | Broader event sources | Signed GitHub and generic hooks plus Calendar, Todoist, and Dropbox polling are included; Slack/Notion events and configurable retry backoff are not. | Build them on the same event receipt, permission, approval, dedupe, and replay contract. |
-| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.24 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
+| Organization administration | No SSO, team policy dashboard, audit export, or shared setup images. | Keep 0.25 single-owner; design multi-user tenancy separately instead of weakening local assumptions. |
 
 ## Release decision
 
-Ship 0.24.0 as an **owner-controlled beta**. Local Mac hosting remains the easiest default; the private runner is a real powered-off execution path for an owner with a dedicated Linux host and domain. Do not describe it as managed cloud, automatic Mac/server synchronization, or maintenance-free hosting. Secure installed web apps have Web Push; the native iPhone source includes deliberate voice capture, APNs, Share-sheet ingestion, and private-runner status, and remains simulator-verified rather than claimed App Store distribution. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
+Ship 0.25.0 as an **owner-controlled beta**. Local Mac hosting remains the easiest default; the private runner is a real powered-off execution path with guided setup and visible care state for an owner with a dedicated Linux host and domain. Do not describe it as managed cloud, automatic Mac/server synchronization, outside-in monitoring, or maintenance-free hosting. Secure installed web apps have Web Push; the native iPhone source includes deliberate voice capture, APNs, Share-sheet ingestion, and private-runner diagnostics, and remains simulator-verified rather than claimed App Store distribution. Draft handoff does not yet move unsent attachments, and portable skills cover reviewed browser workflows rather than executable third-party plugins.
 
 ## Verified acceptance criteria
 
-- Automated tests: 100 passing
+- Automated tests: 103 passing
 - iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator with the Share extension embedded; deliberate voice capture and its privacy descriptions compile in the native target; four unit tests pass; the optional live sign-in UI test checks the voice action and skips safely when its private server/key variables are absent; no `WKWebView` remains in the app source
 - Type safety: passing
 - Production build: passing

@@ -23,6 +23,7 @@ struct StudioContainerView: View {
                     title: store.activeThread?.title ?? "The studio",
                     bots: store.activeBot.map { [$0] } ?? store.state.bots,
                     isLive: network.isOnline && store.isLive,
+                    isPrivateHome: store.state.runner?.deployment?.mode == "private_runner",
                     onThreads: { showingThreads = true },
                     onLiveStudio: { showingLiveStudio = true },
                     onSettings: { showingSettings = true }
@@ -80,6 +81,7 @@ private struct StudioHeader: View {
     let title: String
     let bots: [StudioBot]
     let isLive: Bool
+    let isPrivateHome: Bool
     let onThreads: () -> Void
     let onLiveStudio: () -> Void
     let onSettings: () -> Void
@@ -103,7 +105,7 @@ private struct StudioHeader: View {
                     .accessibilityIdentifier("studio-native-title")
                 HStack(spacing: 5) {
                     Circle().fill(isLive ? OpenBotTheme.green : .orange).frame(width: 7, height: 7)
-                    Text(isLive ? "Live on your Mac" : "Reconnecting…")
+                    Text(isLive ? (isPrivateHome ? "Live from your private home" : "Live on your Mac") : "Reconnecting…")
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
@@ -673,8 +675,14 @@ private struct NativeLiveStudioView: View {
                                         .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 Spacer(minLength: 4)
-                                Button("Check now") { Task { await store.wakeRunner() } }
+                                Button(runner.deployment?.mode == "private_runner" ? "Home check" : "Check now") {
+                                    Task {
+                                        if runner.deployment?.mode == "private_runner" { await store.checkRunnerCare() }
+                                        else { await store.wakeRunner() }
+                                    }
+                                }
                                     .buttonStyle(.bordered).controlSize(.small)
+                                    .disabled(store.isCheckingRunner)
                             }
                             if let deployment = runner.deployment, deployment.mode == "private_runner" {
                                 HStack(spacing: 6) {
@@ -685,11 +693,38 @@ private struct NativeLiveStudioView: View {
                                             .lineLimit(1)
                                     }
                                 }
+                                if let care = store.runnerCare {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        HStack {
+                                            Label(care.summary, systemImage: care.overall == "ready" ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                                .foregroundStyle(care.overall == "ready" ? OpenBotTheme.green : .orange)
+                                            Spacer()
+                                            Text("v\(care.version)").font(.system(size: 9, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                                        }
+                                        ForEach(care.checks) { check in
+                                            HStack(spacing: 7) {
+                                                Image(systemName: check.status == "ready" ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                                    .foregroundStyle(check.status == "ready" ? OpenBotTheme.green : .orange)
+                                                Text(check.label).font(.system(size: 10, weight: .semibold, design: .rounded))
+                                                Spacer(minLength: 6)
+                                                Text(check.value).font(.system(size: 9, design: .rounded)).foregroundStyle(.secondary).lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    .padding(10)
+                                    .background(Color.black.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
                             }
                         }
                         .padding(13)
                         .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.black.opacity(0.055)))
+                        .task {
+                            if store.state.runner?.deployment?.mode == "private_runner", store.runnerCare == nil {
+                                await store.checkRunnerCare()
+                            }
+                        }
                     }
 
                     if !attention.isEmpty {

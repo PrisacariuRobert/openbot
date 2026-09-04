@@ -112,6 +112,26 @@ struct StudioDeploymentCheck: Decodable, Hashable {
     let detail: String
 }
 
+struct StudioRunnerCare: Decodable, Hashable {
+    let checkedAt: String
+    let mode: String
+    let version: String
+    let uptimeSeconds: Int
+    let publicUrl: String?
+    let dataPath: String
+    let overall: String
+    let summary: String
+    let checks: [StudioRunnerCareCheck]
+}
+
+struct StudioRunnerCareCheck: Decodable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let status: String
+    let value: String
+    let detail: String
+}
+
 struct StudioApproval: Decodable, Identifiable, Hashable {
     let id: String
     let runId: String

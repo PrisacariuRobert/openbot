@@ -42,6 +42,11 @@ jobs:
               docker exec openbot-private-runner-smoke opencode --version
               docker exec openbot-private-runner-smoke chromium --version
               docker exec openbot-private-runner-smoke docker info --format '{{.ServerVersion}}'
+              access_token="$(docker exec openbot-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"
+              curl --fail --silent \
+                --header "Authorization: Bearer ${access_token}" \
+                http://127.0.0.1:4311/api/runner/diagnostics \
+                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.25.0" || result.checks?.length !== 5) process.exit(1); });'
               exit 0
             fi
             sleep 1

@@ -34,6 +34,7 @@ import { BackgroundServiceManager } from "./background-service.js";
 import { LoginAttemptGate } from "./auth-security.js";
 import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
+import { inspectRunnerCare } from "./runner-care.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -184,6 +185,12 @@ app.get("/api/state", (request, response) => {
 app.get("/api/runner", (_request, response) => {
   const health = db.getRunnerHealth();
   response.json(runnerPayload(health));
+});
+
+app.get("/api/runner/diagnostics", async (_request, response) => {
+  const status = await inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
+  response.setHeader("Cache-Control", "no-store");
+  response.json(status);
 });
 
 app.post("/api/runner/wake", (_request, response) => {
