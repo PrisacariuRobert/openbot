@@ -13,6 +13,7 @@ const backgroundService = readFileSync(new URL("../src/server/background-service
 const deployment = readFileSync(new URL("../src/server/deployment.ts", import.meta.url), "utf8");
 const authSecurity = readFileSync(new URL("../src/server/auth-security.ts", import.meta.url), "utf8");
 const runnerCare = readFileSync(new URL("../src/server/runner-care.ts", import.meta.url), "utf8");
+const externalHeartbeat = readFileSync(new URL("../src/server/external-heartbeat.ts", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
@@ -26,6 +27,9 @@ const privateRunnerCaddy = readFileSync(new URL("../deploy/private-runner/Caddyf
 const privateRunnerGuide = readFileSync(new URL("../deploy/private-runner/README.md", import.meta.url), "utf8");
 const privateRunnerBackup = readFileSync(new URL("../deploy/private-runner/backup.sh", import.meta.url), "utf8");
 const privateRunnerUpdate = readFileSync(new URL("../deploy/private-runner/update.sh", import.meta.url), "utf8");
+const privateRunnerTransfer = readFileSync(new URL("../deploy/private-runner/home-transfer.mjs", import.meta.url), "utf8");
+const privateRunnerExport = readFileSync(new URL("../deploy/private-runner/export-home.sh", import.meta.url), "utf8");
+const privateRunnerImport = readFileSync(new URL("../deploy/private-runner/import-home.sh", import.meta.url), "utf8");
 const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
 const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
 const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
@@ -133,6 +137,15 @@ if (!privateRunnerUpdate.includes('backup.sh') || !privateRunnerUpdate.includes(
 }
 if (!server.includes('/api/runner/diagnostics/alerts') || !app.includes('runner-health-alerts') || !nativeModels.includes('StudioRunnerHealthAlerts') || !nativeStudio.includes('setRunnerHealthAlerts')) {
   failures.push("Opt-in private-home health alerts must remain available on web and native clients.");
+}
+if (!server.includes('/api/runner/diagnostics/heartbeat') || !database.includes('this.vault.encrypt(url)') || !externalHeartbeat.includes('protocol !== "https:"') || !externalHeartbeat.includes('lookup(hostname') || !app.includes('runner-external-heartbeat') || !nativeModels.includes('StudioRunnerExternalHeartbeat') || !nativeStudio.includes('setExternalHeartbeat')) {
+  failures.push("Opt-in outside-in private-home monitoring must keep encrypted storage, HTTPS/public-network validation, and matching web/native controls.");
+}
+if (!privateRunnerTransfer.includes('aes-256-gcm') || !privateRunnerTransfer.includes('scryptSync') || !privateRunnerTransfer.includes('setAAD') || !privateRunnerTransfer.includes('safeArchiveKinds') || !privateRunnerExport.includes('home-transfer.mjs export') || !privateRunnerImport.includes('backup.sh') || !privateRunnerImport.includes('wait_for_healthy') || !privateRunnerImport.includes('rollback')) {
+  failures.push("Encrypted whole-home export/import must authenticate before extraction, constrain archive contents, back up before swapping, verify health, and retain rollback.");
+}
+if (!privateRunnerCompose.includes('/transfers:') || !app.includes('export-home.sh') || !app.includes('import-home.sh')) {
+  failures.push("The private runner and web product must expose the reviewed encrypted home-transfer path.");
 }
 if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");

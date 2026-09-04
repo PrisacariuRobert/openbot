@@ -123,6 +123,7 @@ struct StudioRunnerCare: Decodable, Hashable {
     let summary: String
     let checks: [StudioRunnerCareCheck]
     let alerts: StudioRunnerHealthAlerts
+    let heartbeat: StudioRunnerExternalHeartbeat
 }
 
 struct StudioRunnerHealthAlerts: Decodable, Hashable {
@@ -133,6 +134,16 @@ struct StudioRunnerHealthAlerts: Decodable, Hashable {
     let lastCheckedAt: String?
     let lastNotifiedAt: String?
     let lastStatus: String?
+}
+
+struct StudioRunnerExternalHeartbeat: Decodable, Hashable {
+    let configured: Bool
+    let enabled: Bool
+    let intervalMinutes: Int
+    let provider: String?
+    let lastAttemptAt: String?
+    let lastSuccessAt: String?
+    let lastError: String?
 }
 
 struct StudioRunnerCareCheck: Decodable, Identifiable, Hashable {

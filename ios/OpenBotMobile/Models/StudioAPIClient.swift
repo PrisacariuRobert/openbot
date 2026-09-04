@@ -76,6 +76,11 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runner/diagnostics/alerts", method: "PATCH", body: payload)
     }
 
+    func setExternalHeartbeat(_ enabled: Bool, url: String? = nil) async throws {
+        let payload = try JSONEncoder().encode(RunnerExternalHeartbeatRequest(enabled: enabled, url: url))
+        _ = try await dataRequest("api/runner/diagnostics/heartbeat", method: "PATCH", body: payload)
+    }
+
     func registerNativePush(deviceToken: String, environment: String, bundleID: String) async throws -> NativePushRegistration {
         let payload = try JSONEncoder().encode(NativePushRequest(deviceToken: deviceToken, environment: environment, bundleId: bundleID))
         let data = try await dataRequest("api/notifications/native", method: "POST", body: payload)
@@ -159,6 +164,7 @@ private struct NativePushRequest: Encodable {
 }
 
 private struct RunnerHealthAlertsRequest: Encodable { let enabled: Bool }
+private struct RunnerExternalHeartbeatRequest: Encodable { let enabled: Bool; let url: String? }
 
 struct NativePushRegistration: Decodable {
     let id: String

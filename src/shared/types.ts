@@ -345,6 +345,16 @@ export interface RunnerHealthAlerts {
   lastStatus: "ready" | "attention" | null;
 }
 
+export interface RunnerExternalHeartbeat {
+  configured: boolean;
+  enabled: boolean;
+  intervalMinutes: number;
+  provider: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+}
+
 export interface RunnerCareSnapshot {
   checkedAt: string;
   mode: DeploymentMode;
@@ -359,6 +369,7 @@ export interface RunnerCareSnapshot {
 
 export interface RunnerCareStatus extends RunnerCareSnapshot {
   alerts: RunnerHealthAlerts;
+  heartbeat: RunnerExternalHeartbeat;
 }
 
 export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";

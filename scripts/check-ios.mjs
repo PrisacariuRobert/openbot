@@ -39,8 +39,8 @@ const privacy = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/Privac
 const entitlements = readFileSync(path.join(root, "ios/OpenBotMobile/OpenBotMobile.entitlements"), "utf8");
 const sharePlist = readFileSync(path.join(root, "ios/OpenBotShare/Info.plist"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
-if (!project.includes("MARKETING_VERSION: 0.26.0")) throw new Error("The iOS marketing version is not 0.26.0.");
-if (!project.includes("CURRENT_PROJECT_VERSION: 30")) throw new Error("The iOS build number is not 30.");
+if (!project.includes("MARKETING_VERSION: 0.27.0")) throw new Error("The iOS marketing version is not 0.27.0.");
+if (!project.includes("CURRENT_PROJECT_VERSION: 31")) throw new Error("The iOS build number is not 31.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("NSMicrophoneUsageDescription") || !plist.includes("NSSpeechRecognitionUsageDescription")) throw new Error("The iOS app is missing its deliberate voice-capture permission descriptions.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");
@@ -57,6 +57,8 @@ if (!swift.includes("StudioDeployment") || !swift.includes("PRIVATE ALWAYS-ON HO
 if (!swift.includes("StudioRunnerCare") || !swift.includes("checkRunnerCare") || !swift.includes('Button(runner.deployment?.mode == "private_runner" ? "Home check"')) throw new Error("Native private-home diagnostics are incomplete.");
 if (!swift.includes("Live from your private home")) throw new Error("Native private-home location wording is incomplete.");
 if (!swift.includes("StudioRunnerHealthAlerts") || !swift.includes("setRunnerHealthAlerts") || !swift.includes("Health alerts are on")) throw new Error("Native private-home health alerts are incomplete.");
+if (!swift.includes("StudioRunnerExternalHeartbeat") || !swift.includes("setExternalHeartbeat") || !swift.includes("Offline protection is checking in")) throw new Error("Native outside-in private-home monitoring is incomplete.");
+if (!swift.includes("Move this home securely") || !swift.includes("export-home.sh") || !swift.includes("UIPasteboard.general.string")) throw new Error("Native encrypted home-transfer guidance is incomplete.");
 if (!swift.includes("quickLookPreview") || !swift.includes("api/attachments/\\(attachment.id)") || !swift.includes("ShareLink")) throw new Error("Native authenticated artifact preview and sharing are incomplete.");
 if (!swift.includes("registerForRemoteNotifications") || !swift.includes("api/notifications/native") || !swift.includes("OpenBotSharedInbox") || !swift.includes("importSharedInbox")) throw new Error("Native push registration or share-sheet ingestion is incomplete.");
 if (!swift.includes("SFSpeechAudioBufferRecognitionRequest") || !swift.includes('accessibilityLabel(voice.isListening ? "Stop voice capture" : "Start voice capture")') || !swift.includes("supportsOnDeviceRecognition")) throw new Error("Native deliberate voice capture, editable transcription, or its composer action is incomplete.");
@@ -67,4 +69,4 @@ if (/access[_ -]?key\s*[=:]\s*[\"'][A-Za-z0-9_-]{12,}/i.test(swift)) throw new E
 const swiftFiles = required.filter((file) => file.endsWith(".swift")).map((file) => path.join(root, file));
 const parse = spawnSync("swiftc", ["-frontend", "-parse", ...swiftFiles], { encoding: "utf8" });
 if (!parse.error && parse.status !== 0) throw new Error(`Swift syntax validation failed:\n${parse.stderr || parse.stdout}`);
-console.log("Native SwiftUI studio, deliberate voice capture, APNs registration, share-sheet ingestion, privacy declarations, Keychain storage, API streaming, draft continuity, Live Studio, customizable code-drawn mascot motion, and UI coverage are present.");
+console.log("Native SwiftUI studio, deliberate voice capture, APNs registration, share-sheet ingestion, privacy declarations, Keychain storage, API streaming, draft continuity, Live Studio, private-home heartbeat and transfer guidance, customizable code-drawn mascot motion, and UI coverage are present.");

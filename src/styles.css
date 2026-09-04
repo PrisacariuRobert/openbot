@@ -2549,7 +2549,9 @@ select:focus-visible {
   white-space: nowrap;
 }
 .runner-maintenance-actions button,
-.runner-health-alerts button {
+.runner-health-alerts button,
+.runner-external-heartbeat button,
+.runner-home-transfer button {
   min-height: 29px;
   padding: 0 9px;
   display: inline-flex;
@@ -2591,7 +2593,98 @@ select:focus-visible {
 .runner-health-alerts small { margin-top: 2px; color: #8c8890; font-size: 6.9px; line-height: 1.35; }
 .runner-health-alerts.enabled button { color: #4b715a; background: #e2f1e8; }
 .runner-health-alerts button:disabled,
-.runner-maintenance-actions button:disabled { opacity: 0.55; cursor: wait; }
+.runner-maintenance-actions button:disabled,
+.runner-external-heartbeat button:disabled { opacity: 0.55; cursor: wait; }
+.runner-external-heartbeat,
+.runner-home-transfer {
+  margin: 10px;
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(89, 114, 161, 0.12);
+  border-radius: 14px;
+  background: linear-gradient(120deg, #f9fbff, #fbfaff);
+}
+.runner-external-heartbeat.enabled { border-color: rgba(52, 143, 108, 0.2); background: linear-gradient(120deg, #f4fcf8, #f9fffc); }
+.runner-external-heartbeat.attention { border-color: rgba(185, 118, 73, 0.22); background: #fffaf7; }
+.runner-heartbeat-icon,
+.runner-transfer-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #55709e;
+  border-radius: 10px;
+  background: #e8effb;
+}
+.runner-external-heartbeat.enabled .runner-heartbeat-icon { color: #37825e; background: #def3e7; }
+.runner-external-heartbeat.attention .runner-heartbeat-icon { color: #a56d49; background: #fae9de; }
+.runner-heartbeat-copy b,
+.runner-heartbeat-copy small,
+.runner-home-transfer > span:nth-child(2) b,
+.runner-home-transfer > span:nth-child(2) small { display: block; }
+.runner-heartbeat-copy b,
+.runner-home-transfer > span:nth-child(2) b { color: #45434a; font-size: 8.8px; }
+.runner-heartbeat-copy small,
+.runner-home-transfer > span:nth-child(2) small { margin-top: 2px; color: #89878e; font-size: 6.9px; line-height: 1.4; }
+.runner-heartbeat-copy em { margin-top: 5px; display: flex; align-items: center; gap: 4px; color: #9d6847; font-size: 6.8px; font-style: normal; }
+.runner-heartbeat-copy em.success { color: #37825e; }
+.runner-heartbeat-field {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 4px;
+}
+.runner-heartbeat-field span { color: #7e7b84; font-size: 6.8px; font-weight: 720; }
+.runner-heartbeat-field input {
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  padding: 0 10px;
+  color: #45424b;
+  border: 1px solid rgba(93, 84, 165, 0.14);
+  border-radius: 9px;
+  outline: 0;
+  background: rgba(255,255,255,0.92);
+  font-size: 7.5px;
+}
+.runner-heartbeat-field input:focus { border-color: rgba(104, 88, 205, 0.45); box-shadow: 0 0 0 3px rgba(105, 88, 205, 0.08); }
+.runner-heartbeat-actions { display: flex; align-items: center; gap: 6px; }
+.runner-heartbeat-actions .quiet { color: #706a7c; background: #efedf3; }
+.runner-home-transfer {
+  grid-template-columns: 32px minmax(0, 1fr);
+  background: linear-gradient(120deg, #fffaf2, #fbf8ff);
+}
+.runner-transfer-icon { color: #735c9c; background: #eee6f7; }
+.runner-transfer-command {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+.runner-transfer-command code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px 9px;
+  color: #5b5192;
+  border-radius: 9px;
+  background: rgba(235, 231, 245, 0.82);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.runner-transfer-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: #817b84;
+  font-size: 6.8px;
+  line-height: 1.4;
+}
+.runner-transfer-note svg { flex: none; margin-top: 1px; color: #548467; }
 .private-runner-guide {
   overflow: hidden;
   border: 1px solid rgba(100, 88, 182, 0.14);
@@ -10630,6 +10723,12 @@ select:focus-visible {
   .runner-maintenance-actions button { min-height: 34px; }
   .runner-health-alerts { grid-template-columns: 30px minmax(0, 1fr); }
   .runner-health-alerts button { grid-column: 1 / -1; min-height: 34px; }
+  .runner-external-heartbeat { grid-template-columns: 32px minmax(0, 1fr); }
+  .runner-heartbeat-field,
+  .runner-heartbeat-actions { grid-column: 1 / -1; }
+  .runner-heartbeat-actions button { flex: 1; min-height: 34px; }
+  .runner-transfer-command { grid-template-columns: 1fr; }
+  .runner-transfer-command button { min-height: 34px; }
   .private-runner-guide-body { padding-left: 13px; }
   .private-runner-guide-body ol { grid-template-columns: 1fr; }
   .private-setup-command { grid-template-columns: 1fr; }

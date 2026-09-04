@@ -6566,6 +6566,9 @@ function RoutinesPanel({
     [privateDomain, setPrivateDomain] = useState(""),
     [setupCopied, setSetupCopied] = useState(false),
     [updateCopied, setUpdateCopied] = useState(false),
+    [heartbeatAddress, setHeartbeatAddress] = useState(""),
+    [heartbeatEditing, setHeartbeatEditing] = useState(false),
+    [transferCopied, setTransferCopied] = useState<"export" | "import" | null>(null),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
   const [createdHook, setCreatedHook] = useState<{
@@ -6730,6 +6733,29 @@ function RoutinesPanel({
       setRunnerCareBusy(false);
     }
   };
+  const setExternalHeartbeat = async (enabled: boolean, replace = false) => {
+    if (runnerCareBusy) return;
+    const url = heartbeatAddress.trim();
+    if (enabled && (replace || !runnerCare?.heartbeat.configured) && !url) {
+      setRunnerError("Paste the private HTTPS address from your heartbeat service first.");
+      return;
+    }
+    setRunnerCareBusy(true);
+    setRunnerError(null);
+    try {
+      await api("/api/runner/diagnostics/heartbeat", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled, ...((replace || !runnerCare?.heartbeat.configured) && url ? { url } : {}) }),
+      });
+      setRunnerCare(await api<RunnerCareStatus>("/api/runner/diagnostics"));
+      setHeartbeatAddress("");
+      setHeartbeatEditing(false);
+    } catch (error) {
+      setRunnerError(error instanceof Error ? error.message : "OpenBot could not connect that outside heartbeat.");
+    } finally {
+      setRunnerCareBusy(false);
+    }
+  };
   useEffect(() => {
     if (privateRunner && !runnerCareAttempted) void checkPrivateHome();
   }, [checkPrivateHome, privateRunner, runnerCareAttempted]);
@@ -6832,6 +6858,37 @@ function RoutinesPanel({
             <span className="runner-health-alert-icon"><Bell size={16} /></span>
             <span><b>{runnerCare.alerts.enabled ? "Health alerts are on" : "Alert me if this home needs attention"}</b><small>{runnerCare.alerts.enabled ? `Checked every ${runnerCare.alerts.intervalMinutes} minutes · ${runnerCare.alerts.destinationCount} ready device${runnerCare.alerts.destinationCount === 1 ? "" : "s"}` : "A quiet push when storage, backups, tools, or bot computers need you—and once when they recover."}</small></span>
             <button disabled={runnerCareBusy} onClick={() => void setHealthAlerts(!runnerCare.alerts.enabled)}>{runnerCare.alerts.enabled ? "Turn off" : "Turn on"}</button>
+          </div>
+          <div className={`runner-external-heartbeat ${runnerCare.heartbeat.enabled ? "enabled" : ""}${runnerCare.heartbeat.lastError ? " attention" : ""}`}>
+            <span className="runner-heartbeat-icon">{runnerCare.heartbeat.enabled ? <Wifi size={16} /> : <WifiOff size={16} />}</span>
+            <div className="runner-heartbeat-copy">
+              <b>{runnerCare.heartbeat.enabled ? "Offline protection is checking in" : "Know if this whole home goes offline"}</b>
+              <small>{runnerCare.heartbeat.enabled
+                ? `A private pulse goes to ${runnerCare.heartbeat.provider || "your outside service"} every ${runnerCare.heartbeat.intervalMinutes} minutes. It can alert you even if this host loses power.`
+                : "Connect a private heartbeat address. Only an empty check-in leaves OpenBot; no studio names, files, prompts, or health details are sent."}</small>
+              {runnerCare.heartbeat.lastError && <em><CircleAlert size={10} /> {runnerCare.heartbeat.lastError}</em>}
+              {!runnerCare.heartbeat.lastError && runnerCare.heartbeat.lastSuccessAt && <em className="success"><Check size={10} /> Last check-in {relativeTime(runnerCare.heartbeat.lastSuccessAt) === "Now" ? "just now" : `${relativeTime(runnerCare.heartbeat.lastSuccessAt)} ago`}</em>}
+            </div>
+            {(!runnerCare.heartbeat.configured || heartbeatEditing) && (
+              <label className="runner-heartbeat-field">
+                <span>Private heartbeat address</span>
+                <input type="url" value={heartbeatAddress} onChange={(event) => setHeartbeatAddress(event.target.value)} placeholder="https://heartbeat.example/your-private-id" spellCheck={false} />
+              </label>
+            )}
+            <div className="runner-heartbeat-actions">
+              {runnerCare.heartbeat.configured && !heartbeatEditing && <button className="quiet" disabled={runnerCareBusy} onClick={() => setHeartbeatEditing(true)}>Replace</button>}
+              {heartbeatEditing && <button className="quiet" disabled={runnerCareBusy} onClick={() => { setHeartbeatEditing(false); setHeartbeatAddress(""); }}>Cancel</button>}
+              <button disabled={runnerCareBusy} onClick={() => void setExternalHeartbeat(!runnerCare.heartbeat.enabled || heartbeatEditing, heartbeatEditing)}>
+                {runnerCare.heartbeat.enabled && !heartbeatEditing ? "Turn off" : runnerCare.heartbeat.configured && !heartbeatEditing ? "Turn on" : "Connect"}
+              </button>
+            </div>
+          </div>
+          <div className="runner-home-transfer">
+            <span className="runner-transfer-icon"><KeyRound size={16} /></span>
+            <span><b>Move this home without exposing it</b><small>Your studio, subscriptions, browser state, and projects become one authenticated encrypted file. The passphrase is entered only in the host terminal.</small></span>
+            <div className="runner-transfer-command"><code>./deploy/private-runner/export-home.sh</code><button onClick={() => { copy("./deploy/private-runner/export-home.sh"); setTransferCopied("export"); }}><Copy size={12} /> {transferCopied === "export" ? "Copied" : "Export"}</button></div>
+            <div className="runner-transfer-command"><code>./deploy/private-runner/import-home.sh your-file.openbot-home</code><button onClick={() => { copy("./deploy/private-runner/import-home.sh your-file.openbot-home"); setTransferCopied("import"); }}><Copy size={12} /> {transferCopied === "import" ? "Copied" : "Import"}</button></div>
+            <small className="runner-transfer-note"><ShieldCheck size={11} /> Import verifies and stages everything first, keeps a fresh recovery copy, and restores the old home if the new one does not become healthy.</small>
           </div>
         </section>
       )}

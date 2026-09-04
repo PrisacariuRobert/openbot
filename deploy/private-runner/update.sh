@@ -16,7 +16,7 @@ env_file="${runner_dir}/.env"
 target_ref="${1:-origin/main}"
 
 if [[ ! "${target_ref}" =~ ^(origin/main|v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?)$ ]]; then
-  echo "Use origin/main or a release tag such as v0.26.0."
+  echo "Use origin/main or a release tag such as v0.27.0."
   exit 1
 fi
 if [[ ! -f "${env_file}" ]]; then

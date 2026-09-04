@@ -36,6 +36,7 @@ import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentC
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
+import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -162,10 +163,15 @@ const runnerCareMonitor = new RunnerCareMonitor({
   destinationCount: () => db.listPushSubscriptions().length + (notifications.nativeStatus().configured ? db.listNativePushDevices().length : 0),
   wakeNotifications: () => notifications.wake(),
 });
+const externalHeartbeat = new RunnerExternalHeartbeatMonitor({
+  db,
+  canCheck: () => deployment.mode === "private_runner" && runner.isLeader(),
+});
 const providerConnections = new ProviderConnectionManager(() => broadcast({ type: "provider", at: Date.now() }));
 runner.start();
 notifications.start();
 if (deployment.mode === "private_runner") runnerCareMonitor.start();
+if (deployment.mode === "private_runner") externalHeartbeat.start();
 
 function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
@@ -200,7 +206,7 @@ app.get("/api/runner", (_request, response) => {
 app.get("/api/runner/diagnostics", async (_request, response) => {
   const status = await inspectPrivateHome();
   response.setHeader("Cache-Control", "no-store");
-  response.json({ ...status, alerts: runnerCareMonitor.status() });
+  response.json({ ...status, alerts: runnerCareMonitor.status(), heartbeat: externalHeartbeat.status() });
 });
 
 app.patch("/api/runner/diagnostics/alerts", async (request, response) => {
@@ -213,6 +219,20 @@ app.patch("/api/runner/diagnostics/alerts", async (request, response) => {
   if (parsed.data.enabled) await runnerCareMonitor.checkNow();
   broadcast({ type: "runner-care", at: Date.now() });
   response.json(runnerCareMonitor.status());
+});
+
+app.patch("/api/runner/diagnostics/heartbeat", async (request, response) => {
+  if (deployment.mode !== "private_runner") return response.status(409).json({ error: "External heartbeat monitoring is available when OpenBot is running on a private host." });
+  const parsed = z.object({ enabled: z.boolean(), url: z.string().max(2_048).nullable().optional() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Add one private HTTPS heartbeat URL, or turn the heartbeat off." });
+  try {
+    externalHeartbeat.configure(parsed.data);
+    if (parsed.data.enabled) await externalHeartbeat.checkNow();
+    broadcast({ type: "runner-care", at: Date.now() });
+    response.json(externalHeartbeat.status());
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : "OpenBot could not save that heartbeat." });
+  }
 });
 
 app.post("/api/runner/wake", (_request, response) => {
@@ -1944,6 +1964,7 @@ const server = app.listen(port, host, () => {
 
 async function shutdown() {
   runnerCareMonitor.stop();
+  externalHeartbeat.stop();
   notifications.stop();
   runner.stop();
   providerConnections.stop();

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.0 — 2026-09-04
+
+- Added an opt-in five-minute external heartbeat so an owner-selected dead-man service can detect complete private-host or network loss
+- Encrypted heartbeat URLs in the local vault, returned only the provider hostname to clients, rejected redirects, and blocked private, local, metadata, and mixed DNS destinations
+- Added passphrase-encrypted `.openbot-home` export/import for studio state, subscription sessions, browser state, and projects using scrypt and authenticated AES-256-GCM
+- Staged and authenticated imports before downtime, rejected unsafe archive paths and links, created a fresh pre-import backup, retained the previous home, and restored it automatically after failed health verification
+- Added matching heartbeat and migration guidance to responsive web and native iPhone Live Studio
+- Expanded the automated suite to 110 passing tests, including wrong-passphrase, tamper, DNS-rebinding, encryption-at-rest, and durable heartbeat-state coverage
+
 ## 0.26.0 — 2026-09-04
 
 - Added opt-in private-home health monitoring with durable 15-minute checks, changed-state alerts, once-daily unchanged reminders, and a separate recovery notification

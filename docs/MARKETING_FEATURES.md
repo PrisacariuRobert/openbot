@@ -1,7 +1,7 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 4, 2026
-Release: 0.26.0 owner-controlled beta
+Release: 0.27.0 owner-controlled beta
 
 This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
 
@@ -30,6 +30,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 13. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
 14. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
 15. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
+16. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
+17. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
 
 ## Available now
 
@@ -220,6 +222,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - One-click macOS login/crash protection with safe foreground-to-background handoff and owner-removable setup
 - Optional private Linux runner with Caddy HTTPS, automatic restart, durable studio/model/browser/project storage, public OAuth/webhook callbacks, health state, owner-only backups, and guarded release updates
 - Opt-in private-home checks every 15 minutes with changed-state attention alerts, one recovery alert, durable anti-spam state, and delivery through registered Web Push or APNs destinations
+- Opt-in external heartbeat with encrypted URL storage, public-HTTPS/network validation, empty five-minute check-ins, and visible last-success/failure state on web and iPhone
+- Passphrase-encrypted whole-home export/import covering studio data, model logins, browser profiles, and projects, with archive validation, staged replacement, backup-first health verification, and rollback
 - Durable per-target notification outbox with standards-based Web Push, native APNs, stale-device cleanup, and direct result/approval links
 
 ### Messages, files, voice, and phone use
@@ -277,6 +281,8 @@ These features are implemented, but marketing must explain their requirement.
 | Calendar automations | The selected teammate needs Calendar permission, and the chosen Mac or private host must be online. |
 | Todoist/Dropbox automations | The selected teammate needs matching read permission and the chosen host must be online. Fresh baselines prevent old account history from starting work when a routine is enabled. |
 | Runner location | Mac background protection still requires an awake Mac. The optional private runner requires a dedicated Linux host, Docker, a domain, owner-operated security/updates/backups, and an explicit whole-studio migration. |
+| Outside heartbeat | Private-runner only and opt-in. The owner supplies a private URL from an external heartbeat service; OpenBot sends an empty HTTPS GET every five minutes. That outside service—not OpenBot—delivers outage alerts. |
+| Encrypted home transfer | Export/import runs from the owner's host terminal and requires a passphrase of at least 12 characters. It is a deliberate copy-and-switch operation, not continuous synchronization. Existing Mac-only absolute project paths may need reconnecting on Linux. |
 | GitHub and generic webhooks | The sender needs the one-time secret and a secure route. Private-runner mode includes Caddy HTTPS; local mode needs a trusted tunnel or reverse proxy. |
 | Visible Mac app control | macOS Accessibility permission is required. Support is limited to the Accessibility tree, not arbitrary pixels or canvases. |
 | Voice input | Browser/OS speech recognition support and microphone permission are required; the platform vendor may process audio. |
@@ -311,6 +317,7 @@ These features are implemented, but marketing must explain their requirement.
 Do not say OpenBot currently:
 
 - is a managed zero-maintenance cloud service or silently synchronizes Mac and server data;
+- includes its own hosted outage-alert service—the optional outside heartbeat depends on an owner-chosen third party;
 - is already distributed through the iOS App Store or available for Android;
 - provides unrestricted visual computer control;
 - supports a large production connector marketplace;
@@ -325,7 +332,6 @@ Do not say OpenBot currently:
 ## Roadmap, not launch copy
 
 - Physical-device voice/APNs/Share-extension QA and TestFlight distribution
-- Encrypted cross-host export/import and optional privacy-preserving outside-in reachability checks
 - Reviewed third-party connector SDK/marketplace plus CRM and team-storage connectors
 - Hosted event ingress, Slack/Notion event triggers, richer Calendar selection, and configurable retry backoff
 - Document, PDF, and spreadsheet fidelity tools

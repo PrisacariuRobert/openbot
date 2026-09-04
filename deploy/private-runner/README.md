@@ -10,6 +10,8 @@ This optional deployment gives one owner an always-on OpenBot home on a Linux se
 - The same single-leader job claims, recovery, approvals, budgets, and activity receipts as local mode
 - A public health check that reveals only readiness and deployment mode
 - Automatic restart after host or process restarts
+- An optional empty outside heartbeat so an independent service can notice a complete host or network outage
+- Authenticated passphrase-encrypted export/import for the complete studio, model-login state, browser profiles, and projects
 
 ## Before you start
 
@@ -57,10 +59,30 @@ Use the guided updater from a clean checkout:
 ./deploy/private-runner/update.sh
 ```
 
-The updater accepts `origin/main` by default or an explicit release tag such as `v0.26.0`. It refuses a dirty or diverged checkout, creates a consistent backup before changing source, builds while the current service remains available, waits for the replacement to become healthy, and restores the previous container image if that check fails. Successful updates appear in **Automations → Home check**.
+The updater accepts `origin/main` by default or an explicit release tag such as `v0.27.0`. It refuses a dirty or diverged checkout, creates a consistent backup before changing source, builds while the current service remains available, waits for the replacement to become healthy, and restores the previous container image if that check fails. Successful updates appear in **Automations → Home check**.
 
 Backups are stored under `/srv/openbot/backups` with owner-only permissions. The backup script records the successful time and size so Home check can warn when protection is missing or stale. The archive includes the encryption key, connector tokens, model logins, browser profiles, and studio history. Protect it like a password vault. Projects are intentionally not included because they can be large; back them up separately.
 
-## Move an existing local studio
+## Know if the whole home goes offline
 
-Stop OpenBot on the Mac before copying `.openbot` to `/srv/openbot/data`. Copy the whole directory, including `keys/vault.key`; individual encrypted token files are not portable without that key. Existing absolute Mac project paths will not work on Linux, so re-add projects from `/srv/openbot/projects`. Do not run local and private copies against separate copies of the same studio and expect them to synchronize—OpenBot has one authoritative data location, chosen by the owner.
+Open **Automations → Home check** and paste the private HTTPS URL supplied by an external heartbeat service. OpenBot encrypts that URL and sends one empty check-in every five minutes. It never adds prompts, files, diagnostics, credentials, or an OpenBot identifier. The external service—not OpenBot—must alert you after check-ins stop, which is what lets it detect a complete host or network outage.
+
+Only public HTTPS on port 443 is accepted. OpenBot rejects local/private/reserved addresses, checks every DNS answer, and pins the request to a validated public address. Treat the URL itself as a secret because most heartbeat services use it as the monitor credential.
+
+## Move an existing studio safely
+
+Create one encrypted transfer file from the source host:
+
+```bash
+./deploy/private-runner/export-home.sh
+```
+
+The script asks for a passphrase twice without echoing it, briefly stops OpenBot for a consistent snapshot, and writes an owner-only `.openbot-home` file under `/srv/openbot/transfers`. Move that file over a trusted channel to the destination host's `/srv/openbot/transfers`, then run:
+
+```bash
+./deploy/private-runner/import-home.sh your-transfer.openbot-home
+```
+
+Import authenticates the complete file before extraction, validates that it contains only the expected `data`, `home`, and `projects` roots, rejects links and special files, and stages the candidate while the current studio remains available. It then creates a fresh backup, swaps the complete home, waits for OpenBot health, and restores the previous roots if anything fails. The prior home is retained after success for deliberate cleanup.
+
+The passphrase never enters the web or iPhone app. Keep the archive and passphrase separate and delete the transferred file only after verifying the new host. This is copy-and-switch, not live synchronization: keep one authoritative data location for OpenBot. Existing absolute Mac project paths may need reconnecting on Linux, while projects already below `/srv/openbot/projects` move with the archive.

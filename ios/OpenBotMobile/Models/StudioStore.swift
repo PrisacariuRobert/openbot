@@ -111,6 +111,17 @@ final class StudioStore: ObservableObject {
         } catch { handle(error) }
     }
 
+    func setExternalHeartbeat(_ enabled: Bool, url: String? = nil) async {
+        guard !isCheckingRunner else { return }
+        isCheckingRunner = true
+        errorMessage = nil
+        defer { isCheckingRunner = false }
+        do {
+            try await client.setExternalHeartbeat(enabled, url: url)
+            runnerCare = try await client.runnerCare()
+        } catch { handle(error) }
+    }
+
     func saveDraft(_ body: String) async {
         do {
             _ = try await client.saveDraft(threadID: selectedThreadID, body: body)
