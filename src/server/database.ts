@@ -680,6 +680,12 @@ export class OpenBotDatabase {
     insertSetting.run("runner_health_last_notified_at", "", settingsAt);
     insertSetting.run("runner_health_last_status", "", settingsAt);
     insertSetting.run("runner_health_last_signature", "", settingsAt);
+    insertSetting.run("runner_external_heartbeat_enabled", "0", settingsAt);
+    insertSetting.run("runner_external_heartbeat_url_ciphertext", "", settingsAt);
+    insertSetting.run("runner_external_heartbeat_provider", "", settingsAt);
+    insertSetting.run("runner_external_heartbeat_last_attempt_at", "", settingsAt);
+    insertSetting.run("runner_external_heartbeat_last_success_at", "", settingsAt);
+    insertSetting.run("runner_external_heartbeat_last_error", "", settingsAt);
     this.db.exec(`UPDATE bots SET mac_access_enabled=CAST((SELECT setting_value FROM app_settings WHERE setting_key='mac_access_enabled') AS INTEGER)`);
   }
 
@@ -845,6 +851,70 @@ export class OpenBotDatabase {
       throw error;
     }
     return this.getRunnerHealthMonitorState();
+  }
+
+  getRunnerExternalHeartbeatState(): {
+    enabled: boolean;
+    url: string | null;
+    provider: string | null;
+    lastAttemptAt: string | null;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+  } {
+    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key LIKE 'runner_external_heartbeat_%'").all() as Row[];
+    const values = new Map(rows.map((row) => [String(row.setting_key), String(row.setting_value || "")]));
+    const encrypted = values.get("runner_external_heartbeat_url_ciphertext") || "";
+    let url: string | null = null;
+    try { if (encrypted) url = this.vault.decrypt(encrypted); }
+    catch { url = null; }
+    return {
+      enabled: values.get("runner_external_heartbeat_enabled") === "1" && Boolean(url),
+      url,
+      provider: values.get("runner_external_heartbeat_provider") || null,
+      lastAttemptAt: values.get("runner_external_heartbeat_last_attempt_at") || null,
+      lastSuccessAt: values.get("runner_external_heartbeat_last_success_at") || null,
+      lastError: values.get("runner_external_heartbeat_last_error") || null,
+    };
+  }
+
+  configureRunnerExternalHeartbeat(input: { enabled: boolean; url?: string | null; provider?: string | null }) {
+    const current = this.getRunnerExternalHeartbeatState();
+    const url = input.url === undefined ? current.url : input.url;
+    const provider = input.provider === undefined ? current.provider : input.provider;
+    const update = this.db.prepare("UPDATE app_settings SET setting_value=?,updated_at=? WHERE setting_key=?");
+    const at = now();
+    this.db.exec("BEGIN");
+    try {
+      update.run(input.enabled && url ? "1" : "0", at, "runner_external_heartbeat_enabled");
+      update.run(url ? this.vault.encrypt(url) : "", at, "runner_external_heartbeat_url_ciphertext");
+      update.run(provider?.slice(0, 160) || "", at, "runner_external_heartbeat_provider");
+      if (!url) {
+        update.run("", at, "runner_external_heartbeat_last_attempt_at");
+        update.run("", at, "runner_external_heartbeat_last_success_at");
+        update.run("", at, "runner_external_heartbeat_last_error");
+      }
+      if (!input.enabled) update.run("", at, "runner_external_heartbeat_last_error");
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getRunnerExternalHeartbeatState();
+  }
+
+  recordRunnerExternalHeartbeat(input: { attemptedAt: string; success: boolean; error?: string | null }) {
+    const update = this.db.prepare("UPDATE app_settings SET setting_value=?,updated_at=? WHERE setting_key=?");
+    this.db.exec("BEGIN");
+    try {
+      update.run(input.attemptedAt, input.attemptedAt, "runner_external_heartbeat_last_attempt_at");
+      if (input.success) update.run(input.attemptedAt, input.attemptedAt, "runner_external_heartbeat_last_success_at");
+      update.run(input.success ? "" : input.error?.replace(/\s+/g, " ").trim().slice(0, 240) || "The heartbeat service did not accept this check-in.", input.attemptedAt, "runner_external_heartbeat_last_error");
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getRunnerExternalHeartbeatState();
   }
 
   createBot(input: {

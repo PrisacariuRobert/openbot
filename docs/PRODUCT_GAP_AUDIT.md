@@ -1,16 +1,16 @@
 # OpenBot Product Gap Audit
 
-Updated for OpenBot 0.26.0. This audit compares the verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
+Updated for OpenBot 0.27.0. This audit compares the verified product with the current official Grok Bot product documentation. It separates what works now from what would merely look impressive in a screenshot.
 
 ## Current position
 
-OpenBot's strongest difference is owner control: an explicit local-or-private-host data location, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.26.0 adds opt-in private-home attention/recovery alerts and a guarded updater that backs up first, refuses unsafe source state, verifies the replacement, and can recover the prior container image. The local Mac remains the default and no data moves silently. Grok Bot remains easier because Cursor operates the cloud service, and it still has broader connectors, fidelity-preserving Office work, App Store distribution, and organization administration.
+OpenBot's strongest difference is owner control: an explicit local-or-private-host data location, bring-your-own model access, per-teammate app and project permissions, durable approvals, explicit cost limits, isolated code branches, recoverable edits, independent review, and preserved artifact revisions. Version 0.27.0 adds an opt-in empty outside heartbeat plus authenticated passphrase-encrypted whole-home export/import with staged replacement, health verification, and rollback. The local Mac remains the default and no data moves silently. Grok Bot remains easier because Cursor operates the cloud service, and it still has broader connectors, fidelity-preserving Office work, App Store distribution, and organization administration.
 
 ## Highest-value gaps
 
 | Priority | Experience gap | Why it matters | Product direction |
 |---|---|---|---|
-| P1 | Managed availability | The private runner continues when the Mac is off; setup, backup-first updates, real diagnostics, and device alerts are guided. OpenBot still does not sell or operate a zero-setup managed cloud. | Add encrypted export/import and optional outside-in reachability checks without hiding ownership or location. |
+| P1 | Managed availability | The private runner continues when the Mac is off; setup, backup-first updates, diagnostics, device alerts, outside check-ins, and encrypted migration are guided. OpenBot still does not sell or operate a zero-setup managed cloud. | Simplify host bootstrap and recovery without hiding ownership, location, or the third-party heartbeat dependency. |
 | P2 | Connector breadth and events | Google Workspace, GitHub, Slack, Notion, Todoist, and Dropbox cover the core personal context loop; Todoist and Dropbox can now start proactive work, but CRM, Slack events, and Notion events remain absent. | Continue one reviewed connector at a time on the durable cursor, permission, dedupe, and replay contract. |
 | P2 | Fidelity editing, OCR, and transcription | OpenBot understands common PDF/Office/sheet/text files and forwards media to compatible models, but scanned documents, guaranteed local transcription, and layout-safe Office edits remain uneven. | Add opt-in OCR/local speech models and dedicated document/workbook engines with rendered before/after review. |
 | P2 | Connector-event breadth | Calendar, Todoist, Dropbox, signed GitHub, and signed generic events are durable and can now run continuously on a private host; Slack and Notion event sources are still absent. | Add event sources one at a time on the existing cursor, receipt, dedupe, replay, and approval contract. |
@@ -28,12 +28,13 @@ OpenBot's strongest difference is owner control: an explicit local-or-private-ho
 6. **0.24 — Shipped in source:** optional owner-operated private runner with HTTPS ingress, durable data/model/browser storage, public callbacks, health/readiness, backups, and matching web/native visibility.
 7. **0.25 — Shipped in source:** real authenticated Home checks, backup freshness receipts, domain-guided setup, and consistent Mac/private location language on web and iPhone.
 8. **0.26 — Shipped in source:** opt-in durable health/recovery notifications plus backup-first, fail-closed private-runner updates with replacement health checks and previous-image recovery.
-9. **Next — Open connector events:** Slack/Notion events, custom MCP review contract, and additional productivity sources.
-10. **Later — Fidelity tools:** OCR, local transcription, and format-aware Office editing after their model, privacy, and rendered-review boundaries are proven.
+9. **0.27 — Shipped in source:** privacy-preserving outside check-ins plus encrypted whole-home export/import with authentication, staging, health verification, and rollback.
+10. **Next — Open connector events:** Slack/Notion events, custom MCP review contract, and additional productivity sources.
+11. **Later — Fidelity tools:** OCR, local transcription, and format-aware Office editing after their model, privacy, and rendered-review boundaries are proven.
 
 ## Release truth
 
-OpenBot 0.26.0 closes more of the owner-operated availability gap around its always-on private host: setup begins with one domain, the running product checks actual storage/backups/software/tools, registered devices can receive opt-in changed-state and recovery alerts, and updates back up before advancing and recover the prior image after failed startup. It is not a zero-setup managed service; DNS, server hardening, provider/OAuth configuration, and outside-in reachability remain owner responsibilities. OpenBot remains differentiated by explicit data location, model ownership, granular teammate authority, one-voice consultation, exact-commit review, recoverable writes, durable approvals, and signed automations. Signed native distribution, broader connector/event coverage, fidelity tools, and organization administration remain real gaps.
+OpenBot 0.27.0 closes more of the owner-operated availability and portability gap around its always-on private host: setup begins with one domain, the running product checks actual storage/backups/software/tools, registered devices can receive opt-in changed-state and recovery alerts, an outside service can detect a total outage from missing empty check-ins, and a complete home can move through an authenticated encrypted archive with staged rollback. It is not a zero-setup managed service; DNS, server hardening, provider/OAuth configuration, and choosing the external heartbeat service remain owner responsibilities. OpenBot remains differentiated by explicit data location, model ownership, granular teammate authority, one-voice consultation, exact-commit review, recoverable writes, durable approvals, and signed automations. Signed native distribution, broader connector/event coverage, fidelity tools, and organization administration remain real gaps.
 
 ## Primary comparison sources
 

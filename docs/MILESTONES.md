@@ -491,3 +491,16 @@ Status: complete in source for the owner-operated 0.26.0 release
 - Successful update receipts record the old/new release and exact revision for the authenticated Home check
 
 Verification: 105 automated tests cover durable alert transitions, restart-safe dedupe, recovery notifications, opt-in behavior, update-receipt parsing, and every earlier product contract. TypeScript, production build, release/native checks, iOS simulator tests, shell syntax, invalid-ref rejection, desktop/phone visual QA, and the Linux private-runner build/boot/Home-check CI gate form the release gate.
+
+## M33 — Outside outage detection and encrypted home transfer
+
+Status: complete in source for the owner-operated 0.27.0 release
+
+- Private-home owners can opt into an external heartbeat that sends one empty HTTPS check-in every five minutes, allowing the chosen outside service to notice a complete host or network outage
+- Heartbeat URLs are encrypted at rest, omitted from diagnostics, restricted to public HTTPS on the standard secure port, resolved before sending, and pinned to the validated public address to resist private-network requests and DNS rebinding
+- Web and native iPhone Home checks share calm setup, enabled, failure, replace, and disable states without exposing the private URL
+- A terminal-only export command creates one authenticated AES-256-GCM archive containing studio data, model logins, browser state, and server-side projects; scrypt derives the key from a passphrase that never enters either app
+- Import authenticates before extraction, accepts only the expected three roots, rejects links and special files, stages the complete result while OpenBot remains available, and creates a fresh backup before any swap
+- The replacement must become healthy; partial or failed imports restore the prior home and keep a recoverable copy instead of silently losing data
+
+Verification: 110 automated tests cover safe URL parsing, private/reserved address rejection, mixed public/private DNS rejection, encrypted durable heartbeat state, success/failure receipts, disabled silence, secret-free authenticated export, complete restore, incorrect-passphrase rejection, and ciphertext tamper rejection alongside every earlier product contract. TypeScript, production build, release/native checks, iOS simulator tests, shell/Node syntax, responsive desktop/phone visual QA, and the Linux private-runner build/boot/Home-check CI gate form the release gate.

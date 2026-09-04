@@ -46,11 +46,13 @@ jobs:
               curl --fail --silent \
                 --header "Authorization: Bearer ${access_token}" \
                 http://127.0.0.1:4311/api/runner/diagnostics \
-                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.26.0" || result.checks?.length !== 6 || result.alerts?.enabled !== false) process.exit(1); });'
+                | node -e 'let value = ""; process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => { const result = JSON.parse(value); if (result.mode !== "private_runner" || result.version !== "0.27.0" || result.checks?.length !== 6 || result.alerts?.enabled !== false || result.heartbeat?.configured !== false || result.heartbeat?.enabled !== false) process.exit(1); });'
               exit 0
             fi
             sleep 1
           done
           exit 1
       - name: Validate private runner maintenance scripts
-        run: bash -n deploy/private-runner/setup.sh deploy/private-runner/backup.sh deploy/private-runner/update.sh
+        run: |
+          bash -n deploy/private-runner/setup.sh deploy/private-runner/backup.sh deploy/private-runner/update.sh deploy/private-runner/export-home.sh deploy/private-runner/import-home.sh
+          node --check deploy/private-runner/home-transfer.mjs

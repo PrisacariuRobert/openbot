@@ -42,6 +42,11 @@ final class OpenBotMobileUITests: XCTestCase {
         let messageField = app.textFields["native-message-field"]
         XCTAssertTrue(messageField.waitForExistence(timeout: 10), "The native message composer did not load.")
         XCTAssertTrue(app.buttons["Start voice capture"].exists, "The native voice action is missing from the composer.")
+        app.buttons["Live Studio"].tap()
+        let heartbeatEnabled = app.staticTexts["Offline protection is checking in"].waitForExistence(timeout: 10)
+        let heartbeatReadyToConfigure = app.staticTexts["Know if this whole home goes offline"].waitForExistence(timeout: heartbeatEnabled ? 0 : 2)
+        XCTAssertTrue(heartbeatEnabled || heartbeatReadyToConfigure, "The native outside-heartbeat control did not load.")
+        XCTAssertTrue(app.staticTexts["Move this home securely"].exists, "The native encrypted-transfer guidance did not load.")
         if let expectedDraft = environment["OPENBOT_TEST_DRAFT"], !expectedDraft.isEmpty {
             let continuedLabel = app.staticTexts["Continued from your Mac"]
             XCTAssertTrue(continuedLabel.waitForExistence(timeout: 10), "The Mac-to-iPhone handoff cue did not appear.")

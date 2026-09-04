@@ -1,6 +1,6 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 for the 0.26 private-home maintenance release.
+Updated September 4, 2026 for the 0.27 resilient private-home release.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
 
@@ -166,11 +166,21 @@ Verified by 103 automated tests, TypeScript and production builds, native simula
 
 Verified by 105 automated tests, TypeScript and production builds, native simulator checks, shell syntax, guarded-script validation, live private-server behavior, responsive desktop/phone browser acceptance, and the Linux private-runner build/boot/Home-check CI gate.
 
+## Shipped in 0.27 — Outside outage detection and encrypted migration
+
+- Added an opt-in five-minute outside heartbeat so an owner-chosen service can notice when the complete host or network disappears
+- Kept heartbeat payloads empty, encrypted the private URL at rest, omitted it from diagnostics, and rejected non-HTTPS, nonstandard-port, local, private, reserved, or mixed-DNS destinations
+- Added matching plain-language heartbeat setup and status to responsive web and native iPhone Home checks
+- Added a terminal-only authenticated AES-256-GCM whole-home export containing studio data, model-login state, browser profiles, and server-side projects
+- Added staged import that authenticates before extraction, validates the archive shape, rejects links/special files, creates a fresh backup, swaps only complete roots, waits for health, and restores the prior home after failure
+- Kept the transfer passphrase out of both applications and made copy-and-switch semantics explicit instead of implying background synchronization
+
+Verified by 110 automated tests, TypeScript and production builds, native simulator checks, shell/Node syntax, transfer tamper and wrong-passphrase tests, live private-server behavior, responsive desktop/phone browser acceptance, and the Linux private-runner build/boot/Home-check CI gate.
+
 ## Next — Open connections and richer events
 
 - Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
 - Define a reviewed custom MCP/connector install contract with visible permissions and revocation
-- Add encrypted private-home export/import and an optional privacy-preserving outside-in reachability check
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
 
 ## Later, not implied by the beta

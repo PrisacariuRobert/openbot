@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import QuickLook
+import UIKit
 
 struct StudioContainerView: View {
     @EnvironmentObject private var session: ConnectionSession
@@ -631,6 +632,8 @@ private struct NativeLiveStudioView: View {
     @EnvironmentObject private var session: ConnectionSession
     @EnvironmentObject private var push: PushRegistration
     @ObservedObject var store: StudioStore
+    @State private var heartbeatAddress = ""
+    @State private var editingHeartbeat = false
     let onSelect: (String) -> Void
 
     private var runs: [StudioRun] { store.state.studioRuns ?? store.state.runs }
@@ -736,6 +739,59 @@ private struct NativeLiveStudioView: View {
                                             }
                                             .buttonStyle(.borderedProminent).tint(care.alerts.enabled ? .gray : OpenBotTheme.purple).controlSize(.mini)
                                             .disabled(store.isCheckingRunner)
+                                        }
+                                        Divider().opacity(0.55)
+                                        VStack(alignment: .leading, spacing: 7) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: care.heartbeat.enabled ? "wifi" : "wifi.slash")
+                                                    .foregroundStyle(care.heartbeat.enabled ? OpenBotTheme.green : OpenBotTheme.purple)
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(care.heartbeat.enabled ? "Offline protection is checking in" : "Know if this whole home goes offline")
+                                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                    Text(care.heartbeat.enabled ? "Every \(care.heartbeat.intervalMinutes) min · \(care.heartbeat.provider ?? "outside service")" : "Only an empty pulse leaves OpenBot. No files, prompts, or health details are sent.")
+                                                        .font(.system(size: 8.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                                }
+                                                Spacer(minLength: 4)
+                                                if care.heartbeat.configured && !editingHeartbeat {
+                                                    Button("Replace") { editingHeartbeat = true }.buttonStyle(.bordered).controlSize(.mini)
+                                                }
+                                                Button(care.heartbeat.enabled && !editingHeartbeat ? "Turn off" : care.heartbeat.configured && !editingHeartbeat ? "Turn on" : "Connect") {
+                                                    Task {
+                                                        let replacing = editingHeartbeat || !care.heartbeat.configured
+                                                        await store.setExternalHeartbeat(care.heartbeat.enabled && !editingHeartbeat ? false : true, url: replacing ? heartbeatAddress.trimmingCharacters(in: .whitespacesAndNewlines) : nil)
+                                                        if store.errorMessage == nil { heartbeatAddress = ""; editingHeartbeat = false }
+                                                    }
+                                                }
+                                                .buttonStyle(.borderedProminent).tint(care.heartbeat.enabled && !editingHeartbeat ? .gray : OpenBotTheme.purple).controlSize(.mini)
+                                                .disabled(store.isCheckingRunner)
+                                            }
+                                            if !care.heartbeat.configured || editingHeartbeat {
+                                                TextField("https://heartbeat.example/your-private-id", text: $heartbeatAddress)
+                                                    .font(.system(size: 9, design: .rounded)).textInputAutocapitalization(.never).keyboardType(.URL)
+                                                    .padding(.horizontal, 9).frame(height: 32)
+                                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(.black.opacity(0.07)))
+                                            }
+                                            if let heartbeatError = care.heartbeat.lastError {
+                                                Label(heartbeatError, systemImage: "exclamationmark.circle.fill")
+                                                    .font(.system(size: 8.5, design: .rounded)).foregroundStyle(.orange)
+                                            } else if care.heartbeat.lastSuccessAt != nil {
+                                                Label("Latest check-in reached the outside service", systemImage: "checkmark.circle.fill")
+                                                    .font(.system(size: 8.5, design: .rounded)).foregroundStyle(OpenBotTheme.green)
+                                            }
+                                        }
+                                        Divider().opacity(0.55)
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Label("Move this home securely", systemImage: "lock.shield.fill")
+                                                .font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(OpenBotTheme.purple)
+                                            Text("Create one passphrase-encrypted file containing the studio, subscriptions, browser state, and projects. Import verifies and stages it before replacing anything.")
+                                                .font(.system(size: 8.5, design: .rounded)).foregroundStyle(.secondary)
+                                            HStack {
+                                                Text("./deploy/private-runner/export-home.sh").font(.system(size: 8, design: .monospaced)).lineLimit(1)
+                                                Spacer()
+                                                Button { UIPasteboard.general.string = "./deploy/private-runner/export-home.sh" } label: { Image(systemName: "doc.on.doc") }
+                                                    .buttonStyle(.bordered).controlSize(.mini)
+                                            }
                                         }
                                         if let error = store.errorMessage {
                                             Text(error).font(.system(size: 8.5, design: .rounded)).foregroundStyle(.orange)

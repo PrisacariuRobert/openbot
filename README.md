@@ -1,18 +1,18 @@
-# OpenBot 0.26.0
+# OpenBot 0.27.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.26.0
+## What's new in 0.27.0
 
-- Added opt-in **private-home health alerts** that check every 15 minutes and send one quiet Web Push or iPhone alert when storage, backup, model runtime, browser, or bot-computer health needs attention.
-- Added a separate recovery notification when every Home check returns to ready, with durable state that prevents restart spam and limits unchanged reminders to once per day.
-- Added a guided `update.sh` workflow that refuses dirty or diverged source, creates an owner-only backup first, builds while the current service stays online, and verifies the replacement before declaring success.
-- Added automatic container recovery: if the new OpenBot image does not become healthy, the updater restores the previously running image and points the owner to the fresh backup.
-- Home check now includes the installed software release and the last successful backup-first update receipt.
-- Added matching health-alert controls to the responsive web app and native SwiftUI Live Studio, reusing the existing private Web Push and APNs delivery paths.
-- Preserved the 0.25 guided private-home setup, real diagnostics, local-first default, connector permissions, approvals, isolated coding, and animated customizable characters.
+- Added an opt-in **outside heartbeat** that sends one empty check-in every five minutes, allowing the owner's chosen external service to notice even when the entire private host or network is offline.
+- Heartbeat addresses are encrypted at rest, never returned to clients, restricted to public HTTPS, pinned to checked DNS results, and blocked from local, private, metadata, or redirected destinations.
+- Added one authenticated `.openbot-home` transfer containing studio state, subscription sessions, browser state, and projects, protected by AES-256-GCM and a memory-hard passphrase key.
+- Export pauses OpenBot for a consistent snapshot; import authenticates and stages every file before touching the running home.
+- Import creates a fresh ordinary backup and preserves the previous home, then automatically rolls back if the transferred home does not become healthy.
+- Added clear responsive web and native iPhone controls for heartbeat setup and secure migration commands without placing the transfer passphrase in either app.
+- Preserved the 0.26 backup-first updater, internal health/recovery alerts, owner-controlled hosting, granular permissions, isolated coding, and animated customizable characters.
 
 ## What is included
 
@@ -41,7 +41,8 @@ The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCod
 - Dependable automations with five-minute/hourly/daily schedules, signed generic and GitHub webhooks, Google Calendar triggers, narrow filters, editing, pause/resume, explicit test runs, event receipts, replay, result links, and safe deletion
 - Proactive Todoist task and Dropbox folder-change triggers with durable cursors, fresh-start baselines, and connector-specific filters
 - Duplicate-event protection, rate limits, loop headers, bounded retained inputs, visible failure guidance, approval-wait alerts, missed-schedule notices, and automatic pausing after three consecutive failures
-- A durable single-leader runner with atomic job claims, renewable leases, graceful shutdown handoff, crash recovery, visible health, optional macOS login/crash protection, and an optional private always-on Linux home with backup-first updates and opt-in health alerts
+- A durable single-leader runner with atomic job claims, renewable leases, graceful shutdown handoff, crash recovery, visible health, optional macOS login/crash protection, and an optional private always-on Linux home with backup-first updates and opt-in internal and outside health signals
+- Passphrase-encrypted whole-home export/import for studio state, subscription sessions, browser profiles, and server projects, with authenticated staging, health verification, and rollback
 - A durable notification outbox plus standards-based Web Push for installed secure web apps, including direct links to results and approval waits
 - Native iPhone APNs registration and delivery with per-device retries, stale-token cleanup, and conversation/approval deep links
 - Persistent approvals for destructive, publishing, communication, purchasing, credential, and system actions
