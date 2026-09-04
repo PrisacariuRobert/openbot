@@ -8,6 +8,8 @@ final class StudioStore: ObservableObject {
     @Published private(set) var isLive = false
     @Published private(set) var needsAuthentication = false
     @Published private(set) var runnerCare: StudioRunnerCare?
+    @Published private(set) var connectorStatus: StudioConnectorStatus?
+    @Published private(set) var isCheckingConnectors = false
     @Published private(set) var isCheckingRunner = false
     @Published var errorMessage: String?
     @Published var shareNotice: String?
@@ -41,6 +43,7 @@ final class StudioStore: ObservableObject {
 
     func start() async {
         await refresh()
+        await refreshConnectors()
         eventTask?.cancel()
         eventTask = Task { [weak self] in await self?.eventLoop() }
     }
@@ -89,6 +92,32 @@ final class StudioStore: ObservableObject {
 
     func wakeRunner() async {
         await perform { try await client.wakeRunner() }
+    }
+
+    func refreshConnectors() async {
+        guard !isCheckingConnectors else { return }
+        isCheckingConnectors = true
+        defer { isCheckingConnectors = false }
+        do {
+            connectorStatus = try await client.connectors()
+        } catch {
+            if case StudioAPIError.unauthorized = error { handle(error) }
+        }
+    }
+
+    func beginGoogleConnection() async -> URL? {
+        guard !isCheckingConnectors else { return nil }
+        isCheckingConnectors = true
+        errorMessage = nil
+        defer { isCheckingConnectors = false }
+        do { return try await client.beginGoogleConnection() }
+        catch { handle(error); return nil }
+    }
+
+    @discardableResult
+    func startWorkflow(_ starter: StudioStarter, timeZone: String = TimeZone.current.identifier) async -> Bool {
+        await chooseThread("team-room")
+        return await send(starter.prompt(timeZone: timeZone), targetBotID: nil)
     }
 
     func checkRunnerCare() async {

@@ -1,9 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 5, 2026
-Release: 0.31.0 development beta — not yet published
+Release: 0.32.0 development beta — not yet published
 
-New in this pass: bounded source-backed Gmail/Calendar briefs, local unsent reply drafts with source-bound recipients, encrypted source snapshots, automatic report attachments, and coding-command evidence tied to the reviewed/published commit. See [validation and remaining limits](QA_0.31.md). Safe claim: **“See the sources, review the drafts, and know which code checks actually ran.”** Do not claim complete inbox coverage, independently verified AI advice, guaranteed bug fixes, or comparative model-quality superiority.
+New in this pass: the native SwiftUI iPhone app has a first-class Work destination for Morning Brief, Meeting Prep, and Inbox Follow-ups, backed by live connector readiness, one-tap Google recovery, and the same source/no-write requirements as the web app. See [validation and remaining limits](QA_0.32.md). Safe claim: **“Start the same source-backed jobs from your iPhone and follow them in the team room.”** Do not claim full native settings, physical-device/cellular proof, complete inbox coverage, independently verified AI advice, guaranteed bug fixes, or comparative model-quality superiority.
 
 Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 
@@ -26,7 +26,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 5. **You choose where it lives.** Keep conversations, permissions, routines, encrypted connector credentials, and audit trails on the Mac, or move the whole studio deliberately to your own always-on host.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
 7. **Files become working context and reviewable results.** PDFs, Office files, sheets, source, screenshots, and media arrive with bounded previews; teammate-created files return in the conversation with preserved revisions.
-8. **Continue on the device in your hand.** Share a file or link from another iPhone app, dictate an editable message, follow result/approval notifications, or return to the web studio from anywhere the chosen host is reachable.
+8. **Continue on the device in your hand.** Start a connector-aware brief, meeting prep, or follow-up job; share a file or link from another iPhone app; dictate an editable message; and follow result or approval notifications wherever the chosen host is reachable.
 9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
 10. **A real iPhone app without a data grab.** The compiled SwiftUI client protects the key in Keychain and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, approvals, and host status to the phone without embedding the desktop website.
 11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
@@ -255,6 +255,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Authenticated remote mode for a trusted private network or encrypted tunnel
 - Matching web/native **This Mac** and **Private always-on home** status with explicit data location
 - Live in-app notifications, background Web Push for secure installed web apps, and native APNs registration/deep links
+- Native connector-aware Work screen for Morning Brief, Meeting Prep, and Inbox Follow-ups, with one-tap Google authorization/API recovery and the same source, coverage, draft, and no-write rules as the web app
 - Embedded iOS Share extension with a bounded private handoff for text, links, images, and files
 
 ### Safety, privacy, and accountability

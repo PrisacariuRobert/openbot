@@ -25,4 +25,28 @@ final class ConnectionAddressTests: XCTestCase {
         XCTAssertNil(OpenBotDeepLink.serverAddress(from: URL(string: "openbot://connect?key=never-put-secrets-here")!))
         XCTAssertNil(OpenBotDeepLink.serverAddress(from: URL(string: "openbot://connect?server=https%3A%2F%2Fstudio.example.com&key=never-put-secrets-here")!))
     }
+
+    func testNativeWorkStartersKeepSourceAndSafetyRequirements() {
+        XCTAssertEqual(StudioStarter.all.map(\.id), ["morning-brief", "meeting-prep", "inbox-follow-ups"])
+
+        let morning = StudioStarter.all[0].prompt(timeZone: "Europe/Brussels")
+        XCTAssertTrue(morning.contains("Europe/Brussels"))
+        XCTAssertTrue(morning.contains("source-linked"))
+        XCTAssertTrue(morning.contains("Do not send or change anything"))
+
+        let followUps = StudioStarter.all[2].prompt(timeZone: "Europe/Brussels")
+        XCTAssertTrue(followUps.contains("Skip conversations I have already answered"))
+        XCTAssertTrue(followUps.contains("reply drafts for me to review"))
+        XCTAssertTrue(followUps.contains("Do not send or change anything"))
+    }
+
+    func testNativeConnectorReadinessUsesLiveCatalog() throws {
+        let data = Data(#"{"managedGoogleClient":false,"connection":{"connected":true},"googleApiRecoveries":[{"service":"google-calendar","serviceName":"Google Calendar","enableUrl":"https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"}],"catalog":[{"id":"gmail","name":"Gmail","connected":true,"description":"Mail","badge":"Live","availability":"live","capabilities":[]},{"id":"google-calendar","name":"Google Calendar","connected":false,"description":"Calendar","badge":"Live","availability":"live","capabilities":[]}]}"#.utf8)
+        let status = try JSONDecoder().decode(StudioConnectorStatus.self, from: data)
+        XCTAssertTrue(status.isConnected("gmail"))
+        XCTAssertFalse(status.isConnected("google-calendar"))
+        XCTAssertFalse(status.isConnected("google-drive"))
+        XCTAssertTrue(status.canStartGoogleOAuth)
+        XCTAssertEqual(status.googleRecoveryURL(for: "google-calendar")?.host, "console.cloud.google.com")
+    }
 }

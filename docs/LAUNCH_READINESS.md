@@ -1,6 +1,8 @@
-# OpenBot 0.31.0 Launch Readiness
+# OpenBot 0.32.0 Launch Readiness
 
-0.31 adds source-backed brief/follow-up reports and host-recorded coding checks bound to the published commit. See [current validation](QA_0.31.md). These are functional improvements with bounded fixtures, not completion of the repeated two-model acceptance gate. Google consent/setup, fresh-user onboarding, full native settings, stronger runtime/egress isolation, crash-safe external-action reconciliation, signed distribution and physical-device/cellular checks remain open.
+0.32 adds native, connector-aware entry points for the source-backed Morning Brief, Meeting Prep, and Inbox Follow-up jobs. See [current validation](QA_0.32.md). This was compiled and exercised against the running studio on an iPhone 17 Pro simulator; it is not a physical-device, cellular, APNs, App Store, or complete native-settings certification. Google consent/setup, fresh-user onboarding, full native provider and connector administration, the repeated two-model workflow gate, stronger runtime/egress isolation, crash-safe external-action reconciliation, and signed distribution remain open.
+
+0.31 adds source-backed brief/follow-up reports and host-recorded coding checks bound to the published commit. See [its validation](QA_0.31.md). These are functional improvements with bounded fixtures, not completion of the repeated two-model acceptance gate.
 
 0.30 adds bounded execution and reported-usage protection; see [current validation](QA_0.30.md). The historical evidence below is not a new end-to-end certification. The application remains an owner-operated development beta; broad launch gates remain open.
 

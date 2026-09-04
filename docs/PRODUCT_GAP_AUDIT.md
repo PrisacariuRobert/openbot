@@ -2,7 +2,7 @@
 
 Audit date: 4 September 2026. Baseline: 0.28.0, commit `88b8de9`. Remediation: **0.29.0 development branch**, not a published release.
 
-Follow-up, 5 September 2026: 0.31 turns briefs/follow-ups into source-backed report workflows and adds host-recorded code checks bound to an exact clean commit. 0.30's execution/usage safeguards remain in place. See [current functional validation](QA_0.31.md). These changes advance M2; they do not complete its two-model repeated acceptance gate or the remaining security milestones.
+Follow-up, 5 September 2026: 0.32 exposes the same source-backed brief, meeting-prep, and follow-up jobs in the native SwiftUI app, gated by live connector state. 0.31's reports and commit-bound code checks plus 0.30's execution/usage safeguards remain in place. See [current native validation](QA_0.32.md). This advances daily-use native parity; it does not complete full native administration, the two-model repeated acceptance gate, physical-device/cellular validation, or the remaining security milestones.
 
 ## Verdict
 
@@ -57,11 +57,11 @@ These are blockers to advertising unattended, unrestricted computer autonomy. Ex
 |---|---|---|
 | Persistent assistant and private consultation | Durable data and bounded coordinator/child orchestration exist. Quality depends on the model; synthetic tests are not business-work evidence. | Repeated real tasks produce one sourced answer after actual consultation; child failures remain visible. |
 | Bring your own models | Two runtimes; account-specific sign-in; 0.29 adds custom Chat Completions, Responses and Messages configurations. Not every subscription is eligible. | Provider contract suite plus real tool-use task per supported runtime; clear unsupported states and reconnect tests. |
-| Morning brief / inbox triage | Read connectors, schedules and draft artifacts exist. End-to-end account setup and source freshness remain uneven. | Fresh inbox + calendar + task inputs produce a ranked digest with source links, no duplicates and no unsent message marked sent. |
+| Morning brief / inbox triage | Source-backed web and native starters, bounded snapshots, saved reports, and unsent drafts exist. End-to-end account setup, source freshness, and repeated two-model evidence remain uneven. | Fresh inbox + calendar + task inputs produce a ranked digest with source links, no duplicates and no unsent message marked sent. |
 | Invoice / document work | Bounded extraction and artifact revisions exist; OCR, transcription and layout-preserving editing are incomplete. | Mixed receipt fixtures, exact reconciled totals, missing-data flags, editable workbook and rendered visual review. |
 | Browser/admin work | Persistent profiles, readable pages, owner takeover and browser skills exist. General visual app control is limited. | Ten controlled site workflows, changed selectors, login expiry and stopped actions; zero unauthorized mutations. |
 | Engineering work | Worktrees, project grants, diffs and reviews exist. General dependency provisioning and reproducible builds are incomplete. | Fix a real fixture bug in separate JS and Python projects; run independent tests; preserve the original checkout. |
-| Laptop closed / phone away | Private-host source and health/transfer tooling exist. No managed service; native distribution and physical APNs proof incomplete. | Fresh-host install, restart/restore, Wi-Fi-to-cellular continuity and physical push delivery with an owner-configured host. |
+| Laptop closed / phone away | Private-host source and health/transfer tooling exist, and native Work can start the three dependable jobs. No managed service; native distribution and physical APNs/cellular proof are incomplete. | Fresh-host install, restart/restore, Wi-Fi-to-cellular continuity and physical push delivery with an owner-configured host. |
 | Community / team ecosystem | MIT source and portable browser skills exist. No reviewed executable marketplace, multi-user tenancy, SSO or offboarding. | Published extension contract, contributor setup/CI, compatibility matrix; later design tenancy before organization claims. |
 
 ## Different in useful ways

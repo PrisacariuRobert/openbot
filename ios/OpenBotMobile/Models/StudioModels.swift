@@ -179,6 +179,88 @@ struct StudioDraft: Codable, Hashable {
 
 struct StudioEvent: Decodable { let type: String }
 
+struct StudioConnectorStatus: Decodable, Hashable {
+    let catalog: [StudioConnectorCatalogEntry]
+    let managedGoogleClient: Bool?
+    let connection: StudioConnectorConnection?
+    let googleApiRecoveries: [StudioGoogleApiRecovery]?
+
+    func isConnected(_ serviceID: String) -> Bool {
+        catalog.first(where: { $0.id == serviceID })?.connected == true
+    }
+
+    var canStartGoogleOAuth: Bool { managedGoogleClient == true || connection != nil }
+
+    func googleRecoveryURL(for serviceID: String) -> URL? {
+        guard let value = googleApiRecoveries?.first(where: { $0.service == serviceID })?.enableUrl,
+              let url = URL(string: value), url.scheme?.lowercased() == "https" else { return nil }
+        return url
+    }
+}
+
+struct StudioConnectorCatalogEntry: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let connected: Bool
+}
+
+struct StudioConnectorConnection: Decodable, Hashable {
+    let connected: Bool
+}
+
+struct StudioGoogleApiRecovery: Decodable, Hashable {
+    let service: String
+    let serviceName: String
+    let enableUrl: String
+}
+
+struct StudioStarter: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let summary: String
+    let detail: String
+    let systemImage: String
+    let requiredServices: [String]
+
+    func prompt(timeZone: String) -> String {
+        switch id {
+        case "morning-brief":
+            return "Prepare my morning brief for the next 24 hours in \(timeZone). Check my primary calendar and unread inbox conversations from the past seven days. Give me a short schedule and source-linked priorities, save a report, and tell me if anything could not be checked. Separate suggestions from facts. Do not send or change anything."
+        case "meeting-prep":
+            return "Use @calendar, @drive, and @gmail to prepare me for my next meeting. Deliver a short briefing with the event details, attendees, recent related documents, the latest relevant email thread, likely decisions, and five useful questions. Link every source, verify that the material is about the same meeting, and do not change anything."
+        default:
+            return "Prepare my inbox follow-ups in \(timeZone). Check inbox conversations from the past seven days. Suggest source-linked priorities and save useful reply drafts for me to review. Skip conversations I have already answered and flag any missing or shortened context. Save the report. Do not send or change anything."
+        }
+    }
+
+    static let all: [StudioStarter] = [
+        StudioStarter(
+            id: "morning-brief",
+            title: "Morning brief",
+            summary: "Your next 24 hours, priorities, and source links",
+            detail: "Reads Calendar and recent unread Gmail. Saves a report and never sends or changes anything.",
+            systemImage: "sun.max.fill",
+            requiredServices: ["gmail", "google-calendar"]
+        ),
+        StudioStarter(
+            id: "meeting-prep",
+            title: "Prepare my next meeting",
+            summary: "A checked brief with context and useful questions",
+            detail: "Matches Calendar, Drive, and Gmail sources before drawing conclusions.",
+            systemImage: "person.2.fill",
+            requiredServices: ["gmail", "google-drive", "google-calendar"]
+        ),
+        StudioStarter(
+            id: "inbox-follow-ups",
+            title: "Prepare my follow-ups",
+            summary: "Priorities and reply drafts for your review",
+            detail: "Reads recent inbox conversations, skips threads you answered, and leaves every draft unsent.",
+            systemImage: "envelope.badge.fill",
+            requiredServices: ["gmail"]
+        )
+    ]
+}
+
 extension StudioState {
     static let empty = StudioState(
         bots: [], threads: [], messages: [], runs: [], studioRuns: [], approvals: [], workflows: [], runner: nil,

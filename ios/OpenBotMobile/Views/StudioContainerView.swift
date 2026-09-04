@@ -10,6 +10,7 @@ struct StudioContainerView: View {
     @StateObject private var store: StudioStore
     @StateObject private var network = NetworkMonitor()
     @State private var showingThreads = false
+    @State private var showingWork = false
     @State private var showingLiveStudio = false
     @State private var showingSettings = false
 
@@ -26,6 +27,7 @@ struct StudioContainerView: View {
                     isLive: network.isOnline && store.isLive,
                     isPrivateHome: store.state.runner?.deployment?.mode == "private_runner",
                     onThreads: { showingThreads = true },
+                    onWork: { showingWork = true },
                     onLiveStudio: { showingLiveStudio = true },
                     onSettings: { showingSettings = true }
                 )
@@ -53,13 +55,19 @@ struct StudioContainerView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await store.importSharedInbox() }
+            Task {
+                await store.importSharedInbox()
+                await store.refreshConnectors()
+            }
         }
         .sheet(isPresented: $showingThreads) {
             ThreadPickerView(store: store) { id in
                 showingThreads = false
                 Task { await store.chooseThread(id) }
             }
+        }
+        .sheet(isPresented: $showingWork) {
+            NativeWorkView(store: store)
         }
         .sheet(isPresented: $showingLiveStudio) {
             NativeLiveStudioView(store: store) { threadID in
@@ -84,6 +92,7 @@ private struct StudioHeader: View {
     let isLive: Bool
     let isPrivateHome: Bool
     let onThreads: () -> Void
+    let onWork: () -> Void
     let onLiveStudio: () -> Void
     let onSettings: () -> Void
 
@@ -113,6 +122,14 @@ private struct StudioHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            Button(action: onWork) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 34, height: 40)
+            }
+            .accessibilityLabel("Work")
+            .accessibilityIdentifier("studio-work-button")
+
             Button(action: onLiveStudio) {
                 Image(systemName: "rectangle.3.group")
                     .font(.system(size: 16, weight: .semibold))
@@ -132,6 +149,253 @@ private struct StudioHeader: View {
         .padding(.top, 3)
         .padding(.bottom, 5)
         .background(.ultraThinMaterial)
+    }
+}
+
+private struct NativeWorkView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openURL) private var openURL
+    @ObservedObject var store: StudioStore
+    @State private var startingID: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 12) {
+                                workHeroCopy
+                                workHeroMascots.frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        } else {
+                            HStack(alignment: .center, spacing: 14) {
+                                workHeroCopy
+                                Spacer(minLength: 0)
+                                workHeroMascots
+                            }
+                        }
+                    }
+                    .padding(19)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.24, green: 0.29, blue: 0.47), OpenBotTheme.messagePurpleEnd],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ready-made work")
+                            .font(.title3.bold()).fontDesign(.rounded)
+                            .accessibilityIdentifier("native-ready-made-work")
+                        Text("Start here, then keep talking naturally in the team room.")
+                            .font(.subheadline.weight(.medium)).fontDesign(.rounded)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let error = store.errorMessage {
+                        Label(error, systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote.weight(.semibold)).fontDesign(.rounded)
+                            .foregroundStyle(Color(red: 0.68, green: 0.25, blue: 0.23))
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(red: 1, green: 0.91, blue: 0.88), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+
+                    ForEach(StudioStarter.all) { starter in
+                        workCard(starter)
+                    }
+
+                    if store.connectorStatus == nil {
+                        HStack(spacing: 10) {
+                            ProgressView().controlSize(.small).tint(OpenBotTheme.purple)
+                            Text("Checking which apps are ready…")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
+            }
+            .background(OpenBotTheme.paper.ignoresSafeArea())
+            .navigationTitle("Work")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityIdentifier("close-native-work")
+                }
+            }
+            .task { await store.refreshConnectors() }
+        }
+    }
+
+    private var workHeroCopy: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("DEPENDABLE STARTING POINTS", systemImage: "checkmark.seal.fill")
+                .font(.caption2.bold()).fontDesign(.rounded)
+                .foregroundStyle(Color.white.opacity(0.78))
+            Text("Put your team to work")
+                .font(.title2.bold()).fontDesign(.rounded)
+                .foregroundStyle(.white)
+            Text("Each job saves its sources, shows incomplete coverage, and keeps outgoing actions for your approval.")
+                .font(.footnote.weight(.medium)).fontDesign(.rounded)
+                .foregroundStyle(Color.white.opacity(0.74))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var workHeroMascots: some View {
+        MascotStack(bots: store.state.bots)
+            .scaleEffect(1.34)
+            .frame(width: 108, height: 76)
+            .clipped()
+    }
+
+    private func workCard(_ starter: StudioStarter) -> some View {
+        let missing = missingServices(for: starter)
+        let isReady = store.connectorStatus != nil && missing.isEmpty
+        let recoveryURL = missing.compactMap { store.connectorStatus?.googleRecoveryURL(for: $0) }.first
+        let canReconnect = store.connectorStatus?.canStartGoogleOAuth == true
+        let canAct = isReady || recoveryURL != nil || canReconnect
+        let statusLabel = isReady
+            ? connectedLabel(for: starter)
+            : recoveryURL != nil
+                ? "Tap to turn on \(missing.map(serviceName).joined(separator: " + "))"
+                : canReconnect
+                    ? "Tap to add \(missing.map(serviceName).joined(separator: " + "))"
+                    : missingLabel(missing)
+        return NativeWorkCard(
+            starter: starter,
+            isReady: isReady,
+            canAct: canAct,
+            isStarting: startingID == starter.id,
+            isBusy: startingID != nil,
+            statusLabel: statusLabel
+        ) {
+            guard canAct, startingID == nil else { return }
+            if let recoveryURL {
+                openURL(recoveryURL)
+                return
+            }
+            startingID = starter.id
+            Task {
+                if isReady {
+                    if await store.startWorkflow(starter) { dismiss() }
+                } else if let url = await store.beginGoogleConnection() {
+                    openURL(url)
+                }
+                startingID = nil
+            }
+        }
+    }
+
+    private func missingServices(for starter: StudioStarter) -> [String] {
+        guard let status = store.connectorStatus else { return starter.requiredServices }
+        return starter.requiredServices.filter { !status.isConnected($0) }
+    }
+
+    private func connectedLabel(for starter: StudioStarter) -> String {
+        "Ready with \(starter.requiredServices.map(serviceName).joined(separator: ", "))"
+    }
+
+    private func missingLabel(_ services: [String]) -> String {
+        services.isEmpty ? "Ready" : "Finish Google setup for \(services.map(serviceName).joined(separator: " + ")) on your host"
+    }
+
+    private func serviceName(_ id: String) -> String {
+        switch id {
+        case "google-calendar": return "Calendar"
+        case "google-drive": return "Drive"
+        default: return "Gmail"
+        }
+    }
+}
+
+private struct NativeWorkCard: View {
+    let starter: StudioStarter
+    let isReady: Bool
+    let canAct: Bool
+    let isStarting: Bool
+    let isBusy: Bool
+    let statusLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                cardHeader
+                Text(starter.detail)
+                    .font(.footnote).fontDesign(.rounded)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label(statusLabel, systemImage: isReady ? "checkmark.circle.fill" : "link.badge.plus")
+                    .font(.caption.bold()).fontDesign(.rounded)
+                    .foregroundStyle(isReady ? OpenBotTheme.green : Color.orange)
+            }
+            .padding(15)
+            .background(cardBackground, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .overlay(cardBorder)
+        }
+        .buttonStyle(NativeWorkButtonStyle())
+        .disabled(!canAct || isBusy)
+        .opacity(isReady ? 1 : 0.82)
+        .accessibilityHint(isReady ? "Starts this job in the team room" : statusLabel)
+    }
+
+    private var cardHeader: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(OpenBotTheme.purple.opacity(0.10))
+                Image(systemName: starter.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(OpenBotTheme.purple)
+            }
+            .frame(width: 46, height: 46)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(starter.title)
+                    .font(.headline).fontDesign(.rounded)
+                    .foregroundStyle(OpenBotTheme.ink)
+                    .multilineTextAlignment(.leading)
+                Text(starter.summary)
+                    .font(.subheadline.weight(.medium)).fontDesign(.rounded)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 4)
+            if isStarting {
+                ProgressView().controlSize(.small).tint(OpenBotTheme.purple)
+            } else {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(isReady ? OpenBotTheme.purple : Color.secondary)
+            }
+        }
+    }
+
+    private var cardBackground: Color {
+        Color.white.opacity(isReady ? 0.93 : 0.70)
+    }
+
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 21, style: .continuous)
+            .stroke(isReady ? OpenBotTheme.purple.opacity(0.12) : Color.black.opacity(0.06))
+    }
+}
+
+private struct NativeWorkButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.72 : 1)
     }
 }
 

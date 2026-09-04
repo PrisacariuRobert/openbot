@@ -1,6 +1,19 @@
 # OpenBot Milestones
 
-All milestones below are implemented in the current repository and were verified on September 2, 2026.
+Historical milestones below were implemented in the repository. The current milestone was verified on September 5, 2026; older verification dates remain attached to their original evidence.
+
+## M35 — Native dependable Work
+
+Status: complete in source for the owner-operated 0.32.0 native beta
+
+- The real SwiftUI app has a first-class Work destination for Morning Brief, Meeting Prep, and Inbox Follow-ups
+- Native jobs use the same source, coverage, time-zone, local-draft, and no-write requirements as their web equivalents
+- The phone reads live authenticated connector readiness and prevents a job from starting until its required Gmail, Calendar, and Drive services are available
+- Missing OAuth access can begin from iPhone in one tap; disabled Google APIs open their exact HTTPS Cloud enable page, and readiness refreshes when the owner returns
+- Missing apps remain readable and are named in plain language; ready jobs enter the shared team room so desktop and phone continue one durable conversation
+- Code-drawn runtime-colored teammates remain animated, contained, and Reduce Motion-aware; Work copy uses Dynamic Type-aware native styles and an accessibility-size layout
+
+Verification: Xcode 27.0 beta builds the app and Share extension for the booted iPhone 17 Pro simulator. Six native unit tests plus default-size and accessibility-XXXL live UI runs pass against the running owner studio without a model request. Simulator visual QA caught and fixed mascot overflow and excessive disabled opacity. Physical-device, cellular, production APNs, signing/TestFlight, complete native settings, and the repeated two-model M2 workflow gate remain open. See [the 0.32 validation record](QA_0.32.md).
 
 ## M0 — Working local teammate studio
 

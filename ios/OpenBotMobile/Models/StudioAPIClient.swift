@@ -8,6 +8,21 @@ struct StudioAPIClient {
         try await request("api/state", queryItems: [URLQueryItem(name: "threadId", value: threadID)])
     }
 
+    func connectors() async throws -> StudioConnectorStatus {
+        try await request("api/connectors")
+    }
+
+    func beginGoogleConnection() async throws -> URL {
+        let data = try await dataRequest("api/connectors/google/connect", method: "POST")
+        let result: StudioOAuthStart
+        do { result = try JSONDecoder().decode(StudioOAuthStart.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+        guard let url = URL(string: result.url), url.scheme?.lowercased() == "https" else {
+            throw StudioAPIError.invalidResponse
+        }
+        return url
+    }
+
     func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String]) async throws {
         let payload = try JSONEncoder().encode(MessageRequest(
             threadId: threadID,
@@ -171,6 +186,8 @@ struct NativePushRegistration: Decodable {
     let connected: Bool
     let deliveryReady: Bool
 }
+
+private struct StudioOAuthStart: Decodable { let url: String }
 
 private struct ServerMessage: Decodable { let error: String }
 

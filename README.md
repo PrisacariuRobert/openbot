@@ -1,10 +1,22 @@
-# OpenBot 0.31.0
+# OpenBot 0.32.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.31.0
+## What's new in 0.32.0
+
+This native-continuity beta brings OpenBot's three dependable starting points to the real SwiftUI iPhone app. It keeps the existing source and approval boundaries; it does not claim physical-device, cellular, APNs, App Store, or full native-settings completion. See [the iPhone Simulator validation record](docs/QA_0.32.md).
+
+- **Work from iPhone:** a first-class **Work** destination starts Morning Brief, Meeting Prep, or Inbox Follow-ups without making the owner remember a prompt.
+- **One job on both surfaces:** iPhone sends the same source, coverage, time-zone, draft, and no-write requirements as the web app, then opens the shared team room for live progress and results.
+- **Honest live readiness and recovery:** the native screen reads the authenticated connector catalog. Each job starts only when its required Gmail, Calendar, and Drive connections are live. Missing OAuth access can be added from iPhone in one tap; a disabled Google API opens its exact Cloud enable page instead of pretending another sign-in will fix it.
+- **Readable, playful native UI:** the screen uses native controls, Dynamic Type-aware text, restrained surfaces, and the same code-drawn, recolorable teammates with independent blink and motion timing. Missing connections stay readable instead of fading into disabled-card noise.
+- **Simulator-verified:** the iPhone 17 Pro simulator connected to the running local studio, loaded live connector state, opened all three job cards, and preserved Live Studio. Six native unit tests and the live native UI test pass without a model request.
+
+This closes an important daily-use parity gap, not the whole competitor gap. Connector setup and provider administration remain desktop-first, and the repeated two-model workflow gate, process/egress isolation, physical-device continuity, signed distribution, and fresh-user onboarding are still open.
+
+### Previously in 0.31.0
 
 This functional beta strengthens three everyday jobs: morning briefs, inbox follow-ups, and checked code changes. It preserves the existing animated, recolorable mascots. It is **not yet a verified drop-in Grok Bot replacement**; see [the validation record](docs/QA_0.31.md).
 
@@ -93,7 +105,7 @@ This development version focuses on trustworthy foundations, not a larger featur
 - An official Claude Code runtime adapter with the same isolated workspace, browser, memory, approval, and teamwork tools
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
-- Native SwiftUI iPhone app with conversations, teammate targeting, voice-to-editable-text capture, message sending, live task/approval state, Keychain-backed API access, offline/reconnect state, and address-only deep linking
+- Native SwiftUI iPhone app with conversations, teammate targeting, voice-to-editable-text capture, message sending, live task/approval state, connector-aware ready-made Work jobs, Keychain-backed API access, offline/reconnect state, and address-only deep linking
 - Embedded iOS Share extension for securely handing text, links, images, and files into the active OpenBot conversation
 - Customizable code-drawn mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
