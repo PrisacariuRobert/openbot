@@ -7,22 +7,24 @@ Historical milestones below were implemented in the repository. The current mile
 Status: complete in source for the owner-operated 0.34.0 development beta
 
 - A genuine SwiftUI/AppKit Mac application connects directly to the authenticated OpenBot API; it contains no WebKit or embedded web interface
-- Native conversations include thread switching, teammate targeting, messages, attachments, shared draft continuity, live run progress, approval/cancel controls, and downloadable results
+- Native conversations include thread switching, teammate targeting, messages, attachments, reply context, reactions, private studio search, shared draft continuity, live run progress, approval/cancel controls, and downloadable results
 - Native Work exposes the three source-backed jobs with live Google readiness and recovery, while native Live Studio shows teammate state, attention, recent action receipts, and uncertain-action reconciliation
 - A dedicated macOS Keychain identity protects saved access, the same-Mac runner pairs automatically through its loopback-only access endpoint, remote hosts require HTTPS, address-only deep links reject embedded credentials, and launch-only development access stays in memory
 - Native code-drawn mascots use the saved teammate shape, colour, and work state with independent blink/motion and reduced-motion support
 - Native menus and keyboard commands expose settings, message focus, Work, and Live Studio without depending on a browser tab
 - Optional native attention alerts contain only a generic approval/interruption count and stay off until the owner enables them
-- Native Automations lists durable routines, pauses or resumes them, creates bounded schedules, and requires an explicit confirmation before a manual run
+- Native Automations creates and edits every supported schedule/app-event trigger, deletes routines safely, rotates one-time signed-hook secrets, pauses or resumes work, and requires explicit confirmation before a manual run
 - Native AI Connections exposes real provider readiness, supported subscription sign-in and code completion, and hosted API or localhost-model setup/editing/removal while keeping stored secrets off the client response; removal is blocked until every teammate is reassigned
 - Native provider-to-teammate assignment, code-project folder/GitHub connection, per-teammate project grants, base/task-worktree diff review, guarded edit restoration, safe disconnect, and terminal/browser/Mac capability controls cover the main everyday administration path
 - Native draft source handling is shared end to end, so Mac edits hand off to web and iPhone instead of failing the server contract
 - Native Apps & Tools exposes supported connection flows and explicit teammate read/write grants; Skill Library supports starter install, edit, immutable history, non-destructive rollback, assignment, bounded import, non-overwriting export, and confirmed deletion
+- Native Live Studio controls the isolated teammate browser, and native Teach records visible browser demonstrations with private non-chat typing before saving a readable versioned skill
+- Native Teammates creates, edits, and cleanly duplicates roles, instructions, provider/model assignments, capabilities, weekly budgets, and recolorable code-drawn characters; Workspace Files provides bounded read-only review without exposing host paths
 - Native Live Studio can enable or remove the existing login/crash LaunchAgent protection from the local Mac
 
-Verification: the complete TypeScript release gate, native source contract, macOS build and eight macOS unit tests pass. The built app connected to the live local runner, populated real conversations and teammate state, and was inspected through a direct WindowServer capture without sending a model request. See [QA_0.34](QA_0.34.md).
+Verification: the complete TypeScript release gate, native source contract, macOS build and thirteen macOS unit tests pass. Disposable API checks proved teammate create/update/duplicate choices and bounded workspace preview; live-runner checks proved teaching and the full signed-automation lifecycle without sending a model request. See [QA_0.34](QA_0.34.md).
 
-Remaining: the current app is an ad-hoc development build. Developer ID signing, hardened runtime, notarization, automatic updates, fresh-Mac packaging of the runner, Windows support, native self-hosted OAuth/event setup and interactive skill teaching, and repeated real-model competitor acceptance runs are not claimed.
+Remaining: the current app is an ad-hoc development build. Developer ID signing, hardened runtime, notarization, automatic updates, fresh-Mac packaging of the runner, Windows support, native self-hosted OAuth/event setup, and repeated real-model competitor acceptance runs are not claimed.
 
 ## M36 — Crash-safe approved actions
 

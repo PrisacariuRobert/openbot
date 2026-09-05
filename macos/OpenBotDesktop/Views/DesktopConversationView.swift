@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct DesktopConversationView: View {
     @ObservedObject var store: StudioStore
+    @State private var replyingTo: StudioMessage?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,11 +38,15 @@ struct DesktopConversationView: View {
                 }
             }
             Spacer()
-            Text("⌘K to message")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .background(Color.black.opacity(0.04), in: Capsule())
+            HStack(spacing: 7) {
+                Button { NotificationCenter.default.post(name: .openBotShowSearch, object: nil) } label: { Image(systemName: "magnifyingglass") }
+                    .help("Search the studio (⌘F)")
+                Button { NotificationCenter.default.post(name: .openBotShowWork, object: nil) } label: { Image(systemName: "sparkles") }
+                    .help("Start work")
+                Button { NotificationCenter.default.post(name: .openBotShowLive, object: nil) } label: { Image(systemName: "rectangle.3.group") }
+                    .help("Live Studio")
+            }
+            .buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
         .background(.ultraThinMaterial)
@@ -61,7 +66,9 @@ struct DesktopConversationView: View {
                                 bot: message.senderId.flatMap { id in store.state.bots.first(where: { $0.id == id }) },
                                 onOpenAttachment: { attachment in
                                     if let url = await store.download(attachment) { NSWorkspace.shared.open(url) }
-                                }
+                                },
+                                onReply: { replyingTo = message },
+                                onReaction: { emoji in Task { await store.toggleReaction(messageID: message.id, emoji: emoji) } }
                             )
                             .id(message.id)
                         }
@@ -85,7 +92,7 @@ struct DesktopConversationView: View {
                 .onChange(of: store.activeRuns) { _, _ in
                     withAnimation(.easeOut(duration: 0.22)) { proxy.scrollTo("conversation-end", anchor: .bottom) }
                 }
-                DesktopComposer(store: store)
+                DesktopComposer(store: store, replyingTo: $replyingTo)
             }
         }
     }
@@ -109,6 +116,8 @@ private struct DesktopMessageBubble: View {
     let message: StudioMessage
     let bot: StudioBot?
     let onOpenAttachment: (StudioAttachment) async -> Void
+    let onReply: () -> Void
+    let onReaction: (String) -> Void
 
     private var isUser: Bool { message.senderType == "user" }
 
@@ -124,6 +133,14 @@ private struct DesktopMessageBubble: View {
                         .font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 8) {
+                    if let reply = message.replyTo {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(reply.senderName).font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            Text(reply.body).font(.system(size: 10.5, design: .rounded)).lineLimit(2)
+                        }
+                        .padding(.horizontal, 9).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background((isUser ? Color.white : DesktopTheme.purple).opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
                     Text(markdown: message.body)
                         .font(.system(size: 14, design: .rounded)).textSelection(.enabled)
                         .lineSpacing(2)
@@ -156,12 +173,32 @@ private struct DesktopMessageBubble: View {
                     in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                 )
                 .foregroundStyle(isUser ? .white : DesktopTheme.ink)
+                if let reactions = message.reactions, !reactions.isEmpty {
+                    HStack(spacing: 5) {
+                        ForEach(reactions) { reaction in
+                            Button { onReaction(reaction.emoji) } label: {
+                                Text("\(reaction.emoji) \(reaction.count)")
+                                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                    .background(reaction.reactedByYou ? DesktopTheme.purple.opacity(0.13) : Color.black.opacity(0.045), in: Capsule())
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
                 Text(message.createdAt.desktopTime)
                     .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.tertiary)
             }
             if !isUser { Spacer(minLength: 100) }
         }
         .frame(maxWidth: .infinity)
+        .contextMenu {
+            Button { onReply() } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+            Menu("React") {
+                ForEach(["👍", "❤️", "✅", "👀", "🎉"], id: \.self) { emoji in
+                    Button(emoji) { onReaction(emoji) }
+                }
+            }
+        }
     }
 
     private var fallbackBot: StudioBot? {
@@ -221,6 +258,7 @@ private struct DesktopRunCard: View {
 
 private struct DesktopComposer: View {
     @ObservedObject var store: StudioStore
+    @Binding var replyingTo: StudioMessage?
     @State private var draft = ""
     @State private var targetBotID: String?
     @State private var files: [URL] = []
@@ -230,6 +268,19 @@ private struct DesktopComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
+            if let reply = replyingTo {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrowshape.turn.up.left.fill").foregroundStyle(DesktopTheme.purple)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Replying to \(reply.senderName)").font(.system(size: 10.5, weight: .bold, design: .rounded))
+                        Text(reply.body).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer()
+                    Button { replyingTo = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 9).padding(.vertical, 6)
+                .background(DesktopTheme.purple.opacity(0.07), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
             if store.activeThread?.kind == "room" {
                 Menu {
                     Button("Auto-pick the best teammate") { targetBotID = nil }
@@ -321,12 +372,15 @@ private struct DesktopComposer: View {
     private func send() {
         let body = draft
         let attachments = files
+        let replyID = replyingTo?.id
         draft = ""
         files = []
+        replyingTo = nil
         Task {
-            if !(await store.send(body, targetBotID: targetBotID, files: attachments)) {
+            if !(await store.send(body, targetBotID: targetBotID, files: attachments, replyToID: replyID)) {
                 draft = body
                 files = attachments
+                replyingTo = store.state.messages.first(where: { $0.id == replyID })
             }
         }
     }

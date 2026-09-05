@@ -117,6 +117,7 @@ struct DesktopLiveView: View {
     @ObservedObject var store: StudioStore
     let canManageBackgroundProtection: Bool
     @State private var confirmingProtectionRemoval = false
+    @State private var browserBot: StudioBot?
 
     private var runs: [StudioRun] { store.state.studioRuns ?? store.state.runs }
     private var uncertain: [StudioApprovedAction] { (store.state.approvedActions ?? []).filter { $0.status == "uncertain" } }
@@ -225,6 +226,10 @@ struct DesktopLiveView: View {
                                     .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                     .padding(.horizontal, 8).padding(.vertical, 4)
                                     .background(DesktopTheme.purple.opacity(0.08), in: Capsule())
+                                if bot.browserEnabled == true {
+                                    Button("Control browser") { browserBot = bot }
+                                        .buttonStyle(.bordered).controlSize(.small)
+                                }
                             }
                             .padding(11).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
@@ -241,6 +246,7 @@ struct DesktopLiveView: View {
         } message: {
             Text("Saved work stays in place, but this Mac will not automatically restart OpenBot after it stops.")
         }
+        .sheet(item: $browserBot) { bot in DesktopBrowserControlView(store: store, bot: bot) }
     }
 
     private func liveStat(_ value: Int, _ label: String, _ icon: String) -> some View {

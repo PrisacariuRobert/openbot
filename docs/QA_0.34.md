@@ -14,14 +14,20 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 
 - Native three-column conversation navigation populated the team room plus Nova, Pixel, and Scout from the live runner.
 - Existing messages and teammate appearance loaded from the shared studio state.
-- The composer exposes native teammate targeting, file import, saved draft continuity, and Command-Return sending.
+- The composer exposes native teammate targeting, file import, saved draft continuity, reply context, reactions, and Command-Return sending.
+- Command-F search queries the private runner across messages, result files, automations, skills, and teammates, then opens the original conversation instead of creating a detached copy.
+- Workspace Files lists only relative paths from one teammate's private workspace and provides a bounded read-only text preview. Hidden entries, oversized files, traversal, direct symlinks, nested symlink escapes, and host paths are not exposed by this view.
 - Work exposes Morning Brief, Meeting Prep, and Inbox Follow-ups through the same connector-aware source contracts as iPhone and web.
-- Automations lists durable routines, can pause/resume them, creates bounded five-minute through daily schedules, and requires a second confirmation before a manual run that may perform real work.
+- Automations creates and edits schedules, Calendar, GitHub, signed webhook, Todoist, Dropbox, Slack, and Notion triggers; it also pauses/resumes, deletes, rotates one-time hook secrets, and requires a second confirmation before a manual run that may perform real work.
 - AI Connections reads real runtime/provider readiness, starts supported account/subscription sign-in, supports code-based completion, and saves, edits, or removes hosted API and localhost model endpoints without exposing saved secrets back to the client. Leaving the key empty while editing preserves the encrypted key already held by the runner; removal is refused while a teammate still uses that connection.
 - AI Connections also assigns an available provider/model to each teammate. Code Projects connects a same-Mac folder or clones a GitHub repository on the runner, updates explicit read/coding grants per teammate, inspects base/task-worktree diffs, restores eligible recorded edits only through the server's newer-work guard, and disconnects without deleting project files.
 - Access & Capabilities controls each teammate's private terminal and browser plus the bounded studio-wide Mac-files/apps gate.
 - Apps & Tools starts supported Google, GitHub, Slack, Notion, Todoist, and Dropbox connection flows and keeps read access separate from approval-safe acting for each teammate. Self-hosted OAuth client and event-secret configuration remains a web/host setup path.
 - Skill Library lists saved skills, installs transparent starters, creates retained versions through editing, browses immutable history, restores an earlier setup as a new non-destructive version, assigns clean copies to another teammate, imports bounded packages through the runner's integrity/secret checks, exports without overwriting an existing download, and confirms deletion.
+- Teach opens a teammate's isolated browser visibly, maps clicks into its preview, accepts sensitive text through a private non-chat field, records the demonstration, and saves the resulting readable workflow into Skill Library.
+- Live Studio can open the same bounded browser takeover outside teaching so the owner can navigate, click, type privately, and send common keys while supervising work.
+- Teammates creates and edits role, instructions, provider/model assignment, computer/browser switches, weekly token budget, mascot shape, preset colour, and custom colour. Duplication keeps setup and grants but starts a separate conversation, workspace, memory, browser profile, and future usage history.
+- A server persistence defect found during this pass was fixed: creating a teammate with computer/browser disabled or with a zero weekly cap now retains those explicit values instead of substituting the defaults.
 - Live Studio exposes the existing login/crash LaunchAgent protection to the local native owner, with confirmation before it is removed.
 - Background-service restarts now terminate the complete TypeScript runner process group, preventing an orphaned loader from surviving an upgrade and delaying the protected replacement. LaunchAgent startup no longer depends on entering a protected Documents working directory before the bounded launcher starts.
 - Native drafts now use an accepted `macos` source in the shared server contract, fixing an otherwise hidden 400 response during desktop-to-phone/web handoff.
@@ -38,7 +44,7 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 `npm run verify` passed:
 
 - release, iOS, and macOS source-contract checks
-- 165 TypeScript tests, 0 failures
+- 167 TypeScript tests, 0 failures
 - TypeScript type checking
 - production Vite build
 
@@ -46,9 +52,9 @@ Native macOS Xcode validation passed on the local arm64 Mac:
 
 - Release build: succeeded
 - ad-hoc code-signature verification: valid on disk and satisfies its designated requirement
-- `OpenBotDesktopTests`: 8 tests, 0 failures
+- `OpenBotDesktopTests`: 13 tests, 0 failures
 
-The eight native tests cover secure address normalization and loopback recognition, credential-free deep links, in-memory launch credentials, decoding crash-safe public action receipts without their private payload, provider/account/API status decoding without returned secrets, explicit code-project grants/workspaces/recovery entries, separate connector read/write grants, and portable skills/starters.
+The thirteen native tests cover secure address normalization and loopback recognition, credential-free deep links, in-memory launch credentials, crash-safe public action receipts without private payloads, provider/account/API status without returned secrets, explicit code-project grants/workspaces/recovery entries, separate connector read/write grants, portable skills/starters, interactive teaching and private browser preview, event filters and one-time automation secrets, relative workspace files and bounded preview, original-destination search, and message reply/reaction decoding.
 
 Shared iOS code was rebuilt and tested on the booted iPhone 17 Pro Simulator:
 
@@ -60,6 +66,13 @@ The app was also inspected using a direct WindowServer capture of the installed 
 
 The live `/api/provider` response was checked through the same authenticated local runner: catalog, saved-instance, and login-attempt collections were present, and no provider instance returned a `secret` field. No connection flow or model request was started for this check.
 
+Live and disposable API checks used no provider/model request:
+
+- The live runner opened `https://example.com` in Nova's isolated browser, reported a valid JPEG preview and title, recorded one visible teaching step, saved the skill, and then removed the test skill.
+- A paused signed-webhook automation was created, edited with an event filter, issued a one-time secret, rotated that secret, and was removed; no routine run was started.
+- A disposable isolated runner created a teammate with browser/computer disabled and zero weekly cap, duplicated it into an independent thread/workspace, updated its role and budget, listed a copied fixture by relative workspace path, and returned its bounded preview. The entire disposable data directory was then removed.
+- A second disposable HTTP-level boundary check listed and previewed a normal file while excluding direct and directory symlinks; attempts to preview both escape paths returned 404. Its temporary runner and data were removed.
+
 ## Harmless build-host warnings
 
 Xcode's App Intents metadata processor reported that no AppIntents dependency exists; OpenBot does not currently declare App Intents. Test hosting also logged unavailable `linkd.autoShortcut` registration on this beta macOS/Xcode environment. Neither warning failed the build or tests.
@@ -70,7 +83,7 @@ Xcode's App Intents metadata processor reported that no AppIntents dependency ex
 - bundling or installing the Node/OpenCode runner from the Mac app itself
 - locked-login restart from a source checkout stored under macOS-protected Documents; the current session was restored from an already-authorized process, while a clean distributable still needs to place its runner outside protected source folders
 - Windows desktop support
-- self-hosted OAuth client/event-secret setup and interactive skill teaching in the Mac client; routine editing is intentionally limited to safe schedule creation, pause/resume, and confirmed run-now in this milestone
+- self-hosted OAuth client/event-secret setup in the Mac client
 - physical iPhone, cellular, production APNs, TestFlight, or App Store delivery
 - public DNS/TLS and restart validation on a real private Linux host
 - repeated real-model head-to-head workflow success, quality, latency, or cost against Grok Bot

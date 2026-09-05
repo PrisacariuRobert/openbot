@@ -81,6 +81,10 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
             case "access", "permissions": NotificationCenter.default.post(name: .openBotShowPermissions, object: nil)
             case "connectors", "apps": NotificationCenter.default.post(name: .openBotShowConnectors, object: nil)
             case "skills": NotificationCenter.default.post(name: .openBotShowSkills, object: nil)
+            case "teach": NotificationCenter.default.post(name: .openBotShowTeach, object: nil)
+            case "teammates", "bots": NotificationCenter.default.post(name: .openBotShowTeammates, object: nil)
+            case "files", "workspace": NotificationCenter.default.post(name: .openBotShowFiles, object: nil)
+            case "search": NotificationCenter.default.post(name: .openBotShowSearch, object: nil)
             default: session.handleDeepLink(url)
             }
         }
@@ -152,6 +156,26 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: .openBotShowSkills, object: nil)
     }
 
+    @objc private func showTeach() {
+        window?.makeKeyAndOrderFront(nil)
+        NotificationCenter.default.post(name: .openBotShowTeach, object: nil)
+    }
+
+    @objc private func showTeammates() {
+        window?.makeKeyAndOrderFront(nil)
+        NotificationCenter.default.post(name: .openBotShowTeammates, object: nil)
+    }
+
+    @objc private func showFiles() {
+        window?.makeKeyAndOrderFront(nil)
+        NotificationCenter.default.post(name: .openBotShowFiles, object: nil)
+    }
+
+    @objc private func showSearch() {
+        window?.makeKeyAndOrderFront(nil)
+        NotificationCenter.default.post(name: .openBotShowSearch, object: nil)
+    }
+
     private func installMainMenu() {
         let mainMenu = NSMenu()
 
@@ -182,6 +206,9 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
 
         let studioItem = NSMenuItem()
         let studioMenu = NSMenu(title: "Studio")
+        let search = NSMenuItem(title: "Search Studio…", action: #selector(showSearch), keyEquivalent: "f")
+        search.target = self
+        studioMenu.addItem(search)
         let focus = NSMenuItem(title: "Focus Message", action: #selector(focusComposer), keyEquivalent: "k")
         focus.target = self
         studioMenu.addItem(focus)
@@ -209,6 +236,15 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
         let skills = NSMenuItem(title: "Skill Library", action: #selector(showSkills), keyEquivalent: "S")
         skills.target = self
         studioMenu.addItem(skills)
+        let teach = NSMenuItem(title: "Teach a Skill", action: #selector(showTeach), keyEquivalent: "D")
+        teach.target = self
+        studioMenu.addItem(teach)
+        let teammates = NSMenuItem(title: "Teammates", action: #selector(showTeammates), keyEquivalent: "B")
+        teammates.target = self
+        studioMenu.addItem(teammates)
+        let files = NSMenuItem(title: "Workspace Files", action: #selector(showFiles), keyEquivalent: "F")
+        files.target = self
+        studioMenu.addItem(files)
         studioItem.submenu = studioMenu
         mainMenu.addItem(studioItem)
 
@@ -235,6 +271,10 @@ extension Notification.Name {
     static let openBotShowPermissions = Notification.Name("app.openbot.show-permissions")
     static let openBotShowConnectors = Notification.Name("app.openbot.show-connectors")
     static let openBotShowSkills = Notification.Name("app.openbot.show-skills")
+    static let openBotShowTeach = Notification.Name("app.openbot.show-teach")
+    static let openBotShowTeammates = Notification.Name("app.openbot.show-teammates")
+    static let openBotShowFiles = Notification.Name("app.openbot.show-files")
+    static let openBotShowSearch = Notification.Name("app.openbot.show-search")
 }
 
 enum DesktopTheme {

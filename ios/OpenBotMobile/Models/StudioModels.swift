@@ -26,6 +26,8 @@ struct StudioRoutine: Decodable, Identifiable, Hashable {
     let prompt: String
     let intervalMinutes: Int
     let triggerType: String
+    let triggerConfig: StudioRoutineTriggerConfig?
+    let hasWebhookSecret: Bool?
     let enabled: Bool
     let nextRunAt: String?
     let lastRunAt: String?
@@ -34,6 +36,35 @@ struct StudioRoutine: Decodable, Identifiable, Hashable {
     let consecutiveFailures: Int
     let lastError: String?
     let pausedReason: String?
+}
+
+struct StudioRoutineTriggerConfig: Codable, Hashable {
+    var eventName: String?
+    var githubEvent: String?
+    var githubAction: String?
+    var repository: String?
+    var titleContains: String?
+    var minutesBefore: Int?
+    var todoistEvent: String?
+    var dropboxPath: String?
+    var slackEvent: String?
+    var slackChannel: String?
+    var notionEvent: String?
+    var notionEntityId: String?
+
+    static let empty = StudioRoutineTriggerConfig()
+}
+
+struct StudioRoutineSaveResult: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let triggerType: String
+    let webhook: StudioWebhookCredentials?
+}
+
+struct StudioWebhookCredentials: Decodable, Hashable {
+    let url: String
+    let secret: String
 }
 
 struct StudioProviderStatus: Decodable, Hashable {
@@ -181,6 +212,10 @@ struct StudioBot: Decodable, Identifiable, Hashable {
     var computerEnabled: Bool? = nil
     var browserEnabled: Bool? = nil
     var macAccessEnabled: Bool? = nil
+    var emoji: String? = nil
+    var instructions: String? = nil
+    var weeklyTokenBudget: Int? = nil
+    var tokensUsedThisWeek: Int? = nil
 }
 
 struct StudioSettings: Decodable, Hashable {
@@ -207,6 +242,22 @@ struct StudioMessage: Decodable, Identifiable, Hashable {
     let createdAt: String
     let runId: String?
     let attachments: [StudioAttachment]
+    var replyTo: StudioMessageReplyPreview? = nil
+    var reactions: [StudioMessageReaction]? = nil
+}
+
+struct StudioMessageReplyPreview: Decodable, Hashable {
+    let id: String
+    let senderName: String
+    let body: String
+}
+
+struct StudioMessageReaction: Decodable, Identifiable, Hashable {
+    let emoji: String
+    let count: Int
+    let reactedByYou: Bool
+
+    var id: String { emoji }
 }
 
 struct StudioAttachment: Decodable, Identifiable, Hashable {
@@ -217,6 +268,33 @@ struct StudioAttachment: Decodable, Identifiable, Hashable {
     let mime: String?
     let summary: String?
     let previewText: String?
+}
+
+struct StudioWorkspaceFile: Decodable, Identifiable, Hashable {
+    let path: String
+    let size: Int
+    let modifiedAt: String
+    let kind: String
+
+    var id: String { path }
+}
+
+struct StudioWorkspaceFileContent: Decodable, Hashable {
+    let path: String
+    let content: String
+}
+
+struct StudioSearchResult: Decodable, Identifiable, Hashable {
+    let id: String
+    let kind: String
+    let title: String
+    let subtitle: String
+    let snippet: String
+    let threadId: String
+    let botId: String?
+    let createdAt: String
+
+    var stableID: String { "\(kind)-\(id)" }
 }
 
 struct StudioWorkflow: Decodable, Identifiable, Hashable {
@@ -266,6 +344,28 @@ struct StudioSkillTemplate: Decodable, Identifiable, Hashable {
     let startUrl: String
     let category: String
     let stepCount: Int
+}
+
+struct StudioTeachingStatus: Decodable, Hashable {
+    let recording: Bool
+    let name: String?
+    let stepCount: Int
+}
+
+struct StudioComputerStatus: Decodable, Hashable {
+    let botId: String
+    let container: String
+    let browser: String
+    let currentUrl: String?
+    let title: String?
+    let screenshot: String?
+    let updatedAt: String
+}
+
+struct StudioBrowserTakeoverResult: Decodable, Hashable {
+    let url: String
+    let title: String
+    let screenshot: String?
 }
 
 struct StudioRun: Decodable, Identifiable, Hashable {

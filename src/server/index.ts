@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -25,7 +25,7 @@ import { NotionConnector } from "./notion.js";
 import { TodoistConnector } from "./todoist.js";
 import { DropboxConnector } from "./dropbox.js";
 import { CONNECTOR_MANIFESTS, friendlyConnectorError, manifestCatalogEntry } from "./connectors.js";
-import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance, WorkspaceFile } from "../shared/types.js";
+import type { CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
 import { invokedWorkflow } from "../shared/skills.js";
@@ -42,6 +42,7 @@ import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
+import { listWorkspaceFiles, readWorkspaceFile } from "./workspace-files.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
@@ -1462,29 +1463,16 @@ app.post("/api/automation-alerts/:id/resolve", (request, response) => {
   broadcast(); response.json({ ok: true });
 });
 
-function safeWorkspacePath(botId: string, relativePath = ""): string | null {
-  const root = path.resolve(db.workspacesDir, botId), target = path.resolve(root, relativePath);
-  return target === root || target.startsWith(`${root}${path.sep}`) ? target : null;
-}
-function listWorkspace(root: string, current = root, depth = 0): WorkspaceFile[] {
-  if (depth > 5 || !existsSync(current)) return [];
-  return readdirSync(current, { withFileTypes: true }).filter((entry) => !entry.name.startsWith(".")).flatMap((entry) => {
-    const absolute = path.join(current, entry.name), stat = statSync(absolute);
-    const item: WorkspaceFile = { path: path.relative(root, absolute), size: stat.size, modifiedAt: stat.mtime.toISOString(), kind: entry.isDirectory() ? "directory" : "file" };
-    return entry.isDirectory() ? [item, ...listWorkspace(root, absolute, depth + 1)] : [item];
-  });
-}
 app.get("/api/bots/:id/files", (request, response) => {
   if (!db.getBot(request.params.id)) return response.status(404).json({ error: "Teammate not found." });
-  const root = safeWorkspacePath(request.params.id);
-  response.json(root ? listWorkspace(root) : []);
+  response.json(listWorkspaceFiles(path.join(db.workspacesDir, request.params.id)));
 });
 app.get("/api/bots/:id/file", (request, response) => {
   const relativePath = typeof request.query.path === "string" ? request.query.path : "";
-  const target = safeWorkspacePath(request.params.id, relativePath);
-  if (!db.getBot(request.params.id) || !target || !existsSync(target) || !statSync(target).isFile()) return response.status(404).json({ error: "File not found." });
-  if (statSync(target).size > 500_000) return response.status(413).json({ error: "This file is too large to preview." });
-  response.json({ path: relativePath, content: readFileSync(target, "utf8") });
+  if (!db.getBot(request.params.id)) return response.status(404).json({ error: "Teammate not found." });
+  const result = readWorkspaceFile(path.join(db.workspacesDir, request.params.id), relativePath);
+  if (!result.ok) return response.status(result.reason === "too_large" ? 413 : 404).json({ error: result.reason === "too_large" ? "This file is too large to preview." : "File not found." });
+  response.json({ path: result.path, content: result.content });
 });
 
 app.get("/api/bots/:id/computer", async (request, response) => {

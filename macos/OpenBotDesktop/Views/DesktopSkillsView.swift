@@ -11,6 +11,7 @@ struct DesktopSkillsView: View {
     @State private var pendingDelete: StudioSkill?
     @State private var importBotID = ""
     @State private var showingImporter = false
+    @State private var showingTeach = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +23,8 @@ struct DesktopSkillsView: View {
                         .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button { showingTeach = true } label: { Label("Teach", systemImage: "eye.fill") }
+                    .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small)
                 Menu {
                     ForEach(store.state.bots) { bot in
                         Button("Import for \(bot.name)…") { importBotID = bot.id; showingImporter = true }
@@ -61,6 +64,7 @@ struct DesktopSkillsView: View {
         .sheet(item: $editingSkill) { skill in DesktopSkillEditView(store: store, skill: skill) }
         .sheet(item: $historySkill) { skill in DesktopSkillHistoryView(store: store, skill: skill) }
         .sheet(item: $selectedTemplate) { template in DesktopSkillInstallView(store: store, template: template) }
+        .sheet(isPresented: $showingTeach) { DesktopTeachView(store: store) }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let url = urls.first, !importBotID.isEmpty else { return }
             Task { _ = await store.importSkill(fileURL: url, botID: importBotID) }

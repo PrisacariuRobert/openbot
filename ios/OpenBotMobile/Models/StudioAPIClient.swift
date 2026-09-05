@@ -97,6 +97,45 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/bots/\(botID)", method: "PATCH", body: payload)
     }
 
+    func saveBot(
+        id: String? = nil,
+        name: String,
+        emoji: String,
+        mascot: String,
+        color: String,
+        role: String,
+        instructions: String,
+        providerInstanceID: String,
+        model: String,
+        computerEnabled: Bool,
+        browserEnabled: Bool,
+        weeklyTokenBudget: Int
+    ) async throws {
+        let payload = try JSONEncoder().encode(BotSaveRequest(
+            name: name, emoji: emoji, mascot: mascot, color: color, role: role,
+            instructions: instructions, model: model, providerInstanceId: providerInstanceID,
+            computerEnabled: computerEnabled, browserEnabled: browserEnabled,
+            weeklyTokenBudget: weeklyTokenBudget
+        ))
+        _ = try await dataRequest(id.map { "api/bots/\($0)" } ?? "api/bots", method: id == nil ? "POST" : "PATCH", body: payload)
+    }
+
+    func duplicateBot(_ botID: String) async throws {
+        _ = try await dataRequest("api/bots/\(botID)/duplicate", method: "POST")
+    }
+
+    func workspaceFiles(botID: String) async throws -> [StudioWorkspaceFile] {
+        try await request("api/bots/\(botID)/files")
+    }
+
+    func workspaceFile(botID: String, path: String) async throws -> StudioWorkspaceFileContent {
+        try await request("api/bots/\(botID)/file", queryItems: [URLQueryItem(name: "path", value: path)])
+    }
+
+    func search(_ query: String) async throws -> [StudioSearchResult] {
+        try await request("api/search", queryItems: [URLQueryItem(name: "q", value: query)])
+    }
+
     func beginGoogleConnection() async throws -> URL {
         let data = try await dataRequest("api/connectors/google/connect", method: "POST")
         let result: StudioOAuthStart
@@ -182,14 +221,68 @@ struct StudioAPIClient {
         return destination
     }
 
-    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String]) async throws {
+    func teachingStatus(botID: String) async throws -> StudioTeachingStatus {
+        try await request("api/bots/\(botID)/teach")
+    }
+
+    func computerStatus(botID: String) async throws -> StudioComputerStatus {
+        try await request("api/bots/\(botID)/computer")
+    }
+
+    func openBrowser(botID: String, url: String) async throws -> StudioComputerStatus {
+        let payload = try JSONEncoder().encode(BrowserOpenRequest(url: url))
+        _ = try await dataRequest("api/bots/\(botID)/browser/open", method: "POST", body: payload)
+        return try await computerStatus(botID: botID)
+    }
+
+    func startTeaching(botID: String, name: String, startURL: String) async throws -> StudioTeachingStatus {
+        let payload = try JSONEncoder().encode(TeachingStartRequest(name: name, startUrl: startURL))
+        let data = try await dataRequest("api/bots/\(botID)/teach/start", method: "POST", body: payload)
+        do { return try JSONDecoder().decode(StudioTeachingStatus.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
+    func stopTeaching(botID: String) async throws -> StudioSkill {
+        let data = try await dataRequest("api/bots/\(botID)/teach/stop", method: "POST")
+        do { return try JSONDecoder().decode(StudioSkill.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
+    func takeoverClick(botID: String, x: Double, y: Double) async throws -> StudioBrowserTakeoverResult {
+        let payload = try JSONEncoder().encode(BrowserClickRequest(x: x, y: y))
+        return try await takeover(botID: botID, path: "click", payload: payload)
+    }
+
+    func takeoverType(botID: String, value: String, replace: Bool) async throws -> StudioBrowserTakeoverResult {
+        let payload = try JSONEncoder().encode(BrowserTypeRequest(value: value, replace: replace))
+        return try await takeover(botID: botID, path: "type", payload: payload)
+    }
+
+    func takeoverKey(botID: String, key: String) async throws -> StudioBrowserTakeoverResult {
+        let payload = try JSONEncoder().encode(BrowserKeyRequest(key: key))
+        return try await takeover(botID: botID, path: "key", payload: payload)
+    }
+
+    private func takeover(botID: String, path: String, payload: Data) async throws -> StudioBrowserTakeoverResult {
+        let data = try await dataRequest("api/bots/\(botID)/browser/takeover/\(path)", method: "POST", body: payload)
+        do { return try JSONDecoder().decode(StudioBrowserTakeoverResult.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
+    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String? = nil) async throws {
         let payload = try JSONEncoder().encode(MessageRequest(
             threadId: threadID,
             body: body,
             targetBotIds: targetBotIDs,
-            attachmentIds: attachmentIDs
+            attachmentIds: attachmentIDs,
+            replyToId: replyToID
         ))
         _ = try await dataRequest("api/messages", method: "POST", body: payload)
+    }
+
+    func toggleMessageReaction(messageID: String, emoji: String) async throws {
+        let payload = try JSONEncoder().encode(MessageReactionRequest(emoji: emoji))
+        _ = try await dataRequest("api/messages/\(messageID)/reactions", method: "POST", body: payload)
     }
 
     func saveDraft(threadID: String, body: String) async throws -> StudioDraft {
@@ -253,6 +346,38 @@ struct StudioAPIClient {
             triggerType: "schedule"
         ))
         _ = try await dataRequest("api/routines", method: "POST", body: payload)
+    }
+
+    func saveRoutine(
+        id: String? = nil,
+        name: String,
+        botID: String,
+        threadID: String,
+        prompt: String,
+        intervalMinutes: Int,
+        enabled: Bool,
+        triggerType: String,
+        triggerConfig: StudioRoutineTriggerConfig
+    ) async throws -> StudioRoutineSaveResult {
+        let payload = try JSONEncoder().encode(RoutineSaveRequest(
+            name: name, botId: botID, threadId: threadID, prompt: prompt,
+            intervalMinutes: intervalMinutes, enabled: enabled,
+            triggerType: triggerType, triggerConfig: triggerConfig
+        ))
+        let path = id.map { "api/routines/\($0)" } ?? "api/routines"
+        let data = try await dataRequest(path, method: id == nil ? "POST" : "PATCH", body: payload)
+        do { return try JSONDecoder().decode(StudioRoutineSaveResult.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
+    func deleteRoutine(_ routineID: String) async throws {
+        _ = try await dataRequest("api/routines/\(routineID)", method: "DELETE")
+    }
+
+    func rotateRoutineSecret(_ routineID: String) async throws -> StudioRoutineSaveResult {
+        let data = try await dataRequest("api/routines/\(routineID)/rotate-secret", method: "POST")
+        do { return try JSONDecoder().decode(StudioRoutineSaveResult.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
     }
 
     func setRoutineEnabled(_ routineID: String, enabled: Bool) async throws {
@@ -362,11 +487,18 @@ private struct MessageRequest: Encodable {
     let body: String
     let targetBotIds: [String]
     let attachmentIds: [String]
+    let replyToId: String?
 }
+private struct MessageReactionRequest: Encodable { let emoji: String }
 
 private struct ProviderConnectRequest: Encodable { let providerId: String }
 private struct ProviderCallbackRequest: Encodable { let code: String }
 private struct SkillRollbackRequest: Encodable { let version: Int }
+private struct TeachingStartRequest: Encodable { let name: String; let startUrl: String }
+private struct BrowserOpenRequest: Encodable { let url: String }
+private struct BrowserClickRequest: Encodable { let x: Double; let y: Double }
+private struct BrowserTypeRequest: Encodable { let value: String; let replace: Bool }
+private struct BrowserKeyRequest: Encodable { let key: String }
 
 private struct APIProviderRequest: Encodable {
     let id: String?
@@ -410,6 +542,19 @@ private struct CodeProjectAccessRequest: Encodable {
 private struct MacAccessRequest: Encodable { let macAccessEnabled: Bool }
 private struct BotCapabilitiesRequest: Encodable { let computerEnabled: Bool; let browserEnabled: Bool }
 private struct BotProviderRequest: Encodable { let providerInstanceId: String; let model: String }
+private struct BotSaveRequest: Encodable {
+    let name: String
+    let emoji: String
+    let mascot: String
+    let color: String
+    let role: String
+    let instructions: String
+    let model: String
+    let providerInstanceId: String
+    let computerEnabled: Bool
+    let browserEnabled: Bool
+    let weeklyTokenBudget: Int
+}
 
 private struct DraftRequest: Encodable {
     let body: String
@@ -435,6 +580,17 @@ private struct ScheduledRoutineRequest: Encodable {
     let intervalMinutes: Int
     let enabled: Bool
     let triggerType: String
+}
+
+private struct RoutineSaveRequest: Encodable {
+    let name: String
+    let botId: String
+    let threadId: String
+    let prompt: String
+    let intervalMinutes: Int
+    let enabled: Bool
+    let triggerType: String
+    let triggerConfig: StudioRoutineTriggerConfig
 }
 
 struct NativePushRegistration: Decodable {

@@ -995,16 +995,21 @@ export class OpenBotDatabase {
 
   createBot(input: {
     name: string; emoji: string; mascot?: MascotKind; color: string; role: string; instructions: string; model?: string;
-    providerInstanceId?: string | null; weeklyTokenBudget?: number;
+    providerInstanceId?: string | null; computerEnabled?: boolean; browserEnabled?: boolean; weeklyTokenBudget?: number;
   }): Bot {
     const id = `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "bot"}-${randomUUID().slice(0, 5)}`;
     const threadId = `bot-${id}`;
     const createdAt = now();
     this.db.prepare(`
       INSERT INTO bots
-      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, mac_access_enabled, weekly_token_budget, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, DEFAULT_OWNER, input.providerInstanceId || "local-opencode", input.name, input.emoji, input.mascot || "orbit", input.color, input.role, input.instructions, input.model || DEFAULT_MODEL, this.getStudioSettings().macAccessEnabled ? 1 : 0, input.weeklyTokenBudget || 250000, createdAt);
+      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, DEFAULT_OWNER, input.providerInstanceId || "local-opencode", input.name, input.emoji, input.mascot || "orbit",
+      input.color, input.role, input.instructions, input.model || DEFAULT_MODEL, input.computerEnabled === false ? 0 : 1,
+      input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
+      input.weeklyTokenBudget ?? 250000, createdAt,
+    );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);
     const google = this.getConnector("google-workspace");

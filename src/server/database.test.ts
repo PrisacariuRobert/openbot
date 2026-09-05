@@ -20,8 +20,14 @@ test("seeds persistent teammates and creates a routable task", () => {
     assert.equal(state.bots[0]?.macAccessEnabled, false);
     assert.equal(db.updateStudioSettings({ macAccessEnabled: true }).macAccessEnabled, true);
     assert.equal(db.listBots().every((bot) => bot.macAccessEnabled), true);
-    const newBot = db.createBot({ name: "Mochi", emoji: "•", color: "#6757d9", role: "Helper", instructions: "Help clearly." });
+    const newBot = db.createBot({
+      name: "Mochi", emoji: "•", color: "#6757d9", role: "Helper", instructions: "Help clearly.",
+      computerEnabled: false, browserEnabled: false, weeklyTokenBudget: 0,
+    });
     assert.equal(newBot.macAccessEnabled, true);
+    assert.equal(newBot.computerEnabled, false);
+    assert.equal(newBot.browserEnabled, false);
+    assert.equal(newBot.weeklyTokenBudget, 0);
     const restyled = db.updateBot("nova", { mascot: "sunny", color: "#3187dc" });
     assert.equal(restyled?.mascot, "sunny");
     assert.equal(restyled?.color, "#3187dc");

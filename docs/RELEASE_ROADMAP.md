@@ -9,12 +9,13 @@ This order follows one rule: deepen real daily usefulness before adding a long l
 Goal: make the primary desktop experience a real application instead of requiring an always-open browser tab.
 
 - Added a genuine SwiftUI/AppKit app with a native window, three-column navigation, menus, keyboard commands, settings, files, loopback-only local pairing, and Keychain-backed remote connection
-- Added native conversations, teammate routing, attachments, cross-device drafts, live progress, approval and stop controls, action history, and uncertain-action reconciliation
+- Added native conversations, teammate routing, attachments, replies/reactions, cross-device drafts, private studio search, live progress, approval and stop controls, action history, and uncertain-action reconciliation
 - Added source-backed Work starters and Live Studio against the same authenticated local or private runner used by web and iPhone
-- Added native routine listing, pause/resume, bounded schedule creation, and confirmation-gated manual runs
+- Added native create/edit/delete for every supported schedule and app-event trigger, including one-time webhook secret rotation, pause/resume, and confirmation-gated manual runs
 - Added native provider readiness, supported account/subscription sign-in, code completion, and hosted API or localhost-model setup
 - Added native provider/model assignment, local-folder and GitHub code-project connection, explicit per-teammate grants, base/task-worktree diff review, guarded edit restoration, safe disconnect, and computer/browser/Mac capability controls
 - Added native Apps & Tools connection entry points with separate teammate read/write grants, portable Skill Library management including history and rollback, and local background-protection controls
+- Added native teammate creation/editing/clean duplication, bounded workspace-file review, isolated-browser takeover, and visible teach-by-demonstration saved into the Skill Library
 - Kept mascots code-drawn, recolorable, independently animated, work-state aware, and reduced-motion compatible
 - Added a no-WebKit release contract, macOS unit tests, Xcode build validation, and a real populated local-runner launch check without consuming model usage
 

@@ -14,10 +14,18 @@ final class StudioStore: ObservableObject {
     @Published private(set) var codeProjectReview: StudioCodeProjectReview?
     @Published private(set) var skills: [StudioSkill] = []
     @Published private(set) var skillTemplates: [StudioSkillTemplate] = []
+    @Published private(set) var teachingStatus: StudioTeachingStatus?
+    @Published private(set) var browserComputer: StudioComputerStatus?
+    @Published private(set) var workspaceFiles: [StudioWorkspaceFile] = []
+    @Published private(set) var workspaceFileContent: StudioWorkspaceFileContent?
+    @Published private(set) var searchResults: [StudioSearchResult] = []
     @Published private(set) var isCheckingConnectors = false
     @Published private(set) var isCheckingProviders = false
     @Published private(set) var isCheckingCodeProjects = false
     @Published private(set) var isCheckingSkills = false
+    @Published private(set) var isTeaching = false
+    @Published private(set) var isCheckingWorkspace = false
+    @Published private(set) var isSearching = false
     @Published private(set) var isCheckingRunner = false
     @Published var errorMessage: String?
     @Published var shareNotice: String?
@@ -70,7 +78,7 @@ final class StudioStore: ObservableObject {
     }
 
     @discardableResult
-    func send(_ body: String, targetBotID: String?, files: [URL] = []) async -> Bool {
+    func send(_ body: String, targetBotID: String?, files: [URL] = [], replyToID: String? = nil) async -> Bool {
         let cleanBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (!cleanBody.isEmpty || !files.isEmpty), !isSending else { return false }
         isSending = true
@@ -82,7 +90,8 @@ final class StudioStore: ObservableObject {
                 threadID: selectedThreadID,
                 body: cleanBody,
                 targetBotIDs: targetBotID.map { [$0] } ?? [],
-                attachmentIDs: attachments.map(\.id)
+                attachmentIDs: attachments.map(\.id),
+                replyToID: replyToID
             )
             await refresh(silent: true)
             return true
@@ -90,6 +99,10 @@ final class StudioStore: ObservableObject {
             handle(error)
             return false
         }
+    }
+
+    func toggleReaction(messageID: String, emoji: String) async {
+        await perform { try await client.toggleMessageReaction(messageID: messageID, emoji: emoji) }
     }
 
     func approve(_ run: StudioRun) async {
@@ -122,6 +135,58 @@ final class StudioStore: ObservableObject {
 
     func runRoutineNow(_ routine: StudioRoutine) async {
         await perform { try await client.runRoutineNow(routine.id) }
+    }
+
+    @discardableResult
+    func saveRoutine(
+        id: String? = nil,
+        name: String,
+        botID: String,
+        threadID: String,
+        prompt: String,
+        intervalMinutes: Int,
+        enabled: Bool,
+        triggerType: String,
+        triggerConfig: StudioRoutineTriggerConfig
+    ) async -> StudioRoutineSaveResult? {
+        do {
+            errorMessage = nil
+            let result = try await client.saveRoutine(
+                id: id, name: name, botID: botID, threadID: threadID, prompt: prompt,
+                intervalMinutes: intervalMinutes, enabled: enabled,
+                triggerType: triggerType, triggerConfig: triggerConfig
+            )
+            await refresh(silent: true)
+            return result
+        } catch {
+            handle(error)
+            return nil
+        }
+    }
+
+    @discardableResult
+    func deleteRoutine(_ routine: StudioRoutine) async -> Bool {
+        do {
+            errorMessage = nil
+            try await client.deleteRoutine(routine.id)
+            await refresh(silent: true)
+            return true
+        } catch {
+            handle(error)
+            return false
+        }
+    }
+
+    func rotateRoutineSecret(_ routine: StudioRoutine) async -> StudioRoutineSaveResult? {
+        do {
+            errorMessage = nil
+            let result = try await client.rotateRoutineSecret(routine.id)
+            await refresh(silent: true)
+            return result
+        } catch {
+            handle(error)
+            return nil
+        }
     }
 
     func wakeRunner() async {
@@ -243,6 +308,113 @@ final class StudioStore: ObservableObject {
     func exportSkill(_ skill: StudioSkill) async -> URL? {
         do { return try await client.exportSkill(skill) }
         catch { handle(error); return nil }
+    }
+
+    func refreshTeaching(botID: String, reportErrors: Bool = false) async {
+        do {
+            async let status = client.teachingStatus(botID: botID)
+            async let computer = client.computerStatus(botID: botID)
+            (teachingStatus, browserComputer) = try await (status, computer)
+        } catch {
+            if reportErrors { handle(error) }
+        }
+    }
+
+    @discardableResult
+    func startTeaching(botID: String, name: String, startURL: String) async -> Bool {
+        guard !isTeaching else { return false }
+        isTeaching = true
+        errorMessage = nil
+        defer { isTeaching = false }
+        do {
+            teachingStatus = try await client.startTeaching(botID: botID, name: name, startURL: startURL)
+            browserComputer = try await client.computerStatus(botID: botID)
+            return true
+        } catch {
+            handle(error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func stopTeaching(botID: String) async -> StudioSkill? {
+        guard !isTeaching else { return nil }
+        isTeaching = true
+        errorMessage = nil
+        defer { isTeaching = false }
+        do {
+            let skill = try await client.stopTeaching(botID: botID)
+            teachingStatus = StudioTeachingStatus(recording: false, name: nil, stepCount: 0)
+            browserComputer = try? await client.computerStatus(botID: botID)
+            await refreshSkills()
+            return skill
+        } catch {
+            handle(error)
+            return nil
+        }
+    }
+
+    func teachingClick(botID: String, x: Double, y: Double) async {
+        await browserTakeover(botID: botID) {
+            try await client.takeoverClick(botID: botID, x: x, y: y)
+        }
+    }
+
+    func teachingType(botID: String, value: String, replace: Bool) async {
+        await browserTakeover(botID: botID) {
+            try await client.takeoverType(botID: botID, value: value, replace: replace)
+        }
+    }
+
+    func teachingKey(botID: String, key: String) async {
+        await browserTakeover(botID: botID) {
+            try await client.takeoverKey(botID: botID, key: key)
+        }
+    }
+
+    func refreshBrowser(botID: String, reportErrors: Bool = false) async {
+        do { browserComputer = try await client.computerStatus(botID: botID) }
+        catch { if reportErrors { handle(error) } }
+    }
+
+    func openBrowser(botID: String, url: String) async {
+        guard !isTeaching else { return }
+        isTeaching = true
+        errorMessage = nil
+        defer { isTeaching = false }
+        do { browserComputer = try await client.openBrowser(botID: botID, url: url) }
+        catch { handle(error) }
+    }
+
+    func browserClick(botID: String, x: Double, y: Double) async {
+        await browserTakeover(botID: botID) { try await client.takeoverClick(botID: botID, x: x, y: y) }
+    }
+
+    func browserType(botID: String, value: String, replace: Bool) async {
+        await browserTakeover(botID: botID) { try await client.takeoverType(botID: botID, value: value, replace: replace) }
+    }
+
+    func browserKey(botID: String, key: String) async {
+        await browserTakeover(botID: botID) { try await client.takeoverKey(botID: botID, key: key) }
+    }
+
+    private func browserTakeover(botID: String, _ action: () async throws -> StudioBrowserTakeoverResult) async {
+        guard !isTeaching else { return }
+        isTeaching = true
+        errorMessage = nil
+        defer { isTeaching = false }
+        do {
+            let result = try await action()
+            browserComputer = StudioComputerStatus(
+                botId: botID,
+                container: browserComputer?.container ?? "stopped",
+                browser: "ready",
+                currentUrl: result.url,
+                title: result.title,
+                screenshot: result.screenshot,
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+        } catch { handle(error) }
     }
 
     func refreshProviders() async {
@@ -382,6 +554,88 @@ final class StudioStore: ObservableObject {
     func setBotProvider(_ botID: String, providerInstanceID: String, model: String) async {
         await perform { try await client.setBotProvider(botID, providerInstanceID: providerInstanceID, model: model) }
         await refreshProviders()
+    }
+
+    @discardableResult
+    func saveBot(
+        id: String? = nil,
+        name: String,
+        emoji: String,
+        mascot: String,
+        color: String,
+        role: String,
+        instructions: String,
+        providerInstanceID: String,
+        model: String,
+        computerEnabled: Bool,
+        browserEnabled: Bool,
+        weeklyTokenBudget: Int
+    ) async -> Bool {
+        do {
+            errorMessage = nil
+            try await client.saveBot(
+                id: id, name: name, emoji: emoji, mascot: mascot, color: color,
+                role: role, instructions: instructions, providerInstanceID: providerInstanceID,
+                model: model, computerEnabled: computerEnabled, browserEnabled: browserEnabled,
+                weeklyTokenBudget: weeklyTokenBudget
+            )
+            await refresh(silent: true)
+            await refreshProviders()
+            return true
+        } catch {
+            handle(error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func duplicateBot(_ botID: String) async -> Bool {
+        do {
+            errorMessage = nil
+            try await client.duplicateBot(botID)
+            await refresh(silent: true)
+            return true
+        } catch {
+            handle(error)
+            return false
+        }
+    }
+
+    func refreshWorkspace(botID: String) async {
+        guard !isCheckingWorkspace else { return }
+        isCheckingWorkspace = true
+        errorMessage = nil
+        workspaceFileContent = nil
+        defer { isCheckingWorkspace = false }
+        do { workspaceFiles = try await client.workspaceFiles(botID: botID) }
+        catch { workspaceFiles = []; handle(error) }
+    }
+
+    func openWorkspaceFile(botID: String, path: String) async {
+        guard !isCheckingWorkspace else { return }
+        isCheckingWorkspace = true
+        errorMessage = nil
+        defer { isCheckingWorkspace = false }
+        do { workspaceFileContent = try await client.workspaceFile(botID: botID, path: path) }
+        catch { handle(error) }
+    }
+
+    func closeWorkspaceFile() {
+        workspaceFileContent = nil
+    }
+
+    func searchStudio(_ query: String) async {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard clean.count >= 2 else { searchResults = []; isSearching = false; return }
+        isSearching = true
+        defer { isSearching = false }
+        do { searchResults = try await client.search(clean) }
+        catch { searchResults = []; handle(error) }
+    }
+
+    func clearSearch() {
+        searchResults = []
+        isSearching = false
     }
 
     @discardableResult

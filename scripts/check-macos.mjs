@@ -13,12 +13,17 @@ const required = [
   "macos/OpenBotDesktop/Views/DesktopStudioView.swift",
   "macos/OpenBotDesktop/Views/DesktopConversationView.swift",
   "macos/OpenBotDesktop/Views/DesktopWorkView.swift",
+  "macos/OpenBotDesktop/Views/DesktopBrowserControlView.swift",
   "macos/OpenBotDesktop/Views/DesktopAutomationsView.swift",
   "macos/OpenBotDesktop/Views/DesktopProvidersView.swift",
   "macos/OpenBotDesktop/Views/DesktopCodeProjectsView.swift",
   "macos/OpenBotDesktop/Views/DesktopPermissionsView.swift",
   "macos/OpenBotDesktop/Views/DesktopConnectorsView.swift",
   "macos/OpenBotDesktop/Views/DesktopSkillsView.swift",
+  "macos/OpenBotDesktop/Views/DesktopTeachView.swift",
+  "macos/OpenBotDesktop/Views/DesktopTeammatesView.swift",
+  "macos/OpenBotDesktop/Views/DesktopFilesView.swift",
+  "macos/OpenBotDesktop/Views/DesktopSearchView.swift",
   "macos/OpenBotDesktop/Views/DesktopMascotView.swift",
   "macos/OpenBotDesktop/Resources/Info.plist",
   "macos/OpenBotDesktopTests/OpenBotDesktopTests.swift",
@@ -74,8 +79,11 @@ if (!swift.includes("setBackgroundProtection") || !swift.includes("Protect this 
 if (!backgroundRunner.includes("detached: true") || !backgroundRunner.includes("process.kill(-child.pid") || !backgroundRunner.includes("const deadline = setTimeout")) {
   throw new Error("The background runner must stop the complete server process group during upgrades and restarts.");
 }
-if (!swift.includes("DesktopAutomationsView") || !swift.includes("createScheduledRoutine") || !swift.includes("setRoutineEnabled") || !swift.includes("Run this routine now?")) {
-  throw new Error("Native schedule creation, pause/resume, or confirmed run-now controls are incomplete.");
+if (!swift.includes("DesktopAutomationsView") || !swift.includes("saveRoutine") || !swift.includes("setRoutineEnabled") || !swift.includes("deleteRoutine") || !swift.includes("rotateRoutineSecret") || !swift.includes("Run this routine now?")) {
+  throw new Error("Native automation creation, editing, deletion, secret rotation, pause/resume, or confirmed run-now controls are incomplete.");
+}
+if (!["Google Calendar", "GitHub", "Signed webhook", "Todoist", "Dropbox", "Slack", "Notion"].every((label) => swift.includes(label))) {
+  throw new Error("Native connected-app automation triggers are incomplete.");
 }
 if (!swift.includes("DesktopProvidersView") || !swift.includes("beginProviderConnection") || !swift.includes("finishProviderConnection") || !swift.includes("saveAPIProvider") || !swift.includes("deleteAPIProvider")) {
   throw new Error("Native subscription, API, or local-model connection controls are incomplete.");
@@ -107,11 +115,41 @@ if (!swift.includes("DesktopSkillsView") || !swift.includes("installSkillTemplat
 if (!swift.includes('case "skills"') || !swift.includes("openBotShowSkills")) {
   throw new Error("Native Skill Library must remain addressable from the app lifecycle.");
 }
+if (!swift.includes("DesktopTeachView") || !swift.includes("startTeaching") || !swift.includes("stopTeaching") || !swift.includes("teachingClick") || !swift.includes("Private keyboard")) {
+  throw new Error("Native browser skill teaching and private takeover controls are incomplete.");
+}
+if (!swift.includes("DesktopBrowserControlView") || !swift.includes("openBrowser") || !swift.includes("browserClick") || !swift.includes("Control browser")) {
+  throw new Error("Native live browser preview and takeover controls are incomplete.");
+}
+if (!swift.includes('case "teach"') || !swift.includes("openBotShowTeach")) {
+  throw new Error("Native skill teaching must remain addressable from the app lifecycle.");
+}
+if (!swift.includes("DesktopTeammatesView") || !swift.includes("saveBot") || !swift.includes("duplicateBot") || !swift.includes("Weekly token budget") || !swift.includes("ColorPicker")) {
+  throw new Error("Native teammate creation, duplication, personality, mascot, model, and budget controls are incomplete.");
+}
+if (!swift.includes('case "teammates", "bots"') || !swift.includes("openBotShowTeammates")) {
+  throw new Error("Native teammate administration must remain addressable from the app lifecycle.");
+}
+if (!swift.includes("DesktopFilesView") || !swift.includes("workspaceFiles") || !swift.includes("openWorkspaceFile") || !swift.includes("selected teammate's private workspace")) {
+  throw new Error("Native read-only teammate workspace browsing is incomplete.");
+}
+if (!swift.includes('case "files", "workspace"') || !swift.includes("openBotShowFiles")) {
+  throw new Error("Native workspace files must remain addressable from the app lifecycle.");
+}
+if (!swift.includes("DesktopSearchView") || !swift.includes("searchStudio") || !swift.includes("opens the original conversation")) {
+  throw new Error("Native private studio search is incomplete.");
+}
+if (!swift.includes('case "search"') || !swift.includes("openBotShowSearch")) {
+  throw new Error("Native studio search must remain addressable from the app lifecycle.");
+}
 if (!swift.includes('case "automations"') || !swift.includes("openBotShowAutomations")) {
   throw new Error("Native work, live, and automation destinations must remain addressable from the app lifecycle.");
 }
 if (!swift.includes("fileImporter") || !swift.includes("saveDraft") || !swift.includes("keyboardShortcut(.return, modifiers: [.command])")) {
   throw new Error("Native attachments, draft continuity, or keyboard sending are incomplete.");
+}
+if (!swift.includes("toggleMessageReaction") || !swift.includes("Replying to") || !swift.includes('Menu("React")')) {
+  throw new Error("Native conversation replies and reactions are incomplete.");
 }
 if (!swift.includes("accessibilityReduceMotion") || !swift.includes("characterBody") || swift.includes('Image("Mascot')) {
   throw new Error("Native desktop mascots must remain code-drawn, animated, and reduced-motion aware.");

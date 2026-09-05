@@ -168,4 +168,74 @@ final class OpenBotDesktopTests: XCTestCase {
         XCTAssertEqual(version.workflowId, "skill-1")
         XCTAssertEqual(version.version, 1)
     }
+
+    func testNativeTeachingStatusAndPrivateBrowserPreviewDecode() throws {
+        let status = try JSONDecoder().decode(
+            StudioTeachingStatus.self,
+            from: Data(#"{"recording":true,"name":"Weekly tracker","stepCount":4}"#.utf8)
+        )
+        XCTAssertTrue(status.recording)
+        XCTAssertEqual(status.name, "Weekly tracker")
+        XCTAssertEqual(status.stepCount, 4)
+
+        let computer = try JSONDecoder().decode(
+            StudioComputerStatus.self,
+            from: Data(#"{"botId":"nova","container":"stopped","browser":"ready","currentUrl":"https://example.com","title":"Example","screenshot":"data:image/jpeg;base64,YQ==","updatedAt":"2026-09-05T00:00:00.000Z"}"#.utf8)
+        )
+        XCTAssertEqual(computer.botId, "nova")
+        XCTAssertEqual(computer.browser, "ready")
+        XCTAssertTrue(computer.screenshot?.hasPrefix("data:image/jpeg") == true)
+    }
+
+    func testNativeAutomationDecodesEventFiltersAndOneTimeSecret() throws {
+        let routineJSON = """
+        {"id":"routine-1","name":"Issue triage","botId":"nova","botName":"Nova","threadId":"nova-thread",
+        "prompt":"Triage the issue","intervalMinutes":1440,"triggerType":"github",
+        "triggerConfig":{"githubEvent":"issues","githubAction":"opened","repository":"owner/repo"},
+        "hasWebhookSecret":true,"enabled":true,"nextRunAt":null,"lastRunAt":null,"lastStatus":"never",
+        "runCount":0,"consecutiveFailures":0,"lastError":null,"pausedReason":null}
+        """
+        let routine = try JSONDecoder().decode(StudioRoutine.self, from: Data(routineJSON.utf8))
+        XCTAssertEqual(routine.triggerType, "github")
+        XCTAssertEqual(routine.triggerConfig?.repository, "owner/repo")
+        XCTAssertTrue(routine.hasWebhookSecret == true)
+
+        let resultJSON = #"{"id":"routine-1","name":"Issue triage","triggerType":"github","webhook":{"url":"https://studio.example/api/automation-hooks/routine-1","secret":"one-time-test-secret"}}"#
+        let result = try JSONDecoder().decode(StudioRoutineSaveResult.self, from: Data(resultJSON.utf8))
+        XCTAssertEqual(result.webhook?.secret, "one-time-test-secret")
+    }
+
+    func testNativeWorkspaceFilesDecodeWithoutHostPaths() throws {
+        let files = try JSONDecoder().decode(
+            [StudioWorkspaceFile].self,
+            from: Data(#"[{"path":"reports/weekly.md","size":612,"modifiedAt":"2026-09-05T00:00:00.000Z","kind":"file"},{"path":"reports","size":96,"modifiedAt":"2026-09-05T00:00:00.000Z","kind":"directory"}]"#.utf8)
+        )
+        XCTAssertEqual(files.first?.id, "reports/weekly.md")
+        XCTAssertEqual(files.last?.kind, "directory")
+        XCTAssertFalse(String(data: try JSONEncoder().encode(files.map(\.path)), encoding: .utf8)?.contains("/Users/") == true)
+
+        let preview = try JSONDecoder().decode(
+            StudioWorkspaceFileContent.self,
+            from: Data(##"{"path":"reports/weekly.md","content":"# Weekly report"}"##.utf8)
+        )
+        XCTAssertEqual(preview.content, "# Weekly report")
+    }
+
+    func testNativeSearchResultKeepsOriginalConversationDestination() throws {
+        let result = try JSONDecoder().decode(
+            StudioSearchResult.self,
+            from: Data(#"{"id":"message-1","kind":"message","title":"Nova","subtitle":"Research","snippet":"The launch brief is ready.","threadId":"bot-nova","botId":"nova","createdAt":"2026-09-05T00:00:00.000Z"}"#.utf8)
+        )
+        XCTAssertEqual(result.stableID, "message-message-1")
+        XCTAssertEqual(result.threadId, "bot-nova")
+        XCTAssertEqual(result.botId, "nova")
+    }
+
+    func testNativeMessageDecodesReplyContextAndReactions() throws {
+        let json = ##"{"id":"message-2","threadId":"bot-nova","senderType":"bot","senderId":"nova","senderName":"Nova","senderMascot":"nova","senderColor":"#6D5BD8","body":"Here is the answer.","createdAt":"2026-09-05T00:00:00.000Z","runId":null,"attachments":[],"replyTo":{"id":"message-1","senderName":"You","body":"What changed?"},"reactions":[{"emoji":"✅","count":1,"reactedByYou":true}]}"##
+        let message = try JSONDecoder().decode(StudioMessage.self, from: Data(json.utf8))
+        XCTAssertEqual(message.replyTo?.body, "What changed?")
+        XCTAssertEqual(message.reactions?.first?.emoji, "✅")
+        XCTAssertTrue(message.reactions?.first?.reactedByYou == true)
+    }
 }

@@ -12,12 +12,20 @@ struct DesktopStudioView: View {
     @State private var showingPermissions = false
     @State private var showingConnectors = false
     @State private var showingSkills = false
+    @State private var showingTeach = false
+    @State private var showingTeammates = false
+    @State private var showingFiles = false
+    @State private var showingSearch = false
 
     init(serverURL: URL, accessKey: String?) {
         _store = StateObject(wrappedValue: StudioStore(serverURL: serverURL, accessKey: accessKey))
     }
 
     var body: some View {
+        managementSheets
+    }
+
+    private var studioSurface: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             DesktopSidebar(store: store)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 285)
@@ -25,7 +33,7 @@ struct DesktopStudioView: View {
             DesktopConversationView(store: store)
                 .navigationSplitViewColumnWidth(min: 440, ideal: 650)
         } detail: {
-            DesktopInspectorView(store: store, showingWork: $showingWork, showingLive: $showingLive, showingAutomations: $showingAutomations, showingProviders: $showingProviders, showingCodeProjects: $showingCodeProjects, showingPermissions: $showingPermissions, showingConnectors: $showingConnectors, showingSkills: $showingSkills)
+            DesktopInspectorView(store: store, showingWork: $showingWork, showingLive: $showingLive, showingAutomations: $showingAutomations, showingProviders: $showingProviders, showingCodeProjects: $showingCodeProjects, showingPermissions: $showingPermissions, showingConnectors: $showingConnectors, showingSkills: $showingSkills, showingTeammates: $showingTeammates, showingFiles: $showingFiles)
                 .navigationSplitViewColumnWidth(min: 270, ideal: 310, max: 390)
         }
         .background(DesktopTheme.paper)
@@ -42,9 +50,17 @@ struct DesktopStudioView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openBotShowPermissions)) { _ in showingPermissions = true }
         .onReceive(NotificationCenter.default.publisher(for: .openBotShowConnectors)) { _ in showingConnectors = true }
         .onReceive(NotificationCenter.default.publisher(for: .openBotShowSkills)) { _ in showingSkills = true }
+        .onReceive(NotificationCenter.default.publisher(for: .openBotShowTeach)) { _ in showingTeach = true }
+        .onReceive(NotificationCenter.default.publisher(for: .openBotShowTeammates)) { _ in showingTeammates = true }
+        .onReceive(NotificationCenter.default.publisher(for: .openBotShowFiles)) { _ in showingFiles = true }
+        .onReceive(NotificationCenter.default.publisher(for: .openBotShowSearch)) { _ in showingSearch = true }
         .onChange(of: attentionSignature) { _, _ in
             Task { await DesktopNotifications.postAttention(count: attentionCount) }
         }
+    }
+
+    private var primarySheets: some View {
+        studioSurface
         .sheet(isPresented: $showingWork) { DesktopWorkView(store: store) }
         .sheet(isPresented: $showingLive) {
             DesktopLiveView(store: store, canManageBackgroundProtection: ConnectionAddress.isLoopback(storeServerURL))
@@ -55,30 +71,16 @@ struct DesktopStudioView: View {
             DesktopCodeProjectsView(store: store, canChooseLocalFolders: ConnectionAddress.isLoopback(storeServerURL))
         }
         .sheet(isPresented: $showingPermissions) { DesktopPermissionsView(store: store) }
+    }
+
+    private var managementSheets: some View {
+        primarySheets
         .sheet(isPresented: $showingConnectors) { DesktopConnectorsView(store: store) }
         .sheet(isPresented: $showingSkills) { DesktopSkillsView(store: store) }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button { showingWork = true } label: { Label("Work", systemImage: "sparkles") }
-                    .help("Start dependable work")
-                Button { showingLive = true } label: { Label("Live Studio", systemImage: "rectangle.3.group") }
-                    .help("See active teammates and approvals")
-                Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") }
-                    .help("Create and manage routines")
-                Button { showingProviders = true } label: { Label("AI Connections", systemImage: "cpu") }
-                    .help("Connect subscriptions, APIs and local models")
-                Button { showingCodeProjects = true } label: { Label("Code Projects", systemImage: "chevron.left.forwardslash.chevron.right") }
-                    .help("Connect repositories and manage teammate access")
-                Button { showingPermissions = true } label: { Label("Access", systemImage: "checkmark.shield") }
-                    .help("Manage teammate computers, browsers and Mac access")
-                Button { showingConnectors = true } label: { Label("Apps & Tools", systemImage: "puzzlepiece.extension") }
-                    .help("Connect apps and manage teammate permissions")
-                Button { showingSkills = true } label: { Label("Skill Library", systemImage: "wand.and.stars") }
-                    .help("Manage portable teammate skills")
-                Button { Task { await store.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                    .help("Refresh")
-            }
-        }
+        .sheet(isPresented: $showingTeach) { DesktopTeachView(store: store) }
+        .sheet(isPresented: $showingTeammates) { DesktopTeammatesView(store: store) }
+        .sheet(isPresented: $showingFiles) { DesktopFilesView(store: store) }
+        .sheet(isPresented: $showingSearch) { DesktopSearchView(store: store) }
     }
 
     private var storeServerURL: URL {
@@ -180,6 +182,8 @@ private struct DesktopInspectorView: View {
     @Binding var showingPermissions: Bool
     @Binding var showingConnectors: Bool
     @Binding var showingSkills: Bool
+    @Binding var showingTeammates: Bool
+    @Binding var showingFiles: Bool
 
     private var activeRuns: [StudioRun] { store.activeRuns }
     private var uncertain: [StudioApprovedAction] {
@@ -268,6 +272,26 @@ private struct DesktopInspectorView: View {
                         Label("Skill Library", systemImage: "wand.and.stars")
                         Spacer()
                         Text(store.skills.isEmpty ? "Manage" : "\(store.skills.count) saved")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.bordered).controlSize(.regular)
+
+                Button { showingTeammates = true } label: {
+                    HStack {
+                        Label("Teammates", systemImage: "person.3.fill")
+                        Spacer()
+                        Text("\(store.state.bots.count) configured")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.bordered).controlSize(.regular)
+
+                Button { showingFiles = true } label: {
+                    HStack {
+                        Label("Workspace files", systemImage: "folder.fill")
+                        Spacer()
+                        Text("Review")
                             .font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
                 }

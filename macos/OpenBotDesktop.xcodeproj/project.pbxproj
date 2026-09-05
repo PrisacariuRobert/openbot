@@ -7,15 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		199A378CC7C16D266E002C41 /* DesktopSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */; };
 		1FA6DE9A644BC0727430DF0C /* StudioModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */; };
 		24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */; };
 		27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */; };
+		3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */; };
 		370696C603C06617F205A59B /* OpenBotDesktopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */; };
 		3AF0F8E96D2A80321DBE782D /* DesktopNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */; };
 		547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */; };
+		591EF96847C737A770E5CE36 /* DesktopTeammatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */; };
 		70F6EA3F3347A0E6C143CC6B /* StudioAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */; };
+		75E18C61FD138658535D401E /* DesktopFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */; };
 		77176D34D553501E64B47AD0 /* DesktopMascotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */; };
 		86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */; };
+		8A106A9C73B7AC546EE1970D /* DesktopTeachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */; };
 		8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */; };
 		8BF12897D18BE6DEF969931D /* ConnectionAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */; };
 		8EE31CCB1DA58D2843615258 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = B753B530BAF8C97928B53B97 /* AppIcon-1024.png */; };
@@ -47,15 +52,19 @@
 		258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMascotView.swift; sourceTree = "<group>"; };
 		27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopStudioView.swift; sourceTree = "<group>"; };
 		32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopWorkView.swift; sourceTree = "<group>"; };
+		3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopTeammatesView.swift; sourceTree = "<group>"; };
 		3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopSkillsView.swift; sourceTree = "<group>"; };
+		3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopTeachView.swift; sourceTree = "<group>"; };
 		418D0F26B773B931A05A3C1D /* DesktopRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRootView.swift; sourceTree = "<group>"; };
 		4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAutomationsView.swift; sourceTree = "<group>"; };
 		56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopProvidersView.swift; sourceTree = "<group>"; };
 		7540A41257FDF7FCAE2B0DA4 /* OpenBotDesktopTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenBotDesktopTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopSearchView.swift; sourceTree = "<group>"; };
 		ACD38ED25F0A8CF93E8528D9 /* OpenBotDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenBotDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConnectionSession.swift; sourceTree = "<group>"; };
 		B753B530BAF8C97928B53B97 /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon-1024.png"; sourceTree = "<group>"; };
+		C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBrowserControlView.swift; sourceTree = "<group>"; };
 		C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConversationView.swift; sourceTree = "<group>"; };
 		C16657B10E332E485EF58EF5 /* StudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioStore.swift; sourceTree = "<group>"; };
 		CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopCodeProjectsView.swift; sourceTree = "<group>"; };
@@ -65,6 +74,7 @@
 		EBA74A4E2732684E76B1A397 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPermissionsView.swift; sourceTree = "<group>"; };
 		ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNotifications.swift; sourceTree = "<group>"; };
+		F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopFilesView.swift; sourceTree = "<group>"; };
 		FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAPIClient.swift; sourceTree = "<group>"; };
 		FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAddress.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -171,15 +181,20 @@
 			isa = PBXGroup;
 			children = (
 				4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */,
+				C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */,
 				CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */,
 				CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */,
 				C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */,
+				F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */,
 				258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */,
 				ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */,
 				56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */,
 				418D0F26B773B931A05A3C1D /* DesktopRootView.swift */,
+				76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */,
 				3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */,
 				27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */,
+				3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */,
+				3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */,
 				32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */,
 			);
 			path = Views;
@@ -318,17 +333,22 @@
 			files = (
 				8BF12897D18BE6DEF969931D /* ConnectionAddress.swift in Sources */,
 				27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */,
+				3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */,
 				24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */,
 				86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */,
 				F66C28F89DE814E13BF9322C /* DesktopConnectorsView.swift in Sources */,
 				AE4FE07FAA35FDA37415A7F9 /* DesktopConversationView.swift in Sources */,
+				75E18C61FD138658535D401E /* DesktopFilesView.swift in Sources */,
 				77176D34D553501E64B47AD0 /* DesktopMascotView.swift in Sources */,
 				3AF0F8E96D2A80321DBE782D /* DesktopNotifications.swift in Sources */,
 				FAC93C170A84615869E711BE /* DesktopPermissionsView.swift in Sources */,
 				8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */,
 				A444C931E34109A875B9A427 /* DesktopRootView.swift in Sources */,
+				199A378CC7C16D266E002C41 /* DesktopSearchView.swift in Sources */,
 				CFB5B1CD511D01D5F47DBC23 /* DesktopSkillsView.swift in Sources */,
 				547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */,
+				8A106A9C73B7AC546EE1970D /* DesktopTeachView.swift in Sources */,
+				591EF96847C737A770E5CE36 /* DesktopTeammatesView.swift in Sources */,
 				FE21386030003E443C4BBF62 /* DesktopWorkView.swift in Sources */,
 				E1554AC0D7DFE09593E483BA /* KeychainStore.swift in Sources */,
 				9901530C05491907F54D439D /* OpenBotDesktopApp.swift in Sources */,

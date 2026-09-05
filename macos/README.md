@@ -1,6 +1,6 @@
 # OpenBot for macOS
 
-This is a native SwiftUI client for the same private OpenBot home used by the iPhone app. It does not embed the web app or use WebKit. Conversations, attachments, approvals, crash-recovery decisions, source-backed work starters, automations, subscription/API/local-model setup and assignment, app permissions, portable skills, code-project review/recovery, capability/background controls, live teammate status, and action history use the authenticated OpenBot API directly.
+This is a native SwiftUI client for the same private OpenBot home used by the iPhone app. It does not embed the web app or use WebKit. Conversations, replies/reactions, private search, workspace files, teammate administration, approvals, crash-recovery decisions, source-backed work starters, all supported automation triggers, isolated-browser takeover, visible skill teaching, subscription/API/local-model setup and assignment, app permissions, portable skills, code-project review/recovery, capability/background controls, live teammate status, and action history use the authenticated OpenBot API directly.
 
 ## Generate and build
 
