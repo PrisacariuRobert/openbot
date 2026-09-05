@@ -128,7 +128,7 @@ final class OpenBotDesktopTests: XCTestCase {
         {
           "catalog": [{
             "id": "gmail", "name": "Gmail", "connected": true, "description": "Mail", "badge": "Connected",
-            "availability": "live", "writeRequiresApproval": true, "capabilities": ["Read", "Approval-safe sending"]
+            "availability": "live", "writeConnected": true, "writeRequiresApproval": true, "capabilities": ["Read", "Approval-safe sending"]
           }],
           "access": [{
             "botId": "nova", "connectorId": "google-workspace", "service": "gmail", "canRead": true, "canSend": false
@@ -138,6 +138,7 @@ final class OpenBotDesktopTests: XCTestCase {
         """
         let status = try JSONDecoder().decode(StudioConnectorStatus.self, from: Data(json.utf8))
         XCTAssertTrue(status.isConnected("gmail"))
+        XCTAssertTrue(status.catalog.first?.writeConnected == true)
         XCTAssertTrue(status.access?.first?.canRead == true)
         XCTAssertFalse(status.access?.first?.canSend == true)
     }

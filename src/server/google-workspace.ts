@@ -57,17 +57,26 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.events.owned",
 ];
 
-export function connectorCatalog(connected: boolean, scopes: string[] = []): ConnectorCatalogEntry[] {
+export function googleServiceCapabilities(connected: boolean, scopes: string[]) {
   const hasScope = (suffix: string) => connected && scopes.some((scope) => scope === suffix || scope.endsWith(`/${suffix}`));
-  const gmailConnected = hasScope("gmail.readonly") && hasScope("gmail.send");
-  const driveConnected = hasScope("drive.readonly"), calendarConnected = hasScope("calendar.readonly");
+  return {
+    gmail: { read: hasScope("gmail.readonly"), write: hasScope("gmail.send") },
+    "google-drive": { read: hasScope("drive.readonly"), write: hasScope("drive.file") || hasScope("drive") },
+    "google-calendar": { read: hasScope("calendar.readonly") || hasScope("calendar.events.owned"), write: hasScope("calendar.events.owned") || hasScope("calendar.events") || hasScope("calendar") },
+  } satisfies Record<GoogleConnectorService, { read: boolean; write: boolean }>;
+}
+
+export function connectorCatalog(connected: boolean, scopes: string[] = []): ConnectorCatalogEntry[] {
+  const capability = googleServiceCapabilities(connected, scopes);
   return [
-    { id: "gmail", name: "Gmail", description: "Search and read mail, then send only after your approval.", badge: connected && !gmailConnected ? "Reconnect to add" : "Available now", availability: "live", connected: gmailConnected, capabilities: ["Search inbox", "Read messages", "Approval-safe sending"] },
-    { id: "google-drive", name: "Google Drive", description: "Find documents and bring current project context into a conversation.", badge: connected && !driveConnected ? "Reconnect to add" : "Available now", availability: "live", connected: driveConnected, capabilities: ["Search files", "Read documents"] },
-    { id: "google-calendar", name: "Google Calendar", description: "Check upcoming events and find the context around your day.", badge: connected && !calendarConnected ? "Reconnect to add" : "Available now", availability: "live", connected: calendarConnected, capabilities: ["Read schedule", "See event details"] },
+    { id: "gmail", name: "Gmail", description: "Search and read mail, then send only after your approval.", badge: connected && !capability.gmail.write ? "Read ready · reconnect to send" : "Available now", availability: "live", connected: capability.gmail.read, writeConnected: capability.gmail.write, capabilities: ["Search inbox", "Read messages", "Approval-safe sending"] },
+    { id: "google-drive", name: "Google Drive", description: "Find documents, read current context, and create reviewed text files.", badge: connected && !capability["google-drive"].write ? "Read ready · reconnect to create" : "Available now", availability: "live", connected: capability["google-drive"].read, writeConnected: capability["google-drive"].write, capabilities: ["Search files", "Read documents", "Approval-safe file creation"] },
+    { id: "google-calendar", name: "Google Calendar", description: "Check your schedule and add a reviewed event or invitation.", badge: connected && !capability["google-calendar"].write ? "Read ready · reconnect to create" : "Available now", availability: "live", connected: capability["google-calendar"].read, writeConnected: capability["google-calendar"].write, capabilities: ["Read schedule", "See event details", "Approval-safe event creation"] },
     { id: "slack", name: "Slack", description: "Summarize channels and prepare carefully reviewed replies.", badge: "Planned", availability: "next", connected: false, capabilities: ["Search", "Read", "Approval-safe replies"] },
     { id: "notion", name: "Notion", description: "Search team knowledge and update pages with a clear review step.", badge: "Planned", availability: "next", connected: false, capabilities: ["Search pages", "Read content"] },
     { id: "github", name: "GitHub", description: "Track issues, review pull requests, and follow repository activity.", badge: "Planned", availability: "next", connected: false, capabilities: ["Issues", "Pull requests", "Notifications"] },
@@ -305,6 +314,24 @@ export class GoogleWorkspaceConnector {
     return { id: file.id, name: file.name || "Untitled", mimeType, modifiedTime: file.modifiedTime || "", webViewLink: file.webViewLink || "", size: file.size ? Number(file.size) : null, content };
   }
 
+  async createDriveTextFile(input: { name: string; content: string; mimeType?: "text/plain" | "text/markdown" }) {
+    const name = input.name.trim(), content = input.content, mimeType = input.mimeType || "text/plain";
+    if (!name || name.length > 240 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error("Give the Drive file a short name without control characters.");
+    if (!content.trim() || content.length > 100_000) throw new Error("Drive text files must contain between 1 and 100,000 characters.");
+    const boundary = `openbot_${randomBytes(12).toString("hex")}`;
+    const body = [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, mimeType })}\r\n`,
+      `--${boundary}\r\nContent-Type: ${mimeType}; charset=UTF-8\r\n\r\n${content}\r\n`,
+      `--${boundary}--`,
+    ].join("");
+    const fields = "id,name,mimeType,webViewLink";
+    const result = await this.request<{ id?: string; name?: string; mimeType?: string; webViewLink?: string }>(`https://www.googleapis.com/upload/drive/v3/files?${new URLSearchParams({ uploadType: "multipart", fields })}`, {
+      method: "POST", headers: { "content-type": `multipart/related; boundary=${boundary}` }, body,
+    });
+    if (!result.id) throw new Error("Google Drive did not confirm that the file was created.");
+    return { id: result.id, name: result.name || name, mimeType: result.mimeType || mimeType, webViewLink: result.webViewLink || `https://drive.google.com/open?id=${encodeURIComponent(result.id)}` };
+  }
+
   async calendarAgenda(days = 7, maxResults = 20): Promise<CalendarEventSummary[]> {
     const duration = Math.max(1, Math.min(Math.round(days), 31)), now = new Date(), until = new Date(now.getTime() + duration * 86_400_000);
     const params = new URLSearchParams({ timeMin: now.toISOString(), timeMax: until.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: String(Math.max(1, Math.min(Math.round(maxResults), 40))) });
@@ -313,6 +340,27 @@ export class GoogleWorkspaceConnector {
       id: event.id!, title: event.summary || "Busy", start: event.start?.dateTime || event.start?.date || "", end: event.end?.dateTime || event.end?.date || "",
       allDay: Boolean(event.start?.date && !event.start.dateTime), location: event.location || "", description: (event.description || "").slice(0, 2_000), webLink: event.htmlLink || "", attendeeCount: event.attendees?.length || 0,
     }));
+  }
+
+  async createCalendarEvent(input: { title: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; addGoogleMeet?: boolean }) {
+    const title = input.title.trim(), start = new Date(input.start), end = new Date(input.end);
+    const attendees = [...new Set((input.attendees || []).map((value) => value.trim().toLowerCase()).filter(Boolean))];
+    if (!title || title.length > 300) throw new Error("Give the calendar event a short title.");
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start || end.getTime() - start.getTime() > 7 * 86_400_000) throw new Error("Choose a valid event start and end, no more than seven days apart.");
+    if (attendees.length > 20 || attendees.some((email) => !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))) throw new Error("Use at most 20 valid attendee email addresses.");
+    if ((input.description || "").length > 8_000 || (input.location || "").length > 500) throw new Error("Shorten the event description or location.");
+    const params = new URLSearchParams({ sendUpdates: attendees.length ? "all" : "none" });
+    const conferenceData = input.addGoogleMeet ? { createRequest: { requestId: randomBytes(16).toString("hex"), conferenceSolutionKey: { type: "hangoutsMeet" } } } : undefined;
+    if (conferenceData) params.set("conferenceDataVersion", "1");
+    const result = await this.request<{ id?: string; summary?: string; htmlLink?: string; hangoutLink?: string }>(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        summary: title, description: input.description?.trim() || undefined, location: input.location?.trim() || undefined,
+        start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
+        attendees: attendees.length ? attendees.map((email) => ({ email })) : undefined, conferenceData,
+      }),
+    });
+    if (!result.id) throw new Error("Google Calendar did not confirm that the event was created.");
+    return { id: result.id, title: result.summary || title, webLink: result.htmlLink || "", meetingLink: result.hangoutLink || "" };
   }
 
   private pruneAttempts() {

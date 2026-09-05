@@ -23,13 +23,14 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 - AI Connections also assigns an available provider/model to each teammate. Code Projects connects a same-Mac folder or clones a GitHub repository on the runner, updates explicit read/coding grants per teammate, inspects base/task-worktree diffs, restores eligible recorded edits only through the server's newer-work guard, and disconnects without deleting project files.
 - Access & Capabilities controls each teammate's private terminal and browser plus the bounded studio-wide Mac-files/apps gate.
 - Apps & Tools starts supported Google, GitHub, Slack, Notion, Todoist, and Dropbox connection flows and keeps read access separate from approval-safe acting for each teammate. Self-hosted OAuth client and event-secret configuration remains a web/host setup path.
+- Drive text/Markdown creation and Calendar events, invitations, guest notifications, and optional Meet links require the new narrow creation scopes, a separate teammate write grant, an exact approval preview, and the existing crash-safe one-time action receipt. Older Google connections remain readable and show a reconnect action before creation can be enabled.
 - Skill Library lists saved skills, installs transparent starters, creates retained versions through editing, browses immutable history, restores an earlier setup as a new non-destructive version, assigns clean copies to another teammate, imports bounded packages through the runner's integrity/secret checks, exports without overwriting an existing download, and confirms deletion.
 - Teach opens a teammate's isolated browser visibly, maps clicks into its preview, accepts sensitive text through a private non-chat field, records the demonstration, and saves the resulting readable workflow into Skill Library.
 - Live Studio can open the same bounded browser takeover outside teaching so the owner can navigate, click, type privately, and send common keys while supervising work.
 - Teammates creates and edits role, instructions, provider/model assignment, computer/browser switches, weekly token budget, mascot shape, preset colour, and custom colour. Duplication keeps setup and grants but starts a separate conversation, workspace, memory, browser profile, and future usage history.
 - A server persistence defect found during this pass was fixed: creating a teammate with computer/browser disabled or with a zero weekly cap now retains those explicit values instead of substituting the defaults.
 - Live Studio exposes the existing login/crash LaunchAgent protection to the local native owner, with confirmation before it is removed.
-- Background-service restarts now terminate the complete TypeScript runner process group, preventing an orphaned loader from surviving an upgrade and delaying the protected replacement. LaunchAgent startup no longer depends on entering a protected Documents working directory before the bounded launcher starts.
+- Background-service restarts now terminate the complete TypeScript runner process group, preventing an orphaned loader from surviving an upgrade and delaying the protected replacement. The LaunchAgent no longer declares a protected Documents working directory, but its source-based launcher still lives in that checkout and remains a packaging blocker for locked-login startup.
 - Native drafts now use an accepted `macos` source in the shared server contract, fixing an otherwise hidden 400 response during desktop-to-phone/web handoff.
 - Live Studio exposes active work, approvals, action receipts, stop controls, and conservative uncertain-action reconciliation.
 - A same-Mac runner pairs automatically only through a loopback address. Private or public remote hosts still require an explicit access key; plain HTTP remote origins are rejected.
@@ -44,7 +45,7 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 `npm run verify` passed:
 
 - release, iOS, and macOS source-contract checks
-- 167 TypeScript tests, 0 failures
+- 169 TypeScript tests, 0 failures
 - TypeScript type checking
 - production Vite build
 
@@ -72,6 +73,10 @@ Live and disposable API checks used no provider/model request:
 - A paused signed-webhook automation was created, edited with an event filter, issued a one-time secret, rotated that secret, and was removed; no routine run was started.
 - A disposable isolated runner created a teammate with browser/computer disabled and zero weekly cap, duplicated it into an independent thread/workspace, updated its role and budget, listed a copied fixture by relative workspace path, and returned its bounded preview. The entire disposable data directory was then removed.
 - A second disposable HTTP-level boundary check listed and previewed a normal file while excluding direct and directory symlinks; attempts to preview both escape paths returned 404. Its temporary runner and data were removed.
+
+Google creation used deterministic provider fixtures rather than the owner's account: OAuth includes `drive.file` and `calendar.events.owned`; multipart Drive content, Calendar times, deduplicated guests, guest-notification query values, optional Meet request data, scope-aware tool exposure, and both-runtime schemas passed. The implementation follows Google's current [Drive scope guidance](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [Drive file-create contract](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/create), and [Calendar event-insert contract](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert). No real file, event, invitation, or notification was created.
+
+After the verified source replaced a legacy orphaned process group, the authenticated live connector catalog exposed `writeConnected` and `writeRequiresApproval` from the current server. Gmail remained ready; Drive and Calendar correctly reported that their new creation scopes require reconnecting. The existing studio stayed intact, and no active job or pending approval was interrupted before the controlled restart. Because the Mac was locked, the current server was kept available through a detached user-session process; this is continuity evidence, not proof of locked-login LaunchAgent recovery.
 
 ## Harmless build-host warnings
 

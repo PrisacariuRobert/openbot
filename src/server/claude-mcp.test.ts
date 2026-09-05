@@ -75,7 +75,9 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     assert.ok(exposed.includes("gmail_send"));
     assert.ok(exposed.includes("google_drive_search"));
     assert.ok(exposed.includes("google_drive_read"));
+    assert.ok(exposed.includes("google_drive_create"));
     assert.ok(exposed.includes("google_calendar_agenda"));
+    assert.ok(exposed.includes("google_calendar_create"));
     assert.ok(exposed.includes("slack_search"));
     assert.ok(exposed.includes("slack_read"));
     assert.ok(exposed.includes("slack_post"));

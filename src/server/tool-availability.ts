@@ -1,5 +1,6 @@
 import type { Bot, ConnectorServiceId } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { connectorCatalog } from "./google-workspace.js";
 
 // Context reduction only. The tool endpoints remain the authorization boundary
 // and recheck grants when a call arrives, including after session revocation.
@@ -49,13 +50,13 @@ export function toolAvailability(
       id: "google-workspace",
       service: "google-drive",
       read: ["google_drive_search", "google_drive_read"],
-      write: [],
+      write: ["google_drive_create"],
     },
     {
       id: "google-workspace",
       service: "google-calendar",
       read: ["google_calendar_agenda"],
-      write: [],
+      write: ["google_calendar_create"],
     },
     {
       id: "github-cli",
@@ -88,11 +89,15 @@ export function toolAvailability(
       write: [],
     },
   ];
+  const googleConnection = db.getConnector("google-workspace");
+  const googleCatalog = connectorCatalog(Boolean(googleConnection?.connected), googleConnection?.scopes || []);
   for (const app of apps) {
     const access = db.getBotConnectorAccess(bot.id, app.service, app.id);
-    const connected = Boolean(db.getConnector(app.id)?.connected);
-    set(app.read, connected && Boolean(access?.canRead));
-    set(app.write, connected && Boolean(access?.canSend));
+    const google = app.id === "google-workspace" ? googleCatalog.find((entry) => entry.id === app.service) : undefined;
+    const readConnected = google ? google.connected : Boolean(db.getConnector(app.id)?.connected);
+    const writeConnected = google ? google.writeConnected === true : readConnected;
+    set(app.read, readConnected && Boolean(access?.canRead));
+    set(app.write, writeConnected && Boolean(access?.canSend));
   }
   set(["work_collect", "work_report"], Boolean(flags.gmail_read || flags.google_calendar_agenda));
   const projects = db.listCodeProjects(bot.id);

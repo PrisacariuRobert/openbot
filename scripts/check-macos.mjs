@@ -151,6 +151,9 @@ if (!swift.includes("fileImporter") || !swift.includes("saveDraft") || !swift.in
 if (!swift.includes("toggleMessageReaction") || !swift.includes("Replying to") || !swift.includes('Menu("React")')) {
   throw new Error("Native conversation replies and reactions are incomplete.");
 }
+if (!swift.includes("writeConnected") || !swift.includes('Button("Reconnect")') || !swift.includes("connectorSupportsWrite")) {
+  throw new Error("Native Google creation grants must stay scope-aware and reconnectable.");
+}
 if (!swift.includes("accessibilityReduceMotion") || !swift.includes("characterBody") || swift.includes('Image("Mascot')) {
   throw new Error("Native desktop mascots must remain code-drawn, animated, and reduced-motion aware.");
 }

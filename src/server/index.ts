@@ -878,6 +878,8 @@ app.post("/api/connectors/google/disconnect", async (_request, response) => {
 app.patch("/api/connectors/gmail/access/:botId", (request, response) => {
   const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean() }).safeParse(request.body);
   if (!parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid Gmail permissions for this teammate." });
+  const connection = db.getConnector("google-workspace"), capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === "gmail");
+  if (parsed.data.canSend && capability?.writeConnected !== true) return response.status(409).json({ error: "Reconnect Google before allowing this teammate to send Gmail." });
   try { response.json(db.setBotConnectorAccess(request.params.botId, parsed.data)); broadcast({ type: "connector", at: Date.now() }); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -886,6 +888,8 @@ app.patch("/api/connectors/google/access/:service/:botId", (request, response) =
   const service = z.enum(["gmail", "google-drive", "google-calendar"]).safeParse(request.params.service);
   const parsed = z.object({ canRead: z.boolean(), canSend: z.boolean().default(false) }).safeParse(request.body);
   if (!service.success || !parsed.success || !db.getBot(request.params.botId)) return response.status(400).json({ error: "Choose valid app permissions for this teammate." });
+  const connection = db.getConnector("google-workspace"), capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === service.data);
+  if (parsed.data.canSend && capability?.writeConnected !== true) return response.status(409).json({ error: `Reconnect Google before allowing this teammate to create with ${capability?.name || "that app"}.` });
   try { response.json(db.setBotConnectorAccess(request.params.botId, parsed.data, service.data)); broadcast({ type: "connector", at: Date.now() }); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -1093,12 +1097,35 @@ async function performApprovedAction(action: unknown): Promise<string> {
   }
   if (parsed.data.type === "gmail_send") {
     const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId);
-    if (!bot || !access?.canSend || !db.getConnector("google-workspace")?.connected) throw new Error("Gmail sending is not available for this teammate.");
+    const connection = db.getConnector("google-workspace"), capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === "gmail");
+    if (!bot || !access?.canSend || capability?.writeConnected !== true) throw new Error("Gmail sending is not available for this teammate.");
     const message = { to: String(args.to || ""), cc: String(args.cc || ""), subject: String(args.subject || ""), body: String(args.body || "") };
     const result = await googleWorkspace.send(message);
     db.addConnectorEvent({ botId: bot.id, action: "gmail_send", status: "completed", summary: `Sent “${message.subject.replace(/[\r\n]+/g, " ").slice(0, 120)}” to ${message.to.replace(/[\r\n]+/g, " ").slice(0, 120)}` });
     broadcast({ type: "connector", at: Date.now() });
     return `The email was sent to ${message.to}. Gmail reference: ${result.id}.`;
+  }
+  if (parsed.data.type === "google_drive_create") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "google-drive");
+    const connection = db.getConnector("google-workspace"), capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === "google-drive");
+    if (!bot || !access?.canSend || capability?.writeConnected !== true) throw new Error("Creating Google Drive files is not available for this teammate. Reconnect Google and check the teammate's access.");
+    const file = await googleWorkspace.createDriveTextFile({ name: String(args.name || ""), content: String(args.content || ""), mimeType: args.mimeType === "text/markdown" ? "text/markdown" : "text/plain" });
+    db.addConnectorEvent({ botId: bot.id, action: "google_drive_create", status: "completed", summary: `${bot.name} created the approved Drive file “${file.name.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The Drive file was created: ${file.name} (${file.webViewLink}).`;
+  }
+  if (parsed.data.type === "google_calendar_create") {
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "google-calendar");
+    const connection = db.getConnector("google-workspace"), capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === "google-calendar");
+    if (!bot || !access?.canSend || capability?.writeConnected !== true) throw new Error("Creating Google Calendar events is not available for this teammate. Reconnect Google and check the teammate's access.");
+    const event = await googleWorkspace.createCalendarEvent({
+      title: String(args.title || ""), start: String(args.start || ""), end: String(args.end || ""),
+      description: args.description ? String(args.description) : undefined, location: args.location ? String(args.location) : undefined,
+      attendees: Array.isArray(args.attendees) ? args.attendees.map(String) : undefined, addGoogleMeet: args.addGoogleMeet === true,
+    });
+    db.addConnectorEvent({ botId: bot.id, action: "google_calendar_create", status: "completed", summary: `${bot.name} created the approved calendar event “${event.title.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The calendar event was created: ${event.title}${event.webLink ? ` (${event.webLink})` : ""}${event.meetingLink ? ` Meet: ${event.meetingLink}` : ""}.`;
   }
   if (parsed.data.type === "github_issue_create") {
     const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "github", "github-cli");
@@ -1159,11 +1186,13 @@ async function performApprovedAction(action: unknown): Promise<string> {
 function connectorActionFor(actionType: string) {
   return ({
     gmail_send: { connectorId: "google-workspace", denied: "Email was not sent because you chose Not now" },
+    google_drive_create: { connectorId: "google-workspace", denied: "The Drive file was not created because you chose Not now" },
+    google_calendar_create: { connectorId: "google-workspace", denied: "The calendar event was not created because you chose Not now" },
     github_issue_create: { connectorId: "github-cli", denied: "The issue was not created because you chose Not now" },
     slack_post: { connectorId: "slack", denied: "The Slack message was not posted because you chose Not now" },
     notion_update: { connectorId: "notion", denied: "Nothing was added to Notion because you chose Not now" },
     todoist_task_create: { connectorId: "todoist", denied: "The Todoist task was not created because you chose Not now" },
-  } as const)[actionType as "gmail_send" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"];
+  } as const)[actionType as "gmail_send" | "google_drive_create" | "google_calendar_create" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"];
 }
 
 async function executeApprovedAction(approvalId: string) {
@@ -1585,7 +1614,21 @@ app.post("/api/bots/:id/teach/stop", async (request, response) => {
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["work_collect", "work_report", "bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_calendar_agenda", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
+const driveCreateInput = z.object({
+  name: z.string().trim().min(1).max(240).refine((value) => !/[\u0000-\u001f\u007f]/.test(value)),
+  content: z.string().min(1).max(100_000).refine((value) => value.trim().length > 0), mimeType: z.enum(["text/plain", "text/markdown"]).optional().default("text/plain"),
+});
+const calendarCreateInput = z.object({
+  title: z.string().trim().min(1).max(300).refine((value) => !/[\u0000-\u001f\u007f]/.test(value)),
+  start: z.string().max(64).refine((value) => /(Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value))),
+  end: z.string().max(64).refine((value) => /(Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value))),
+  description: z.string().max(8_000).optional(), location: z.string().max(500).optional(),
+  attendees: z.array(z.string().trim().email()).max(20).optional(), addGoogleMeet: z.boolean().optional().default(false),
+}).superRefine((value, context) => {
+  const duration = Date.parse(value.end) - Date.parse(value.start);
+  if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
+});
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["work_collect", "work_report", "bash", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "gmail_search", "gmail_read", "gmail_send", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   if (request.headers["x-openbot-token"] !== internalToken) return response.status(403).json({ error: "Internal tool access denied." });
   const parsed = internalToolInput.safeParse(request.body);
@@ -1772,9 +1815,11 @@ app.post("/api/internal/tools", async (request, response) => {
     }
     if (action === "gmail_search" || action === "gmail_read" || action === "gmail_send") {
       const connection = db.getConnector("google-workspace"), access = db.getBotConnectorAccess(botId);
-      if (!connection?.connected) return response.status(409).json({ error: "Gmail is not connected yet. Ask the user to connect it in Apps & Tools." });
+      const capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find((entry) => entry.id === "gmail");
+      if (!capability?.connected) return response.status(409).json({ error: "Gmail is not connected yet. Ask the user to connect it in Apps & Tools." });
       if ((action === "gmail_search" || action === "gmail_read") && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Gmail." });
       if (action === "gmail_send" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Gmail messages." });
+      if (action === "gmail_send" && capability.writeConnected !== true) return response.status(409).json({ error: "Reconnect Google once to restore approval-safe Gmail sending." });
       if (action === "gmail_search") {
         const query = String(args.query || "").trim().slice(0, 500), maxResults = Number(args.maxResults || 8);
         const messages = await googleWorkspace.search(query, Number.isFinite(maxResults) ? maxResults : 8);
@@ -1796,10 +1841,21 @@ app.post("/api/internal/tools", async (request, response) => {
       const preview = email.body.trim().replace(/\s+/g, " ").slice(0, 260);
       return holdForApproval("external", `${bot.name} prepared an email to ${recipient}. Subject: “${subject}”. Preview: ${preview}${email.body.trim().length > 260 ? "…" : ""}`, `Send “${subject}” to ${recipient}`);
     }
-    if (action === "google_drive_search" || action === "google_drive_read") {
+    if (action === "google_drive_search" || action === "google_drive_read" || action === "google_drive_create") {
       const access = db.getBotConnectorAccess(botId, "google-drive"), catalog = connectorCatalog(Boolean(db.getConnector("google-workspace")?.connected), db.getConnector("google-workspace")?.scopes || []);
-      if (!catalog.find((entry) => entry.id === "google-drive")?.connected) return response.status(409).json({ error: "Google Drive needs to be connected or reconnected in Apps & Tools." });
-      if (!access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Google Drive." });
+      const capability = catalog.find((entry) => entry.id === "google-drive");
+      if (!capability?.connected) return response.status(409).json({ error: "Google Drive needs to be connected or reconnected in Apps & Tools." });
+      if (action !== "google_drive_create" && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Google Drive." });
+      if (action === "google_drive_create") {
+        if (!access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Google Drive files." });
+        if (capability.writeConnected !== true) return response.status(409).json({ error: "Reconnect Google once to add approval-safe Drive file creation." });
+        const input = driveCreateInput.safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give the Drive file a short name and bounded text or Markdown content." });
+        const preview = input.data.content.trim().replace(/\s+/g, " ").slice(0, 480);
+        db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared the Drive file “${input.data.name.slice(0, 120)}”` });
+        broadcast({ type: "connector", at: Date.now() });
+        return holdForApproval("external", `${bot.name} prepared “${input.data.name}” for Google Drive (${input.data.content.length.toLocaleString()} characters). Preview: ${preview}${input.data.content.trim().length > 480 ? "…" : ""}`, `Create “${input.data.name}” in Drive`, input.data);
+      }
       if (action === "google_drive_search") {
         const files = await googleWorkspace.searchDrive(String(args.query || ""), Number(args.maxResults || 8));
         db.addConnectorEvent({ botId, action, status: "completed", summary: `${bot.name} found ${files.length} matching Drive file${files.length === 1 ? "" : "s"}` });
@@ -1809,9 +1865,20 @@ app.post("/api/internal/tools", async (request, response) => {
       db.addConnectorEvent({ botId, action, status: "completed", summary: `${bot.name} read “${file.name.slice(0, 120)}” from Drive` });
       broadcast({ type: "connector", at: Date.now() }); return response.json(file);
     }
-    if (action === "google_calendar_agenda") {
+    if (action === "google_calendar_agenda" || action === "google_calendar_create") {
       const access = db.getBotConnectorAccess(botId, "google-calendar"), catalog = connectorCatalog(Boolean(db.getConnector("google-workspace")?.connected), db.getConnector("google-workspace")?.scopes || []);
-      if (!catalog.find((entry) => entry.id === "google-calendar")?.connected) return response.status(409).json({ error: "Google Calendar needs to be connected or reconnected in Apps & Tools." });
+      const capability = catalog.find((entry) => entry.id === "google-calendar");
+      if (!capability?.connected) return response.status(409).json({ error: "Google Calendar needs to be connected or reconnected in Apps & Tools." });
+      if (action === "google_calendar_create") {
+        if (!access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Google Calendar events." });
+        if (capability.writeConnected !== true) return response.status(409).json({ error: "Reconnect Google once to add approval-safe Calendar event creation." });
+        const input = calendarCreateInput.safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give the event a title, valid start and end with time zones, and valid guest emails." });
+        const guests = input.data.attendees?.length ? input.data.attendees.join(", ") : "No guests";
+        db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared the calendar event “${input.data.title.slice(0, 120)}”` });
+        broadcast({ type: "connector", at: Date.now() });
+        return holdForApproval("external", `${bot.name} prepared “${input.data.title}” from ${input.data.start} to ${input.data.end}. Guests: ${guests}.${input.data.location ? ` Location: ${input.data.location}.` : ""}${input.data.addGoogleMeet ? " A Google Meet link will be added." : ""}${input.data.attendees?.length ? " Google will notify these guests after approval." : ""}`, `Create “${input.data.title}” in Calendar`, input.data);
+      }
       if (!access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Google Calendar." });
       const events = await googleWorkspace.calendarAgenda(Number(args.days || 7), Number(args.maxResults || 20));
       db.addConnectorEvent({ botId, action, status: "completed", summary: `${bot.name} checked ${events.length} upcoming calendar event${events.length === 1 ? "" : "s"}` });

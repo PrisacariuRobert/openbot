@@ -15,6 +15,7 @@ Goal: make the primary desktop experience a real application instead of requirin
 - Added native provider readiness, supported account/subscription sign-in, code completion, and hosted API or localhost-model setup
 - Added native provider/model assignment, local-folder and GitHub code-project connection, explicit per-teammate grants, base/task-worktree diff review, guarded edit restoration, safe disconnect, and computer/browser/Mac capability controls
 - Added native Apps & Tools connection entry points with separate teammate read/write grants, portable Skill Library management including history and rollback, and local background-protection controls
+- Deepened connected work with approval-gated Drive text/Markdown creation and Calendar events, guests, notifications, and optional Meet links; the new scopes remain separate from teammate read grants and reconnect visibly
 - Added native teammate creation/editing/clean duplication, bounded workspace-file review, isolated-browser takeover, and visible teach-by-demonstration saved into the Skill Library
 - Kept mascots code-drawn, recolorable, independently animated, work-state aware, and reduced-motion compatible
 - Added a no-WebKit release contract, macOS unit tests, Xcode build validation, and a real populated local-runner launch check without consuming model usage

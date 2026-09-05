@@ -11,6 +11,7 @@
 - Added native Apps & Tools connection entry points, per-teammate read/write grants, portable Skill Library install/edit/history/non-destructive rollback/assign/import/export/delete, and local background-protection controls
 - Added native isolated-browser preview/control and visible teach-by-demonstration with private typing and saved Skill Library output
 - Added native teammate create/edit/duplicate controls for role, instructions, provider/model, tools, weekly budget, mascot shape, and custom colour, plus bounded read-only teammate workspace browsing
+- Added bounded Google Drive text/Markdown creation and Google Calendar events, guests, notifications, and optional Meet links through the same per-teammate write grant, exact approval preview, one-time action receipt, and reconnect-aware OAuth scope boundary
 - Hardened workspace browsing so traversal, hidden entries, direct links, and folders linked outside a teammate's private workspace cannot be listed or previewed
 - Fixed new-teammate persistence so intentionally disabled computer/browser access and a zero weekly token cap are no longer replaced by defaults
 - Fixed native Mac draft handoff by accepting and preserving the `macos` source instead of rejecting it as an unknown client

@@ -162,11 +162,13 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - OAuth state checking, PKCE S256, offline refresh, and encrypted local token storage
 - Clear recovery steps and direct API-enable links when a Google service is disabled
 - Refresh-safe OAuth result pages that return the user to Apps & Tools
-- Separate Inbox, sending, Drive, and Calendar permission switches for every teammate
+- Separate read and create permission switches for Gmail, Drive, and Calendar for every teammate
 - Gmail search and bounded message reading
 - Plain-text Gmail sending only after a durable approval showing recipient, subject, and body preview
 - Google Drive search and bounded reading for Google Docs, Sheets, and supported text formats
-- Read-only Google Calendar agenda with times, location, attendee count, and links
+- Bounded text or Markdown file creation in My Drive only after an exact name, size, and content-preview approval
+- Google Calendar agenda with times, location, attendee count, and links
+- Calendar event and invitation creation only after an exact title, time, location, guest, notification, and optional Meet-link approval
 - `@gmail`, `@drive`, and `@calendar` composer suggestions
 - Morning brief, meeting preparation, and follow-up starter workflows
 - Connected-account previews and a private local connector activity trail

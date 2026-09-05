@@ -535,6 +535,7 @@ export interface ConnectorCatalogEntry {
   badge: string;
   availability: "live" | "next";
   connected: boolean;
+  writeConnected?: boolean;
   writeRequiresApproval?: boolean;
   capabilities: string[];
 }

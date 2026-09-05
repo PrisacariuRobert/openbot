@@ -143,13 +143,13 @@ This development version focuses on trustworthy foundations, not a larger featur
 - Embedded iOS Share extension for securely handing text, links, images, and files into the active OpenBot conversation
 - Customizable code-drawn mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
-- Real Gmail search/read and approval-gated sending, Google Drive search/document reading, and Google Calendar agenda access
+- Real Gmail search/read and approval-gated sending, Google Drive search/document reading plus approval-gated text-file creation, and Google Calendar agenda access plus approval-gated events, invitations, and optional Meet links
 - Official GitHub CLI connection for notifications, issue search, and approval-gated issue creation
 - Slack search, bounded conversation reading, and approval-gated channel messages or thread replies
 - Notion page search, bounded page reading, and approval-gated content append for pages selected during connection
 - Todoist active-task reading and approval-gated task creation, with runtime-created local OAuth credentials for one-click setup
 - Read-only Dropbox search and bounded text/code reading with official offline OAuth refresh
-- Per-teammate permissions for Inbox, sending, Drive, and Calendar—rather than exposing every connected app to every bot
+- Separate per-teammate read/create permissions for Gmail, Drive, and Calendar—rather than exposing every connected app to every bot
 - Per-teammate Slack read/post, Notion read/update, Todoist read/create, and Dropbox read permissions, backed by the same connector health and audit contract
 - Natural connected-app suggestions plus useful starter workflows that combine calendar, tasks, cloud files, conversations, knowledge, and code activity
 - Owner-controlled access to visible Mac home folders, with bounded text reading and approval-only file organization that cannot delete or overwrite

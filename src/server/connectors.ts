@@ -9,15 +9,15 @@ export const CONNECTOR_MANIFESTS: readonly ConnectorManifest[] = [
   },
   {
     schemaVersion: 2, connectorId: "google-workspace", service: "google-drive", name: "Google Drive",
-    description: "Find documents and bring current project context into a conversation.", auth: "oauth",
-    readCapability: "Search and read supported documents", writeCapability: null, writeRequiresApproval: false, eventCapability: null, eventAuth: null,
-    dataBoundary: "Search results and supported text exports are bounded before model use.", docsUrl: "https://developers.google.com/drive/api",
+    description: "Find documents, read current context, and create a reviewed text file.", auth: "oauth",
+    readCapability: "Search and read supported documents", writeCapability: "Create text files", writeRequiresApproval: true, eventCapability: null, eventAuth: null,
+    dataBoundary: "Search results, supported text exports, and proposed new file contents are bounded; creation requires approval.", docsUrl: "https://developers.google.com/drive/api",
   },
   {
     schemaVersion: 2, connectorId: "google-workspace", service: "google-calendar", name: "Google Calendar",
-    description: "Check upcoming events and use them as automation triggers.", auth: "oauth",
-    readCapability: "Read the primary calendar", writeCapability: null, writeRequiresApproval: false, eventCapability: "Start work before matching events", eventAuth: "cursor",
-    dataBoundary: "Only bounded event summaries from the connected primary calendar are exposed.", docsUrl: "https://developers.google.com/calendar/api",
+    description: "Check upcoming events, create a reviewed event, and use the schedule as an automation trigger.", auth: "oauth",
+    readCapability: "Read the primary calendar", writeCapability: "Create events and invitations", writeRequiresApproval: true, eventCapability: "Start work before matching events", eventAuth: "cursor",
+    dataBoundary: "Only bounded event summaries and the exact proposed event enter a task; creation and guest notifications require approval.", docsUrl: "https://developers.google.com/calendar/api",
   },
   {
     schemaVersion: 2, connectorId: "github-cli", service: "github", name: "GitHub",

@@ -94,6 +94,14 @@ struct DesktopConnectorsView: View {
                 Spacer()
                 if connector.connected {
                     Label("Ready", systemImage: "checkmark.circle.fill").font(.system(size: 10.5, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.green)
+                    if connector.writeRequiresApproval == true && connector.writeConnected == false {
+                        Button("Reconnect") {
+                            Task {
+                                if let url = await store.beginConnectorConnection(connector.id) { NSWorkspace.shared.open(url) }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small).disabled(store.isCheckingConnectors)
+                    }
                     if connector.id != "github" && connector.id != "google-drive" && connector.id != "google-calendar" {
                         Button(role: .destructive) { pendingDisconnect = connector } label: { Image(systemName: "xmark.circle") }
                             .buttonStyle(.bordered).controlSize(.small).help("Disconnect")
@@ -126,7 +134,7 @@ struct DesktopConnectorsView: View {
                         )) {
                             Text(StudioConnectorAccessLevel.none.rawValue).tag(StudioConnectorAccessLevel.none)
                             Text(StudioConnectorAccessLevel.read.rawValue).tag(StudioConnectorAccessLevel.read)
-                            if connectorSupportsWrite(connector) { Text(StudioConnectorAccessLevel.write.rawValue).tag(StudioConnectorAccessLevel.write) }
+                            if connectorSupportsWrite(connector) && connector.writeConnected != false { Text(StudioConnectorAccessLevel.write.rawValue).tag(StudioConnectorAccessLevel.write) }
                         }
                         .labelsHidden().frame(width: 135).disabled(store.isCheckingConnectors)
                     }

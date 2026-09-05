@@ -524,6 +524,7 @@ struct StudioConnectorCatalogEntry: Decodable, Identifiable, Hashable {
     let description: String?
     let badge: String?
     let availability: String?
+    let writeConnected: Bool?
     let writeRequiresApproval: Bool?
     let capabilities: [String]?
 }

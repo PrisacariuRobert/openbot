@@ -4442,16 +4442,15 @@ function ConnectorPanel({
     !status?.managedGoogleClient
       ? status?.googleProjectId
       : null;
-  const gmailReady = Boolean(
-      status?.catalog.find((entry) => entry.id === "gmail")?.connected,
-    ),
-    driveReady = Boolean(
-      status?.catalog.find((entry) => entry.id === "google-drive")?.connected,
-    ),
-    calendarReady = Boolean(
-      status?.catalog.find((entry) => entry.id === "google-calendar")
-        ?.connected,
-    );
+  const gmailCatalog = status?.catalog.find((entry) => entry.id === "gmail"),
+    driveCatalog = status?.catalog.find((entry) => entry.id === "google-drive"),
+    calendarCatalog = status?.catalog.find((entry) => entry.id === "google-calendar"),
+    gmailReady = Boolean(gmailCatalog?.connected),
+    driveReady = Boolean(driveCatalog?.connected),
+    calendarReady = Boolean(calendarCatalog?.connected),
+    gmailWriteReady = gmailCatalog?.writeConnected === true,
+    driveWriteReady = driveCatalog?.writeConnected === true,
+    calendarWriteReady = calendarCatalog?.writeConnected === true;
   const slackReady = Boolean(status?.slack.connected),
     notionReady = Boolean(status?.notion.connected),
     todoistReady = Boolean(status?.todoist.connected),
@@ -5153,10 +5152,10 @@ function ConnectorPanel({
             </section>
           )}
           {serviceRecoveries.length === 0 &&
-            (!gmailReady || !driveReady || !calendarReady) && (
+            (!gmailReady || !driveReady || !calendarReady || !gmailWriteReady || !driveWriteReady || !calendarWriteReady) && (
               <button className="upgrade-google" onClick={() => void connect()}>
-                <RefreshCw size={15} /> Reconnect once to add the newest Google
-                apps
+                <RefreshCw size={15} /> Reconnect once to add approval-safe
+                Drive and Calendar creation
               </button>
             )}
           <section>
@@ -5265,7 +5264,7 @@ function ConnectorPanel({
                         className={gmail?.canRead ? "on" : ""}
                         aria-pressed={Boolean(gmail?.canRead)}
                         disabled={
-                          !gmailReady || busy === `access-gmail-${bot.id}`
+                          !gmailWriteReady || busy === `access-gmail-${bot.id}`
                         }
                         onClick={() =>
                           void setAccess(
@@ -5313,6 +5312,14 @@ function ConnectorPanel({
                         <FolderOpen size={13} /> Drive
                       </button>
                       <button
+                        className={drive?.canSend ? "on create" : "create"}
+                        aria-pressed={Boolean(drive?.canSend)}
+                        disabled={!driveWriteReady || busy === `access-google-drive-${bot.id}`}
+                        onClick={() => void setAccess(bot.id, "google-drive", Boolean(drive?.canRead), !drive?.canSend)}
+                      >
+                        <Plus size={13} /> Create file
+                      </button>
+                      <button
                         className={
                           calendar?.canRead ? "on calendar" : "calendar"
                         }
@@ -5330,6 +5337,14 @@ function ConnectorPanel({
                         }
                       >
                         <Clock3 size={13} /> Calendar
+                      </button>
+                      <button
+                        className={calendar?.canSend ? "on create" : "create"}
+                        aria-pressed={Boolean(calendar?.canSend)}
+                        disabled={!calendarWriteReady || busy === `access-google-calendar-${bot.id}`}
+                        onClick={() => void setAccess(bot.id, "google-calendar", Boolean(calendar?.canRead), !calendar?.canSend)}
+                      >
+                        <Plus size={13} /> Add event
                       </button>
                     </div>
                   </div>

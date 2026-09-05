@@ -31,7 +31,7 @@ OpenBot remains a development beta, **not approved here for broad unattended pro
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
 - One-click release-managed Google OAuth or a self-hosted credentials-file flow, encrypted local tokens, per-teammate app access, previews, and a private activity trail
-- Gmail search/read and approval-only sending, Drive search/document reading, and Calendar agenda reading
+- Gmail search/read and approval-only sending, Drive search/document reading plus approval-only bounded text-file creation, and Calendar agenda reading plus approval-only events, invitations, and optional Meet links
 - Official GitHub CLI connection with notifications, issue search, per-teammate read/create permissions, and approval-only issue creation
 - Slack OAuth with member-visible search/read, bot posting, separate per-teammate read/post grants, exact write approvals, connected preview, health, and private audits
 - Notion OAuth with selected/shared-page search/read, separate per-teammate read/update grants, exact append approvals, connected preview, health, and private audits
