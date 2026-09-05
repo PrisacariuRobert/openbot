@@ -22,8 +22,9 @@ Status: complete in source for the owner-operated 0.34.0 development beta
 - Native Live Studio controls the isolated teammate browser, and native Teach records visible browser demonstrations with private non-chat typing before saving a readable versioned skill
 - Native Teammates creates, edits, and cleanly duplicates roles, instructions, provider/model assignments, capabilities, weekly budgets, and recolorable code-drawn characters; Workspace Files provides bounded read-only review without exposing host paths
 - Native Live Studio can enable or remove the existing login/crash LaunchAgent protection from the local Mac
+- Text deliverables can include bounded workspace-file evidence; OpenBot reopens the file itself, checks requested size/content, records a short fingerprint, and labels host evidence separately from teammate-reported checks
 
-Verification: the complete TypeScript release gate, native source contract, macOS build and thirteen macOS unit tests pass. Disposable API checks proved teammate create/update/duplicate choices and bounded workspace preview; live-runner checks proved teaching and the full signed-automation lifecycle without sending a model request. See [QA_0.34](QA_0.34.md).
+Verification: the complete TypeScript release gate with 171 tests, native source contract, macOS build and thirteen macOS unit tests pass. Disposable API checks proved teammate create/update/duplicate choices, bounded workspace preview, and symlink-safe host verification; live-runner checks proved teaching and the full signed-automation lifecycle without sending a model request. See [QA_0.34](QA_0.34.md).
 
 Remaining: the current app is an ad-hoc development build. Developer ID signing, hardened runtime, notarization, automatic updates, fresh-Mac packaging of the runner, Windows support, native self-hosted OAuth/event setup, and repeated real-model competitor acceptance runs are not claimed.
 

@@ -29,6 +29,7 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 - Live Studio can open the same bounded browser takeover outside teaching so the owner can navigate, click, type privately, and send common keys while supervising work.
 - Teammates creates and edits role, instructions, provider/model assignment, computer/browser switches, weekly token budget, mascot shape, preset colour, and custom colour. Duplication keeps setup and grants but starts a separate conversation, workspace, memory, browser profile, and future usage history.
 - A server persistence defect found during this pass was fixed: creating a teammate with computer/browser disabled or with a zero weekly cap now retains those explicit values instead of substituting the defaults.
+- Text deliverables can attach workspace-file evidence to the final check. OpenBot reopens the bounded relative path itself, refuses symlink escapes and oversized files, computes the pass/fail result from requested size/content markers, stores a short SHA-256 fingerprint, and labels this host evidence separately from teammate self-reporting.
 - Live Studio exposes the existing login/crash LaunchAgent protection to the local native owner, with confirmation before it is removed.
 - Background-service restarts now terminate the complete TypeScript runner process group, preventing an orphaned loader from surviving an upgrade and delaying the protected replacement. The LaunchAgent no longer declares a protected Documents working directory, but its source-based launcher still lives in that checkout and remains a packaging blocker for locked-login startup.
 - Native drafts now use an accepted `macos` source in the shared server contract, fixing an otherwise hidden 400 response during desktop-to-phone/web handoff.
@@ -45,7 +46,7 @@ The signed development Release build was copied to `~/Applications/OpenBot.app`,
 `npm run verify` passed:
 
 - release, iOS, and macOS source-contract checks
-- 169 TypeScript tests, 0 failures
+- 171 TypeScript tests, 0 failures
 - TypeScript type checking
 - production Vite build
 

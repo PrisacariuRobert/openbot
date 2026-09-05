@@ -23,6 +23,8 @@ export interface TaskStep {
 export interface TaskVerificationCheck {
   label: string;
   passed: boolean;
+  source?: "teammate" | "host";
+  detail?: string | null;
 }
 
 export interface TaskContract {

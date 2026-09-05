@@ -1368,6 +1368,23 @@ select:focus-visible {
   color: #38845e;
   font-size: 7px;
 }
+.result-check-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.result-check-copy b {
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+}
+.result-check-copy small {
+  overflow-wrap: anywhere;
+  color: #969098;
+  font-size: 7px;
+  line-height: 1.35;
+}
 .result-checks > div.warning > span {
   color: #976d2e;
   background: #ffedc7;

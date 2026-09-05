@@ -21,7 +21,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 
 1. **Bring your own AI.** Assign a different supported model connection to every teammate instead of buying model access from OpenBot.
 2. **Review-first coding without a broad host shell.** Clone or share one project, let multiple teammates work safely in parallel, inspect every diff, restore an unchanged agent edit, and publish only after checks and an independent teammate review pass.
-3. **Show the work behind the answer.** Real jobs retain their outcome, deliverable, checklist and teammate-reported checks. These are not independent verification unless a workflow-specific oracle also checked the result.
+3. **Show the work behind the answer.** Real jobs retain their outcome, deliverable and checklist. Saved text deliverables can be reopened and checked by the host with a recorded fingerprint; remaining checks stay explicitly teammate-reported unless another workflow-specific oracle exists.
 4. **A team that speaks with one voice.** Teammates consult privately, every signal stays inspectable, and one coordinator combines the result instead of making the user reconcile duplicate replies. Conversations remain limited to three hops and eight related runs.
 5. **You choose where it lives.** Keep conversations, permissions, routines, encrypted connector credentials, and audit trails on the Mac, or move the whole studio deliberately to your own always-on host.
 6. **Friendly on the surface, serious underneath.** Natural chat, voice input, playful animated mascots, and a restrained responsive interface sit above explicit security boundaries.
@@ -88,7 +88,8 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Explicit connected-app and approval requirements
 - Persistent state across restarts and approval pauses
 - Final passed, partial, or blocked verification with concrete checks
-- Compact “Checks reported by teammate” receipt with expandable steps; no independent-certification claim
+- Bounded host checks that reopen workspace text, verify minimum size and required markers, and record a short SHA-256 fingerprint without following symlinks
+- Compact receipts that say “Verified by OpenBot,” “Partly verified by OpenBot,” or “Checks reported by teammate” according to the actual evidence source
 - Honest downgrade when a verification check fails
 - Lightweight ordinary conversation without unnecessary project-management UI
 

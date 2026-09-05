@@ -18,6 +18,7 @@ const notifications = readFileSync(new URL("../src/server/notifications.ts", imp
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
 const workspace = readFileSync(new URL("../src/server/workspace.ts", import.meta.url), "utf8");
+const verificationEvidence = readFileSync(new URL("../src/server/verification-evidence.ts", import.meta.url), "utf8");
 const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
 const connectorEvents = readFileSync(new URL("../src/server/connector-events.ts", import.meta.url), "utf8");
 const connectorContract = readFileSync(new URL("../docs/CONNECTOR_CONTRACT.md", import.meta.url), "utf8");
@@ -74,6 +75,9 @@ if (!database.includes("updateThread(id") || !database.includes("duplicateBot(id
 }
 if (!server.includes('"google_drive_create"') || !server.includes('"google_calendar_create"') || !server.includes("writeConnected") || !workspace.includes("google_drive_create") || !workspace.includes("google_calendar_create")) {
   failures.push("Google Drive file and Calendar event creation must stay scope-gated and approval-gated across both runtimes.");
+}
+if (!server.includes("verifyTaskChecks") || !workspace.includes("workspace_file evidence") || !verificationEvidence.includes("readWorkspaceFile") || !verificationEvidence.includes('source: "host"') || !app.includes("Verified by OpenBot")) {
+  failures.push("Text deliverables must keep bounded host verification and distinguish it from teammate-reported checks.");
 }
 if (!styles.includes(".live-desk-grid") || !styles.includes(".studio-search-results") || !styles.includes(".conversation-organizer")) {
   failures.push("The Live Studio, search, and conversation organization surfaces must remain styled responsively.");

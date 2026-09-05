@@ -962,7 +962,9 @@ function TaskStepMark({
 function ResultReceipt({ run }: { run: Run }) {
   const task = run.task;
   const passed = task.verificationStatus === "passed",
-    partial = task.verificationStatus === "partial";
+    partial = task.verificationStatus === "partial",
+    hostChecks = task.verificationChecks.filter((check) => check.source === "host"),
+    fullyHostVerified = passed && task.verificationChecks.length > 0 && hostChecks.length === task.verificationChecks.length;
   const completed = task.steps.filter(
     (step) => step.status === "completed",
   ).length;
@@ -974,7 +976,11 @@ function ResultReceipt({ run }: { run: Run }) {
         <span>{passed ? <ShieldCheck size={13} /> : <Check size={13} />}</span>
         <strong>
           {passed
-            ? "Checks reported by teammate"
+            ? fullyHostVerified
+              ? "Verified by OpenBot"
+              : hostChecks.length
+                ? "Partly verified by OpenBot"
+                : "Checks reported by teammate"
             : partial
               ? "Finished with a note"
               : "Result delivered"}
@@ -1009,7 +1015,15 @@ function ResultReceipt({ run }: { run: Run }) {
                 className={check.passed ? "passed" : "warning"}
               >
                 <span>{check.passed ? <Check size={10} /> : "!"}</span>
-                {check.label}
+                <div className="result-check-copy">
+                  <b>{check.label}</b>
+                  {(check.source === "host" || check.detail) && (
+                    <small>
+                      {check.source === "host" ? "Host check" : "Teammate report"}
+                      {check.detail ? ` · ${check.detail}` : ""}
+                    </small>
+                  )}
+                </div>
               </div>
             ))}
           </div>

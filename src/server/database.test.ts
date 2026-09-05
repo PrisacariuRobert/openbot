@@ -356,7 +356,7 @@ test("keeps a task contract, advances its checklist, and records verification", 
     const checked = first.verifyRunTask(run.id, {
       status: "passed",
       summary: "The brief was reopened and all required sections were found.",
-      checks: [{ label: "Required headings are present", passed: true }, { label: "Final file can be read", passed: true }],
+      checks: [{ label: "Required headings are present", passed: true }, { label: "Final file can be read", passed: true, source: "host", detail: "launch.md reopened successfully · SHA-256 abc123" }],
     });
     assert.equal(checked?.verificationStatus, "passed");
     first.updateRun(run.id, { status: "completed", finishedAt: new Date().toISOString() });
@@ -369,6 +369,8 @@ test("keeps a task contract, advances its checklist, and records verification", 
     assert.equal(persisted.task.verificationStatus, "passed");
     assert.equal(persisted.task.steps.every((step) => step.status === "completed"), true);
     assert.equal(persisted.task.verificationChecks.length, 2);
+    assert.equal(persisted.task.verificationChecks[1]?.source, "host");
+    assert.match(persisted.task.verificationChecks[1]?.detail || "", /SHA-256/);
     reopened.close();
   } finally {
     rmSync(root, { recursive: true, force: true });

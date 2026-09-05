@@ -19,6 +19,7 @@ This milestone adds a real native macOS application for everyday OpenBot work. I
 - **Native teammate setup and files:** create, edit, and safely duplicate teammates with their own role, instructions, model, tools, token budget, recolorable living mascot, and clean private workspace; browse bounded workspace text without exposing host paths.
 - **Stay running:** Live Studio can turn the existing login/crash LaunchAgent protection on or off from the local native app; the Mac still has to remain awake.
 - **Crash recovery stays visible:** uncertain approved actions can be reconciled from the native inspector or Live Studio and are never silently replayed.
+- **Evidence, not just confidence:** when a teammate delivers a text file, OpenBot can reopen it inside the bounded workspace, check its size and required text, record a short SHA-256 fingerprint, and label the result as host-verified instead of teammate-reported.
 - **Native, living teammates:** mascots are drawn and animated in SwiftUI using each teammate's saved shape, colour, and real work state, with reduced-motion support.
 - **One private home across devices:** the Mac app defaults to the local runner and accepts HTTPS private-runner addresses for use away from home. A launch-only development credential stays in memory rather than being copied to Keychain.
 
@@ -117,7 +118,7 @@ This development version focuses on trustworthy foundations, not a larger featur
 - Three-hop/eight-task teamwork limits that prevent accidental agent loops
 - Live streaming text, activity history, token/cache/cost usage, and a studio control center
 - A persistent completion contract for real jobs: clear outcome, deliverable, live checklist, approval boundary, and recorded final checks
-- Compact result receipts with teammate-reported checks and expandable steps; independent verification depends on the specific workflow
+- Compact result receipts distinguish teammate-reported checks from bounded host verification of delivered workspace text, with expandable steps and evidence details; other claims still depend on workflow-specific oracles
 - One-click GitHub cloning or local code-project connections with separate read-only, code-and-test, or no-access choices for every teammate
 - Project-aware code listing, search, reading, exact edits, atomic file creation, per-task Git worktrees, bounded diffs, scoped commits, and network-isolated checks
 - A recoverable local code-change trail; restore points refuse to overwrite newer work, and disconnecting never deletes project files

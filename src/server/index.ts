@@ -43,6 +43,7 @@ import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
 import type { AutomationEvent, Routine, RunnerHealth } from "../shared/types.js";
 import { listWorkspaceFiles, readWorkspaceFile } from "./workspace-files.js";
+import { verifyTaskChecks } from "./verification-evidence.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
@@ -1678,10 +1679,18 @@ app.post("/api/internal/tools", async (request, response) => {
     if (action === "task_verify") {
       const verification = z.object({
         status: z.enum(["passed", "partial", "blocked"]), summary: z.string().trim().min(1).max(500),
-        checks: z.array(z.object({ label: z.string().trim().min(1).max(180), passed: z.boolean() })).min(1).max(8),
+        checks: z.array(z.object({
+          label: z.string().trim().min(1).max(180), passed: z.boolean(),
+          evidence: z.object({
+            kind: z.literal("workspace_file"), path: z.string().trim().min(1).max(2_048),
+            minBytes: z.number().int().min(0).max(500_000).optional(),
+            contains: z.array(z.string().min(1).max(200)).max(8).optional(),
+          }).optional(),
+        })).min(1).max(8),
       }).safeParse(args);
       if (!verification.success) return response.status(400).json({ error: "Record what was checked and whether each check passed." });
-      const task = db.verifyRunTask(runId, verification.data);
+      const checks = verifyTaskChecks(path.join(db.workspacesDir, botId), verification.data.checks);
+      const task = db.verifyRunTask(runId, { ...verification.data, checks });
       broadcast();
       return response.json({ ok: true, task });
     }

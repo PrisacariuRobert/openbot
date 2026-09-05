@@ -69,7 +69,8 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     assert.equal(((responses.get(2)?.result as { isError?: boolean })?.isError), false);
     assert.equal(((responses.get(3)?.result as { isError?: boolean })?.isError), true);
     assert.equal(((responses.get(4)?.result as { isError?: boolean })?.isError), true);
-    const exposed = ((responses.get(5)?.result as { tools?: Array<{ name: string }> })?.tools || []).map((tool) => tool.name);
+    const listedTools = (responses.get(5)?.result as { tools?: Array<{ name: string; inputSchema?: { properties?: Record<string, unknown> } }> })?.tools || [];
+    const exposed = listedTools.map((tool) => tool.name);
     assert.ok(exposed.includes("gmail_search"));
     assert.ok(exposed.includes("gmail_read"));
     assert.ok(exposed.includes("gmail_send"));
@@ -96,6 +97,7 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     assert.ok(exposed.includes("code_read"));
     assert.ok(exposed.includes("code_replace"));
     assert.ok(exposed.includes("code_run"));
+    assert.match(JSON.stringify(listedTools.find((tool) => tool.name === "task_verify")?.inputSchema), /workspace_file/);
   } finally {
     child.kill("SIGTERM");
     rmSync(workspace, { recursive: true, force: true });

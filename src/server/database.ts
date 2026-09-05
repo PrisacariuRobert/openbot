@@ -1291,7 +1291,14 @@ export class OpenBotDatabase {
       steps,
       verificationStatus: (row.verification_status || "pending") as TaskVerificationStatus,
       verificationSummary: row.verification_summary ? String(row.verification_summary) : null,
-      verificationChecks: jsonArray<TaskVerificationCheck>(row.verification_checks_json).filter((check) => typeof check.label === "string" && typeof check.passed === "boolean"),
+      verificationChecks: jsonArray<TaskVerificationCheck>(row.verification_checks_json)
+        .filter((check) => typeof check.label === "string" && typeof check.passed === "boolean")
+        .map((check) => ({
+          label: check.label,
+          passed: check.passed,
+          source: check.source === "host" ? "host" : "teammate",
+          detail: typeof check.detail === "string" ? check.detail : null,
+        })),
     };
     return {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
@@ -1511,7 +1518,12 @@ export class OpenBotDatabase {
   verifyRunTask(id: string, input: { status: TaskVerificationStatus; summary: string; checks: TaskVerificationCheck[] }): TaskContract | null {
     const run = this.getRun(id);
     if (!run) return null;
-    const checks = input.checks.map((check) => ({ label: check.label.replace(/\s+/g, " ").trim().slice(0, 180), passed: check.passed })).filter((check) => check.label).slice(0, 8);
+    const checks = input.checks.map((check) => ({
+      label: check.label.replace(/\s+/g, " ").trim().slice(0, 180),
+      passed: check.passed,
+      source: check.source === "host" ? "host" as const : "teammate" as const,
+      detail: check.detail?.replace(/\s+/g, " ").trim().slice(0, 300) || null,
+    })).filter((check) => check.label).slice(0, 8);
     const status: TaskVerificationStatus = input.status === "passed" && checks.some((check) => !check.passed) ? "partial" : input.status;
     const steps = run.task.steps.map((step) => status === "passed" && !["blocked", "skipped"].includes(step.status) ? { ...step, status: "completed" as const } : step);
     const stage: TaskStage = status === "blocked" ? "blocked" : "checking";
@@ -1533,7 +1545,7 @@ export class OpenBotDatabase {
       if (verificationStatus === "pending") {
         verificationStatus = "partial";
         verificationSummary = "The result is ready, but it could not be fully checked automatically.";
-        checks = [{ label: "A result was created", passed: true }, { label: "Final checks completed", passed: false }];
+        checks = [{ label: "A result was created", passed: true, source: "teammate" }, { label: "Final checks completed", passed: false, source: "teammate" }];
       }
       for (const step of steps) {
         if (step.status === "active") step.status = "completed";
