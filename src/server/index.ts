@@ -349,7 +349,7 @@ app.patch("/api/threads/:id", (request, response) => {
 });
 
 app.put("/api/drafts/:threadId", (request, response) => {
-  const parsed = z.object({ body: z.string().max(20_000), source: z.enum(["web", "ios"]) }).safeParse(request.body);
+  const parsed = z.object({ body: z.string().max(20_000), source: z.enum(["web", "ios", "macos"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That draft is too long to hand off." });
   const draft = db.saveDraft(request.params.threadId, parsed.data.body, parsed.data.source);
   if (!draft) return response.status(404).json({ error: "That conversation is no longer available." });
@@ -1312,6 +1312,15 @@ app.post("/api/providers", (request, response) => {
   } catch {
     response.status(400).json({ error: "Could not save this connection. Check the API address, model IDs and key." });
   }
+});
+
+app.delete("/api/providers/:id", (request, response) => {
+  const result = db.deleteAPIProvider(request.params.id);
+  if (result === "missing") return response.status(404).json({ error: "That connection no longer exists." });
+  if (result === "protected") return response.status(400).json({ error: "Built-in and subscription connections are managed through their sign-in provider." });
+  if (result === "assigned") return response.status(409).json({ error: "Choose another AI connection for every teammate using this one, then try again." });
+  broadcast();
+  response.json({ ok: true });
 });
 
 const triggerConfigInput = z.object({

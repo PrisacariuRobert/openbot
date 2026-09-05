@@ -1077,12 +1077,12 @@ export class OpenBotDatabase {
     return row ? {
       threadId: String(row.thread_id),
       body: String(row.body),
-      source: row.source === "ios" ? "ios" : "web",
+      source: row.source === "ios" ? "ios" : row.source === "macos" ? "macos" : "web",
       updatedAt: String(row.updated_at),
     } : { threadId, body: "", source: null, updatedAt: null };
   }
 
-  saveDraft(threadId: string, body: string, source: "web" | "ios"): StudioDraft | null {
+  saveDraft(threadId: string, body: string, source: "web" | "ios" | "macos"): StudioDraft | null {
     if (!this.getThread(threadId)) return null;
     const updatedAt = now();
     this.db.prepare(`
@@ -1760,6 +1760,16 @@ export class OpenBotDatabase {
       id, DEFAULT_OWNER, input.provider || "custom", input.name, input.authMode, input.runtime || "opencode", apiConfig ? MODEL_KEY_ENV : input.envName || null, encrypted, existing?.created_at || at, at, apiConfig,
     );
     return this.listProviders().find((provider) => provider.id === id)!;
+  }
+
+  deleteAPIProvider(id: string): "deleted" | "missing" | "assigned" | "protected" {
+    const provider = this.getProvider(id);
+    if (!provider) return "missing";
+    if (provider.authMode !== "api_key" || id.startsWith("local-")) return "protected";
+    const assigned = this.db.prepare("SELECT 1 FROM bots WHERE provider_instance_id=? LIMIT 1").get(id);
+    if (assigned) return "assigned";
+    this.db.prepare("DELETE FROM provider_instances WHERE id=?").run(id);
+    return "deleted";
   }
 
   providerEnvironment(botId: string): Record<string, string> {

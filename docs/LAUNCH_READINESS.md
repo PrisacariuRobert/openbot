@@ -1,14 +1,14 @@
-# OpenBot 0.33.0 Launch Readiness
+# OpenBot 0.34.0 Launch Readiness
 
-0.33 adds a durable, single-claim ledger around approved external and computer actions. A prepared action survives restart; an in-flight action becomes visibly uncertain and is never replayed until the owner confirms whether it happened. Web and native Live Studio expose the same reconciliation and recent history. See [current validation](QA_0.33.md). This materially improves unattended safety, but third-party services do not provide one universal exactly-once contract. Provider-specific reconciliation, encrypted legacy approval payloads, adversarial sandbox-provider testing, the repeated two-model workflow gate, stronger runtime/egress isolation, managed deployment convenience, and physical-device distribution remain open.
+0.34 adds a genuine SwiftUI/AppKit desktop application for macOS. Conversations, files, shared drafts, teammate routing, Work starters, automations, subscription/API/local-model setup and assignment, code-project grants, capability controls, Live Studio, approvals, and crash-recovery decisions now work in a native window without WebKit. See [current validation](QA_0.34.md). This closes the native Mac client gap, but it does not turn OpenBot into a managed service: Developer ID distribution, automatic updates, fresh-user runner packaging, Windows support, provider-specific reconciliation, the repeated two-model workflow gate, stronger runtime/egress isolation, and physical-device distribution remain open.
 
-0.32 adds native, connector-aware entry points for the source-backed Morning Brief, Meeting Prep, and Inbox Follow-up jobs. See [current validation](QA_0.32.md). This was compiled and exercised against the running studio on an iPhone 17 Pro simulator; it is not a physical-device, cellular, APNs, App Store, or complete native-settings certification. Google consent/setup, fresh-user onboarding, full native provider and connector administration, the repeated two-model workflow gate, stronger runtime/egress isolation, crash-safe external-action reconciliation, and signed distribution remain open.
+0.32 added native, connector-aware entry points for the source-backed Morning Brief, Meeting Prep, and Inbox Follow-up jobs. See [its validation](QA_0.32.md). This was compiled and exercised against the running studio on an iPhone 17 Pro simulator; it is not a physical-device, cellular, APNs, App Store, or complete native-settings certification. Google consent/setup, fresh-user onboarding, full native provider and connector administration, the repeated two-model workflow gate, stronger runtime/egress isolation, and signed distribution remain open.
 
 0.31 adds source-backed brief/follow-up reports and host-recorded coding checks bound to the published commit. See [its validation](QA_0.31.md). These are functional improvements with bounded fixtures, not completion of the repeated two-model acceptance gate.
 
 0.30 adds bounded execution and reported-usage protection; see [current validation](QA_0.30.md). The historical evidence below is not a new end-to-end certification. The application remains an owner-operated development beta; broad launch gates remain open.
 
-OpenBot 0.29.0 is a development beta, **not approved here for broad unattended production use**. The [product audit](PRODUCT_GAP_AUDIT.md) identifies unresolved runtime/egress boundaries, incomplete native settings, setup friction and insufficient repeated workflow evidence. The [current validation record](QA_0.29.md) separates fixtures, live-model checks and untested release gates. Historical 0.28 observations below are retained as engineering context, not newly verified launch certification.
+OpenBot remains a development beta, **not approved here for broad unattended production use**. The [product audit](PRODUCT_GAP_AUDIT.md) identifies unresolved runtime/egress boundaries, incomplete native administration, setup friction and insufficient repeated workflow evidence. The 0.29 [foundation validation record](QA_0.29.md) separates fixtures, live-model checks and untested release gates. Historical 0.28 observations below are retained as engineering context, not newly verified launch certification.
 
 ## Implemented capability inventory — not a blanket readiness claim
 
@@ -24,8 +24,9 @@ OpenBot 0.29.0 is a development beta, **not approved here for broad unattended p
 - Rich PDF, Word, workbook, CSV/TSV, PowerPoint, text, JSON/YAML/notebook/email/source, image, audio, and video ingestion with format-specific bounds
 - Original media forwarded to compatible OpenCode models, contained image/PDF and extracted-text previews, friendly unsupported-format recovery, and hardened downloads
 - Teammate-created files surfaced automatically beside the answer, with numbered revisions and preserved earlier copies
-- Voice typing, deliberate native speech-to-editable-text capture, an installable PWA, authenticated remote access, and a native SwiftUI iPhone app with Keychain-backed API access, conversations, teammate routing, live work, and approvals
-- Matching web and native studio geometry, language, code-drawn runtime-colored mascots, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
+- Voice typing, deliberate native speech-to-editable-text capture, an installable PWA, authenticated remote access, a native SwiftUI iPhone app, and a native SwiftUI/AppKit macOS app without WebKit
+- Native Mac conversations, files, teammate routing, Work, Live Studio, approvals, action recovery, menus, keyboard commands, loopback-only local pairing, and Keychain-backed remote access
+- Matching web and native studio language, code-drawn runtime-coloured mascots, asynchronous character motion, status moods, and authenticated Mac/iPhone draft handoff with live updates
 - Durable approval cards, single-claim action receipts, restart reconciliation, recent web/native action history, isolated bot computers, private browser profiles, workspace path checks, and attachment download hardening
 - Responsive desktop and phone layouts, reduced-motion support, live connection state, and expressive asynchronous mascots
 - Repeatable verification through the automated suite, production build, real DeepSeek workflow, and desktop/phone browser QA
@@ -83,7 +84,7 @@ OpenBot 0.29.0 is a development beta, **not approved here for broad unattended p
 | Gap | Honest status | Best next move |
 |---|---|---|
 | Managed cloud convenience | OpenBot runs while the Mac is off, guides backup-first updates, supports encrypted whole-home moves, and can check in to an outside service, but Cursor still operates Grok Bot's infrastructure for the user. | Make private-host onboarding and recovery simpler without hiding ownership or location. |
-| Native distribution | APNs registration/delivery and Share-sheet ingestion are implemented and simulator-compiled, but a physical-device delivery check and App Store signing still require the owner's Apple team and credentials. | Register the App Group and Push capability, provide the host-side `.p8` key, run device QA, then prepare TestFlight metadata. |
+| Native distribution | The Mac client is built, ad-hoc signed, installed, and live-runner tested; iPhone APNs and Share-sheet paths are simulator-compiled. Public Mac Developer ID/notarization/updates and physical iPhone/App Store delivery still require release credentials and clean-device checks. | Sign and notarize the Mac app, add update signing, then register iPhone App Group/Push capabilities and complete physical-device/TestFlight QA. |
 | Large connector marketplace | Gmail, Drive, Calendar, GitHub, Slack, Notion, Todoist, and Dropbox have real bounded tools; manifest v2 and its review document define admission rules, but this remains a focused built-in set rather than an executable marketplace. | Add reviewed connectors one at a time; design signed provenance and isolation before loading third-party code. |
 | Full visual desktop takeover | OpenBot can now supervise and take over isolated bot browsers, while the macOS Accessibility bridge can inspect controls and approval-gate interactions; it still cannot reason over arbitrary desktop pixels, canvases, or video. | Add an optional Screen Recording helper with bounded screenshots and the same per-action approval policy. |
 | Fidelity-preserving Office editing | OpenBot can extract and reason over PDF, Word, spreadsheet, and presentation content, but it does not yet edit complex layouts or formulas through a native document engine. | Add format-aware editing with rendered before/after review. |
@@ -94,11 +95,12 @@ OpenBot 0.29.0 is a development beta, **not approved here for broad unattended p
 
 ## Release decision
 
-Keep 0.29.0 in owner-operated beta while the audit's launch gates remain open. Do not describe source/fixture checks as production certification. Live provider connections need account consent and delivery verification; remote use needs an owner-operated reachable host; physical iPhone distribution remains unverified in this audit. The current work is a reliability foundation, not proof of broad parity or safe unrestricted autonomy.
+Keep 0.34.0 in owner-operated beta while the audit's launch gates remain open. Do not describe source/fixture checks as production certification. The native Mac client is real and locally validated, but public signing, runner packaging, live provider consent, remote-host operation, physical iPhone delivery, repeated real-model acceptance, and stronger isolation still need separate proof. The current work is a functional foundation, not proof of broad parity or safe unrestricted autonomy.
 
 ## Historical acceptance observations through 0.28 — revalidate for release
 
 - Automated tests: 113 passing
+- 0.34 macOS app: native Release build and signature verification pass; 6 native unit tests pass; the installed app pairs over loopback and renders the live studio without WebKit or a model request. See [QA_0.34](QA_0.34.md).
 - iOS project: generated by XcodeGen; compiled with Xcode Beta on an iPhone 17 Pro simulator with the Share extension embedded; deliberate voice capture and its privacy descriptions compile in the native target; four unit tests pass; the optional live sign-in UI test checks the voice action and skips safely when its private server/key variables are absent; no `WKWebView` remains in the app source
 - Type safety: passing
 - Production build: passing

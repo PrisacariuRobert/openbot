@@ -15,5 +15,6 @@ test("builds a bounded macOS background service without shell interpolation", ()
   assert.match(plist, /OPENBOT_PORT/);
   assert.match(plist, /<string>4311<\/string>/);
   assert.match(plist, /OpenBot &amp; Friends/);
+  assert.doesNotMatch(plist, /<key>WorkingDirectory<\/key>/);
   assert.doesNotMatch(plist, /<string>\/bin\/(?:zsh|bash|sh)<\/string>/);
 });

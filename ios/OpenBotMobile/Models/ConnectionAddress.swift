@@ -45,6 +45,11 @@ enum ConnectionAddress {
         return parts.url!
     }
 
+    static func isLoopback(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+    }
+
     private static func isPrivateHost(_ host: String) -> Bool {
         if host == "localhost" || host == "::1" || host.hasSuffix(".local") { return true }
         if host.hasPrefix("10.") || host.hasPrefix("192.168.") || host.hasPrefix("127.") { return true }

@@ -873,7 +873,7 @@ export interface StudioSettings {
 export interface StudioDraft {
   threadId: string;
   body: string;
-  source: "web" | "ios" | null;
+  source: "web" | "ios" | "macos" | null;
   updatedAt: string | null;
 }
 

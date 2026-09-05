@@ -20,7 +20,6 @@ export function backgroundServicePlist(input: { rootDir: string; dataDir: string
   <key>Label</key><string>${BACKGROUND_SERVICE_LABEL}</string>
   <key>ProgramArguments</key>
   <array><string>${xml(input.nodePath)}</string><string>${xml(launcher)}</string></array>
-  <key>WorkingDirectory</key><string>${xml(input.rootDir)}</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>NODE_ENV</key><string>production</string>

@@ -65,6 +65,20 @@ test("hands an unfinished draft between web and iPhone", () => {
   }
 });
 
+test("keeps a native Mac draft in the shared conversation", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-macos-draft-handoff-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const saved = db.saveDraft("team-room", "Continue this from the Mac", "macos");
+    assert.equal(saved?.source, "macos");
+    assert.equal(db.getState("team-room").draft.body, "Continue this from the Mac");
+    assert.equal(db.getState("team-room").draft.source, "macos");
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("organizes the studio, searches durable work, and keeps replies and reactions", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-live-studio-test-"));
   try {

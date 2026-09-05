@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.34.0 — 2026-09-05
+
+- Added a genuine SwiftUI/AppKit macOS app with a native window, navigation, menus, keyboard commands, settings, attachments, Keychain-backed remote sign-in, and loopback-only automatic local pairing
+- Added native conversations, teammate targeting, durable draft continuity, active-run controls, Work starters, Live Studio, action history, and uncertain-action reconciliation
+- Added opt-in native macOS alerts with deliberately generic, privacy-bounded attention text
+- Added native routine listing, pause/resume, schedule creation, and confirmation-gated run-now controls
+- Added native provider readiness, supported subscription sign-in and code completion, plus hosted API and local OpenAI-compatible model setup, safe editing, and removal guarded against active teammate assignments
+- Added native provider-to-teammate model assignment, code-project folder/GitHub connection, per-teammate project grants, worktree/diff review, guarded edit restoration, disconnect-without-delete, and computer/browser/Mac capability controls
+- Added native Apps & Tools connection entry points, per-teammate read/write grants, portable Skill Library install/edit/history/non-destructive rollback/assign/import/export/delete, and local background-protection controls
+- Fixed native Mac draft handoff by accepting and preserving the `macos` source instead of rejecting it as an unknown client
+- Fixed background-service upgrades so macOS stops the complete TypeScript runner process group instead of leaving an orphan behind, and removed a redundant protected-folder working directory from LaunchAgent startup
+- Reused the authenticated mobile protocol while keeping a launch-only local development key in memory and requiring HTTPS for non-private hosts
+- Added native, code-drawn animated mascots using saved teammate appearance and execution state
+- Added eight macOS unit tests, a macOS release contract, Xcode build/test gates, and direct live-runner UI validation without a model request
+- Kept signed/notarized distribution, automatic updates, Windows support, self-hosted OAuth/event setup, interactive skill teaching, and fresh-user runner packaging as explicit future work
+
 ## 0.33.0 — 2026-09-05
 
 - Added durable pre-execution receipts and immutable fingerprints for approved commands, messages, issues, browser/app interactions, and connected-app updates

@@ -9,10 +9,162 @@ struct StudioState: Decodable {
     let approvals: [StudioApproval]
     let approvedActions: [StudioApprovedAction]?
     let workflows: [StudioWorkflow]
+    let routines: [StudioRoutine]?
     let runner: StudioRunner?
     let draft: StudioDraft?
+    let settings: StudioSettings?
     let usage: StudioUsage
     let activeThreadId: String
+}
+
+struct StudioRoutine: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let botId: String
+    let botName: String
+    let threadId: String
+    let prompt: String
+    let intervalMinutes: Int
+    let triggerType: String
+    let enabled: Bool
+    let nextRunAt: String?
+    let lastRunAt: String?
+    let lastStatus: String
+    let runCount: Int
+    let consecutiveFailures: Int
+    let lastError: String?
+    let pausedReason: String?
+}
+
+struct StudioProviderStatus: Decodable, Hashable {
+    let connected: Bool
+    let cliAvailable: Bool
+    let version: String?
+    let defaultModel: String
+    let models: [String]
+    let note: String
+    let instances: [StudioProviderInstance]
+    let catalog: [StudioProviderCatalogEntry]
+    let loginAttempts: [StudioProviderLoginAttempt]
+}
+
+struct StudioProviderCatalogEntry: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let shortName: String
+    let description: String
+    let badge: String
+    let connected: Bool
+    let installed: Bool
+    let canConnect: Bool
+    let connectionId: String?
+    let models: [String]
+    let note: String
+}
+
+struct StudioProviderLoginAttempt: Decodable, Identifiable, Hashable {
+    let id: String
+    let providerId: String
+    let status: String
+    let url: String?
+    let callbackMode: String?
+    let instructions: String
+    let error: String?
+}
+
+struct StudioProviderInstance: Decodable, Identifiable, Hashable {
+    let id: String
+    let provider: String
+    let name: String
+    let authMode: String
+    let runtime: String
+    let hasSecret: Bool
+    let apiConfig: StudioAPIConnectionConfig?
+    let connected: Bool?
+    let models: [String]?
+    let defaultModel: String?
+    let note: String?
+}
+
+struct StudioAPIConnectionConfig: Codable, Hashable {
+    let baseUrl: String
+    let `protocol`: String
+    let modelIds: [String]
+}
+
+struct StudioCodeProjectsStatus: Decodable, Hashable {
+    let projects: [StudioCodeProject]
+    let suggestions: [StudioCodeProjectSuggestion]
+    let edits: [StudioCodeProjectEdit]?
+    let workspaces: [StudioCodeTaskWorkspace]?
+}
+
+struct StudioCodeProject: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let rootPath: String
+    let gitRepository: Bool
+    let projectKind: String
+    let remoteUrl: String?
+    let defaultBranch: String?
+    let managedClone: Bool
+    let access: [StudioCodeProjectAccess]
+}
+
+struct StudioCodeProjectAccess: Codable, Hashable {
+    let botId: String
+    let canRead: Bool
+    let canWrite: Bool
+    let canRun: Bool
+}
+
+struct StudioCodeProjectSuggestion: Decodable, Identifiable, Hashable {
+    let name: String
+    let rootPath: String
+    let gitRepository: Bool
+    let projectKind: String
+    var id: String { rootPath }
+}
+
+struct StudioCodeProjectEdit: Decodable, Identifiable, Hashable {
+    let id: String
+    let projectId: String
+    let botId: String
+    let botName: String
+    let path: String
+    let operation: String
+    let additions: Int
+    let deletions: Int
+    let workspaceRunId: String?
+    let reversible: Bool
+    let restoredAt: String?
+    let createdAt: String
+}
+
+struct StudioCodeTaskWorkspace: Decodable, Identifiable, Hashable {
+    let runId: String
+    let projectId: String
+    let projectName: String
+    let botId: String
+    let botName: String
+    let branch: String
+    let rootPath: String
+    let status: String
+    let createdAt: String
+    let updatedAt: String
+    var id: String { runId }
+}
+
+struct StudioCodeProjectReview: Decodable, Hashable {
+    let projectId: String
+    let gitRepository: Bool
+    let branch: String?
+    let defaultBranch: String?
+    let remoteUrl: String?
+    let workspace: StudioCodeTaskWorkspace?
+    let changes: [String]
+    let diff: String
+    let truncated: Bool
 }
 
 struct StudioBot: Decodable, Identifiable, Hashable {
@@ -24,6 +176,15 @@ struct StudioBot: Decodable, Identifiable, Hashable {
     let status: String
     let threadId: String
     let lastActiveAt: String?
+    var providerInstanceId: String? = nil
+    var model: String? = nil
+    var computerEnabled: Bool? = nil
+    var browserEnabled: Bool? = nil
+    var macAccessEnabled: Bool? = nil
+}
+
+struct StudioSettings: Decodable, Hashable {
+    let macAccessEnabled: Bool
 }
 
 struct StudioThread: Decodable, Identifiable, Hashable {
@@ -67,6 +228,44 @@ struct StudioWorkflow: Decodable, Identifiable, Hashable {
     let description: String?
     let version: Int?
     let source: String?
+}
+
+struct StudioSkill: Decodable, Identifiable, Hashable {
+    let id: String
+    let botId: String
+    let botName: String
+    let name: String
+    let skillSlug: String
+    let description: String
+    let instructions: String
+    let startUrl: String
+    let stepCount: Int
+    let version: Int
+    let source: String
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct StudioSkillVersion: Decodable, Identifiable, Hashable {
+    let id: String
+    let workflowId: String
+    let version: Int
+    let name: String
+    let description: String
+    let instructions: String
+    let startUrl: String
+    let stepCount: Int
+    let createdAt: String
+}
+
+struct StudioSkillTemplate: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String
+    let instructions: String
+    let startUrl: String
+    let category: String
+    let stepCount: Int
 }
 
 struct StudioRun: Decodable, Identifiable, Hashable {
@@ -200,6 +399,7 @@ struct StudioEvent: Decodable { let type: String }
 
 struct StudioConnectorStatus: Decodable, Hashable {
     let catalog: [StudioConnectorCatalogEntry]
+    let access: [StudioBotConnectorAccess]?
     let managedGoogleClient: Bool?
     let connection: StudioConnectorConnection?
     let googleApiRecoveries: [StudioGoogleApiRecovery]?
@@ -221,6 +421,19 @@ struct StudioConnectorCatalogEntry: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
     let connected: Bool
+    let description: String?
+    let badge: String?
+    let availability: String?
+    let writeRequiresApproval: Bool?
+    let capabilities: [String]?
+}
+
+struct StudioBotConnectorAccess: Decodable, Hashable {
+    let botId: String
+    let connectorId: String
+    let service: String
+    let canRead: Bool
+    let canSend: Bool
 }
 
 struct StudioConnectorConnection: Decodable, Hashable {
@@ -282,8 +495,8 @@ struct StudioStarter: Identifiable, Hashable {
 
 extension StudioState {
     static let empty = StudioState(
-        bots: [], threads: [], messages: [], runs: [], studioRuns: [], approvals: [], approvedActions: [], workflows: [], runner: nil,
-        draft: nil,
+        bots: [], threads: [], messages: [], runs: [], studioRuns: [], approvals: [], approvedActions: [], workflows: [], routines: [], runner: nil,
+        draft: nil, settings: nil,
         usage: StudioUsage(totalTokens: 0, completedRuns: 0, activeRuns: 0),
         activeThreadId: "team-room"
     )

@@ -51,6 +51,20 @@ test("persists private endpoint configurations and isolates each teammate's key"
     );
     assert.equal(db.providerEnvironment("nova").OPENBOT_MODEL_API_KEY, key);
     assert.equal(db.getProvider(local.id)?.hasSecret, false);
+    assert.equal(db.deleteAPIProvider("local-opencode"), "protected");
+    assert.equal(db.deleteAPIProvider(first.id), "assigned");
+    const spare = db.upsertProvider({
+      name: "Temporary local test",
+      authMode: "api_key",
+      apiConfig: {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        protocol: "openai-compatible",
+        modelIds: ["temporary-model"],
+      },
+    });
+    assert.equal(db.deleteAPIProvider(spare.id), "deleted");
+    assert.equal(db.getProvider(spare.id), null);
+    assert.equal(db.deleteAPIProvider(spare.id), "missing");
     assert.throws(
       () =>
         db.upsertProvider({

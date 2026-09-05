@@ -1,0 +1,55 @@
+name: OpenBotDesktop
+
+options:
+  bundleIdPrefix: app.openbot
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CURRENT_PROJECT_VERSION: 38
+    MARKETING_VERSION: 0.34.0
+    CODE_SIGN_IDENTITY: "-"
+
+targets:
+  OpenBotDesktop:
+    type: application
+    platform: macOS
+    sources:
+      - path: OpenBotDesktop
+      - path: ../ios/OpenBotMobile/Models/ConnectionAddress.swift
+      - path: ../ios/OpenBotMobile/Models/StudioAPIClient.swift
+      - path: ../ios/OpenBotMobile/Models/StudioModels.swift
+      - path: ../ios/OpenBotMobile/Models/StudioStore.swift
+      - path: ../ios/OpenBotMobile/Security/KeychainStore.swift
+      - path: ../ios/Shared/OpenBotSharedInbox.swift
+      - path: ../ios/OpenBotMobile/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.openbot.desktop
+        PRODUCT_NAME: OpenBot
+        INFOPLIST_FILE: OpenBotDesktop/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_APP_SANDBOX: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    scheme:
+      testTargets:
+        - OpenBotDesktopTests
+
+  OpenBotDesktopTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: OpenBotDesktopTests
+    dependencies:
+      - target: OpenBotDesktop
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.openbot.desktop.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenBot.app/Contents/MacOS/OpenBot"
+        BUNDLE_LOADER: "$(TEST_HOST)"

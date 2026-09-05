@@ -3,6 +3,12 @@ import UniformTypeIdentifiers
 
 struct StudioAPIClient {
     let baseURL: URL
+    let sessionAccessKey: String?
+
+    init(baseURL: URL, accessKey: String? = nil) {
+        self.baseURL = baseURL
+        sessionAccessKey = accessKey
+    }
 
     func state(threadID: String) async throws -> StudioState {
         try await request("api/state", queryItems: [URLQueryItem(name: "threadId", value: threadID)])
@@ -10,6 +16,85 @@ struct StudioAPIClient {
 
     func connectors() async throws -> StudioConnectorStatus {
         try await request("api/connectors")
+    }
+
+    func providers() async throws -> StudioProviderStatus {
+        try await request("api/provider")
+    }
+
+    func beginProviderConnection(_ providerID: String) async throws -> StudioProviderLoginAttempt {
+        let payload = try JSONEncoder().encode(ProviderConnectRequest(providerId: providerID))
+        let data = try await dataRequest("api/provider/connect", method: "POST", body: payload)
+        do { return try JSONDecoder().decode(StudioProviderLoginAttempt.self, from: data) }
+        catch { throw StudioAPIError.invalidResponse }
+    }
+
+    func finishProviderConnection(_ attemptID: String, code: String) async throws {
+        let payload = try JSONEncoder().encode(ProviderCallbackRequest(code: code))
+        _ = try await dataRequest("api/provider/connect/\(attemptID)/callback", method: "POST", body: payload)
+    }
+
+    func saveAPIProvider(id: String? = nil, name: String, baseURL: String, protocolName: String, modelIDs: [String], secret: String?) async throws {
+        let payload = try JSONEncoder().encode(APIProviderRequest(
+            id: id,
+            name: name,
+            provider: "custom",
+            authMode: "api_key",
+            runtime: "opencode",
+            secret: secret,
+            apiConfig: APIProviderConfigRequest(baseUrl: baseURL, protocolName: protocolName, modelIds: modelIDs)
+        ))
+        _ = try await dataRequest("api/providers", method: "POST", body: payload)
+    }
+
+    func deleteAPIProvider(_ id: String) async throws {
+        _ = try await dataRequest("api/providers/\(id)", method: "DELETE")
+    }
+
+    func codeProjects() async throws -> StudioCodeProjectsStatus {
+        try await request("api/code-projects")
+    }
+
+    func connectCodeProject(name: String, rootPath: String, access: [StudioCodeProjectAccess]) async throws {
+        let payload = try JSONEncoder().encode(CodeProjectConnectRequest(name: name, rootPath: rootPath, access: access))
+        _ = try await dataRequest("api/code-projects", method: "POST", body: payload)
+    }
+
+    func cloneCodeProject(repository: String, access: [StudioCodeProjectAccess]) async throws {
+        let payload = try JSONEncoder().encode(CodeProjectCloneRequest(repository: repository, access: access))
+        _ = try await dataRequest("api/code-projects/clone", method: "POST", body: payload)
+    }
+
+    func setCodeProjectAccess(projectID: String, botID: String, access: StudioCodeProjectAccess) async throws {
+        let payload = try JSONEncoder().encode(CodeProjectAccessRequest(canRead: access.canRead, canWrite: access.canWrite, canRun: access.canRun))
+        _ = try await dataRequest("api/code-projects/\(projectID)/access/\(botID)", method: "PATCH", body: payload)
+    }
+
+    func disconnectCodeProject(_ projectID: String) async throws {
+        _ = try await dataRequest("api/code-projects/\(projectID)", method: "DELETE")
+    }
+
+    func reviewCodeProject(_ projectID: String, runID: String? = nil) async throws -> StudioCodeProjectReview {
+        try await request("api/code-projects/\(projectID)/review", queryItems: runID.map { [URLQueryItem(name: "runId", value: $0)] } ?? [])
+    }
+
+    func restoreCodeProjectEdit(_ editID: String) async throws {
+        _ = try await dataRequest("api/code-project-edits/\(editID)/restore", method: "POST")
+    }
+
+    func setMacAccessEnabled(_ enabled: Bool) async throws {
+        let payload = try JSONEncoder().encode(MacAccessRequest(macAccessEnabled: enabled))
+        _ = try await dataRequest("api/settings", method: "PATCH", body: payload)
+    }
+
+    func setBotCapabilities(_ botID: String, computerEnabled: Bool, browserEnabled: Bool) async throws {
+        let payload = try JSONEncoder().encode(BotCapabilitiesRequest(computerEnabled: computerEnabled, browserEnabled: browserEnabled))
+        _ = try await dataRequest("api/bots/\(botID)", method: "PATCH", body: payload)
+    }
+
+    func setBotProvider(_ botID: String, providerInstanceID: String, model: String) async throws {
+        let payload = try JSONEncoder().encode(BotProviderRequest(providerInstanceId: providerInstanceID, model: model))
+        _ = try await dataRequest("api/bots/\(botID)", method: "PATCH", body: payload)
     }
 
     func beginGoogleConnection() async throws -> URL {
@@ -23,6 +108,80 @@ struct StudioAPIClient {
         return url
     }
 
+    func beginConnectorConnection(_ serviceID: String) async throws -> URL? {
+        let connectorID = ["gmail", "google-drive", "google-calendar"].contains(serviceID) ? "google" : serviceID
+        let data = try await dataRequest("api/connectors/\(connectorID)/connect", method: "POST")
+        let result = try? JSONDecoder().decode(StudioOptionalOAuthStart.self, from: data)
+        guard let rawURL = result?.url else { return nil }
+        guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https" else { throw StudioAPIError.invalidResponse }
+        return url
+    }
+
+    func setConnectorAccess(serviceID: String, botID: String, canRead: Bool, canSend: Bool) async throws {
+        let google = ["gmail", "google-drive", "google-calendar"].contains(serviceID)
+        let path = google
+            ? "api/connectors/google/access/\(serviceID)/\(botID)"
+            : "api/connectors/\(serviceID)/access/\(botID)"
+        let payload = try JSONEncoder().encode(ConnectorAccessRequest(canRead: canRead, canSend: canSend))
+        _ = try await dataRequest(path, method: "PATCH", body: payload)
+    }
+
+    func disconnectConnector(_ serviceID: String) async throws {
+        let connectorID = ["gmail", "google-drive", "google-calendar"].contains(serviceID) ? "google" : serviceID
+        _ = try await dataRequest("api/connectors/\(connectorID)/disconnect", method: "POST")
+    }
+
+    func skills() async throws -> [StudioSkill] { try await request("api/workflows") }
+    func skillTemplates() async throws -> [StudioSkillTemplate] { try await request("api/skill-templates") }
+    func skillVersions(_ skillID: String) async throws -> [StudioSkillVersion] {
+        try await request("api/workflows/\(skillID)/versions")
+    }
+
+    func installSkillTemplate(_ templateID: String, botID: String) async throws {
+        let payload = try JSONEncoder().encode(SkillBotRequest(botId: botID))
+        _ = try await dataRequest("api/skill-templates/\(templateID)/install", method: "POST", body: payload)
+    }
+
+    func assignSkill(_ skillID: String, botID: String) async throws {
+        let payload = try JSONEncoder().encode(SkillBotRequest(botId: botID))
+        _ = try await dataRequest("api/workflows/\(skillID)/assign", method: "POST", body: payload)
+    }
+
+    func updateSkill(_ skillID: String, name: String, description: String, instructions: String, startURL: String) async throws {
+        let payload = try JSONEncoder().encode(SkillUpdateRequest(name: name, description: description, instructions: instructions, startUrl: startURL))
+        _ = try await dataRequest("api/workflows/\(skillID)", method: "PATCH", body: payload)
+    }
+
+    func rollbackSkill(_ skillID: String, version: Int) async throws {
+        let payload = try JSONEncoder().encode(SkillRollbackRequest(version: version))
+        _ = try await dataRequest("api/workflows/\(skillID)/rollback", method: "POST", body: payload)
+    }
+
+    func deleteSkill(_ skillID: String) async throws {
+        _ = try await dataRequest("api/workflows/\(skillID)", method: "DELETE")
+    }
+
+    func importSkill(fileURL: URL, botID: String) async throws {
+        let accessed = fileURL.startAccessingSecurityScopedResource()
+        defer { if accessed { fileURL.stopAccessingSecurityScopedResource() } }
+        let data = try Data(contentsOf: fileURL)
+        guard data.count <= 256_000 else { throw StudioAPIError.server("That skill file is larger than OpenBot's 256 KB limit.") }
+        let package = try JSONSerialization.jsonObject(with: data)
+        let body = try JSONSerialization.data(withJSONObject: ["botId": botID, "package": package])
+        _ = try await dataRequest("api/skills/import", method: "POST", body: body)
+    }
+
+    func exportSkill(_ skill: StudioSkill) async throws -> URL {
+        let data = try await dataRequest("api/workflows/\(skill.id)/export")
+        let directory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        var destination = directory.appending(path: "\(skill.skillSlug).openbot-skill.json")
+        if FileManager.default.fileExists(atPath: destination.path) {
+            destination = directory.appending(path: "\(skill.skillSlug)-\(UUID().uuidString.prefix(8)).openbot-skill.json")
+        }
+        try data.write(to: destination, options: .atomic)
+        return destination
+    }
+
     func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String]) async throws {
         let payload = try JSONEncoder().encode(MessageRequest(
             threadId: threadID,
@@ -34,7 +193,12 @@ struct StudioAPIClient {
     }
 
     func saveDraft(threadID: String, body: String) async throws -> StudioDraft {
-        let payload = try JSONEncoder().encode(DraftRequest(body: body, source: "ios"))
+        #if os(macOS)
+        let source = "macos"
+        #else
+        let source = "ios"
+        #endif
+        let payload = try JSONEncoder().encode(DraftRequest(body: body, source: source))
         let data = try await dataRequest("api/drafts/\(threadID)", method: "PUT", body: payload)
         do { return try JSONDecoder().decode(StudioDraft.self, from: data) }
         catch { throw StudioAPIError.invalidResponse }
@@ -78,6 +242,29 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/runs/\(runID)/cancel", method: "POST")
     }
 
+    func createScheduledRoutine(name: String, botID: String, threadID: String, prompt: String, intervalMinutes: Int) async throws {
+        let payload = try JSONEncoder().encode(ScheduledRoutineRequest(
+            name: name,
+            botId: botID,
+            threadId: threadID,
+            prompt: prompt,
+            intervalMinutes: intervalMinutes,
+            enabled: true,
+            triggerType: "schedule"
+        ))
+        _ = try await dataRequest("api/routines", method: "POST", body: payload)
+    }
+
+    func setRoutineEnabled(_ routineID: String, enabled: Bool) async throws {
+        let payload = try JSONEncoder().encode(RoutineEnabledRequest(enabled: enabled))
+        _ = try await dataRequest("api/routines/\(routineID)", method: "PATCH", body: payload)
+    }
+
+    func runRoutineNow(_ routineID: String) async throws {
+        let payload = try JSONEncoder().encode(RoutineRunRequest(confirmed: true))
+        _ = try await dataRequest("api/routines/\(routineID)/run", method: "POST", body: payload)
+    }
+
     func resolveApprovedAction(actionID: String, completed: Bool) async throws {
         let payload = try JSONEncoder().encode(ApprovedActionResolutionRequest(outcome: completed ? "completed" : "not_completed"))
         _ = try await dataRequest("api/approved-actions/\(actionID)/resolve", method: "POST", body: payload)
@@ -85,6 +272,10 @@ struct StudioAPIClient {
 
     func wakeRunner() async throws {
         _ = try await dataRequest("api/runner/wake", method: "POST")
+    }
+
+    func setBackgroundProtection(_ enabled: Bool) async throws {
+        _ = try await dataRequest("api/runner/background", method: enabled ? "POST" : "DELETE")
     }
 
     func runnerCare() async throws -> StudioRunnerCare {
@@ -144,7 +335,8 @@ struct StudioAPIClient {
     }
 
     private func authorizedRequest(path: String, queryItems: [URLQueryItem] = []) throws -> URLRequest {
-        guard let accessKey = KeychainStore.load(), !accessKey.isEmpty else { throw StudioAPIError.unauthorized }
+        let accessKey = sessionAccessKey ?? KeychainStore.load()
+        guard let accessKey, !accessKey.isEmpty else { throw StudioAPIError.unauthorized }
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)
         if !queryItems.isEmpty { components?.queryItems = queryItems }
         guard let url = components?.url else { throw StudioAPIError.invalidResponse }
@@ -172,6 +364,53 @@ private struct MessageRequest: Encodable {
     let attachmentIds: [String]
 }
 
+private struct ProviderConnectRequest: Encodable { let providerId: String }
+private struct ProviderCallbackRequest: Encodable { let code: String }
+private struct SkillRollbackRequest: Encodable { let version: Int }
+
+private struct APIProviderRequest: Encodable {
+    let id: String?
+    let name: String
+    let provider: String
+    let authMode: String
+    let runtime: String
+    let secret: String?
+    let apiConfig: APIProviderConfigRequest
+}
+
+private struct APIProviderConfigRequest: Encodable {
+    let baseUrl: String
+    let protocolName: String
+    let modelIds: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case baseUrl
+        case protocolName = "protocol"
+        case modelIds
+    }
+}
+
+private struct CodeProjectConnectRequest: Encodable {
+    let name: String
+    let rootPath: String
+    let access: [StudioCodeProjectAccess]
+}
+
+private struct CodeProjectCloneRequest: Encodable {
+    let repository: String
+    let access: [StudioCodeProjectAccess]
+}
+
+private struct CodeProjectAccessRequest: Encodable {
+    let canRead: Bool
+    let canWrite: Bool
+    let canRun: Bool
+}
+
+private struct MacAccessRequest: Encodable { let macAccessEnabled: Bool }
+private struct BotCapabilitiesRequest: Encodable { let computerEnabled: Bool; let browserEnabled: Bool }
+private struct BotProviderRequest: Encodable { let providerInstanceId: String; let model: String }
+
 private struct DraftRequest: Encodable {
     let body: String
     let source: String
@@ -186,6 +425,17 @@ private struct NativePushRequest: Encodable {
 private struct RunnerHealthAlertsRequest: Encodable { let enabled: Bool }
 private struct RunnerExternalHeartbeatRequest: Encodable { let enabled: Bool; let url: String? }
 private struct ApprovedActionResolutionRequest: Encodable { let outcome: String }
+private struct RoutineEnabledRequest: Encodable { let enabled: Bool }
+private struct RoutineRunRequest: Encodable { let confirmed: Bool }
+private struct ScheduledRoutineRequest: Encodable {
+    let name: String
+    let botId: String
+    let threadId: String
+    let prompt: String
+    let intervalMinutes: Int
+    let enabled: Bool
+    let triggerType: String
+}
 
 struct NativePushRegistration: Decodable {
     let id: String
@@ -194,6 +444,15 @@ struct NativePushRegistration: Decodable {
 }
 
 private struct StudioOAuthStart: Decodable { let url: String }
+private struct StudioOptionalOAuthStart: Decodable { let url: String? }
+private struct ConnectorAccessRequest: Encodable { let canRead: Bool; let canSend: Bool }
+private struct SkillBotRequest: Encodable { let botId: String }
+private struct SkillUpdateRequest: Encodable {
+    let name: String
+    let description: String
+    let instructions: String
+    let startUrl: String
+}
 
 private struct ServerMessage: Decodable { let error: String }
 

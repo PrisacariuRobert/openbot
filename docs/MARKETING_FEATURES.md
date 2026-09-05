@@ -1,9 +1,9 @@
 # OpenBot Marketing Capability Catalog
 
 Last verified: September 5, 2026
-Release: 0.33.0 development beta — not yet published
+Release: 0.34.0 development beta — not yet published
 
-New in this pass: every approved command, email, post, issue, and connected-app update gets a durable single-claim receipt before execution. If OpenBot restarts while the destination may be processing it, web and native Live Studio ask the owner what happened and do not replay it. See [validation and remaining limits](QA_0.33.md). Safe claim: **“OpenBot never blindly repeats an approved action after an uncertain restart.”** Do not claim universal provider-level exactly-once delivery, automatic reconciliation for every service, full native settings, physical-device/cellular proof, independently verified AI advice, guaranteed task success, or comparative model-quality superiority.
+New in this pass: a real SwiftUI/AppKit macOS app provides native conversations, files, shared drafts, teammate routing, source-backed Work starters, routine management, subscription/API/local-model setup and assignment, app permissions, portable skills, code-project grants/review/recovery, capability/background controls, Live Studio, approvals, and crash-recovery decisions without embedding the website. See [validation and remaining limits](QA_0.34.md). Safe claim: **“OpenBot has a native Mac client for its owner-controlled local or private runner.”** Do not claim signed public distribution, automatic updates, a bundled zero-setup runner, Windows support, universal provider-level exactly-once delivery, complete native administration, physical-device/cellular proof, independently verified AI advice, guaranteed task success, or comparative model-quality superiority.
 
 Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
 
@@ -29,15 +29,16 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 8. **Continue on the device in your hand.** Start a connector-aware brief, meeting prep, or follow-up job; share a file or link from another iPhone app; dictate an editable message; and follow result or approval notifications wherever the chosen host is reachable.
 9. **Supervision without credential exposure.** Live Studio shows every teammate's real work and private browser, lets the owner step in, and masks password-like fields from model-visible snapshots.
 10. **A real iPhone app without a data grab.** The compiled SwiftUI client protects the key in Keychain and brings native chat, attachments, sharing, APNs registration, teammate routing, live progress, approvals, and host status to the phone without embedding the desktop website.
-11. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
-12. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
-13. **Approved once means dispatched once locally.** Every approved action is fingerprinted and recorded before execution. Interrupted remote outcomes wait for your confirmation instead of being guessed or replayed.
-14. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
-15. **An always-on home you can understand.** Web and iPhone check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
-16. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
-17. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
-18. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
-19. **Let conversations and knowledge wake the right teammate.** Signed Slack and Notion events can start one permissioned, inspectable routine without bypassing ordinary approvals.
+11. **A real Mac app, not a renamed browser tab.** The SwiftUI/AppKit client uses native windows, menus, keyboard commands, files, Keychain access, conversations, Work, automations, provider/model assignment, code-project grants, capability controls, Live Studio, and recovery controls without WebKit; a same-Mac runner pairs automatically over loopback.
+12. **Reusable work without mystery files.** Skills are readable, integrity-checked, secret-scanned, portable, versioned, reversible, and assignable without copying a teammate's private history.
+13. **A studio that can stay awake.** One active runner owns each job; use Mac background protection locally or an optional private Linux home that continues while the Mac is off.
+14. **Approved once means dispatched once locally.** Every approved action is fingerprinted and recorded before execution. Interrupted remote outcomes wait for your confirmation instead of being guessed or replayed.
+15. **Connected context that can notice first.** Todoist activity and Dropbox folder changes can start a bounded teammate routine with a fresh baseline, durable cursor, duplicate protection, and the ordinary approval rules.
+16. **An always-on home you can understand.** Web, iPhone, and Mac clients check real storage, backup freshness, model runtime, browser runtime, and isolated-computer access, then explain exactly what needs attention.
+17. **Maintenance without blind trust.** Private homes can alert registered devices when health changes, back up before every guided update, verify the replacement, and recover the prior container image after failed startup.
+18. **Know when the whole home disappears.** An optional outside service receives one empty HTTPS pulse every five minutes, so loss of the host or network can be noticed without sending prompts, files, diagnostics, or credentials.
+19. **Move the whole home, not a fragile pile of secrets.** A terminal-only passphrase encrypts studio data, model logins, browser state, and projects into one authenticated archive; import verifies and stages it before any replacement.
+20. **Let conversations and knowledge wake the right teammate.** Signed Slack and Notion events can start one permissioned, inspectable routine without bypassing ordinary approvals.
 
 ## Available now
 
@@ -242,7 +243,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Passphrase-encrypted whole-home export/import covering studio data, model logins, browser profiles, and projects, with archive validation, staged replacement, backup-first health verification, and rollback
 - Durable per-target notification outbox with standards-based Web Push, native APNs, stale-device cleanup, and direct result/approval links
 
-### Messages, files, voice, and phone use
+### Messages, files, voice, and native apps
 
 - Streaming replies and friendly live activity labels
 - Safe GitHub-flavored Markdown for headings, lists, links, tables, quotes, inline code, and code blocks
@@ -256,6 +257,10 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - Authenticated artifact downloads with forced download behavior, content sniffing protection, and a sandbox content policy
 - Browser/operating-system voice typing; OpenBot stores the transcript rather than microphone audio
 - Installable responsive PWA for phone check-ins
+- Genuine SwiftUI/AppKit Mac app with native windows, menus, keyboard commands, conversations, files, teammate routing, Work, Live Studio, approvals, and recovery controls; no WebKit
+- Automatic same-Mac pairing through the runner's loopback-only access route, plus Keychain-backed HTTPS connection to a private runner
+- Opt-in native Mac attention alerts with generic privacy-bounded wording rather than prompt or file contents
+- Native routine listing, pause/resume, bounded schedule creation, and confirmation-gated manual runs
 - Guided private phone connection with live, reconnecting, and offline states
 - Authenticated remote mode for a trusted private network or encrypted tunnel
 - Matching web/native **This Mac** and **Private always-on home** status with explicit data location

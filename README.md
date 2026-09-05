@@ -1,10 +1,28 @@
-# OpenBot 0.33.0
+# OpenBot 0.34.0
 
 OpenBot is an open-source, owner-controlled home for persistent AI teammates. Run it locally on a Mac or choose an always-on private host you control. It combines a friendly messaging interface with private bot computers, browser work, durable routines, bounded teammate communication, teach-by-demonstration, and clear approval boundaries.
 
 The preferred test model is **DeepSeek V4 Flash** through the user's own OpenCode Go account, with Muse Spark 1.2 Free as a no-cost fallback. OpenBot never pools or resells model access.
 
-## What's new in 0.33.0
+## What's new in 0.34.0
+
+This milestone adds a real native macOS application for everyday OpenBot work. It is a SwiftUI/AppKit client of the same owner-controlled local or private runner used by the iPhone app; it does not embed the website or use WebKit. See [the native desktop validation record](docs/QA_0.34.md).
+
+- **A real Mac app:** native window lifecycle, menus, keyboard commands, three-column navigation, settings, file picker, attachment opening, and Keychain-backed sign-in. A local runner pairs automatically through a loopback-only endpoint.
+- **The complete daily loop:** switch conversations, target a teammate, send messages and files, continue saved drafts, follow live runs, approve or stop work, inspect recent action receipts, and optionally receive a private native attention alert.
+- **Dependable work from desktop:** Morning Brief, Meeting Prep, and Inbox Follow-ups use the same source and connector gates as the web and iPhone surfaces.
+- **Native automations:** see existing routines, pause or resume them, create five-minute through daily schedules, and start a confirmed run from the Mac app. Real actions still follow the ordinary approval boundary.
+- **Your models from the Mac app:** inspect provider readiness, connect supported subscription accounts, complete code-based sign-in, and add, edit, or safely remove hosted APIs and local OpenAI-compatible models without falling back to a browser settings screen.
+- **Native project and access control:** connect a folder on the runner Mac or clone a GitHub repository, choose read-only or coding access per teammate, inspect task worktrees and diffs, safely restore recorded edits, and manage private computer, browser, and bounded Mac access from the app.
+- **Native apps and skills:** connect supported services, separate read from approval-safe write access for every teammate, and manage portable skills through starter install, edit/version history, non-destructive rollback, assignment, guarded import, export, and deletion.
+- **Stay running:** Live Studio can turn the existing login/crash LaunchAgent protection on or off from the local native app; the Mac still has to remain awake.
+- **Crash recovery stays visible:** uncertain approved actions can be reconciled from the native inspector or Live Studio and are never silently replayed.
+- **Native, living teammates:** mascots are drawn and animated in SwiftUI using each teammate's saved shape, colour, and real work state, with reduced-motion support.
+- **One private home across devices:** the Mac app defaults to the local runner and accepts HTTPS private-runner addresses for use away from home. A launch-only development credential stays in memory rather than being copied to Keychain.
+
+This closes the missing native desktop-client gap, not the entire managed-service gap. The development build is ad-hoc signed. Developer ID signing, hardened runtime, notarization, automatic updates, Windows support, fresh-Mac runner packaging, self-hosted OAuth client/event-secret configuration, interactive teach takeover, managed hosting, and repeated real-model competitor benchmarks remain open.
+
+### Previously in 0.33.0
 
 This reliability beta adds a durable action ledger for every approved command, email, post, issue, and connected-app update. Its purpose is simple: a restart must never make OpenBot blindly repeat an action whose remote result is unknown. See [the crash-recovery validation record](docs/QA_0.33.md).
 
@@ -119,6 +137,7 @@ This development version focuses on trustworthy foundations, not a larger featur
 - AES-256-GCM encrypted API keys with a machine-local 0600 vault key
 - Responsive desktop/phone UI, installable PWA shell, finish notifications, connection recovery state, and authenticated remote mode
 - Native SwiftUI iPhone app with conversations, teammate targeting, voice-to-editable-text capture, message sending, live task/approval state, connector-aware ready-made Work jobs, Keychain-backed API access, offline/reconnect state, and address-only deep linking
+- Native SwiftUI/AppKit macOS app with conversation navigation, files, saved drafts, teammate targeting, Work starters, automations, subscription/API/local-model connections and assignment, code-project grants, capability controls, Live Studio, approvals, crash-recovery decisions, action history, native menus, and keyboard commands—without WebKit
 - Embedded iOS Share extension for securely handing text, links, images, and files into the active OpenBot conversation
 - Customizable code-drawn mascots with independent blink/idle timing plus work, wait, laugh/celebrate, and failure expressions tied to real execution state
 - One-click Google sign-in for release builds, plus a credentials-file flow for self-hosters with no manual ID copying
