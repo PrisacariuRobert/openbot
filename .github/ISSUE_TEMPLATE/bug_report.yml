@@ -1,0 +1,25 @@
+name: Bug report
+description: Report a reproducible problem without private data.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, read SECURITY.md instead. Never upload .openbot, credentials, browser profiles or private conversations."
+  - type: input
+    id: version
+    attributes:
+      label: Version and environment
+      description: OpenBot version or commit, operating system, and web/Mac/iPhone client.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest steps using synthetic data, with expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Error text, relevant checks or screenshots with private information removed. State whether any external action happened or its outcome is uncertain.

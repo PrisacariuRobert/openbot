@@ -1,11 +1,12 @@
 // A source receipt proves what was fetched, not that a model's interpretation is true.
-export type WorkKind = "morning" | "inbox";
-export type WorkService = "gmail" | "google-calendar";
+export type WorkKind = "morning" | "inbox" | "meeting" | "weekly";
+export type WorkService = "gmail" | "google-calendar" | "google-drive" | "apple-mail" | "apple-calendar" | "slack" | "notion" | "todoist";
 export interface WorkCoverage {
   service: WorkService;
   state: "complete" | "limited" | "unavailable";
   count: number;
   detail: string;
+  account?: string;
 }
 export interface WorkSource {
   ref: string;
@@ -21,6 +22,8 @@ export interface WorkSource {
   start?: string;
   end?: string;
   allDay?: boolean;
+  sourceId?: string;
+  scope?: string;
 }
 export interface WorkSnapshot {
   id: string;
@@ -30,6 +33,7 @@ export interface WorkSnapshot {
   kind: WorkKind;
   fetchedAt: string;
   timeZone: string;
+  contextRevision?: string;
   window: { from: string; until: string; mailQuery: string };
   coverage: WorkCoverage[];
   sources: WorkSource[];

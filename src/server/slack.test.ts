@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { SlackConnector } from "./slack.js";
 
 test("uses Slack user authority for search and bot authority for approved posting", async () => {

@@ -3,7 +3,20 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { protectedProjectPaths, safeHostEnvironment, safeUrl } from "./runtime.js";
+import { codeProjectToolchain, protectedProjectPaths, safeHostEnvironment, safeUrl } from "./runtime.js";
+
+test("code checks select the Python toolchain for Python commands and projects without overriding explicit Node commands", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-toolchain-"));
+  try {
+    assert.equal(codeProjectToolchain(root, "python3 -m unittest"), "python");
+    assert.equal(codeProjectToolchain(root, "npm test"), "node");
+    writeFileSync(path.join(root, "pyproject.toml"), "[project]\nname='fixture'\n");
+    assert.equal(codeProjectToolchain(root, "sh check.sh"), "python");
+    assert.equal(codeProjectToolchain(root, "node check.js"), "node");
+    writeFileSync(path.join(root, "package.json"), "{}");
+    assert.equal(codeProjectToolchain(root, "sh check.sh"), "node");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("passes only allowlisted host environment values to model processes", () => {
   const env = safeHostEnvironment({ OPENBOT_TEST_VALUE: "safe" });

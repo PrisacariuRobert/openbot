@@ -1,5 +1,7 @@
 # OpenBot for iPhone — native SwiftUI
 
+**0.37 conversation-first design candidate:** conversations are the starting screen; a chat opens with its own details, files and routines. Settings separates providers, connected apps, team, routines and devices. Incoming messages are open text, outgoing bubbles contrast against a single white/dark surface, and the animated characters remain editable. Team/group creation and app-access controls use the real host API. Builds, unit tests and a disposable-Simulator navigation check have been run; physical-device installation and real-account workflows remain separate. [Current evidence and limits](../docs/QA_NATIVE_CONVERSATIONS.md).
+
 The iPhone app is a real SwiftUI client for an OpenBot studio that remains hosted by the owner's Mac. Chat, teammate selection, live progress, approvals, connection management, and animated mascots are native controls; the app does not embed the desktop website in a web view. Mascots are drawn from native shapes instead of static image files, so each teammate keeps the color and character chosen on the Mac while blinking, floating, working, waiting, celebrating, and reacting to errors. It does not bundle a model runtime or copy the OpenBot database to the phone.
 
 ## Open in Xcode
@@ -11,9 +13,9 @@ The iPhone app is a real SwiftUI client for an OpenBot studio that remains hoste
 5. Register `group.app.openbot.shared` for both `OpenBotMobile` and `OpenBotShare`, and enable Push Notifications on the main app identifier.
 6. Run on an iPhone with iOS 17 or newer.
 
-The checked-in project is generated from `project.yml`. On this Mac, the app is compiled and exercised on the iPhone 17 Pro simulator with Xcode Beta. Four connection tests run without secrets. The optional native UI test signs in to a running local studio and verifies the conversation header and composer when `OPENBOT_TEST_SERVER` and `OPENBOT_TEST_ACCESS_KEY` are supplied; it skips safely otherwise.
+The checked-in project is generated from `project.yml`. The current native unit suite has 21 tests that run without owner credentials. A separate synthetic UI test verifies conversation navigation, drafts, Settings and routine cancellation on the disposable `OpenBot Native Polish QA` simulator; it requires the marker-checked loopback fixture described in the [native QA record](../docs/QA_NATIVE_CONVERSATIONS.md). The optional owner-account UI test still requires both `OPENBOT_TEST_SERVER` and `OPENBOT_TEST_ACCESS_KEY` and skips without them. A compile-only Simulator build may disable signing, but Keychain-backed UI tests need the normal ad-hoc Simulator signature.
 
-On the Mac, start OpenBot with `npm run remote`, open **Control center → Phone remote**, and use the shown private address and access key. For access on cellular or different Wi-Fi networks, turn on Tailscale on the Mac and iPhone with the same account; OpenBot automatically promotes the private `100.x` address and pairing link. An HTTPS reverse proxy is also supported. Never expose OpenBot's plain local port to the public internet.
+Open **Away access** on the Mac and use its pairing QR code. Access over cellular or different Wi-Fi requires a reachable hosted OpenBot relay/private home, or a separately configured private network/HTTPS proxy; having a native app alone does not make away access ready. Tailscale remains an optional private-network route, not a requirement for the app. Never expose OpenBot's plain local port to the public internet. See the [away-access verification record](../docs/QA_AWAY_ACCESS.md) for setup limits and device checks.
 
 For native notifications, create an APNs signing key in the Apple Developer portal and set `OPENBOT_APNS_TEAM_ID`, `OPENBOT_APNS_KEY_ID`, and `OPENBOT_APNS_PRIVATE_KEY_PATH` on the Mac host. The `.p8` private key stays on the Mac. Debug builds register as sandbox devices and Release builds register as production devices. The simulator can compile and exercise the UI but production APNs delivery requires an owner-signed physical-device build.
 
@@ -34,3 +36,27 @@ In the connection form, the keyboard's **Next** action moves from the studio add
 - Forgetting the connection removes the Keychain item and remembered address.
 
 The native project currently provides secure connection, conversation switching, teammate targeting, deliberate speech-to-editable-text capture, message and file sending, live server events, streaming task state, approvals, cancellation, Markdown-style message text, authenticated artifact downloads, Quick Look previews, message/file sharing, APNs registration/deep links, Share-sheet ingestion, offline/reconnect state, connection management, runner health, recovery state, and a remote **Check now** control. Voice starts only after a tap, stops explicitly, prefers on-device recognition when Apple reports it available, never sends automatically, and is not retained as audio by OpenBot. Optional macOS background protection keeps the studio service available after the foreground app exits, provided the Mac remains powered on and awake. App Store distribution is not claimed yet. Secure installed web clients can use Web Push independently of the native app.
+## Personal Team device preview
+
+The release project retains its push notification and app-group entitlements. A free Apple Personal Team cannot provision those capabilities. For a clearly labelled personal test build, use `PersonalPreview.entitlements` (empty) for **both** targets and enable the preview banner:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild \
+  -project ios/OpenBotMobile.xcodeproj -scheme OpenBotMobile \
+  -configuration Debug -destination 'id=YOUR_DEVICE_UDID' \
+  -derivedDataPath /tmp/OpenBotPhonePreview DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+  CODE_SIGN_ENTITLEMENTS="$PWD/ios/PersonalPreview.entitlements" \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG OPENBOT_PERSONAL_PREVIEW' \
+  -allowProvisioningUpdates build
+```
+
+Install the resulting `Debug-iphoneos/OpenBot.app` with Xcode or `xcrun devicectl device install app`. Unlock the phone to launch it. This preview can test chat, provider selection, included skills, in-app file attachments and approval screens. APNs and delivery from the system Share sheet are **not available**; use the in-app attachment picker instead. A paid-team signed release still needs a real APNs/share-group acceptance run. Development provisioning is not App Store distribution and requires periodic renewal as indicated by Xcode's profile.
+
+### Phone test checklist
+
+1. On the Mac, open Remote access and copy the private host address and access key. Enter them in the native iPhone app. Do not post the key in chat, commit it or put it into a URL.
+2. For use away from home, connect Tailscale on the iPhone to the same private network as the host, then use the host's Tailscale address. The Mac/private runner must remain on. Do not forward the HTTP port to the public internet.
+3. Open Tools, skills & memory → Skills: the seven included methods should already be there. You do not need to import or enable each one.
+4. Paste short meeting notes and ask for an action list. Check that missing owners and dates stay unresolved and decisions are not confused with suggestions.
+5. Ask one teammate to consult another: expect one consolidated final answer. Open an attachment and try an approval preview; decline any real external change you do not want.
+6. Turn Wi-Fi off while Tailscale stays connected. Send a new message, background/reopen the app and check that the same conversation returns without duplicate sends. Report any error and which step triggered it. This is a user acceptance check, not yet a verified cellular claim.

@@ -11,14 +11,22 @@
 		1FA6DE9A644BC0727430DF0C /* StudioModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */; };
 		24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */; };
 		27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */; };
+		2D1341AFBB88973F656F3AD4 /* DesktopRunnerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */; };
 		3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */; };
 		370696C603C06617F205A59B /* OpenBotDesktopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */; };
 		3AF0F8E96D2A80321DBE782D /* DesktopNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */; };
+		3D9DD23EC2F7787D14C08F92 /* OpenExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */; };
+		4A16387AAC1CEABE808892A5 /* DesktopAwayAccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */; };
+		506DF6B42CA49EBEAECDED93 /* StudioApprovalReviewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */; };
 		547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */; };
+		591207B3D2B17212F166D757 /* WorkSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */; };
 		591EF96847C737A770E5CE36 /* DesktopTeammatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */; };
+		5E62BA570CAEAD6D14212DFE /* StudioBrandMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */; };
+		6316196058224C1AFCC0F1BB /* StudioPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66DEAEA72B148F9B68625D7C /* StudioPalette.swift */; };
 		70F6EA3F3347A0E6C143CC6B /* StudioAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */; };
 		75E18C61FD138658535D401E /* DesktopFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */; };
 		77176D34D553501E64B47AD0 /* DesktopMascotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */; };
+		789FB0126AAD7143924FA67A /* StudioAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */; };
 		86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */; };
 		8A106A9C73B7AC546EE1970D /* DesktopTeachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */; };
 		8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */; };
@@ -27,10 +35,15 @@
 		9901530C05491907F54D439D /* OpenBotDesktopApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E090B986078E376939392EA9 /* OpenBotDesktopApp.swift */; };
 		A444C931E34109A875B9A427 /* DesktopRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 418D0F26B773B931A05A3C1D /* DesktopRootView.swift */; };
 		AE4FE07FAA35FDA37415A7F9 /* DesktopConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */; };
+		B1E0AE83850E4A9141101F1B /* RoutineScheduleFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */; };
 		B33AAA280781EEEB2B10CE00 /* OpenBotSharedInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */; };
 		C06C973B5EFC5C8AF7C693FC /* StudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16657B10E332E485EF58EF5 /* StudioStore.swift */; };
+		C3894B0925EFE8D7BD80601A /* RecipeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */; };
 		CFB5B1CD511D01D5F47DBC23 /* DesktopSkillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */; };
+		DF33311732489207EB8D56C1 /* StudioApprovalReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */; };
 		E1554AC0D7DFE09593E483BA /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */; };
+		E6872D9A3EE4A3077D9D1ABB /* DesktopArtifactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */; };
+		F267DBD4F6947B1A46CAFC8C /* BrandAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */; };
 		F66C28F89DE814E13BF9322C /* DesktopConnectorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */; };
 		FAC93C170A84615869E711BE /* DesktopPermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */; };
 		FE21386030003E443C4BBF62 /* DesktopWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */; };
@@ -48,6 +61,7 @@
 
 /* Begin PBXFileReference section */
 		04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioModels.swift; sourceTree = "<group>"; };
+		11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopArtifactsView.swift; sourceTree = "<group>"; };
 		208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotSharedInbox.swift; sourceTree = "<group>"; };
 		258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMascotView.swift; sourceTree = "<group>"; };
 		27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopStudioView.swift; sourceTree = "<group>"; };
@@ -59,22 +73,34 @@
 		4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAutomationsView.swift; sourceTree = "<group>"; };
 		56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopProvidersView.swift; sourceTree = "<group>"; };
+		66DEAEA72B148F9B68625D7C /* StudioPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioPalette.swift; sourceTree = "<group>"; };
+		7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkSourcesView.swift; sourceTree = "<group>"; };
 		7540A41257FDF7FCAE2B0DA4 /* OpenBotDesktopTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenBotDesktopTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopSearchView.swift; sourceTree = "<group>"; };
+		8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineScheduleFields.swift; sourceTree = "<group>"; };
+		853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = BrandAssets.xcassets; sourceTree = "<group>"; };
+		8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioBrandMark.swift; sourceTree = "<group>"; };
+		941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRunnerController.swift; sourceTree = "<group>"; };
+		9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioApprovalReview.swift; sourceTree = "<group>"; };
 		ACD38ED25F0A8CF93E8528D9 /* OpenBotDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenBotDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAwayAccessView.swift; sourceTree = "<group>"; };
 		B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConnectionSession.swift; sourceTree = "<group>"; };
+		B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAttentionTests.swift; sourceTree = "<group>"; };
 		B753B530BAF8C97928B53B97 /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon-1024.png"; sourceTree = "<group>"; };
+		B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
 		C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBrowserControlView.swift; sourceTree = "<group>"; };
 		C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConversationView.swift; sourceTree = "<group>"; };
 		C16657B10E332E485EF58EF5 /* StudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioStore.swift; sourceTree = "<group>"; };
 		CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopCodeProjectsView.swift; sourceTree = "<group>"; };
 		CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConnectorsView.swift; sourceTree = "<group>"; };
+		CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioApprovalReviewModel.swift; sourceTree = "<group>"; };
 		E090B986078E376939392EA9 /* OpenBotDesktopApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotDesktopApp.swift; sourceTree = "<group>"; };
 		E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotDesktopTests.swift; sourceTree = "<group>"; };
 		EBA74A4E2732684E76B1A397 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPermissionsView.swift; sourceTree = "<group>"; };
 		ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNotifications.swift; sourceTree = "<group>"; };
 		F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopFilesView.swift; sourceTree = "<group>"; };
+		F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenExtensionsView.swift; sourceTree = "<group>"; };
 		FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAPIClient.swift; sourceTree = "<group>"; };
 		FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAddress.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -85,7 +111,10 @@
 			children = (
 				FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */,
 				FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */,
+				CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */,
+				8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */,
 				04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */,
+				66DEAEA72B148F9B68625D7C /* StudioPalette.swift */,
 				C16657B10E332E485EF58EF5 /* StudioStore.swift */,
 			);
 			path = Models;
@@ -96,6 +125,7 @@
 			children = (
 				E0CD1B0C9719CD34A5A73AF8 /* OpenBotMobile */,
 				8B126FFA6B5C505C6270CECC /* Shared */,
+				7B8B1A917D590EADBB750A5C /* SharedTests */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -105,6 +135,7 @@
 			children = (
 				B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */,
 				ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */,
+				941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -134,6 +165,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		68E8944D44049FB5431778BB /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */,
+				B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */,
+				8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */,
+				9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */,
+				7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		6DB45CC3C12EABFA0DA18573 /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -142,9 +185,18 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		7B8B1A917D590EADBB750A5C /* SharedTests */ = {
+			isa = PBXGroup;
+			children = (
+				B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */,
+			);
+			path = SharedTests;
+			sourceTree = "<group>";
+		};
 		8B126FFA6B5C505C6270CECC /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */,
 				208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */,
 			);
 			path = Shared;
@@ -180,7 +232,9 @@
 		B2754415716F1557E5D6FF76 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */,
 				4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */,
+				B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */,
 				C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */,
 				CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */,
 				CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */,
@@ -223,6 +277,7 @@
 				12A7F522888F0937169614DC /* Models */,
 				A4D1473764A621BA135D1102 /* Resources */,
 				FC8CF93852BDA00F7001D80A /* Security */,
+				68E8944D44049FB5431778BB /* Views */,
 			);
 			path = OpenBotMobile;
 			sourceTree = "<group>";
@@ -321,6 +376,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8EE31CCB1DA58D2843615258 /* AppIcon-1024.png in Resources */,
+				F267DBD4F6947B1A46CAFC8C /* BrandAssets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,7 +388,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8BF12897D18BE6DEF969931D /* ConnectionAddress.swift in Sources */,
+				E6872D9A3EE4A3077D9D1ABB /* DesktopArtifactsView.swift in Sources */,
 				27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */,
+				4A16387AAC1CEABE808892A5 /* DesktopAwayAccessView.swift in Sources */,
 				3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */,
 				24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */,
 				86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */,
@@ -344,6 +402,7 @@
 				FAC93C170A84615869E711BE /* DesktopPermissionsView.swift in Sources */,
 				8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */,
 				A444C931E34109A875B9A427 /* DesktopRootView.swift in Sources */,
+				2D1341AFBB88973F656F3AD4 /* DesktopRunnerController.swift in Sources */,
 				199A378CC7C16D266E002C41 /* DesktopSearchView.swift in Sources */,
 				CFB5B1CD511D01D5F47DBC23 /* DesktopSkillsView.swift in Sources */,
 				547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */,
@@ -353,9 +412,17 @@
 				E1554AC0D7DFE09593E483BA /* KeychainStore.swift in Sources */,
 				9901530C05491907F54D439D /* OpenBotDesktopApp.swift in Sources */,
 				B33AAA280781EEEB2B10CE00 /* OpenBotSharedInbox.swift in Sources */,
+				3D9DD23EC2F7787D14C08F92 /* OpenExtensionsView.swift in Sources */,
+				C3894B0925EFE8D7BD80601A /* RecipeLibraryView.swift in Sources */,
+				B1E0AE83850E4A9141101F1B /* RoutineScheduleFields.swift in Sources */,
 				70F6EA3F3347A0E6C143CC6B /* StudioAPIClient.swift in Sources */,
+				DF33311732489207EB8D56C1 /* StudioApprovalReview.swift in Sources */,
+				506DF6B42CA49EBEAECDED93 /* StudioApprovalReviewModel.swift in Sources */,
+				5E62BA570CAEAD6D14212DFE /* StudioBrandMark.swift in Sources */,
 				1FA6DE9A644BC0727430DF0C /* StudioModels.swift in Sources */,
+				6316196058224C1AFCC0F1BB /* StudioPalette.swift in Sources */,
 				C06C973B5EFC5C8AF7C693FC /* StudioStore.swift in Sources */,
+				591207B3D2B17212F166D757 /* WorkSourcesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -364,6 +431,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				370696C603C06617F205A59B /* OpenBotDesktopTests.swift in Sources */,
+				789FB0126AAD7143924FA67A /* StudioAttentionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,7 +515,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 42;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -460,7 +528,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.34.0;
+				MARKETING_VERSION = 0.37.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -524,7 +592,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 42;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -543,7 +611,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.34.0;
+				MARKETING_VERSION = 0.37.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

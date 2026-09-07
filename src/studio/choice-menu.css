@@ -1,0 +1,113 @@
+.choice-menu {
+  display: block;
+  min-width: 0;
+}
+.choice-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  text-align: left;
+  font-size: 14px;
+}
+.choice-trigger > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.choice-trigger:hover,
+.choice-trigger[aria-expanded="true"] {
+  background: var(--hover, #f4f4f4);
+}
+.choice-compact .choice-trigger {
+  padding: 4px 8px;
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+}
+.choice-compact {
+  max-width: min(230px, 60%);
+}
+.choice-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 5px;
+  z-index: 20;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 8px 32px #00000018,
+    0 2px 6px #0000000a;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.choice-popover::backdrop {
+  background: transparent;
+}
+.choice-popover > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.choice-popover > button:focus-visible {
+  outline: none;
+  background: var(--selection, #ebebeb);
+}
+.choice-popover > button:hover {
+  background: var(--hover, #f5f5f5);
+}
+.choice-popover > button > span {
+  flex: 1;
+  min-width: 0;
+}
+.choice-popover strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.choice-popover small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.choice-popover > p {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.choice-popover:popover-open {
+  animation: menu-appear 100ms ease-out;
+}
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .choice-popover:popover-open {
+    animation: none;
+  }
+}

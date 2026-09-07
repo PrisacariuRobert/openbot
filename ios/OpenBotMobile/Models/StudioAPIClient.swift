@@ -2,6 +2,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 struct StudioAPIClient {
+    private static let network = URLSession(configuration: .ephemeral, delegate: ConnectionNoRedirect(), delegateQueue: nil)
     let baseURL: URL
     let sessionAccessKey: String?
 
@@ -14,8 +15,36 @@ struct StudioAPIClient {
         try await request("api/state", queryItems: [URLQueryItem(name: "threadId", value: threadID)])
     }
 
+    func saveGroup(id: String?, input: StudioGroupInput) async throws -> StudioThread {
+        let path = id.map { "api/threads/\($0)/group" } ?? "api/threads"
+        let data = try await dataRequest(path, method: id == nil ? "POST" : "PATCH", body: JSONEncoder().encode(input))
+        return try JSONDecoder().decode(StudioThread.self, from: data)
+    }
+
     func connectors() async throws -> StudioConnectorStatus {
         try await request("api/connectors")
+    }
+
+    func workSources(botID: String) async throws -> StudioWorkSources { try await request("api/work-sources/\(botID)") }
+    func workFollowups() async throws -> StudioWorkFollowups { try await request("api/work-followups") }
+    func updateWorkDigest(enabled: Bool?) async throws {
+        _ = try await dataRequest("api/work-followups/digest", method: enabled == nil ? "DELETE" : "PUT", body: enabled.map { try JSONSerialization.data(withJSONObject: ["enabled": $0]) })
+    }
+    func trackFollowup(_ item: StudioWorkFollowup) async throws {
+        let payload = try JSONSerialization.data(withJSONObject: ["snapshotId": item.snapshotId, "itemIndex": item.itemIndex])
+        _ = try await dataRequest("api/work-followups", method: "POST", body: payload)
+    }
+    func updateFollowup(_ id: String, status: String) async throws {
+        let payload = try JSONSerialization.data(withJSONObject: ["status": status])
+        _ = try await dataRequest("api/work-followups/\(id)", method: "PATCH", body: payload)
+    }
+    func workSourceChoices(service: String, query: String) async throws -> StudioWorkSourceChoices {
+        try await request("api/work-source-choices/\(service)", queryItems: [URLQueryItem(name: "q", value: query)])
+    }
+    func saveWorkSources(botID: String, value: StudioWorkSources) async throws -> StudioWorkSources {
+        let payload = try JSONEncoder().encode(StudioWorkSourcesInput(lookbackHours: value.lookbackHours, selections: value.selections))
+        let data = try await dataRequest("api/work-sources/\(botID)", method: "PUT", body: payload)
+        return try JSONDecoder().decode(StudioWorkSources.self, from: data)
     }
 
     func providers() async throws -> StudioProviderStatus {
@@ -97,6 +126,11 @@ struct StudioAPIClient {
         _ = try await dataRequest("api/bots/\(botID)", method: "PATCH", body: payload)
     }
 
+    func chooseInitialProvider(providerInstanceID: String, model: String) async throws {
+        let payload = try JSONEncoder().encode(BotProviderRequest(providerInstanceId: providerInstanceID, model: model))
+        _ = try await dataRequest("api/provider/choose", method: "POST", body: payload)
+    }
+
     func saveBot(
         id: String? = nil,
         name: String,
@@ -126,6 +160,14 @@ struct StudioAPIClient {
 
     func workspaceFiles(botID: String) async throws -> [StudioWorkspaceFile] {
         try await request("api/bots/\(botID)/files")
+    }
+
+    func artifacts() async throws -> [StudioArtifact] {
+        try await request("api/artifacts")
+    }
+
+    func artifactRevisions(_ artifactID: String) async throws -> [StudioArtifactRevision] {
+        try await request("api/artifacts/\(artifactID)/revisions")
     }
 
     func workspaceFile(botID: String, path: String) async throws -> StudioWorkspaceFileContent {
@@ -269,13 +311,14 @@ struct StudioAPIClient {
         catch { throw StudioAPIError.invalidResponse }
     }
 
-    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String? = nil) async throws {
+    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String? = nil, expectedWorkKind: String? = nil) async throws {
         let payload = try JSONEncoder().encode(MessageRequest(
             threadId: threadID,
             body: body,
             targetBotIds: targetBotIDs,
             attachmentIds: attachmentIDs,
-            replyToId: replyToID
+            replyToId: replyToID,
+            expectedWorkKind: expectedWorkKind
         ))
         _ = try await dataRequest("api/messages", method: "POST", body: payload)
     }
@@ -327,8 +370,42 @@ struct StudioAPIClient {
         return destination
     }
 
-    func approve(runID: String) async throws {
-        _ = try await dataRequest("api/runs/\(runID)/approve", method: "POST")
+    func signInControl(_ approvalID: String, control: StudioSignInControl) async throws -> StudioSignInScreen {
+        let payload = try JSONEncoder().encode(control)
+        let data = try await dataRequest("api/approvals/\(approvalID)/sign-in", method: "POST", body: payload)
+        return try JSONDecoder().decode(StudioSignInScreen.self, from: data)
+    }
+
+    func approvalPreview(_ approvalID: String) async throws -> StudioApprovalPreview {
+        try await request("api/approvals/\(approvalID)/preview")
+    }
+
+    func decideReviewedApproval(_ approvalID: String, decision: String, reviewFingerprint: String?) async throws -> StudioApproval {
+        guard ["approved", "denied"].contains(decision) else { throw StudioApprovalDecisionError.invalidPreview }
+        var request = try authorizedRequest(path: "api/approvals/\(approvalID)/decide")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body = ["decision": decision]
+        if decision == "approved" {
+            guard let reviewFingerprint, reviewFingerprint.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw StudioApprovalDecisionError.invalidPreview }
+            body["reviewFingerprint"] = reviewFingerprint
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await Self.network.data(for: request)
+        if (response as? HTTPURLResponse)?.statusCode == 409 { throw StudioApprovalDecisionError.changed }
+        try validate(response: response, data: data)
+        return try JSONDecoder().decode(StudioApproval.self, from: data)
+    }
+
+    func fullApprovalReviewURL(threadID: String?) -> URL {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.path = baseURL.path.isEmpty ? "/" : baseURL.path + "/"
+        components.user = nil
+        components.password = nil
+        components.queryItems = [URLQueryItem(name: "panel", value: "live")]
+        if let threadID { components.queryItems?.append(URLQueryItem(name: "thread", value: threadID)) }
+        components.fragment = nil
+        return components.url!
     }
 
     func cancel(runID: String) async throws {
@@ -357,12 +434,13 @@ struct StudioAPIClient {
         intervalMinutes: Int,
         enabled: Bool,
         triggerType: String,
-        triggerConfig: StudioRoutineTriggerConfig
+        triggerConfig: StudioRoutineTriggerConfig,
+        schedule: StudioRoutineSchedule = .interval
     ) async throws -> StudioRoutineSaveResult {
         let payload = try JSONEncoder().encode(RoutineSaveRequest(
             name: name, botId: botID, threadId: threadID, prompt: prompt,
             intervalMinutes: intervalMinutes, enabled: enabled,
-            triggerType: triggerType, triggerConfig: triggerConfig
+            triggerType: triggerType, triggerConfig: triggerConfig, schedule: schedule
         ))
         let path = id.map { "api/routines/\($0)" } ?? "api/routines"
         let data = try await dataRequest(path, method: id == nil ? "POST" : "PATCH", body: payload)
@@ -372,6 +450,13 @@ struct StudioAPIClient {
 
     func deleteRoutine(_ routineID: String) async throws {
         _ = try await dataRequest("api/routines/\(routineID)", method: "DELETE")
+    }
+
+    func previewSchedule(_ schedule: StudioRoutineSchedule, intervalMinutes: Int, routineID: String?) async throws -> StudioSchedulePreview {
+        struct Request: Encodable { let schedule: StudioRoutineSchedule; let intervalMinutes: Int; let routineId: String? }
+        let payload = try JSONEncoder().encode(Request(schedule: schedule, intervalMinutes: intervalMinutes, routineId: routineID))
+        let data = try await dataRequest("api/routines/preview", method: "POST", body: payload)
+        return try JSONDecoder().decode(StudioSchedulePreview.self, from: data)
     }
 
     func rotateRoutineSecret(_ routineID: String) async throws -> StudioRoutineSaveResult {
@@ -428,12 +513,39 @@ struct StudioAPIClient {
         var request = try authorizedRequest(path: "api/events")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 60 * 60
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await Self.network.bytes(for: request)
         try validate(response: response, data: nil)
         for try await line in bytes.lines {
             guard line.hasPrefix("data:"), !Task.isCancelled else { continue }
             await onEvent()
         }
+    }
+
+    func computerFrames(botID: String, onEvent: @escaping (StudioComputerLiveEvent) async -> Void) async throws {
+        var request = try authorizedRequest(path: "api/bots/\(botID)/computer/live")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 60 * 60
+        let (bytes, response) = try await Self.network.bytes(for: request)
+        try validate(response: response, data: nil)
+        for try await line in bytes.lines {
+            guard line.hasPrefix("data:"), !Task.isCancelled else { continue }
+            let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            guard let data = payload.data(using: .utf8),
+                  let event = try? JSONDecoder().decode(StudioComputerLiveEvent.self, from: data) else { continue }
+            await onEvent(event)
+        }
+    }
+
+    func extensionData(_ path: String = "", method: String = "GET", body: Data? = nil) async throws -> Data {
+        try await dataRequest("api/extensions" + path, method: method, body: body)
+    }
+
+    func recipeData(_ path: String = "", botID: String? = nil, method: String = "GET", body: Data? = nil) async throws -> Data {
+        try await dataRequest("api/recipes" + path, queryItems: botID.map { [URLQueryItem(name: "botId", value: $0)] } ?? [], method: method, body: body)
+    }
+
+    func awayData(_ path: String = "/away", method: String = "GET") async throws -> Data {
+        try await dataRequest("api/access" + path, method: method)
     }
 
     private func request<T: Decodable>(_ path: String, queryItems: [URLQueryItem] = []) async throws -> T {
@@ -454,7 +566,7 @@ struct StudioAPIClient {
         request.httpBody = body
         if body != nil && headers["Content-Type"] == nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Self.network.data(for: request)
         try validate(response: response, data: data)
         return data
     }
@@ -468,7 +580,7 @@ struct StudioAPIClient {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 20
+        request.timeoutInterval = path.hasPrefix("api/extensions") ? 40 : 20
         return request
     }
 
@@ -483,11 +595,13 @@ struct StudioAPIClient {
 }
 
 private struct MessageRequest: Encodable {
+    var timeZone: String = TimeZone.current.identifier
     let threadId: String
     let body: String
     let targetBotIds: [String]
     let attachmentIds: [String]
     let replyToId: String?
+    let expectedWorkKind: String?
 }
 private struct MessageReactionRequest: Encodable { let emoji: String }
 
@@ -591,6 +705,7 @@ private struct RoutineSaveRequest: Encodable {
     let enabled: Bool
     let triggerType: String
     let triggerConfig: StudioRoutineTriggerConfig
+    let schedule: StudioRoutineSchedule
 }
 
 struct NativePushRegistration: Decodable {
@@ -617,6 +732,10 @@ enum StudioAPIError: LocalizedError {
     case unreachable
     case invalidResponse
     case server(String)
+
+    static func isCancelledRequest(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled
+    }
 
     var errorDescription: String? {
         switch self {

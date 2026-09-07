@@ -84,6 +84,24 @@ export class SlackConnector {
     return { channelId: channel, messages: messages.map((item) => this.messageSummary(item, channel)).filter((item): item is SlackMessageSummary => Boolean(item)) };
   }
 
+  async workChannels() {
+    const result = await this.call("conversations.list", { types: "public_channel,private_channel", exclude_archived: "true", limit: "100" }, "user");
+    const rows = Array.isArray(result.channels) ? result.channels : [];
+    const meta = result.response_metadata as Record<string, unknown> | undefined;
+    return { choices: rows.slice(0, 100).flatMap((value) => {
+      const row = value as Record<string, unknown>, id = cleanText(row.id, 200), label = cleanText(row.name, 200);
+      return id && label && row.is_member === true ? [{ service: "slack" as const, id, label: `#${label}` }] : [];
+    }), limited: Boolean(meta?.next_cursor) || rows.length >= 100 };
+  }
+
+  async workMessages(channelId: string, from: string, until: string, signal: AbortSignal) {
+    const result = await this.call("conversations.history", { channel: channelId, oldest: String(Date.parse(from) / 1000), latest: String(Date.parse(until) / 1000), limit: "15", inclusive: "true" }, "user", signal);
+    if (!Array.isArray(result.messages)) throw new Error("Slack returned no readable message list.");
+    const rows = result.messages, meta = result.response_metadata as Record<string, unknown> | undefined;
+    const messages = rows.slice(0, 15).map((row) => this.messageSummary(row, channelId)).filter((row): row is SlackMessageSummary => Boolean(row));
+    return { messages, hasMore: result.has_more === true || Boolean(meta?.next_cursor) || rows.length > 15, omitted: messages.length !== rows.length };
+  }
+
   async post(channelId: string, text: string, threadTimestamp?: string | null) {
     const channel = cleanText(channelId, 200), body = cleanText(text, 4_000), thread = cleanText(threadTimestamp, 80);
     if (!channel || !body) throw new Error("Choose a Slack destination and write a message.");
@@ -108,10 +126,11 @@ export class SlackConnector {
     };
   }
 
-  private async call(method: string, parameters: Record<string, string>, tokenKind: "bot" | "user"): Promise<SlackResponse> {
+  private async call(method: string, parameters: Record<string, string>, tokenKind: "bot" | "user", signal?: AbortSignal): Promise<SlackResponse> {
     const token = await this.accessToken(tokenKind);
     const response = await this.fetcher(`https://slack.com/api/${method}`, {
       method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(parameters),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
     const result = await response.json().catch(() => ({})) as SlackResponse;
     if (!response.ok || !result.ok) {
@@ -123,6 +142,7 @@ export class SlackConnector {
   }
 
   private async accessToken(kind: "bot" | "user") {
+    const version = this.db.connectorAuthorizationVersion("slack");
     const configured = this.db.oauthConnectorCredentials<SlackCredentials>("slack"), credentials = configured?.credentials;
     if (!configured || !credentials?.[kind]?.accessToken) throw new Error("Connect Slack in Apps & Tools first.");
     const token = credentials[kind];
@@ -136,13 +156,14 @@ export class SlackConnector {
       accessToken, refreshToken: cleanText(kind === "user" ? nested.refresh_token || refreshed.refresh_token : refreshed.refresh_token, 4_000) || token.refreshToken,
       expiresAt: expiresAt(kind === "user" ? nested.expires_in || refreshed.expires_in : refreshed.expires_in),
     };
-    this.db.updateOAuthConnectorCredentials("slack", credentials);
+    this.db.updateOAuthConnectorCredentials("slack", credentials, version);
     return accessToken;
   }
 
   private async oauthRequest(clientId: string, clientSecret: string, parameters: Record<string, string>): Promise<SlackResponse> {
     const response = await this.fetcher("https://slack.com/api/oauth.v2.access", {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(20_000),
       body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...parameters }),
     });
     const result = await response.json().catch(() => ({})) as SlackResponse;

@@ -16,8 +16,13 @@ final class StudioStore: ObservableObject {
     @Published private(set) var skillTemplates: [StudioSkillTemplate] = []
     @Published private(set) var teachingStatus: StudioTeachingStatus?
     @Published private(set) var browserComputer: StudioComputerStatus?
+    @Published private(set) var browserLiveFrame: Data?
+    @Published private(set) var browserLiveState: String?
     @Published private(set) var workspaceFiles: [StudioWorkspaceFile] = []
     @Published private(set) var workspaceFileContent: StudioWorkspaceFileContent?
+    @Published private(set) var artifacts: [StudioArtifact] = []
+    @Published private(set) var artifactRevisions: [StudioArtifactRevision] = []
+    @Published private(set) var isCheckingArtifacts = false
     @Published private(set) var searchResults: [StudioSearchResult] = []
     @Published private(set) var isCheckingConnectors = false
     @Published private(set) var isCheckingProviders = false
@@ -32,9 +37,58 @@ final class StudioStore: ObservableObject {
     @Published var selectedThreadID = "team-room"
 
     private let client: StudioAPIClient
+
+    func workSources(botID: String) async throws -> StudioWorkSources { try await client.workSources(botID: botID) }
+    func workFollowups() async throws -> StudioWorkFollowups { try await client.workFollowups() }
+    func updateWorkDigest(enabled: Bool?) async throws { try await client.updateWorkDigest(enabled: enabled) }
+    func trackFollowup(_ item: StudioWorkFollowup) async throws { try await client.trackFollowup(item) }
+    func updateFollowup(_ id: String, status: String) async throws { try await client.updateFollowup(id, status: status) }
+    func workSourceChoices(service: String, query: String) async throws -> StudioWorkSourceChoices { try await client.workSourceChoices(service: service, query: query) }
+    func saveWorkSources(botID: String, value: StudioWorkSources) async throws -> StudioWorkSources { try await client.saveWorkSources(botID: botID, value: value) }
+    func extensionData(_ path: String = "", method: String = "GET", body: Data? = nil) async throws -> Data {
+        try await client.extensionData(path, method: method, body: body)
+    }
+    func recipeData(_ path: String = "", botID: String? = nil, method: String = "GET", body: Data? = nil) async throws -> Data {
+        try await client.recipeData(path, botID: botID, method: method, body: body)
+    }
     private var eventTask: Task<Void, Never>?
     private var refreshInProgress = false
+    private var refreshAgain = false
     private var shareImportInProgress = false
+    private var liveViewTask: Task<Void, Never>?
+    private var liveViewBotID: String?
+
+    /// Live screen frames for the computer screen currently open. Watching
+    /// never starts a browser or grants access; when the live stream is
+    /// unavailable the view falls back to snapshot refreshes.
+    func startLiveView(botID: String) {
+        stopLiveView()
+        liveViewBotID = botID
+        liveViewTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await client.computerFrames(botID: botID) { [weak self] event in
+                    guard let self, self.liveViewBotID == botID, !Task.isCancelled else { return }
+                    if event.type == "frame", let jpeg = event.jpeg, let data = Data(base64Encoded: jpeg) {
+                        self.browserLiveFrame = data
+                    } else if event.type == "status", let browser = event.browser {
+                        self.browserLiveState = browser
+                    }
+                }
+                if self.liveViewBotID == botID && !Task.isCancelled { self.browserLiveState = self.browserLiveState ?? "unavailable" }
+            } catch {
+                if self.liveViewBotID == botID { self.browserLiveState = "unavailable" }
+            }
+        }
+    }
+
+    func stopLiveView() {
+        liveViewTask?.cancel()
+        liveViewTask = nil
+        liveViewBotID = nil
+        browserLiveFrame = nil
+        browserLiveState = nil
+    }
 
     init(serverURL: URL, accessKey: String? = nil) {
         client = StudioAPIClient(baseURL: serverURL, accessKey: accessKey)
@@ -50,7 +104,7 @@ final class StudioStore: ObservableObject {
     }
 
     var activeRuns: [StudioRun] {
-        state.runs.filter { ["awaiting_approval", "waiting_for_teammate", "queued", "running"].contains($0.status) }
+        state.allRuns.filter { ["awaiting_approval", "waiting_for_teammate", "queued", "running"].contains($0.status) }
     }
 
     var activeDraft: StudioDraft {
@@ -78,20 +132,41 @@ final class StudioStore: ObservableObject {
     }
 
     @discardableResult
-    func send(_ body: String, targetBotID: String?, files: [URL] = [], replyToID: String? = nil) async -> Bool {
+    func saveGroup(id: String? = nil, title: String, botIDs: [String]) async -> Bool {
+        guard let input = StudioGroupInput(title: title, botIDs: botIDs),
+              input.botIds.allSatisfy({ id in state.bots.contains { $0.id == id } }) else {
+            errorMessage = "Choose a name up to 48 characters and one to six existing teammates."
+            return false
+        }
+        errorMessage = nil
+        do {
+            let thread = try await client.saveGroup(id: id, input: input)
+            await refresh(silent: true)
+            await chooseThread(thread.id)
+            return true
+        } catch {
+            handle(error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func send(_ body: String, targetBotID: String?, files: [URL] = [], replyToID: String? = nil, expectedWorkKind: String? = nil, threadID: String? = nil) async -> Bool {
         let cleanBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (!cleanBody.isEmpty || !files.isEmpty), !isSending else { return false }
+        let destination = threadID ?? selectedThreadID
         isSending = true
         errorMessage = nil
         defer { isSending = false }
         do {
-            let attachments = try await files.asyncMap { try await client.upload(threadID: selectedThreadID, fileURL: $0) }
+            let attachments = try await files.asyncMap { try await client.upload(threadID: destination, fileURL: $0) }
             try await client.sendMessage(
-                threadID: selectedThreadID,
+                threadID: destination,
                 body: cleanBody,
                 targetBotIDs: targetBotID.map { [$0] } ?? [],
                 attachmentIDs: attachments.map(\.id),
-                replyToID: replyToID
+                replyToID: replyToID,
+                expectedWorkKind: expectedWorkKind
             )
             await refresh(silent: true)
             return true
@@ -105,9 +180,21 @@ final class StudioStore: ObservableObject {
         await perform { try await client.toggleMessageReaction(messageID: messageID, emoji: emoji) }
     }
 
-    func approve(_ run: StudioRun) async {
-        await perform { try await client.approve(runID: run.id) }
+    func signInControl(_ approvalID: String, control: StudioSignInControl) async throws -> StudioSignInScreen {
+        try await client.signInControl(approvalID, control: control)
     }
+
+    func approvalPreview(_ approvalID: String) async throws -> StudioApprovalPreview {
+        try await client.approvalPreview(approvalID)
+    }
+
+    func decideReviewedApproval(_ approvalID: String, decision: String, reviewFingerprint: String?) async throws -> StudioApproval {
+        try await client.decideReviewedApproval(approvalID, decision: decision, reviewFingerprint: reviewFingerprint)
+    }
+
+    func refreshApprovalState() async { await refresh(silent: true) }
+
+    func fullApprovalReviewURL(threadID: String?) -> URL { client.fullApprovalReviewURL(threadID: threadID) }
 
     func cancel(_ run: StudioRun) async {
         await perform { try await client.cancel(runID: run.id) }
@@ -147,14 +234,15 @@ final class StudioStore: ObservableObject {
         intervalMinutes: Int,
         enabled: Bool,
         triggerType: String,
-        triggerConfig: StudioRoutineTriggerConfig
+        triggerConfig: StudioRoutineTriggerConfig,
+        schedule: StudioRoutineSchedule = .interval
     ) async -> StudioRoutineSaveResult? {
         do {
             errorMessage = nil
             let result = try await client.saveRoutine(
                 id: id, name: name, botID: botID, threadID: threadID, prompt: prompt,
                 intervalMinutes: intervalMinutes, enabled: enabled,
-                triggerType: triggerType, triggerConfig: triggerConfig
+                triggerType: triggerType, triggerConfig: triggerConfig, schedule: schedule
             )
             await refresh(silent: true)
             return result
@@ -175,6 +263,10 @@ final class StudioStore: ObservableObject {
             handle(error)
             return false
         }
+    }
+
+    func previewSchedule(_ schedule: StudioRoutineSchedule, intervalMinutes: Int, routineID: String?) async throws -> StudioSchedulePreview {
+        try await client.previewSchedule(schedule, intervalMinutes: intervalMinutes, routineID: routineID)
     }
 
     func rotateRoutineSecret(_ routine: StudioRoutine) async -> StudioRoutineSaveResult? {
@@ -556,6 +648,15 @@ final class StudioStore: ObservableObject {
         await refreshProviders()
     }
 
+    var needsProviderChoice: Bool {
+        !state.bots.isEmpty && state.bots.allSatisfy { ($0.providerInstanceId ?? "").isEmpty && ($0.model ?? "").isEmpty }
+    }
+
+    func chooseInitialProvider(providerInstanceID: String, model: String) async {
+        await perform { try await client.chooseInitialProvider(providerInstanceID: providerInstanceID, model: model) }
+        await refreshProviders()
+    }
+
     @discardableResult
     func saveBot(
         id: String? = nil,
@@ -611,6 +712,30 @@ final class StudioStore: ObservableObject {
         catch { workspaceFiles = []; handle(error) }
     }
 
+    func refreshArtifacts() async {
+        guard !isCheckingArtifacts else { return }
+        isCheckingArtifacts = true
+        errorMessage = nil
+        defer { isCheckingArtifacts = false }
+        do { artifacts = try await client.artifacts() }
+        catch { artifacts = []; handle(error) }
+    }
+
+    func openArtifact(_ artifact: StudioArtifact) async {
+        guard !isCheckingArtifacts else { return }
+        isCheckingArtifacts = true
+        errorMessage = nil
+        defer { isCheckingArtifacts = false }
+        do { artifactRevisions = try await client.artifactRevisions(artifact.id) }
+        catch { artifactRevisions = []; handle(error) }
+    }
+
+    func closeArtifact() { artifactRevisions = [] }
+
+    func previewURL(_ path: String) -> URL? {
+        URL(string: path, relativeTo: client.baseURL)
+    }
+
     func openWorkspaceFile(botID: String, path: String) async {
         guard !isCheckingWorkspace else { return }
         isCheckingWorkspace = true
@@ -641,7 +766,7 @@ final class StudioStore: ObservableObject {
     @discardableResult
     func startWorkflow(_ starter: StudioStarter, timeZone: String = TimeZone.current.identifier) async -> Bool {
         await chooseThread("team-room")
-        return await send(starter.prompt(timeZone: timeZone), targetBotID: nil)
+        return await send(starter.prompt(timeZone: timeZone), targetBotID: nil, expectedWorkKind: starter.expectedWorkKind)
     }
 
     func checkRunnerCare() async {
@@ -675,9 +800,10 @@ final class StudioStore: ObservableObject {
         } catch { handle(error) }
     }
 
-    func saveDraft(_ body: String) async {
+    func saveDraft(_ body: String, threadID: String? = nil) async {
+        let destination = threadID ?? selectedThreadID
         do {
-            _ = try await client.saveDraft(threadID: selectedThreadID, body: body)
+            _ = try await client.saveDraft(threadID: destination, body: body)
         } catch {
             if case StudioAPIError.unauthorized = error { handle(error) }
         }
@@ -717,20 +843,26 @@ final class StudioStore: ObservableObject {
     }
 
     func refresh(silent: Bool = false) async {
-        guard !refreshInProgress else { return }
+        guard !refreshInProgress else { refreshAgain = true; return }
         refreshInProgress = true
         if !silent { isLoading = state.threads.isEmpty }
         defer { refreshInProgress = false; isLoading = false }
-        do {
-            let next = try await client.state(threadID: selectedThreadID)
-            state = next
-            selectedThreadID = next.activeThreadId
-            isLive = true
-            errorMessage = nil
-        } catch {
-            isLive = false
-            handle(error)
-        }
+        repeat {
+            refreshAgain = false
+            let destination = selectedThreadID
+            do {
+                let next = try await client.state(threadID: destination)
+                guard destination == selectedThreadID else { refreshAgain = true; continue }
+                state = next
+                selectedThreadID = next.activeThreadId
+                isLive = true
+                errorMessage = nil
+            } catch {
+                guard destination == selectedThreadID else { refreshAgain = true; continue }
+                isLive = false
+                handle(error)
+            }
+        } while refreshAgain && !Task.isCancelled
     }
 
     private func perform(_ action: () async throws -> Void) async {
@@ -787,6 +919,9 @@ final class StudioStore: ObservableObject {
     }
 
     private func handle(_ error: Error) {
+        // Leaving a native settings page cancels its loading task. That is not
+        // a failed action and must not leak an error onto the next page.
+        if StudioAPIError.isCancelledRequest(error) { return }
         if case StudioAPIError.unauthorized = error { needsAuthentication = true }
         errorMessage = (error as? LocalizedError)?.errorDescription ?? "Something went wrong. Try again."
     }

@@ -6,72 +6,138 @@ struct DesktopTeammatesView: View {
     @ObservedObject var store: StudioStore
     @State private var editingBot: StudioBot?
     @State private var showingEditor = false
+    @State private var showingGroupEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "person.3.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Teammates").font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("Give each teammate a clear job, model, budget, and only the tools it needs.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("Your team").font(.system(size: 25, weight: .semibold))
+                    Text("People to help with your work.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button("New group", systemImage: "bubble.left.and.bubble.right") { showingGroupEditor = true }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .disabled(store.state.bots.isEmpty)
                 Button { editingBot = nil; showingEditor = true } label: { Label("New teammate", systemImage: "plus") }
-                    .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                    .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.regular)
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
+            .padding(.horizontal, 38).padding(.top, 32).padding(.bottom, 22).background(StudioPalette.paper)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
                     ForEach(store.state.bots) { bot in
                         HStack(spacing: 14) {
-                            DesktopMascotView(bot: bot, size: 58).frame(width: 69, height: 64)
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack(spacing: 8) {
-                                    Text(bot.name).font(.system(size: 16, weight: .bold, design: .rounded))
-                                    Text(bot.status.uppercased()).font(.system(size: 8.5, weight: .bold, design: .rounded))
-                                        .foregroundStyle(bot.status == "ready" ? DesktopTheme.green : DesktopTheme.purple)
-                                }
-                                Text(bot.role).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                                Text(bot.model ?? "Choose an AI model")
-                                    .font(.system(size: 9.5, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
-                                HStack(spacing: 10) {
-                                    Label(bot.browserEnabled == true ? "Browser" : "No browser", systemImage: "globe")
-                                    Label(bot.computerEnabled == true ? "Computer" : "No computer", systemImage: "terminal")
-                                    let budget = bot.weeklyTokenBudget ?? 0
-                                    Label(budget > 0 ? "\(budget.formatted()) / week" : "No token cap", systemImage: "gauge.with.dots.needle.33percent")
-                                }
-                                .font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
-                            }
-                            Spacer()
-                            Button("Edit") { editingBot = bot; showingEditor = true }.buttonStyle(.bordered)
-                            Button {
-                                Task { _ = await store.duplicateBot(bot.id) }
-                            } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
-                            .buttonStyle(.bordered)
+                            Button { editingBot = bot; showingEditor = true } label: {
+                                HStack(spacing: 16) {
+                                    DesktopMascotView(bot: bot, size: 46).frame(width: 48)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(bot.name).font(.system(size: 14, weight: .semibold))
+                                        Text(bot.role).font(.system(size: 12)).foregroundStyle(StudioPalette.muted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(StudioPalette.muted)
+                                }.contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                            Menu {
+                                Button("Duplicate teammate") { Task { _ = await store.duplicateBot(bot.id) } }
+                            } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize().help("Teammate actions")
                         }
-                        .controlSize(.small).padding(14)
-                        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.black.opacity(0.055)))
+                        .padding(.vertical, 22)
+                        .overlay(alignment: .bottom) { Rectangle().fill(StudioPalette.line).frame(height: 1) }
                     }
 
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                     Text("Duplicating creates an independent teammate with a separate conversation, workspace, browser profile, memory, skills, permissions, and future usage history.")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
-                .padding(20)
+                .padding(.horizontal, 38).padding(.vertical, 18)
             }
         }
-        .frame(width: 760, height: 650).background(DesktopTheme.paper)
+        .desktopPanelSize(width: 760, height: 650).background(DesktopTheme.paper)
         .task { await store.refreshProviders() }
+        .onAppear { if store.state.bots.isEmpty { showingEditor = true } }
         .sheet(isPresented: $showingEditor, onDismiss: { editingBot = nil }) {
             DesktopTeammateEditorView(store: store, bot: editingBot)
+        }
+        .sheet(isPresented: $showingGroupEditor) { DesktopGroupEditor(store: store) }
+    }
+}
+
+struct DesktopGroupEditor: View {
+    @ObservedObject var store: StudioStore
+    var thread: StudioThread? = nil
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = ""
+    @State private var selected = Set<String>()
+    @State private var saving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(thread == nil ? "New group conversation" : "Edit group").font(.title2.weight(.semibold))
+            Text("Bring teammates together around a project or a shared goal. Their existing tools and permissions stay unchanged.")
+                .font(.callout).foregroundStyle(.secondary)
+            TextField("Group name", text: $title).textFieldStyle(.plain)
+                .padding(12).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("Group name")
+            Text("Teammates · \(selected.count) of 6").font(.callout.weight(.medium))
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(store.state.bots) { bot in
+                        Button {
+                            if selected.contains(bot.id) { selected.remove(bot.id) } else { selected.insert(bot.id) }
+                        } label: {
+                            HStack(spacing: 10) {
+                                DesktopMascotView(bot: bot, size: 40).accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(bot.name).font(.body.weight(.medium))
+                                    Text(bot.role).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: selected.contains(bot.id) ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 19)).foregroundStyle(selected.contains(bot.id) ? StudioPalette.ink : StudioPalette.muted)
+                            }
+                            .padding(12)
+                            .background(selected.contains(bot.id) ? StudioPalette.surface : StudioPalette.paper,
+                                        in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(StudioPalette.line))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(bot.name), \(bot.role)")
+                        .accessibilityValue(selected.contains(bot.id) ? "Included" : "Not included")
+                        .accessibilityAddTraits(selected.contains(bot.id) ? .isSelected : [])
+                        .disabled(saving || (selected.count >= 6 && !selected.contains(bot.id)))
+                    }
+                }
+            }.frame(maxHeight: 280)
+            if let error = store.errorMessage {
+                Text(error).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered).keyboardShortcut(.cancelAction).disabled(saving)
+                Button(thread == nil ? "Create group" : "Save group") {
+                    saving = true
+                    Task {
+                        if await store.saveGroup(id: thread?.id, title: title, botIDs: Array(selected)) { dismiss() }
+                        saving = false
+                    }
+                }
+                .buttonStyle(.borderedProminent).tint(StudioPalette.accent)
+                .disabled(saving || StudioGroupInput(title: title, botIDs: Array(selected)) == nil)
+            }
+        }
+        .padding(28).frame(width: 490)
+        .background(StudioPalette.paper)
+        .buttonBorderShape(.capsule).controlSize(.large)
+        .onAppear {
+            title = thread?.title ?? ""
+            selected = Set(thread?.botIds ?? [])
         }
     }
 }
@@ -91,6 +157,7 @@ private struct DesktopTeammateEditorView: View {
     @State private var browserEnabled: Bool
     @State private var weeklyBudget: Int
     @State private var saving = false
+    @State private var showingProviders = false
 
     private let mascots = [("nova", "Orbit"), ("blob", "Blob"), ("sprout", "Sprout"), ("orbit", "Satellite"), ("pebble", "Pebble"), ("sunny", "Sunny")]
     private let colors = ["#6D5BD8", "#E75C83", "#36AA82", "#E18A45", "#3478C8", "#A85BB7"]
@@ -105,8 +172,8 @@ private struct DesktopTeammateEditorView: View {
         _colorHex = State(initialValue: bot?.color ?? "#6D5BD8")
         _providerID = State(initialValue: bot?.providerInstanceId ?? "")
         _model = State(initialValue: bot?.model ?? "")
-        _computerEnabled = State(initialValue: bot?.computerEnabled ?? true)
-        _browserEnabled = State(initialValue: bot?.browserEnabled ?? true)
+        _computerEnabled = State(initialValue: bot?.computerEnabled ?? false)
+        _browserEnabled = State(initialValue: bot?.browserEnabled ?? false)
         _weeklyBudget = State(initialValue: bot?.weeklyTokenBudget ?? 0)
     }
 
@@ -126,13 +193,13 @@ private struct DesktopTeammateEditorView: View {
                 DesktopMascotView(bot: previewBot, size: 54).frame(width: 64, height: 60)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(bot == nil ? "Create a teammate" : "Edit \(bot?.name ?? "teammate")")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .default))
                     Text("Personality is guidance. Permissions and token limits are enforced separately.")
-                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            .padding(20).background(.ultraThinMaterial)
+            .padding(20).background(StudioPalette.paper)
             Divider().opacity(0.55)
 
             ScrollView {
@@ -142,9 +209,9 @@ private struct DesktopTeammateEditorView: View {
                         editorField("Role") { TextField("Researcher", text: $role).textFieldStyle(.roundedBorder) }
                     }
                     editorField("How should this teammate work?") {
-                        TextEditor(text: $instructions).font(.system(size: 12.5, design: .rounded)).frame(height: 105)
-                            .padding(7).background(.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(.black.opacity(0.10)))
+                        TextEditor(text: $instructions).font(.system(size: 12.5, design: .default)).frame(height: 105)
+                            .padding(7).background(StudioPalette.paper, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(StudioPalette.line))
                     }
 
                     HStack(spacing: 12) {
@@ -169,15 +236,19 @@ private struct DesktopTeammateEditorView: View {
                     HStack(spacing: 12) {
                         editorField("AI connection") {
                             Picker("AI connection", selection: $providerID) {
+                                Text("Choose a provider").tag("")
                                 ForEach(providers) { Text($0.name).tag($0.id) }
-                            }.labelsHidden().onChange(of: providerID) { _, _ in chooseFirstModel() }
+                            }.labelsHidden().onChange(of: providerID) { _, _ in model = "" }
                         }
                         editorField("Model") {
                             Picker("Model", selection: $model) {
+                                Text("Choose a model").tag("")
                                 ForEach(models, id: \.self) { Text($0).tag($0) }
                             }.labelsHidden()
                         }
                     }
+                    Button(providers.isEmpty ? "Connect your AI to get started" : "Manage AI connections") { showingProviders = true }
+                        .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.secondary)
 
                     HStack(spacing: 20) {
                         Toggle("Private computer", isOn: $computerEnabled).toggleStyle(.switch)
@@ -187,13 +258,13 @@ private struct DesktopTeammateEditorView: View {
                         HStack {
                             TextField("0", value: $weeklyBudget, format: .number).textFieldStyle(.roundedBorder).frame(width: 150)
                             Text(weeklyBudget <= 0 ? "No per-teammate cap" : "Stops new work after \(max(0, weeklyBudget).formatted()) tokens this week")
-                                .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                                .font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary)
                         }
                     }
 
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                 }.padding(20)
             }
@@ -232,9 +303,8 @@ private struct DesktopTeammateEditorView: View {
         .frame(width: 690, height: 710).background(DesktopTheme.paper)
         .task {
             await store.refreshProviders()
-            if providerID.isEmpty { providerID = providers.first?.id ?? "" }
-            if model.isEmpty { chooseFirstModel() }
         }
+        .sheet(isPresented: $showingProviders) { DesktopProvidersView(store: store).environment(\.desktopSettingsEmbedded, false) }
     }
 
     private var valid: Bool {
@@ -244,15 +314,9 @@ private struct DesktopTeammateEditorView: View {
         !providerID.isEmpty && !model.isEmpty && weeklyBudget >= 0
     }
 
-    private func chooseFirstModel() {
-        let provider = providers.first(where: { $0.id == providerID })
-        let available = provider?.models.flatMap { $0.isEmpty ? nil : $0 } ?? provider?.defaultModel.map { [$0] } ?? []
-        if !available.contains(model) { model = available.first ?? "" }
-    }
-
     private func editorField<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 11, weight: .semibold, design: .rounded))
+            Text(title).font(.system(size: 11, weight: .semibold, design: .default))
             content()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }

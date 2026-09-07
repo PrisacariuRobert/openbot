@@ -26,8 +26,8 @@ enum DesktopNotifications {
         let content = UNMutableNotificationContent()
         content.title = "OpenBot needs your attention"
         content.body = count == 1
-            ? "One approval or interrupted action is waiting for you."
-            : "\(count) approvals or interrupted actions are waiting for you."
+            ? "One item needs your attention. Open Activity to review it."
+            : "\(count) items need your attention. Open Activity to review them."
         content.sound = .default
         let request = UNNotificationRequest(identifier: "openbot-attention", content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)

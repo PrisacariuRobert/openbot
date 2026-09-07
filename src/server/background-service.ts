@@ -26,6 +26,7 @@ export function backgroundServicePlist(input: { rootDir: string; dataDir: string
     <key>OPENBOT_BACKGROUND_SERVICE</key><string>1</string>
     <key>OPENBOT_HOST</key><string>0.0.0.0</string>
     <key>OPENBOT_PORT</key><string>${input.port}</string>
+    <key>OPENBOT_DATA_DIR</key><string>${xml(input.dataDir)}</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -61,13 +62,15 @@ export class BackgroundServiceManager {
     return {
       backgroundService: "installed",
       backgroundServiceDetail: active && health?.mode === "background"
-        ? "Protected in the background and ready after login or an unexpected stop."
+        ? "Background protection is installed and the studio is running. This Mac must stay awake."
         : "Background protection is installed and will take over if this session stops.",
     };
   }
 
   async install(): Promise<void> {
     if (process.platform !== "darwin") throw new Error("Background launch is currently available on macOS.");
+    // Re-enabling from a service-owned process must never boot out itself.
+    if (process.env.OPENBOT_BACKGROUND_SERVICE === "1" && existsSync(this.plistPath)) return;
     const launchAgents = path.dirname(this.plistPath), logDir = path.join(this.input.dataDir, "logs");
     mkdirSync(launchAgents, { recursive: true, mode: 0o700 });
     mkdirSync(logDir, { recursive: true, mode: 0o700 });

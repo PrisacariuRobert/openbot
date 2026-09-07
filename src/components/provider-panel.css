@@ -1,7 +1,7 @@
 .provider-settings {
-  --ai-text: #29272f;
-  --ai-muted: #706d77;
-  --ai-line: #e7e5eb;
+  --ai-text: var(--ink, #282828);
+  --ai-muted: var(--secondary, #6e6e6e);
+  --ai-line: var(--line, #e6e6e6);
   color: var(--ai-text);
   display: grid;
   gap: 24px;
@@ -16,7 +16,7 @@
 }
 .provider-settings
   :is(button, a, input, select, textarea, summary):focus-visible {
-  outline: 3px solid #9587e9;
+  outline: 3px solid #919191;
   outline-offset: 3px;
 }
 .provider-settings button:disabled {
@@ -54,7 +54,7 @@
   gap: 4px;
   border: 1px solid var(--ai-line);
   border-radius: 13px;
-  background: #eeedf1;
+  background: var(--surface-muted, #f4f4f4);
 }
 .ai-mode-switch button {
   flex: 1;
@@ -70,15 +70,15 @@
   cursor: pointer;
 }
 .ai-mode-switch button[aria-pressed="true"] {
-  background: white;
+  background: var(--surface, white);
   color: var(--ai-text);
-  box-shadow: 0 1px 3px #20173510;
+  box-shadow: 0 1px 3px #1b1b1b10;
 }
 .ai-list {
   border: 1px solid var(--ai-line);
   border-radius: 16px;
   overflow: hidden;
-  background: white;
+  background: var(--surface, white);
 }
 .ai-account {
   display: flex;
@@ -96,16 +96,16 @@
   height: 36px;
   flex: none;
   border-radius: 10px;
-  color: #36333e;
-  background: #f2f1f5;
+  color: var(--secondary, #525252);
+  background: var(--surface-muted, #f4f4f4);
 }
 .ai-brand svg {
   width: 21px;
   height: 21px;
 }
 .ai-brand-claude {
-  color: #b65a3a;
-  background: #fff2ec;
+  color: var(--secondary, #525252);
+  background: var(--surface-muted, #f4f4f4);
 }
 .ai-account-copy {
   min-width: 0;
@@ -144,7 +144,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #26734f;
+  color: var(--secondary, #525252);
   white-space: nowrap;
 }
 .ai-action {
@@ -152,15 +152,15 @@
   padding: 8px 12px;
   border: 1px solid var(--ai-line);
   border-radius: 10px;
-  background: #fff;
-  color: #5341ab;
+  background: var(--surface, #fff);
+  color: var(--secondary, #525252);
   font-size: 12px !important;
   font-weight: 650 !important;
   cursor: pointer;
 }
 .ai-primary {
-  background: #6752cf;
-  border-color: #6752cf;
+  background: #5f5f5f;
+  border-color: #5f5f5f;
   color: white;
 }
 .ai-more {
@@ -181,9 +181,9 @@
   gap: 10px;
   align-items: flex-start;
   padding: 14px 16px;
-  border: 1px solid #d5e5dc;
+  border: 1px solid var(--line-strong, #ddd);
   border-radius: 12px;
-  background: #f3f8f5;
+  background: var(--surface-muted, #f4f4f4);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -192,21 +192,21 @@
   margin-top: 2px;
 }
 .ai-error {
-  color: #933a32;
-  border-color: #edd4d0;
-  background: #fcf4f2;
+  color: var(--secondary, #525252);
+  border-color: var(--line, #ddd);
+  background: var(--surface-muted, #f4f4f4);
 }
 .ai-login {
   display: grid;
   margin-top: 14px;
-  border-color: #e0daf3;
-  background: #f7f5fd;
+  border-color: var(--line, #ddd);
+  background: var(--surface-muted, #f4f4f4);
 }
 .ai-login a {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #5947b0;
+  color: var(--secondary, #525252);
 }
 .ai-login form {
   display: flex;
@@ -225,10 +225,10 @@
   width: 100%;
   min-height: 48px;
   padding: 12px;
-  border: 1px dashed #c6bedf;
+  border: 1px dashed #c2c2c2;
   border-radius: 12px;
-  color: #5947b0;
-  background: #f8f7fc;
+  color: var(--secondary, #525252);
+  background: var(--surface-muted, #f4f4f4);
   cursor: pointer;
 }
 .ai-list + .ai-add,
@@ -241,7 +241,7 @@
   padding: 20px;
   border: 1px solid var(--ai-line);
   border-radius: 16px;
-  background: white;
+  background: var(--surface, white);
 }
 .ai-form h4 {
   font-size: 16px;
@@ -250,7 +250,7 @@
   display: grid;
   gap: 6px;
   min-width: 0;
-  color: #5d5866;
+  color: var(--secondary, #525252);
   font-size: 12px;
   font-weight: 600;
 }
@@ -261,10 +261,10 @@
   min-width: 0;
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid #dad6e2;
+  border: 1px solid var(--line-strong, #ddd);
   border-radius: 10px;
   color: var(--ai-text);
-  background: white;
+  background: var(--surface, white);
   font-size: 14px;
   font-weight: 400;
 }

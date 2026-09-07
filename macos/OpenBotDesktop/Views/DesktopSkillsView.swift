@@ -12,15 +12,16 @@ struct DesktopSkillsView: View {
     @State private var importBotID = ""
     @State private var showingImporter = false
     @State private var showingTeach = false
+    @State private var showingIncluded = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Image(systemName: "wand.and.stars").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Skill Library").font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text("Skill Library").font(.system(size: 17, weight: .bold, design: .default))
                     Text("Portable, versioned ways of doing repeatable work.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { showingTeach = true } label: { Label("Teach", systemImage: "eye.fill") }
@@ -31,40 +32,49 @@ struct DesktopSkillsView: View {
                     }
                 } label: { Label("Import", systemImage: "square.and.arrow.down") }
                 .buttonStyle(.bordered).controlSize(.small)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 24).background(StudioPalette.paper)
             Divider().opacity(0.55)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    Button { showingIncluded = true } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Ready-to-use skills", systemImage: "books.vertical")
+                                .font(.headline)
+                            Text("Meeting actions, weekly planning, research and more. Already available to your teammates.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(.bordered)
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
-                    Text("Saved skills").font(.system(size: 14, weight: .bold, design: .rounded))
+                    Text("Saved skills").font(.system(size: 14, weight: .bold, design: .default))
                     if store.skills.isEmpty && !store.isCheckingSkills {
                         Text("No saved skills yet. Install a transparent starter below or import an OpenBot skill package.")
-                            .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
+                            .font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary)
                     }
                     ForEach(store.skills) { skill in skillCard(skill) }
 
                     Divider().padding(.vertical, 3)
-                    Text("Starter skills").font(.system(size: 14, weight: .bold, design: .rounded))
+                    Text("Starter skills").font(.system(size: 14, weight: .bold, design: .default))
                     ForEach(store.skillTemplates) { template in templateCard(template) }
 
                     Text("Imported packages are size-limited, integrity-checked, and scanned by the runner. Assignment copies the skill instructions, never the original teammate's messages, memory, credentials, or browser profile.")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 .padding(20)
             }
         }
-        .frame(width: 780, height: 700).background(DesktopTheme.paper)
+        .desktopPanelSize(width: 780, height: 700).background(DesktopTheme.paper)
         .task { await store.refreshSkills() }
         .sheet(item: $editingSkill) { skill in DesktopSkillEditView(store: store, skill: skill) }
         .sheet(item: $historySkill) { skill in DesktopSkillHistoryView(store: store, skill: skill) }
         .sheet(item: $selectedTemplate) { template in DesktopSkillInstallView(store: store, template: template) }
-        .sheet(isPresented: $showingTeach) { DesktopTeachView(store: store) }
+        .sheet(isPresented: $showingTeach) { DesktopTeachView(store: store).environment(\.desktopSettingsEmbedded, false) }
+        .sheet(isPresented: $showingIncluded) { OpenExtensionsView(store: store, section: 1) }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let url = urls.first, !importBotID.isEmpty else { return }
             Task { _ = await store.importSkill(fileURL: url, botID: importBotID) }
@@ -92,12 +102,12 @@ struct DesktopSkillsView: View {
                 DesktopMascotView(bot: store.state.bots.first(where: { $0.id == skill.botId }) ?? fallbackBot(skill), size: 38).frame(width: 42, height: 42)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 7) {
-                        Text(skill.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                        Text("v\(skill.version)").font(.system(size: 9, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.purple)
+                        Text(skill.name).font(.system(size: 14, weight: .bold, design: .default))
+                        Text("v\(skill.version)").font(.system(size: 9, weight: .bold, design: .default)).foregroundStyle(DesktopTheme.purple)
                     }
                     Text("/\(skill.skillSlug) · \(skill.botName) · \(skill.stepCount) steps")
                         .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                    Text(skill.description).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                    Text(skill.description).font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer()
                 Menu {
@@ -125,22 +135,22 @@ struct DesktopSkillsView: View {
                 }
             }
         }
-        .padding(14).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+        .padding(14).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(StudioPalette.line))
     }
 
     private func templateCard(_ template: StudioSkillTemplate) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "sparkles.rectangle.stack.fill").font(.system(size: 18)).foregroundStyle(DesktopTheme.purple).frame(width: 38, height: 38)
             VStack(alignment: .leading, spacing: 3) {
-                Text(template.name).font(.system(size: 13.5, weight: .bold, design: .rounded))
-                Text(template.description).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                Text(template.name).font(.system(size: 13.5, weight: .bold, design: .default))
+                Text(template.description).font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer()
             Button("Install") { selectedTemplate = template }.buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small)
         }
-        .padding(13).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.black.opacity(0.05)))
+        .padding(13).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(StudioPalette.line))
     }
 
     private func fallbackBot(_ skill: StudioSkill) -> StudioBot {
@@ -161,14 +171,14 @@ private struct DesktopSkillHistoryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "clock.arrow.circlepath").foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(skill.name) history").font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text("\(skill.name) history").font(.system(size: 17, weight: .bold, design: .default))
                     Text("Restoring creates a new version, so the current setup is not lost.")
-                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 24).background(StudioPalette.paper)
             Divider().opacity(0.55)
 
             if loading {
@@ -181,23 +191,23 @@ private struct DesktopSkillHistoryView: View {
                         ForEach(versions) { version in
                             HStack(alignment: .top, spacing: 12) {
                                 Text("v\(version.version)")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.purple)
+                                    .font(.system(size: 11, weight: .bold, design: .default)).foregroundStyle(DesktopTheme.purple)
                                     .frame(width: 42).padding(.vertical, 5).background(DesktopTheme.purple.opacity(0.09), in: Capsule())
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(version.name).font(.system(size: 13, weight: .bold, design: .rounded))
+                                    Text(version.name).font(.system(size: 13, weight: .bold, design: .default))
                                     Text("\(version.stepCount) steps · \(formatted(version.createdAt))")
-                                        .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.secondary)
-                                    Text(version.description).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                        .font(.system(size: 9.5, design: .default)).foregroundStyle(.secondary)
+                                    Text(version.description).font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 Spacer()
                                 if version.version == skill.version {
-                                    Text("Current").font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(DesktopTheme.green)
+                                    Text("Current").font(.system(size: 10, weight: .semibold, design: .default)).foregroundStyle(DesktopTheme.green)
                                 } else {
                                     Button("Restore") { pendingRestore = version }.buttonStyle(.bordered).controlSize(.small)
                                 }
                             }
-                            .padding(13).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(.black.opacity(0.05)))
+                            .padding(13).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(StudioPalette.line))
                         }
                     }
                     .padding(18)
@@ -247,8 +257,8 @@ private struct DesktopSkillInstallView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            Text("Install \(template.name)").font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(template.description).font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
+            Text("Install \(template.name)").font(.system(size: 20, weight: .bold, design: .default))
+            Text(template.description).font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary)
             Picker("Teammate", selection: $botID) {
                 ForEach(store.state.bots) { Text("\($0.name) · \($0.role)").tag($0.id) }
             }
@@ -276,14 +286,14 @@ private struct DesktopSkillEditView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Edit skill").font(.system(size: 20, weight: .bold, design: .rounded))
+            Text("Edit skill").font(.system(size: 20, weight: .bold, design: .default))
             TextField("Name", text: $name).textFieldStyle(.roundedBorder)
             TextField("What this skill is for", text: $description).textFieldStyle(.roundedBorder)
             TextField("https://starting-page.example", text: $startURL).textFieldStyle(.roundedBorder)
-            Text("Instructions").font(.system(size: 11, weight: .semibold, design: .rounded))
-            TextEditor(text: $instructions).font(.system(size: 12, design: .rounded)).frame(minHeight: 180)
-                .padding(7).background(.white, in: RoundedRectangle(cornerRadius: 9)).overlay(RoundedRectangle(cornerRadius: 9).stroke(.black.opacity(0.10)))
-            Text("Saving creates a new retained version.").font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+            Text("Instructions").font(.system(size: 11, weight: .semibold, design: .default))
+            TextEditor(text: $instructions).font(.system(size: 12, design: .default)).frame(minHeight: 180)
+                .padding(7).background(StudioPalette.paper, in: RoundedRectangle(cornerRadius: 9)).overlay(RoundedRectangle(cornerRadius: 9).stroke(StudioPalette.line))
+            Text("Saving creates a new retained version.").font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary)
             HStack { Spacer(); Button("Cancel") { dismiss() }; Button("Save new version") { Task { if await store.updateSkill(skill.id, name: cleanName, description: cleanDescription, instructions: cleanInstructions, startURL: cleanURL) { dismiss() } } }.buttonStyle(.borderedProminent).tint(DesktopTheme.purple).disabled(!canSave) }
         }
         .padding(22).frame(width: 600, height: 520).background(DesktopTheme.paper)

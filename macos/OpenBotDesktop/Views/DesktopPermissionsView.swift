@@ -3,77 +3,96 @@ import SwiftUI
 struct DesktopPermissionsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: StudioStore
+    @State private var expandedBotID: String?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "checkmark.shield.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Access & capabilities").font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("Turn on only the tools each teammate needs.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("Permissions").font(.system(size: 20, weight: .semibold))
+                    Text("You choose what your team can use.")
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
-
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 24).background(StudioPalette.paper)
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("On this Mac").font(.system(size: 13, weight: .semibold))
                         Toggle(isOn: Binding(
                             get: { store.state.settings?.macAccessEnabled ?? false },
                             set: { enabled in Task { await store.setMacAccessEnabled(enabled) } }
                         )) {
-                            Label("Files and visible apps on this Mac", systemImage: "desktopcomputer")
-                                .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Files & apps").font(.system(size: 14, weight: .medium))
+                                Text("Allow the team to use approved folders and Mac apps.")
+                                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .toggleStyle(.switch)
-                        Text("This is a studio-wide gate. OpenBot can use only allowed home folders and visible Accessibility controls; destructive or external actions still require approval.")
-                            .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                        .toggleStyle(.switch).controlSize(.small)
+                        Text("Applies to every teammate. macOS may ask for permission. Sending, deleting and other sensitive actions still wait for your approval.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(14).background(DesktopTheme.purple.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
+                    Divider()
+                    VStack(alignment: .leading, spacing: 0) {
+                    Text("Private tools by teammate").font(.system(size: 13, weight: .semibold)).padding(.bottom, 10)
                     ForEach(store.state.bots) { bot in
-                        VStack(alignment: .leading, spacing: 11) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Button { expandedBotID = expandedBotID == bot.id ? nil : bot.id } label: {
                             HStack(spacing: 10) {
                                 DesktopMascotView(bot: bot, size: 35).frame(width: 39, height: 39)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(bot.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                                    Text(bot.role).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(bot.name).font(.system(size: 14, weight: .medium))
+                                    Text(toolSummary(bot)).font(.system(size: 12)).foregroundStyle(.secondary)
                                 }
+                                Spacer(minLength: 16)
+                                Image(systemName: expandedBotID == bot.id ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                             }
-                            Toggle("Private terminal and project tools", isOn: Binding(
+                            .padding(.vertical, 16).contentShape(Rectangle())
+                            }.buttonStyle(.plain).accessibilityLabel("Permissions for \(bot.name)")
+                            if expandedBotID == bot.id {
+                            VStack(alignment: .leading, spacing: 18) {
+                            Toggle("Terminal & projects", isOn: Binding(
                                 get: { bot.computerEnabled ?? false },
                                 set: { enabled in Task { await store.setBotCapabilities(bot, computerEnabled: enabled) } }
                             ))
-                            Toggle("Private browser profile", isOn: Binding(
+                            Toggle("Private browser", isOn: Binding(
                                 get: { bot.browserEnabled ?? false },
                                 set: { enabled in Task { await store.setBotCapabilities(bot, browserEnabled: enabled) } }
                             ))
-                            HStack(spacing: 6) {
-                                Image(systemName: store.state.settings?.macAccessEnabled == true ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(store.state.settings?.macAccessEnabled == true ? DesktopTheme.green : .secondary)
-                                Text(store.state.settings?.macAccessEnabled == true ? "Mac access follows the studio-wide gate" : "Mac files and apps are off for everyone")
+                            Text("A separate workspace and browser for \(bot.name). You grant access to individual code projects in Code projects.")
+                                .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            }.font(.system(size: 13)).toggleStyle(.switch).controlSize(.small)
+                                .padding(.leading, 49).padding(.bottom, 20)
                             }
-                            .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                            Divider()
                         }
-                        .toggleStyle(.switch)
-                        .padding(14).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+                    }
+                    if store.state.bots.isEmpty {
+                        Text("Create a teammate to choose their private tools.").font(.callout).foregroundStyle(.secondary).padding(.vertical, 16)
+                    }
                     }
 
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
-                    Text("Code-project access is managed separately so a teammate can use a private computer without automatically receiving every repository.")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                 }
-                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 32).padding(.bottom, 32)
             }
         }
-        .frame(width: 680, height: 650).background(DesktopTheme.paper)
+        .desktopPanelSize(width: 680, height: 650).background(DesktopTheme.paper)
+    }
+
+    private func toolSummary(_ bot: StudioBot) -> String {
+        switch (bot.computerEnabled == true, bot.browserEnabled == true) {
+        case (true, true): return "Terminal, projects and browser"
+        case (true, false): return "Terminal and projects"
+        case (false, true): return "Browser only"
+        default: return "Private tools are off"
+        }
     }
 }

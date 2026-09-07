@@ -1,6 +1,50 @@
 # OpenBot Milestones
 
+## Locked-host continuation — checked saved skills
+
+Added real supervised skill checks with explicit expected outcomes and owner review, two distinct input identities, exact revision/setup and account-generation binding, expiry, all routine enable/dispatch gates and queued-job rechecks. Web and native Mac/iPhone controls share the owner API. The teaching panel also handles host outages without unhandled polling errors or retrying a check. [Evidence and open boundaries](QA_WORKFLOW_CHECKS.md). This closes the explicit `/skill` scheduling enforcement slice, not all of C or the A–F plan.
+
+## 0.37 continuation — reusable workflows and safer continuity
+
+Implemented a shared six-recipe library with real safe-example checks and strict settings-only round-trips; protected, expiring, source-attributed private memory; opt-in deduplicated in-app suggestion digests; and a shared teaching/task browser profile with private-field placeholders. Browser experiment acceptance now covers real DOM/keyboard/label invariants, an improvable fixture, unchanged input and a faster broken candidate. [Verification and open A–F gates](QA_0.37.md). These changes do not establish real-account reference-workflow success, universal app control, two-provider parity or public release readiness.
+
+## 0.36 continuation — connected work and evidence
+
+Implemented scoped multi-app morning/weekly briefs, owner-approved local follow-up tracking, a bounded MCP OAuth/public-registration subset, explicit provider-usage receipts and exact-commit command experiments. Validation: 306 server/shared tests, production desktop/390px flows, native Mac/iPhone simulator checks, real Docker repair checks and four live Spark 1.3 fixture workflows. [Detailed evidence, operational caveat and remaining A–F gates](QA_0.36.md). These slices do not mark the complete competitive plan or public distribution ready.
+
 Historical milestones below were implemented in the repository. The current milestone was verified on September 5, 2026; older verification dates remain attached to their original evidence.
+
+## M38 — Packaged Mac startup and shared job budgets
+
+Hermes-inspired extension follow-up: implemented real Streamable HTTP MCP connections with host-side tokens, explicit per-teammate grants, schema/access rechecks, bounded source receipts and uncertain-write recovery. Reviewed text-only community skills include explicit references and pinned content; unsupported runtime policies/scripts block import. Private memory can be corrected, searched or removed without silently resuming stale sessions. Native Mac/iPhone and web setup controls share the same API. Live Spark evaluation found and fixed tool-discovery search being mistaken for absent access. [Checks, observed failures and remaining gaps](QA_OPEN_EXTENSIONS.md). This closes a bounded interoperability gap, not the entire marketplace or competitor gap.
+
+Checked-outcome follow-up: exact decimal CSV summaries, non-overwriting XLSX export, and current-source attachment delivery to private consultants. Real Spark 1.3 evaluation uncovered a false approval prompt and a stale-source consultation bug; both now have regression coverage. [Evidence and explicit remaining limits](QA_CHECKED_OUTCOMES.md). Outcome checks take priority over a self-reported “finished” message.
+
+Fresh-research follow-up: removed automatic provider/model assignment across fresh web/Mac/iPhone setup; protected existing choices; added a real fresh-browser flow and dispatch/restart tests. Corrected spreadsheet previews that silently lost coverage or cell positions. Two free models passed four live source-artifact/private-consultation workflows, with slow consultation explicitly recorded. [Evidence](QA_PROVIDER_CHOICE.md). This closes specific defects, not all competitor/release gaps.
+
+General app-reading follow-up: bounded Accessibility text, encrypted persistent source receipts, authenticated Markdown download, permission/cancellation rechecks and a per-run read cap. Script/compiler fixtures cover text/cells, recognized protected fields and unavailable windows. Real arbitrary-app verification remains blocked by the locked Mac. [Updated competitor assessment](COMPETITOR_RECHECK_2026-09-05.md) and [plugin interoperability](PLUGIN_INTEROPERABILITY.md) keep shipped work separate from unimplemented compatibility.
+
+Functional follow-up: bounded Mac Mail/Calendar fallback, source provenance, access-aware starter selection and native/web source gates are implemented. See [the fallback test record](QA_MAC_FALLBACK.md). OS-consent/live personal-app verification is blocked while the Mac is locked; this milestone does not claim that check passed.
+
+Status: owner-operated 0.35.0 development beta; see the evidence record for completed checks
+
+- Report starters across web/Mac/iPhone require a saved matching report; one bounded repair cannot silently become an unverified success
+- Meeting Prep reads bounded event/mail/Drive context with explicit gaps and candidate-relevance limits
+- Actual OpenCode transport checks report-only and ordinary-agent permission filtering; internal tool tokens are scoped per teammate/run
+- Real JavaScript and Python Docker checks fail before and pass after implementation-only fixes using disposable check views
+- Packaging includes OpenCode and Node with version-matched licenses; model accounts remain user-owned
+
+- The macOS release package embeds its own Node executable, production UI, server, dependencies, skills, and runner launcher
+- Local startup reuses a healthy studio or launches the bundled child runner; remote connections do not start local services
+- A fresh data home uses Application Support; existing configured service homes are preserved and unknown/missing locations fail closed
+- No automatic data move, service replacement, runtime rollback, or locked-login recovery is claimed
+- Coordinator, nested consultations, and steered follow-ups share a persisted usage total; over-budget families stop without stopping unrelated work
+- The LaunchAgent receives the exact data home explicitly and keeps shell-free arguments, private logs, foreground handoff, process-group termination, and powered-on/awake limits
+- A deterministic packaging command embeds the runner into any built `OpenBot.app`, re-signs the complete bundle, and verifies the resulting signature
+
+Verification: behavior tests cover shared usage, cancellation/approval cleanup, restart and steering continuity; native unit tests cover existing/fresh data-home selection and rejection. Exact build, package, runtime and regression results are recorded in [QA_0.35](QA_0.35.md). No migration was run on the owner's studio.
+
+Remaining: Developer ID signing, hardened runtime, notarization, Sparkle or another signed update channel, clean second-Mac Gatekeeper/onboarding proof, Windows packaging, powered-off local execution, and repeated real-model competitor acceptance are not claimed.
 
 ## M37 — Native macOS studio
 
@@ -573,3 +617,6 @@ Status: complete in source for the owner-operated 0.28.0 release
 - Third-party executable connector installation remains disabled until signed provenance, dependency isolation, network allowlists, permission diffs, and update/revocation behavior are implemented
 
 Verification: 113 automated tests cover provider signatures, replay-window and loop prevention, reaction/comment filters, encrypted secrets, private-address rotation, manifest validation, and natural-routine contracts alongside every earlier product boundary. TypeScript, production build, release/native checks, signed live-shaped Slack/Notion delivery, duplicate replay, and responsive 1280×800/390×844 visual QA pass. Real Slack/Notion account consent and publicly reachable provider delivery remain owner-environment checks.
+## Included-methods delivery — 5 September 2026
+
+Implemented and verified: default skill catalog across clients, current-task method discovery, durable opt-outs, pinned upstream credits, local code-security advisory subset and signed physical-iPhone personal preview installation. See [the acceptance record](QA_INCLUDED_SKILLS.md) for 248 passing tests, two live Spark outcomes, the discovery failure fixed during testing and the phone tests still awaiting the owner. This is not an all-plugins or all-gaps-closed milestone.

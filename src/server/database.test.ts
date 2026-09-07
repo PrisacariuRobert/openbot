@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { connectedAppsText, prepareWorkspace } from "./workspace.js";
 
 test("seeds persistent teammates and creates a routable task", () => {
@@ -15,7 +15,8 @@ test("seeds persistent teammates and creates a routable task", () => {
     const state = db.getState("team-room");
     assert.deepEqual(state.bots.map((bot) => bot.name), ["Nova", "Pixel", "Scout"]);
     assert.equal(state.activeThreadId, "team-room");
-    assert.equal(state.bots[0]?.model, "opencode/muse-spark-1.2-contributor-free");
+    assert.equal(state.bots[0]?.model, "");
+    assert.equal(state.bots[0]?.providerInstanceId, null);
     assert.equal(state.settings.macAccessEnabled, false);
     assert.equal(state.bots[0]?.macAccessEnabled, false);
     assert.equal(db.updateStudioSettings({ macAccessEnabled: true }).macAccessEnabled, true);
@@ -477,6 +478,35 @@ test("stores provider runtimes and bounded teammate signals", () => {
   }
 });
 
+test("lists live delegations with consultants and signals", () => {  const root = mkdtempSync(path.join(tmpdir(), "openbot-delegations-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.deepEqual(db.listDelegations(), []);
+    const parent = db.createRun({ threadId: "team-room", botId: "nova", prompt: "Coordinate this", status: "queued" });
+    const child = db.createRun({ threadId: "team-room", botId: "pixel", prompt: "Private handoff from Nova: Draw the chart", status: "running", parentRunId: parent.id });
+    db.addAgentMessage({ threadId: "team-room", fromBotId: "nova", toBotId: "pixel", body: "Draw the chart", kind: "handoff", expectsReply: true, runId: parent.id, hopCount: 1, dedupeKey: "delegation-signal" });
+    db.markRunConsultationPending(parent.id);
+    db.pauseRunForConsultation(parent.id);
+    const delegations = db.listDelegations();
+    assert.equal(delegations.length, 1);
+    const delegation = delegations[0]!;
+    assert.equal(delegation.runId, parent.id);
+    assert.equal(delegation.botName, "Nova");
+    assert.equal(delegation.request, "Coordinate this");
+    assert.equal(delegation.consultants.length, 1);
+    assert.equal(delegation.consultants[0]!.botName, "Pixel");
+    assert.equal(delegation.consultants[0]!.status, "running");
+    assert.equal(delegation.signals.length, 1);
+    assert.equal(delegation.signals[0]!.kind, "handoff");
+    db.updateRun(child.id, { status: "completed", finishedAt: new Date().toISOString() });
+    db.resumeRunAfterConsultation(parent.id, "Give one combined answer");
+    assert.deepEqual(db.listDelegations(), []);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("keeps uploaded files private until they are claimed by a message", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-attachment-test-"));
   try {
@@ -555,6 +585,122 @@ test("encrypts reusable OAuth connectors and revokes stale model capabilities", 
     db.close();
     const stored = readFileSync(path.join(root, ".openbot", "openbot.sqlite"));
     for (const secret of ["slack-secret-private", "slack-bot-private", "slack-user-private", "notion-secret-private", "notion-token-private", "slack-signing-secret-private", "notion-verification-token-private", slackEvents.pathToken, notionEvents.pathToken]) assert.equal(stored.includes(Buffer.from(secret)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("indexes artifacts with revision history, newest first", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-artifacts-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const run = db.createRun({ threadId: "bot-pixel", botId: "pixel", prompt: "Draft the brief", status: "completed" });
+    const message = db.addMessage({ threadId: "bot-pixel", senderType: "bot", senderId: "pixel", body: "Here is the brief.", runId: run.id });
+    const brief = (revision: number, name: string) => {
+      const id = `artifact-v${revision}`, directory = path.join(db.attachmentsDir, id), storagePath = path.join(directory, name);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(storagePath, `# Launch brief v${revision}\n`);
+      return db.createAttachment({ threadId: "bot-pixel", messageId: message.id, name, mime: "text/markdown", size: 20, storagePath, source: "artifact", artifactKey: "pixel:brief.md", revision, replacesAttachmentId: revision > 1 ? `artifact-v${revision - 1}` : null });
+    };
+    brief(1, "brief.md");
+    const second = brief(2, "brief.md");
+    const other = (() => {
+      const id = "artifact-report", directory = path.join(db.attachmentsDir, id), storagePath = path.join(directory, "report.md");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(storagePath, "# Report\n");
+      return db.createAttachment({ threadId: "team-room", name: "report.md", mime: "text/markdown", size: 9, storagePath, source: "artifact", artifactKey: "nova:report.md", revision: 1 });
+    })();
+    const artifacts = db.listArtifacts();
+    assert.equal(artifacts.length, 2);
+    assert.equal(artifacts[0].id, other.id);
+    const briefArtifact = artifacts.find((item) => item.name === "brief.md");
+    assert.equal(briefArtifact?.revisions, 2);
+    assert.equal(briefArtifact?.revision, 2);
+    assert.equal(briefArtifact?.botName, "Pixel");
+    assert.equal(briefArtifact?.threadTitle, "Pixel");
+    const revisions = db.listArtifactRevisions("bot-pixel", "pixel:brief.md");
+    assert.equal(revisions.length, 2);
+    assert.equal(revisions[0].id, second.id);
+    assert.equal(revisions.map((item) => item.revision).join(","), "2,1");
+    assert.equal(db.findArtifact(second.id)?.key, "pixel:brief.md");
+    assert.equal(db.findArtifact("missing"), null);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("studio settings persist self-extending and runs keep a coding-model override", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-self-extend-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const bot = db.listBots()[0]!;
+    const initial = db.getStudioSettings();
+    assert.equal(initial.selfExtendEnabled, true);
+    assert.equal(initial.codingModel, null);
+    const updated = db.updateStudioSettings({ selfExtendEnabled: false, codingModel: "openai/gpt-5.2" });
+    assert.equal(updated.selfExtendEnabled, false);
+    assert.equal(updated.codingModel, "openai/gpt-5.2");
+    const restored = db.updateStudioSettings({ selfExtendEnabled: true, codingModel: null });
+    assert.equal(restored.selfExtendEnabled, true);
+    assert.equal(restored.codingModel, null);
+    assert.equal(db.getStudioSettings().yoloMode, false);
+    assert.equal(db.updateStudioSettings({ yoloMode: true }).yoloMode, true);
+    assert.equal(db.updateStudioSettings({ yoloMode: false }).yoloMode, false);
+    const run = db.createRun({ threadId: bot.threadId, botId: bot.id, prompt: "Build the missing tool", status: "queued" });
+    assert.equal(run.modelOverride, null);
+    db.updateRun(run.id, { modelOverride: "openai/gpt-5.2" });
+    assert.equal(db.getRun(run.id)?.modelOverride, "openai/gpt-5.2");
+    db.updateRun(run.id, { modelOverride: null });
+    assert.equal(db.getRun(run.id)?.modelOverride, null);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("workspaces ship the self-extension proposal tool and guidance", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-self-extend-tools-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const bot = db.listBots()[0]!;
+    const workspace = prepareWorkspace(db, bot);
+    assert.equal(existsSync(path.join(workspace, ".opencode", "tools", "self_extend.ts")), true);
+    assert.match(readFileSync(path.join(workspace, "AGENTS.md"), "utf8"), /self_extend/);
+    db.updateStudioSettings({ selfExtendEnabled: false });
+    assert.match(readFileSync(path.join(prepareWorkspace(db, bot), "AGENTS.md"), "utf8"), /Self-extending is turned off/);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("teammate governance caps seats and retires without losing history", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-governance-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    assert.equal(db.getStudioSettings().maxTeammates, 12);
+    const active = db.listBots().length;
+    assert.ok(active > 0);
+    db.updateStudioSettings({ maxTeammates: active });
+    assert.throws(() => db.createBot({ name: "Extra", emoji: "●", color: "#000000", role: "Extra", instructions: "Extra." }), /room for/);
+    const nova = db.getBot("nova")!;
+    const run = db.createRun({ threadId: nova.threadId, botId: "nova", prompt: "Do work", status: "queued" });
+    assert.equal(db.activeRunsForBot("nova").length, 1);
+    assert.equal(db.retireBot("nova")?.retiredAt !== null, true);
+    assert.equal(db.listBots().some((bot) => bot.id === "nova"), false);
+    assert.equal(db.getBot("nova")?.retiredAt !== null, true);
+    assert.equal(db.listBots(true).filter((bot) => bot.retiredAt).length, 1);
+    assert.throws(() => db.createRun({ threadId: nova.threadId, botId: "nova", prompt: "More work", status: "queued" }), /retired/);
+    const extra = db.createBot({ name: "Extra", emoji: "●", color: "#000000", role: "Extra", instructions: "Extra." });
+    assert.ok(extra.id);
+    assert.throws(() => db.restoreBot("nova"), /room for/);
+    assert.equal(db.retireBot("nova"), null);
+    db.updateStudioSettings({ maxTeammates: active + 1 });
+    assert.equal(db.restoreBot("nova")?.retiredAt, null);
+    assert.equal(db.restoreBot("nova"), null);
+    assert.equal(db.getRun(run.id)?.status, "queued");
+    db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

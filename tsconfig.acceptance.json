@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "scripts/test-onboarding.ts",
+    "scripts/test-draft-attachments-api.ts",
+    "scripts/test-first-teammate.ts",
+    "scripts/test-new-studio.ts",
+    "scripts/test-studio-design.ts",
+    "scripts/test-calendar-routines.ts",
+    "scripts/benchmark-page-watch.ts",
+    "scripts/test-away-access.ts",
+    "scripts/relay-server.ts",
+    "scripts/benchmark-extensions.ts",
+    "scripts/benchmark-expenses.ts",
+    "scripts/benchmark-workflows.ts",
+    "scripts/test-productivity-runtime.ts",
+    "scripts/test-browser-sign-in.ts",
+    "scripts/test-browser-session-workflows.ts"
+  ]
+}

@@ -120,6 +120,22 @@ export class TodoistConnector {
     }).filter((value): value is TodoistActivitySummary => Boolean(value));
   }
 
+  async workProjects() {
+    const result = await this.request("/api/v1/projects?limit=100");
+    if (!Array.isArray(result.results)) throw new Error("Todoist returned no readable project list.");
+    return { choices: result.results.slice(0, 100).flatMap((value) => {
+      const row = value as Json, id = cleanText(row.id, 200), label = cleanText(row.name, 200);
+      return id && label ? [{ service: "todoist" as const, id, label }] : [];
+    }), limited: Boolean(result.next_cursor) || result.results.length >= 100 };
+  }
+
+  async workTasks(projectId: string, signal: AbortSignal) {
+    const result = await this.request(`/api/v1/tasks?${new URLSearchParams({ project_id: projectId, limit: "20" })}`, { signal });
+    if (!Array.isArray(result.results)) throw new Error("Todoist returned no readable task list.");
+    const rows = result.results, tasks = rows.slice(0, 20).map((row) => this.taskSummary(row)).filter((row): row is TodoistTaskSummary => Boolean(row && row.projectId === projectId && !row.completed));
+    return { tasks, hasMore: Boolean(result.next_cursor) || rows.length > 20, omitted: tasks.length !== rows.length };
+  }
+
   async create(input: { content: string; description?: string; dueString?: string; projectId?: string; priority?: number }) {
     const content = cleanText(input.content, 500), description = cleanText(input.description, 4_000), dueString = cleanText(input.dueString, 200), projectId = cleanText(input.projectId, 200);
     if (!content) throw new Error("Give the Todoist task a title first.");
@@ -150,33 +166,36 @@ export class TodoistConnector {
     };
   }
 
-  private async request(path: string, options: { method?: "GET" | "POST"; body?: Json } = {}, retry = true): Promise<Json> {
+  private async request(path: string, options: { method?: "GET" | "POST"; body?: Json; signal?: AbortSignal } = {}, retry = true): Promise<Json> {
+    const version = this.db.connectorAuthorizationVersion("todoist");
     const configured = this.db.oauthConnectorCredentials<TodoistCredentials>("todoist"), credentials = configured?.credentials;
     if (!configured || !credentials?.accessToken) throw new Error("Connect Todoist in Apps & Tools first.");
-    if (retry && credentials.expiresAt && new Date(credentials.expiresAt).getTime() <= Date.now() + 60_000 && credentials.refreshToken) await this.refresh(configured.clientId, configured.clientSecret, credentials);
+    if (retry && credentials.expiresAt && new Date(credentials.expiresAt).getTime() <= Date.now() + 60_000 && credentials.refreshToken) await this.refresh(configured.clientId, configured.clientSecret, credentials, version);
     const current = this.db.oauthConnectorCredentials<TodoistCredentials>("todoist")?.credentials || credentials;
     const response = await this.fetcher(`https://api.todoist.com${path}`, {
       method: options.method || "GET", headers: { authorization: `Bearer ${current.accessToken}`, "content-type": "application/json" },
+      signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     });
-    if (response.status === 401 && retry && current.refreshToken) { await this.refresh(configured.clientId, configured.clientSecret, current); return this.request(path, options, false); }
+    if (response.status === 401 && retry && current.refreshToken) { await this.refresh(configured.clientId, configured.clientSecret, current, version); return this.request(path, options, false); }
     const result = await response.json().catch(() => ({})) as Json;
     if (!response.ok) throw new Error(`Todoist could not complete that request (${cleanText(result.error_description || result.error || result.message, 400) || response.status}).`);
     this.db.markConnectorUsed("todoist");
     return result;
   }
 
-  private async refresh(clientId: string, clientSecret: string, credentials: TodoistCredentials) {
+  private async refresh(clientId: string, clientSecret: string, credentials: TodoistCredentials, version: number) {
     if (!credentials.refreshToken) throw new Error("Todoist sign-in expired. Reconnect it in Apps & Tools.");
     const result = await this.tokenRequest(clientId, clientSecret, { grant_type: "refresh_token", refresh_token: credentials.refreshToken });
     const accessToken = cleanText(result.access_token, 4_000);
     if (!accessToken) throw new Error("Todoist could not refresh its sign-in. Reconnect it in Apps & Tools.");
-    this.db.updateOAuthConnectorCredentials("todoist", { accessToken, refreshToken: cleanText(result.refresh_token, 4_000) || credentials.refreshToken, ...(expiresAt(result.expires_in) ? { expiresAt: expiresAt(result.expires_in) } : {}) });
+    this.db.updateOAuthConnectorCredentials("todoist", { accessToken, refreshToken: cleanText(result.refresh_token, 4_000) || credentials.refreshToken, ...(expiresAt(result.expires_in) ? { expiresAt: expiresAt(result.expires_in) } : {}) }, version);
   }
 
   private async tokenRequest(clientId: string, clientSecret: string, values: Record<string, string>) {
     const response = await this.fetcher("https://api.todoist.com/oauth/access_token", {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...values }),
+      signal: AbortSignal.timeout(20_000),
     });
     const result = await response.json().catch(() => ({})) as Json;
     if (!response.ok) throw new Error(`Todoist sign-in failed (${cleanText(result.error_description || result.error, 300) || response.status}).`);

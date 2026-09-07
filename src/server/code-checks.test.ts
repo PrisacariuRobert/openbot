@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { CodeProjectManager } from "./code-projects.js";
 import { CodeCheckService } from "./code-checks.js";
 import { AttachmentService } from "./attachments.js";
@@ -24,7 +24,7 @@ function fixture() {
   git(source, "add", ".");
   git(source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-m", "Fixture bug");
   git(source, "remote", "add", "origin", "https://github.com/example/fixture.git");
-  const db = new OpenBotDatabase(root), projects = new CodeProjectManager(db, root);
+  const db = new OpenBotDatabase(root), projects = new CodeProjectManager(db, root, { withGitHubIdentity: async () => { assert.fail("Code-check fixtures must reject publication before any account or network operation"); } });
   const project = db.createCodeProject({ name: "Shop", ...projects.inspectRoot(source), access: [{ botId: "nova", canRead: true, canWrite: true, canRun: true }, { botId: "pixel", canRead: true, canWrite: false, canRun: false }] });
   const run = db.createRun({ botId: "nova", threadId: "bot-nova", status: "running", prompt: "Fix quantity totals and check it" });
   projects.branch("nova", project.id, "openbot/fix-quantity", run.id);
@@ -122,8 +122,14 @@ test("publishing rechecks the exact approved commit before any GitHub command", 
     const headCommit = f.projects.currentCommit("nova", f.project.id, f.run.id);
     const reviewer = f.db.createRun({ botId: "pixel", threadId: "bot-nova", status: "completed", parentRunId: f.run.id, prompt: "Fixture review" });
     f.db.recordCodeTaskReview({ sourceRunId: f.run.id, reviewerRunId: reviewer.id, projectId: f.project.id, reviewerBotId: "pixel", verdict: "approved", summary: "Fixture verdict", findings: [], headCommit });
+    const input = { title: "Fixture", body: "Do not publish", base: "main", draft: true };
+    const publicationReview = f.projects.preparePublishReview("nova", f.project.id, input, f.run.id);
+    await assert.rejects(f.projects.publishPullRequest("nova", f.project.id, { ...input, expectedHeadCommit: headCommit }, f.run.id), /complete approval review/);
     f.projects.write("nova", f.project.id, "note.txt", "Another change\n", f.run.id);
     f.projects.commit("nova", f.project.id, "Another commit", ["note.txt"], f.run.id);
-    await assert.rejects(f.projects.publishPullRequest("nova", f.project.id, { title: "Fixture", body: "Do not publish", expectedHeadCommit: headCommit }, f.run.id), /no longer matches/);
+    await f.execute();
+    const nextReviewer = f.db.createRun({ botId: "pixel", threadId: "bot-nova", status: "completed", parentRunId: f.run.id, prompt: "Review the changed fixture" });
+    f.db.recordCodeTaskReview({ sourceRunId: f.run.id, reviewerRunId: nextReviewer.id, projectId: f.project.id, reviewerBotId: "pixel", verdict: "approved", summary: "New fixture verdict", findings: [], headCommit: f.projects.currentCommit("nova", f.project.id, f.run.id) });
+    await assert.rejects(f.projects.publishPullRequest("nova", f.project.id, { ...input, expectedHeadCommit: headCommit, publicationReview, publicationIdentity: { host: "github.com", accountLogin: "fixture-owner" } }, f.run.id), /changed since this proposal/);
   } finally { f.close(); }
 });

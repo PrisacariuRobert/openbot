@@ -10,6 +10,10 @@ struct DesktopProvidersView: View {
     @State private var showingAPIForm = false
     @State private var editingAPIProvider: StudioProviderInstance?
     @State private var pendingDeleteAPIProvider: StudioProviderInstance?
+    @State private var initialProvider = ""
+    @State private var initialModel = ""
+    @State private var showingConnections = false
+    @State private var selectedProviderID = ""
 
     private enum ProviderMode: String, CaseIterable, Identifiable {
         case accounts = "Accounts & subscriptions"
@@ -20,47 +24,58 @@ struct DesktopProvidersView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "cpu.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
+                if showingConnections {
+                    Button { showingConnections = false } label: { Image(systemName: "chevron.left") }
+                        .buttonStyle(.bordered).help("Back to your connections")
+                }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("AI connections").font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("Bring an account, API key, or a model running on your computer.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text(showingConnections ? "Add a provider" : "AI providers").font(.system(size: 25, weight: .semibold))
+                    Text(showingConnections ? "Choose how you want to connect." : "The AI your teammates work with.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { Task { await store.refreshProviders() } } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.bordered).controlSize(.small).disabled(store.isCheckingProviders)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                if !showingConnections {
+                    Button("Add provider", systemImage: "plus") { showingConnections = true }
+                        .buttonStyle(.borderedProminent).tint(StudioPalette.accent)
+                }
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
+            .padding(.horizontal, 38).padding(.top, 32).padding(.bottom, 22).background(StudioPalette.paper)
 
-            Picker("Connection type", selection: $mode) {
+            if showingConnections { Picker("Connection type", selection: $mode) {
                 ForEach(ProviderMode.allCases) { item in Text(item.rawValue).tag(item) }
             }
-            .pickerStyle(.segmented).padding(.horizontal, 20).padding(.top, 18)
+            .pickerStyle(.segmented).padding(.horizontal, 24).padding(.top, 20) }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 20) {
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                     if store.providerStatus == nil && store.isCheckingProviders {
                         ProgressView("Checking your connections…").frame(maxWidth: .infinity).padding(.vertical, 80)
+                    } else if !showingConnections {
+                        connectionOverview
+                        if store.state.bots.contains(where: { ($0.providerInstanceId ?? "").isEmpty }) {
+                            initialChoice
+                        }
                     } else if mode == .accounts {
                         accounts
                     } else {
                         apiConnections
                     }
-                    if store.providerStatus != nil {
-                        Divider().padding(.vertical, 4)
-                        teammateAssignments
+                    if store.providerStatus != nil && !showingConnections {
+                        DisclosureGroup("Models by teammate") { teammateAssignments.padding(.top, 12) }
+                            .font(.system(size: 13, weight: .medium))
+                        Button("Refresh connections") { Task { await store.refreshProviders() } }
+                            .buttonStyle(.plain).font(.caption).foregroundStyle(StudioPalette.muted).disabled(store.isCheckingProviders)
                     }
                 }
-                .padding(20)
+                .padding(.horizontal, 38).padding(.vertical, 18)
             }
         }
-        .frame(width: 760, height: 660)
+        .desktopPanelSize(width: 760, height: 660)
         .background(DesktopTheme.paper)
         .task { await store.refreshProviders() }
         .sheet(isPresented: $showingAPIForm) { DesktopAPIProviderForm(store: store) }
@@ -96,17 +111,78 @@ struct DesktopProvidersView: View {
         return store.providerStatus?.loginAttempts.first(where: { $0.id == activeAttempt.id }) ?? activeAttempt
     }
 
+    @ViewBuilder private var connectionOverview: some View {
+        let connections = store.providerStatus?.instances ?? []
+        if connections.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Choose the AI that works for you.").font(.title3.weight(.semibold))
+                Text("Connect an eligible subscription, add an API key, or use a local model. Nothing is selected automatically.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }.padding(.vertical, 12)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(connections) { connection in
+                    HStack(spacing: 12) {
+                        StudioBrandMark(provider: connection.provider).frame(width: 34)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(connection.name).font(.system(size: 14, weight: .semibold))
+                            Text(connection.connectionLabel)
+                                .font(.system(size: 12)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if connection.authMode == "api_key" {
+                            Menu {
+                                Button("Edit connection") { editingAPIProvider = connection }
+                                Button("Remove connection", role: .destructive) { pendingDeleteAPIProvider = connection }
+                            } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize()
+                        } else {
+                            Image(systemName: connection.connected == true ? "checkmark.circle" : "exclamationmark.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                    }.padding(.vertical, 22)
+                    if connection.id != connections.last?.id { Divider().padding(.leading, 64) }
+                }
+            }
+        }
+        Text("A saved connection may still need sign-in or access to the model you choose.")
+            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 12)
+        if let attempt = currentAttempt, attempt.status != "connected" {
+            Button("Continue signing in", systemImage: "person.crop.circle.badge.clock") { showingConnections = true; mode = .accounts }
+                .buttonStyle(.bordered)
+        }
+    }
+
     @ViewBuilder private var accounts: some View {
         if let status = store.providerStatus {
-            ForEach(status.catalog.filter { $0.id != "opencode" }) { provider in
-                providerRow(provider)
+            VStack(spacing: 8) {
+                ForEach(status.catalog.filter { $0.id != "opencode" }) { provider in providerRow(provider) }
+            }
+            if let provider = status.catalog.first(where: { $0.id == selectedProviderID }) {
+                Text(provider.description).font(.callout).foregroundStyle(.secondary)
+                if provider.connected {
+                    Label("Sign-in found. Choose its model in Models by teammate.", systemImage: "checkmark.circle")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else if provider.canConnect {
+                    Button("Connect \(provider.name)") {
+                        Task {
+                            guard let attempt = await store.beginProviderConnection(provider.id) else { return }
+                            activeAttempt = attempt
+                            if let rawURL = attempt.url, let url = URL(string: rawURL), url.scheme == "https" { NSWorkspace.shared.open(url) }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent).tint(StudioPalette.accent).controlSize(.large)
+                    .disabled(store.isCheckingProviders)
+                } else {
+                    Text("Set up this provider's runtime on your host first, or choose API & local models.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             }
             if let attempt = currentAttempt, attempt.status != "connected" {
                 VStack(alignment: .leading, spacing: 9) {
                     Label(attempt.status == "failed" ? "Sign-in wasn’t completed" : "Finish signing in", systemImage: attempt.status == "failed" ? "exclamationmark.circle.fill" : "person.crop.circle.badge.clock")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold, design: .default))
                     Text(attempt.error ?? attempt.instructions)
-                        .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary)
                     if let rawURL = attempt.url, let url = URL(string: rawURL), url.scheme == "https" {
                         Button("Open sign-in page") { NSWorkspace.shared.open(url) }.buttonStyle(.bordered)
                     }
@@ -130,56 +206,41 @@ struct DesktopProvidersView: View {
                 .padding(14).background(DesktopTheme.purple.opacity(0.07), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             }
             Text("OpenBot uses the provider runtime installed on the computer hosting your private runner. Your plan, provider rules, and usage limits still apply.")
-                .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary).padding(.top, 3)
+                .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary).padding(.top, 3)
         } else if !store.isCheckingProviders {
             Text("OpenBot could not read provider status.").foregroundStyle(.secondary)
         }
     }
 
     private func providerRow(_ provider: StudioProviderCatalogEntry) -> some View {
+        Button { selectedProviderID = provider.id } label: {
         HStack(spacing: 13) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 13, style: .continuous).fill(provider.connected ? DesktopTheme.green.opacity(0.12) : DesktopTheme.purple.opacity(0.09))
-                Image(systemName: providerSymbol(provider.id)).font(.system(size: 18, weight: .semibold)).foregroundStyle(provider.connected ? DesktopTheme.green : DesktopTheme.purple)
-            }.frame(width: 46, height: 46)
+            StudioBrandMark(provider: provider.id).frame(width: 38, height: 38)
             VStack(alignment: .leading, spacing: 4) {
-                Text(provider.name).font(.system(size: 14.5, weight: .bold, design: .rounded))
-                Text(provider.connected ? "Ready on this host" : provider.installed ? provider.badge : "Provider runtime needs setup")
-                    .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
-                Text(provider.description).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.tertiary).lineLimit(2)
+                Text(provider.name).font(.system(size: 14.5, weight: .bold, design: .default))
+                Text(provider.connected ? "Sign-in found on this host" : provider.installed ? provider.badge : "Provider runtime needs setup")
+                    .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 12)
-            if provider.connected {
-                Label("Ready", systemImage: "checkmark.circle.fill").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.green)
-            } else if provider.canConnect {
-                Button("Connect") {
-                    Task {
-                        guard let attempt = await store.beginProviderConnection(provider.id) else { return }
-                        activeAttempt = attempt
-                        if let rawURL = attempt.url, let url = URL(string: rawURL), url.scheme == "https" { NSWorkspace.shared.open(url) }
-                    }
-                }
-                .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small)
-                .disabled(store.isCheckingProviders)
-            } else {
-                Text(provider.installed ? "Setup needed" : "Install runtime")
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-            }
+            Image(systemName: selectedProviderID == provider.id ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
         }
-        .padding(14).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+        .padding(14).background(selectedProviderID == provider.id ? StudioPalette.surface : StudioPalette.paper, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedProviderID == provider.id ? .isSelected : [])
     }
 
     @ViewBuilder private var apiConnections: some View {
         if let saved = store.providerStatus?.instances.filter({ $0.authMode == "api_key" }), !saved.isEmpty {
             ForEach(saved) { provider in
                 HStack(spacing: 13) {
-                    Image(systemName: "server.rack").font(.system(size: 18, weight: .semibold)).foregroundStyle(DesktopTheme.purple).frame(width: 42, height: 42)
+                    StudioBrandMark(provider: provider.provider).frame(width: 42, height: 42)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(provider.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                        Text(provider.apiConfig?.baseUrl ?? "API-key connection").font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(1)
+                        Text(provider.name).font(.system(size: 14, weight: .bold, design: .default))
+                        Text(provider.apiConfig?.baseUrl ?? "API-key connection").font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary).lineLimit(1)
                         Text("\(provider.apiConfig?.modelIds.count ?? provider.models?.count ?? 0) models · key stored by your private runner")
-                            .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.tertiary)
+                            .font(.system(size: 9.5, design: .default)).foregroundStyle(.tertiary)
                     }
                     Spacer()
                     Menu {
@@ -189,14 +250,14 @@ struct DesktopProvidersView: View {
                     } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton).fixedSize()
                 }
-                .padding(14).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+                .padding(14).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(StudioPalette.line))
             }
         }
         Button { showingAPIForm = true } label: { Label("Add API or local model", systemImage: "plus") }
             .buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
         Text("Hosted services require an API key. Localhost connections can run without one and always refer to the computer hosting OpenBot.")
-            .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+            .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary)
     }
 
     private func providerSymbol(_ id: String) -> String {
@@ -212,13 +273,13 @@ struct DesktopProvidersView: View {
 
     private var teammateAssignments: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Teammate models").font(.system(size: 14, weight: .bold, design: .rounded))
+            Text("Teammate models").font(.system(size: 14, weight: .bold, design: .default))
             Text("Every teammate can use a different connection and model.")
-                .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary)
             ForEach(store.state.bots) { bot in
                 HStack(spacing: 9) {
                     DesktopMascotView(bot: bot, size: 30).frame(width: 33, height: 33)
-                    Text(bot.name).font(.system(size: 12, weight: .semibold, design: .rounded)).frame(width: 82, alignment: .leading)
+                    Text(bot.name).font(.system(size: 12, weight: .semibold, design: .default)).frame(width: 82, alignment: .leading)
                     Picker("Connection for \(bot.name)", selection: Binding(
                         get: { bot.providerInstanceId ?? "" },
                         set: { connectionID in
@@ -248,8 +309,28 @@ struct DesktopProvidersView: View {
                 }
             }
         }
-        .padding(14).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.black.opacity(0.055)))
+        .padding(14).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(StudioPalette.line))
+    }
+
+    private var initialChoice: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("First, choose your AI").font(.headline)
+            Text("No provider is selected for you. Connect an account below, or choose an existing connection. Your account’s limits and billing apply.").font(.callout).foregroundStyle(.secondary)
+            Picker("Provider", selection: $initialProvider) {
+                Text("Choose a provider").tag("")
+                ForEach(store.providerStatus?.instances.filter { $0.connected == true && !($0.models ?? []).isEmpty } ?? []) { Text($0.name).tag($0.id) }
+            }.onChange(of: initialProvider) { _, _ in initialModel = "" }
+            Picker("Model", selection: $initialModel) {
+                Text("Choose a model").tag("")
+                ForEach(store.providerStatus?.instances.first(where: { $0.id == initialProvider })?.models ?? [], id: \.self) { Text(modelLabel($0)).tag($0) }
+            }.disabled(initialProvider.isEmpty)
+            Button("Use this AI for unconfigured teammates") {
+                Task { await store.chooseInitialProvider(providerInstanceID: initialProvider, model: initialModel) }
+            }.buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
+                .disabled(initialProvider.isEmpty || initialModel.isEmpty || store.isCheckingProviders)
+            Text("Existing teammates keep their choices. Model access is checked when the first task runs.").font(.caption).foregroundStyle(.secondary)
+        }.padding(16).background(StudioPalette.paper, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private func modelLabel(_ model: String) -> String {
@@ -308,9 +389,9 @@ private struct DesktopAPIProviderForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            Text(existing == nil ? "Add a model connection" : "Edit model connection").font(.system(size: 20, weight: .bold, design: .rounded))
+            Text(existing == nil ? "Add a model connection" : "Edit model connection").font(.system(size: 20, weight: .bold, design: .default))
             Text(existing == nil ? "The key goes directly to your private OpenBot runner and is never returned to this app." : "Leave the key empty to keep the encrypted key already stored by your runner.")
-                .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary)
             field("Provider") {
                 Picker("Provider", selection: $preset) { ForEach(APIPreset.allCases) { Text($0.rawValue).tag($0) } }
                     .labelsHidden().onChange(of: preset) { _, value in
@@ -328,11 +409,11 @@ private struct DesktopAPIProviderForm: View {
             }
             field("Exact model IDs") {
                 TextEditor(text: $modelIDs).font(.system(size: 12, design: .monospaced)).frame(height: 70)
-                    .padding(6).background(.white, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(.black.opacity(0.10)))
+                    .padding(6).background(StudioPalette.paper, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(StudioPalette.line))
             }
             field(isLocal ? "API key (optional for local models)" : "API key") { SecureField("Stored encrypted by OpenBot", text: $secret).textFieldStyle(.roundedBorder) }
             if let error = store.errorMessage {
-                Label(error, systemImage: "exclamationmark.circle.fill").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                Label(error, systemImage: "exclamationmark.circle.fill").font(.system(size: 11, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
             }
             HStack {
                 Spacer()
@@ -366,7 +447,7 @@ private struct DesktopAPIProviderForm: View {
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label).font(.system(size: 11, weight: .semibold, design: .rounded))
+            Text(label).font(.system(size: 11, weight: .semibold, design: .default))
             content()
         }
     }

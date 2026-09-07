@@ -1,4 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
+import { calendarDeliveryBody, calendarDeliveryMatches, type CalendarDeliveryEvent } from "./calendar-delivery.js";
+import { ApprovalReviewChangedError, ApprovedConnectorOutcomeUncertainError } from "./approval-review-binding.js";
 import type { CalendarEventSummary, ConnectorCatalogEntry, DriveFileDetail, DriveFileSummary, GmailMessageDetail, GmailMessageSummary, GoogleConnectorService } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 
@@ -96,6 +98,10 @@ function decodeBase64Url(value = "") {
 }
 
 async function boundedGoogleJson<T>(response: Response): Promise<T> {
+  return JSON.parse(await boundedGoogleText(response)) as T;
+}
+
+async function boundedGoogleText(response: Response): Promise<string> {
   const maximum = 2 * 1024 * 1024;
   if (Number(response.headers.get("content-length")) > maximum) {
     await response.body?.cancel();
@@ -116,7 +122,7 @@ async function boundedGoogleJson<T>(response: Response): Promise<T> {
       }
       chunks.push(value);
     }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
+    return Buffer.concat(chunks).toString("utf8");
   } finally { reader.releaseLock(); }
 }
 
@@ -234,8 +240,8 @@ export class GoogleWorkspaceConnector {
 
   async disconnect() {
     const credentials = this.db.googleConnectorCredentials(), token = credentials?.refreshToken || credentials?.accessToken;
-    if (token) await this.fetcher("https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }) }).catch(() => undefined);
     const connection = this.db.disconnectGoogleConnector();
+    if (token) await this.fetcher("https://oauth2.googleapis.com/revoke", { method: "POST", signal: AbortSignal.timeout(20_000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }) }).catch(() => undefined);
     this.db.addConnectorEvent({ action: "disconnected", status: "completed", summary: "Google Workspace disconnected" });
     return connection;
   }
@@ -292,25 +298,25 @@ export class GoogleWorkspaceConnector {
     return { id: result.id, threadId: result.threadId || "" };
   }
 
-  async searchDrive(query: string, maxResults = 8): Promise<DriveFileSummary[]> {
+  async searchDrive(query: string, maxResults = 8, signal?: AbortSignal): Promise<DriveFileSummary[]> {
     const term = query.trim().slice(0, 200).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     const q = term ? `trashed = false and (name contains '${term}' or fullText contains '${term}')` : "trashed = false";
     const params = new URLSearchParams({ q, pageSize: String(Math.max(1, Math.min(Math.round(maxResults), 12))), orderBy: "modifiedTime desc", fields: "files(id,name,mimeType,modifiedTime,webViewLink,size)" });
-    const result = await this.request<{ files?: Array<{ id?: string; name?: string; mimeType?: string; modifiedTime?: string; webViewLink?: string; size?: string }> }>(`https://www.googleapis.com/drive/v3/files?${params}`);
+    const result = await this.request<{ files?: Array<{ id?: string; name?: string; mimeType?: string; modifiedTime?: string; webViewLink?: string; size?: string }> }>(`https://www.googleapis.com/drive/v3/files?${params}`, { signal });
     return (result.files || []).filter((file) => file.id).map((file) => ({ id: file.id!, name: file.name || "Untitled", mimeType: file.mimeType || "application/octet-stream", modifiedTime: file.modifiedTime || "", webViewLink: file.webViewLink || "", size: file.size ? Number(file.size) : null }));
   }
 
-  async readDriveFile(fileId: string): Promise<DriveFileDetail> {
+  async readDriveFile(fileId: string, signal?: AbortSignal): Promise<DriveFileDetail> {
     if (!/^[A-Za-z0-9_-]{4,200}$/.test(fileId)) throw new Error("Choose a valid Google Drive file.");
     const fields = "id,name,mimeType,modifiedTime,webViewLink,size";
-    const file = await this.request<{ id: string; name?: string; mimeType?: string; modifiedTime?: string; webViewLink?: string; size?: string }>(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?${new URLSearchParams({ fields })}`);
+    const file = await this.request<{ id: string; name?: string; mimeType?: string; modifiedTime?: string; webViewLink?: string; size?: string }>(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?${new URLSearchParams({ fields })}`, { signal });
     const mimeType = file.mimeType || "application/octet-stream";
     if (file.size && Number(file.size) > 2_000_000) throw new Error("That Drive file is too large to read safely in one conversation. Open its link or narrow the request.");
     let url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
     if (mimeType === "application/vnd.google-apps.document") url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent("text/plain")}`;
     else if (mimeType === "application/vnd.google-apps.spreadsheet") url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent("text/csv")}`;
     else if (!mimeType.startsWith("text/") && !["application/json", "application/xml"].includes(mimeType)) throw new Error("OpenBot can find this file, but this format needs a dedicated viewer. Use its Google Drive link instead.");
-    const content = (await this.requestText(url)).slice(0, 100_000);
+    const content = (await this.requestText(url, false, signal)).slice(0, 100_000);
     return { id: file.id, name: file.name || "Untitled", mimeType, modifiedTime: file.modifiedTime || "", webViewLink: file.webViewLink || "", size: file.size ? Number(file.size) : null, content };
   }
 
@@ -342,7 +348,7 @@ export class GoogleWorkspaceConnector {
     }));
   }
 
-  async createCalendarEvent(input: { title: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; addGoogleMeet?: boolean }) {
+  async createCalendarEvent(input: { title: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; addGoogleMeet?: boolean }, approvalID?: string) {
     const title = input.title.trim(), start = new Date(input.start), end = new Date(input.end);
     const attendees = [...new Set((input.attendees || []).map((value) => value.trim().toLowerCase()).filter(Boolean))];
     if (!title || title.length > 300) throw new Error("Give the calendar event a short title.");
@@ -352,15 +358,40 @@ export class GoogleWorkspaceConnector {
     const params = new URLSearchParams({ sendUpdates: attendees.length ? "all" : "none" });
     const conferenceData = input.addGoogleMeet ? { createRequest: { requestId: randomBytes(16).toString("hex"), conferenceSolutionKey: { type: "hangoutsMeet" } } } : undefined;
     if (conferenceData) params.set("conferenceDataVersion", "1");
-    const result = await this.request<{ id?: string; summary?: string; htmlLink?: string; hangoutLink?: string }>(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+    const body = {
         summary: title, description: input.description?.trim() || undefined, location: input.location?.trim() || undefined,
         start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
         attendees: attendees.length ? attendees.map((email) => ({ email })) : undefined, conferenceData,
-      }),
-    });
+    };
+    const delivery = approvalID ? calendarDeliveryBody(body, approvalID) : undefined;
+    const authorizationVersion = this.db.connectorAuthorizationVersion(CONNECTOR_ID);
+    const assertSameAccount = () => {
+      if (this.db.connectorAuthorizationVersion(CONNECTOR_ID) !== authorizationVersion) throw new ApprovalReviewChangedError(true);
+    };
+    let result: CalendarDeliveryEvent, recovered = false;
+    try {
+      result = await this.request<CalendarDeliveryEvent>(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(delivery || body),
+      });
+      assertSameAccount();
+      if (delivery && !calendarDeliveryMatches(delivery, result)) throw new ApprovedConnectorOutcomeUncertainError();
+    } catch (error) {
+      if (!delivery || error instanceof ApprovalReviewChangedError) throw error;
+      assertSameAccount();
+      // Exactly one readback operation, no sleep loop and no second insert.
+      // Not found is NOT evidence that the original request was not applied.
+      try {
+        result = await this.request<CalendarDeliveryEvent>(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${delivery.id}`);
+        assertSameAccount();
+      } catch (readError) {
+        if (readError instanceof ApprovalReviewChangedError) throw readError;
+        throw new ApprovedConnectorOutcomeUncertainError();
+      }
+      if (!calendarDeliveryMatches(delivery, result)) throw new ApprovedConnectorOutcomeUncertainError();
+      recovered = true;
+    }
     if (!result.id) throw new Error("Google Calendar did not confirm that the event was created.");
-    return { id: result.id, title: result.summary || title, webLink: result.htmlLink || "", meetingLink: result.hangoutLink || "" };
+    return { id: result.id, title: result.summary || title, webLink: result.htmlLink || "", meetingLink: result.hangoutLink || "", recovered, meetingPending: input.addGoogleMeet === true && !result.hangoutLink };
   }
 
   private pruneAttempts() {
@@ -375,6 +406,7 @@ export class GoogleWorkspaceConnector {
   }
 
   private async accessToken(force = false) {
+    const version = this.db.connectorAuthorizationVersion("google-workspace");
     const credentials = this.db.googleConnectorCredentials();
     if (!credentials?.accessToken && !credentials?.refreshToken) throw new Error("Connect Gmail before asking a teammate to use it.");
     const stillFresh = credentials.accessToken && credentials.expiresAt && new Date(credentials.expiresAt).getTime() > Date.now() + 60_000;
@@ -387,7 +419,7 @@ export class GoogleWorkspaceConnector {
     if (credentials.clientSecret) params.client_secret = credentials.clientSecret;
     const token = await this.tokenRequest(params);
     if (!token.access_token) throw new Error("Google did not refresh the Gmail connection.");
-    this.db.updateGoogleAccessToken(token.access_token, expiresAt(token.expires_in), token.refresh_token);
+    this.db.updateGoogleAccessToken(token.access_token, expiresAt(token.expires_in), token.refresh_token, version);
     return token.access_token;
   }
 
@@ -409,9 +441,9 @@ export class GoogleWorkspaceConnector {
     return body;
   }
 
-  private async requestText(url: string, retried = false): Promise<string> {
-    const token = await this.accessToken(retried), response = await this.fetcher(url, { headers: { authorization: `Bearer ${token}` } });
-    if (response.status === 401 && !retried) return this.requestText(url, true);
+  private async requestText(url: string, retried = false, signal = AbortSignal.timeout(20_000)): Promise<string> {
+    const token = await this.accessToken(retried), response = await this.fetcher(url, { signal, headers: { authorization: `Bearer ${token}` } });
+    if (response.status === 401 && !retried) return this.requestText(url, true, signal);
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
       const message = body.error?.message || `Google Drive returned ${response.status}.`;
@@ -421,6 +453,6 @@ export class GoogleWorkspaceConnector {
     }
     this.db.clearConnectorServiceError("google-drive");
     this.db.markConnectorUsed(CONNECTOR_ID);
-    return response.text();
+    return boundedGoogleText(response);
   }
 }

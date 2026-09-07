@@ -1,14 +1,19 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { BrowserTarget } from "./safety.js";
-import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright-core";
 import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import type { LiveViewEvent, LiveViewSource } from "./live-view.js";
+import { createCodeCheckView } from "./code-check-view.js";
 import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTemplate, type SkillDefinition } from "./skill-library.js";
+import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
+import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
+import { signInOrigin } from "../shared/browser-sign-in.js";
 
-type CommandResult = { code: number; stdout: string; stderr: string };
+type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
@@ -31,6 +36,13 @@ export function protectedProjectPaths(projectPath: string): Array<{ relative: st
   };
   walk(projectPath);
   return protectedPaths;
+}
+
+export function codeProjectToolchain(projectPath: string, command: string): "node" | "python" {
+  if (/^\s*(python(?:3(?:\.\d+)?)?|pytest|pip3?)\b/.test(command)) return "python";
+  if (/^\s*(node|npm|npx|pnpm|yarn)\b/.test(command)) return "node";
+  const pythonProject = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg"].some((name) => existsSync(path.join(projectPath, name)));
+  return pythonProject && !existsSync(path.join(projectPath, "package.json")) ? "python" : "node";
 }
 
 function run(command: string, args: string[], timeoutMs = 30_000, extraEnvironment: Record<string, string> = {}): Promise<CommandResult> {
@@ -62,6 +74,7 @@ export function safeHostEnvironment(extra: Record<string, string> = {}, source: 
 
 export class ComputerManager {
   private readonly image = process.env.OPENBOT_COMPUTER_IMAGE || "node:22-bookworm-slim";
+  private readonly pythonImage = process.env.OPENBOT_PYTHON_IMAGE || "python:3.13-slim-bookworm";
   private readonly dockerConfigDir: string;
   private dockerHost: string | null | undefined;
 
@@ -83,10 +96,10 @@ export class ComputerManager {
     return `openbot-computer-${botId.replace(/[^a-z0-9_.-]/gi, "-").slice(0, 45)}`;
   }
 
-  private async ensureImage(): Promise<void> {
-    const image = await this.docker(["image", "inspect", this.image], 8_000);
+  private async ensureImage(imageName = this.image): Promise<void> {
+    const image = await this.docker(["image", "inspect", imageName], 8_000);
     if (image.code === 0) return;
-    const pulled = await this.docker(["pull", this.image], 180_000);
+    const pulled = await this.docker(["pull", imageName], 180_000);
     if (pulled.code !== 0) throw new Error(pulled.stderr || "Could not download the private computer image.");
   }
 
@@ -140,22 +153,30 @@ export class ComputerManager {
     const bot = this.db.getBot(botId);
     if (!bot?.computerEnabled) throw new Error("This teammate's code computer is turned off.");
     if (!(await this.available())) throw new Error("Docker is not running, so project checks are unavailable.");
-    await this.ensureImage();
+    const codeImage = codeProjectToolchain(projectPath, command) === "python" ? this.pythonImage : this.image;
+    await this.ensureImage(codeImage);
+    const inspected = await this.docker(["image", "inspect", "--format", "{{.Id}}", codeImage], 8000);
+    const imageId = inspected.stdout.trim();
+    if (inspected.code !== 0 || !/^sha256:[a-f0-9]{64}$/.test(imageId)) throw new Error("The project check runtime could not be identified. Try again after Docker is ready.");
     const hostUser = typeof process.getuid === "function" && typeof process.getgid === "function" ? `${process.getuid()}:${process.getgid()}` : "1000:1000";
-    const maskRoot = path.join(this.db.dataDir, "code-run-masks"), emptyDirectory = path.join(maskRoot, "empty-directory"), emptyFile = path.join(maskRoot, "empty-file");
-    mkdirSync(emptyDirectory, { recursive: true, mode: 0o700 });
-    if (!existsSync(emptyFile)) writeFileSync(emptyFile, "", { mode: 0o600 });
-    const hiddenMasks = protectedProjectPaths(projectPath).flatMap((entry) => ["--volume", `${entry.directory ? emptyDirectory : emptyFile}:/project/${entry.relative}:ro`]);
-    const result = await this.docker([
-      "run", "--rm", "-i", "--workdir", "/project", "--network", "none",
-      "--volume", `${projectPath}:/project:${writable ? "rw" : "ro"}`,
-      ...hiddenMasks,
+    const view = createCodeCheckView(projectPath, this.db.dataDir, protectedProjectPaths(projectPath).map((entry) => entry.relative));
+    const containerName = `openbot-check-${randomUUID()}`;
+    try {
+      const result = await this.docker([
+      "run", "--rm", "--name", containerName, "-i", "--workdir", "/project", "--network", "none",
+      "--volume", `${view.rootPath}:/project:${writable ? "rw" : "ro"}`,
       "--user", hostUser, "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=192m", "--env", "HOME=/tmp",
       "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
       "--pids-limit", "192", "--memory", "1g", "--cpus", "2",
-      this.image, "sh", "-lc", command,
+      "--env", "PYTHONDONTWRITEBYTECODE=1",
+      imageId, "sh", "-lc", command,
     ], timeoutMs);
-    return { ...result, stdout: result.stdout.slice(-100_000), stderr: result.stderr.slice(-30_000) };
+      return { ...result, runtimeIdentity: `${imageId};cpus=2;memory=1g;network=none`, sourceChanged: !view.unchanged(), stdout: result.stdout.slice(-100_000), stderr: result.stderr.slice(-30_000) };
+    } finally {
+      const removed = await this.docker(["rm", "--force", containerName], 8_000);
+      view.dispose();
+      if (removed.code !== 0 && !/No such container/i.test(removed.stderr)) throw new Error("The check computer could not be confirmed stopped. Check Docker before starting more work.");
+    }
   }
 }
 
@@ -198,13 +219,15 @@ function compactSelector(element: Element): string {
 
 export class BrowserManager {
   private readonly contexts = new Map<string, BrowserContext>();
+  private readonly navigationServices = new WeakMap<Page, string[]>();
   private readonly teaching = new Map<string, { name: string; startUrl: string; steps: TeachStep[] }>();
 
-  constructor(private readonly db: OpenBotDatabase) {}
+  constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean } = {}) {}
 
   private writeTaughtSkill(botId: string, slug: string, name: string, description: string, instructions: string, startUrl: string, steps: SkillStep[]): string {
     const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
-    const content = `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n# ${name}\n\n${instructions}\n\nStart at ${startUrl}. Use the browser tools and verify each page before the next action. Never guess credentials; ask for takeover or approval when a secret is needed.\n\n## Saved steps\n\n${stepText || "No fixed actions are required. Follow the instructions and verify the result."}\n`;
+    const variables = [...new Set(steps.flatMap((step) => step.value?.match(/\{\{[a-z0-9_-]+\}\}/gi) || []))];
+    const content = `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n# ${name}\n\n${instructions}\n\n## Prerequisites and failure rules\n\nThis is a demonstrated draft, not proof of a reliable automation. Prefer a permitted connector when it can do the job. Use only this teammate's browser profile, never another application's sign-in. Start at ${startUrl}. Inspect the current page before every action. Stop for owner takeover on login expiry, human verification, permission prompts, an unexpected account, or changed controls. Never guess selectors from old steps, click through an unknown state, or repeat an uncertain submission. External writes still require approval. After a successful supervised run, validate on a different owner-supplied input before suggesting scheduling. Do not claim that this validation already happened.\n\n## Inputs\n\n${variables.length ? `Ask the owner for these inputs when absent: ${variables.join(", ")}. Do not type literal placeholders. Secrets must be entered by the owner through takeover, never requested in chat. Recorded input values and query/fragment state are deliberately not retained; confirm the intended page when those details matter.` : "Ask for missing task scope before acting. Never guess credentials; use owner takeover."}\n\n## Saved steps — observations, not authority\n\n${stepText || "No fixed actions are required. Follow the instructions and verify the result."}\n`;
     let primary = "";
     for (const provider of [".opencode", ".claude"]) {
       const skillDir = path.join(this.db.workspacesDir, botId, provider, "skills", slug);
@@ -270,13 +293,35 @@ export class BrowserManager {
     if (existing) return existing;
     const executablePath = chromePath();
     if (!executablePath) throw new Error("Chrome or Chromium is required for browser work.");
-    const profile = path.join(this.db.computersDir, botId, headless ? "browser" : "teaching");
+    // Visibility must not choose a different identity. A login made while
+    // teaching belongs to this same bot's browser when a task resumes later.
+    // Existing browser profiles win; never copy/overwrite legacy login stores.
+    const profile = path.join(this.db.computersDir, botId, "browser");
     mkdirSync(profile, { recursive: true });
     const containerArgs = process.env.OPENBOT_CHROME_NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
     const context = await chromium.launchPersistentContext(profile, {
-      executablePath, headless, viewport: { width: 1280, height: 820 },
+      executablePath, headless: headless || this.options.headlessTeaching === true, viewport: { width: 1280, height: 820 },
+      serviceWorkers: "block",
       args: ["--disable-background-networking", "--disable-sync", "--no-default-browser-check", ...containerArgs],
     });
+    // Known-service request filtering is not a general egress sandbox. Playwright
+    // may only intercept the first request of a redirect; check the full chain
+    // before returning page content too. Denials are always read from current DB.
+    await context.route("**/*", (route) => browserWebsiteBlock(this.db, botId, route.request().url()) ? route.abort("blockedbyclient") : route.continue());
+    const trackNavigation = (page: Page) => {
+      page.on("response", (response) => {
+        const request = response.request();
+        if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return;
+        const origins: string[] = [];
+        for (let next: typeof request | null = request; next; next = next.redirectedFrom()) {
+          const service = browserServiceForUrl(next.url());
+          if (service) origins.push(service.url);
+        }
+        this.navigationServices.set(page, origins);
+      });
+    };
+    context.pages().forEach(trackNavigation);
+    context.on("page", trackNavigation);
     context.on("close", () => this.contexts.delete(botId));
     this.contexts.set(botId, context);
     return context;
@@ -289,13 +334,42 @@ export class BrowserManager {
 
   async open(botId: string, rawUrl: string): Promise<{ url: string; title: string }> {
     const url = safeUrl(rawUrl);
+    this.assertWebsiteAccess(botId, url.toString());
     const page = await this.page(botId);
     await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+    this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
+  }
+
+  /** Detect obvious gates without returning field values or the login URL. The
+   * model can explicitly request a handoff for gates this conservative check misses. */
+  async signInState(botId: string): Promise<{ siteOrigin: string; needsSignIn: boolean }> {
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    const address = new URL(page.url());
+    if (/\/(?:login|signin|sign-in|log-in|sso|oauth2?\/authorize)(?:\/|$)/i.test(address.pathname)) {
+      return { siteOrigin: address.origin, needsSignIn: true };
+    }
+    const needsSignIn = await page.locator("body").evaluate((body) => {
+      // Keep callbacks inline: tsx's named-function helper is not present in the browser.
+      if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return true;
+      const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden").map((node) => node.textContent || "").join(" ");
+      return /sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading) &&
+        [...body.querySelectorAll('input,button,[role="button"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden");
+    });
+    this.assertPageAccess(botId, page);
+    return { siteOrigin: new URL(page.url()).origin, needsSignIn };
+  }
+
+  async signInView(botId: string) {
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    return { siteOrigin: signInOrigin(page.url()), screenshot: await this.screenshot(botId) };
   }
 
   async snapshot(botId: string): Promise<{ url: string; title: string; text: string }> {
     const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
     const text = await page.locator("body").evaluate((body) => {
       const elements = [...body.querySelectorAll("h1,h2,h3,p,a,button,input,textarea,select,[role]")].slice(0, 250);
       return elements.map((element, index) => {
@@ -307,11 +381,13 @@ export class BrowserManager {
         return `${index + 1}. [${role}] ${label.trim().replace(/\s+/g, " ").slice(0, 240)}`;
       }).filter((line) => !line.endsWith("] ")).join("\n");
     });
+    this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title(), text: text.slice(0, 30_000) };
   }
 
   async describeTarget(botId: string, selector: string): Promise<BrowserTarget & { fingerprint: string }> {
     const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
     const details = await page.locator(selector).first().evaluate((element) => {
       const node = element.closest("button,a,input,textarea,select,[role=button],[role=link]") || element;
       const input = node as HTMLInputElement;
@@ -325,20 +401,33 @@ export class BrowserManager {
         searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
       };
     }, undefined, { timeout: 12_000 });
+    this.assertPageAccess(botId, page);
     const target = { url: page.url(), ...details };
     return { ...target, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
   }
 
   private async assertTarget(botId: string, selector: string, fingerprint?: string) {
+    this.assertPageAccess(botId, await this.page(botId));
     if (fingerprint && (await this.describeTarget(botId, selector)).fingerprint !== fingerprint) {
       throw new Error("The page or control changed after review. Inspect it again and request a new approval.");
     }
+  }
+
+  private assertWebsiteAccess(botId: string, url: string) {
+    const reason = browserWebsiteBlock(this.db, botId, url);
+    if (reason) throw new Error(reason);
+  }
+
+  private assertPageAccess(botId: string, page: Page) {
+    const reason = browserNavigationBlock(this.db, botId, [page.url(), ...(this.navigationServices.get(page) || [])]);
+    if (reason) throw new Error(reason);
   }
 
   async click(botId: string, selector: string, fingerprint?: string) {
     const page = await this.page(botId);
     await this.assertTarget(botId, selector, fingerprint);
     await page.locator(selector).first().click({ timeout: 12_000 });
+    this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
   }
 
@@ -389,16 +478,113 @@ export class BrowserManager {
     };
   }
 
+  /** Live screen frames for viewers who are already watching. This never
+   * starts a browser or grants access: it only attaches to a browser this bot
+   * already has running, reports "stopped" until one appears, and follows the
+   * bot's browser when a task opens one later. Frames come from the same
+   * screen the owner can already see through the snapshot endpoint; the model
+   * never receives them. */
+  startFrameSource(botId: string, emit: (event: LiveViewEvent) => void): Promise<LiveViewSource> {
+    const bot = this.db.getBot(botId);
+    if (!bot?.browserEnabled || !this.isAvailable()) {
+      emit({ type: "status", browser: "stopped" });
+      return Promise.resolve({ stop() {} });
+    }
+    let stopped = false;
+    let session: CDPSession | null = null;
+    let tracked: Page | null = null;
+    let watchdog: ReturnType<typeof setInterval> | null = null;
+
+    const describe = async () => {
+      const page = tracked;
+      if (!page || page.isClosed()) return { title: null, currentUrl: null };
+      return { title: await page.title().catch(() => null), currentUrl: page.url() };
+    };
+
+    const detach = () => {
+      const current = session;
+      session = null;
+      tracked = null;
+      if (current) {
+        void current.send("Page.stopScreencast").catch(() => {});
+        void current.detach().catch(() => {});
+      }
+    };
+
+    const emitStatus = () => {
+      void describe().then(({ title, currentUrl }) => {
+        if (!stopped) emit({ type: "status", browser: session ? "ready" : "stopped", title, currentUrl });
+      });
+    };
+
+    const attach = async () => {
+      if (stopped) return;
+      const context = this.contexts.get(botId);
+      if (!context) {
+        if (session) {
+          detach();
+          emitStatus();
+        }
+        return;
+      }
+      if (session && tracked && !tracked.isClosed()) return;
+      const page = context.pages()[0] || await context.newPage().catch(() => null);
+      if (!page || stopped) return;
+      if (session && tracked === page) return;
+      detach();
+      try {
+        const cdp = await context.newCDPSession(page);
+        if (stopped) {
+          void cdp.detach().catch(() => {});
+          return;
+        }
+        cdp.on("Page.screencastFrame", (frame: unknown) => {
+          const data = (frame as { data?: string }).data;
+          const frameId = (frame as { sessionId?: number }).sessionId;
+          if (typeof frameId === "number") void cdp.send("Page.screencastFrameAck", { sessionId: frameId }).catch(() => {});
+          if (!stopped && typeof data === "string" && data.length > 0) emit({ type: "frame", jpeg: data });
+        });
+        await cdp.send("Page.startScreencast", { format: "jpeg", quality: 58, maxWidth: 1280, maxHeight: 820, everyNthFrame: 1 });
+        session = cdp;
+        tracked = page;
+        page.once("close", () => {
+          if (tracked === page) {
+            detach();
+            emitStatus();
+          }
+        });
+        emitStatus();
+      } catch {
+        session = null;
+        tracked = null;
+        if (!stopped) emit({ type: "status", browser: "unavailable" });
+      }
+    };
+
+    void attach();
+    watchdog = setInterval(() => void attach(), 2_000);
+    return Promise.resolve({
+      stop() {
+        stopped = true;
+        if (watchdog) clearInterval(watchdog);
+        detach();
+      },
+    });
+  }
+
   async startTeaching(botId: string, name: string, startUrl: string) {
     safeUrl(startUrl);
     await this.contexts.get(botId)?.close();
     const context = await this.context(botId, false);
-    const session = { name, startUrl, steps: [] as TeachStep[] };
+    const session = { name, startUrl: teachingAddress(startUrl), steps: [] as TeachStep[] };
+    const fields = new Map<string, string>();
     this.teaching.set(botId, session);
-    await context.exposeBinding("__openbotTeach", (_source, step: Omit<TeachStep, "at">) => {
+    await context.exposeBinding("__openbotTeach", (source, step: unknown) => {
       const active = this.teaching.get(botId);
-      if (!active) return;
-      const sanitized = { ...step, value: step.value && /password|secret|token|key/i.test(step.label || "") ? "{{secret}}" : step.value, at: new Date().toISOString() } as TeachStep;
+      if (!active || active.steps.length >= 80) return;
+      let captured: SkillStep;
+      try { captured = captureTeachingStep(step, source.frame.url(), fields); } catch { return; }
+      const sanitized = { ...captured, at: new Date().toISOString() };
       const last = active.steps.at(-1);
       if (last && last.type === sanitized.type && last.selector === sanitized.selector && last.value === sanitized.value) return;
       active.steps.push(sanitized);
@@ -408,12 +594,12 @@ export class BrowserManager {
         const selector = ${compactSelector.toString()};
         const send = (step) => window.__openbotTeach?.({ ...step, url: location.href });
         addEventListener('click', (event) => { const el = event.target?.closest?.('a,button,input,[role="button"]'); if (el) send({ type:'click', selector:selector(el), label:(el.getAttribute('aria-label') || el.innerText || '').trim().slice(0,120) }); }, true);
-        addEventListener('change', (event) => { const el = event.target; if (el?.matches?.('input,textarea,select')) send({ type:'input', selector:selector(el), value:el.type === 'password' ? '{{secret}}' : el.value, label:el.getAttribute('aria-label') || el.name || el.placeholder || el.type }); }, true);
+        addEventListener('change', (event) => { const el = event.target; if (el?.matches?.('input,textarea,select')) send({ type:'input', selector:selector(el), privateField:el.type === 'password' || /password|secret|token|one.?time|passcode|verification|otp/i.test([el.name,el.id,el.autocomplete,el.getAttribute('aria-label')].join(' ')), label:el.getAttribute('aria-label') || el.name || el.placeholder || el.type }); }, true);
         addEventListener('submit', (event) => send({ type:'submit', selector:selector(event.target), label:'Submit form' }), true);
       })();
     `);
     const page = context.pages()[0] || await context.newPage();
-    page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) session.steps.push({ type: "navigate", url: frame.url(), at: new Date().toISOString() }); });
+    page.on("framenavigated", (frame) => { if (frame === page.mainFrame() && session.steps.length < 80) { try { session.steps.push({ type: "navigate", url: teachingAddress(frame.url()), at: new Date().toISOString() }); } catch { /* Non-web transitions are not reusable steps. */ } } });
     await page.goto(startUrl, { waitUntil: "domcontentloaded" });
     return { recording: true, stepCount: session.steps.length };
   }
@@ -424,8 +610,8 @@ export class BrowserManager {
     this.teaching.delete(botId);
     await this.contexts.get(botId)?.close();
     const slug = this.db.nextWorkflowSlug(botId, session.name);
-    const description = `Repeat the browser workflow taught for ${session.name}.`;
-    const instructions = `Start at the saved page, follow the demonstrated actions in order, and verify the result before answering.`;
+    const description = `A demonstrated draft for ${session.name}; confirm inputs and test another example before scheduling.`;
+    const instructions = `Start at the saved page and inspect its current state. Recorded inputs are placeholders, not retained values. Ask for missing non-secret inputs; use owner takeover for login or private fields. Adapt the demonstrated actions only within the owner's request, stop on changed controls or unknown state, and verify the result before answering.`;
     const skillPath = this.writeTaughtSkill(botId, slug, session.name, description, instructions, session.startUrl, session.steps);
     return this.db.saveWorkflow({ botId, name: session.name, description, instructions, startUrl: session.startUrl, steps: session.steps, skillPath, skillSlug: slug, source: "taught" });
   }

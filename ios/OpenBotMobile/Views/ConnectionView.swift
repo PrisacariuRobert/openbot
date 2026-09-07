@@ -4,6 +4,8 @@ struct ConnectionView: View {
     @EnvironmentObject private var session: ConnectionSession
     @State private var address = ""
     @State private var accessKey = ""
+    @State private var scanning = false
+    @State private var scannedURL: URL?
     @FocusState private var focusedField: Field?
 
     private enum Field { case address, key }
@@ -11,24 +13,37 @@ struct ConnectionView: View {
     var body: some View {
         ZStack {
             OpenBotTheme.paper.ignoresSafeArea()
-            Circle().fill(OpenBotTheme.purple.opacity(0.12)).frame(width: 330).blur(radius: 4).offset(x: 170, y: -330)
-            Circle().fill(Color.green.opacity(0.08)).frame(width: 260).blur(radius: 8).offset(x: -180, y: 360)
             ScrollView {
                 VStack(spacing: 24) {
                     Spacer(minLength: 24)
                     MascotPairView().frame(height: 126)
                     VStack(spacing: 8) {
                         Text("Your studio, in your pocket.")
-                            .font(.system(size: 31, weight: .bold, design: .rounded))
+                            .font(.system(size: 31, weight: .bold, design: .default))
                             .foregroundStyle(OpenBotTheme.ink)
                             .multilineTextAlignment(.center)
-                        Text("Connect to your OpenBot home on a Mac or private host. Your conversations, teammates and approvals stay there.")
-                            .font(.system(size: 15, weight: .regular, design: .rounded))
+                        Text("Open Away access on your Mac, then scan its QR code. Your team, conversations and approvals come with you.")
+                            .font(.system(size: 15, weight: .regular, design: .default))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .lineSpacing(3)
                     }
                     VStack(spacing: 14) {
+                        Button { scanning = true } label: {
+                            Label("Scan my Mac’s QR code", systemImage: "qrcode.viewfinder")
+                                .font(.system(size: 16, weight: .bold, design: .default))
+                                .frame(maxWidth: .infinity, minHeight: 54)
+                        }
+                        .buttonStyle(.plain).foregroundStyle(.white)
+                        .background(OpenBotTheme.purple, in: RoundedRectangle(cornerRadius: 12))
+                        .disabled(session.isConnecting)
+                        .accessibilityIdentifier("scan-pairing-code")
+                        if session.isConnecting { ProgressView("Connecting to your studio…") }
+                        if let error = session.errorMessage {
+                            Text(error).foregroundStyle(Color.primary).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        }
+                        DisclosureGroup("Advanced · connect manually") {
+                        VStack(spacing: 14) {
                         fieldLabel("OpenBot address", icon: "network")
                         TextField("https://your-private-address", text: $address)
                             .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
@@ -47,8 +62,8 @@ struct ConnectionView: View {
                             .openBotField()
                         if let error = session.errorMessage {
                             Label(error, systemImage: "exclamationmark.circle.fill")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color(red: 0.72, green: 0.30, blue: 0.28))
+                                .font(.system(size: 13, weight: .medium, design: .default))
+                                .foregroundStyle(Color(white: 0.388))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         Button {
@@ -59,23 +74,23 @@ struct ConnectionView: View {
                                 else { Image(systemName: "arrow.up.right") }
                                 Text(session.isConnecting ? "Connecting…" : "Open my studio")
                             }
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(.system(size: 16, weight: .bold, design: .default))
                             .frame(maxWidth: .infinity, minHeight: 54)
                         }
                         .buttonStyle(.plain).foregroundStyle(.white)
                         .accessibilityIdentifier("connect-studio")
                         .background(OpenBotTheme.purple, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .shadow(color: OpenBotTheme.purple.opacity(0.22), radius: 18, y: 8)
                         .disabled(session.isConnecting)
+                        }.padding(.top, 16)
+                        }
                     }
                     .padding(20)
                     .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.black.opacity(0.06)))
                     VStack(alignment: .leading, spacing: 10) {
-                        reassurance("The access key is protected in this iPhone’s Keychain.", icon: "lock.shield.fill")
-                        reassurance("With Tailscale on both devices, OpenBot works over cellular or any Wi-Fi.", icon: "globe.americas.fill")
-                        reassurance("Other public addresses must use HTTPS; never expose OpenBot’s plain port.", icon: "checkmark.shield.fill")
-                        reassurance("Use your Mac, or choose a private always-on host that keeps working when it is off.", icon: "server.rack")
+                        reassurance("Only OpenBot. No extra apps on your Mac or iPhone.", icon: "checkmark.shield.fill")
+                        reassurance("Your phone’s connection is saved securely. Remove it from your Mac at any time.", icon: "lock.shield.fill")
+                        reassurance("Away access needs the OpenBot relay online and your Mac awake, or a private always-on host.", icon: "globe.americas.fill")
                     }
                     Spacer(minLength: 20)
                 }
@@ -84,11 +99,20 @@ struct ConnectionView: View {
         }
         .onAppear { if address.isEmpty { address = session.suggestedAddress } }
         .onChange(of: session.suggestedAddress) { _, value in if !value.isEmpty { address = value } }
+        .sheet(isPresented: $scanning, onDismiss: {
+            if let url = scannedURL { scannedURL = nil; session.handleDeepLink(url) }
+        }) {
+            NavigationStack {
+                PairingScannerView { url in scannedURL = url; scanning = false }
+                    .navigationTitle("Connect your studio").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { scanning = false } } }
+            }
+        }
     }
 
     private func fieldLabel(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(.system(size: 13, weight: .semibold, design: .default))
             .foregroundStyle(OpenBotTheme.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, -8)
@@ -101,14 +125,14 @@ struct ConnectionView: View {
 
     private func reassurance(_ text: String, icon: String) -> some View {
         Label { Text(text).fixedSize(horizontal: false, vertical: true) } icon: { Image(systemName: icon).foregroundStyle(OpenBotTheme.green) }
-            .font(.system(size: 12.5, weight: .medium, design: .rounded))
+            .font(.system(size: 12.5, weight: .medium, design: .default))
             .foregroundStyle(.secondary)
     }
 }
 
 private extension View {
     func openBotField() -> some View {
-        self.font(.system(size: 15, weight: .medium, design: .rounded))
+        self.font(.system(size: 15, weight: .medium, design: .default))
             .padding(.horizontal, 15).frame(minHeight: 52)
             .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(Color.black.opacity(0.08)))

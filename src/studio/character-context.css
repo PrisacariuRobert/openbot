@@ -1,0 +1,63 @@
+.meet-teammate > .character {
+  margin: -5px auto 21px;
+}
+.meet-teammate > .overline,
+.meet-teammate > .detail-title,
+.teammate-specialty {
+  text-align: center;
+}
+.meet-teammate > .detail-title {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+.teammate-specialty {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.teammate-facts {
+  border-top: 1px solid var(--line);
+}
+.teammate-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.teammate-facts span {
+  color: var(--muted);
+}
+.teammate-facts strong {
+  font-weight: 500;
+  text-align: right;
+}
+.character-mood-curious .character-drawing {
+  rotate: 5deg;
+}
+.character-mood-focused .character-drawing {
+  animation-duration: 2.7s;
+}
+.character-wave {
+  transform-origin: 81px 64px;
+  animation: character-wave 0.65s ease-in-out 3;
+}
+@keyframes character-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(17deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .character-wave {
+    animation: none;
+  }
+  .character-mood-curious .character-drawing {
+    rotate: none;
+  }
+}

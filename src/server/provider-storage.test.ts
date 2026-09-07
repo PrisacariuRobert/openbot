@@ -3,7 +3,31 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
+
+test("first-run provider choice is explicit, durable, and never overwrites existing choices", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-choice-test-"));
+  let db = new OpenBotDatabase(root);
+  try {
+    const empty = () => assert.ok(db.listBots().every((bot) => bot.providerInstanceId === null && bot.model === ""));
+    empty();
+    db.close(); db = new OpenBotDatabase(root); empty();
+    const custom = db.upsertProvider({ name: "Local owner choice", authMode: "api_key", apiConfig: { baseUrl: "http://localhost:11434/v1", protocol: "openai-compatible", modelIds: ["chosen"] } });
+    // Discovering or saving a provider is not consent to use it.
+    empty();
+    assert.throws(() => db.chooseInitialProvider(custom.id, "opencode/unrelated"), /selected AI connection/);
+    empty();
+    db.updateBot("pixel", { providerInstanceId: "local-opencode", model: "opencode/existing-owner-choice" });
+    assert.equal(db.chooseInitialProvider(custom.id, `openbot-${custom.id}/chosen`), 2);
+    assert.equal(db.chooseInitialProvider("local-opencode", "opencode/another"), 0);
+    db.close(); db = new OpenBotDatabase(root);
+    assert.equal(db.getBot("nova")?.providerInstanceId, custom.id);
+    assert.equal(db.getBot("pixel")?.model, "opencode/existing-owner-choice");
+    const added = db.createBot({ name: "Unconfigured", emoji: "x", color: "#123456", role: "Helper", instructions: "Test" });
+    assert.equal(added.providerInstanceId, null);
+    assert.equal(added.model, "");
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
 
 test("persists private endpoint configurations and isolates each teammate's key", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-provider-test-"));

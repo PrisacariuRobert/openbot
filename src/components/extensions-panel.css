@@ -1,0 +1,49 @@
+.extensions-panel { margin-top: 28px; padding: clamp(18px, 3vw, 28px); border: 1px solid #e4e4e4; border-radius: 24px; background: #ffffff; color: #2e2e2e; min-width: 0; }
+.extensions-panel * { box-sizing: border-box; }
+.extensions-panel header { display:flex; justify-content:space-between; gap:16px; }
+.extensions-panel h3 { margin:6px 0; font-size:22px; letter-spacing:-.5px; }
+.extension-eyebrow { color:#797979; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+.extensions-panel p { color:#707070; line-height:1.55; margin:8px 0 14px; overflow-wrap:anywhere; }
+.extensions-panel h4 { display:flex; align-items:center; gap:8px; margin:0 0 6px; font-size:15px; overflow-wrap:anywhere; }
+.extensions-panel small { color:#737373; font-size:12px; }
+.extensions-panel nav { display:flex; flex-wrap:wrap; gap:5px; padding:5px; background:#f5f5f5; border-radius:14px; margin:20px 0; }
+.extensions-panel button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:8px 13px; border:1px solid #e5e5e5; border-radius:11px; background:#ffffff; color:#484848; font:inherit; font-size:13px; cursor:pointer; }
+.extensions-panel nav button { flex:1 1 auto; border-color:transparent; background:transparent; }
+.extensions-panel nav button[aria-pressed=true] { background:white; border-color:#e5e5e5; }
+.extensions-panel button:disabled { opacity:.5; cursor:wait; }
+.extensions-panel .extension-primary { color:white; background:#616161; border-color:#616161; margin-top:10px; }
+.extensions-panel fieldset { min-width:0; padding:0; border:0; margin:0; }
+.extensions-panel form { display:grid; gap:14px; margin-top:16px; }
+.extensions-panel label { display:grid; gap:7px; font-size:13px; font-weight:550; }
+.extensions-panel input:not([type=checkbox]), .extensions-panel textarea, .extensions-panel select { width:100%; min-width:0; border:1px solid #dbdbdb; background:white; border-radius:10px; padding:10px 12px; color:inherit; font:inherit; font-size:14px; }
+.extensions-panel textarea { resize:vertical; }
+.extensions-panel :is(input,textarea,select,button):focus-visible { outline:3px solid #bdbdbd; outline-offset:2px; }
+.extensions-panel .extension-teammate { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.extension-teammate select { max-width:240px; }
+.extension-card { border:1px solid #e6e6e6; border-radius:16px; padding:18px; margin:14px 0; min-width:0; }
+.extension-card-heading { display:flex; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.extension-card-heading > div { min-width:0; }
+.extension-card-heading > button { align-self:flex-start; flex-shrink:0; }
+.extensions-panel details { margin-top:14px; min-width:0; }
+.extensions-panel summary { cursor:pointer; font-size:14px; color:#5b5b5b; padding:7px 0; }
+.extensions-panel pre { overflow:auto; max-height:280px; white-space:pre-wrap; overflow-wrap:anywhere; background:#f6f6f6; border-radius:10px; padding:14px; font-size:12px; }
+.extension-tool { display:grid; grid-template-columns:minmax(0,1fr) 165px; gap:16px; border-top:1px solid #ebebeb; padding:16px 0; align-items:start; }
+.extension-tool p { font-size:12px; }
+.extensions-panel .extension-check { display:flex; gap:9px; align-items:center; font-weight:400; line-height:1.5; }
+.extension-check input { accent-color:#616161; flex-shrink:0; }
+.extension-add { border-top:1px solid #ebebeb; padding-top:12px; }
+.extension-add > summary { font-weight:600; }
+.extension-starters { display:grid; gap:7px; padding:10px 0; border-bottom:1px solid #ebebeb; margin-bottom:10px; }
+.extension-starters small { color:#898989; line-height:1.5; }
+.extension-starters button { justify-self:start; border:1px solid #e2e2e2; border-radius:8px; padding:5px 11px; font-size:12px; background:transparent; cursor:pointer; }
+.extension-starters button:hover { background:#f3f3f3; }
+.extension-divider { margin:24px 0 16px; font-size:12px; color:#898989; }
+.extension-review { padding:18px; background:#f9f9f9; border:1px solid #e2e2e2; border-radius:14px; margin-top:18px; }
+.extension-review li { margin:8px 0; font-size:13px; line-height:1.5; }
+.extensions-panel .extension-error { color:#535353; background:#f7f7f7; padding:10px; border-radius:10px; }
+.extensions-panel .extension-notice { display:flex; gap:8px; align-items:center; color:#666666; font-size:13px; }
+.extension-actions { display:flex; gap:8px; }
+.extension-empty { padding:20px; background:#f9f9f9; border-radius:14px; }
+@media(max-width:560px) { .extension-tool { grid-template-columns: minmax(0,1fr); } .extensions-panel { padding:18px; } .extension-card { padding:14px; } }
+.skill-own-workflows { margin-top: 24px; border-top: 1px solid #e6e6e6; padding-top: 20px; }
+.skill-own-workflows > summary { cursor: pointer; padding: 10px 0; font-weight: 650; }

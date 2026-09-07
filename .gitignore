@@ -7,3 +7,16 @@ dist/
 .env.*
 !.env.example
 coverage/
+
+# Runtime databases, signing credentials and per-user native state are never source.
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+*.xcuserstate
+xcuserdata/
+DerivedData/

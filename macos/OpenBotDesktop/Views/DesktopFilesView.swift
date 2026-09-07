@@ -18,18 +18,18 @@ struct DesktopFilesView: View {
             HStack(spacing: 12) {
                 Image(systemName: "folder.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Workspace files").font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text("Workspace files").font(.system(size: 17, weight: .bold, design: .default))
                     Text("Review the durable files a teammate created in its private workspace.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Picker("Teammate", selection: $selectedBotID) {
                     ForEach(store.state.bots) { Text($0.name).tag($0.id) }
                 }
                 .labelsHidden().frame(width: 170)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 24).background(StudioPalette.paper)
             Divider().opacity(0.55)
 
             if let file = store.workspaceFileContent {
@@ -38,7 +38,7 @@ struct DesktopFilesView: View {
                 fileBrowser
             }
         }
-        .frame(width: 820, height: 680).background(DesktopTheme.paper)
+        .desktopPanelSize(width: 820, height: 680).background(DesktopTheme.paper)
         .task {
             if selectedBotID.isEmpty { selectedBotID = store.activeBot?.id ?? store.state.bots.first?.id ?? "" }
             if !selectedBotID.isEmpty { await store.refreshWorkspace(botID: selectedBotID) }
@@ -60,8 +60,8 @@ struct DesktopFilesView: View {
                 }
             }
             .padding(.horizontal, 12).frame(height: 38)
-            .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(.black.opacity(0.07)))
+            .background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(StudioPalette.line))
             .padding(16)
 
             if store.isCheckingWorkspace && store.workspaceFiles.isEmpty {
@@ -84,10 +84,10 @@ struct DesktopFilesView: View {
                                 .foregroundStyle(file.kind == "directory" ? DesktopTheme.purple.opacity(0.78) : .secondary)
                                 .frame(width: 22)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(file.path).font(.system(size: 12.5, weight: file.kind == "directory" ? .semibold : .regular, design: .rounded))
+                                Text(file.path).font(.system(size: 12.5, weight: file.kind == "directory" ? .semibold : .regular, design: .default))
                                     .lineLimit(1).truncationMode(.middle)
                                 Text(file.kind == "directory" ? "Folder" : ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
-                                    .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.secondary)
+                                    .font(.system(size: 9.5, design: .default)).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if file.kind == "file" { Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary) }
@@ -101,11 +101,11 @@ struct DesktopFilesView: View {
 
             if let error = store.errorMessage {
                 Label(error, systemImage: "exclamationmark.circle.fill")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                    .font(.system(size: 11, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     .padding(.horizontal, 18).padding(.bottom, 8)
             }
             Text("This view is read-only and limited to the selected teammate's private workspace. Hidden files, large files, and paths outside that workspace stay unavailable.")
-                .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 .padding(.horizontal, 18).padding(.vertical, 11)
         }
     }
@@ -116,7 +116,7 @@ struct DesktopFilesView: View {
                 Button { store.closeWorkspaceFile() } label: { Label("All files", systemImage: "chevron.left") }
                     .buttonStyle(.bordered).controlSize(.small)
                 Image(systemName: fileIcon(file.path)).foregroundStyle(DesktopTheme.purple)
-                Text(file.path).font(.system(size: 12, weight: .semibold, design: .rounded)).lineLimit(1).truncationMode(.middle)
+                Text(file.path).font(.system(size: 12, weight: .semibold, design: .default)).lineLimit(1).truncationMode(.middle)
                 Spacer()
                 Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(file.content, forType: .string) } label: {
                     Label("Copy text", systemImage: "doc.on.doc")
@@ -129,7 +129,7 @@ struct DesktopFilesView: View {
                     .font(.system(size: 11.5, design: .monospaced)).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading).padding(18)
             }
-            .background(.white.opacity(0.72))
+            .background(StudioPalette.surface)
         }
     }
 

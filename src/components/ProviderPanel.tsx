@@ -27,6 +27,7 @@ type Props = {
   provider: ProviderStatus | null;
   bots: Bot[];
   onUpdateBot: (id: string, patch: Partial<Bot>) => Promise<void>;
+  onChooseInitial: (providerInstanceId: string, model: string) => Promise<void>;
   onAdd: (input: ProviderInput) => Promise<void>;
   onConnect: (id: ProviderCatalogEntry["id"]) => Promise<ProviderLoginAttempt>;
   onFinish: (id: string, code: string) => Promise<void>;
@@ -74,6 +75,7 @@ export function ProviderPanel({
   provider,
   bots,
   onUpdateBot,
+  onChooseInitial,
   onAdd,
   onConnect,
   onFinish,
@@ -94,6 +96,10 @@ export function ProviderPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [initialConnection, setInitialConnection] = useState("");
+  const [initialModel, setInitialModel] = useState("");
+  const needsChoice = bots.some((bot) => !bot.providerInstanceId && !bot.model);
+  const initial = provider?.instances.find((entry) => entry.id === initialConnection);
   // Polling refreshes the shared status. Never keep showing an old waiting
   // attempt after the runtime has reported success or failure.
   const currentAttempt =
@@ -228,6 +234,30 @@ export function ProviderPanel({
         )}
       </header>
       {!provider && <p role="status">Checking your connections…</p>}
+      {needsChoice && (
+        <section className="ai-team" aria-label="Choose your first AI provider">
+          <h3>First, choose the AI you want to use</h3>
+          <p>No provider is selected for you. Connect an account below, or choose an existing connection. You can mix models later.</p>
+          <div className="ai-teammate-fields">
+            <label>Provider
+              <select aria-label="First provider" value={initialConnection} onChange={(event) => { setInitialConnection(event.target.value); setInitialModel(""); }} disabled={busy !== null}>
+                <option value="">Choose your provider</option>
+                {provider?.instances.filter((entry) => entry.connected && entry.models?.length).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+              </select>
+            </label>
+            <label>Model
+              <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
+                <option value="">Choose a model</option>
+                {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}
+              </select>
+            </label>
+          </div>
+          <p className="ai-help">Uses your account’s limits or API billing. OpenBot will not silently switch providers. The first task checks actual model access.</p>
+          <button className="button-primary" disabled={busy !== null || !initial?.connected || !initial?.models?.includes(initialModel)} onClick={() => void act("initial", () => onChooseInitial(initialConnection, initialModel))}>
+            Use this AI for unconfigured teammates
+          </button>
+        </section>
+      )}
       {error && (
         <div className="ai-feedback ai-error" role="alert">
           <CircleAlert size={17} />
@@ -486,7 +516,7 @@ export function ProviderPanel({
             (entry) => entry.id === bot.providerInstanceId,
           );
           const models = [
-            ...new Set([bot.model, ...(connection?.models || [])]),
+            ...new Set([bot.model, ...(connection?.models || [])].filter(Boolean)),
           ];
           return (
             <div key={bot.id} className="ai-teammate">
@@ -542,6 +572,7 @@ export function ProviderPanel({
                       )
                     }
                   >
+                    {!bot.model && <option value="">Choose a model</option>}
                     {models.map((model) => (
                       <option key={model} value={model}>
                         {modelLabel(model)}

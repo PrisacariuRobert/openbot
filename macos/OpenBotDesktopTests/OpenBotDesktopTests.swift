@@ -1,8 +1,141 @@
 import Foundation
+import AppKit
 import XCTest
 @testable import OpenBot
 
 final class OpenBotDesktopTests: XCTestCase {
+    func testRoomIdentityShowsOnlyActualMembersAndKeepsTheWholeTeamRoom() {
+        let bots = ["nova", "pixel", "scout"].map { StudioBot(id: $0, name: $0, mascot: "blob", color: "#7768CD", role: "Partner", status: "ready", threadId: $0, lastActiveAt: nil) }
+        let custom = StudioThread(id: "group", title: "Launch", kind: "room", botId: nil, botIds: ["pixel", "nova"], updatedAt: "")
+        XCTAssertEqual(custom.members(in: bots).map(\.id), ["pixel", "nova"])
+        let whole = StudioThread(id: "team-room", title: "Together", kind: "room", botId: nil, updatedAt: "")
+        XCTAssertEqual(whole.members(in: bots).count, 3)
+        let direct = StudioThread(id: "nova", title: "Nova", kind: "direct", botId: "nova", updatedAt: "")
+        XCTAssertEqual(direct.members(in: bots).map(\.id), ["nova"])
+    }
+    func testBrandMarksUseBundledServiceArtworkAndHonestFallbacks() {
+        for name in ["opencode", "openai", "claude", "github", "gitlab", "gmail", "google-calendar", "google-drive", "slack", "notion", "todoist", "dropbox"] {
+            let asset = StudioBrandMark.assetName(for: name)
+            XCTAssertNotNil(asset, name)
+            XCTAssertNotNil(asset.flatMap { NSImage(named: $0) }, "Missing bundled logo for \(name)")
+        }
+        XCTAssertEqual(StudioBrandMark.assetName(for: "ChatGPT / OpenAI"), "Brand-openai")
+        XCTAssertEqual(StudioBrandMark.assetName(for: "github-copilot"), "Brand-github")
+        XCTAssertNil(StudioBrandMark.assetName(for: "unknown-service"))
+    }
+    func testCancelledSettingsLoadsDoNotBecomeMisleadingActionErrors() {
+        XCTAssertTrue(StudioAPIError.isCancelledRequest(CancellationError()))
+        XCTAssertTrue(StudioAPIError.isCancelledRequest(URLError(.cancelled)))
+        XCTAssertFalse(StudioAPIError.isCancelledRequest(URLError(.notConnectedToInternet)))
+        XCTAssertFalse(StudioAPIError.isCancelledRequest(StudioAPIError.unauthorized))
+        XCTAssertFalse(StudioAPIError.isCancelledRequest(StudioAPIError.server("Action failed")))
+    }
+    func testSettingsKeepsEveryExistingManagementDestination() {
+        XCTAssertEqual(Set(DesktopSettingsSection.allCases.map(\.rawValue)), Set([
+            "AI providers", "Your team", "Connected apps", "Routines", "Skills", "Teach a skill",
+            "Code projects", "Files", "Artifacts", "Permissions", "You & devices"
+        ]))
+        XCTAssertTrue(DesktopSettingsSection.allCases.allSatisfy { !$0.icon.isEmpty })
+    }
+
+    func testGroupInputMatchesHostContractWithoutChangingMemberPermissions() throws {
+        let input = try XCTUnwrap(StudioGroupInput(title: "  Launch team  ", botIDs: ["pixel", "nova", "pixel"]))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(input)) as? [String: Any])
+        XCTAssertEqual(json["title"] as? String, "Launch team")
+        XCTAssertEqual(json["botIds"] as? [String], ["nova", "pixel"])
+        XCTAssertEqual(Set(json.keys), Set(["title", "botIds"]))
+        XCTAssertNil(StudioGroupInput(title: " ", botIDs: ["nova"]))
+        XCTAssertNil(StudioGroupInput(title: "Team", botIDs: []))
+        XCTAssertNil(StudioGroupInput(title: "Team", botIDs: [" "]))
+        XCTAssertNil(StudioGroupInput(title: "Team", botIDs: (0..<7).map(String.init)))
+        XCTAssertNil(StudioGroupInput(title: String(repeating: "a", count: 49), botIDs: ["nova"]))
+        XCTAssertNil(StudioGroupInput(title: String(repeating: "🤖", count: 25), botIDs: ["nova"]))
+    }
+    func testConversationListSearchesDirectChatsAndRoomsAndHidesHiddenThreads() {
+        let threads = [
+            StudioThread(id: "nova", title: "Nova", kind: "direct", botId: "bot", updatedAt: "2026-09-06T10:00:00Z", lastMessage: "Design review"),
+            StudioThread(id: "room", title: "Launch", kind: "room", botId: nil, updatedAt: "2026-09-06T11:00:00Z", lastMessage: "Ready to review"),
+            StudioThread(id: "hidden", title: "Review", kind: "direct", botId: nil, updatedAt: "2026-09-06T12:00:00Z", hidden: true)
+        ]
+        let bot = StudioBot(id: "bot", name: "Nova", mascot: "nova", color: "#6757d9", role: "Researcher", status: "ready", threadId: "nova", lastActiveAt: nil)
+        XCTAssertEqual(DesktopConversationPresentation.conversations(threads, bots: [bot], matching: " REVIEW ").map(\.id), ["room", "nova"])
+        XCTAssertEqual(DesktopConversationPresentation.conversations(threads, bots: [bot], matching: "researcher").map(\.id), ["nova"])
+        XCTAssertTrue(DesktopConversationPresentation.conversations(threads, bots: [bot], matching: "no match").isEmpty)
+        XCTAssertEqual(DesktopConversationPresentation.conversations(threads, bots: [bot], matching: " ").count, 2)
+    }
+
+    func testConversationOrderUsesLatestMessageAndStableTies() {
+        let threads = [
+            StudioThread(id: "z", title: "Z", kind: "room", botId: nil, updatedAt: "2026-09-06T12:00:00Z", lastMessageAt: "2026-09-01T12:00:00Z"),
+            StudioThread(id: "b", title: "B", kind: "room", botId: nil, updatedAt: "2026-09-06T11:00:00.000Z"),
+            StudioThread(id: "a", title: "A", kind: "room", botId: nil, updatedAt: "2026-09-06T11:00:00Z")
+        ]
+        XCTAssertEqual(DesktopConversationPresentation.conversations(threads, bots: [], matching: "").map(\.id), ["a", "b", "z"])
+    }
+
+    func testMessagesGroupOnlyForTheSameSpeakerAndNearbyTime() {
+        let first = displayMessage(id: "one", at: "2026-09-06T10:00:00Z")
+        XCTAssertTrue(DesktopConversationPresentation.startsGroup(first, after: nil))
+        XCTAssertFalse(DesktopConversationPresentation.startsGroup(displayMessage(id: "two", at: "2026-09-06T10:01:00.000Z"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.startsGroup(displayMessage(id: "late", at: "2026-09-06T10:06:00Z"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.startsGroup(displayMessage(id: "system", at: "2026-09-06T10:01:00Z", type: "system"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.startsGroup(displayMessage(id: "other", at: "2026-09-06T10:01:00Z", type: "user"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.startsGroup(displayMessage(id: "invalid", at: "unknown"), after: first))
+    }
+
+    func testTimestampSeparatorsRespectGapsAndThreadBoundaries() {
+        let first = displayMessage(id: "one", at: "2026-09-06T10:00:00Z")
+        XCTAssertTrue(DesktopConversationPresentation.showsTimestamp(first, after: nil))
+        XCTAssertFalse(DesktopConversationPresentation.showsTimestamp(displayMessage(id: "two", at: "2026-09-06T10:01:00Z"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.showsTimestamp(displayMessage(id: "late", at: "2026-09-06T10:15:00Z"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.showsTimestamp(displayMessage(id: "tomorrow", at: "2026-09-07T10:00:00Z"), after: first))
+        XCTAssertTrue(DesktopConversationPresentation.showsTimestamp(displayMessage(id: "other", at: "2026-09-06T10:00:00Z", thread: "another"), after: first))
+        XCTAssertEqual(DesktopConversationPresentation.timestamp("invalid"), "")
+    }
+
+    private func displayMessage(id: String, at: String, type: String = "bot", thread: String = "chat") -> StudioMessage {
+        StudioMessage(id: id, threadId: thread, senderType: type, senderId: nil, senderName: type == "bot" ? "Nova" : "You", senderMascot: nil, senderColor: nil, body: "Hello", createdAt: at, runId: nil, attachments: [])
+    }
+
+    func testNativeAndRunnerVersionsMustMatchBeforeStartingOrReusingAStudio() throws {
+        XCTAssertNoThrow(try DesktopRunnerController.requireMatchingVersion("0.37.0", appVersion: "0.37.0"))
+        XCTAssertThrowsError(try DesktopRunnerController.requireMatchingVersion("0.36.0", appVersion: "0.37.0"))
+        XCTAssertThrowsError(try DesktopRunnerController.requireMatchingVersion(nil, appVersion: "0.37.0", running: true))
+    }
+    func testCalendarScheduleAndServerPreviewRoundTrip() throws {
+        let schedule = StudioRoutineSchedule(kind: "calendar", timeZone: "Europe/Brussels", time: "08:00", daysOfWeek: [1, 2, 3, 4, 5])
+        XCTAssertEqual(try JSONDecoder().decode(StudioRoutineSchedule.self, from: JSONEncoder().encode(schedule)), schedule)
+        let json = #"{"label":"Weekdays at 08:00 · Europe/Brussels","nextRuns":["2026-03-30T06:00:00.000Z"],"descriptions":["Mon 30 Mar 2026, 08:00 CEST"],"policy":"Catch up once"}"#
+        let preview = try JSONDecoder().decode(StudioSchedulePreview.self, from: Data(json.utf8))
+        XCTAssertEqual(preview.nextRuns, ["2026-03-30T06:00:00.000Z"])
+        XCTAssertEqual(preview.descriptions, ["Mon 30 Mar 2026, 08:00 CEST"])
+    }
+    func testPageWatchStatusAndConfigurationDecodeWithoutRawSnapshot() throws {
+        let data = Data(#"{"id":"watch","name":"Updates","botId":"nova","botName":"Nova","threadId":"bot-nova","prompt":"Summarize changes","intervalMinutes":15,"triggerType":"webpage","triggerConfig":{"pageUrl":"https://example.com/","pageSelector":"main"},"enabled":true,"lastStatus":"never","runCount":0,"consecutiveFailures":0,"watchStatus":{"state":"unchanged","checkedAt":"2026-09-05T12:00:00Z","nextCheckAt":"2026-09-05T12:15:00Z","checks":2,"unchangedChecks":1,"detail":"No model was used."}}"#.utf8)
+        let routine = try JSONDecoder().decode(StudioRoutine.self, from: data)
+        XCTAssertEqual(routine.triggerConfig?.pageSelector, "main")
+        XCTAssertEqual(routine.watchStatus?.unchangedChecks, 1)
+        XCTAssertEqual(routine.watchStatus?.state, "unchanged")
+    }
+    func testOnlyLoopbackPairingAvoidsPersistentKeyStorage() throws {
+        XCTAssertFalse(DesktopConnectionSession.persistsAccessKey(for: try ConnectionAddress.normalized("http://127.0.0.1:4311")))
+        XCTAssertFalse(DesktopConnectionSession.persistsAccessKey(for: try ConnectionAddress.normalized("http://localhost:4311")))
+        XCTAssertTrue(DesktopConnectionSession.persistsAccessKey(for: try ConnectionAddress.normalized("http://100.94.155.13:4311")))
+        XCTAssertTrue(DesktopConnectionSession.persistsAccessKey(for: try ConnectionAddress.normalized("https://studio.example.com")))
+    }
+    func testNativeStartersCarryTheirRequiredSavedReport() {
+        XCTAssertEqual(StudioStarter.all.first { $0.id == "morning-brief" }?.expectedWorkKind, "morning")
+        XCTAssertEqual(StudioStarter.all.first { $0.id == "inbox-follow-ups" }?.expectedWorkKind, "inbox")
+        XCTAssertEqual(StudioStarter.all.first { $0.id == "meeting-prep" }?.expectedWorkKind, "meeting")
+    }
+    func testPackagedRunnerPreservesExistingDataAndRejectsUnknownServiceLayouts() throws {
+        let home = URL(filePath: "/Users/Owner", directoryHint: .isDirectory)
+        XCTAssertEqual(try DesktopRunnerController.dataDirectory(home: home, service: nil).path, "/Users/Owner/Library/Application Support/OpenBot/Data")
+        XCTAssertEqual(try DesktopRunnerController.dataDirectory(home: home, service: ["EnvironmentVariables": ["OPENBOT_DATA_DIR": "/Volumes/Private/Studio"]]).path, "/Volumes/Private/Studio")
+        XCTAssertEqual(try DesktopRunnerController.dataDirectory(home: home, service: ["ProgramArguments": ["/bin/node", "/Users/Owner/Documents/openbot/scripts/background-runner.mjs"]]).path, "/Users/Owner/Documents/openbot/.openbot")
+        XCTAssertThrowsError(try DesktopRunnerController.dataDirectory(home: home, service: ["ProgramArguments": ["/bin/sh", "unknown-script"]]))
+        XCTAssertThrowsError(try DesktopRunnerController.dataDirectory(home: home, service: ["EnvironmentVariables": ["OPENBOT_DATA_DIR": "relative"]]))
+    }
     func testLocalAndPrivateAddressesNormalizeSafely() throws {
         let local = try ConnectionAddress.normalized("127.0.0.1:4311")
         XCTAssertEqual(local.absoluteString, "http://127.0.0.1:4311")
@@ -141,6 +274,22 @@ final class OpenBotDesktopTests: XCTestCase {
         XCTAssertTrue(status.catalog.first?.writeConnected == true)
         XCTAssertTrue(status.access?.first?.canRead == true)
         XCTAssertFalse(status.access?.first?.canSend == true)
+    }
+
+    func testMacSourceFallbackIsAnAttemptNotAFakeConnectedAccount() throws {
+        let json = """
+        {"catalog":[],"localApps":{"available":true,"enabled":true,"readServices":["gmail","google-calendar"]}}
+        """
+        let status = try JSONDecoder().decode(StudioConnectorStatus.self, from: Data(json.utf8))
+        XCTAssertFalse(status.isConnected("gmail"))
+        XCTAssertTrue(status.canTryRead("gmail"))
+        XCTAssertFalse(status.canTryRead("google-drive"))
+        for starter in StudioStarter.all {
+            XCTAssertTrue(status.missingSources(for: starter).isEmpty)
+            XCTAssertTrue(status.sourceLabel(for: starter).contains("Automation permission"))
+        }
+        let unavailable = try JSONDecoder().decode(StudioConnectorStatus.self, from: Data("{\"catalog\":[],\"localApps\":{\"available\":false,\"enabled\":true,\"readServices\":[\"gmail\"]}}".utf8))
+        XCTAssertFalse(unavailable.canTryRead("gmail"))
     }
 
     func testPortableSkillAndStarterDecodeForNativeLibrary() throws {

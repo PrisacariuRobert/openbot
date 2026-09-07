@@ -14,6 +14,10 @@ test("execution limits reject invalid or unlimited configuration", () => {
     executionLimits({ OPENBOT_RUN_MAX_TOKENS: "20000" }).maxTokens,
     20_000,
   );
+  assert.equal(executionLimits({ OPENBOT_JOB_MAX_TOKENS: "50000" }).maxJobTokens, 50_000);
+  for (const value of ["0", "-1", "NaN", "1.5", "2000001", ""]) {
+    assert.throws(() => executionLimits({ OPENBOT_JOB_MAX_TOKENS: value }));
+  }
 });
 
 test("execution meter distinguishes silence from progress and bounds active time across resumes", () => {

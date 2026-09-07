@@ -18,13 +18,13 @@ struct DesktopBrowserControlView: View {
             HStack(spacing: 12) {
                 DesktopMascotView(bot: bot, size: 38).frame(width: 43, height: 43)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(bot.name)’s browser").font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text("\(bot.name)’s browser").font(.system(size: 17, weight: .bold, design: .default))
                     Text("Guide the browser on the OpenBot host from this private window.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Label(status?.browser == "ready" ? "Connected" : "Ready on demand", systemImage: "circle.fill")
-                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    .font(.system(size: 9.5, weight: .bold, design: .default))
                     .foregroundStyle(status?.browser == "ready" ? DesktopTheme.green : .secondary)
                 Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
             }
@@ -46,14 +46,14 @@ struct DesktopBrowserControlView: View {
                     .disabled(!validAddress || store.isTeaching)
                 }
                 .padding(.horizontal, 12).frame(height: 42)
-                .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.black.opacity(0.07)))
+                .background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(StudioPalette.line))
 
                 browserScreen
 
                 HStack(alignment: .center, spacing: 10) {
                     Label("Private keyboard", systemImage: "lock.keyboard")
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 11.5, weight: .bold, design: .default))
                     SecureField("Type into the selected field", text: $privateEntry)
                         .textFieldStyle(.roundedBorder).onSubmit { sendPrivateText(replace: false) }
                     Button("Replace") { sendPrivateText(replace: true) }
@@ -65,19 +65,19 @@ struct DesktopBrowserControlView: View {
                 .controlSize(.small)
 
                 HStack(spacing: 8) {
-                    Text("Keys").font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                    Text("Keys").font(.system(size: 10.5, weight: .semibold, design: .default)).foregroundStyle(.secondary)
                     ForEach(["Tab", "Enter", "Escape", "Backspace"], id: \.self) { key in
                         Button(key) { Task { await store.browserKey(botID: bot.id, key: key) } }
                             .buttonStyle(.bordered).controlSize(.small).disabled(status?.browser != "ready" || store.isTeaching)
                     }
                     Spacer()
                     Text("Text sent through the private keyboard is not saved in chat or activity history.")
-                        .font(.system(size: 9.5, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 9.5, design: .default)).foregroundStyle(.secondary)
                 }
 
                 if let error = store.errorMessage {
                     Label(error, systemImage: "exclamationmark.circle.fill")
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                        .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                 }
             }
             .padding(16)
@@ -111,27 +111,27 @@ struct DesktopBrowserControlView: View {
                     })
                     .overlay(alignment: .bottomTrailing) {
                         Label("Click to control", systemImage: "cursorarrow.click.2")
-                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                            .font(.system(size: 9.5, weight: .semibold, design: .default))
                             .padding(.horizontal, 9).padding(.vertical, 6).background(.regularMaterial, in: Capsule()).padding(9)
                     }
             }
             .aspectRatio(1280.0 / 820.0, contentMode: .fit)
             .background(Color.black.opacity(0.90), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(.black.opacity(0.13)))
+            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(StudioPalette.line))
         } else {
             VStack(spacing: 11) {
                 DesktopMascotView(bot: bot, size: 86).frame(width: 106, height: 94)
-                Text("\(bot.name)’s browser is resting").font(.system(size: 17, weight: .bold, design: .rounded))
+                Text("\(bot.name)’s browser is resting").font(.system(size: 17, weight: .bold, design: .default))
                 Text("Open a page when you want to sign in, handle a private field, or guide the next step.")
-                    .font(.system(size: 11, design: .rounded)).foregroundStyle(.secondary)
+                    .font(.system(size: 11, design: .default)).foregroundStyle(.secondary)
                 Button("Start browser") { openAddress() }.buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
                     .disabled(!validAddress || store.isTeaching)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .aspectRatio(1280.0 / 820.0, contentMode: .fit)
-            .background(.white.opacity(0.75), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(.black.opacity(0.06)))
+            .background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(StudioPalette.line))
         }
     }
 

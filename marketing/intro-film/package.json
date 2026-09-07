@@ -1,0 +1,59 @@
+{
+  "name": "intro-film",
+  "version": "1.0.0",
+  "description": "OpenBot — editable original product introduction films",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PrisacariuRobert/openbot.git",
+    "directory": "marketing/intro-film"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.521",
+    "@remotion/fonts": "4.0.521",
+    "@remotion/media": "4.0.521",
+    "@remotion/transitions": "4.0.521",
+    "lucide-react": "1.39.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.521"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.521",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "score:studio": "node scripts/make-pulse-score.mjs --studio",
+    "check:studio": "node scripts/check-studio-export.mjs",
+    "render:studio": "remotion render src/index.ts OpenBot-In-Motion out/openbot-in-motion.mp4 --codec h264 --crf 17 --concurrency 2 --timeout 60000",
+    "dev": "remotion studio --no-open",
+    "score:demo": "node scripts/make-pulse-score.mjs --demo",
+    "test:demo": "node scripts/check-demo-fixture.mjs",
+    "check:demo": "node scripts/check-demo-export.mjs",
+    "render:demo": "remotion render src/index.ts OpenBot-See-It-Work out/openbot-see-it-work.mp4 --codec h264 --crf 17 --concurrency 2 --timeout 60000",
+    "score:pulse": "node scripts/make-pulse-score.mjs",
+    "check:pulse": "node scripts/check-pulse.mjs",
+    "render:pulse": "remotion render src/index.ts OpenBot-Pulse-No-Voice out/openbot-pulse-no-voice.mp4 --codec h264 --crf 17 --concurrency 3",
+    "prepare:full": "node scripts/prepare-full-introduction.mjs && node scripts/make-full-score.mjs",
+    "render:full": "remotion render src/index.ts OpenBot-Full-Introduction out/openbot-full-introduction.mp4 --codec h264 --crf 17 --concurrency 3",
+    "score:voice-test": "node scripts/make-voice-direction-bed.mjs",
+    "render:voice-test": "remotion render src/index.ts OpenBot-Voice-Direction out/openbot-voice-direction.mp4 --codec h264 --crf 17 --concurrency 3",
+    "score": "node scripts/make-score.mjs",
+    "score:dynamic": "node scripts/make-score.mjs --dynamic",
+    "score:story": "node scripts/make-story-score.mjs",
+    "render:story": "remotion render src/index.ts OpenBot-From-Idea out/openbot-from-idea.mp4 --codec h264 --crf 17 --concurrency 3",
+    "render:dynamic": "remotion render src/index.ts OpenBot-Dynamic out/openbot-introduction-dynamic.mp4 --codec h264 --crf 18 --concurrency 3",
+    "render": "remotion render src/index.ts OpenBot-Introduction out/openbot-introduction.mp4 --codec h264 --crf 18 --concurrency 3",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

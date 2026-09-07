@@ -14,13 +14,16 @@ struct DesktopWorkView: View {
                 VStack(alignment: .leading, spacing: 13) {
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 12, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                     ForEach(StudioStarter.all) { starter in
                         workCard(starter)
                     }
+                    WorkSourcesView(store: store)
+                    RecipeLibraryView(store: store, onStarted: { dismiss() })
+                    WorkFollowupsView(store: store)
                     Text("Every starter saves a report, keeps source coverage visible, and leaves outgoing changes for approval.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                         .padding(.top, 3)
                 }
                 .padding(20)
@@ -38,7 +41,7 @@ struct DesktopWorkView: View {
         let canConnect = store.connectorStatus?.canStartGoogleOAuth == true
         let canAct = ready || recoveryURL != nil || canConnect
         let status = ready
-            ? "Ready with \(starter.requiredServices.map(serviceName).joined(separator: ", "))"
+            ? store.connectorStatus?.sourceLabel(for: starter) ?? "Checking sources"
             : recoveryURL != nil
                 ? "Turn on \(missing.map(serviceName).joined(separator: " + "))"
                 : canConnect
@@ -65,12 +68,12 @@ struct DesktopWorkView: View {
                 }
                 .frame(width: 46, height: 46)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(starter.title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.ink)
-                    Text(starter.summary).font(.system(size: 12.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
-                    Text(starter.detail).font(.system(size: 11, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                    Text(starter.title).font(.system(size: 15, weight: .bold, design: .default)).foregroundStyle(DesktopTheme.ink)
+                    Text(starter.summary).font(.system(size: 12.5, weight: .medium, design: .default)).foregroundStyle(.secondary)
+                    Text(starter.detail).font(.system(size: 11, design: .default)).foregroundStyle(.secondary).lineLimit(2)
                     Label(status, systemImage: ready ? "checkmark.circle.fill" : "link.badge.plus")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(ready ? DesktopTheme.green : .orange)
+                        .font(.system(size: 10.5, weight: .semibold, design: .default))
+                        .foregroundStyle(ready ? DesktopTheme.green : Color.primary)
                 }
                 Spacer(minLength: 8)
                 if startingID == starter.id { ProgressView().controlSize(.small) }
@@ -78,7 +81,7 @@ struct DesktopWorkView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(ready ? 0.90 : 0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(StudioPalette.surface.opacity(ready ? 1 : 0.7), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(ready ? DesktopTheme.purple.opacity(0.14) : .black.opacity(0.06)))
         }
         .buttonStyle(.plain)
@@ -87,7 +90,7 @@ struct DesktopWorkView: View {
 
     private func missingServices(for starter: StudioStarter) -> [String] {
         guard let status = store.connectorStatus else { return starter.requiredServices }
-        return starter.requiredServices.filter { !status.isConnected($0) }
+        return status.missingSources(for: starter)
     }
 
     private func serviceName(_ id: String) -> String {
@@ -102,8 +105,8 @@ struct DesktopWorkView: View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 17, weight: .bold, design: .rounded))
-                Text(subtitle).font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 17, weight: .bold, design: .default))
+                Text(subtitle).font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
             }
             Spacer()
             Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
@@ -118,128 +121,138 @@ struct DesktopLiveView: View {
     let canManageBackgroundProtection: Bool
     @State private var confirmingProtectionRemoval = false
     @State private var browserBot: StudioBot?
+    @State private var showingRoutines = false
+    @State private var showingTeam = false
+    @State private var showingBackground = false
 
-    private var runs: [StudioRun] { store.state.studioRuns ?? store.state.runs }
+    private var runs: [StudioRun] { store.state.allRuns }
     private var uncertain: [StudioApprovedAction] { (store.state.approvedActions ?? []).filter { $0.status == "uncertain" } }
+    private var working: [StudioRun] { runs.filter { ["queued", "running", "awaiting_approval", "waiting_for_teammate"].contains($0.status) } }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "rectangle.3.group").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Live Studio").font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("Watch work, approve the next move, and recover interrupted actions safely.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Activity").font(.system(size: 22, weight: .semibold))
+                    Text(store.isLive ? "What needs you. What’s moving forward." : "Reconnecting to your studio…")
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
-            }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
+                Button("Done") { dismiss() }.buttonStyle(DesktopActionButtonStyle()).keyboardShortcut(.cancelAction)
+            }.padding(28)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 18) {
-                        DesktopMascotStack(bots: store.state.bots, size: 70).frame(width: 190, height: 86)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Label(store.isLive ? "STUDIO CONNECTED" : "RECONNECTING", systemImage: "circle.fill")
-                                .font(.system(size: 9.5, weight: .bold, design: .rounded)).foregroundStyle(store.isLive ? DesktopTheme.green : .orange)
-                            Text(store.state.usage.activeRuns > 0 ? "Your team is moving work forward" : "Your team is ready")
-                                .font(.system(size: 23, weight: .bold, design: .rounded))
-                            Text(store.state.runner?.backgroundServiceDetail ?? "OpenBot keeps the work queue durable on its host.")
-                                .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(3)
-                        }
-                    }
-                    .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                    HStack(spacing: 10) {
-                        liveStat(store.state.usage.activeRuns, "working now", "sparkles")
-                        liveStat(store.state.approvals.count + uncertain.count, "need you", "hand.raised.fill")
-                        liveStat(store.state.usage.completedRuns, "finished", "checkmark.circle.fill")
-                    }
-
-                    if store.state.runner?.deployment?.mode != "private_runner" && canManageBackgroundProtection {
-                        HStack(spacing: 12) {
-                            Image(systemName: store.state.runner?.backgroundService == "installed" ? "shield.checkered" : "moon.stars.fill")
-                                .font(.system(size: 19, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(store.state.runner?.backgroundService == "installed" ? "Background protection is on" : "Keep OpenBot running")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                Text(store.state.runner?.backgroundServiceDetail ?? "Start OpenBot at login and restart it after an unexpected stop.")
-                                    .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
-                            }
-                            Spacer()
-                            if store.state.runner?.backgroundService == "installed" {
-                                Button("Turn off") { confirmingProtectionRemoval = true }.buttonStyle(.bordered)
-                            } else {
-                                Button("Protect this Mac") { Task { await store.setBackgroundProtection(true) } }
-                                    .buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
-                            }
-                        }
-                        .controlSize(.small).padding(14)
-                        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
-                    } else if store.state.runner?.deployment?.mode != "private_runner" {
-                        Label("Background protection can be changed only from the Mac running OpenBot.", systemImage: "desktopcomputer")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if !uncertain.isEmpty {
-                        VStack(alignment: .leading, spacing: 11) {
-                            Label("Check before OpenBot continues", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
-                                .font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 28) {
+                    if !store.state.attentionItems.isEmpty || !uncertain.isEmpty {
+                        VStack(alignment: .leading, spacing: 0) {
+                            sectionHeading("Needs you", count: store.state.attentionItems.count)
                             ForEach(uncertain) { action in
-                                HStack(spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(action.actionLabel).font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                                        Text("This may have completed during a restart. It was not repeated.")
-                                            .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text(action.actionLabel).font(.system(size: 14, weight: .medium))
+                                    Text("This may have completed before the connection stopped. Check the result before continuing; OpenBot has not repeated it.")
+                                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                                    HStack(spacing: 10) {
+                                        Button("It happened") { Task { await store.resolveApprovedAction(action, completed: true) } }
+                                            .buttonStyle(DesktopActionButtonStyle())
+                                        Button("It didn’t") { Task { await store.resolveApprovedAction(action, completed: false) } }
+                                            .buttonStyle(DesktopActionButtonStyle())
                                     }
+                                }.padding(.vertical, 18)
+                                Divider()
+                            }
+                            ForEach(store.state.attentionItems.filter { $0.kind != .uncertainAction }) { item in
+                                HStack(alignment: .top, spacing: 14) {
+                                    Image(systemName: item.kind == .automation ? "calendar" : "exclamationmark.bubble")
+                                        .font(.system(size: 17)).frame(width: 22).padding(.top, 2)
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Text(item.title).font(.system(size: 14, weight: .medium))
+                                        Text(item.detail).font(.system(size: 12)).foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        if item.kind == .automation {
+                                            Button("Review routine") { showingRoutines = true }.buttonStyle(.plain).underline()
+                                        } else if let threadID = item.threadID, store.state.threads.contains(where: { $0.id == threadID }) {
+                                            Button("Open conversation") { Task { await store.chooseThread(threadID); dismiss() } }
+                                                .buttonStyle(.plain).underline()
+                                        } else {
+                                            Text("Conversation unavailable").foregroundStyle(.secondary)
+                                        }
+                                    }.font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
+                                }.padding(.vertical, 18)
+                                Divider()
+                            }
+                        }.accessibilityIdentifier("desktop-attention-items")
+                    }
+                    if !working.isEmpty {
+                        VStack(alignment: .leading, spacing: 0) {
+                            sectionHeading("In progress", count: working.count)
+                            ForEach(working) { run in
+                                HStack(spacing: 12) {
+                                    if let bot = store.state.bots.first(where: { $0.id == run.botId }) {
+                                        DesktopMascotView(bot: bot, size: 34).frame(width: 40)
+                                    }
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(run.botName).font(.system(size: 14, weight: .medium))
+                                        Text(run.partialText ?? run.approvalReason ?? run.status.desktopLiveStatus)
+                                            .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                    Button("Open") { Task { await store.chooseThread(run.threadId); dismiss() } }
+                                        .buttonStyle(DesktopActionButtonStyle())
+                                }.padding(.vertical, 18)
+                                Divider()
+                            }
+                        }
+                    }
+                    if store.state.attentionItems.isEmpty && uncertain.isEmpty && working.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Image(systemName: "checkmark").font(.system(size: 24, weight: .light)).padding(.bottom, 8)
+                            Text("You’re all caught up.").font(.system(size: 22, weight: .semibold))
+                            Text("New requests and work in progress will appear here.").font(.system(size: 13)).foregroundStyle(.secondary)
+                        }.padding(.vertical, 28)
+                    }
+                    DisclosureGroup("Your team", isExpanded: $showingTeam) {
+                        VStack(spacing: 0) {
+                            ForEach(store.state.bots) { bot in
+                                HStack(spacing: 12) {
+                                    DesktopMascotView(bot: bot, size: 34).frame(width: 40)
+                                    Text(bot.name).font(.system(size: 13, weight: .medium))
                                     Spacer()
-                                    Button("It happened") { Task { await store.resolveApprovedAction(action, completed: true) } }
-                                        .buttonStyle(.borderedProminent).tint(DesktopTheme.green)
-                                    Button("It didn’t") { Task { await store.resolveApprovedAction(action, completed: false) } }
-                                        .buttonStyle(.bordered)
-                                }
-                                .controlSize(.small).padding(11)
-                                .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                                    Text(working.first(where: { $0.botId == bot.id })?.status.desktopLiveStatus ?? "Available")
+                                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                                    if bot.browserEnabled == true {
+                                        Button("Control browser") { browserBot = bot }.buttonStyle(DesktopActionButtonStyle())
+                                    }
+                                }.padding(.vertical, 14)
+                                Divider()
                             }
-                        }
-                        .padding(15).background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                    }
+                        }.padding(.top, 8)
+                    }.font(.system(size: 13, weight: .medium))
 
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text("Teammates").font(.system(size: 14, weight: .bold, design: .rounded))
-                        ForEach(store.state.bots) { bot in
-                            let run = runs.first(where: { $0.botId == bot.id && ["queued", "running", "awaiting_approval", "waiting_for_teammate"].contains($0.status) })
-                            HStack(spacing: 11) {
-                                DesktopMascotView(bot: bot, size: 41)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(bot.name).font(.system(size: 12.5, weight: .bold, design: .rounded))
-                                    Text(run?.partialText ?? run?.approvalReason ?? (run == nil ? "Ready for a new task" : "Working through the next step"))
-                                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                    if store.state.runner?.deployment?.mode != "private_runner" {
+                        DisclosureGroup("Run in the background", isExpanded: $showingBackground) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(store.state.runner?.backgroundServiceDetail ?? "Start OpenBot at login and restart it after an unexpected stop.")
+                                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                                if canManageBackgroundProtection {
+                                    if store.state.runner?.backgroundService == "installed" {
+                                        Button("Turn off background protection") { confirmingProtectionRemoval = true }
+                                            .buttonStyle(DesktopActionButtonStyle())
+                                    } else {
+                                        Button("Protect this Mac") { Task { await store.setBackgroundProtection(true) } }
+                                            .buttonStyle(DesktopActionButtonStyle())
+                                    }
+                                } else {
+                                    Text("Change this on the Mac running OpenBot.").font(.system(size: 12)).foregroundStyle(.secondary)
                                 }
-                                Spacer()
-                                Text(run?.status.desktopLiveStatus ?? bot.status.capitalized)
-                                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(DesktopTheme.purple.opacity(0.08), in: Capsule())
-                                if bot.browserEnabled == true {
-                                    Button("Control browser") { browserBot = bot }
-                                        .buttonStyle(.bordered).controlSize(.small)
-                                }
-                            }
-                            .padding(11).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
+                            }.padding(.top, 12)
+                        }.font(.system(size: 13, weight: .medium))
                     }
-                }
-                .padding(20)
+                    if let error = store.errorMessage {
+                        Text(error).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                }.padding(.horizontal, 28).padding(.bottom, 28)
             }
         }
-        .frame(width: 720, height: 640)
-        .background(DesktopTheme.paper)
+        .frame(width: 620, height: 580).background(StudioPalette.paper)
         .confirmationDialog("Turn off background protection?", isPresented: $confirmingProtectionRemoval, titleVisibility: .visible) {
             Button("Turn off", role: .destructive) { Task { await store.setBackgroundProtection(false) } }
             Button("Cancel", role: .cancel) { }
@@ -247,19 +260,15 @@ struct DesktopLiveView: View {
             Text("Saved work stays in place, but this Mac will not automatically restart OpenBot after it stops.")
         }
         .sheet(item: $browserBot) { bot in DesktopBrowserControlView(store: store, bot: bot) }
+        .sheet(isPresented: $showingRoutines) { DesktopAutomationsView(store: store) }
     }
 
-    private func liveStat(_ value: Int, _ label: String, _ icon: String) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon).foregroundStyle(DesktopTheme.purple)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(value)").font(.system(size: 17, weight: .bold, design: .rounded))
-                Text(label).font(.system(size: 10, design: .rounded)).foregroundStyle(.secondary)
-            }
-        }
-        .padding(11).frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.80), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.black.opacity(0.05)))
+    private func sectionHeading(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title).font(.system(size: 13, weight: .semibold))
+            Spacer()
+            Text("\(count)").font(.system(size: 12)).foregroundStyle(.secondary)
+        }.padding(.bottom, 4)
     }
 }
 

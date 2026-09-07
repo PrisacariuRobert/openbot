@@ -1,6 +1,7 @@
 import Foundation
 
 struct StudioState: Decodable {
+    var automationAlerts: [StudioAutomationAlert]? = nil
     let bots: [StudioBot]
     let threads: [StudioThread]
     let messages: [StudioMessage]
@@ -15,9 +16,70 @@ struct StudioState: Decodable {
     let settings: StudioSettings?
     let usage: StudioUsage
     let activeThreadId: String
+
+    /// The host sends both the selected conversation and a studio-wide snapshot.
+    /// Never let selecting a quiet conversation hide another teammate's work.
+    var allRuns: [StudioRun] {
+        var seen = Set<String>()
+        return ((studioRuns ?? []) + runs).filter { seen.insert($0.id).inserted }
+    }
+
+    var attentionItems: [StudioAttentionItem] {
+        let runs = allRuns
+        var items = (approvedActions ?? []).filter { $0.status == "uncertain" }.map { action in
+            StudioAttentionItem(id: "action:\(action.id)", kind: .uncertainAction,
+                title: action.actionLabel, detail: "Check whether this happened before continuing. It has not been repeated.",
+                threadID: runs.first { $0.id == action.runId }?.threadId)
+        }
+        let needingRuns = runs.filter { ["awaiting_approval", "failed"].contains($0.status) }
+        items += needingRuns.map { run in
+            StudioAttentionItem(id: "run:\(run.id):\(run.status)", kind: .task,
+                title: run.status == "failed" ? "\(run.botName) needs a hand" : "\(run.botName) needs your okay",
+                detail: run.error ?? run.approvalReason ?? run.summary ?? "Open the conversation to review the next step.", threadID: run.threadId)
+        }
+        items += approvals.filter { approval in
+            approval.status == "pending" && !needingRuns.contains { $0.id == approval.runId }
+        }.map { approval in
+            StudioAttentionItem(id: "approval:\(approval.id)", kind: .approval,
+                title: "\(approval.botName) needs your okay", detail: approval.reason,
+                threadID: runs.first { $0.id == approval.runId }?.threadId ?? bots.first { $0.id == approval.botId }?.threadId)
+        }
+        items += (automationAlerts ?? []).filter { $0.resolvedAt == nil }.map { alert in
+            StudioAttentionItem(id: "automation:\(alert.id)", kind: .automation,
+                title: alert.routineName, detail: alert.message,
+                threadID: (routines ?? []).first { $0.id == alert.routineId }?.threadId)
+        }
+        var seen = Set<String>()
+        return items.filter { seen.insert($0.id).inserted }
+    }
+
+    var attentionSignature: String { attentionItems.map(\.id).sorted().joined(separator: ",") }
+
+    func failedRuns(in threadID: String) -> [StudioRun] {
+        allRuns.filter { $0.threadId == threadID && $0.status == "failed" }
+    }
+}
+
+struct StudioAttentionItem: Identifiable, Hashable {
+    enum Kind: String { case task, approval, automation, uncertainAction }
+    let id: String
+    let kind: Kind
+    let title: String
+    let detail: String
+    let threadID: String?
+}
+
+struct StudioAutomationAlert: Decodable, Identifiable, Hashable {
+    let id: String
+    let routineId: String
+    let routineName: String
+    let message: String
+    let resolvedAt: String?
 }
 
 struct StudioRoutine: Decodable, Identifiable, Hashable {
+    var schedule: StudioRoutineSchedule? = nil
+    var scheduleLabel: String? = nil
     let id: String
     let name: String
     let botId: String
@@ -36,6 +98,33 @@ struct StudioRoutine: Decodable, Identifiable, Hashable {
     let consecutiveFailures: Int
     let lastError: String?
     let pausedReason: String?
+    var watchStatus: StudioPageWatchStatus? = nil
+}
+
+struct StudioRoutineSchedule: Codable, Hashable {
+    var kind: String
+    var timeZone: String?
+    var time: String?
+    var daysOfWeek: [Int]?
+    var at: String?
+    static let interval = StudioRoutineSchedule(kind: "interval")
+    static var weekdays: StudioRoutineSchedule { StudioRoutineSchedule(kind: "calendar", timeZone: TimeZone.current.identifier, time: "08:00", daysOfWeek: [1, 2, 3, 4, 5]) }
+}
+
+struct StudioSchedulePreview: Decodable {
+    let label: String
+    let nextRuns: [String]
+    let descriptions: [String]
+    let policy: String
+}
+
+struct StudioPageWatchStatus: Decodable, Hashable {
+    let state: String
+    let checkedAt: String
+    let nextCheckAt: String
+    let checks: Int
+    let unchangedChecks: Int
+    let detail: String
 }
 
 struct StudioRoutineTriggerConfig: Codable, Hashable {
@@ -51,6 +140,8 @@ struct StudioRoutineTriggerConfig: Codable, Hashable {
     var slackChannel: String?
     var notionEvent: String?
     var notionEntityId: String?
+    var pageUrl: String?
+    var pageSelector: String?
 
     static let empty = StudioRoutineTriggerConfig()
 }
@@ -115,6 +206,13 @@ struct StudioProviderInstance: Decodable, Identifiable, Hashable {
     let models: [String]?
     let defaultModel: String?
     let note: String?
+
+    /// Stored credentials are not evidence of a successful model request.
+    var connectionLabel: String {
+        guard connected == true else { return "Needs attention" }
+        if authMode == "subscription" { return "Sign-in found" }
+        return hasSecret ? "Connection saved" : "Connection found"
+    }
 }
 
 struct StudioAPIConnectionConfig: Codable, Hashable {
@@ -207,6 +305,7 @@ struct StudioBot: Decodable, Identifiable, Hashable {
     let status: String
     let threadId: String
     let lastActiveAt: String?
+    var currentAction: String? = nil
     var providerInstanceId: String? = nil
     var model: String? = nil
     var computerEnabled: Bool? = nil
@@ -218,8 +317,31 @@ struct StudioBot: Decodable, Identifiable, Hashable {
     var tokensUsedThisWeek: Int? = nil
 }
 
+extension StudioThread {
+    /// A custom room must never display teammates that are not its members.
+    func members(in bots: [StudioBot]) -> [StudioBot] {
+        if let botId { return bots.filter { $0.id == botId } }
+        if id == "team-room" && botIds == nil { return bots }
+        return (botIds ?? []).compactMap { id in bots.first { $0.id == id } }
+    }
+}
+
 struct StudioSettings: Decodable, Hashable {
     let macAccessEnabled: Bool
+}
+
+struct StudioGroupInput: Encodable {
+    let title: String
+    let botIds: [String]
+
+    init?(title: String, botIDs: [String]) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let members = Array(Set(botIDs)).sorted()
+        guard !title.isEmpty, title.utf16.count <= 48, (1...6).contains(members.count),
+              members.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return nil }
+        self.title = title
+        self.botIds = members
+    }
 }
 
 struct StudioThread: Decodable, Identifiable, Hashable {
@@ -227,10 +349,15 @@ struct StudioThread: Decodable, Identifiable, Hashable {
     let title: String
     let kind: String
     let botId: String?
+    var botIds: [String]? = nil
     let updatedAt: String
+    var lastMessage: String? = nil
+    var lastMessageAt: String? = nil
+    var hidden: Bool? = nil
 }
 
 struct StudioMessage: Decodable, Identifiable, Hashable {
+    var progressUpdates: [String]? = nil
     let id: String
     let threadId: String
     let senderType: String
@@ -244,6 +371,31 @@ struct StudioMessage: Decodable, Identifiable, Hashable {
     let attachments: [StudioAttachment]
     var replyTo: StudioMessageReplyPreview? = nil
     var reactions: [StudioMessageReaction]? = nil
+    var kind: String? = nil
+    var eventType: String? = nil
+    var eventData: [String: String]? = nil
+
+    private func event(_ key: String) -> String? { eventData?[key] ?? nil }
+
+    var isEventCard: Bool { kind == "event" }
+    var eventCardTitle: String {
+        switch eventType {
+        case "routine_created": return "Created Routine \(event("name") ?? body)"
+        case "routine_run": return "\(event("name") ?? "Routine") started"
+        case "handoff": return "\(event("fromName") ?? senderName) handed off to \(event("toName") ?? "a teammate")"
+        case "teammate_message": return "\(event("fromName") ?? senderName) \(event("expectsReply") == "true" ? "asked" : "messaged") \(event("toName") ?? "a teammate")"
+        default: return "Studio event"
+        }
+    }
+    var eventCardDetail: String {
+        switch eventType {
+        case "routine_created": return "\(event("schedule") ?? "")\(event("enabled") == "false" ? " · Paused" : "")"
+        case "routine_run": return "\(event("source") == "manual" ? "Test run" : "From \(event("source") ?? "schedule")")\(event("waiting") == "true" ? " · Needs your okay" : "")"
+        case "handoff": return (event("task") ?? body).replacingOccurrences(of: "\n", with: " ")
+        case "teammate_message": return event("expectsReply") == "true" ? "Waiting for their reply" : "Update shared"
+        default: return body
+        }
+    }
 }
 
 struct StudioMessageReplyPreview: Decodable, Hashable {
@@ -277,6 +429,32 @@ struct StudioWorkspaceFile: Decodable, Identifiable, Hashable {
     let kind: String
 
     var id: String { path }
+}
+
+struct StudioArtifact: Decodable, Identifiable, Hashable {
+    let id: String
+    let threadId: String
+    let threadTitle: String
+    let botName: String?
+    let name: String
+    let kind: String
+    let size: Int
+    let summary: String?
+    let previewUrl: String?
+    let url: String
+    let revision: Int
+    let revisions: Int
+    let createdAt: String
+}
+
+struct StudioArtifactRevision: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let revision: Int
+    let size: Int
+    let createdAt: String
+    let previewUrl: String?
+    let url: String
 }
 
 struct StudioWorkspaceFileContent: Decodable, Hashable {
@@ -362,6 +540,13 @@ struct StudioComputerStatus: Decodable, Hashable {
     let updatedAt: String
 }
 
+struct StudioComputerLiveEvent: Decodable {
+    let type: String
+    let jpeg: String?
+    let browser: String?
+    let title: String?
+}
+
 struct StudioBrowserTakeoverResult: Decodable, Hashable {
     let url: String
     let title: String
@@ -382,6 +567,11 @@ struct StudioRun: Decodable, Identifiable, Hashable {
     let partialText: String?
     let summary: String?
     let error: String?
+
+    var failureDetail: String {
+        let detail = error?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return detail.isEmpty ? "The task stopped before a finished result could be confirmed." : detail
+    }
 }
 
 struct StudioRunner: Decodable, Hashable {
@@ -503,6 +693,23 @@ struct StudioConnectorStatus: Decodable, Hashable {
     let managedGoogleClient: Bool?
     let connection: StudioConnectorConnection?
     let googleApiRecoveries: [StudioGoogleApiRecovery]?
+    var localApps: StudioLocalApps? = nil
+
+    func canTryRead(_ serviceID: String) -> Bool {
+        isConnected(serviceID) || (localApps?.available == true && localApps?.enabled == true && localApps?.readServices.contains(serviceID) == true)
+    }
+
+    func missingSources(for starter: StudioStarter) -> [String] {
+        if ["morning-brief", "weekly-review"].contains(starter.id) && starter.requiredServices.contains(where: { canTryRead($0) }) { return [] }
+        return starter.requiredServices.filter { !canTryRead($0) }
+    }
+
+    func sourceLabel(for starter: StudioStarter) -> String {
+        if starter.requiredServices.contains(where: { !isConnected($0) && canTryRead($0) }) {
+            return "Try Mac apps · Automation permission checked when run"
+        }
+        return "Use connected sources · missing coverage stays visible"
+    }
 
     func isConnected(_ serviceID: String) -> Bool {
         catalog.first(where: { $0.id == serviceID })?.connected == true
@@ -517,6 +724,12 @@ struct StudioConnectorStatus: Decodable, Hashable {
     }
 }
 
+struct StudioLocalApps: Decodable, Hashable {
+    let available: Bool
+    let enabled: Bool
+    let readServices: [String]
+}
+
 struct StudioConnectorCatalogEntry: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
@@ -527,6 +740,12 @@ struct StudioConnectorCatalogEntry: Decodable, Identifiable, Hashable {
     let writeConnected: Bool?
     let writeRequiresApproval: Bool?
     let capabilities: [String]?
+
+    var connectionLabel: String {
+        guard connected else { return "Not connected" }
+        if writeRequiresApproval == true && writeConnected == false { return "Read access connected" }
+        return "Connected"
+    }
 }
 
 struct StudioBotConnectorAccess: Decodable, Hashable {
@@ -555,12 +774,24 @@ struct StudioStarter: Identifiable, Hashable {
     let systemImage: String
     let requiredServices: [String]
 
+    var expectedWorkKind: String? {
+        switch id {
+        case "morning-brief": return "morning"
+        case "inbox-follow-ups": return "inbox"
+        case "meeting-prep": return "meeting"
+        case "weekly-review": return "weekly"
+        default: return nil
+        }
+    }
+
     func prompt(timeZone: String) -> String {
         switch id {
+        case "weekly-review":
+            return "Prepare my weekly review in \(timeZone). Use work_collect with kind weekly and save with work_report. Combine recent inbox conversations, next week’s calendar and my selected Slack, Notion and Todoist sources. Focus on decisions, open actions and next steps with sources. Current pages and open tasks are not a history of completed work. Clearly identify missing coverage. Do not send or change anything."
         case "morning-brief":
             return "Prepare my morning brief for the next 24 hours in \(timeZone). Check my primary calendar and unread inbox conversations from the past seven days. Give me a short schedule and source-linked priorities, save a report, and tell me if anything could not be checked. Separate suggestions from facts. Do not send or change anything."
         case "meeting-prep":
-            return "Use @calendar, @drive, and @gmail to prepare me for my next meeting. Deliver a short briefing with the event details, attendees, recent related documents, the latest relevant email thread, likely decisions, and five useful questions. Link every source, verify that the material is about the same meeting, and do not change anything."
+            return "Prepare me for my next timed meeting in \(timeZone). Use the meeting source snapshot and save a source-linked report with event details, candidate related documents and email, suggested decisions, and useful questions. Verify relevance and flag uncertain matches or missing attendee information. Distinguish suggestions from facts. Do not send or change anything."
         default:
             return "Prepare my inbox follow-ups in \(timeZone). Check inbox conversations from the past seven days. Suggest source-linked priorities and save useful reply drafts for me to review. Skip conversations I have already answered and flag any missing or shortened context. Save the report. Do not send or change anything."
         }
@@ -571,17 +802,17 @@ struct StudioStarter: Identifiable, Hashable {
             id: "morning-brief",
             title: "Morning brief",
             summary: "Your next 24 hours, priorities, and source links",
-            detail: "Reads Calendar and recent unread Gmail. Saves a report and never sends or changes anything.",
+            detail: "Reads connected sources, with Mail/Calendar on your Mac as an enabled fallback. Saves a report; never sends or changes anything.",
             systemImage: "sun.max.fill",
-            requiredServices: ["gmail", "google-calendar"]
+            requiredServices: ["gmail", "google-calendar", "slack", "notion", "todoist"]
         ),
         StudioStarter(
             id: "meeting-prep",
             title: "Prepare my next meeting",
             summary: "A checked brief with context and useful questions",
-            detail: "Matches Calendar, Drive, and Gmail sources before drawing conclusions.",
+            detail: "Starts with Calendar and adds available mail/document context. Mac-app fallback and missing coverage are labelled.",
             systemImage: "person.2.fill",
-            requiredServices: ["gmail", "google-drive", "google-calendar"]
+            requiredServices: ["google-calendar"]
         ),
         StudioStarter(
             id: "inbox-follow-ups",
@@ -590,9 +821,52 @@ struct StudioStarter: Identifiable, Hashable {
             detail: "Reads recent inbox conversations, skips threads you answered, and leaves every draft unsent.",
             systemImage: "envelope.badge.fill",
             requiredServices: ["gmail"]
-        )
+        ),
+        StudioStarter(id: "weekly-review", title: "Weekly review", summary: "Open actions, decisions and next week’s priorities", detail: "Uses recent mail, upcoming calendar and your selected app sources. Shows partial coverage; never sends or changes anything.", systemImage: "calendar", requiredServices: ["gmail", "google-calendar", "slack", "notion", "todoist"])
     ]
 }
+
+struct StudioWorkSource: Codable, Hashable, Identifiable {
+    let service: String
+    let id: String
+    let label: String
+    var key: String { "\(service):\(id)" }
+}
+struct StudioWorkSources: Codable {
+    var lookbackHours: Int
+    var selections: [StudioWorkSource]
+    let revision: Int
+}
+struct StudioWorkSourcesInput: Encodable {
+    let lookbackHours: Int
+    let selections: [StudioWorkSource]
+}
+struct StudioWorkSourceChoices: Decodable {
+    let choices: [StudioWorkSource]
+    let limited: Bool
+}
+struct StudioWorkFollowupSource: Decodable, Identifiable {
+    let ref: String
+    let title: String
+    let url: String?
+    var id: String { ref }
+}
+struct StudioWorkFollowup: Decodable, Identifiable {
+    let id: String
+    let snapshotId: String
+    let itemIndex: Int
+    let text: String
+    let capturedAt: String
+    let sources: [StudioWorkFollowupSource]
+    let status: String?
+}
+struct StudioWorkFollowups: Decodable {
+    let suggestions: [StudioWorkFollowup]
+    let tracked: [StudioWorkFollowup]
+    let digestEnabled: Bool?
+    let digest: StudioWorkDigest?
+}
+struct StudioWorkDigest: Decodable { let createdAt: String; let items: [StudioWorkFollowup] }
 
 extension StudioState {
     static let empty = StudioState(

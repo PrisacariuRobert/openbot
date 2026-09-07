@@ -1,0 +1,31 @@
+# relay profile: used when setup.sh runs with --relay. Written to
+# OPENBOT_CADDYFILE so the studio and the relay share one TLS listener.
+{$OPENBOT_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	reverse_proxy openbot:4311
+}
+
+{$OPENBOT_RELAY_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# WebSocket upgrades for studio tunnels and long streams must reach the
+	# relay without buffering. Caddy passes upgrades through automatically.
+	reverse_proxy relay:8080
+}

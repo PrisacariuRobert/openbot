@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 @MainActor
 final class ConnectionSession: ObservableObject {
@@ -7,6 +8,7 @@ final class ConnectionSession: ObservableObject {
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
     @Published var suggestedAddress = ""
+    @Published var pairingInvitation: PairingInvitation?
     @Published private(set) var requestedThreadID: String?
     @Published private(set) var nativePushReady = false
     @Published private(set) var nativePushMessage: String?
@@ -47,9 +49,44 @@ final class ConnectionSession: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
+        if let invitation = OpenBotDeepLink.pairingInvitation(from: url) { pairingInvitation = invitation; return }
         guard let address = OpenBotDeepLink.serverAddress(from: url) else { return }
         suggestedAddress = address
         disconnect(keepAddress: true)
+    }
+
+    func connectByQR(_ invitation: PairingInvitation) async {
+        guard !isConnecting else { return }
+        isConnecting = true
+        errorMessage = nil
+        defer { isConnecting = false }
+        do {
+            var bytes = [UInt8](repeating: 0, count: 32)
+            guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { throw SessionError.unreachable }
+            let deviceKey = "obd_" + Data(bytes).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            var request = URLRequest(url: invitation.server.appending(path: "api/auth/pair"))
+            request.httpMethod = "POST"
+            request.timeoutInterval = 20
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(PairRequest(ticket: invitation.ticket, deviceKey: deviceKey, name: "iPhone"))
+            let network = URLSession(configuration: .ephemeral, delegate: ConnectionNoRedirect(), delegateQueue: nil)
+            defer { network.invalidateAndCancel() }
+            let result: (Data, URLResponse)
+            do { result = try await network.data(for: request) }
+            catch { result = try await network.data(for: request) } // Same key makes a lost-response retry idempotent.
+            guard let response = result.1 as? HTTPURLResponse, response.statusCode == 200 else {
+                let detail = (try? JSONDecoder().decode(ServerError.self, from: result.0).error) ?? "This QR code could not connect. Show a new code on your Mac."
+                throw SessionError.server(detail)
+            }
+            // Keep a successfully claimed connection recoverable even if the
+            // following login request is interrupted by a network change.
+            try KeychainStore.save(deviceKey)
+            UserDefaults.standard.set(invitation.server.absoluteString, forKey: addressKey)
+            suggestedAddress = invitation.server.absoluteString
+            await authenticate(address: invitation.server.absoluteString, accessKey: deviceKey, remember: false)
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Your Mac could not be reached. Keep OpenBot running and scan a new code."
+        }
     }
 
     func handleNotificationPath(_ path: String) {
@@ -104,7 +141,9 @@ final class ConnectionSession: ObservableObject {
             request.httpBody = try JSONEncoder().encode(LoginRequest(token: cleanAccessKey))
             let configuration = URLSessionConfiguration.ephemeral
             configuration.httpShouldSetCookies = true
-            let (data, response) = try await URLSession(configuration: configuration).data(for: request)
+            let network = URLSession(configuration: configuration, delegate: ConnectionNoRedirect(), delegateQueue: nil)
+            defer { network.invalidateAndCancel() }
+            let (data, response) = try await network.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw SessionError.unreachable }
             guard http.statusCode == 200 else {
                 if http.statusCode == 401 { throw SessionError.wrongKey }
@@ -139,6 +178,7 @@ final class ConnectionSession: ObservableObject {
 }
 
 private struct LoginRequest: Encodable { let token: String }
+private struct PairRequest: Encodable { let ticket: String; let deviceKey: String; let name: String }
 private struct ServerError: Decodable { let error: String }
 
 private enum SessionError: LocalizedError {

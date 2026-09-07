@@ -3,6 +3,7 @@ export interface ExecutionLimits {
   maxIdleMs: number;
   maxSteps: number;
   maxTokens: number;
+  maxJobTokens: number;
   maxOutputBytes: number;
   terminationGraceMs: number;
 }
@@ -13,6 +14,7 @@ export const DEFAULT_EXECUTION_LIMITS: Readonly<ExecutionLimits> =
     maxIdleMs: 5 * 60_000,
     maxSteps: 64,
     maxTokens: 100_000,
+    maxJobTokens: 100_000,
     maxOutputBytes: 4 * 1024 * 1024,
     terminationGraceMs: 2_000,
   });
@@ -35,6 +37,7 @@ export function executionLimits(
     maxIdleMs: integer("OPENBOT_RUN_IDLE_MINUTES", 5, 1, 30) * 60_000,
     maxSteps: integer("OPENBOT_RUN_MAX_STEPS", 64, 1, 512),
     maxTokens: integer("OPENBOT_RUN_MAX_TOKENS", 100_000, 1_000, 2_000_000),
+    maxJobTokens: integer("OPENBOT_JOB_MAX_TOKENS", 100_000, 1_000, 2_000_000),
   };
 }
 
@@ -43,9 +46,11 @@ export type ExecutionStop =
   | "idle"
   | "steps"
   | "tokens"
+  | "job_budget"
   | "weekly_budget"
   | "output";
 export const executionStopMessage: Record<ExecutionStop, string> = {
+  job_budget: "This job reached its shared token limit, including teammate consultations and follow-ups. OpenBot stopped the remaining work. Your files and progress are kept for review.",
   time: "This task reached its time limit. Your saved files and progress are kept. Review them before asking for a smaller next step.",
   idle: "The model stopped making progress, so OpenBot stopped the run. Your saved work is kept. Check the connection before trying again.",
   steps:

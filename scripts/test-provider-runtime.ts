@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { apiRuntimeEnvironment } from "../src/shared/provider-config.js";
 import { safeHostEnvironment } from "../src/server/runtime.js";
+import { ModelOutput } from "../src/server/model-output.js";
 import type { ProviderInstance } from "../src/shared/types.js";
 
 const root = mkdtempSync(path.join(tmpdir(), "openbot-runtime-contract-"));
@@ -171,6 +172,12 @@ try {
     ),
   );
   assert.match(result.stdout, /OPENBOT_RUNTIME_OK/);
+  const output = new ModelOutput("opencode");
+  for (const line of result.stdout.split(/\r?\n/).filter(Boolean)) {
+    try { output.add(JSON.parse(line)); } catch { /* CLI diagnostics are not output events. */ }
+  }
+  assert.equal(output.finalText, "OPENBOT_RUNTIME_OK", "The actual installed CLI must produce a final answer with the same parser used by tasks.");
+  assert.deepEqual(output.drainProgress(), []);
   console.log(
     `PASS: real OpenCode -> configured endpoint -> streamed reply (${requests.length} request(s)); model ID and scoped key verified.`,
   );

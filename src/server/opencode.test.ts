@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
+import { CommunitySkills } from "./community-skills.js";
 import { AttachmentService } from "./attachments.js";
 import { appendModelText, eventText, eventUsage, shouldPublishRunMessage, toolActivity, UsageAccumulator, OpenCodeRunner } from "./opencode.js";
 
@@ -15,7 +16,7 @@ test("a consultation that cannot start reports its failure privately and release
     const child = db.createRun({ threadId: "team-room", botId: "nova", prompt: "Check the result", parentRunId: parent.id, status: "running" });
     db.markRunConsultationPending(parent.id);
     db.pauseRunForConsultation(parent.id);
-    db.updateBot("nova", { model: "wrong-connection/model" });
+    db.updateBot("nova", { providerInstanceId: "local-opencode", model: "wrong-connection/model" });
     const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
     // Exercise the dispatch guard without invoking a real model or timer loop.
     runner["executeRun"](child);
@@ -25,6 +26,22 @@ test("a consultation that cannot start reports its failure privately and release
     assert.equal(db.getRun(parent.id)?.consultationPending, false);
     assert.match(db.listAgentInbox("pixel", "team-room")[0]?.body || "", /could not start/);
     assert.equal(db.getState("team-room").messages.some((message) => message.runId === child.id), false);
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("current task prompts surface relevant methods, honor opt-outs and preserve bounded report mode", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-method-prompt-")), db = new OpenBotDatabase(root);
+  try {
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Extract document obligations and action items from a policy", status: "queued" });
+    const prompt = runner["buildPrompt"](run, db.getBot("nova")!, false);
+    assert.match(prompt, /bundled-document-to-action-items/);
+    const context = prompt.split("Reviewed methods already available")[1]!.split("Completion rules:")[0]!;
+    assert.equal((context.match(/- bundled-/g) || []).length, 3);
+    assert.ok(context.length < 1_400);
+    new CommunitySkills(db).remove("bundled-document-to-action-items");
+    assert.doesNotMatch(runner["buildPrompt"](run, db.getBot("nova")!, true), /bundled-document-to-action-items/);
+    assert.doesNotMatch(runner["buildPrompt"]({ ...run, expectedWorkKind: "morning" }, db.getBot("nova")!, false), /Reviewed methods already available/);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

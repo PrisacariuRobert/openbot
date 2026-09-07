@@ -44,5 +44,7 @@
     <string>Open source contributors</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>OpenBot uses apps you allow on this Mac to read Calendar and Mail context and perform app actions you approve.</string>
 </dict>
 </plist>

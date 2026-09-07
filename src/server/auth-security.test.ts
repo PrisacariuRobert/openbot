@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LoginAttemptGate } from "./auth-security.js";
+import { LoginAttemptGate, readCookie, trustedLocalRequest } from "./auth-security.js";
+
+test("only genuine local owner requests bypass authentication", () => {
+  const local = { socket: { remoteAddress: "127.0.0.1" }, headers: { host: "127.0.0.1:4311" } };
+  assert.ok(trustedLocalRequest(local));
+  assert.ok(trustedLocalRequest({ ...local, headers: { host: "localhost:4311", origin: "http://localhost:4310" } }));
+  assert.ok(trustedLocalRequest({ socket: { remoteAddress: "::1" }, headers: { host: "[::1]:4311" } }));
+  for (const headers of [
+    { host: "studio.example.com" }, { host: "127.0.0.1.attacker.example" },
+    { host: "127.0.0.1", "x-forwarded-for": "127.0.0.1" },
+    { host: "127.0.0.1", "x-openbot-relay": "1" },
+    { host: "127.0.0.1", origin: "https://attacker.example" },
+    { host: "127.0.0.1", origin: "null" }, { host: "127.0.0.1", "sec-fetch-site": "cross-site" },
+  ]) assert.equal(trustedLocalRequest({ ...local, headers }), false, JSON.stringify(headers));
+  assert.equal(trustedLocalRequest({ ...local, socket: { remoteAddress: "192.168.1.20" } }), false);
+  assert.equal(readCookie("openbot_access=%E0%A4%A", "openbot_access"), null);
+});
 
 test("rate limits repeated access-key failures and resets after the window", () => {
   const gate = new LoginAttemptGate(2, 1_000);

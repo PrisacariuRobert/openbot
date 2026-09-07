@@ -1,0 +1,16 @@
+.workflow-checks { display: grid; gap: 16px; padding: 20px; margin-block: 16px; min-width: 0; border: 1px solid #e3e3e3; border-radius: 20px; background: #ffffff; overflow-wrap: anywhere; }
+.workflow-checks header, .workflow-checks-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.workflow-checks header { justify-content: space-between; }
+.workflow-checks h3, .workflow-checks p { margin: 0; }
+.workflow-checks form, .workflow-checks label, .workflow-checks article { display: grid; gap: 10px; min-width: 0; }
+.workflow-checks form { gap: 16px; }
+.workflow-checks textarea { width: 100%; min-width: 0; min-height: 88px; padding: 12px; font: inherit; border: 1px solid #dadada; border-radius: 12px; resize: vertical; box-sizing: border-box; }
+.workflow-checks label.workflow-checks-consent { display: flex; align-items: start; gap: 10px; font-size: 13px; }
+.workflow-checks-consent input { flex: 0 0 auto; margin-top: 3px; }
+.workflow-checks button { border: 1px solid #e3e3e3; border-radius: 12px; padding: 10px 14px; min-height: 44px; font: inherit; cursor: pointer; }
+.workflow-checks button:disabled { opacity: .5; cursor: default; }
+.workflow-checks article { border-top: 1px solid #e3e3e3; padding-top: 16px; }
+.workflow-checks small, .workflow-checks-note { font-size: 13px; color: #6d6d6d; }
+.workflow-checks-result { white-space: pre-wrap; max-height: 320px; overflow: auto; padding-block: 12px; }
+.workflow-checks [role=alert] { color: #4f4f4f; }
+@media (max-width: 480px) { .workflow-checks { padding: 14px; } .workflow-checks-actions button { flex: 1 1 150px; } }

@@ -1,0 +1,70 @@
+.run-controls {
+  display: grid;
+  gap: 10px;
+  margin-block: 20px;
+  padding: 16px;
+  border: 1px solid var(--line, var(--line));
+  border-radius: 14px;
+  min-width: 0;
+}
+.run-controls p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.run-control-note {
+  color: var(--muted, var(--secondary));
+  font-size: 13px;
+  line-height: 1.5;
+}
+.run-controls details {
+  padding-block: 6px;
+}
+.run-controls summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.run-controls dl {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+}
+.run-controls dt {
+  font-size: 12px;
+  color: var(--muted, var(--secondary));
+  margin-bottom: 4px;
+}
+.run-controls dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow: auto;
+}
+.run-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.run-control-actions button,
+.run-stop {
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid var(--line, var(--line));
+  border-radius: 9px;
+}
+.run-stop {
+  justify-self: start;
+  background: transparent;
+}
+.run-controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.run-controls a {
+  font-size: 13px;
+  text-underline-offset: 3px;
+}

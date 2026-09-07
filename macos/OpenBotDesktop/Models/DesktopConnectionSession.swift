@@ -11,14 +11,38 @@ final class DesktopConnectionSession: ObservableObject {
     private let addressKey = "openbot.desktop.server.address"
     private var lastAuthenticatedAt: Date?
     private var activeAccessKey: String?
+    private let runner = DesktopRunnerController()
 
     var displayAddress: String { serverURL?.absoluteString ?? suggestedAddress }
     var clientAccessKey: String? { activeAccessKey }
 
+    // Loopback pairing is fetched from the local runner each launch. Keeping
+    // this key in memory avoids unnecessary Keychain writes in local previews;
+    // non-loopback hosts must still store their key securely before connecting.
+    nonisolated static func persistsAccessKey(for url: URL) -> Bool {
+        !ConnectionAddress.isLoopback(url)
+    }
+
     func restore() async {
         guard !isAuthenticated, !isConnecting else { return }
+        #if DEBUG
+        // Visual QA uses a disposable loopback fixture, never the owner's
+        // saved host or Keychain. No development override ships in Release.
+        if let address = ProcessInfo.processInfo.environment["OPENBOT_NATIVE_PREVIEW_SERVER"],
+           let url = try? ConnectionAddress.normalized(address), ConnectionAddress.isLoopback(url),
+           let key = ProcessInfo.processInfo.environment["OPENBOT_NATIVE_PREVIEW_KEY"] {
+            await authenticate(address: address, accessKey: key, remember: false)
+            return
+        }
+        #endif
         let saved = UserDefaults.standard.string(forKey: addressKey) ?? suggestedAddress
         suggestedAddress = saved
+        if let url = try? ConnectionAddress.normalized(saved), ConnectionAddress.isLoopback(url), url.port == 4311 {
+            isConnecting = true
+            do { try await runner.ensureLocalRunner() }
+            catch { errorMessage = error.localizedDescription }
+            isConnecting = false
+        }
         let localDevelopmentKey = accessKeyFromEnvironmentFile()
         if let localDevelopmentKey {
             await authenticate(address: saved, accessKey: localDevelopmentKey, remember: false)
@@ -34,6 +58,12 @@ final class DesktopConnectionSession: ObservableObject {
     }
 
     func connect(address: String, accessKey: String) async {
+        if let url = try? ConnectionAddress.normalized(address), ConnectionAddress.isLoopback(url), url.port == 4311 {
+            isConnecting = true
+            do { try await runner.ensureLocalRunner() }
+            catch { errorMessage = error.localizedDescription; isConnecting = false; return }
+            isConnecting = false
+        }
         await authenticate(address: address, accessKey: accessKey, remember: true)
     }
 
@@ -42,12 +72,13 @@ final class DesktopConnectionSession: ObservableObject {
         errorMessage = nil
         defer { isConnecting = false }
         do {
+            try await runner.ensureLocalRunner()
             let url = try ConnectionAddress.normalized("http://127.0.0.1:4311")
             let key = try await localPairingKey(from: url)
             isConnecting = false
             await authenticate(address: url.absoluteString, accessKey: key, remember: true)
         } catch {
-            errorMessage = "OpenBot is not running on this Mac yet. Start the studio runner, then try again."
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -100,7 +131,9 @@ final class DesktopConnectionSession: ObservableObject {
             request.httpBody = try JSONEncoder().encode(DesktopLoginRequest(token: cleanKey))
             let configuration = URLSessionConfiguration.ephemeral
             configuration.httpShouldSetCookies = true
-            let (data, response) = try await URLSession(configuration: configuration).data(for: request)
+            let network = URLSession(configuration: configuration, delegate: ConnectionNoRedirect(), delegateQueue: nil)
+            defer { network.invalidateAndCancel() }
+            let (data, response) = try await network.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw DesktopSessionError.unreachable }
             guard http.statusCode == 200 else {
                 if http.statusCode == 401 { throw DesktopSessionError.wrongKey }
@@ -108,7 +141,9 @@ final class DesktopConnectionSession: ObservableObject {
                 throw DesktopSessionError.server(message ?? "OpenBot could not unlock this studio.")
             }
             if remember {
-                try KeychainStore.save(cleanKey)
+                if Self.persistsAccessKey(for: normalized) {
+                    try KeychainStore.save(cleanKey)
+                }
                 UserDefaults.standard.set(normalized.absoluteString, forKey: addressKey)
             }
             suggestedAddress = normalized.absoluteString

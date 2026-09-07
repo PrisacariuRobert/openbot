@@ -1,22 +1,33 @@
 import type { Bot, ConnectorServiceId } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { connectorCatalog } from "./google-workspace.js";
+import { macFallbackAllowed } from "./mac-productivity.js";
+import { McpConnections } from "./mcp-connections.js";
+import { CommunitySkills } from "./community-skills.js";
 
 // Context reduction only. The tool endpoints remain the authorization boundary
 // and recheck grants when a call arrives, including after session revocation.
 export function toolAvailability(
   db: OpenBotDatabase,
   bot: Bot,
+  reportOnly = false,
 ): Record<string, boolean> {
   const flags: Record<string, boolean> = {
+    spreadsheet_export: true,
+    table_summary: true,
     bash: bot.computerEnabled,
     isolated_bash: bot.computerEnabled,
+    connected_tools: new McpConnections(db).toolsFor(bot.id).length > 0,
+    connected_call: new McpConnections(db).toolsFor(bot.id).length > 0,
+    community_skill_search: new CommunitySkills(db).search(bot.id).length > 0,
+    community_skill_read: new CommunitySkills(db).search(bot.id).length > 0,
+    memory_search: true,
   };
   const set = (names: string[], available: boolean) => {
     for (const name of names) flags[name] = available;
   };
   set(
-    ["browser_open", "browser_snapshot", "browser_click", "browser_type"],
+    ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_request_sign_in"],
     bot.browserEnabled,
   );
   set(
@@ -26,6 +37,7 @@ export function toolAvailability(
       "mac_organize",
       "mac_apps_list",
       "mac_app_inspect",
+      "mac_app_read",
       "mac_app_open",
       "mac_app_click",
       "mac_app_type",
@@ -99,7 +111,8 @@ export function toolAvailability(
     set(app.read, readConnected && Boolean(access?.canRead));
     set(app.write, writeConnected && Boolean(access?.canSend));
   }
-  set(["work_collect", "work_report"], Boolean(flags.gmail_read || flags.google_calendar_agenda));
+  const selectedWorkSource = db.getWorkSources(bot.id).selections.some(({ service }) => db.getConnector(service)?.connected && db.getBotConnectorAccess(bot.id, service, service)?.canRead && db.getWorkSources(bot.id).connectionVersions[service] === db.connectorAuthorizationVersion(service));
+  set(["work_collect", "work_report"], Boolean(selectedWorkSource || flags.gmail_read || flags.google_calendar_agenda || macFallbackAllowed(db, bot.id, "gmail") || macFallbackAllowed(db, bot.id, "google-calendar")));
   const projects = db.listCodeProjects(bot.id);
   set(
     ["code_list", "code_search", "code_read", "code_status", "code_diff"],
@@ -121,10 +134,14 @@ export function toolAvailability(
     ),
   );
   set(
-    ["code_run"],
+    ["code_run", "code_benchmark"],
     projects.some((project) =>
       project.access.some((access) => access.botId === bot.id && access.canRun),
     ),
   );
+  if (reportOnly) {
+    const names = [...Object.keys(flags), "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "code_projects", "code_review_result", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "read", "write", "edit", "glob", "grep", "list", "task", "todowrite", "todoread", "webfetch", "websearch", "question", "skill", "apply_patch", "lsp"];
+    return { ...Object.fromEntries(names.map((name) => [name, false])), work_collect: flags.work_collect, work_report: flags.work_report };
+  }
   return flags;
 }

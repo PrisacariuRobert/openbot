@@ -12,7 +12,7 @@ struct DesktopSearchView: View {
             HStack(spacing: 11) {
                 Image(systemName: "magnifyingglass").font(.system(size: 18, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 TextField("Search messages, files, automations, skills and teammates", text: $query)
-                    .textFieldStyle(.plain).font(.system(size: 15, design: .rounded)).focused($focused)
+                    .textFieldStyle(.plain).font(.system(size: 15, design: .default)).focused($focused)
                 if !query.isEmpty {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -41,13 +41,13 @@ struct DesktopSearchView: View {
                                 }.frame(width: 38, height: 38)
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
-                                        Text(result.title).font(.system(size: 13, weight: .bold, design: .rounded)).lineLimit(1)
-                                        Text(label(result.kind).uppercased()).font(.system(size: 8.5, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.purple)
+                                        Text(result.title).font(.system(size: 13, weight: .bold, design: .default)).lineLimit(1)
+                                        Text(label(result.kind).uppercased()).font(.system(size: 8.5, weight: .bold, design: .default)).foregroundStyle(DesktopTheme.purple)
                                         Spacer()
-                                        Text(result.createdAt.desktopSearchDate).font(.system(size: 9.5, design: .rounded)).foregroundStyle(.tertiary)
+                                        Text(result.createdAt.desktopSearchDate).font(.system(size: 9.5, design: .default)).foregroundStyle(.tertiary)
                                     }
-                                    Text(result.subtitle).font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.secondary).lineLimit(1)
-                                    Text(result.snippet).font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(result.subtitle).font(.system(size: 10, weight: .semibold, design: .default)).foregroundStyle(.secondary).lineLimit(1)
+                                    Text(result.snippet).font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 Image(systemName: "arrow.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary).padding(.top, 13)
                             }
@@ -59,7 +59,7 @@ struct DesktopSearchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Text("Search stays on your OpenBot host and opens the original conversation rather than making another copy.")
-                .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 .padding(.horizontal, 18).padding(.vertical, 11).frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(width: 760, height: 620).background(DesktopTheme.paper)

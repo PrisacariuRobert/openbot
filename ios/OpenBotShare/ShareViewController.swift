@@ -47,7 +47,11 @@ final class ShareViewController: UIViewController {
         super.viewDidAppear(animated)
         guard !started else { return }
         started = true
+        #if OPENBOT_PERSONAL_PREVIEW
+        finish(message: "Sharing is unavailable in this Personal Team preview. Open OpenBot and use its attachment button instead.", delay: 4)
+        #else
         Task { await capture() }
+        #endif
     }
 
     @MainActor

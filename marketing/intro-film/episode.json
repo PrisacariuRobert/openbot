@@ -1,0 +1,209 @@
+{
+  "title": "OpenBot \u2014 full introduction and retained voice audition",
+  "voice": {
+    "speaker": "Aiden",
+    "direction": "Warm, confident product introduction. Speak naturally, clearly and conversationally, like showing a friend something genuinely useful. Light curiosity on the question, a gentle smile on the opening, calm confidence on the explanation. Use natural pauses between ideas. Medium pace, not slow documentary narration, not a movie trailer or a sales pitch. Pronounce OpenBot as Open Bot. Do not add words."
+  },
+  "assets": [
+    {
+      "id": "voice-full-01-hello",
+      "file": "audio/voice/full-01-hello-2d176e2673861f01.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-02-yours",
+      "file": "audio/voice/full-02-yours-92b6c72aa1a6de67.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-03-apps",
+      "file": "audio/voice/full-03-apps-5ed96529baeaf3c0.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-04-team",
+      "file": "audio/voice/full-04-team-82659d051b59fc6e.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-05-work",
+      "file": "audio/voice/full-05-work-920ea988d839960e.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-06-routines",
+      "file": "audio/voice/full-06-routines-52e23d84d5d218e1.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-07-extend",
+      "file": "audio/voice/full-07-extend-cd49486aee1916c1.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-08-control",
+      "file": "audio/voice/full-08-control-6dc81d50d77a66e9.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-09-everywhere",
+      "file": "audio/voice/full-09-everywhere-83870d60ee8438b3.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-full-10-open",
+      "file": "audio/voice/full-10-open-dfbe175a4350b244.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    },
+    {
+      "id": "voice-self-extension-direction",
+      "file": "audio/voice/self-extension-direction-e1d58d043e6da640.wav",
+      "type": "audio",
+      "origin": "generated-narration",
+      "credit": "Voice Studio Aiden \u00b7 AI-generated narration",
+      "sourceUrl": "local:voice-studio/Aiden",
+      "rights": {
+        "status": "pending",
+        "basis": ""
+      }
+    }
+  ],
+  "segments": [
+    {
+      "id": "full-01-hello",
+      "kind": "narration",
+      "text": "Meet OpenBot. Your own team of AI teammates. For the work you care about, and the things you'd rather have taken care of.",
+      "audioAsset": "voice-full-01-hello"
+    },
+    {
+      "id": "full-02-yours",
+      "kind": "narration",
+      "text": "Create a teammate. Give it a role, a personality, and your choice of AI. Bring a supported subscription, an API key, or a local model.",
+      "audioAsset": "voice-full-02-yours"
+    },
+    {
+      "id": "full-03-apps",
+      "kind": "narration",
+      "text": "Say you're preparing a launch. Your teammate can work with email, calendars, websites, and the Mac apps and files you allow. When it needs a sign-in, you take over.",
+      "audioAsset": "voice-full-03-apps"
+    },
+    {
+      "id": "full-04-team",
+      "kind": "narration",
+      "text": "One teammate researches. Another builds. Another checks the details. They consult each other, and bring one coordinated answer back to you.",
+      "audioAsset": "voice-full-04-team"
+    },
+    {
+      "id": "full-05-work",
+      "kind": "narration",
+      "text": "Not just a summary. A presentation you can use. A spreadsheet you can open. A website. Code changes with tests and a pull request to review.",
+      "audioAsset": "voice-full-05-work"
+    },
+    {
+      "id": "full-06-routines",
+      "kind": "narration",
+      "text": "Make useful work a routine. Keep preferences in memory. Teach a workflow, save a skill, and connect more tools through MCP. Build on what already works.",
+      "audioAsset": "voice-full-06-routines"
+    },
+    {
+      "id": "full-07-extend",
+      "kind": "narration",
+      "text": "And if a tool is missing? Review its plan. Approve it. Your chosen coding model continues the task, building a tool you can inspect or remove.",
+      "audioAsset": "voice-full-07-extend"
+    },
+    {
+      "id": "full-08-control",
+      "kind": "narration",
+      "text": "You set the boundaries. Review sensitive actions before they happen. See the work behind the result, and step in when you're needed.",
+      "audioAsset": "voice-full-08-control"
+    },
+    {
+      "id": "full-09-everywhere",
+      "kind": "narration",
+      "text": "Start on your Mac. Continue from your iPhone. The same conversations, teammates, and work, within reach.",
+      "audioAsset": "voice-full-09-everywhere"
+    },
+    {
+      "id": "full-10-open",
+      "kind": "closing",
+      "text": "Open source. Local first. Yours to shape. OpenBot. A little team. A lot more possible.",
+      "audioAsset": "voice-full-10-open"
+    },
+    {
+      "id": "self-extension-direction",
+      "kind": "narration",
+      "text": "Meet OpenBot. A little team, built around you. And when the right tool doesn't exist? Your teammate can propose one. You review the plan. Choose your coding model. Then approve. The same task continues, building a new tool you can inspect, keep, or remove.",
+      "audioAsset": "voice-self-extension-direction"
+    }
+  ]
+}

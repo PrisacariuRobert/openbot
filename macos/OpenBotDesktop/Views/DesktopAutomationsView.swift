@@ -12,49 +12,46 @@ struct DesktopAutomationsView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Automations").font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("Repeat dependable work without keeping a browser tab open.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("Routines").font(.system(size: 22, weight: .semibold))
+                    Text("The little things, taken care of.")
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { editingRoutine = nil; showingCreate = true } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                    .buttonStyle(DesktopActionButtonStyle(primary: true))
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
+            .padding(.horizontal, 38).padding(.top, 32).padding(.bottom, 22).background(StudioPalette.paper)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                     if store.routines.isEmpty {
                         VStack(spacing: 10) {
                             Image(systemName: "clock.badge.plus").font(.system(size: 28)).foregroundStyle(DesktopTheme.purple)
-                            Text("Nothing is scheduled yet").font(.system(size: 16, weight: .bold, design: .rounded))
+                            Text("Nothing is scheduled yet").font(.system(size: 16, weight: .bold, design: .default))
                             Text("Create a routine for one teammate. Every real action still follows the normal approval rules.")
-                                .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                .font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                                 .frame(maxWidth: 360)
                             Button("Create routine") { editingRoutine = nil; showingCreate = true }
-                                .buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
+                                .buttonStyle(DesktopActionButtonStyle(primary: true))
                         }
                         .frame(maxWidth: .infinity).padding(.vertical, 70)
                     } else {
                         ForEach(store.routines) { routine in routineCard(routine) }
                     }
                     Text("Run now can perform the routine's real work. OpenBot asks for confirmation here and still applies every approval boundary inside the task.")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary)
                         .padding(.top, 3)
                 }
-                .padding(20)
+                .padding(.horizontal, 38).padding(.vertical, 18)
             }
         }
-        .frame(width: 720, height: 640)
+        .desktopPanelSize(width: 720, height: 640)
         .background(DesktopTheme.paper)
         .sheet(isPresented: $showingCreate, onDismiss: { editingRoutine = nil }) {
             DesktopRoutineEditorView(store: store, routine: editingRoutine) { result in
@@ -95,59 +92,44 @@ struct DesktopAutomationsView: View {
     }
 
     private func routineCard(_ routine: StudioRoutine) -> some View {
-        HStack(alignment: .top, spacing: 13) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(routine.enabled ? DesktopTheme.purple.opacity(0.10) : Color.black.opacity(0.04))
-                Image(systemName: routine.triggerType == "schedule" ? "clock.fill" : "bolt.horizontal.fill")
-                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(routine.enabled ? DesktopTheme.purple : .secondary)
-            }
-            .frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
-                    Text(routine.name).font(.system(size: 14.5, weight: .bold, design: .rounded))
-                    Text(routine.enabled ? "ON" : "PAUSED")
-                        .font(.system(size: 8.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(routine.enabled ? DesktopTheme.green : .secondary)
-                }
-                Text("\(routine.botName) · \(routineSchedule(routine))")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                Text(routine.prompt).font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
-                HStack(spacing: 9) {
-                    Label(routine.lastStatus.capitalized, systemImage: routine.lastStatus == "failed" ? "exclamationmark.circle.fill" : "checkmark.circle")
-                    Text(routine.runCount == 1 ? "1 run" : "\(routine.runCount) runs")
-                    if routine.consecutiveFailures > 0 { Text("\(routine.consecutiveFailures) recent failures").foregroundStyle(.orange) }
-                }
-                .font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 10)
-            VStack(alignment: .trailing, spacing: 9) {
-                Toggle("", isOn: Binding(
-                    get: { routine.enabled },
-                    set: { enabled in Task { await store.setRoutineEnabled(routine, enabled: enabled) } }
-                ))
-                .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                Button("Run now") { pendingRun = routine }
-                    .buttonStyle(.bordered).controlSize(.small)
-                Menu {
-                    Button("Edit") { editingRoutine = routine; showingCreate = true }
-                    if ["webhook", "github"].contains(routine.triggerType) {
-                        Button("Replace signing secret") {
-                            Task { if let result = await store.rotateRoutineSecret(routine) { hookResult = result } }
-                        }
+        HStack(spacing: 14) {
+            Image(systemName: routine.triggerType == "schedule" ? "clock" : "bolt.horizontal")
+                .font(.system(size: 20, weight: .regular)).frame(width: 30)
+                .foregroundStyle(StudioPalette.muted)
+            Button { editingRoutine = routine; showingCreate = true } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(routine.name).font(.system(size: 14, weight: .semibold))
+                    Text("\(routine.botName) · \(routineSchedule(routine))")
+                        .font(.system(size: 12)).foregroundStyle(StudioPalette.muted)
+                    if routine.consecutiveFailures > 0 {
+                        Label("Needs attention · \(routine.consecutiveFailures) failed runs", systemImage: "exclamationmark.circle")
+                            .font(.system(size: 11)).foregroundStyle(StudioPalette.muted)
                     }
-                    Divider()
-                    Button("Delete", role: .destructive) { pendingDelete = routine }
-                } label: { Image(systemName: "ellipsis.circle") }
-                .menuStyle(.borderlessButton).fixedSize()
-            }
-        }
-        .padding(14)
-        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+                }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            Text(routine.enabled ? "On" : "Paused").font(.system(size: 11)).foregroundStyle(StudioPalette.muted)
+            Menu {
+                Button("Edit routine") { editingRoutine = routine; showingCreate = true }
+                Button(routine.enabled ? "Pause" : "Resume") {
+                    Task { await store.setRoutineEnabled(routine, enabled: !routine.enabled) }
+                }
+                Button(routine.triggerType == "webpage" ? "Check now" : "Run now") { pendingRun = routine }
+                    .disabled(routine.triggerType == "webpage" && !routine.enabled)
+                if ["webhook", "github"].contains(routine.triggerType) {
+                    Button("Replace signing secret") {
+                        Task { if let result = await store.rotateRoutineSecret(routine) { hookResult = result } }
+                    }
+                }
+                Divider()
+                Button("Delete", role: .destructive) { pendingDelete = routine }
+            } label: { Image(systemName: "ellipsis").frame(width: 24, height: 28) }
+                .menuStyle(.borderlessButton).fixedSize().help("Routine actions")
+        }.padding(.vertical, 22)
+            .overlay(alignment: .bottom) { Rectangle().fill(StudioPalette.line).frame(height: 1) }
     }
 
     private func routineSchedule(_ routine: StudioRoutine) -> String {
+        if routine.triggerType == "schedule", let label = routine.scheduleLabel { return label }
         guard routine.triggerType == "schedule" else {
             switch routine.triggerType {
             case "github": return "GitHub event"
@@ -157,6 +139,7 @@ struct DesktopAutomationsView: View {
             case "dropbox": return "Dropbox change"
             case "slack": return "Slack event"
             case "notion": return "Notion event"
+            case "webpage": return "Page changes · \(routine.triggerConfig?.pageUrl ?? "public page")"
             default: return routine.triggerType.capitalized
             }
         }
@@ -192,10 +175,15 @@ private struct DesktopRoutineEditorView: View {
     @State private var slackChannel: String
     @State private var notionEvent: String
     @State private var notionEntityID: String
+    @State private var pageURL: String
+    @State private var pageSelector: String
     @State private var saving = false
+    @State private var clockSchedule: StudioRoutineSchedule
+    @State private var scheduleValid = false
+    @State private var showingTriggers = false
 
     private let schedules = [("5", "Every 5 minutes"), ("15", "Every 15 minutes"), ("60", "Every hour"), ("1440", "Every day"), ("10080", "Every week"), ("custom", "Custom")]
-    private let triggers = [("schedule", "Schedule"), ("calendar", "Google Calendar"), ("github", "GitHub"), ("webhook", "Signed webhook"), ("todoist", "Todoist"), ("dropbox", "Dropbox"), ("slack", "Slack"), ("notion", "Notion")]
+    private let triggers = [("schedule", "Schedule"), ("webpage", "Page changes"), ("calendar", "Google Calendar"), ("github", "GitHub"), ("webhook", "Signed webhook"), ("todoist", "Todoist"), ("dropbox", "Dropbox"), ("slack", "Slack"), ("notion", "Notion")]
 
     init(store: StudioStore, routine: StudioRoutine?, onSaved: @escaping (StudioRoutineSaveResult) -> Void) {
         self.store = store
@@ -207,6 +195,7 @@ private struct DesktopRoutineEditorView: View {
         _botID = State(initialValue: routine?.botId ?? "")
         _schedule = State(initialValue: [5, 15, 60, 1_440, 10_080].contains(interval) ? String(interval) : "custom")
         _customMinutes = State(initialValue: interval)
+        _clockSchedule = State(initialValue: routine?.schedule ?? (routine == nil ? .weekdays : .interval))
         _prompt = State(initialValue: routine?.prompt ?? "")
         _triggerType = State(initialValue: routine?.triggerType ?? "schedule")
         _enabled = State(initialValue: routine?.enabled ?? true)
@@ -222,86 +211,111 @@ private struct DesktopRoutineEditorView: View {
         _slackChannel = State(initialValue: config.slackChannel ?? "")
         _notionEvent = State(initialValue: config.notionEvent ?? "page_updated")
         _notionEntityID = State(initialValue: config.notionEntityId ?? "")
+        _pageURL = State(initialValue: config.pageUrl ?? "")
+        _pageSelector = State(initialValue: config.pageSelector ?? "")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 17) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(routine == nil ? "New automation" : "Edit automation").font(.system(size: 20, weight: .bold, design: .rounded))
-                Text("Choose one owner, one clear trigger, and describe the finished result in normal language.")
-                    .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Name").font(.system(size: 11, weight: .semibold, design: .rounded))
-                TextField("Daily priorities", text: $name).textFieldStyle(.roundedBorder)
-            }
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Teammate").font(.system(size: 11, weight: .semibold, design: .rounded))
-                    Picker("Teammate", selection: $botID) {
-                        ForEach(store.state.bots) { bot in Text("\(bot.name) · \(bot.role)").tag(bot.id) }
-                    }.labelsHidden().frame(maxWidth: .infinity)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Starts when").font(.system(size: 11, weight: .semibold, design: .rounded))
-                    Picker("Starts when", selection: $triggerType) {
-                        ForEach(triggers, id: \.0) { value, label in Text(label).tag(value) }
-                    }.labelsHidden().frame(maxWidth: .infinity)
-                }
+        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(routine == nil ? "Make it a routine" : "Edit routine").font(.system(size: 22, weight: .semibold))
+            Text("A little work, taken care of regularly.").font(.callout).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 28).padding(.top, 28).padding(.bottom, 24)
+        ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What should happen?").font(.system(size: 12, weight: .medium))
+                TextField("For example, prepare a plan for my day.", text: $prompt, axis: .vertical)
+                    .textFieldStyle(.plain).lineLimit(3...7)
+                    .font(.system(size: 13)).padding(12).studioOutline(radius: 9)
+                    .accessibilityLabel("What should happen?")
             }
             triggerFields
-            VStack(alignment: .leading, spacing: 6) {
-                Text("What should happen?").font(.system(size: 11, weight: .semibold, design: .rounded))
-                TextEditor(text: $prompt)
-                    .font(.system(size: 13, design: .rounded)).frame(minHeight: 120)
-                    .padding(7).background(.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(.black.opacity(0.10)))
+            DisclosureGroup("Name & teammate") {
+                TextField("Name (optional)", text: $name).textFieldStyle(.plain)
+                    .padding(12).studioOutline().padding(.top, 10)
+                HStack {
+                    Text("Teammate").font(.callout.weight(.medium))
+                    Spacer()
+                    Picker("Teammate", selection: $botID) {
+                        ForEach(store.state.bots) { bot in Text("\(bot.name) · \(bot.role)").tag(bot.id) }
+                    }.labelsHidden().frame(maxWidth: 240)
+                }.padding(.top, 12)
+                Toggle("Run automatically", isOn: $enabled).toggleStyle(.switch).controlSize(.small).padding(.top, 14)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                DisclosureGroup("Other triggers", isExpanded: $showingTriggers) {
+                    Picker("Starts when", selection: $triggerType) {
+                        ForEach(triggers, id: \.0) { value, label in Text(label).tag(value) }
+                    }.padding(.top, 10)
+                }
+                .font(.system(size: 12))
             }
             if let error = store.errorMessage {
                 Label(error, systemImage: "exclamationmark.circle.fill")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                    .font(.system(size: 11, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
             }
-            HStack {
-                Toggle("Enabled", isOn: $enabled).toggleStyle(.switch).controlSize(.small)
+        }.font(.system(size: 12)).padding(.horizontal, 28).padding(.bottom, 20)
+        }
+        Divider()
+            HStack(spacing: 10) {
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
+                Button("Cancel") { dismiss() }.buttonStyle(DesktopActionButtonStyle()).keyboardShortcut(.cancelAction)
                 Button {
                     saving = true
                     Task {
                         let bot = store.state.bots.first(where: { $0.id == botID })
                         if let bot, let result = await store.saveRoutine(
                             id: routine?.id,
-                            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)) : name.trimmingCharacters(in: .whitespacesAndNewlines),
                             botID: bot.id,
-                            threadID: bot.threadId,
+                            threadID: routine?.botId == bot.id ? routine!.threadId : bot.threadId,
                             prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
-                            intervalMinutes: triggerType == "schedule" ? intervalMinutes : 1_440,
+                            intervalMinutes: ["schedule", "webpage"].contains(triggerType) ? intervalMinutes : 1_440,
                             enabled: enabled,
                             triggerType: triggerType,
-                            triggerConfig: triggerConfig
+                            triggerConfig: triggerConfig,
+                            schedule: triggerType == "schedule" ? clockSchedule : .interval
                         ) { onSaved(result); dismiss() }
                         saving = false
                     }
                 } label: {
                     if saving { ProgressView().controlSize(.small) }
-                    else { Text(routine == nil ? "Create automation" : "Save changes") }
+                    else { Text(routine == nil ? "Create routine" : "Save changes") }
                 }
-                .buttonStyle(.borderedProminent).tint(DesktopTheme.purple)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || botID.isEmpty || saving)
-            }
+                .buttonStyle(DesktopActionButtonStyle(primary: true))
+                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || botID.isEmpty || saving || (triggerType == "schedule" && !scheduleValid) || (triggerType == "webpage" && (pageURL.isEmpty || intervalMinutes < 15 || intervalMinutes > 43_200)))
+            }.padding(.horizontal, 28).padding(.vertical, 20)
+        }.frame(width: 480, height: 550).background(DesktopTheme.paper)
+        .buttonBorderShape(.capsule).controlSize(.regular)
+        .onAppear {
+            if botID.isEmpty { botID = store.activeBot?.id ?? store.state.bots.first?.id ?? "" }
+            showingTriggers = triggerType != "schedule"
         }
-        .padding(22).frame(width: 600, height: 660).background(DesktopTheme.paper)
-        .onAppear { if botID.isEmpty { botID = store.state.bots.first?.id ?? "" } }
     }
 
     @ViewBuilder private var triggerFields: some View {
         switch triggerType {
+        case "webpage":
+            fieldLabel("Public page or feed address") { TextField("https://example.com/changelog", text: $pageURL).textFieldStyle(.roundedBorder) }
+            HStack(spacing: 12) {
+                fieldLabel("Page section (optional)") { TextField("#updates, .news, or main", text: $pageSelector).textFieldStyle(.roundedBorder) }
+                fieldLabel("Minutes between checks (15–43,200)") {
+                    TextField("60", value: $customMinutes, format: .number).textFieldStyle(.roundedBorder)
+                        .onAppear { schedule = "custom" }
+                }
+            }
+            Text("The first check saves a baseline. Only changed text wakes your teammate. Public HTTPS pages and feeds only: no login, query strings, redirects, JavaScript or images.")
+                .font(.system(size: 11, design: .default)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         case "schedule":
+            RoutineScheduleFields(store: store, schedule: $clockSchedule, valid: $scheduleValid, intervalMinutes: intervalMinutes, routineID: routine?.id, enabled: enabled, compact: true)
+            if clockSchedule.kind == "interval" {
             HStack(spacing: 12) {
                 fieldLabel("How often") { Picker("How often", selection: $schedule) { ForEach(schedules, id: \.0) { value, label in Text(label).tag(value) } }.labelsHidden() }
                 if schedule == "custom" {
                     fieldLabel("Minutes (5–43,200)") { TextField("120", value: $customMinutes, format: .number).textFieldStyle(.roundedBorder) }
                 }
+            }
             }
         case "calendar":
             HStack(spacing: 12) {
@@ -336,7 +350,7 @@ private struct DesktopRoutineEditorView: View {
 
     private func fieldLabel<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 11, weight: .semibold, design: .rounded))
+            Text(title).font(.system(size: 11, weight: .semibold, design: .default))
             content()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -344,6 +358,7 @@ private struct DesktopRoutineEditorView: View {
     private var intervalMinutes: Int { schedule == "custom" ? customMinutes : Int(schedule) ?? 1_440 }
     private var triggerConfig: StudioRoutineTriggerConfig {
         switch triggerType {
+        case "webpage": return StudioRoutineTriggerConfig(pageUrl: clean(pageURL), pageSelector: clean(pageSelector))
         case "calendar": return StudioRoutineTriggerConfig(titleContains: clean(titleContains), minutesBefore: max(0, min(1_440, minutesBefore)))
         case "github": return StudioRoutineTriggerConfig(githubEvent: clean(githubEvent), githubAction: clean(githubAction), repository: clean(repository))
         case "webhook": return StudioRoutineTriggerConfig(eventName: clean(eventName))
@@ -367,9 +382,9 @@ private struct DesktopWebhookCredentialsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Signing details ready", systemImage: "key.fill")
-                .font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.purple)
+                .font(.system(size: 20, weight: .bold, design: .default)).foregroundStyle(DesktopTheme.purple)
             Text("Copy these now. The secret is shown only after creation or replacement and is never returned in the normal automation list.")
-                .font(.system(size: 11.5, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 11.5, design: .default)).foregroundStyle(.secondary)
             if let webhook = result.webhook {
                 credential("Webhook address", webhook.url)
                 credential("Signing secret", webhook.secret)
@@ -381,14 +396,14 @@ private struct DesktopWebhookCredentialsView: View {
 
     private func credential(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 10.5, weight: .semibold, design: .default)).foregroundStyle(.secondary)
             HStack {
                 Text(value).font(.system(size: 10.5, design: .monospaced)).lineLimit(2).textSelection(.enabled)
                 Spacer()
                 Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(value, forType: .string) }
                     .buttonStyle(.bordered).controlSize(.small)
             }
-            .padding(10).background(.white.opacity(0.80), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .padding(10).background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
     }
 }

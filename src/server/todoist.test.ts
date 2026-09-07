@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { TodoistConnector } from "./todoist.js";
 
 test("registers a private Todoist client, reads tasks, and creates only through the connector action", async () => {

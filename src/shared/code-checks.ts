@@ -9,6 +9,8 @@ export interface CodeCheckReceipt {
   startedAt: string;
   finishedAt: string | null;
   detail: string;
+  durationMs?: number;
+  runtimeIdentity?: string;
 }
 
 export function passingCodeChecks(receipts: CodeCheckReceipt[], headCommit: string): CodeCheckReceipt[] {

@@ -1,3 +1,5 @@
+import type { RoutineSchedule } from "./calendar-schedule.js";
+
 export type BotStatus = "ready" | "working" | "waiting" | "offline" | "failed" | "celebrating";
 export type MascotKind = "nova" | "blob" | "sprout" | "orbit" | "pebble" | "sunny";
 export type RunStatus =
@@ -52,6 +54,7 @@ export interface Bot {
   instructions: string;
   model: string;
   status: BotStatus;
+  currentAction: string | null;
   computerEnabled: boolean;
   browserEnabled: boolean;
   macAccessEnabled: boolean;
@@ -60,6 +63,7 @@ export interface Bot {
   createdAt: string;
   lastActiveAt: string | null;
   threadId: string;
+  retiredAt: string | null;
 }
 
 export interface Thread {
@@ -67,12 +71,15 @@ export interface Thread {
   title: string;
   kind: "direct" | "room";
   botId: string | null;
+  botIds?: string[];
   section: string | null;
   pinned: boolean;
   hidden: boolean;
   createdAt: string;
   updatedAt: string;
   unreadCount: number;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
 }
 
 export interface MessageReplyPreview {
@@ -88,6 +95,8 @@ export interface MessageReaction {
 }
 
 export interface Message {
+  /** Provider-delimited intermediate updates, separate from the final body. */
+  progressUpdates?: string[];
   id: string;
   threadId: string;
   senderType: "user" | "bot" | "system";
@@ -99,6 +108,9 @@ export interface Message {
   body: string;
   createdAt: string;
   runId: string | null;
+  kind: "text" | "event";
+  eventType: string | null;
+  eventData: Record<string, string | number | boolean | null> | null;
   replyTo: MessageReplyPreview | null;
   reactions: MessageReaction[];
   attachments: Attachment[];
@@ -136,6 +148,23 @@ export interface Attachment {
   createdAt: string;
 }
 
+export interface ArtifactSummary {
+  id: string;
+  threadId: string;
+  threadTitle: string;
+  botName: string | null;
+  name: string;
+  kind: Attachment["kind"];
+  mime: string;
+  size: number;
+  summary: string | null;
+  previewUrl: string | null;
+  url: string;
+  revision: number;
+  revisions: number;
+  createdAt: string;
+}
+
 export interface Activity {
   id: string;
   runId: string;
@@ -168,7 +197,51 @@ export interface AgentMessage {
   createdAt: string;
 }
 
+export interface DelegationConsultant {
+  runId: string;
+  botId: string;
+  botName: string;
+  status: RunStatus;
+  detail: string | null;
+}
+
+export interface DelegationSignal {
+  fromName: string;
+  toName: string;
+  kind: AgentMessageKind;
+  body: string;
+}
+
+/** A live delegation: one teammate paused waiting on another teammate's work. */
+export interface Delegation {
+  runId: string;
+  threadId: string;
+  botId: string;
+  botName: string;
+  waitingSince: string;
+  request: string;
+  consultants: DelegationConsultant[];
+  signals: DelegationSignal[];
+}
+
+export type ReadinessStepId = "runtime" | "connection" | "teammate";
+
+export interface ReadinessStep {
+  id: ReadinessStepId;
+  ready: boolean;
+  label: string;
+  detail: string;
+}
+
+/** First-run setup state: what a fresh owner still needs for a working studio. */
+export interface Readiness {
+  ready: boolean;
+  steps: ReadinessStep[];
+}
+
 export interface Run {
+  expectedWorkKind?: "morning" | "inbox" | "meeting" | "weekly" | null;
+  completionRepairCount?: number;
   id: string;
   threadId: string;
   botId: string;
@@ -189,6 +262,7 @@ export interface Run {
   approvalReason: string | null;
   approvalId: string | null;
   partialText: string | null;
+  modelOverride: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   progressAt: string | null;
@@ -245,9 +319,11 @@ export interface ApprovedActionReceipt {
   reviewedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion" | "webpage";
 
 export interface RoutineTriggerConfig {
+  pageUrl?: string;
+  pageSelector?: string;
   eventName?: string;
   githubEvent?: string;
   githubAction?: string;
@@ -263,6 +339,9 @@ export interface RoutineTriggerConfig {
 }
 
 export interface Routine {
+  schedule?: RoutineSchedule;
+  scheduleLabel?: string;
+  watchStatus?: { state: "baseline" | "unchanged" | "changed" | "error"; checkedAt: string; nextCheckAt: string; checks: number; unchangedChecks: number; detail: string };
   id: string;
   name: string;
   botId: string;
@@ -629,6 +708,7 @@ export interface ConnectorStatus {
   googleProjectId: string | null;
   googleApiRecovery: GoogleApiRecovery | null;
   googleApiRecoveries: GoogleApiRecovery[];
+  localApps?: { available: boolean; enabled: boolean; readServices: string[] };
   github: GitHubConnectorStatus;
   slack: OAuthConnectorStatus;
   notion: OAuthConnectorStatus;
@@ -871,6 +951,12 @@ export interface WorkspaceFile {
 
 export interface StudioSettings {
   macAccessEnabled: boolean;
+  selfExtendEnabled: boolean;
+  codingModel: string | null;
+  embeddingsProviderInstanceId: string | null;
+  embeddingsModel: string | null;
+  maxTeammates: number;
+  yoloMode: boolean;
 }
 
 export interface StudioDraft {
@@ -894,6 +980,8 @@ export interface AppState {
   approvals: Approval[];
   approvedActions: ApprovedActionReceipt[];
   agentMessages: AgentMessage[];
+  delegations: Delegation[];
+  retiredBots: Bot[];
   providers: ProviderInstance[];
   settings: StudioSettings;
   draft: StudioDraft;

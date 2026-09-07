@@ -19,13 +19,16 @@ export class CodeCheckService {
     const receipt: CodeCheckReceipt = { id: randomUUID(), runId, projectId, command, headCommit: before.headCommit, status: "running", exitCode: null, startedAt: new Date().toISOString(), finishedAt: null, detail: "Command is running. No successful result has been recorded." };
     this.pending.add(runId);
     this.db.saveCodeCheck(receipt);
+    const started = performance.now();
     try {
       const result = await this.computer.executeCodeProject(botId, project.rootPath, command, access.canWrite);
+      receipt.durationMs = Math.max(0, performance.now() - started);
+      if (result.runtimeIdentity) receipt.runtimeIdentity = result.runtimeIdentity;
       const current = this.db.getRun(runId);
       const active = current && ["running", "awaiting_approval"].includes(current.status);
       this.projects.forRun(botId, projectId, runId); // Recheck permission after execution too.
       const after = this.projects.checkIdentity(botId, projectId, runId), cleanAfter = after.clean;
-      const sameCommit = after.headCommit === receipt.headCommit;
+      const sameCommit = after.headCommit === receipt.headCommit && !result.sourceChanged;
       receipt.exitCode = result.code;
       receipt.status = !active ? "error" : !cleanBefore || !cleanAfter || !sameCommit ? "changed" : result.code === 0 ? "passed" : "failed";
       receipt.detail = !active ? "The task stopped before the check finished. Rerun it in an active task." : receipt.status === "changed" ? "This command was not run against one unchanged, clean commit. Commit the intended files and rerun the check." : `Command exited ${result.code}. Exit status is execution evidence, not proof that the chosen test covers the bug.`;

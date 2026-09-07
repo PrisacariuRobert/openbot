@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const source = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+const app = ["src/studio/Studio.tsx", "src/studio/Character.tsx", "src/studio/StudioAccess.tsx", "src/studio/CapabilityPanelHost.tsx", "src/CapabilityPanels.tsx", "src/studio/DeliveryReceipt.tsx", "src/studio/AppearancePicker.tsx"].map(source).join("\n");
+const styles = ["src/studio/studio.css", "src/studio/capability-panels.css", "src/studio/character-context.css"].map(source).join("\n");
 const database = readFileSync(new URL("../src/server/database.ts", import.meta.url), "utf8");
 const runtime = readFileSync(new URL("../src/server/runtime.ts", import.meta.url), "utf8");
 const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", import.meta.url), "utf8");
@@ -52,16 +53,16 @@ if (!readme.includes(`## What's new in ${version}\n`)) {
 if (!connectorManifests.includes('service: "todoist"') || !connectorManifests.includes('service: "dropbox"') || !todoist.includes("oauth/register") || !dropbox.includes("files.content.read")) {
   failures.push("Todoist and read-only Dropbox must remain registered through the reviewed connector contract.");
 }
-if (!app.includes("room-cluster-motion") || !app.includes("mascot-presence") || !app.includes("mascot-body")) {
+if (!app.includes("character-drawing") || !app.includes("mascotBodies") || !app.includes("--blink-delay")) {
   failures.push("The shared studio must keep its independently animated mascot composition.");
 }
 if (app.includes('/mascots/') || app.includes('className="mascot-art"')) {
   failures.push("Mascots must remain code-drawn and recolorable rather than image-backed.");
 }
-if (!app.includes("MASCOT_COLORS") || !app.includes('type="color"') || !database.includes('patch.color ?? current.color')) {
+if (!app.includes("mascotColors") || !app.includes('type="color"') || !database.includes('patch.color ?? current.color')) {
   failures.push("Existing teammate appearance customization must remain editable and persistent.");
 }
-if (!styles.includes(".mascot-state-celebrating .mascot-eye") || !styles.includes("prefers-reduced-motion")) {
+if (!styles.includes(".character-celebrating .character-drawing") || !styles.includes("prefers-reduced-motion")) {
   failures.push("The web mascot system must keep celebration and reduced-motion states.");
 }
 if (!app.includes("function LiveStudioPanel") || !app.includes("function LiveBrowser") || !app.includes('panel === "live"')) {
@@ -133,7 +134,7 @@ if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app
 if (!deployment.includes('requestedMode === "private_runner"') || !deployment.includes('url.protocol !== "https:"') || !deployment.includes("path.isAbsolute") || !server.includes("deploymentCallbackUrl")) {
   failures.push("Private runner mode must fail closed and use its canonical HTTPS address for public callbacks.");
 }
-if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy", 1)') || !server.includes("loginGate") || !authSecurity.includes("maximumFailures")) {
+if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy", "loopback")') || !server.includes("loginGate") || !authSecurity.includes("maximumFailures") || !server.includes("trustedLocalRequest(request)")) {
   failures.push("Private-host health, proxy-aware Secure cookies, or login throttling is incomplete.");
 }
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
@@ -169,11 +170,15 @@ if (!privateRunnerTransfer.includes('aes-256-gcm') || !privateRunnerTransfer.inc
 if (!privateRunnerCompose.includes('/transfers:') || !app.includes('export-home.sh') || !app.includes('import-home.sh')) {
   failures.push("The private runner and web product must expose the reviewed encrypted home-transfer path.");
 }
-if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
+if (!app.includes("function StudioAccess") || !app.includes("Let’s reconnect.") || !styles.includes(".studio-access")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");
 }
 if (!app.includes("oauth-setup-disclosure") || !styles.includes(".oauth-setup-disclosure")) {
   failures.push("Developer connector credentials must remain progressively disclosed instead of overwhelming the main app catalog.");
+}
+
+if (existsSync(new URL("../src/App.tsx", import.meta.url)) || existsSync(new URL("../src/styles.css", import.meta.url)) || existsSync(new URL("../src/studio-design.css", import.meta.url)) || !source("src/main.tsx").includes('import "./studio/main"')) {
+  failures.push("Both public entry points must use Studio; the retired app and styles must not return.");
 }
 
 if (failures.length) {

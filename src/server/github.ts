@@ -2,6 +2,7 @@ import { execFile, spawn, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import type { GitHubConnectorStatus, GitHubIssueSummary, GitHubNotificationSummary } from "../shared/types.js";
 import { safeHostEnvironment } from "./runtime.js";
+import { githubWriteHost, withPinnedGitHubWriteIdentity, type GitHubWriteDependencies, type GitHubWriteIdentity } from "./github-write-identity.js";
 
 export function githubCliEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env = safeHostEnvironment({ GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0" }, source);
@@ -56,11 +57,12 @@ export class GitHubConnector {
   private connectingUntil = 0;
   private cachedStatus: GitHubConnectorStatus | null = null;
   private cachedAt = 0;
+  constructor(private readonly writeDependencies: GitHubWriteDependencies = {}) {}
 
   status(force = false): GitHubConnectorStatus {
     const cacheFor = this.cachedStatus?.connected ? 10_000 : 2_000;
     if (!force && this.cachedStatus && Date.now() - this.cachedAt < cacheFor) return this.cachedStatus;
-    const user = spawnSync("gh", ["api", "user", "--jq", ".login"], { encoding: "utf8", timeout: 5_000, env: githubCliEnvironment() });
+    const user = spawnSync("gh", ["api", "--hostname", githubWriteHost(), "user", "--jq", ".login"], { encoding: "utf8", timeout: 5_000, env: githubCliEnvironment() });
     if ((user.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") return this.remember({ installed: false, connected: false, connecting: false, accountLogin: null, lastError: "Install GitHub CLI to connect your account." });
     return this.remember({ installed: true, connected: user.status === 0, connecting: user.status !== 0 && Date.now() < this.connectingUntil, accountLogin: user.status === 0 ? user.stdout.trim() || null : null, lastError: user.status === 0 || Date.now() < this.connectingUntil ? null : friendlyError(user.stderr) });
   }
@@ -72,7 +74,7 @@ export class GitHubConnector {
   beginLogin(): GitHubConnectorStatus {
     const current = this.status(true);
     if (!current.installed || current.connected) return current;
-    const child = spawn("gh", ["auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web", "--clipboard"], { detached: true, stdio: "ignore", env: githubCliEnvironment() });
+    const child = spawn("gh", ["auth", "login", "--hostname", githubWriteHost(), "--git-protocol", "https", "--web", "--clipboard"], { detached: true, stdio: "ignore", env: githubCliEnvironment() });
     child.unref();
     this.connectingUntil = Date.now() + 10 * 60_000;
     return this.remember({ ...current, connecting: true, lastError: null });
@@ -104,13 +106,8 @@ export class GitHubConnector {
     }));
   }
 
-  async createIssue(repository: string, title: string, body: string): Promise<string> {
+  async createIssue(repository: string, title: string, body: string, expected: GitHubWriteIdentity): Promise<string> {
     if (!REPOSITORY.test(repository)) throw new Error("Choose a repository as owner/name.");
-    try {
-      const result = await execFileAsync("gh", ["issue", "create", "--repo", repository, "--title", title, "--body", body], { encoding: "utf8", timeout: 30_000, maxBuffer: 1_000_000 });
-      const url = result.stdout.trim().split("\n").find((line) => line.startsWith("https://github.com/"));
-      if (!url) throw new Error("GitHub did not return the new issue link.");
-      return url;
-    } catch (error) { throw new Error(friendlyError(error)); }
+    return withPinnedGitHubWriteIdentity(expected, async (writer) => (await writer.createIssue({ repository, title, body })).url, this.writeDependencies);
   }
 }

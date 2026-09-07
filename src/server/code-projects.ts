@@ -1,12 +1,15 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { codeSecurityGuidance } from "./code-security-guidance.js";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import type { CodeProject, CodeProjectReview, CodeProjectSuggestion } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { passingCodeChecks } from "../shared/code-checks.js";
+import { codePublicationReviewSchema, type CodePublicationInput, type CodePublicationReview } from "../shared/code-publication.js";
 import { githubCliEnvironment } from "./github.js";
+import { GitHubWriteUncertainError, withPinnedGitHubWriteIdentity, type GitHubWriteIdentity, type PinnedGitHubWriter } from "./github-write-identity.js";
 
 const SKIP_DIRECTORIES = new Set([".git", ".openbot", "node_modules", "dist", "build", "coverage", ".next", ".turbo", "vendor"]);
 const SAFE_HIDDEN_DIRECTORIES = new Set([".github"]);
@@ -43,7 +46,7 @@ export class CodeProjectManager {
   readonly allowedRoot: string;
   readonly worktreesRoot: string;
 
-  constructor(private readonly db: OpenBotDatabase, allowedRoot = homedir()) {
+  constructor(private readonly db: OpenBotDatabase, allowedRoot = homedir(), private readonly options: { withGitHubIdentity?: typeof withPinnedGitHubWriteIdentity } = {}) {
     this.allowedRoot = realpathSync(path.resolve(allowedRoot));
     const worktreesRoot = path.join(db.dataDir, "code-worktrees");
     mkdirSync(worktreesRoot, { recursive: true });
@@ -77,7 +80,7 @@ export class CodeProjectManager {
   }
 
   private git(project: CodeProject, args: string[], timeout = 15_000) {
-    const result = spawnSync("git", args, { cwd: project.rootPath, encoding: "utf8", timeout, maxBuffer: 1_500_000, env: githubCliEnvironment() });
+    const result = spawnSync("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: project.rootPath, encoding: "utf8", timeout, maxBuffer: 1_500_000, env: githubCliEnvironment() });
     if (result.error || result.status !== 0) throw new Error(safeGitError(result.stderr || result.error?.message));
     return String(result.stdout || "");
   }
@@ -227,7 +230,7 @@ export class CodeProjectManager {
     } finally { if (existsSync(temporary)) unlinkSync(temporary); }
     const beforeLines = before ? before.split(/\r?\n/).length : 0, afterLines = content ? content.split(/\r?\n/).length : 0;
     const edit = this.db.recordCodeProjectEdit({ projectId, botId, path: file.relative, operation: existed ? "updated" : "created", additions: Math.max(0, afterLines - beforeLines) || (existed ? 0 : afterLines), deletions: Math.max(0, beforeLines - afterLines), beforeContent: existed ? before : null, afterHash: contentHash(content), workspaceRunId: runId && this.db.getCodeTaskWorkspace(runId) ? runId : null });
-    return { projectId, path: file.relative, operation: edit.operation, additions: edit.additions, deletions: edit.deletions, editId: edit.id };
+    return { projectId, path: file.relative, operation: edit.operation, additions: edit.additions, deletions: edit.deletions, editId: edit.id, securityGuidance: codeSecurityGuidance(file.relative, content) };
   }
 
   replace(botId: string, projectId: string, requested: string, oldText: string, newText: string, expectedOccurrences = 1, runId?: string) {
@@ -378,40 +381,107 @@ export class CodeProjectManager {
   preparePublish(botId: string, projectId: string, requestedBase?: string, runId?: string) {
     const project = this.project(botId, projectId, "write", runId);
     if (!project.gitRepository || !project.remoteUrl) throw new Error("Connect a GitHub repository before publishing a pull request.");
-    const repository = parseGitHubRepository(project.remoteUrl), branch = this.git(project, ["branch", "--show-current"]).trim();
+    const fetchUrls = this.git(project, ["remote", "get-url", "--all", "origin"]).trim().split(/\r?\n/);
+    const pushUrls = this.git(project, ["remote", "get-url", "--push", "--all", "origin"]).trim().split(/\r?\n/);
+    const expectedRemote = this.safeRemoteUrl(project.remoteUrl);
+    if (!expectedRemote || fetchUrls.length !== 1 || pushUrls.length !== 1 || this.safeRemoteUrl(fetchUrls[0]!) !== expectedRemote || this.safeRemoteUrl(pushUrls[0]!) !== expectedRemote) throw new Error("The project's GitHub destination changed or has multiple push destinations. Reconnect and review the correct repository first.");
+    const repository = parseGitHubRepository(expectedRemote), branch = this.git(project, ["branch", "--show-current"]).trim();
     const base = (requestedBase || project.defaultBranch || "main").trim();
     if (!branch || branch === base) throw new Error("Create and commit on a separate branch before publishing.");
+    for (const value of [branch, base]) {
+      if (value.startsWith("-") || value.length > 200 || /[\u0000-\u0020\u007f]/.test(value)) throw new Error("Use a valid named branch for this pull request.");
+      this.git(project, ["check-ref-format", `refs/heads/${value}`]);
+    }
     if (this.git(project, ["status", "--porcelain"]).trim()) throw new Error("Commit or restore every current change before publishing.");
     this.git(project, ["rev-parse", "--verify", "HEAD"]);
     return { project, repository, branch, base };
   }
 
-  async publishPullRequest(botId: string, projectId: string, input: { title: string; body: string; base?: string; draft?: boolean; expectedHeadCommit?: string }, runId?: string) {
-    const prepared = this.preparePublish(botId, projectId, input.base, runId), title = input.title.trim(), body = input.body.trim();
-    if (!runId || !input.expectedHeadCommit || this.currentCommit(botId, projectId, runId) !== input.expectedHeadCommit) throw new Error("The code no longer matches the commit approved for publishing. Review and approve the new commit first.");
-    this.assertCheckedCommit(botId, projectId, runId);
+  preparePublishReview(botId: string, projectId: string, input: CodePublicationInput, runId: string): CodePublicationReview {
+    const prepared = this.preparePublish(botId, projectId, input.base, runId);
+    const workspace = this.db.getCodeTaskWorkspace(runId), original = this.db.getCodeProject(projectId);
+    if (!original || !workspace || workspace.botId !== botId || workspace.projectId !== projectId || workspace.branch !== prepared.branch || workspace.status !== "active") throw new Error("Start a new isolated coding task before publishing its result.");
+    this.project(botId, projectId, "run", runId);
+    const headCommit = this.currentCommit(botId, projectId, runId), checks = this.assertCheckedCommit(botId, projectId, runId);
     const review = this.db.latestCodeTaskReview(runId);
-    if (!review || review.verdict !== "approved" || review.headCommit !== input.expectedHeadCommit) throw new Error("This exact commit still needs an independent code review.");
-    if (!title || title.length > 160 || !body || body.length > 10_000) throw new Error("Give the pull request a clear title and review summary.");
-    const repo = `${prepared.repository.owner}/${prepared.repository.name}`;
-    await this.command("gh", ["auth", "status", "--hostname", "github.com"], { cwd: prepared.project.rootPath, timeout: 15_000 });
-    // Push the approved object, never a movable local branch/HEAD reference.
-    await this.command("git", ["-c", "core.hooksPath=/dev/null", "push", "--no-verify", "origin", `${input.expectedHeadCommit}:refs/heads/${prepared.branch}`], { cwd: prepared.project.rootPath, timeout: 120_000 });
-    try {
-      const existing = await this.command("gh", ["pr", "view", prepared.branch, "--repo", repo, "--json", "url"], { cwd: prepared.project.rootPath, timeout: 20_000 });
-      const url = (JSON.parse(existing.stdout) as { url?: string }).url;
-      if (url) {
-        if (runId) this.db.updateCodeTaskWorkspaceStatus(runId, "published");
-        return { projectId, branch: prepared.branch, url, existing: true };
+    if (!review || review.projectId !== projectId || review.verdict !== "approved" || review.headCommit !== headCommit || review.reviewerBotId === botId) throw new Error("This exact commit still needs an independent code review.");
+    const reviewerRun = this.db.getRun(review.reviewerRunId);
+    if (!reviewerRun || reviewerRun.botId !== review.reviewerBotId || reviewerRun.parentRunId !== runId) throw new Error("The independent review is not bound to this coding task.");
+    if (!this.db.getCodeProjectForBot(review.reviewerBotId, projectId, "read")) throw new Error("The reviewing teammate no longer has access to this project. Ask for a fresh review.");
+    const grant = original.access.find((access) => access.botId === botId), reviewerGrant = original.access.find((access) => access.botId === review.reviewerBotId);
+    if (!grant || !reviewerGrant) throw new Error("Project access changed. Ask for a fresh review.");
+    const baseCommit = this.git(prepared.project, ["rev-parse", "--verify", `refs/heads/${prepared.base}^{commit}`]).trim();
+    const mergeBaseCommit = this.git(prepared.project, ["merge-base", baseCommit, headCommit]).trim();
+    const commits = this.git(prepared.project, ["rev-list", "--reverse", `${baseCommit}..${headCommit}`]).trim().split(/\r?\n/).filter(Boolean);
+    if (!commits.length || commits.length > 32) throw new Error("Publish a focused change with between one and 32 commits.");
+    if (this.git(prepared.project, ["rev-list", "--merges", `${baseCommit}..${headCommit}`]).trim()) throw new Error("This change contains merge commits. Prepare a focused linear task branch so every published change can be reviewed.");
+    // Review the entire outgoing patch history, not only the final tree: a
+    // secret committed and then removed still leaves the computer on a push.
+    const files = [...new Set(commits.flatMap((sha) => this.git(prepared.project, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha]).split("\0").filter(Boolean)))].sort();
+    if (files.some((file) => /[\u0000-\u001f\u007f]/.test(file) || file.split("/").some((part) => part.startsWith(".") && !SAFE_HIDDEN_DIRECTORIES.has(part)))) throw new Error("This branch includes protected or unreadable file paths. Remove them from the outgoing commit history before publishing.");
+    const diff = this.git(prepared.project, ["log", "--reverse", "--format=Commit %H%n%s", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "-p", `${baseCommit}..${headCommit}`, "--"]);
+    if (/^(?:Binary files |GIT binary patch|(?:old mode|new mode|new file mode|deleted file mode) (?:120000|160000)|index [^\n]+ (?:120000|160000))/m.test(diff)) throw new Error("Binary files, symbolic links and submodules need a separate review before publishing.");
+    const accessSnapshot = (access: typeof grant) => ({ canRead: access.canRead, canWrite: access.canWrite, canRun: access.canRun, updatedAt: access.updatedAt });
+    const parsed = codePublicationReviewSchema.safeParse({
+      version: 1, projectId, projectName: original.name, ownerId: original.ownerId, botId, runId,
+      projectRoot: original.rootPath, workspaceRoot: workspace.rootPath,
+      repository: `${prepared.repository.owner}/${prepared.repository.name}`, remoteUrl: prepared.repository.url,
+      branch: prepared.branch, base: prepared.base, headCommit, baseCommit, mergeBaseCommit,
+      title: input.title.trim(), body: input.body.trim(), draft: input.draft === true, files, commits, diff,
+      grant: accessSnapshot(grant), reviewerGrant: accessSnapshot(reviewerGrant),
+      checks: checks.map((check) => ({ id: check.id, command: check.command, headCommit: check.headCommit, exitCode: check.exitCode, finishedAt: check.finishedAt, detail: check.detail })).sort((a, b) => a.id.localeCompare(b.id)),
+      review: { id: review.id, reviewerRunId: review.reviewerRunId, reviewerBotId: review.reviewerBotId, reviewerBotName: review.reviewerBotName, headCommit: review.headCommit, summary: review.summary, findings: review.findings, createdAt: review.createdAt },
+    });
+    if (!parsed.success) throw new Error("The complete publication is too large or missing required evidence. Split the change and rerun checks and review; nothing has been published.");
+    return parsed.data;
+  }
+
+  assertPublishReview(botId: string, projectId: string, input: CodePublicationInput, runId: string, snapshot: unknown): CodePublicationReview {
+    const expected = codePublicationReviewSchema.safeParse(snapshot);
+    if (!expected.success) throw new Error("This publication needs a complete, fresh review before it can be approved.");
+    const current = this.preparePublishReview(botId, projectId, input, runId);
+    if (JSON.stringify(expected.data) !== JSON.stringify(current)) throw new Error("The code, destination, checks or project access changed since this proposal. Ask for a new publication review; nothing has been published.");
+    return current;
+  }
+
+  private async assertPublishDestination(review: CodePublicationReview, writer: PinnedGitHubWriter) {
+    await writer.assertRepositoryWriteAccess({ repository: review.repository });
+    const remoteBase = await writer.readBranchCommit({ repository: review.repository, branch: review.base });
+    if (remoteBase !== review.baseCommit) throw new Error("The GitHub base branch changed. Update the local base, rerun checks and request a new publication review.");
+    const existing = await writer.findPullRequest({ repository: review.repository, branch: review.branch, base: review.base, expectedHeadCommit: review.headCommit, expectedBaseCommit: review.baseCommit });
+    if (existing) throw new Error("This branch already has a pull request. Updating existing pull requests needs a separate review; nothing has been published by this proposal.");
+  }
+
+  async verifyPublishDestination(snapshot: unknown, identity: GitHubWriteIdentity) {
+    const review = codePublicationReviewSchema.parse(snapshot);
+    if (identity.host !== "github.com") throw new Error("This connected code project is on github.com. Reconnect the matching account before publishing.");
+    await (this.options.withGitHubIdentity || withPinnedGitHubWriteIdentity)(identity, async (writer) => this.assertPublishDestination(review, writer));
+  }
+
+  async publishPullRequest(botId: string, projectId: string, input: CodePublicationInput & { expectedHeadCommit?: string; publicationReview?: unknown; publicationIdentity?: GitHubWriteIdentity }, runId?: string) {
+    if (!runId || !input.expectedHeadCommit || !input.publicationIdentity) throw new Error("Publishing needs the exact code and GitHub account from a complete approval review.");
+    const review = this.assertPublishReview(botId, projectId, input, runId, input.publicationReview);
+    if (input.expectedHeadCommit !== review.headCommit) throw new Error("The code no longer matches the commit approved for publishing. Review and approve the new commit first.");
+    const identity = input.publicationIdentity;
+    if (identity.host !== "github.com") throw new Error("This connected code project is on github.com. Reconnect the matching account before publishing.");
+    return await (this.options.withGitHubIdentity || withPinnedGitHubWriteIdentity)(identity, async (writer) => {
+      await this.assertPublishDestination(review, writer);
+      // The network reads above yield to owner edits. Recheck everything after
+      // them, then upload only the immutable object and reviewed destination.
+      this.assertPublishReview(botId, projectId, input, runId, review);
+      try {
+        await writer.pushCommit({ cwd: review.workspaceRoot, repository: review.repository, commit: review.headCommit, branch: review.branch });
+        if (await writer.readBranchCommit({ repository: review.repository, branch: review.base }) !== review.baseCommit) throw new Error("The base changed after the branch upload.");
+        const result = await writer.createPullRequest({ repository: review.repository, branch: review.branch, base: review.base, expectedHeadCommit: review.headCommit, expectedBaseCommit: review.baseCommit, title: review.title, body: review.body, draft: review.draft });
+        this.db.updateCodeTaskWorkspaceStatus(runId, "published");
+        return { verified: true as const, projectId, repository: review.repository, branch: review.branch, base: review.base, headCommit: review.headCommit, url: result.url, existing: false as const, accountLogin: identity.accountLogin, host: identity.host, draft: review.draft, checks: review.checks, review: review.review };
+      } catch (error) {
+        // The upload might already exist even if PR creation/readback failed.
+        // The action journal must require reconciliation, not automatic retry.
+        if (error instanceof GitHubWriteUncertainError) throw error;
+        throw new GitHubWriteUncertainError("The reviewed branch may have been uploaded, but GitHub did not confirm the complete pull request. Check the repository before trying again.");
       }
-    } catch { /* No pull request exists for this branch yet. */ }
-    const args = ["pr", "create", "--repo", repo, "--base", prepared.base, "--head", prepared.branch, "--title", title, "--body", body];
-    if (input.draft) args.push("--draft");
-    const created = await this.command("gh", args, { cwd: prepared.project.rootPath, timeout: 60_000 });
-    const url = created.stdout.split(/\r?\n/).find((line) => /^https:\/\/github\.com\//.test(line.trim()))?.trim();
-    if (!url) throw new Error("GitHub created the pull request but did not return its link.");
-    if (runId) this.db.updateCodeTaskWorkspaceStatus(runId, "published");
-    return { projectId, branch: prepared.branch, url, existing: false };
+    });
   }
 
   restoreEdit(editId: string) {

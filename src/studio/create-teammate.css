@@ -1,0 +1,164 @@
+.create-teammate {
+  display: grid;
+  gap: 19px;
+}
+.topbar > span { min-width: 0; overflow: hidden; }
+.topbar > div { flex-shrink: 0; }
+.topbar button.conversation-identity { display: flex; width: 100%; gap: 8px; padding-inline: 4px; font-size: 13px; }
+.conversation-identity > .character, .conversation-identity > svg { flex-shrink: 0; }
+.conversation-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.new-character {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 8px;
+}
+.new-character p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.new-character strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.create-teammate > label {
+  display: grid;
+  gap: 9px;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.creation-field { display: grid; gap: 9px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.appearance-picker fieldset { border: 0; padding: 0; margin: 20px 0; min-width: 0; }
+.appearance-picker legend { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.shape-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.shape-options button { display: grid; justify-items: center; gap: 3px; padding: 7px; border-radius: 12px; border: 1px solid var(--line); font-size: 11px; }
+.shape-options button:hover, .color-options button:hover { background: var(--hover, var(--surface-muted)); }
+.shape-options button[aria-pressed="true"], .color-options button[aria-pressed="true"] { border-color: var(--ink); background: var(--selection, var(--surface-muted)); }
+.color-options { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; }
+.color-options button { display: grid; place-items: center; border: 1px solid transparent; border-radius: 9px; padding: 2px 0; }
+.color-options .character { width: 100%; max-width: 36px; }
+.custom-character-color { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.custom-character-color input { padding: 2px; width: 40px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); filter: grayscale(1); }
+.appearance-editor { border-top: 1px solid var(--line); margin: 22px 0; padding-top: 16px; }
+.appearance-editor summary { cursor: pointer; font-size: 13px; }
+.appearance-preview { display: flex; align-items: center; gap: 15px; padding-top: 16px; }
+.appearance-preview p { color: var(--muted); font-size: 13px; }
+.create-teammate :is(input, textarea, select) {
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.create-teammate textarea {
+  resize: vertical;
+}
+.create-teammate .text-action {
+  padding: 0;
+}
+.create-teammate .boundary-note,
+.create-teammate .full-width {
+  margin-top: 0;
+}
+.character-customize {
+  border-block: 1px solid var(--line);
+  padding: 17px 0;
+  color: var(--secondary);
+  font-size: 13px;
+}
+.character-customize summary {
+  cursor: pointer;
+}
+.character-customize fieldset {
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
+}
+.character-customize legend {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.character-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.character-options button {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 4px;
+}
+.character-options button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--sidebar);
+}
+.first-teammate {
+  margin: auto;
+  padding: 55px 25px;
+  max-width: 500px;
+  text-align: center;
+}
+.first-teammate-mark {
+  display: inline-grid;
+  place-items: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 24px;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 27px;
+  color: var(--secondary);
+}
+.first-teammate h1 {
+  font-size: 33px;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+.first-teammate p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+  margin: 18px auto 27px;
+  max-width: 350px;
+}
+.first-teammate .primary {
+  min-height: 44px;
+  padding-inline: 22px;
+  font-size: 14px;
+}
+.sidebar-create {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 12px;
+  margin: 7px 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 12px;
+  background: var(--surface);
+}
+.first-teammate small {
+  display: block;
+  margin: 20px auto 0;
+  max-width: 280px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 760px) {
+  .create-teammate :is(input, textarea, select) {
+    font-size: 16px;
+  }
+  .first-teammate {
+    padding-top: 40px;
+  }
+  .first-teammate h1 {
+    font-size: 29px;
+  }
+}

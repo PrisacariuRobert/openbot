@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 
 test("keeps notification subscriptions and delivery outbox durable without exposing keys in app state", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-notification-test-"));

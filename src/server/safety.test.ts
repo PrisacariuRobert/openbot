@@ -30,6 +30,18 @@ test("terminal mutations and uploads are intercepted", () => {
   assert.equal(commandApprovalReason("git restore src/app.ts"), "This terminal command may publish or rewrite project work.");
 });
 
+test("coordinated prohibitions do not turn safe work into a publishing request", () => {
+  assert.equal(approvalReason("Fix the bug. Do not install packages, access the network, push, publish, or change my original checkout."), null);
+  assert.equal(approvalReason("Prepare the drafts. Don't send emails or post to the team."), null);
+  assert.equal(approvalReason("Never delete, overwrite, or publish the originals."), null);
+  assert.ok(approvalReason("Do not delete files or publish the preview, then deploy the approved release."));
+  assert.ok(approvalReason("Do not delete files, and publish the preview."));
+  assert.ok(approvalReason("Do not ask for approval or publish later, deploy now."));
+  assert.ok(approvalReason("Do not delete or publish drafts. Publish the website."));
+  assert.ok(commandApprovalReason("git push origin main"));
+  assert.ok(commandApprovalReason("rm -rf drafts"));
+});
+
 test("destructive and external actions wait for the user", () => {
   assert.equal(approvalReason("Delete all the draft files"), "This may delete files or data.");
   assert.equal(

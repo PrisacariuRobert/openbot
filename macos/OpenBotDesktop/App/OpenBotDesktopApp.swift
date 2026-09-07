@@ -34,6 +34,10 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
             .tint(DesktopTheme.purple)
             .task { await self.session.restore() }
         let controller = NSHostingController(rootView: content)
+        // NSWindow owns the size limits. Automatic SwiftUI ideal/minimum size
+        // propagation can oscillate with the split view and scroll geometry at
+        // compact widths, repeatedly invalidating AppKit's constraints.
+        controller.sizingOptions = []
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_180, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -41,11 +45,26 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "OpenBot"
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
         window.minSize = NSSize(width: 1_080, height: 640)
         window.contentViewController = controller
+        #if DEBUG
+        let preview = ProcessInfo.processInfo.environment
+        let isolatedPreview = preview["OPENBOT_NATIVE_PREVIEW_KEY"] != nil
+            && preview["OPENBOT_NATIVE_PREVIEW_SERVER"].flatMap { try? ConnectionAddress.normalized($0) }.map(ConnectionAddress.isLoopback) == true
+        if isolatedPreview {
+            // Keep synthetic visual checks out of the owner's saved geometry
+            // and appearance. No preview override is compiled into Release.
+            window.appearance = NSAppearance(named: preview["OPENBOT_NATIVE_PREVIEW_APPEARANCE"] == "dark" ? .darkAqua : .aqua)
+            if preview["OPENBOT_NATIVE_PREVIEW_SIZE"] == "compact" {
+                window.setContentSize(NSSize(width: 1_080, height: 640))
+            }
+        } else { window.setFrameAutosaveName("OpenBotMainWindow") }
+        #else
         window.setFrameAutosaveName("OpenBotMainWindow")
+        #endif
         if window.frame.width < 1_080 {
             let available = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
             let width = min(1_180, available?.width ?? 1_180)
@@ -94,6 +113,11 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     @objc private func showSettings() {
+        if session.isAuthenticated {
+            window?.makeKeyAndOrderFront(nil)
+            NotificationCenter.default.post(name: .openBotShowSettings, object: nil)
+            return
+        }
         if let settingsWindow {
             settingsWindow.makeKeyAndOrderFront(nil)
         } else {
@@ -262,7 +286,9 @@ final class OpenBotDesktopApplication: NSObject, NSApplicationDelegate {
 }
 
 extension Notification.Name {
+    static let openBotShowSettings = Notification.Name("app.openbot.show-settings")
     static let openBotFocusComposer = Notification.Name("app.openbot.focus-composer")
+    static let openBotShowInspector = Notification.Name("app.openbot.show-inspector")
     static let openBotShowWork = Notification.Name("app.openbot.show-work")
     static let openBotShowLive = Notification.Name("app.openbot.show-live")
     static let openBotShowAutomations = Notification.Name("app.openbot.show-automations")
@@ -278,9 +304,10 @@ extension Notification.Name {
 }
 
 enum DesktopTheme {
-    static let purple = Color(red: 0.40, green: 0.34, blue: 0.84)
-    static let ink = Color(red: 0.14, green: 0.13, blue: 0.12)
-    static let paper = Color(red: 0.97, green: 0.96, blue: 0.94)
-    static let green = Color(red: 0.20, green: 0.61, blue: 0.42)
-    static let botBubble = Color(red: 0.933, green: 0.925, blue: 0.91)
+    static let purple = StudioPalette.accent // Legacy name; interface accent, not mascot color.
+    static let ink = StudioPalette.ink
+    static let paper = StudioPalette.paper
+    static let green = StudioPalette.green
+    static let botBubble = StudioPalette.surface
+    static let userBubble = StudioPalette.userBubble
 }

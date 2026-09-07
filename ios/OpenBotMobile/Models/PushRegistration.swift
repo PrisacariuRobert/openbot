@@ -21,6 +21,11 @@ final class PushRegistration: ObservableObject {
     var isAuthorized: Bool { state == .available || state == .registered }
 
     func restore() async {
+        #if OPENBOT_PERSONAL_PREVIEW
+        state = .failed
+        errorMessage = "Push notifications are unavailable in this Personal Team preview. Chat still works while the app is open."
+        return
+        #else
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
@@ -29,9 +34,13 @@ final class PushRegistration: ObservableObject {
         case .denied: state = .denied
         default: state = .unknown
         }
+        #endif
     }
 
     func requestPermission() async {
+        #if OPENBOT_PERSONAL_PREVIEW
+        await restore()
+        #else
         do {
             let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             state = allowed ? .available : .denied
@@ -41,6 +50,7 @@ final class PushRegistration: ObservableObject {
             state = .failed
             errorMessage = "iPhone could not enable notifications. Try again from Settings."
         }
+        #endif
     }
 
     func openSettings() {

@@ -1,7 +1,7 @@
 // Opt-in live-model acceptance checks. The model may incur provider usage.
 // Always starts an isolated OpenBot database; never targets the user's studio.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import {
   mkdirSync,
@@ -10,17 +10,24 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AppState, Run } from "../src/shared/types.js";
+import { OpenBotDatabase } from "../src/server/testing/database.js";
 
 const model = process.env.OPENBOT_BENCHMARK_MODEL;
 assert.ok(
   model?.startsWith("opencode/") || model?.startsWith("opencode-go/"),
   "Set OPENBOT_BENCHMARK_MODEL to a model in your OpenCode account. This opt-in check uses that account's allowance.",
 );
-const root = mkdtempSync(path.join(tmpdir(), "openbot-live-benchmark-"));
+const codeOnly = process.env.OPENBOT_BENCHMARK_CODE === "1";
+// Docker's default Colima mounts include this project, not macOS /var/folders.
+const fixtureBase = codeOnly ? path.join(homedir(), "Library/Caches/OpenBot Acceptance") : tmpdir();
+mkdirSync(fixtureBase, { recursive: true });
+const root = mkdtempSync(path.join(fixtureBase, "openbot-live-benchmark-"));
+const evidence = mkdtempSync(path.join(tmpdir(), "openbot-workflow-evidence-"));
+let passed = false;
 const reservation = createServer();
 await new Promise<void>((resolve) =>
   reservation.listen(0, "127.0.0.1", resolve),
@@ -88,7 +95,7 @@ async function run(
   });
   assert.equal(submitted.runs.length, 1);
   const id = submitted.runs[0]!.id;
-  while (Date.now() - started < 180_000) {
+  while (Date.now() - started < 300_000) {
     await delay(1000);
     const state = await api<AppState>(`/api/state?threadId=${threadId}`);
     const task = state.runs.find((entry) => entry.id === id);
@@ -101,7 +108,7 @@ async function run(
       return { state, run: task, elapsedMs: Date.now() - started };
   }
   await api(`/api/runs/${id}/cancel`, {});
-  throw new Error("Workflow exceeded the three-minute test deadline.");
+  throw new Error("Workflow exceeded the five-minute test deadline.");
 }
 
 try {
@@ -122,12 +129,14 @@ try {
       `/api/bots/${id}`,
       {
         model,
+        providerInstanceId: process.env.OPENBOT_BENCHMARK_PROVIDER || "local-opencode",
         computerEnabled: false,
         browserEnabled: false,
         weeklyTokenBudget: 100_000,
       },
       "PATCH",
     );
+  if (!codeOnly) {
   const workspace = path.join(root, "workspaces", "nova");
   mkdirSync(workspace, { recursive: true });
   writeFileSync(
@@ -207,6 +216,47 @@ try {
   console.log(
     "These two bounded checks are not a head-to-head Grok Bot benchmark or general reliability claim.",
   );
+  } else {
+    const git = (cwd: string, ...args: string[]) => {
+      const result = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+      assert.equal(result.status, 0, result.stderr); return result.stdout.trim();
+    };
+    const source = path.join(root, "quantity-project"); mkdirSync(source);
+    const broken = "module.exports = items => items.reduce((sum, item) => sum + item.price, 0);\n";
+    const tests = "const assert = require('node:assert/strict'); const total = require('./total.cjs'); assert.equal(total([{price:12,quantity:3},{price:5,quantity:2}]),46); assert.equal(total([]),0); assert.equal(total([{price:4,quantity:0}]),0); assert.equal(total([{price:7,quantity:1}]),7); console.log('Independent quantity tests passed');\n";
+    writeFileSync(path.join(source, "total.cjs"), broken); writeFileSync(path.join(source, "total.test.cjs"), tests);
+    git(source, "init", "-b", "main"); git(source, "add", ".");
+    git(source, "-c", "user.name=Acceptance Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Independent failing quantity fixture");
+    const originalCommit = git(source, "rev-parse", "HEAD");
+    const project = await api<{ id: string }>("/api/code-projects", { name: "Quantity fixture", rootPath: source, access: [{ botId: "pixel", canRead: true, canWrite: true, canRun: true }] });
+    await api("/api/bots/pixel", { computerEnabled: true }, "PATCH");
+    const result = await run("bot-pixel", "pixel", "Fix the quantity calculation bug in the shared Quantity fixture project. First reproduce it with node total.test.cjs. Do not modify the existing tests. Work on your isolated task branch, make the smallest implementation fix, commit only total.cjs, rerun the original tests against that commit, and explain the evidence. Do not install packages, access the network, push, publish, or change my original checkout.");
+    const previousDataDir = process.env.OPENBOT_DATA_DIR;
+    process.env.OPENBOT_DATA_DIR = root;
+    const db = new OpenBotDatabase(root);
+    if (previousDataDir === undefined) delete process.env.OPENBOT_DATA_DIR;
+    else process.env.OPENBOT_DATA_DIR = previousDataDir;
+    try {
+      const workspace = db.getCodeTaskWorkspace(result.run.id); assert.ok(workspace, "No isolated coding workspace was created.");
+      const checks = db.listCodeChecks(result.run.id);
+      writeFileSync(path.join(evidence, "coding-run.json"), JSON.stringify({ model, elapsedMs: result.elapsedMs, run: result.run, checks, finalMessages: result.state.messages.filter((message) => message.runId === result.run.id) }, null, 2));
+      assert.ok(checks.some((check) => check.status === "failed" && check.command === "node total.test.cjs" && check.headCommit === originalCommit), "No real reproduction against the unchanged failing commit.");
+      const head = git(workspace.rootPath, "rev-parse", "HEAD");
+      assert.notEqual(head, originalCommit);
+      assert.ok(checks.some((check) => check.status === "passed" && check.command === "node total.test.cjs" && check.headCommit === head), "No passed original tests tied to the repaired commit.");
+      assert.equal(readFileSync(path.join(source, "total.cjs"), "utf8"), broken);
+      assert.equal(readFileSync(path.join(workspace.rootPath, "total.test.cjs"), "utf8"), tests);
+      assert.equal(git(source, "status", "--porcelain"), "");
+      assert.equal(git(source, "rev-parse", "HEAD"), originalCommit);
+      assert.equal(git(workspace.rootPath, "diff", "--name-only", originalCommit, head), "total.cjs");
+      const diff = git(workspace.rootPath, "diff", originalCommit, head);
+      writeFileSync(path.join(evidence, "repair.patch"), diff);
+      writeFileSync(path.join(evidence, "original-tests.cjs"), tests);
+      const output = { workflow: "isolated-bug-fix", result: "pass", model, elapsedMs: result.elapsedMs, inputTokens: result.run.inputTokens, outputTokens: result.run.outputTokens, cacheReadTokens: result.run.cacheReadTokens, oracle: "real failing and passing network-disabled Docker checks tied to commits; original checkout and independent tests unchanged", limitations: "One small JavaScript fixture, not general coding quality or competitor parity." };
+      writeFileSync(path.join(evidence, "summary.json"), JSON.stringify(output, null, 2)); console.log(JSON.stringify(output));
+    } finally { db.close(); }
+  }
+  passed = true;
 } finally {
   child.kill("SIGTERM");
   await Promise.race([
@@ -214,5 +264,7 @@ try {
     delay(5000),
   ]);
   if (child.exitCode === null) child.kill("SIGKILL");
-  rmSync(root, { recursive: true, force: true });
+  if (passed) rmSync(root, { recursive: true, force: true });
+  else console.error(`Private failure fixture retained at ${root}`);
+  console.log(`Acceptance evidence: ${evidence}`);
 }

@@ -17,44 +17,55 @@ struct DesktopConnectorsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: StudioStore
     @State private var pendingDisconnect: StudioConnectorCatalogEntry?
+    @State private var showingExtensions = false
+    @State private var search = ""
+    @State private var adding = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "puzzlepiece.extension.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(DesktopTheme.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Apps & tools").font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text(adding ? "Add an app" : "Connected apps").font(.system(size: 25, weight: .semibold))
                     Text("Connect once, then choose what each teammate may use.")
-                        .font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { Task { await store.refreshConnectors() } } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.bordered).controlSize(.small).disabled(store.isCheckingConnectors)
-                Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
+                Menu {
+                    Button("Open extensions") { showingExtensions = true }
+                    Button("Refresh apps") { Task { await store.refreshConnectors() } }.disabled(store.isCheckingConnectors)
+                } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize().help("App options")
+                Button(adding ? "Back" : "Add app", systemImage: adding ? "arrow.left" : "plus") { adding.toggle(); search = "" }
+                    .buttonStyle(.borderedProminent).tint(StudioPalette.ink)
+                DesktopPanelCloseButton()
             }
-            .padding(.horizontal, 18).padding(.vertical, 13).background(.ultraThinMaterial)
-            Divider().opacity(0.55)
+            .padding(.horizontal, 38).padding(.top, 32).padding(.bottom, 22).background(StudioPalette.paper)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
+                    if adding { TextField("Find an app", text: $search).textFieldStyle(.plain).padding(12).studioOutline(radius: 9).accessibilityLabel("Find an app") }
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.circle.fill")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(.orange)
+                            .font(.system(size: 11.5, weight: .semibold, design: .default)).foregroundStyle(Color.primary)
                     }
                     if store.connectorStatus == nil && store.isCheckingConnectors {
                         ProgressView("Checking connected apps…").frame(maxWidth: .infinity).padding(.vertical, 90)
                     } else {
-                        ForEach(store.connectorStatus?.catalog.filter { $0.availability != "next" } ?? []) { connector in
+                        ForEach(store.connectorStatus?.catalog.filter { $0.availability != "next" && (adding ? !$0.connected : $0.connected) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) } ?? []) { connector in
                             connectorCard(connector)
+                        }
+                        if !adding && store.connectorStatus?.catalog.contains(where: { $0.connected }) != true {
+                            Text("Connect an app when you need it. Your teammates only receive the access you choose.")
+                                .font(.callout).foregroundStyle(StudioPalette.muted).padding(.vertical, 28)
                         }
                     }
                     Text("Read access never implies permission to send, create, or update. Any supported external write still pauses for an exact approval preview.")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(.secondary).padding(.top, 3)
+                        .font(.system(size: 10.5, weight: .medium, design: .default)).foregroundStyle(.secondary).padding(.top, 3)
                 }
-                .padding(20)
+                .padding(.horizontal, 38).padding(.vertical, 18)
             }
         }
-        .frame(width: 820, height: 700).background(DesktopTheme.paper)
+        .desktopPanelSize(width: 820, height: 700).background(DesktopTheme.paper)
+        .sheet(isPresented: $showingExtensions) { OpenExtensionsView(store: store) }
         .task { await store.refreshConnectors() }
         .task {
             while !Task.isCancelled {
@@ -82,18 +93,15 @@ struct DesktopConnectorsView: View {
     private func connectorCard(_ connector: StudioConnectorCatalogEntry) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(connector.connected ? DesktopTheme.green.opacity(0.12) : DesktopTheme.purple.opacity(0.09))
-                    Image(systemName: connectorSymbol(connector.id)).font(.system(size: 17, weight: .semibold)).foregroundStyle(connector.connected ? DesktopTheme.green : DesktopTheme.purple)
-                }.frame(width: 44, height: 44)
+                StudioBrandMark(provider: connector.id).frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(connector.name).font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    Text(connector.name).font(.system(size: 14.5, weight: .bold, design: .default))
                     Text(connector.description ?? connector.badge ?? "Connected app")
-                        .font(.system(size: 10.5, design: .rounded)).foregroundStyle(.secondary).lineLimit(2)
+                        .font(.system(size: 10.5, design: .default)).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer()
                 if connector.connected {
-                    Label("Ready", systemImage: "checkmark.circle.fill").font(.system(size: 10.5, weight: .bold, design: .rounded)).foregroundStyle(DesktopTheme.green)
+                    Label(connector.connectionLabel, systemImage: "checkmark.circle").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
                     if connector.writeRequiresApproval == true && connector.writeConnected == false {
                         Button("Reconnect") {
                             Task {
@@ -103,8 +111,8 @@ struct DesktopConnectorsView: View {
                         .buttonStyle(.borderedProminent).tint(DesktopTheme.purple).controlSize(.small).disabled(store.isCheckingConnectors)
                     }
                     if connector.id != "github" && connector.id != "google-drive" && connector.id != "google-calendar" {
-                        Button(role: .destructive) { pendingDisconnect = connector } label: { Image(systemName: "xmark.circle") }
-                            .buttonStyle(.bordered).controlSize(.small).help("Disconnect")
+                        Menu { Button("Disconnect", role: .destructive) { pendingDisconnect = connector } } label: { Image(systemName: "ellipsis") }
+                            .menuStyle(.borderlessButton).fixedSize().help("App actions")
                     }
                 } else {
                     Button("Connect") {
@@ -116,12 +124,12 @@ struct DesktopConnectorsView: View {
                 }
             }
 
-            if connector.connected {
+            if connector.connected { DisclosureGroup("Teammate access") {
                 Divider().opacity(0.45)
                 ForEach(store.state.bots) { bot in
                     HStack(spacing: 10) {
                         DesktopMascotView(bot: bot, size: 28).frame(width: 31, height: 31)
-                        Text(bot.name).font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        Text(bot.name).font(.system(size: 11.5, weight: .semibold, design: .default))
                         Spacer()
                         Picker("\(connector.name) access for \(bot.name)", selection: Binding(
                             get: {
@@ -139,10 +147,10 @@ struct DesktopConnectorsView: View {
                         .labelsHidden().frame(width: 135).disabled(store.isCheckingConnectors)
                     }
                 }
-            }
+            } }
         }
-        .padding(14).background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous).stroke(.black.opacity(0.055)))
+        .padding(.vertical, 18)
+        .overlay(alignment: .bottom) { Rectangle().fill(StudioPalette.line).frame(height: 1) }
     }
 
     private func connectorSupportsWrite(_ connector: StudioConnectorCatalogEntry) -> Bool {

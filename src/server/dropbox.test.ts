@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { DropboxConnector } from "./dropbox.js";
 
 const file = { ".tag": "file", id: "id:launch", name: "launch.md", path_display: "/Projects/launch.md", server_modified: "2026-09-03T10:00:00Z", size: 42, is_downloadable: true };

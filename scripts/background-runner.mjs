@@ -35,7 +35,7 @@ const tsx = path.join(rootDir, "node_modules", "tsx", "dist", "cli.mjs");
 const server = path.join(rootDir, "src", "server", "index.ts");
 const child = spawn(process.execPath, [tsx, server], {
   cwd: rootDir,
-  env: { ...process.env, NODE_ENV: "production", OPENBOT_BACKGROUND_SERVICE: "1", OPENBOT_HOST: "0.0.0.0", OPENBOT_PORT: String(port) },
+  env: { ...process.env, PATH: [path.join(rootDir, "bin"), process.env.PATH || "/usr/bin:/bin"].join(path.delimiter), NODE_ENV: "production", OPENBOT_HOST: process.env.OPENBOT_HOST || "127.0.0.1", OPENBOT_PORT: String(port) },
   stdio: "inherit",
   detached: true,
 });

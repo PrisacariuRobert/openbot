@@ -1,0 +1,28 @@
+.browser-sign-in { display: grid; gap: 12px; min-width: 0; margin-block: 16px; padding: 16px; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 16px; }
+.browser-sign-in p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.browser-sign-in button { min-height: 36px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 9px; padding: 7px 12px; font: inherit; color: inherit; background: transparent; cursor: pointer; }
+.browser-sign-in button:disabled { opacity: .5; cursor: default; }
+.browser-sign-in-address { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.browser-sign-in-address strong { flex: 1; min-width: 100px; }
+.browser-sign-in .browser-sign-in-screen { display: block; width: 100%; padding: 0; overflow: hidden; line-height: 0; border: 0; border-radius: 8px; cursor: crosshair; }
+.browser-sign-in-screen img { display: block; width: 100%; height: auto; }
+.browser-sign-in form { display: grid; gap: 8px; font-size: 13px; }
+.browser-sign-in-input { display: flex; gap: 8px; flex-wrap: wrap; }
+.browser-sign-in-input input { flex: 1; min-width: 120px; width: 100%; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 9px; padding: 9px 12px; color: inherit; background: transparent; font: inherit; }
+.browser-sign-in-keys { display: flex; flex-wrap: wrap; gap: 8px; }
+.browser-sign-in .browser-sign-in-hint { font-size: 12px; opacity: .75; }
+.browser-sign-in { margin: 8px 0; padding: 20px; background: var(--surface, #fff); border-color: var(--line, #ddd); }
+.browser-sign-in-title { display: flex; align-items: center; gap: 12px; }
+.browser-sign-in-title > svg { flex-shrink: 0; }
+.browser-sign-in-title div { min-width: 0; display: grid; gap: 4px; }
+.browser-sign-in-title strong { font-size: 15px; overflow-wrap: anywhere; }
+.browser-sign-in-title span { color: var(--secondary, #666); font-size: 12px; }
+.browser-sign-in-address { padding: 10px 12px; background: var(--surface-muted, #f4f4f4); border-radius: 8px; }
+.browser-sign-in-address strong { flex-basis: 150px; }
+.browser-sign-in-address > span { flex-basis: 100%; color: var(--secondary, #666); }
+.browser-sign-in-address button { min-height: 32px; padding: 7px; border: 0; display: grid; place-items: center; }
+.browser-sign-in .browser-sign-in-keyboard { padding: 10px 0; border-block: 1px solid var(--line, #ddd); }
+.browser-sign-in-keyboard[open] .browser-sign-in-keys { margin-block: 12px; }
+.run-controls > label { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.run-controls > label input { margin-top: 3px; accent-color: var(--strong, #111); flex-shrink: 0; }
+@media(max-width: 600px) { .browser-sign-in { padding: 16px; } .browser-sign-in-input input { font-size: 16px; } }

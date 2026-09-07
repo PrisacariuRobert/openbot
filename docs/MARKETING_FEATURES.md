@@ -1,13 +1,26 @@
-# OpenBot Marketing Capability Catalog
+# OpenBot marketing functionality inventory
 
-Last verified: September 5, 2026
-Release: 0.34.0 development beta — not yet published
+This is an implementation inventory for an owner-operated **0.37.0 development beta**, not a launch or comparative-quality certification. Keep setup requirements beside claims. Do not advertise roadmap features as working integrations.
 
-New in this pass: a real SwiftUI/AppKit macOS app provides native conversations, replies/reactions, private search, workspace files, shared drafts, teammate routing and administration, source-backed Work starters, every supported automation trigger, isolated-browser takeover, visible skill teaching, subscription/API/local-model setup and assignment, app permissions, portable skills, code-project grants/review/recovery, capability/background controls, Live Studio, approvals, and crash-recovery decisions without embedding the website. See [validation and remaining limits](QA_0.34.md). Safe claim: **“OpenBot has a native Mac client for its owner-controlled local or private runner.”** Do not claim signed public distribution, automatic updates, a bundled zero-setup runner, Windows support, universal provider-level exactly-once delivery, complete native administration, physical-device/cellular proof, independently verified AI advice, guaranteed task success, or comparative model-quality superiority.
+**First-release scope now takes precedence over the inventory below:** Mac-first open-source beta, iPhone companion preview. The [candidate evidence](QA_BETA_CANDIDATE.md) lists proven checks and current approval coverage. Generic browser/terminal/Mac-app/MCP actions still need complete target/environment review before they can be enabled safely. Focused new-branch GitHub PR publication and issue creation now bind the reviewed execution account; [delivery evidence and limits](QA_WORK_DELIVERY.md) distinguish synthetic integration tests from real-account proof. Do not market implemented executors as universal end-to-end workflows. Public native distribution, live-account certification and a user pilot remain gates in the [release checklist](FIRST_PUBLIC_RELEASE.md).
 
-Audit qualifier: this is an implementation inventory, not a certification that every workflow succeeds. The [current audit](PRODUCT_GAP_AUDIT.md) takes precedence over older comparative language. Provider availability, real-account consent, full native settings, network/process isolation and repeated end-to-end success remain explicit release gates.
+**Work, not just summaries:** “Ask for a checked code change, coordinated follow-through or help with personal admin. Teammates work with the access you choose, stop for supported sensitive-action review and show what actually completed.” These are product directions with different evidence levels: checked PR delivery has a real-Git/synthetic-GitHub acceptance path; Calendar, Todoist, Notion and mail actions are implemented but their combined live-account outcomes remain pilot gates. Never describe a draft as sent, an approval as completion or a pull request as deployed.
 
-This is the marketing source of truth for what OpenBot can honestly claim today. Use **Available now** claims in launch copy. Keep **Setup-dependent** qualifiers close to the claim. Do not present **Roadmap** items as working features.
+Latest safe wording: **“A quieter conversation app with six animated characters you can make your own. Use a supported app connection or sign in to a teammate's browser, and review the full supported action before approving it.”** The web preview and native conversation source share a monochrome direction; legacy panels and installed apps are not automatically replaced. Saved browser sessions are per teammate and can expire; they are not verified API connections. Native action reviews fail closed on unsupported/incomplete details. [Polish evidence and boundaries](QA_APP_POLISH.md), [browser and connector choices](BROWSER_AND_CONNECTORS.md).
+
+Safe wording for the latest continuation: **“Try a saved skill on two different examples, review what happened, then schedule the checked version.”** The owner judges correctness; OpenBot enforces completion/tool evidence, distinct inputs, current version/setup, fresh account authorization and expiry. Applies to explicit saved `/skill` references, not arbitrary prose. These checks do not grant external-write permission or certify universal reliability. [Verification](QA_WORKFLOW_CHECKS.md).
+
+New safe wording: **“Try an included recipe on sample data, make it yours, and share its settings without sharing your accounts. Keep control of what your teammates remember, and opt into a quieter follow-up digest.”** Safe examples use real deterministic services with prewritten interpretations, not AI-generated results. Owner corrections are protected; task memory expires by default; conflict detection is limited to normalized note names. New teaching keeps a teammate's login across modes and avoids recording typed values. [0.37 evidence and limits](QA_0.37.md).
+
+New safe wording: **“Choose the sources for your daily and weekly brief, keep evidence-linked follow-ups, sign into compatible open tools, and see what each job reported using.”** The source picker and tracker are native on Mac/iPhone and available on web. MCP browser sign-in currently requires public-client registration; local studios finish it on the Mac. The measured coding experiment is a bounded command benchmark, not a claim to optimize arbitrary websites. [0.36 evidence and limits](QA_0.36.md).
+
+**New verified slice:** calendar-time routines with selected weekdays, named time zones, one-time runs, shared Mac/iPhone/web previews and atomic scheduled dispatch. Safe wording: “Set the time, preview the next runs, and catch up once after downtime.” The execution host must be awake; seven-day unattended reliability has not been established. [Evidence](QA_CALENDAR_ROUTINES.md).
+
+Current additions: explicit provider/model choice; checked CSV arithmetic and new workbooks; current-source private consultation; native runner packaging; source-linked reports and Mac-app reading; limited HTTP MCP tools, reviewed portable text skills, and correctable private memory across web/Mac/iPhone. [Extension evidence and compatibility limits](QA_OPEN_EXTENSIONS.md), [workflow evidence and failures](QA_CHECKED_OUTCOMES.md), [provider setup](QA_PROVIDER_CHOICE.md), [packaged runtime](QA_0.35.md), and [competitive assessment](COMPETITOR_RECHECK_2026-09-05.md) govern the claims below.
+
+Safe new wording: **“Bring your supported model connection. Turn source files into checked totals and editable workbooks, and let teammates consult on the same originals before one combined answer.”** The host verifies arithmetic under selected filters and workbook export bytes, not the model's policy interpretation or advice. Excel export creates new files; it does not preserve arbitrary existing workbook layouts, formulas, charts, or macros.
+
+Do not claim universal model/subscription compatibility, universal app access, Grok Bot marketplace account reuse, zero-setup OAuth, exact billing caps, powered-off local execution, notarized public distribution, production Windows support, guaranteed completion, or superiority over another product. Spark 1.3 Free is the explicitly selected test model, not a forced product default. Live-model synthetic tests and real-account/device verification are different evidence categories.
 
 ## Product in one sentence
 
@@ -232,6 +245,7 @@ Give every AI teammate a name, role, model, memory, private workspace, browser, 
 - HMAC-SHA256 webhook verification with encrypted secrets shown only after creation or rotation
 - Provider-specific Slack timestamp replay protection, bot-message loop suppression, Notion verification-token bootstrap, and private rotating event addresses
 - Natural in-chat creation of scheduled, Slack, Notion, Calendar, Todoist, and Dropbox routines through the same validated server action
+- Public-page/feed watches: a saved baseline, no model calls on first/unchanged checks, source-linked change receipts and ordinary approval-gated teammate jobs. Web/native Mac controls and in-chat creation; 20 watches, minimum 15-minute checks, static HTTPS text only. No logged-in feeds, JavaScript, visual/link-only comparison or powered-off execution. [Evidence](QA_PAGE_WATCH.md).
 - Connector manifest v2 with explicit event capability, authenticity, approval, and data-boundary declarations, backed by a published admission contract
 - Secret-redacted, size-bounded payload retention and an explicit untrusted-event boundary before model use
 - Inspect event history, open linked results, and safely replay failed, cancelled, or rate-limited deliveries
@@ -299,7 +313,9 @@ These features are implemented, but marketing must explain their requirement.
 | Code and terminal checks | Docker must be installed and running; dependencies must already be available because project checks have no network. |
 | GitHub activity, issues, and pull requests | Git and the official GitHub CLI must be installed; the owner must sign the CLI into an account with the required repository access. Issue creation and pull-request publishing still require OpenBot approval. |
 | Browser work and teach mode | Google Chrome or Chromium must be installed. Logged-in third-party sessions belong to each teammate's browser profile. |
-| Portable skills | Import/export covers bounded browser-oriented OpenBot skills. Imported definitions are inspected and secret-scanned, but this is not a public executable plugin marketplace. |
+| Portable skills | Existing browser-oriented OpenBot skills plus reviewed Agent Skills text bundles with pinned source/content and explicit reference loading. Scripts and unsupported runtime policies block import. This is not a public executable plugin marketplace. |
+| Open MCP connections | Connect public/token-authenticated Streamable HTTP services, discover tools and assign per-teammate access with approval-safe calls and source receipts. No generic OAuth login, command-server install, or borrowed competitor sessions. |
+| Correctable private memory | Owner-visible notes with add/edit/delete and model search; corrections invalidate old sessions for future tasks and initial prompt size is bounded. Not semantic organizational memory or historical-chat erasure. |
 | Gmail, Drive, and Calendar | The owner must complete Google OAuth and enable the corresponding Google APIs. Public distribution may require Google verification and a security assessment. |
 | Slack | The owner must install or authorize a Slack OAuth app. Search follows the connected member's visibility; posting also depends on app scopes, channel access, and workspace policy. Live events require a publicly reachable HTTPS request URL, Slack event subscriptions, and the app signing secret. Public managed distribution requires provider review. |
 | Notion | The owner must authorize a Notion integration and select or share pages. OpenBot cannot see unshared workspace content. Live events require a publicly reachable HTTPS URL, a webhook subscription, and completion of Notion's verification-token step. Public managed distribution requires provider review. |
@@ -390,3 +406,16 @@ OpenBot gives your agents memory, private computers, browsers, connected context
 ### Closing line
 
 Friendly enough to use every day. Explicit enough to trust with real work.
+## Included methods and device preview — 5 September 2026
+
+Safe claims: seven useful methods are included by default, with five reviewed Hermes adaptations; they load when relevant and can be disabled. Shared-project writes receive local code-security advisories. Native iPhone development builds can be installed on a paired device with suitable Apple signing.
+
+Do not claim: the whole Hermes marketplace works, all plugins are imported, method instructions install missing Office/OCR software, or the free Personal Team preview supports push/Share-sheet delivery. Model quality, source access and permissions still determine each workflow's outcome.
+# Away access development update (0.35.0)
+
+OpenBot now includes its own relay client and QR-based phone pairing. No extra
+networking apps are required on Mac or iPhone. Device connections are individually
+revocable. **Do not market cellular access as shipped yet:** the public relay,
+operator onboarding, independent security review and physical cellular tests are
+not complete. The pilot relay is trusted with traffic; it is not E2EE. See
+[the validation record](QA_AWAY_ACCESS.md).

@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    CURRENT_PROJECT_VERSION: 38
-    MARKETING_VERSION: 0.34.0
+    CURRENT_PROJECT_VERSION: 42
+    MARKETING_VERSION: 0.37.0
     CODE_SIGN_IDENTITY: "-"
 
 targets:
@@ -23,7 +23,16 @@ targets:
       - path: ../ios/OpenBotMobile/Models/ConnectionAddress.swift
       - path: ../ios/OpenBotMobile/Models/StudioAPIClient.swift
       - path: ../ios/OpenBotMobile/Models/StudioModels.swift
+      - path: ../ios/OpenBotMobile/Models/StudioPalette.swift
+      - path: ../ios/OpenBotMobile/Models/StudioBrandMark.swift
+      - path: ../ios/Shared/BrandAssets.xcassets
       - path: ../ios/OpenBotMobile/Models/StudioStore.swift
+      - path: ../ios/OpenBotMobile/Models/StudioApprovalReviewModel.swift
+      - path: ../ios/OpenBotMobile/Views/StudioApprovalReview.swift
+      - path: ../ios/OpenBotMobile/Views/OpenExtensionsView.swift
+      - path: ../ios/OpenBotMobile/Views/RoutineScheduleFields.swift
+      - path: ../ios/OpenBotMobile/Views/WorkSourcesView.swift
+      - path: ../ios/OpenBotMobile/Views/RecipeLibraryView.swift
       - path: ../ios/OpenBotMobile/Security/KeychainStore.swift
       - path: ../ios/Shared/OpenBotSharedInbox.swift
       - path: ../ios/OpenBotMobile/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
@@ -45,6 +54,7 @@ targets:
     platform: macOS
     sources:
       - path: OpenBotDesktopTests
+      - path: ../ios/SharedTests
     dependencies:
       - target: OpenBotDesktop
     settings:

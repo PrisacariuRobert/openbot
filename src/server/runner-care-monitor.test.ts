@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import type { RunnerCareSnapshot } from "../shared/types.js";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 
 function snapshot(status: "ready" | "attention"): RunnerCareSnapshot {

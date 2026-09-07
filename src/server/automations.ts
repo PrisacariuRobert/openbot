@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { AutomationTriggerType, Routine, RoutineTriggerConfig } from "../shared/types.js";
+import { pageWatchConfig } from "./page-watch-source.js";
 
 const MAX_EVENT_TEXT = 12_000;
 
@@ -105,6 +106,7 @@ export function automationEventMatches(routine: Routine, payload: unknown, heade
 
 export function summarizeAutomationPayload(source: AutomationTriggerType | "manual", payload: unknown): string {
   const body = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  if (source === "webpage") return `Page changed · ${normalizedText(body.url, 180)}`;
   if (source === "github") {
     const repository = normalizedText(objectAt(body, "repository").full_name, 120);
     const issue = objectAt(body, "issue"), pull = objectAt(body, "pull_request"), subject = issue.number || pull.number;
@@ -151,6 +153,7 @@ export function automationRepairHint(error: string | null | undefined): string |
 
 export function normalizedTriggerConfig(type: AutomationTriggerType, value: RoutineTriggerConfig | undefined): RoutineTriggerConfig {
   const config = value || {};
+  if (type === "webpage") return pageWatchConfig(config);
   if (type === "github") return {
     githubEvent: normalizedText(config.githubEvent, 80) || "issues",
     ...(normalizedText(config.githubAction, 80) ? { githubAction: normalizedText(config.githubAction, 80) } : {}),

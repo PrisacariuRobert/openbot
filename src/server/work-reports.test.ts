@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { decodeWorkThread, GoogleWorkspaceConnector, GOOGLE_SCOPES } from "./google-workspace.js";
 import { WorkReportService } from "./work-reports.js";
 import { AttachmentService } from "./attachments.js";
@@ -15,7 +15,7 @@ const AT = Date.parse("2026-09-05T07:00:00Z");
 function mail(id: string, text: string, sent = false, date = AT - 1000) {
   return { id, internalDate: String(date), labelIds: sent ? ["SENT"] : ["INBOX", "UNREAD"], payload: { mimeType: "text/plain", headers: [{ name: "From", value: sent ? "owner@example.com" : "Mira <mira@example.com>" }, { name: "Subject", value: "Launch decision" }], body: { data: Buffer.from(text).toString("base64url") } } };
 }
-function fixture(options: { more?: boolean; calendarFails?: boolean; mailFails?: boolean; unreadable?: boolean; delayed?: () => Promise<void> } = {}) {
+function fixture(options: { more?: boolean; calendarFails?: boolean; mailFails?: boolean; unreadable?: boolean; noTimedMeeting?: boolean; oversizedDrive?: boolean; delayed?: () => Promise<void> } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-work-report-"));
   const db = new OpenBotDatabase(root);
   db.configureGoogleConnector({ clientId: "fixture.apps.googleusercontent.com" });
@@ -42,18 +42,76 @@ function fixture(options: { more?: boolean; calendarFails?: boolean; mailFails?:
     }
     if (url.pathname.endsWith("/calendars/primary/events")) {
       if (options.calendarFails) return Response.json({ error: { message: "calendar unavailable" } }, { status: 503 });
+      if (options.noTimedMeeting) return Response.json({ items: [{ id: "all-day", summary: "Focus", start: { date: "2026-09-05" }, end: { date: "2026-09-06" } }] });
       return Response.json({ items: [
         { id: "c1", summary: "Launch review", start: { dateTime: "2026-09-05T08:00:00Z" }, end: { dateTime: "2026-09-05T08:30:00Z" }, htmlLink: "https://calendar.google.com/calendar/event?eid=fixture" },
         { id: "c2", summary: "Focus day", start: { date: "2026-09-05" }, end: { date: "2026-09-06" }, htmlLink: "javascript:alert(1)" },
         { id: "cancelled", status: "cancelled", summary: "Cancelled meeting" },
       ] });
     }
+    if (url.pathname === "/drive/v3/files") return Response.json({ files: ["doc1", "doc2", "doc3", "doc4"].map((id) => ({ id, name: "Launch review notes", mimeType: "application/vnd.google-apps.document" })) });
+    if (/\/drive\/v3\/files\/doc[123]$/.test(url.pathname)) return Response.json({ id: url.pathname.split("/").at(-1), name: "Launch review notes", mimeType: "application/vnd.google-apps.document" });
+    if (/\/drive\/v3\/files\/doc[123]\/export$/.test(url.pathname)) return new Response(options.oversizedDrive ? "x".repeat(2 * 1024 * 1024 + 1) : "Candidate launch notes. Confirm the release date with Mira.");
     throw new Error(`Unexpected fixture request: ${url.pathname}`);
   }) as typeof fetch);
   let now = AT;
   const service = new WorkReportService(db, google, () => now);
   return { root, db, run, requests, service, tick: (ms: number) => { now += ms; }, collect: (kind = "morning") => service.collect("nova", run.id, { kind, timeZone: "Europe/Brussels" }), close: () => { db.close(); rmSync(root, { recursive: true, force: true }); } };
 }
+
+test("meeting preparation selects a timed event and saves bounded, clearly labelled candidate sources", async () => {
+  const f = fixture();
+  try {
+    f.db.setBotConnectorAccess("nova", { canRead: true, canSend: false }, "google-drive");
+    const snapshot = await f.collect("meeting");
+    assert.equal(f.db.getRun(f.run.id)?.expectedWorkKind, "meeting");
+    assert.equal(snapshot.sources.filter((source) => source.service === "google-calendar").length, 1);
+    assert.equal(snapshot.sources[0].title, "Launch review");
+    assert.match(snapshot.window.mailQuery, /subject:"Launch review"/);
+    assert.equal(snapshot.sources.filter((source) => source.service === "google-drive").length, 3);
+    assert.equal(snapshot.coverage.find((entry) => entry.service === "google-drive")?.state, "limited");
+    assert.ok(snapshot.coverage.filter((entry) => entry.service !== "google-calendar").every((entry) => entry.detail.includes("do not establish")));
+    const report = f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [{ priority: "soon", text: "Review the candidate notes and confirm relevance before the meeting.", sourceRefs: ["C1", "D1"] }], drafts: [] });
+    assert.match(report.markdown, /Your next meeting/);
+    assert.match(report.markdown, /Google Drive/);
+    assert.match(report.markdown, /drive.google.com\/file\/d\/doc1/);
+    const calendar = f.requests.find((url) => url.pathname.endsWith("/events"))!;
+    assert.equal(Date.parse(calendar.searchParams.get("timeMax")!) - Date.parse(calendar.searchParams.get("timeMin")!), 7 * 86_400_000);
+  } finally { f.close(); }
+});
+
+test("a calendar failure cannot produce a meeting report or trigger unrelated mailbox searches", async () => {
+  const f = fixture({ calendarFails: true });
+  try {
+    const snapshot = await f.collect("meeting");
+    assert.equal(snapshot.sources.length, 0);
+    assert.ok(snapshot.coverage.every((entry) => entry.state === "unavailable"));
+    assert.ok(!f.requests.some((url) => url.pathname.includes("/threads")));
+    assert.throws(() => f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [], drafts: [] }), /No connected app/);
+  } finally { f.close(); }
+});
+
+test("no timed meeting is a scoped empty result and does not read mail or documents", async () => {
+  const f = fixture({ noTimedMeeting: true });
+  try {
+    const snapshot = await f.collect("meeting");
+    assert.equal(snapshot.sources.length, 0);
+    assert.equal(f.requests.length, 1);
+    assert.match(snapshot.coverage[0].detail, /No upcoming timed meeting/);
+    assert.doesNotThrow(() => f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [], drafts: [] }));
+  } finally { f.close(); }
+});
+
+test("oversized document streams are rejected and visibly reduce meeting coverage", async () => {
+  const f = fixture({ oversizedDrive: true });
+  try {
+    f.db.setBotConnectorAccess("nova", { canRead: true, canSend: false }, "google-drive");
+    const snapshot = await f.collect("meeting");
+    assert.equal(snapshot.sources.filter((source) => source.service === "google-drive").length, 0);
+    assert.equal(snapshot.coverage.find((entry) => entry.service === "google-drive")?.state, "limited");
+    assert.match(snapshot.coverage.find((entry) => entry.service === "google-drive")?.detail || "", /3 candidates could not be read/);
+  } finally { f.close(); }
+});
 
 test("morning brief fetches bounded real connector contracts, deduplicates threads and preserves calendar dates", async () => {
   const f = fixture();

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { buildRawEmail, connectorCatalog, decodeGmailMessage, GOOGLE_SCOPES, GoogleWorkspaceConnector } from "./google-workspace.js";
 
 test("builds a safe Gmail message and rejects header injection", () => {

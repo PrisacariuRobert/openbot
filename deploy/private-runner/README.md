@@ -25,6 +25,23 @@ From a checked-out OpenBot release:
 ./deploy/private-runner/setup.sh studio.example.com
 ```
 
+With built-in away access, create a second DNS record pointing at the same
+server first (a CNAME or A record), then add `--relay`:
+
+```bash
+./deploy/private-runner/setup.sh studio.example.com --relay relay.example.com
+```
+
+The `--relay` option also runs the built-in away-access relay in the same
+image behind the same Caddy TLS listener. The setup generates an enrollment
+secret, configures `OPENBOT_RELAY_URL` on the studio automatically, and enables
+the compose `relay` profile by recording `COMPOSE_PROFILES=relay` in `.env`.
+After the health check passes, open **Away access** in the studio and pair the
+native iPhone app by QR; the phone then reaches
+`https://relay.example.com/s/<studio-id>` from cellular. Your Mac does not need
+to be awake for this path. The relay is a trusted transport, not end-to-end
+encryption — details and limits are in [the relay README](../relay/README.md).
+
 The setup creates owner-only folders at `/srv/openbot`, records the Docker socket group, builds the image, and starts Caddy plus OpenBot. When the container is healthy:
 
 ```bash

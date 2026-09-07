@@ -8,6 +8,7 @@ const required = [
   "macos/OpenBotDesktop.xcodeproj/project.pbxproj",
   "macos/OpenBotDesktop/App/OpenBotDesktopApp.swift",
   "macos/OpenBotDesktop/Models/DesktopConnectionSession.swift",
+  "macos/OpenBotDesktop/Models/DesktopRunnerController.swift",
   "macos/OpenBotDesktop/Models/DesktopNotifications.swift",
   "macos/OpenBotDesktop/Views/DesktopRootView.swift",
   "macos/OpenBotDesktop/Views/DesktopStudioView.swift",
@@ -28,9 +29,14 @@ const required = [
   "macos/OpenBotDesktop/Resources/Info.plist",
   "macos/OpenBotDesktopTests/OpenBotDesktopTests.swift",
   "macos/README.md",
+  "scripts/package-macos-app.mjs",
   "ios/OpenBotMobile/Models/ConnectionAddress.swift",
   "ios/OpenBotMobile/Models/StudioAPIClient.swift",
   "ios/OpenBotMobile/Models/StudioModels.swift",
+  "ios/OpenBotMobile/Models/StudioPalette.swift",
+  "ios/OpenBotMobile/Models/StudioBrandMark.swift",
+  "ios/OpenBotMobile/Models/StudioApprovalReviewModel.swift",
+  "ios/OpenBotMobile/Views/StudioApprovalReview.swift",
   "ios/OpenBotMobile/Models/StudioStore.swift",
   "ios/OpenBotMobile/Security/KeychainStore.swift",
 ];
@@ -61,11 +67,19 @@ if (!swift.includes("NSWindow(") || !swift.includes("NSHostingController") || !s
 if (swift.includes("WebKit") || swift.includes("WKWebView") || swift.includes("StudioWebView")) {
   throw new Error("The macOS experience must remain native rather than embedding the web app.");
 }
+if (swift.includes(".preferredColorScheme(.light)")) throw new Error("The Mac app must respect system appearance rather than force light mode.");
 if (!swift.includes("StudioStore(serverURL: serverURL, accessKey: accessKey)") || !swift.includes("clientAccessKey") || !swift.includes("app.openbot.desktop")) {
   throw new Error("The macOS authenticated API session or dedicated Keychain identity is incomplete.");
 }
 if (!swift.includes("connectToThisMac") || !swift.includes('url.appending(path: "api/access")') || !swift.includes("ConnectionAddress.isLoopback")) {
   throw new Error("The Mac app must keep its loopback-only one-click local pairing path.");
+}
+if (!swift.includes("DesktopRunnerController") || !swift.includes("ensureLocalRunner") || !swift.includes('resourceURL?.appending(path: "OpenBotRuntime")') || !swift.includes("try child.run()")) {
+  throw new Error("The native Mac app must be able to start its packaged private runner without Terminal.");
+}
+const macPackage = readFileSync(path.join(root, "scripts/package-macos-app.mjs"), "utf8");
+if (!macPackage.includes('"OpenBotRuntime"') || !macPackage.includes("process.execPath") || !macPackage.includes('"--verify", "--deep", "--strict"')) {
+  throw new Error("The macOS package must include its Node runner and verify the final app signature.");
 }
 if (!swift.includes("UNUserNotificationCenter") || !swift.includes("postAttention") || !swift.includes("Notify me when OpenBot needs a decision")) {
   throw new Error("The native Mac attention-notification path is incomplete.");
@@ -154,7 +168,7 @@ if (!swift.includes("toggleMessageReaction") || !swift.includes("Replying to") |
 if (!swift.includes("writeConnected") || !swift.includes('Button("Reconnect")') || !swift.includes("connectorSupportsWrite")) {
   throw new Error("Native Google creation grants must stay scope-aware and reconnectable.");
 }
-if (!swift.includes("accessibilityReduceMotion") || !swift.includes("characterBody") || swift.includes('Image("Mascot')) {
+if (!swift.includes("accessibilityReduceMotion") || !swift.includes("StudioCharacter") || swift.includes('Image("Mascot')) {
   throw new Error("Native desktop mascots must remain code-drawn, animated, and reduced-motion aware.");
 }
 if (/access[_ -]?key\s*[=:]\s*["'][A-Za-z0-9_-]{12,}/i.test(swift)) throw new Error("A possible access key was embedded in macOS source.");

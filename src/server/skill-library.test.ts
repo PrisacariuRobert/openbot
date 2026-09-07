@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { BrowserManager } from "./runtime.js";
 import { createSkillPackage, parseSkillPackage, skillSecretFindings, SKILL_TEMPLATES } from "./skill-library.js";
 

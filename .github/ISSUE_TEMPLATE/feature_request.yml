@@ -1,0 +1,15 @@
+name: Workflow request
+description: Describe a useful outcome, not just another setting.
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What should a user be able to finish?
+      description: Explain the real task, how you do it today and why the existing path falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: How would we know it works?
+      description: Give a small example, expected deliverable and which steps need human review. Do not include account credentials or private records.
