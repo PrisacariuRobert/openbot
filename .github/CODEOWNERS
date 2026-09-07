@@ -1,0 +1,3 @@
+# Review routing only. This does not by itself prevent another administrator
+# from merging; configure and verify branch/ruleset protection separately.
+* @PrisacariuRobert

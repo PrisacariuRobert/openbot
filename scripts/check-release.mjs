@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const source = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+const app = ["src/studio/Studio.tsx", "src/studio/Character.tsx", "src/studio/StudioAccess.tsx", "src/studio/CapabilityPanelHost.tsx", "src/CapabilityPanels.tsx", "src/studio/DeliveryReceipt.tsx", "src/studio/AppearancePicker.tsx"].map(source).join("\n");
+const styles = ["src/studio/studio.css", "src/studio/capability-panels.css", "src/studio/character-context.css"].map(source).join("\n");
 const database = readFileSync(new URL("../src/server/database.ts", import.meta.url), "utf8");
 const runtime = readFileSync(new URL("../src/server/runtime.ts", import.meta.url), "utf8");
 const skillLibrary = readFileSync(new URL("../src/server/skill-library.ts", import.meta.url), "utf8");
@@ -17,7 +18,11 @@ const externalHeartbeat = readFileSync(new URL("../src/server/external-heartbeat
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
+const workspace = readFileSync(new URL("../src/server/workspace.ts", import.meta.url), "utf8");
+const verificationEvidence = readFileSync(new URL("../src/server/verification-evidence.ts", import.meta.url), "utf8");
 const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
+const connectorEvents = readFileSync(new URL("../src/server/connector-events.ts", import.meta.url), "utf8");
+const connectorContract = readFileSync(new URL("../docs/CONNECTOR_CONTRACT.md", import.meta.url), "utf8");
 const todoist = readFileSync(new URL("../src/server/todoist.ts", import.meta.url), "utf8");
 const dropbox = readFileSync(new URL("../src/server/dropbox.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
@@ -48,16 +53,16 @@ if (!readme.includes(`## What's new in ${version}\n`)) {
 if (!connectorManifests.includes('service: "todoist"') || !connectorManifests.includes('service: "dropbox"') || !todoist.includes("oauth/register") || !dropbox.includes("files.content.read")) {
   failures.push("Todoist and read-only Dropbox must remain registered through the reviewed connector contract.");
 }
-if (!app.includes("room-cluster-motion") || !app.includes("mascot-presence") || !app.includes("mascot-body")) {
+if (!app.includes("character-drawing") || !app.includes("mascotBodies") || !app.includes("--blink-delay")) {
   failures.push("The shared studio must keep its independently animated mascot composition.");
 }
 if (app.includes('/mascots/') || app.includes('className="mascot-art"')) {
   failures.push("Mascots must remain code-drawn and recolorable rather than image-backed.");
 }
-if (!app.includes("MASCOT_COLORS") || !app.includes('type="color"') || !database.includes('patch.color ?? current.color')) {
+if (!app.includes("mascotColors") || !app.includes('type="color"') || !database.includes('patch.color ?? current.color')) {
   failures.push("Existing teammate appearance customization must remain editable and persistent.");
 }
-if (!styles.includes(".mascot-state-celebrating .mascot-eye") || !styles.includes("prefers-reduced-motion")) {
+if (!styles.includes(".character-celebrating .character-drawing") || !styles.includes("prefers-reduced-motion")) {
   failures.push("The web mascot system must keep celebration and reduced-motion states.");
 }
 if (!app.includes("function LiveStudioPanel") || !app.includes("function LiveBrowser") || !app.includes('panel === "live"')) {
@@ -68,6 +73,12 @@ if (!app.includes("function SearchPanel") || !database.includes("searchStudio(ra
 }
 if (!database.includes("updateThread(id") || !database.includes("duplicateBot(id")) {
   failures.push("The release must keep persistent sections, pins, hide/restore, and safe teammate duplication.");
+}
+if (!server.includes('"google_drive_create"') || !server.includes('"google_calendar_create"') || !server.includes("writeConnected") || !workspace.includes("google_drive_create") || !workspace.includes("google_calendar_create")) {
+  failures.push("Google Drive file and Calendar event creation must stay scope-gated and approval-gated across both runtimes.");
+}
+if (!server.includes("verifyTaskChecks") || !workspace.includes("workspace_file evidence") || !verificationEvidence.includes("readWorkspaceFile") || !verificationEvidence.includes('source: "host"') || !app.includes("Verified by OpenBot")) {
+  failures.push("Text deliverables must keep bounded host verification and distinguish it from teammate-reported checks.");
 }
 if (!styles.includes(".live-desk-grid") || !styles.includes(".studio-search-results") || !styles.includes(".conversation-organizer")) {
   failures.push("The Live Studio, search, and conversation organization surfaces must remain styled responsively.");
@@ -87,6 +98,9 @@ if (!app.includes("skill-owner-switcher") || !app.includes("Import reviewed skil
 if (!database.includes("CREATE TABLE IF NOT EXISTS runner_state") || !database.includes("claimNextQueuedRun") || !database.includes("recoverExpiredRuns")) {
   failures.push("The durable runner lease, exclusive claim, or restart recovery store is incomplete.");
 }
+if (!database.includes("CREATE TABLE IF NOT EXISTS approved_actions") || !database.includes("claimApprovedAction") || !database.includes("recoverInterruptedApprovedActions") || !server.includes('/api/approved-actions/:id/resolve') || !app.includes("Action history")) {
+  failures.push("Approved actions must keep a durable single-claim ledger, uncertain-restart recovery, and visible reconciliation.");
+}
 if (!runner.includes("maintainLeadership") || !runner.includes("renewRunLeases") || !runner.includes("requeueWorkerRuns")) {
   failures.push("The model runner must keep exclusive leadership, renewable job leases, and graceful handoff.");
 }
@@ -102,6 +116,15 @@ if (!notifications.includes("nativeStatus") || !apns.includes("api.push.apple.co
 if (!server.includes("dispatchConnectorEvents") || !server.includes("todoist.activities") || !server.includes("dropbox.latestCursor") || !database.includes("automation_cursors")) {
   failures.push("Proactive Todoist and Dropbox event automation is incomplete.");
 }
+if (!server.includes('/api/connector-hooks/slack/') || !server.includes('/api/connector-hooks/notion/') || !connectorEvents.includes('verifySlackEventRequest') || !connectorEvents.includes('verifyNotionEventRequest')) {
+  failures.push("Signed Slack and Notion event ingress is incomplete.");
+}
+if (!connectorManifests.includes('schemaVersion: 2') || !connectorManifests.includes('eventAuth: "provider_hmac"') || !connectorContract.includes("OpenBot Connector Contract v2") || !connectorContract.includes("does not download or execute arbitrary connector packages")) {
+  failures.push("Connector manifest v2 or its reviewed admission boundary is incomplete.");
+}
+if (!app.includes('triggerType === "slack"') || !app.includes('triggerType === "notion"') || !styles.includes(".connector-event-setup")) {
+  failures.push("Slack and Notion event setup must remain available in the responsive product UI.");
+}
 if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifier") || !dropbox.includes('body.set("client_id"')) {
   failures.push("Managed Dropbox OAuth must retain PKCE and public-client support.");
 }
@@ -111,13 +134,13 @@ if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app
 if (!deployment.includes('requestedMode === "private_runner"') || !deployment.includes('url.protocol !== "https:"') || !deployment.includes("path.isAbsolute") || !server.includes("deploymentCallbackUrl")) {
   failures.push("Private runner mode must fail closed and use its canonical HTTPS address for public callbacks.");
 }
-if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy", 1)') || !server.includes("loginGate") || !authSecurity.includes("maximumFailures")) {
+if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy", "loopback")') || !server.includes("loginGate") || !authSecurity.includes("maximumFailures") || !server.includes("trustedLocalRequest(request)")) {
   failures.push("Private-host health, proxy-aware Secure cookies, or login throttling is incomplete.");
 }
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
   failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
 }
-if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics")) {
+if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics") || !verifyWorkflow.includes('require("./package.json").version')) {
   failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
 }
 if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {
@@ -147,11 +170,15 @@ if (!privateRunnerTransfer.includes('aes-256-gcm') || !privateRunnerTransfer.inc
 if (!privateRunnerCompose.includes('/transfers:') || !app.includes('export-home.sh') || !app.includes('import-home.sh')) {
   failures.push("The private runner and web product must expose the reviewed encrypted home-transfer path.");
 }
-if (!app.includes("function StudioStartup") || !app.includes("Open the running studio") || !styles.includes(".splash-stage")) {
+if (!app.includes("function StudioAccess") || !app.includes("Let’s reconnect.") || !styles.includes(".studio-access")) {
   failures.push("The friendly automatic startup-recovery experience is incomplete.");
 }
 if (!app.includes("oauth-setup-disclosure") || !styles.includes(".oauth-setup-disclosure")) {
   failures.push("Developer connector credentials must remain progressively disclosed instead of overwhelming the main app catalog.");
+}
+
+if (existsSync(new URL("../src/App.tsx", import.meta.url)) || existsSync(new URL("../src/styles.css", import.meta.url)) || existsSync(new URL("../src/studio-design.css", import.meta.url)) || !source("src/main.tsx").includes('import "./studio/main"')) {
+  failures.push("Both public entry points must use Studio; the retired app and styles must not return.");
 }
 
 if (failures.length) {

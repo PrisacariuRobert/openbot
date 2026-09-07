@@ -93,13 +93,14 @@ export class NotionConnector {
     return rows.slice(0, 20).map((row) => this.pageSummary(row)).filter((row): row is NotionPageSummary => Boolean(row));
   }
 
-  async read(pageId: string): Promise<NotionPageDetail> {
-    const id = this.pageId(pageId), page = await this.request(`/v1/pages/${encodeURIComponent(id)}`), summary = this.pageSummary(page);
+  async read(pageId: string, signal?: AbortSignal): Promise<NotionPageDetail> {
+    const id = this.pageId(pageId), page = await this.request(`/v1/pages/${encodeURIComponent(id)}`, { signal }), summary = this.pageSummary(page);
     if (!summary) throw new Error("Notion could not open that shared page.");
     const lines: string[] = [], seen = new Set<string>();
-    await this.readChildren(id, lines, seen, 0);
+    const coverage = { truncated: false, requests: 0 };
+    await this.readChildren(id, lines, seen, 0, coverage, signal);
     const content = lines.join("\n").trim();
-    return { ...summary, content: content.slice(0, 18_000), truncated: content.length > 18_000 || seen.size >= 120 };
+    return { ...summary, content: content.slice(0, 18_000), truncated: coverage.truncated || content.length > 18_000 || seen.size >= 120 };
   }
 
   async append(pageId: string, content: string, heading?: string | null) {
@@ -123,25 +124,30 @@ export class NotionConnector {
     return this.db.disconnectOAuthConnector("notion");
   }
 
-  private async readChildren(blockId: string, lines: string[], seen: Set<string>, depth: number): Promise<void> {
-    if (depth > 2 || seen.size >= 120 || lines.join("\n").length >= 20_000) return;
+  private async readChildren(blockId: string, lines: string[], seen: Set<string>, depth: number, coverage: { truncated: boolean; requests: number }, signal?: AbortSignal): Promise<void> {
+    if (depth > 2 || seen.size >= 120 || lines.join("\n").length >= 20_000 || coverage.requests >= 8) { coverage.truncated = true; return; }
     let cursor = "";
     do {
       const suffix = cursor ? `&start_cursor=${encodeURIComponent(cursor)}` : "";
-      const result = await this.request(`/v1/blocks/${encodeURIComponent(blockId)}/children?page_size=100${suffix}`);
-      const blocks = Array.isArray(result.results) ? result.results : [];
+      coverage.requests++;
+      const result = await this.request(`/v1/blocks/${encodeURIComponent(blockId)}/children?page_size=100${suffix}`, { signal });
+      if (!Array.isArray(result.results)) throw new Error("Notion returned no readable block list.");
+      const blocks = result.results;
       for (const value of blocks) {
         if (!value || typeof value !== "object" || seen.size >= 120) break;
         const block = value as Json, id = cleanText(block.id, 200);
         if (!id || seen.has(id)) continue;
         seen.add(id);
         const text = blockText(block);
+        if (text.length > 2_000 || !["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item", "to_do", "quote", "callout", "toggle", "code", "divider", "column", "column_list"].includes(String(block.type))) coverage.truncated = true;
         if (text) lines.push(text.slice(0, 2_000));
-        if (block.has_children === true) await this.readChildren(id, lines, seen, depth + 1);
+        if (block.has_children === true) await this.readChildren(id, lines, seen, depth + 1, coverage, signal);
         if (lines.join("\n").length >= 20_000) break;
       }
       cursor = result.has_more === true ? cleanText(result.next_cursor, 500) : "";
-    } while (cursor && seen.size < 120 && lines.join("\n").length < 20_000);
+      if (result.has_more === true && !cursor) coverage.truncated = true;
+    } while (cursor && seen.size < 120 && lines.join("\n").length < 20_000 && coverage.requests < 8);
+    if (cursor || seen.size >= 120 || lines.join("\n").length >= 20_000) coverage.truncated = true;
   }
 
   private pageSummary(value: unknown): NotionPageSummary | null {
@@ -157,15 +163,17 @@ export class NotionConnector {
     return id;
   }
 
-  private async request(path: string, options: { method?: "GET" | "POST" | "PATCH"; body?: Json } = {}, retry = true): Promise<Json> {
+  private async request(path: string, options: { method?: "GET" | "POST" | "PATCH"; body?: Json; signal?: AbortSignal } = {}, retry = true): Promise<Json> {
+    const version = this.db.connectorAuthorizationVersion("notion");
     const configured = this.db.oauthConnectorCredentials<NotionCredentials>("notion"), credentials = configured?.credentials;
     if (!configured || !credentials?.accessToken) throw new Error("Connect Notion in Apps & Tools first.");
     const response = await this.fetcher(`https://api.notion.com${path}`, {
       method: options.method || "GET", headers: { authorization: `Bearer ${credentials.accessToken}`, "notion-version": NOTION_VERSION, "content-type": "application/json" },
+      signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     });
     if (response.status === 401 && retry && credentials.refreshToken) {
-      await this.refresh(configured.clientId, configured.clientSecret, credentials);
+      await this.refresh(configured.clientId, configured.clientSecret, credentials, version);
       return this.request(path, options, false);
     }
     const result = await response.json().catch(() => ({})) as Json;
@@ -177,19 +185,20 @@ export class NotionConnector {
     return result;
   }
 
-  private async refresh(clientId: string, clientSecret: string, credentials: NotionCredentials) {
+  private async refresh(clientId: string, clientSecret: string, credentials: NotionCredentials, version: number) {
     if (!credentials.refreshToken) throw new Error("Notion sign-in expired. Reconnect it in Apps & Tools.");
     const result = await this.oauthRequest(clientId, clientSecret, { grant_type: "refresh_token", refresh_token: credentials.refreshToken });
     const accessToken = cleanText(result.access_token, 4_000);
     if (!accessToken) throw new Error("Notion could not refresh its sign-in. Reconnect it in Apps & Tools.");
     credentials.accessToken = accessToken;
     credentials.refreshToken = cleanText(result.refresh_token, 4_000) || credentials.refreshToken;
-    this.db.updateOAuthConnectorCredentials("notion", credentials);
+    this.db.updateOAuthConnectorCredentials("notion", credentials, version);
   }
 
   private async oauthRequest(clientId: string, clientSecret: string, body: Json): Promise<Json> {
     const response = await this.fetcher("https://api.notion.com/v1/oauth/token", {
       method: "POST", headers: { authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`, "notion-version": NOTION_VERSION, "content-type": "application/json" }, body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20_000),
     });
     const result = await response.json().catch(() => ({})) as Json;
     if (!response.ok) throw new Error(`Notion sign-in failed: ${cleanText(result.error_description || result.error || result.message, 400) || response.status}.`);

@@ -1,0 +1,677 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		199A378CC7C16D266E002C41 /* DesktopSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */; };
+		1FA6DE9A644BC0727430DF0C /* StudioModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */; };
+		24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */; };
+		27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */; };
+		2D1341AFBB88973F656F3AD4 /* DesktopRunnerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */; };
+		3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */; };
+		370696C603C06617F205A59B /* OpenBotDesktopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */; };
+		3AF0F8E96D2A80321DBE782D /* DesktopNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */; };
+		3D9DD23EC2F7787D14C08F92 /* OpenExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */; };
+		4A16387AAC1CEABE808892A5 /* DesktopAwayAccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */; };
+		506DF6B42CA49EBEAECDED93 /* StudioApprovalReviewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */; };
+		547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */; };
+		591207B3D2B17212F166D757 /* WorkSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */; };
+		591EF96847C737A770E5CE36 /* DesktopTeammatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */; };
+		5E62BA570CAEAD6D14212DFE /* StudioBrandMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */; };
+		6316196058224C1AFCC0F1BB /* StudioPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66DEAEA72B148F9B68625D7C /* StudioPalette.swift */; };
+		70F6EA3F3347A0E6C143CC6B /* StudioAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */; };
+		75E18C61FD138658535D401E /* DesktopFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */; };
+		77176D34D553501E64B47AD0 /* DesktopMascotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */; };
+		789FB0126AAD7143924FA67A /* StudioAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */; };
+		86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */; };
+		8A106A9C73B7AC546EE1970D /* DesktopTeachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */; };
+		8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */; };
+		8BF12897D18BE6DEF969931D /* ConnectionAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */; };
+		8EE31CCB1DA58D2843615258 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = B753B530BAF8C97928B53B97 /* AppIcon-1024.png */; };
+		9901530C05491907F54D439D /* OpenBotDesktopApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E090B986078E376939392EA9 /* OpenBotDesktopApp.swift */; };
+		A444C931E34109A875B9A427 /* DesktopRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 418D0F26B773B931A05A3C1D /* DesktopRootView.swift */; };
+		AE4FE07FAA35FDA37415A7F9 /* DesktopConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */; };
+		B1E0AE83850E4A9141101F1B /* RoutineScheduleFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */; };
+		B33AAA280781EEEB2B10CE00 /* OpenBotSharedInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */; };
+		C06C973B5EFC5C8AF7C693FC /* StudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16657B10E332E485EF58EF5 /* StudioStore.swift */; };
+		C3894B0925EFE8D7BD80601A /* RecipeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */; };
+		CFB5B1CD511D01D5F47DBC23 /* DesktopSkillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */; };
+		DF33311732489207EB8D56C1 /* StudioApprovalReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */; };
+		E1554AC0D7DFE09593E483BA /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */; };
+		E6872D9A3EE4A3077D9D1ABB /* DesktopArtifactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */; };
+		F267DBD4F6947B1A46CAFC8C /* BrandAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */; };
+		F66C28F89DE814E13BF9322C /* DesktopConnectorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */; };
+		FAC93C170A84615869E711BE /* DesktopPermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */; };
+		FE21386030003E443C4BBF62 /* DesktopWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		771F948D8A3C2D885EF0DF32 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8F9B3F0FAF28E408E8E6DC32 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 14A4DD02179B8A2A3F6D0077;
+			remoteInfo = OpenBotDesktop;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioModels.swift; sourceTree = "<group>"; };
+		11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopArtifactsView.swift; sourceTree = "<group>"; };
+		208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotSharedInbox.swift; sourceTree = "<group>"; };
+		258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMascotView.swift; sourceTree = "<group>"; };
+		27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopStudioView.swift; sourceTree = "<group>"; };
+		32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopWorkView.swift; sourceTree = "<group>"; };
+		3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopTeammatesView.swift; sourceTree = "<group>"; };
+		3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopSkillsView.swift; sourceTree = "<group>"; };
+		3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopTeachView.swift; sourceTree = "<group>"; };
+		418D0F26B773B931A05A3C1D /* DesktopRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRootView.swift; sourceTree = "<group>"; };
+		4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAutomationsView.swift; sourceTree = "<group>"; };
+		56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopProvidersView.swift; sourceTree = "<group>"; };
+		66DEAEA72B148F9B68625D7C /* StudioPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioPalette.swift; sourceTree = "<group>"; };
+		7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkSourcesView.swift; sourceTree = "<group>"; };
+		7540A41257FDF7FCAE2B0DA4 /* OpenBotDesktopTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenBotDesktopTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopSearchView.swift; sourceTree = "<group>"; };
+		8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineScheduleFields.swift; sourceTree = "<group>"; };
+		853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = BrandAssets.xcassets; sourceTree = "<group>"; };
+		8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioBrandMark.swift; sourceTree = "<group>"; };
+		941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRunnerController.swift; sourceTree = "<group>"; };
+		9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioApprovalReview.swift; sourceTree = "<group>"; };
+		ACD38ED25F0A8CF93E8528D9 /* OpenBotDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenBotDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAwayAccessView.swift; sourceTree = "<group>"; };
+		B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConnectionSession.swift; sourceTree = "<group>"; };
+		B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAttentionTests.swift; sourceTree = "<group>"; };
+		B753B530BAF8C97928B53B97 /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon-1024.png"; sourceTree = "<group>"; };
+		B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
+		C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBrowserControlView.swift; sourceTree = "<group>"; };
+		C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConversationView.swift; sourceTree = "<group>"; };
+		C16657B10E332E485EF58EF5 /* StudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioStore.swift; sourceTree = "<group>"; };
+		CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopCodeProjectsView.swift; sourceTree = "<group>"; };
+		CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopConnectorsView.swift; sourceTree = "<group>"; };
+		CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioApprovalReviewModel.swift; sourceTree = "<group>"; };
+		E090B986078E376939392EA9 /* OpenBotDesktopApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotDesktopApp.swift; sourceTree = "<group>"; };
+		E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenBotDesktopTests.swift; sourceTree = "<group>"; };
+		EBA74A4E2732684E76B1A397 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPermissionsView.swift; sourceTree = "<group>"; };
+		ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNotifications.swift; sourceTree = "<group>"; };
+		F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopFilesView.swift; sourceTree = "<group>"; };
+		F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenExtensionsView.swift; sourceTree = "<group>"; };
+		FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAPIClient.swift; sourceTree = "<group>"; };
+		FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAddress.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		12A7F522888F0937169614DC /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				FCEF5EE2AC0F9DAD1D2E5A8C /* ConnectionAddress.swift */,
+				FC54AF8D753062E8153690B9 /* StudioAPIClient.swift */,
+				CF779DD05095377D2F941FB9 /* StudioApprovalReviewModel.swift */,
+				8D4747907AA2A9D7F61B8BF2 /* StudioBrandMark.swift */,
+				04DA89F68F554D3D8D2D4B94 /* StudioModels.swift */,
+				66DEAEA72B148F9B68625D7C /* StudioPalette.swift */,
+				C16657B10E332E485EF58EF5 /* StudioStore.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		26B5071C216557557458C031 /* ios */ = {
+			isa = PBXGroup;
+			children = (
+				E0CD1B0C9719CD34A5A73AF8 /* OpenBotMobile */,
+				8B126FFA6B5C505C6270CECC /* Shared */,
+				7B8B1A917D590EADBB750A5C /* SharedTests */,
+			);
+			path = ios;
+			sourceTree = "<group>";
+		};
+		3C41982DD8903C3A380BCC04 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B3D69CC03479C23759D0CC40 /* DesktopConnectionSession.swift */,
+				ECC74CB43FA3A2FA6CE7409C /* DesktopNotifications.swift */,
+				941B8FAA800CD9A14AF8A779 /* DesktopRunnerController.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4C930349065A0A02227DC0F4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				EBA74A4E2732684E76B1A397 /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5DF4957ECCE8910ED665DE64 /* OpenBotDesktopTests */ = {
+			isa = PBXGroup;
+			children = (
+				E6C94BCF1265982BD5093653 /* OpenBotDesktopTests.swift */,
+			);
+			path = OpenBotDesktopTests;
+			sourceTree = "<group>";
+		};
+		65B000A665C46637D15F53A6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				ACD38ED25F0A8CF93E8528D9 /* OpenBotDesktop.app */,
+				7540A41257FDF7FCAE2B0DA4 /* OpenBotDesktopTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		68E8944D44049FB5431778BB /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F569CDD03A4BE513C1663863 /* OpenExtensionsView.swift */,
+				B9C4106E87C52C003CCE4B88 /* RecipeLibraryView.swift */,
+				8119CC5CF61371B7EE738E65 /* RoutineScheduleFields.swift */,
+				9D2003C4B0D340FDF1CA5686 /* StudioApprovalReview.swift */,
+				7154EA7D38A0DDD128F9EBC3 /* WorkSourcesView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		6DB45CC3C12EABFA0DA18573 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				E090B986078E376939392EA9 /* OpenBotDesktopApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		7B8B1A917D590EADBB750A5C /* SharedTests */ = {
+			isa = PBXGroup;
+			children = (
+				B4CEA3AD43DA25285D57641B /* StudioAttentionTests.swift */,
+			);
+			path = SharedTests;
+			sourceTree = "<group>";
+		};
+		8B126FFA6B5C505C6270CECC /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				853A6FE8ADB9DF6C55EE52B8 /* BrandAssets.xcassets */,
+				208BB204B491D87C1A1CD409 /* OpenBotSharedInbox.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		9EC9C1424BE6D5059DE1C2F8 /* OpenBotDesktop */ = {
+			isa = PBXGroup;
+			children = (
+				6DB45CC3C12EABFA0DA18573 /* App */,
+				3C41982DD8903C3A380BCC04 /* Models */,
+				4C930349065A0A02227DC0F4 /* Resources */,
+				B2754415716F1557E5D6FF76 /* Views */,
+			);
+			path = OpenBotDesktop;
+			sourceTree = "<group>";
+		};
+		A4D1473764A621BA135D1102 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A521578288C5821B9B4F1299 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A521578288C5821B9B4F1299 /* Assets.xcassets */ = {
+			isa = PBXGroup;
+			children = (
+				B7089ADE938A65D2FDE77B43 /* AppIcon.appiconset */,
+			);
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		B2754415716F1557E5D6FF76 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				11A67B3ECACD07DA55DC7CB1 /* DesktopArtifactsView.swift */,
+				4D5994B3E9900EF4B0514BE5 /* DesktopAutomationsView.swift */,
+				B172761AB0AFE4C2409B3E5F /* DesktopAwayAccessView.swift */,
+				C04A39461E21CA52FAAC52CF /* DesktopBrowserControlView.swift */,
+				CA22E82878551D4243F9606D /* DesktopCodeProjectsView.swift */,
+				CAA7A8823E6B6B3913ADB586 /* DesktopConnectorsView.swift */,
+				C0C87A768BE6AD18436746E9 /* DesktopConversationView.swift */,
+				F3E37619272803CFBF915EC4 /* DesktopFilesView.swift */,
+				258B87A3A9BA459BC0AEBA57 /* DesktopMascotView.swift */,
+				ECC44F82CEB57C265CF9AA85 /* DesktopPermissionsView.swift */,
+				56B899D88E55A150DE57F613 /* DesktopProvidersView.swift */,
+				418D0F26B773B931A05A3C1D /* DesktopRootView.swift */,
+				76D8B00D5EE0B840B15FFDC1 /* DesktopSearchView.swift */,
+				3B6A51F7BA0BCA9870DA1D0D /* DesktopSkillsView.swift */,
+				27DB0AEE699820ED580CDE88 /* DesktopStudioView.swift */,
+				3C63803C40C2BBFB2F31D143 /* DesktopTeachView.swift */,
+				3AB10D1DC385A80B2B71E72B /* DesktopTeammatesView.swift */,
+				32BE7E38095A3E4CEC2ED72E /* DesktopWorkView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B7089ADE938A65D2FDE77B43 /* AppIcon.appiconset */ = {
+			isa = PBXGroup;
+			children = (
+				B753B530BAF8C97928B53B97 /* AppIcon-1024.png */,
+			);
+			path = AppIcon.appiconset;
+			sourceTree = "<group>";
+		};
+		C5361AB3E2BB40170664FDA8 /* openbot */ = {
+			isa = PBXGroup;
+			children = (
+				26B5071C216557557458C031 /* ios */,
+			);
+			name = openbot;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		E0CD1B0C9719CD34A5A73AF8 /* OpenBotMobile */ = {
+			isa = PBXGroup;
+			children = (
+				12A7F522888F0937169614DC /* Models */,
+				A4D1473764A621BA135D1102 /* Resources */,
+				FC8CF93852BDA00F7001D80A /* Security */,
+				68E8944D44049FB5431778BB /* Views */,
+			);
+			path = OpenBotMobile;
+			sourceTree = "<group>";
+		};
+		FC8CF93852BDA00F7001D80A /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				4C37B8EB55726E12ACD2ED52 /* KeychainStore.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		FE03DC661A013F3B128E356F = {
+			isa = PBXGroup;
+			children = (
+				C5361AB3E2BB40170664FDA8 /* openbot */,
+				9EC9C1424BE6D5059DE1C2F8 /* OpenBotDesktop */,
+				5DF4957ECCE8910ED665DE64 /* OpenBotDesktopTests */,
+				65B000A665C46637D15F53A6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		14A4DD02179B8A2A3F6D0077 /* OpenBotDesktop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3535D040774A55051E8873C4 /* Build configuration list for PBXNativeTarget "OpenBotDesktop" */;
+			buildPhases = (
+				41750F7911ACFAE318702BA9 /* Sources */,
+				6E2BE2AC790A3597812FBDFA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenBotDesktop;
+			packageProductDependencies = (
+			);
+			productName = OpenBotDesktop;
+			productReference = ACD38ED25F0A8CF93E8528D9 /* OpenBotDesktop.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C7F236A413D07804CED87ABE /* OpenBotDesktopTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342E306E07CB8742195700EE /* Build configuration list for PBXNativeTarget "OpenBotDesktopTests" */;
+			buildPhases = (
+				6EEFEEE6B7BA703FA3D80C7A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CD9416F831E38AF68EF8C28E /* PBXTargetDependency */,
+			);
+			name = OpenBotDesktopTests;
+			packageProductDependencies = (
+			);
+			productName = OpenBotDesktopTests;
+			productReference = 7540A41257FDF7FCAE2B0DA4 /* OpenBotDesktopTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8F9B3F0FAF28E408E8E6DC32 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = F539DD4FCBC09DB33CEAA0EC /* Build configuration list for PBXProject "OpenBotDesktop" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FE03DC661A013F3B128E356F;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 65B000A665C46637D15F53A6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				14A4DD02179B8A2A3F6D0077 /* OpenBotDesktop */,
+				C7F236A413D07804CED87ABE /* OpenBotDesktopTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6E2BE2AC790A3597812FBDFA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EE31CCB1DA58D2843615258 /* AppIcon-1024.png in Resources */,
+				F267DBD4F6947B1A46CAFC8C /* BrandAssets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		41750F7911ACFAE318702BA9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8BF12897D18BE6DEF969931D /* ConnectionAddress.swift in Sources */,
+				E6872D9A3EE4A3077D9D1ABB /* DesktopArtifactsView.swift in Sources */,
+				27DD901E0744A24ACFCC360C /* DesktopAutomationsView.swift in Sources */,
+				4A16387AAC1CEABE808892A5 /* DesktopAwayAccessView.swift in Sources */,
+				3136C071A41C03FC94D37760 /* DesktopBrowserControlView.swift in Sources */,
+				24A1B0D7AF67AA40393E7E8D /* DesktopCodeProjectsView.swift in Sources */,
+				86BF8F6862678B5B18BC4C10 /* DesktopConnectionSession.swift in Sources */,
+				F66C28F89DE814E13BF9322C /* DesktopConnectorsView.swift in Sources */,
+				AE4FE07FAA35FDA37415A7F9 /* DesktopConversationView.swift in Sources */,
+				75E18C61FD138658535D401E /* DesktopFilesView.swift in Sources */,
+				77176D34D553501E64B47AD0 /* DesktopMascotView.swift in Sources */,
+				3AF0F8E96D2A80321DBE782D /* DesktopNotifications.swift in Sources */,
+				FAC93C170A84615869E711BE /* DesktopPermissionsView.swift in Sources */,
+				8BAB124D5B5923E281177363 /* DesktopProvidersView.swift in Sources */,
+				A444C931E34109A875B9A427 /* DesktopRootView.swift in Sources */,
+				2D1341AFBB88973F656F3AD4 /* DesktopRunnerController.swift in Sources */,
+				199A378CC7C16D266E002C41 /* DesktopSearchView.swift in Sources */,
+				CFB5B1CD511D01D5F47DBC23 /* DesktopSkillsView.swift in Sources */,
+				547E26CA1F7DFBE6D98ED6BE /* DesktopStudioView.swift in Sources */,
+				8A106A9C73B7AC546EE1970D /* DesktopTeachView.swift in Sources */,
+				591EF96847C737A770E5CE36 /* DesktopTeammatesView.swift in Sources */,
+				FE21386030003E443C4BBF62 /* DesktopWorkView.swift in Sources */,
+				E1554AC0D7DFE09593E483BA /* KeychainStore.swift in Sources */,
+				9901530C05491907F54D439D /* OpenBotDesktopApp.swift in Sources */,
+				B33AAA280781EEEB2B10CE00 /* OpenBotSharedInbox.swift in Sources */,
+				3D9DD23EC2F7787D14C08F92 /* OpenExtensionsView.swift in Sources */,
+				C3894B0925EFE8D7BD80601A /* RecipeLibraryView.swift in Sources */,
+				B1E0AE83850E4A9141101F1B /* RoutineScheduleFields.swift in Sources */,
+				70F6EA3F3347A0E6C143CC6B /* StudioAPIClient.swift in Sources */,
+				DF33311732489207EB8D56C1 /* StudioApprovalReview.swift in Sources */,
+				506DF6B42CA49EBEAECDED93 /* StudioApprovalReviewModel.swift in Sources */,
+				5E62BA570CAEAD6D14212DFE /* StudioBrandMark.swift in Sources */,
+				1FA6DE9A644BC0727430DF0C /* StudioModels.swift in Sources */,
+				6316196058224C1AFCC0F1BB /* StudioPalette.swift in Sources */,
+				C06C973B5EFC5C8AF7C693FC /* StudioStore.swift in Sources */,
+				591207B3D2B17212F166D757 /* WorkSourcesView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6EEFEEE6B7BA703FA3D80C7A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				370696C603C06617F205A59B /* OpenBotDesktopTests.swift in Sources */,
+				789FB0126AAD7143924FA67A /* StudioAttentionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CD9416F831E38AF68EF8C28E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 14A4DD02179B8A2A3F6D0077 /* OpenBotDesktop */;
+			targetProxy = 771F948D8A3C2D885EF0DF32 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2F192D2FD82378F2FFB8D065 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.desktop.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenBot.app/Contents/MacOS/OpenBot";
+			};
+			name = Debug;
+		};
+		54215E5EC97A71CB2AD96AD5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.desktop.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenBot.app/Contents/MacOS/OpenBot";
+			};
+			name = Release;
+		};
+		66270BF0DCF07893470B55B6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 42;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.37.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		935AC5ACA008F2487873CC95 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenBotDesktop/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.desktop;
+				PRODUCT_NAME = OpenBot;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		C265ED79F0356FDA395AFB16 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 42;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.37.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CA551974731089CDA045B4B2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenBotDesktop/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.openbot.desktop;
+				PRODUCT_NAME = OpenBot;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		342E306E07CB8742195700EE /* Build configuration list for PBXNativeTarget "OpenBotDesktopTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F192D2FD82378F2FFB8D065 /* Debug */,
+				54215E5EC97A71CB2AD96AD5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3535D040774A55051E8873C4 /* Build configuration list for PBXNativeTarget "OpenBotDesktop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA551974731089CDA045B4B2 /* Debug */,
+				935AC5ACA008F2487873CC95 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F539DD4FCBC09DB33CEAA0EC /* Build configuration list for PBXProject "OpenBotDesktop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C265ED79F0356FDA395AFB16 /* Debug */,
+				66270BF0DCF07893470B55B6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 8F9B3F0FAF28E408E8E6DC32 /* Project object */;
+}

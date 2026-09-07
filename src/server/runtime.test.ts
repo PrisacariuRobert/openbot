@@ -3,13 +3,39 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { protectedProjectPaths, safeHostEnvironment, safeUrl } from "./runtime.js";
+import { codeProjectToolchain, protectedProjectPaths, safeHostEnvironment, safeUrl } from "./runtime.js";
+
+test("code checks select the Python toolchain for Python commands and projects without overriding explicit Node commands", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-toolchain-"));
+  try {
+    assert.equal(codeProjectToolchain(root, "python3 -m unittest"), "python");
+    assert.equal(codeProjectToolchain(root, "npm test"), "node");
+    writeFileSync(path.join(root, "pyproject.toml"), "[project]\nname='fixture'\n");
+    assert.equal(codeProjectToolchain(root, "sh check.sh"), "python");
+    assert.equal(codeProjectToolchain(root, "node check.js"), "node");
+    writeFileSync(path.join(root, "package.json"), "{}");
+    assert.equal(codeProjectToolchain(root, "sh check.sh"), "node");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("passes only allowlisted host environment values to model processes", () => {
   const env = safeHostEnvironment({ OPENBOT_TEST_VALUE: "safe" });
   assert.equal(env.OPENBOT_TEST_VALUE, "safe");
   assert.equal("AWS_SECRET_ACCESS_KEY" in env, false);
   assert.equal("GITHUB_TOKEN" in env, false);
+});
+
+test("discovers user CLIs with a background-service PATH without inheriting secrets", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-cli-path-"));
+  try {
+    mkdirSync(path.join(root, ".opencode/bin"), { recursive: true });
+    mkdirSync(path.join(root, ".local/bin"), { recursive: true });
+    const env = safeHostEnvironment({}, { HOME: root, PATH: "/usr/bin:/bin", AWS_SECRET_ACCESS_KEY: "never-inherit" });
+    assert.ok(env.PATH?.split(path.delimiter).includes(path.join(root, ".opencode/bin")));
+    assert.ok(env.PATH?.split(path.delimiter).includes(path.join(root, ".local/bin")));
+    assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
+    assert.equal(safeHostEnvironment({ PATH: "/test/bin" }, { PATH: "/usr/bin" }).PATH, "/test/bin");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("browser URL guard allows local tests and blocks metadata/private hosts", () => {

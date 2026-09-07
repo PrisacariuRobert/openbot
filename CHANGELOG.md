@@ -1,5 +1,116 @@
 # Changelog
 
+## Working tree
+
+- Added **OpenBot-In-Motion**, a 64-second instrumental product-film revision based on the current native conversation UI and shared mascot shapes. It adds request close-ups, animated character handoffs, real-layout file and approval treatments and a desktop-to-phone pullback while keeping the complete work story. Previous cuts remain intact; this is staged marketing, not new runtime functionality or release proof.
+- Rebuilt the film as **OpenBot-See-It-Work**, an 82-second continuous app walkthrough without narration. A single client-review request now carries the explanation, including the proposed/approved missing-tool build, failed checks, correction, successful use and reuse in a later routine. Local sample parsing tests ground the numbers; the sequence is staged and does not implement or certify the depicted autonomous loop. Previous films remain intact.
+- Added **OpenBot-Pulse-No-Voice**, a separate 54-second music-led review cut with an original 120 BPM instrumental, shorter shots, perspective/camera choreography and the full product overview. No narration, voice services or paid generation are used. The rejected narrated and earlier visual cuts remain intact. This changes the film, not app capabilities or release status.
+- Expanded the narrated introduction to a 103-second full-product overview with ten chapters. Self-extension is approximately 10% of the cut; the broader teammate/provider/browser/work/routine/approval/device experience is restored. Narration is locally generated, chapter duration is measured from the audio, and previous cuts remain separate. No publication or application-state change.
+- Added Apple-film research and a separate 22-second narrated self-extension direction test using the existing local Aiden pipeline. Earlier full cuts are preserved, not labeled creatively approved; the exact self-extension proof and model-connection limits are recorded outside the staged film. No app capabilities, owner data, or release status changed in this creative pass.
+- Recut the introduction around one request becoming usable work: the current 47-second, 60-fps film includes full-size deliverables, teammate responsibility, a quiet approval pause, a message-led device handoff and a new original score. The earlier 52-second motion cut and first cut remain available. This changes the marketing film, not application capabilities or release status.
+- Native build 42 aligns Activity, permissions, group details and the routine editor with the approved conversation-first prototype. Activity prioritizes review items, permissions retain their real switches inside expandable rows, group identities reserve their full mascot width, and routine timing is a compact paired control. Shared primary/secondary capsule buttons replace mixed local styles on these surfaces; no stored grants or schedules are changed by the redesign.
+- Added an original 80.4-second editable Remotion introduction: monochrome product scenes, six animated vector mascots, real bundled service marks, and an original deterministic stereo score. The film uses fictional content, contains no unfinished-feature badges or release-date/download claim, and keeps its pre-launch concept scope and capability verification notes in the accompanying README.
+- Added conversation-local failed-task notices on native Mac and iPhone, showing the recorded error and opening Activity without repeating the task or treating uncertain actions as safe to retry.
+- Fixed the Mac compact-window constraint loop and clipped inspector. AppKit owns the window minimum; wide windows show inline details, while compact windows use a dismissible sheet that hands off to routines/preferences without competing presentations. Debug-only loopback fixture appearance/size controls do not change owner window preferences or Release behavior.
+- Added host-approval-bound Google Calendar event IDs, full event-content verification and one exact readback operation after an ambiguous create response. Missing, changed, cancelled, malformed or inaccessible events remain uncertain; there is no second insert. Account changes stop recovery, and an unconfirmed Meet link is reported separately. This is bounded same-process recovery, not automatic reconciliation of every interrupted action.
+- Verified the unlocked native UI, real read-only Gmail/Drive access, simulated browser sign-in handoff and four free Spark 1.3 synthetic work scenarios. Google Calendar's API configuration still blocks its live pilot. See `docs/QA_UNLOCKED_MAC_2026-09-07.md`; no external write, publication or installed-app replacement was performed.
+
+- Separated provider-delimited progress from completed replies across web, Mac and iPhone. Final text is used for conversation previews/copy/share; earlier updates are preserved in an expandable work log. Completed text parts are identity-deduplicated; Claude's explicit successful result is no longer discarded after earlier commentary. An unfinished tool turn or reported runtime error cannot publish a false finished reply.
+- Built and checked a new self-contained arm64 Mac development candidate with the redesigned native client and embedded runner. Isolated package startup, explicit provider choice and clean shutdown passed; no installed application or owner data was replaced. See `docs/QA_RESULT_FLOW.md` for exact evidence and remaining release gates.
+
+- Native Mac and iPhone now share studio-wide task attention: failed work in other conversations, pending approvals, uncertain actions and unresolved routine alerts remain visible. The **Needs you** entry opens Activity, which links back to the affected conversation or routine settings. Opening a task does not approve, retry or resolve it. iPhone Activity selection now opens the conversation rather than leaving the conversation list visible.
+- Connection labels distinguish saved sign-in from demonstrated model execution and show read-only app connections without implying write access. Added six shared native regression tests and a synthetic iPhone navigation check for failed-task and routine-alert review.
+
+- Redesigned the boot flow around the feeling of a messaging app: web, Mac and iPhone now open straight into the conversation. Choosing an AI connection is no longer a forced boot gate — the composer stays usable, and trying to send opens the explicit chooser with the draft kept. Nothing is pre-assigned; owners still pick their provider deliberately
+- Premium conversation rhythm on all three surfaces: messages group like iMessage (tight spacing within a group, breathing room between speakers, identity at the head of each group), refined bubble shapes with hairline separation on web, calmer spacing on iPhone, and macOS keeps composing enabled with a quiet chooser affordance
+- The playful mascot family is untouched: blinks, work moods and appearance editing still carry the personality
+
+- Added owner-created group chats: name a group, pick one to six teammates, and message there with the same @mention routing, direct chat and approval boundaries as the all-hands room. Members join/leave with an explanatory system message; future tasks follow the current membership while work already running keeps going
+- Groups support rename, pin, section and hide, list members everywhere threads do, and the conversation context pane shows the roster with an edit entry; the team room keeps its implicit everyone-membership and stays protected from rename/hide
+- Added group thread storage, API (create and edit group membership/title), studio UI, and five unit tests covering validation, membership changes, routing through mentions, and safety guards
+
+- Added stdio transport for custom MCP connectors: community MCP servers (official reference servers, Hermes optional MCPs and any other standard server) can now run as a local command on the host — plain executable path, line-per-argument list, and a small owner-named environment, with shell metacharacters rejected and a deliberately small inherited environment
+- Same reviewed contract as HTTP connectors: discovery, per-teammate tool grants, argument-schema validation, digest-checked calls, receipts, and revoke-on-change; a starter picker links the open MCP catalog with pinned MIT-attributed presets
+- Added a real stdio MCP fixture and a round-trip unit test (discover → per-bot grants → grant isolation → schema-checked call), plus a live server smoke test
+
+- Added owner-authored Auto Review rules (Grok Bot-style, deterministic): Require-Approval rules always stop a matching task, terminal command or browser action for review; Always-Allow rules can skip one of OpenBot's own review prompts for a narrowly matched isolated-command pattern only — they never waive a detector, never apply to browser actions or tasks, and cannot allowlist deleting or system-changing command prefixes. A matching Require-Approval rule always wins over Always-Allow
+- Rules live in the studio Settings drawer with pattern matching (`*`/`?` wildcards, case-insensitive) and are enforced at task start, for routines, and at every isolated command and browser click/type decision
+- Added owner-authored Auto Review rule storage, API and unit tests for pattern matching, effect precedence, scope isolation and guardrails
+- Made memory retrieval rank instead of filter: `memory_search` now returns relevance-ranked notes (rarity weighting, phrase bonus, deterministic ordering) so a note missing one query word is no longer hidden; empty and stopword-only queries return nothing
+- Tasks now seed bounded background context from related past conversation (this teammate's answers and owner messages in the task's thread, keyword-ranked, labeled as background and to be verified against current state)
+- Added consolidation pressure without silent merges: a task saving content that nearly duplicates an owner note under a different name is refused and pointed at the existing owner note; owner-controlled memory is unchanged
+- All retrieval is local and deterministic (no model, no embeddings, no network); an owner-chosen embeddings connection remains an explicit future upgrade
+- Made always-on away access turnkey: `./deploy/private-runner/setup.sh studio.example.com --relay relay.example.com` now also runs the built-in away-access relay in the same reviewed image behind the same Caddy TLS listener, generating the enrollment secret and wiring `OPENBOT_RELAY_URL` on the studio automatically
+- Added an optional compose `relay` profile, a dedicated relay Caddyfile with WebSocket upgrade passthrough, and a durable owner-only relay database; a misconfigured or unreachable relay keeps the studio healthy
+- Verified the relay image end to end at service level (health check, token-enforced enrollment, verified-secret enrollment, correct 503 routing for offline and unknown studios); real-domain TLS and cellular phone delivery still require an actual deployment
+- Added live computer viewing: an authenticated server-sent event stream (`/api/bots/:id/computer/live`) feeds CDP screencast frames from a teammate's already-running browser to viewers, with a per-bot source shared across all watchers and stopped when the last one leaves
+- Added a live watch view in the studio conversation pane and a Grok Bot-style "Agent Computer" takeover dialog: explicit Take control arming, click-to-act coordinate transfer, address opening, a private keyboard whose text is never stored in chat, and key controls over the existing reviewed takeover endpoints
+- Added a native iPhone teammate computer screen with the same live stream, tap-to-act takeover, private SecureField typing, key buttons, and snapshot fallback when the stream is unavailable
+- Watching never starts a browser and grants no access; slow viewers drop frames instead of accumulating an unbounded buffer, and the stream carries a 15-second heartbeat
+- Added unit tests covering live-frame fan-out, subscriber lifecycle, viewer isolation and no leaked sources
+
+## 0.34.0 — 2026-09-05
+
+- Added a genuine SwiftUI/AppKit macOS app with a native window, navigation, menus, keyboard commands, settings, attachments, Keychain-backed remote sign-in, and loopback-only automatic local pairing
+- Added native conversations, teammate targeting, durable draft continuity, reply context, reactions, private studio-wide search, active-run controls, Work starters, Live Studio, action history, and uncertain-action reconciliation
+- Added opt-in native macOS alerts with deliberately generic, privacy-bounded attention text
+- Added native automation create/edit/delete across schedules, Calendar, GitHub, signed webhook, Todoist, Dropbox, Slack, and Notion, with pause/resume, one-time secret rotation, and confirmation-gated run-now controls
+- Added native provider readiness, supported subscription sign-in and code completion, plus hosted API and local OpenAI-compatible model setup, safe editing, and removal guarded against active teammate assignments
+- Added native provider-to-teammate model assignment, code-project folder/GitHub connection, per-teammate project grants, worktree/diff review, guarded edit restoration, disconnect-without-delete, and computer/browser/Mac capability controls
+- Added native Apps & Tools connection entry points, per-teammate read/write grants, portable Skill Library install/edit/history/non-destructive rollback/assign/import/export/delete, and local background-protection controls
+- Added native isolated-browser preview/control and visible teach-by-demonstration with private typing and saved Skill Library output
+- Added native teammate create/edit/duplicate controls for role, instructions, provider/model, tools, weekly budget, mascot shape, and custom colour, plus bounded read-only teammate workspace browsing
+- Added bounded Google Drive text/Markdown creation and Google Calendar events, guests, notifications, and optional Meet links through the same per-teammate write grant, exact approval preview, one-time action receipt, and reconnect-aware OAuth scope boundary
+- Added host-verified text-deliverable checks that reopen bounded workspace files, test required size/content, record a short SHA-256 fingerprint, and remain visibly distinct from teammate self-reporting
+- Hardened workspace browsing so traversal, hidden entries, direct links, and folders linked outside a teammate's private workspace cannot be listed or previewed
+- Fixed new-teammate persistence so intentionally disabled computer/browser access and a zero weekly token cap are no longer replaced by defaults
+- Fixed native Mac draft handoff by accepting and preserving the `macos` source instead of rejecting it as an unknown client
+- Fixed background-service upgrades so macOS stops the complete TypeScript runner process group instead of leaving an orphan behind, and removed a redundant protected-folder working directory from LaunchAgent startup
+- Reused the authenticated mobile protocol while keeping a launch-only local development key in memory and requiring HTTPS for non-private hosts
+- Added native, code-drawn animated mascots using saved teammate appearance and execution state
+- Added thirteen macOS unit tests, a macOS release contract, Xcode build/test gates, disposable API lifecycle checks, and direct live-runner teaching/automation validation without a model request
+- Kept signed/notarized distribution, automatic updates, Windows support, self-hosted OAuth/event setup, and fresh-user runner packaging as explicit future work
+
+## 0.33.0 — 2026-09-05
+
+- Added durable pre-execution receipts and immutable fingerprints for approved commands, messages, issues, browser/app interactions, and connected-app updates
+- Added atomic single-process claims, first-writer-wins approval decisions, safe prepared-action restart, and denied-action cleanup
+- Added conservative crash recovery: in-flight remote outcomes become uncertain and can never be blindly reclaimed or replayed
+- Added matching web and native Live Studio reconciliation controls and recent action history without exposing saved request bodies in public state
+- Added deterministic restart/race/privacy fixtures and a native receipt-decoding check
+- Kept universal provider-level exactly-once delivery and automatic reconciliation as explicit future work
+
+## 0.32.0 — 2026-09-05
+
+- Added native SwiftUI Work starters for source-backed briefs, meeting preparation, and inbox follow-ups
+- Added live Gmail/Calendar/Drive readiness, one-tap Google recovery, Dynamic Type layouts, and Simulator UI validation
+
+## 0.31.0 — 2026-09-05
+
+- Added encrypted source snapshots, source-linked productivity reports, unsent follow-up drafts, and commit-bound coding checks
+- Added deterministic runtime fixtures without consuming a real model allowance
+
+## 0.30.0 — 2026-09-05
+
+- Added active-time, idle, model-step, reported-token, and output limits with checkpointed usage and forced stop escalation
+- Added whole-consultation cancellation and deterministic stalled-process recovery tests
+
+## 0.29.0 — 2026-09-04
+
+- Added usable custom provider endpoints/models, safer environment handling, corrected usage accounting, and capability-aware tool exposure
+- Removed misleading message rewriting and separated teammate-reported checks from independent verification
+
+## 0.28.0 — 2026-09-04
+
+- Added signed Slack Events API triggers for mentions, messages, and reactions, with optional channel filtering and bot-message loop prevention
+- Added verified Notion webhook triggers for page, comment, and database activity, with optional entity filtering
+- Added private rotating provider event addresses, encrypted event secrets, verification state, HMAC checks, Slack replay-window enforcement, bounded attempts, and the existing durable dedupe/rate/replay contract
+- Added responsive Apps & Tools setup for copying event addresses, saving the Slack signing secret, completing Notion verification, and rotating compromised addresses
+- Added Slack and Notion cards to the automation builder and extended natural in-chat routine creation across both OpenCode and Claude Code runtimes
+- Upgraded built-in connector manifests to version 2 with explicit event capability and authenticity declarations, plus a documented reviewed connector admission contract
+- Expanded the complete suite to 113 passing tests covering provider signatures, event matching, encrypted configuration, address rotation, manifest validation, and natural routine schemas
+- Kept arbitrary executable connector installation, hosted ingress, provider account consent, and live third-party delivery as explicit owner-setup or future work
+
 ## 0.27.0 — 2026-09-04
 
 - Added an opt-in five-minute external heartbeat so an owner-selected dead-man service can detect complete private-host or network loss

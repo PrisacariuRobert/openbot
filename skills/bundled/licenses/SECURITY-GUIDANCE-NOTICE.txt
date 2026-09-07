@@ -1,0 +1,13 @@
+OpenBot security guidance adapter
+
+Inspired by and adapted from the security-guidance patterns distributed in
+NousResearch/hermes-agent at 622883bad7f55f56a6393cd994e36c65fbdff253.
+Their pattern source is Anthropic's claude-plugins-official repository,
+plugins/security-guidance/hooks/patterns.py, commit 0bde168 (2026-05-26).
+Copyright (c) Anthropic, PBC. and the security-guidance contributors.
+Licensed under Apache License 2.0 (see SECURITY-GUIDANCE-APACHE-2.0.txt).
+
+OpenBot modifications (2026): a selected TypeScript rule set, bounded output,
+source-line references, contextual advisory wording and integration with
+OpenBot shared-project write/replace results. No Hermes Python runtime,
+telemetry or upstream plugin hooks are loaded. This is not the full plugin.

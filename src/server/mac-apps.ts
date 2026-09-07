@@ -66,7 +66,7 @@ function run() {
 }
 `;
 
-const inspectScript = `
+export const inspectScript = `
 ${findProcess}
 ${boundedTree}
 function interactiveRole(role) {
@@ -77,6 +77,7 @@ function run(argv) {
   const appRef = argv[0], maximum = Math.max(1, Math.min(100, parseInt(argv[1] || "50", 10)));
   const systemEvents = Application("System Events"), process = findProcess(systemEvents, appRef);
   if (!process) return JSON.stringify({ error: "app_not_found", app: appRef });
+  if (/passwords|1password|bitwarden|keychain|lastpass|keepass|authenticator|authy/i.test(String(process.name()) + " " + String(appRef))) return JSON.stringify({ error: "sensitive_app", app: appRef });
   try { process.frontmost = true; } catch (e) {}
   delay(0.04);
   let root = process, windowTitle = null;
@@ -88,16 +89,19 @@ function run(argv) {
     let role = "unknown";
     try { role = String(element.role()); } catch (e) {}
     if (!interactiveRole(role)) continue;
+    if (/secure|password/i.test(role)) continue;
+    try { if (element.attributes.byName("AXProtectedContent").value() === true) continue; } catch (e) {}
     let title = null, value = null, description = null, enabled = true, focused = false, frame = null;
     try { title = element.title(); } catch (e) {}
-    try { value = element.value(); } catch (e) {}
     try { description = element.description(); } catch (e) {}
+    if (/password|passcode|one.time.code|verification.code|api.key|access.token|secret.key|recovery.code/i.test(String(title || "") + " " + String(description || ""))) continue;
+    try { value = element.value(); } catch (e) {}
     try { enabled = !!element.enabled(); } catch (e) {}
     try { focused = !!element.focused(); } catch (e) {}
     if (elements.length < 8) {
       try { const p = element.position(), s = element.size(); frame = { x: p[0], y: p[1], width: s[0], height: s[1] }; } catch (e) {}
     }
-    const parts = [title, value, description].filter((part) => part != null && String(part).trim()).map(String);
+    const parts = [title, value, description].filter((part) => part != null && String(part).trim()).map((part) => String(part).slice(0, 2000));
     const item = { index: String(index), role, label: parts[0] || null, enabled, focused };
     if (frame) item.frame = frame;
     elements.push(item);

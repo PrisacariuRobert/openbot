@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { buildRawEmail, connectorCatalog, decodeGmailMessage, GOOGLE_SCOPES, GoogleWorkspaceConnector } from "./google-workspace.js";
 
 test("builds a safe Gmail message and rejects header injection", () => {
@@ -72,6 +72,45 @@ test("searches Drive, reads supported files, and returns a bounded calendar agen
     const agenda = await connector.calendarAgenda(7, 10);
     assert.equal(agenda[0]?.title, "Launch review");
     assert.equal(agenda[0]?.attendeeCount, 2);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("creates only bounded approval-ready Drive files and Calendar events", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-google-create-test-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    db.configureGoogleConnector({ clientId: "desktop-client.apps.googleusercontent.com" });
+    db.completeGoogleConnector({ accessToken: "workspace-access", refreshToken: "workspace-refresh", expiresAt: new Date(Date.now() + 3_600_000).toISOString(), scopes: GOOGLE_SCOPES, accountEmail: "owner@example.com" });
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input); requests.push({ url, init });
+      if (url.includes("upload/drive/v3/files")) return new Response(JSON.stringify({ id: "drive_created", name: "Launch plan.md", mimeType: "text/markdown", webViewLink: "https://drive.google.com/file/drive_created" }), { status: 200 });
+      if (url.includes("calendar/v3/calendars/primary/events")) return new Response(JSON.stringify({ id: "event_created", summary: "Launch review", htmlLink: "https://calendar.google.com/event/event_created", hangoutLink: "https://meet.google.com/abc-defg-hij" }), { status: 200 });
+      return new Response(JSON.stringify({ error: { message: "Unexpected fixture request" } }), { status: 500 });
+    }) as typeof fetch;
+    const connector = new GoogleWorkspaceConnector(db, "http://127.0.0.1:4311/api/connectors/google/callback", fakeFetch);
+
+    const drive = await connector.createDriveTextFile({ name: "Launch plan.md", content: "# Launch\nShip carefully.\n", mimeType: "text/markdown" });
+    assert.equal(drive.id, "drive_created");
+    const driveRequest = requests.find((request) => request.url.includes("upload/drive"))!;
+    assert.equal(driveRequest.init?.method, "POST");
+    assert.match(String((driveRequest.init?.headers as Record<string, string>)["content-type"]), /^multipart\/related; boundary=/);
+    assert.match(String(driveRequest.init?.body), /Launch plan\.md/);
+    assert.match(String(driveRequest.init?.body), /Ship carefully/);
+
+    const event = await connector.createCalendarEvent({ title: "Launch review", start: "2026-09-06T09:00:00+02:00", end: "2026-09-06T09:30:00+02:00", attendees: ["friend@example.com", "friend@example.com"], addGoogleMeet: true });
+    assert.equal(event.meetingLink, "https://meet.google.com/abc-defg-hij");
+    const calendarRequest = requests.find((request) => request.url.includes("calendar/v3"))!;
+    assert.match(calendarRequest.url, /sendUpdates=all/);
+    assert.match(calendarRequest.url, /conferenceDataVersion=1/);
+    const calendarBody = JSON.parse(String(calendarRequest.init?.body));
+    assert.deepEqual(calendarBody.attendees, [{ email: "friend@example.com" }]);
+    assert.equal(calendarBody.start.dateTime, "2026-09-06T07:00:00.000Z");
+    await assert.rejects(() => connector.createCalendarEvent({ title: "Bad", start: "2026-09-06T10:00:00Z", end: "2026-09-06T09:00:00Z" }), /valid event start and end/);
+    await assert.rejects(() => connector.createDriveTextFile({ name: "", content: "Text" }), /short name/);
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });

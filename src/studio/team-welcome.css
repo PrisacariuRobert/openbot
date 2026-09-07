@@ -1,0 +1,75 @@
+.team-welcome { display: grid; grid-template-columns: 1fr 1.2fr; align-items: center; gap: 34px; margin: 0 0 43px; }
+.team-introduction h1 { font-size: clamp(36px, 3.4vw, 49px); line-height: 1.12; letter-spacing: -2px; font-weight: 580; }
+.team-introduction h1 span { color: #7a7a7a; }
+.team-introduction > p:last-child { color: #737373; font-size: 14px; line-height: 1.65; margin-top: 18px; }
+.team-introduction .overline { font-size: 10px; letter-spacing: .12em; margin-bottom: 17px; color: #737373; }
+.team-stage { min-width: 0; text-align: center; padding-top: 8px; }
+.stage-invitation { min-height: 20px; font-size: 13px; color: #737373; margin-bottom: 13px; }
+.team-characters { display: flex; justify-content: center; gap: 5px; padding: 0 5px 17px; border-bottom: 1px solid #e8e8e8; }
+.teammate-intro { display: flex; flex-direction: column; align-items: center; min-width: 0; max-width: 130px; flex: 1; padding: 5px 0 0; border-radius: 14px; transition: background .18s; }
+.teammate-intro:hover, .teammate-intro:focus-visible { background: #f7f7f7; }
+.teammate-intro .character { width: min(116px, 100%); height: auto; }
+.teammate-name { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 550; margin: 4px 0 7px; max-width: 100%; overflow-wrap: anywhere; }
+.teammate-name svg { color: #777; opacity: 0; transition: opacity .18s; }
+.teammate-intro:is(:hover, :focus-visible) .teammate-name svg { opacity: 1; }
+.teammate-role { font-size: 11px; color: #737373; line-height: 1.4; overflow-wrap: anywhere; }
+.stage-footnote { font-size: 11px; color: #737373; padding-top: 12px; }
+.ask-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; margin-bottom: 17px; }
+.ask-heading h2 { font-size: 17px; font-weight: 500; letter-spacing: -.4px; }
+.ask-heading > span { font-size: 11px; color: #737373; }
+.home-page .prompt-starters { margin-bottom: 24px; }
+.team-promise { display: grid; grid-template-columns: .85fr 1.2fr 1.1fr; gap: 22px; list-style: none; padding: 23px 0; margin: 0 0 39px; border-block: 1px solid #ececec; }
+.team-promise li { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.team-promise li > svg { flex: none; margin-top: 2px; color: #777; }
+.team-promise strong { display: block; font-size: 12px; font-weight: 550; line-height: 1.5; }
+.team-promise small { display: block; font-size: 11px; line-height: 1.6; color: #737373; margin-top: 3px; }
+.meet-teammate > .character { margin: -5px auto 21px; }
+.meet-teammate > .overline, .meet-teammate > .detail-title, .teammate-specialty { text-align: center; }
+.meet-teammate > .detail-title { font-size: 32px; margin-bottom: 6px; }
+.teammate-specialty { font-size: 14px; color: #737373; margin-bottom: 28px; }
+.teammate-facts { border-top: 1px solid #ececec; }
+.teammate-facts > div { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid #ececec; padding: 16px 0; font-size: 12px; line-height: 1.5; }
+.teammate-facts span { color: #737373; }.teammate-facts strong { font-weight: 500; text-align: right; }
+.character-mood-curious .character-drawing { rotate: 5deg; }
+.character-mood-focused .character-drawing { animation-duration: 2.7s; }
+.character-wave { transform-origin: 81px 64px; animation: character-wave .65s ease-in-out 3; }
+@keyframes character-wave { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(17deg); } }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .team-welcome { gap: 18px; grid-template-columns: 1fr 1fr; }
+  .team-introduction h1 { font-size: 36px; }
+  .teammate-intro .character { width: 87px; }
+  .team-promise { gap: 12px; grid-template-columns: repeat(3, 1fr); }
+  .team-promise li { flex-direction: column; }
+}
+@media (max-width: 760px) {
+  .home-page { padding-top: 25px; }
+  .team-welcome { grid-template-columns: 1fr; gap: 20px; margin-bottom: 27px; }
+  .team-introduction { position: relative; }
+  .team-introduction h1 { font-size: 35px; line-height: 1.1; letter-spacing: -1.35px; }
+  .team-introduction .overline { margin-bottom: 12px; font-size: 10px; }
+  .team-introduction > p:last-child { position: absolute; right: 0; bottom: 3px; width: 135px; font-size: 12px; line-height: 1.7; margin: 0; }
+  .team-stage { padding: 0; }
+  .stage-invitation { display: none; }
+  .teammate-intro .character { width: 93px; }
+  .team-characters { padding-bottom: 13px; gap: 12px; }
+  .teammate-name { font-size: 13px; margin-top: 0; }
+  .teammate-role { font-size: 11px; }
+  .stage-footnote { padding-top: 9px; font-size: 10px; }
+  .ask-heading { margin-bottom: 13px; }
+  .ask-heading h2 { font-size: 17px; }.ask-heading > span { display: none; }
+  .home-page .composer textarea { min-height: 58px; }
+  .home-page .prompt-starters { margin: 10px 0 20px; gap: 10px 17px; }
+  .team-promise { grid-template-columns: 1fr; gap: 15px; padding: 20px 0; margin-bottom: 30px; }
+  .team-promise li { gap: 13px; }.team-promise strong { font-size: 12px; }.team-promise small { font-size: 11px; margin-top: 0; }
+}
+@media (max-width: 370px) {
+  .team-introduction > p:last-child { display: none; }
+  .team-introduction h1 { font-size: 35px; }
+  .teammate-intro .character { width: 80px; }
+  .team-characters { gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .character-wave { animation: none; }
+  .character-mood-curious .character-drawing { rotate: none; }
+  .teammate-intro, .teammate-name svg { transition: none; }
+}

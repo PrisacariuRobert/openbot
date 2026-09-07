@@ -1,8 +1,27 @@
 # OpenBot Release Roadmap
 
-Updated September 4, 2026 for the 0.27 resilient private-home release.
+Updated September 5, 2026 for the 0.34 native macOS milestone.
 
 This order follows one rule: deepen real daily usefulness before adding a long list of shallow integrations. Cursor's current Grok Bot documentation emphasizes rich attachments, persistent computer work, skills and event-driven routines, structured plugins, mobile review, search, and reviewable artifacts. OpenBot already has a strong local permission model and should extend that same contract rather than trade it away for breadth.
+
+## Shipped in 0.34 — Native Mac studio
+
+Goal: make the primary desktop experience a real application instead of requiring an always-open browser tab.
+
+- Added a genuine SwiftUI/AppKit app with a native window, three-column navigation, menus, keyboard commands, settings, files, loopback-only local pairing, and Keychain-backed remote connection
+- Added native conversations, teammate routing, attachments, replies/reactions, cross-device drafts, private studio search, live progress, approval and stop controls, action history, and uncertain-action reconciliation
+- Added source-backed Work starters and Live Studio against the same authenticated local or private runner used by web and iPhone
+- Added native create/edit/delete for every supported schedule and app-event trigger, including one-time webhook secret rotation, pause/resume, and confirmation-gated manual runs
+- Added native provider readiness, supported account/subscription sign-in, code completion, and hosted API or localhost-model setup
+- Added native provider/model assignment, local-folder and GitHub code-project connection, explicit per-teammate grants, base/task-worktree diff review, guarded edit restoration, safe disconnect, and computer/browser/Mac capability controls
+- Added native Apps & Tools connection entry points with separate teammate read/write grants, portable Skill Library management including history and rollback, and local background-protection controls
+- Deepened connected work with approval-gated Drive text/Markdown creation and Calendar events, guests, notifications, and optional Meet links; the new scopes remain separate from teammate read grants and reconnect visibly
+- Added bounded host verification for text deliverables, including workspace containment, minimum-size/required-marker checks, and a recorded content fingerprint that the UI distinguishes from teammate self-reporting
+- Added native teammate creation/editing/clean duplication, bounded workspace-file review, isolated-browser takeover, and visible teach-by-demonstration saved into the Skill Library
+- Kept mascots code-drawn, recolorable, independently animated, work-state aware, and reduced-motion compatible
+- Added a no-WebKit release contract, macOS unit tests, Xcode build validation, and a real populated local-runner launch check without consuming model usage
+
+Public distribution remains a separate milestone: Developer ID signing, hardened runtime, notarization, update signing, fresh-Mac runner packaging, and Windows support are not shipped by source compilation alone.
 
 ## Shipped in 0.14 — Rich inputs and reviewable artifacts
 
@@ -177,11 +196,22 @@ Verified by 105 automated tests, TypeScript and production builds, native simula
 
 Verified by 110 automated tests, TypeScript and production builds, native simulator checks, shell/Node syntax, transfer tamper and wrong-passphrase tests, live private-server behavior, responsive desktop/phone browser acceptance, and the Linux private-runner build/boot/Home-check CI gate.
 
-## Next — Open connections and richer events
+## Shipped in 0.28 — Connections that act
 
-- Add Slack and Notion event sources on the same receipt, cursor, dedupe, replay, and rate-limit contract
-- Define a reviewed custom MCP/connector install contract with visible permissions and revocation
+- Added signed Slack Events API triggers for mentions, messages, and reactions, with optional channel filtering and bot/app event suppression
+- Added verified Notion webhook triggers for page, comment, and database activity, with optional entity filtering
+- Reused the durable event receipt, dedupe, rate, replay, permission, approval, failure-pause, and private-host contracts rather than creating a second automation system
+- Added private rotating provider addresses, encrypted event verification material, visible setup state, and responsive setup controls in Apps & Tools
+- Added Slack and Notion choices to the routine builder and to natural in-chat routine creation for both supported agent runtimes
+- Upgraded every built-in connector to manifest v2 with explicit event capability and authenticity declarations
+- Published the connector review/admission contract while deliberately keeping arbitrary third-party executable packages disabled
+
+## Next — Connected-work polish
+
+- Add provider-specific setup diagnostics and safe retry/backoff controls for webhook delivery
+- Add the next high-value productivity source one at a time under connector manifest v2
 - Complete physical-device notification/Share-extension QA and TestFlight packaging with owner credentials
+- Design signed provenance, dependency isolation, network allowlists, permission diffs, and revocation before enabling third-party connector packages
 
 ## Later, not implied by the beta
 

@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import type { ProviderCatalogEntry, ProviderInstance, ProviderLoginAttempt, ProviderStatus } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
+import { configuredModels, legacyApiProviderId, isLocalModelUrl } from "../shared/provider-config.js";
 
 const FREE_MODELS = [
   "opencode/muse-spark-1.2-contributor-free",
@@ -14,7 +15,14 @@ const FREE_MODELS = [
 ];
 
 type CommandResult = { code: number; stdout: string; stderr: string };
-type OAuthAuthorization = { url: string; method: "auto" | "code"; instructions: string };
+type OAuthAuthorization = { url: string; method: "auto" | "code"; instructions: string; methodIndex: number };
+
+export function oauthMethodIndex(methods: unknown): number {
+  if (!Array.isArray(methods)) throw new Error("This runtime does not offer account sign-in for that provider. Use an API key instead.");
+  const index = methods.findIndex((method) => method && typeof method === "object" && method.type === "oauth");
+  if (index < 0) throw new Error("This runtime does not offer account sign-in for that provider. Use an API key instead.");
+  return index;
+}
 
 function stripAnsi(value: string) {
   return value.replace(/\x1b\[[0-9;]*m/g, "").replace(/[│●┌└]/g, " ");
@@ -24,9 +32,10 @@ function execute(command: string, args: string[], timeoutMs = 15_000, environmen
   return new Promise((resolve) => {
     let settled = false, stdout = "", stderr = "";
     const child = spawn(command, args, { env: safeHostEnvironment(environment), stdio: ["ignore", "pipe", "pipe"] });
-    child.stdout.on("data", (chunk) => (stdout += String(chunk)));
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)));
-    const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    child.stdout.on("data", (chunk) => (stdout = (stdout + String(chunk)).slice(-1_000_000)));
+    child.stderr.on("data", (chunk) => (stderr = (stderr + String(chunk)).slice(-20_000)));
+    // Discovery must not hang forever if a damaged runtime ignores SIGTERM.
+    const timer = setTimeout(() => { child.kill("SIGKILL"); }, timeoutMs);
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }); } });
     child.on("close", (code) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: code ?? 1, stdout, stderr }); } });
   });
@@ -48,7 +57,7 @@ function availablePort(): Promise<number> {
 }
 
 function modelLines(value: string): string[] {
-  return [...new Set(value.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[a-z0-9._-]+\/[a-z0-9._/-]+$/i.test(line)))];
+  return [...new Set(value.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[a-z0-9._-]+\/[a-z0-9._:/-]+$/i.test(line)))];
 }
 
 function agentModels(models: string[]): string[] {
@@ -71,7 +80,7 @@ function modelsFor(provider: ProviderInstance["provider"], allModels: string[]):
     "github-copilot": ["github-copilot/"], gitlab: ["gitlab/"], xai: ["xai/"], custom: [],
   };
   const selected = agentModels(allModels.filter((model) => prefixes[provider].some((prefix) => model.startsWith(prefix))));
-  if (provider === "claude") return ["claude-code/sonnet", "claude-code/opus", "claude-code/fable"];
+  if (provider === "claude") return ["claude-code/sonnet", "claude-code/opus", "claude-code/haiku"];
   if (provider === "opencode" && !selected.length) return FREE_MODELS;
   return selected;
 }
@@ -79,7 +88,7 @@ function modelsFor(provider: ProviderInstance["provider"], allModels: string[]):
 function apiKeyModels(instance: ProviderInstance, allModels: string[]): string[] {
   const env = instance.envName || "";
   const prefix = env === "ANTHROPIC_API_KEY" ? "anthropic/" : env === "OPENROUTER_API_KEY" ? "openrouter/" : env === "OPENAI_API_KEY" ? "openai/" : "";
-  return agentModels(prefix ? allModels.filter((model) => model.startsWith(prefix)) : allModels);
+  return agentModels(prefix ? allModels.filter((model) => model.startsWith(prefix)) : []);
 }
 
 function apiProviderId(instance: ProviderInstance): string | null {
@@ -94,10 +103,27 @@ function authHas(auth: string, pattern: RegExp) {
 }
 
 function connectedInstance(db: OpenBotDatabase, input: Parameters<OpenBotDatabase["upsertProvider"]>[0]) {
+  const current = input.id ? db.getProvider(input.id) : null;
+  if (current && current.name === input.name && current.provider === input.provider && current.authMode === input.authMode && current.runtime === input.runtime) return current;
   return db.upsertProvider(input);
 }
 
-export async function readProviderStatus(db: OpenBotDatabase, loginAttempts: ProviderLoginAttempt[] = []): Promise<ProviderStatus> {
+export function createProviderStatusReader(inspect: (db: OpenBotDatabase, attempts: ProviderLoginAttempt[]) => Promise<ProviderStatus>, ttlMs = 15_000) {
+  const cache = new WeakMap<OpenBotDatabase, { key: string; expires: number; pending: boolean; promise: Promise<ProviderStatus> }>();
+  return (db: OpenBotDatabase, loginAttempts: ProviderLoginAttempt[] = []): Promise<ProviderStatus> => {
+    const key = JSON.stringify({ attempts: loginAttempts, connections: db.listProviders().filter((entry) => entry.authMode === "api_key") });
+    const current = cache.get(db);
+    if (current?.key === key && (current.pending || current.expires > Date.now())) return current.promise;
+    const entry = { key, expires: 0, pending: true, promise: Promise.resolve(null as unknown as ProviderStatus) };
+    entry.promise = inspect(db, loginAttempts).then((result) => {
+      entry.pending = false; entry.expires = Date.now() + ttlMs; return result;
+    }).catch((error) => { if (cache.get(db) === entry) cache.delete(db); throw error; });
+    cache.set(db, entry);
+    return entry.promise;
+  };
+}
+
+async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: ProviderLoginAttempt[] = []): Promise<ProviderStatus> {
   const [openCodeVersion, claudeVersion] = await Promise.all([execute("opencode", ["--version"]), execute("claude", ["--version"])]);
   const openCodeInstalled = openCodeVersion.code === 0;
   const claudeInstalled = claudeVersion.code === 0;
@@ -125,6 +151,7 @@ export async function readProviderStatus(db: OpenBotDatabase, loginAttempts: Pro
   const apiInstances = db.listProviders().filter((instance) => instance.authMode === "api_key" && instance.hasSecret);
   const apiModels = new Map<string, string[]>();
   await Promise.all(apiInstances.map(async (instance) => {
+    if (instance.apiConfig || !openCodeInstalled) return;
     const cacheKey = `${instance.id}:${instance.updatedAt}`, cached = apiModelCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) { apiModels.set(instance.id, cached.models); return; }
     const providerId = apiProviderId(instance);
@@ -137,29 +164,31 @@ export async function readProviderStatus(db: OpenBotDatabase, loginAttempts: Pro
   allModels = [...new Set([...allModels, ...[...apiModels.values()].flat()])];
 
   const catalog: ProviderCatalogEntry[] = [
-    { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "Free and Go models through your OpenCode account.", badge: "Free + Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? "Ready on this Mac" : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
+    { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "Free and Go models through your OpenCode account.", badge: "Free + Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? "Sign-in found on this Mac; model access is checked when a task runs." : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
     { id: "claude", name: "Claude", shortName: "Claude", description: "Use the official Claude Code login with Pro, Max, Team, Enterprise, or Console.", badge: "Official login", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with OpenBot." : "Install Claude Code first." },
-    { id: "openai", name: "ChatGPT / OpenAI", shortName: "ChatGPT", description: "Use ChatGPT Plus/Pro OAuth or your existing OpenAI connection.", badge: "Subscription", connected: openAIConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: openAIConnected ? "local-openai" : null, models: modelsFor("openai", allModels), note: openAIConnected ? "Ready through OpenCode" : "Browser sign-in through OpenCode." },
-    { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with your Copilot account.", badge: "Subscription", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? "Ready through OpenCode" : "Connect a GitHub.com account." },
-    { id: "gitlab", name: "GitLab Duo", shortName: "GitLab", description: "Connect a GitLab Duo seat for agent work.", badge: "Experimental", connected: gitlabConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: gitlabConnected ? "local-gitlab" : null, models: modelsFor("gitlab", allModels), note: gitlabConnected ? "Ready through OpenCode" : "GitLab support in OpenCode is experimental." },
-    { id: "xai", name: "SuperGrok / xAI", shortName: "Grok", description: "Use SuperGrok device login or an xAI API connection.", badge: "Subscription", connected: xaiConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: xaiConnected ? "local-xai" : null, models: modelsFor("xai", allModels), note: xaiConnected ? "Ready through OpenCode" : "Secure device sign-in through OpenCode." },
+    { id: "openai", name: "ChatGPT / OpenAI", shortName: "ChatGPT", description: "Use ChatGPT Plus/Pro OAuth or your existing OpenAI connection.", badge: "Subscription", connected: openAIConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: openAIConnected ? "local-openai" : null, models: modelsFor("openai", allModels), note: openAIConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Browser sign-in through OpenCode." },
+    { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with your Copilot account.", badge: "Subscription", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Connect a GitHub.com account." },
+    { id: "gitlab", name: "GitLab Duo", shortName: "GitLab", description: "Connect a GitLab Duo seat for agent work.", badge: "Experimental", connected: gitlabConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: gitlabConnected ? "local-gitlab" : null, models: modelsFor("gitlab", allModels), note: gitlabConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "GitLab support in OpenCode is experimental." },
+    { id: "xai", name: "SuperGrok / xAI", shortName: "Grok", description: "Use SuperGrok device login or an xAI API connection.", badge: "Subscription", connected: xaiConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: xaiConnected ? "local-xai" : null, models: modelsFor("xai", allModels), note: xaiConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Secure device sign-in through OpenCode." },
   ];
   const connectionMap = new Map(catalog.map((entry) => [entry.connectionId, entry]));
   const instances = db.listProviders().map((instance) => {
     const entry = connectionMap.get(instance.id);
-    const connected = instance.authMode === "api_key" ? instance.hasSecret : Boolean(entry?.connected);
-    const instanceModels = entry?.models || (instance.authMode === "api_key" ? agentModels(apiModels.get(instance.id) || apiKeyModels(instance, allModels)) : instance.provider === "custom" ? agentModels(allModels) : modelsFor(instance.provider, allModels));
-    return { ...instance, connected, models: instanceModels, defaultModel: preferredModel(instance.provider, instanceModels), note: entry?.note || (connected ? "Encrypted connection ready" : "Connection needs attention") };
+    const configured = instance.apiConfig ? instance.hasSecret || isLocalModelUrl(instance.apiConfig.baseUrl) : instance.hasSecret && Boolean(legacyApiProviderId(instance.envName));
+    const connected = instance.authMode === "api_key" ? openCodeInstalled && configured : Boolean(entry?.connected);
+    const instanceModels = instance.apiConfig ? configuredModels(instance) : entry?.models || (instance.authMode === "api_key" ? agentModels(apiModels.get(instance.id) || apiKeyModels(instance, allModels)) : modelsFor(instance.provider, allModels));
+    const note = entry?.note || (!configured ? "Add an API address and model to finish setup." : !openCodeInstalled ? "Saved. Install OpenCode to run this model." : "Saved, not tested. Model and tool support depend on your provider.");
+    return { ...instance, connected, models: instanceModels, defaultModel: preferredModel(instance.provider, instanceModels), note };
   });
-  const openCodeModels = instances.find((instance) => instance.id === "local-opencode")?.models || [];
-  const defaultModel = openCodeModels.includes("opencode-go/deepseek-v4-flash") ? "opencode-go/deepseek-v4-flash" : openCodeModels.includes(FREE_MODELS[0]!) ? FREE_MODELS[0]! : openCodeModels[0] || FREE_MODELS[0]!;
   return {
     id: "opencode", name: "OpenBot connections", connected: instances.some((instance) => instance.connected), cliAvailable: openCodeInstalled,
-    version: openCodeInstalled ? openCodeVersion.stdout.trim() : null, defaultModel, models: allModels.length ? allModels : FREE_MODELS,
-    note: instances.some((instance) => instance.connected) ? "Your private model connections are ready." : "Connect one model account to wake your teammates.",
+    version: openCodeInstalled ? openCodeVersion.stdout.trim() : null, defaultModel: "", models: allModels,
+    note: instances.some((instance) => instance.connected) ? "Model connections found. Availability and account limits are checked when a task runs." : "Connect one model account to wake your teammates.",
     instances, catalog, loginAttempts,
   };
 }
+
+export const readProviderStatus = createProviderStatusReader(inspectProviderStatus);
 
 class OpenCodeAuthBridge {
   private child: ChildProcess | null = null;
@@ -195,16 +224,21 @@ class OpenCodeAuthBridge {
 
   async authorize(providerId: string): Promise<OAuthAuthorization> {
     const base = await this.ensure();
+    const methodsResponse = await fetch(`${base}/provider/auth`, { headers: this.headers(), signal: AbortSignal.timeout(10_000) });
+    if (!methodsResponse.ok) throw new Error("Could not read the runtime’s available sign-in methods.");
+    const methods = await methodsResponse.json() as Record<string, unknown>;
+    const methodIndex = oauthMethodIndex(methods[providerId]);
     const inputs: Record<string, string> = providerId === "github-copilot" ? { deploymentType: "github.com" } : providerId === "gitlab" ? { instanceUrl: "https://gitlab.com" } : {};
-    const response = await fetch(`${base}/provider/${encodeURIComponent(providerId)}/oauth/authorize`, { method: "POST", headers: this.headers(), body: JSON.stringify({ method: 0, inputs }) });
+    const response = await fetch(`${base}/provider/${encodeURIComponent(providerId)}/oauth/authorize`, { method: "POST", headers: this.headers(), body: JSON.stringify({ method: methodIndex, inputs }), signal: AbortSignal.timeout(30_000) });
     const body = await response.json() as OAuthAuthorization & { data?: { message?: string } };
     if (!response.ok) throw new Error(body.data?.message || `Could not start ${providerId} sign-in.`);
-    return body;
+    if (!["auto", "code"].includes(body.method) || typeof body.url !== "string" || new URL(body.url).protocol !== "https:") throw new Error("The runtime returned an unsupported sign-in flow. Sign in through its own app instead.");
+    return { ...body, methodIndex };
   }
 
-  async callback(providerId: string, code: string): Promise<void> {
+  async callback(providerId: string, methodIndex: number, code?: string): Promise<void> {
     const base = await this.ensure();
-    const response = await fetch(`${base}/provider/${encodeURIComponent(providerId)}/oauth/callback`, { method: "POST", headers: this.headers(), body: JSON.stringify({ method: 0, code }) });
+    const response = await fetch(`${base}/provider/${encodeURIComponent(providerId)}/oauth/callback`, { method: "POST", headers: this.headers(), body: JSON.stringify({ method: methodIndex, ...(code ? { code } : {}) }), signal: AbortSignal.timeout(180_000) });
     if (!response.ok) throw new Error("The sign-in code was not accepted.");
   }
 
@@ -212,15 +246,17 @@ class OpenCodeAuthBridge {
 }
 
 export class ProviderConnectionManager {
-  private readonly bridge = new OpenCodeAuthBridge();
+  private readonly methodIndexes = new Map<string, number>();
   private readonly attempts = new Map<string, ProviderLoginAttempt>();
   private readonly claudeProcesses = new Map<string, ChildProcess>();
 
-  constructor(private readonly onChange: () => void) {}
+  constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop"> = new OpenCodeAuthBridge()) {}
 
   listAttempts(): ProviderLoginAttempt[] { return [...this.attempts.values()].slice(-6); }
 
   async connect(providerId: string): Promise<ProviderLoginAttempt> {
+    const waiting = [...this.attempts.values()].find((attempt) => attempt.providerId === providerId && attempt.status === "waiting");
+    if (waiting) return waiting;
     const id = randomUUID();
     const attempt: ProviderLoginAttempt = { id, providerId, status: "waiting", url: null, callbackMode: null, instructions: "Complete the secure sign-in in your browser.", error: null };
     this.attempts.set(id, attempt);
@@ -237,6 +273,16 @@ export class ProviderConnectionManager {
     try {
       const auth = await this.bridge.authorize(providerId);
       attempt.url = auth.url; attempt.callbackMode = auth.method; attempt.instructions = auth.instructions || attempt.instructions;
+      this.methodIndexes.set(id, auth.methodIndex);
+      if (auth.method === "auto") {
+        // Device/browser flows need the callback to poll/complete too; showing
+        // the authorization URL alone leaves them waiting indefinitely.
+        void this.bridge.callback(providerId, auth.methodIndex).then(() => {
+          attempt.status = "connected"; attempt.error = null; this.onChange();
+        }).catch((error) => {
+          attempt.status = "failed"; attempt.error = error instanceof Error ? error.message : "Sign-in wasn’t completed."; this.onChange();
+        });
+      }
     } catch (error) {
       attempt.status = "failed"; attempt.error = error instanceof Error ? error.message : String(error);
     }
@@ -247,7 +293,8 @@ export class ProviderConnectionManager {
   async finish(attemptId: string, code: string) {
     const attempt = this.attempts.get(attemptId);
     if (!attempt || attempt.status !== "waiting") throw new Error("That sign-in is no longer waiting.");
-    await this.bridge.callback(attempt.providerId, code);
+    if (attempt.callbackMode !== "code") throw new Error("Finish this sign-in in your browser.");
+    await this.bridge.callback(attempt.providerId, this.methodIndexes.get(attemptId)!, code);
     attempt.status = "connected"; attempt.error = null; this.onChange();
     return attempt;
   }

@@ -7,6 +7,7 @@ services:
       dockerfile: deploy/private-runner/Dockerfile
       args:
         OPENCODE_VERSION: ${OPENCODE_VERSION:-1.18.28}
+    image: openbot-private-runner:local
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -25,6 +26,8 @@ services:
       OPENBOT_NOTION_CLIENT_SECRET: ${OPENBOT_NOTION_CLIENT_SECRET:-}
       OPENBOT_DROPBOX_APP_KEY: ${OPENBOT_DROPBOX_APP_KEY:-}
       OPENBOT_DROPBOX_CLIENT_SECRET: ${OPENBOT_DROPBOX_CLIENT_SECRET:-}
+      OPENBOT_RELAY_URL: ${OPENBOT_RELAY_URL:-}
+      OPENBOT_RELAY_ENROLLMENT_TOKEN: ${OPENBOT_RELAY_ENROLLMENT_TOKEN:-}
     volumes:
       - ${OPENBOT_HOST_ROOT:-/srv/openbot}/data:/srv/openbot/data
       - ${OPENBOT_HOST_ROOT:-/srv/openbot}/home:/srv/openbot/home
@@ -44,6 +47,30 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  relay:
+    image: openbot-private-runner:local
+    profiles: ["relay"]
+    restart: unless-stopped
+    command: ["npx", "tsx", "scripts/relay-server.ts"]
+    environment:
+      NODE_ENV: production
+      OPENBOT_RELAY_BIND: 0.0.0.0
+      PORT: "8080"
+      OPENBOT_RELAY_DATABASE: /srv/openbot/relay/hosts.sqlite
+      OPENBOT_RELAY_ENROLLMENT_TOKEN: ${OPENBOT_RELAY_ENROLLMENT_TOKEN:-}
+    volumes:
+      - ${OPENBOT_HOST_ROOT:-/srv/openbot}/relay:/srv/openbot/relay
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
   caddy:
     image: caddy:2.10.2-alpine
     restart: unless-stopped
@@ -57,7 +84,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${OPENBOT_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     security_opt:

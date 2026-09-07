@@ -2,7 +2,11 @@ import Foundation
 import Security
 
 enum KeychainStore {
+    #if os(macOS)
+    private static let service = "app.openbot.desktop"
+    #else
     private static let service = "app.openbot.mobile"
+    #endif
     private static let account = "remote-access-key"
 
     static func save(_ value: String) throws {
@@ -12,7 +16,9 @@ enum KeychainStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        SecItemDelete(query as CFDictionary)
+        let updated = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else { throw KeychainError.unavailable(updated) }
         var insert = query
         insert[kSecValueData as String] = data
         insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
@@ -46,5 +52,5 @@ enum KeychainStore {
 
 private enum KeychainError: LocalizedError {
     case unavailable(OSStatus)
-    var errorDescription: String? { "The iPhone could not save the private access key securely." }
+    var errorDescription: String? { "This device could not save the private access key securely." }
 }

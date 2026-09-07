@@ -1,0 +1,108 @@
+{
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationInFrames": 3100,
+  "chapters": [
+    {
+      "id": "full-01-hello",
+      "label": "hello",
+      "audio": "audio/voice/full-01-hello-2d176e2673861f01.wav",
+      "text": "Meet OpenBot. Your own team of AI teammates. For the work you care about, and the things you'd rather have taken care of.",
+      "voiceFrames": 236,
+      "lead": 24,
+      "durationInFrames": 285,
+      "from": 0
+    },
+    {
+      "id": "full-02-yours",
+      "label": "yours",
+      "audio": "audio/voice/full-02-yours-92b6c72aa1a6de67.wav",
+      "text": "Create a teammate. Give it a role, a personality, and your choice of AI. Bring a supported subscription, an API key, or a local model.",
+      "voiceFrames": 284,
+      "lead": 12,
+      "durationInFrames": 321,
+      "from": 285
+    },
+    {
+      "id": "full-03-apps",
+      "label": "apps",
+      "audio": "audio/voice/full-03-apps-5ed96529baeaf3c0.wav",
+      "text": "Say you're preparing a launch. Your teammate can work with email, calendars, websites, and the Mac apps and files you allow. When it needs a sign-in, you take over.",
+      "voiceFrames": 279,
+      "lead": 12,
+      "durationInFrames": 316,
+      "from": 606
+    },
+    {
+      "id": "full-04-team",
+      "label": "team",
+      "audio": "audio/voice/full-04-team-82659d051b59fc6e.wav",
+      "text": "One teammate researches. Another builds. Another checks the details. They consult each other, and bring one coordinated answer back to you.",
+      "voiceFrames": 281,
+      "lead": 12,
+      "durationInFrames": 318,
+      "from": 922
+    },
+    {
+      "id": "full-05-work",
+      "label": "work",
+      "audio": "audio/voice/full-05-work-920ea988d839960e.wav",
+      "text": "Not just a summary. A presentation you can use. A spreadsheet you can open. A website. Code changes with tests and a pull request to review.",
+      "voiceFrames": 303,
+      "lead": 12,
+      "durationInFrames": 340,
+      "from": 1240
+    },
+    {
+      "id": "full-06-routines",
+      "label": "routines",
+      "audio": "audio/voice/full-06-routines-52e23d84d5d218e1.wav",
+      "text": "Make useful work a routine. Keep preferences in memory. Teach a workflow, save a skill, and connect more tools through MCP. Build on what already works.",
+      "voiceFrames": 365,
+      "lead": 12,
+      "durationInFrames": 402,
+      "from": 1580
+    },
+    {
+      "id": "full-07-extend",
+      "label": "extend",
+      "audio": "audio/voice/full-07-extend-cd49486aee1916c1.wav",
+      "text": "And if a tool is missing? Review its plan. Approve it. Your chosen coding model continues the task, building a tool you can inspect or remove.",
+      "voiceFrames": 276,
+      "lead": 12,
+      "durationInFrames": 313,
+      "from": 1982
+    },
+    {
+      "id": "full-08-control",
+      "label": "control",
+      "audio": "audio/voice/full-08-control-6dc81d50d77a66e9.wav",
+      "text": "You set the boundaries. Review sensitive actions before they happen. See the work behind the result, and step in when you're needed.",
+      "voiceFrames": 233,
+      "lead": 12,
+      "durationInFrames": 270,
+      "from": 2295
+    },
+    {
+      "id": "full-09-everywhere",
+      "label": "everywhere",
+      "audio": "audio/voice/full-09-everywhere-83870d60ee8438b3.wav",
+      "text": "Start on your Mac. Continue from your iPhone. The same conversations, teammates, and work, within reach.",
+      "voiceFrames": 180,
+      "lead": 12,
+      "durationInFrames": 217,
+      "from": 2565
+    },
+    {
+      "id": "full-10-open",
+      "label": "open",
+      "audio": "audio/voice/full-10-open-dfbe175a4350b244.wav",
+      "text": "Open source. Local first. Yours to shape. OpenBot. A little team. A lot more possible.",
+      "voiceFrames": 216,
+      "lead": 12,
+      "durationInFrames": 318,
+      "from": 2782
+    }
+  ]
+}

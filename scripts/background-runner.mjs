@@ -11,15 +11,15 @@ function serverIsAwake() {
   return new Promise((resolve) => {
     const socket = createConnection({ host: "127.0.0.1", port });
     let settled = false;
+    const deadline = setTimeout(() => finish(false), 2_000);
     const finish = (awake) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       socket.destroy();
       resolve(awake);
     };
-    socket.setTimeout(2_000);
     socket.once("connect", () => finish(true));
-    socket.once("timeout", () => finish(false));
     socket.once("error", () => finish(false));
   });
 }
@@ -35,9 +35,24 @@ const tsx = path.join(rootDir, "node_modules", "tsx", "dist", "cli.mjs");
 const server = path.join(rootDir, "src", "server", "index.ts");
 const child = spawn(process.execPath, [tsx, server], {
   cwd: rootDir,
-  env: { ...process.env, NODE_ENV: "production", OPENBOT_BACKGROUND_SERVICE: "1", OPENBOT_HOST: "0.0.0.0", OPENBOT_PORT: String(port) },
+  env: { ...process.env, PATH: [path.join(rootDir, "bin"), process.env.PATH || "/usr/bin:/bin"].join(path.delimiter), NODE_ENV: "production", OPENBOT_HOST: process.env.OPENBOT_HOST || "127.0.0.1", OPENBOT_PORT: String(port) },
   stdio: "inherit",
+  detached: true,
 });
 
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
-child.on("exit", (code, signal) => process.exit(signal ? 1 : code ?? 1));
+let stopping = false;
+function stopServerGroup(signal) {
+  if (stopping) return;
+  stopping = true;
+  try { process.kill(-child.pid, signal); }
+  catch { /* The child may already have finished. */ }
+  const force = setTimeout(() => {
+    try { process.kill(-child.pid, "SIGKILL"); }
+    catch { /* The complete process group is already gone. */ }
+    process.exit(0);
+  }, 4_000);
+  force.unref();
+}
+
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => stopServerGroup(signal));
+child.on("exit", (code, signal) => process.exit(stopping ? 0 : signal ? 1 : code ?? 1));

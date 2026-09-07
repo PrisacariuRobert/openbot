@@ -6,7 +6,7 @@ import path from "node:path";
 import { strToU8, zipSync } from "fflate";
 import sharp from "sharp";
 import { AttachmentService, attachmentPromptBlock, inspectAttachment, modelAttachmentFiles } from "./attachments.js";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 
 function smallPdf(text: string): Buffer {
   const escaped = text.replace(/([\\()])/g, "\\$1");
@@ -68,7 +68,7 @@ test("prepares bounded private context for text, PDF, Word, sheets, slides, imag
     }));
     const xlsx = await inspectAttachment(xlsxPath, "plan.xlsx", "application/octet-stream");
     assert.equal(xlsx.kind, "spreadsheet");
-    assert.match(xlsx.extractedText || "", /Nova\tReady/);
+    assert.match(xlsx.extractedText || "", /A2="Nova"\tB2="Ready"/);
 
     const pptxPath = path.join(root, "deck.pptx");
     writeFileSync(pptxPath, zipSync({ "ppt/slides/slide1.xml": strToU8(`<p:sld xmlns:p="p" xmlns:a="a"><a:t>Slide launch signal</a:t></p:sld>`) }));

@@ -1,0 +1,19 @@
+.delivery-receipt { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--secondary); }
+.delivery-receipt summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.delivery-receipt summary::after { content: "+"; margin-left: auto; }
+.delivery-receipt[open] summary::after { content: "−"; }
+.delivery-receipt ul { list-style: none; padding: 0; display: grid; gap: 12px; }
+.delivery-receipt li { display: flex; align-items: flex-start; gap: 8px; }
+.delivery-receipt li svg { flex-shrink: 0; margin-top: 3px; }
+.delivery-receipt strong { font-weight: 500; color: var(--ink); }
+.delivery-receipt small { display: block; line-height: 1.5; overflow-wrap: anywhere; }
+.delivered-file { width: min(100%, 480px); margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.delivered-file > a > img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
+.delivered-file .message-file { display: flex; width: 100%; gap: 12px; border: 0; margin: 0; padding: 14px; border-radius: 0; }
+.delivered-file .message-file span { flex: 1; min-width: 0; }
+.delivered-file strong { font-weight: 500; overflow-wrap: anywhere; }
+.delivered-file small { display: block; color: var(--secondary); font-size: 11px; line-height: 1.5; }
+.delivered-file > small, .delivered-file > p { margin: 0; padding: 0 14px 14px; font-size: 12px; }
+.delivered-file details { padding: 12px 14px; border-top: 1px solid var(--line); }
+.delivered-file summary { font-size: 12px; cursor: pointer; }
+.delivered-file pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }

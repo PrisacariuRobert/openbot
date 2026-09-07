@@ -9,7 +9,11 @@ test("registers one valid, approval-safe manifest for every live connector", () 
   assert.equal(connectorManifest("slack").connectorId, "slack");
   assert.equal(connectorManifest("notion").dataBoundary.includes("page picker"), true);
   assert.equal(connectorManifest("todoist").writeRequiresApproval, true);
+  assert.equal(connectorManifest("google-drive").writeCapability, "Create text files");
+  assert.equal(connectorManifest("google-calendar").writeRequiresApproval, true);
   assert.equal(connectorManifest("dropbox").writeCapability, null);
+  assert.equal(connectorManifest("slack").eventAuth, "provider_hmac");
+  assert.match(connectorManifest("notion").eventCapability || "", /page/);
 });
 
 test("turns connector failures into short recovery guidance", () => {

@@ -1,0 +1,147 @@
+import type { Bot, ConnectorServiceId } from "../shared/types.js";
+import type { OpenBotDatabase } from "./database.js";
+import { connectorCatalog } from "./google-workspace.js";
+import { macFallbackAllowed } from "./mac-productivity.js";
+import { McpConnections } from "./mcp-connections.js";
+import { CommunitySkills } from "./community-skills.js";
+
+// Context reduction only. The tool endpoints remain the authorization boundary
+// and recheck grants when a call arrives, including after session revocation.
+export function toolAvailability(
+  db: OpenBotDatabase,
+  bot: Bot,
+  reportOnly = false,
+): Record<string, boolean> {
+  const flags: Record<string, boolean> = {
+    spreadsheet_export: true,
+    table_summary: true,
+    bash: bot.computerEnabled,
+    isolated_bash: bot.computerEnabled,
+    connected_tools: new McpConnections(db).toolsFor(bot.id).length > 0,
+    connected_call: new McpConnections(db).toolsFor(bot.id).length > 0,
+    community_skill_search: new CommunitySkills(db).search(bot.id).length > 0,
+    community_skill_read: new CommunitySkills(db).search(bot.id).length > 0,
+    memory_search: true,
+  };
+  const set = (names: string[], available: boolean) => {
+    for (const name of names) flags[name] = available;
+  };
+  set(
+    ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_request_sign_in"],
+    bot.browserEnabled,
+  );
+  set(
+    [
+      "mac_list",
+      "mac_read",
+      "mac_organize",
+      "mac_apps_list",
+      "mac_app_inspect",
+      "mac_app_read",
+      "mac_app_open",
+      "mac_app_click",
+      "mac_app_type",
+      "mac_app_key",
+      "mac_app_scroll",
+    ],
+    db.getStudioSettings().macAccessEnabled,
+  );
+  const apps: {
+    id: string;
+    service: ConnectorServiceId;
+    read: string[];
+    write: string[];
+  }[] = [
+    {
+      id: "google-workspace",
+      service: "gmail",
+      read: ["gmail_search", "gmail_read"],
+      write: ["gmail_send"],
+    },
+    {
+      id: "google-workspace",
+      service: "google-drive",
+      read: ["google_drive_search", "google_drive_read"],
+      write: ["google_drive_create"],
+    },
+    {
+      id: "google-workspace",
+      service: "google-calendar",
+      read: ["google_calendar_agenda"],
+      write: ["google_calendar_create"],
+    },
+    {
+      id: "github-cli",
+      service: "github",
+      read: ["github_notifications", "github_issues"],
+      write: ["github_issue_create"],
+    },
+    {
+      id: "slack",
+      service: "slack",
+      read: ["slack_search", "slack_read"],
+      write: ["slack_post"],
+    },
+    {
+      id: "notion",
+      service: "notion",
+      read: ["notion_search", "notion_read"],
+      write: ["notion_update"],
+    },
+    {
+      id: "todoist",
+      service: "todoist",
+      read: ["todoist_tasks"],
+      write: ["todoist_task_create"],
+    },
+    {
+      id: "dropbox",
+      service: "dropbox",
+      read: ["dropbox_search", "dropbox_read"],
+      write: [],
+    },
+  ];
+  const googleConnection = db.getConnector("google-workspace");
+  const googleCatalog = connectorCatalog(Boolean(googleConnection?.connected), googleConnection?.scopes || []);
+  for (const app of apps) {
+    const access = db.getBotConnectorAccess(bot.id, app.service, app.id);
+    const google = app.id === "google-workspace" ? googleCatalog.find((entry) => entry.id === app.service) : undefined;
+    const readConnected = google ? google.connected : Boolean(db.getConnector(app.id)?.connected);
+    const writeConnected = google ? google.writeConnected === true : readConnected;
+    set(app.read, readConnected && Boolean(access?.canRead));
+    set(app.write, writeConnected && Boolean(access?.canSend));
+  }
+  const selectedWorkSource = db.getWorkSources(bot.id).selections.some(({ service }) => db.getConnector(service)?.connected && db.getBotConnectorAccess(bot.id, service, service)?.canRead && db.getWorkSources(bot.id).connectionVersions[service] === db.connectorAuthorizationVersion(service));
+  set(["work_collect", "work_report"], Boolean(selectedWorkSource || flags.gmail_read || flags.google_calendar_agenda || macFallbackAllowed(db, bot.id, "gmail") || macFallbackAllowed(db, bot.id, "google-calendar")));
+  const projects = db.listCodeProjects(bot.id);
+  set(
+    ["code_list", "code_search", "code_read", "code_status", "code_diff"],
+    projects.length > 0,
+  );
+  set(
+    [
+      "code_write",
+      "code_replace",
+      "code_branch",
+      "code_commit",
+      "code_request_review",
+      "code_publish_pr",
+    ],
+    projects.some((project) =>
+      project.access.some(
+        (access) => access.botId === bot.id && access.canWrite,
+      ),
+    ),
+  );
+  set(
+    ["code_run", "code_benchmark"],
+    projects.some((project) =>
+      project.access.some((access) => access.botId === bot.id && access.canRun),
+    ),
+  );
+  if (reportOnly) {
+    const names = [...Object.keys(flags), "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "code_projects", "code_review_result", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "read", "write", "edit", "glob", "grep", "list", "task", "todowrite", "todoread", "webfetch", "websearch", "question", "skill", "apply_patch", "lsp"];
+    return { ...Object.fromEntries(names.map((name) => [name, false])), work_collect: flags.work_collect, work_report: flags.work_report };
+  }
+  return flags;
+}

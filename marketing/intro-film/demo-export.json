@@ -1,0 +1,22 @@
+{
+  "composition": "OpenBot-See-It-Work",
+  "date": "2026-09-07",
+  "status": "staged-product-walkthrough-for-review",
+  "output": "out/openbot-see-it-work.mp4",
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "videoFrames": 4920,
+  "containerDurationSeconds": 82.048,
+  "sizeBytes": 13411470,
+  "sha256": "1a35eae7ab29cab8843170ddab880cf3ce861f202f0785f4744a05a8ab205fed",
+  "narration": false,
+  "audio": "public/audio/openbot-workflow-demo.wav",
+  "integratedLufs": -14.9,
+  "truePeakDbfs": -1.4,
+  "fixture": "src/demo/expense-fixture.ts",
+  "fixtureScope": "Local parsing example: two initial failures, four checks passing after a source correction, three receipt files totaling EUR 1749.50. Not an autonomous agent run.",
+  "workflow": "One request, sign-in, consultation, capability proposal, approval, build, test, improve, re-test, use, delivered files, email review, routine reuse, phone continuity.",
+  "publicationReview": "CAPABILITY_REVIEW.md",
+  "qa": "QA_DEMO.md"
+}

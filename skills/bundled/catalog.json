@@ -1,0 +1,30 @@
+[
+  {
+    "id": "weekly-review-planning",
+    "source": "https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/weekly-review-planning/SKILL.md"
+  },
+  {
+    "id": "meeting-action-items",
+    "source": "https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/meeting-action-items/SKILL.md"
+  },
+  {
+    "id": "document-to-action-items",
+    "source": "https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/document-to-action-items/SKILL.md"
+  },
+  {
+    "id": "grounded-research",
+    "source": "https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/research/grounded-citations/SKILL.md"
+  },
+  {
+    "id": "systematic-debugging",
+    "source": "https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/software-development/systematic-debugging/SKILL.md"
+  },
+  {
+    "id": "checked-spreadsheet-analysis",
+    "source": "OpenBot maintained built-in method"
+  },
+  {
+    "id": "private-team-review",
+    "source": "OpenBot maintained built-in method"
+  }
+]

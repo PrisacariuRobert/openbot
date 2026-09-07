@@ -1,0 +1,26 @@
+{
+  "composition": "OpenBot-Pulse-No-Voice",
+  "date": "2026-09-07",
+  "status": "creative-review",
+  "output": "out/openbot-pulse-no-voice.mp4",
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "videoFrames": 3240,
+  "containerDurationSeconds": 54.058667,
+  "sizeBytes": 18676448,
+  "sha256": "ed47adf08c61f2dbc9b159f10e6ff5cb570a94c589c2501e8ec4f0a81208641e",
+  "audio": {
+    "source": "public/audio/openbot-pulse.wav",
+    "generator": "scripts/make-pulse-score.mjs",
+    "narration": false,
+    "bpm": 120,
+    "sampleRate": 48000,
+    "channels": 2,
+    "integratedLufs": -14.7,
+    "truePeakDbfs": -1.5
+  },
+  "scope": "Original staged product film; fictional accounts, artifacts, tests, approvals and device states. Not release or execution evidence.",
+  "publicationReview": "CAPABILITY_REVIEW.md",
+  "qa": "QA_PULSE.md"
+}

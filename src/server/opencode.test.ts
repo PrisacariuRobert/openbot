@@ -1,6 +1,78 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendModelText, eventText, eventUsage, shouldPublishRunMessage, toolActivity } from "./opencode.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { OpenBotDatabase } from "./testing/database.js";
+import { CommunitySkills } from "./community-skills.js";
+import { AttachmentService } from "./attachments.js";
+import { appendModelText, eventText, eventUsage, shouldPublishRunMessage, toolActivity, UsageAccumulator, OpenCodeRunner } from "./opencode.js";
+
+test("a consultation that cannot start reports its failure privately and releases the coordinator", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-consultation-failure-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const parent = db.createRun({ threadId: "team-room", botId: "pixel", prompt: "Ask Nova to check", status: "running" });
+    const child = db.createRun({ threadId: "team-room", botId: "nova", prompt: "Check the result", parentRunId: parent.id, status: "running" });
+    db.markRunConsultationPending(parent.id);
+    db.pauseRunForConsultation(parent.id);
+    db.updateBot("nova", { providerInstanceId: "local-opencode", model: "wrong-connection/model" });
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    // Exercise the dispatch guard without invoking a real model or timer loop.
+    runner["executeRun"](child);
+    assert.equal(db.getRun(child.id)?.status, "failed");
+    assert.match(db.getRun(child.id)?.error || "", /model is not configured/);
+    assert.equal(db.getRun(parent.id)?.status, "queued");
+    assert.equal(db.getRun(parent.id)?.consultationPending, false);
+    assert.match(db.listAgentInbox("pixel", "team-room")[0]?.body || "", /could not start/);
+    assert.equal(db.getState("team-room").messages.some((message) => message.runId === child.id), false);
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("current task prompts surface relevant methods, honor opt-outs and preserve bounded report mode", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-method-prompt-")), db = new OpenBotDatabase(root);
+  try {
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Extract document obligations and action items from a policy", status: "queued" });
+    const prompt = runner["buildPrompt"](run, db.getBot("nova")!, false);
+    assert.match(prompt, /bundled-document-to-action-items/);
+    const context = prompt.split("Reviewed methods already available")[1]!.split("Completion rules:")[0]!;
+    assert.equal((context.match(/- bundled-/g) || []).length, 3);
+    assert.ok(context.length < 1_400);
+    new CommunitySkills(db).remove("bundled-document-to-action-items");
+    assert.doesNotMatch(runner["buildPrompt"](run, db.getBot("nova")!, true), /bundled-document-to-action-items/);
+    assert.doesNotMatch(runner["buildPrompt"]({ ...run, expectedWorkKind: "morning" }, db.getBot("nova")!, false), /Reviewed methods already available/);
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("sums OpenCode steps, deduplicates replayed IDs, and keeps cancelled-run usage", () => {
+  const meter = new UsageAccumulator();
+  const step = { type: "step_finish", part: { id: "step-1", tokens: { input: 100, output: 20 }, cost: 0.01 } };
+  meter.add(step);
+  meter.add(step);
+  meter.add({ type: "step_finish", part: { id: "step-2", tokens: { input: 200, output: 30, cache: { read: 40 } }, cost: 0.02 } });
+  assert.deepEqual(meter.total(), { inputTokens: 300, outputTokens: 50, cacheReadTokens: 40, reasoningTokens: 0, cost: 0.03 });
+  meter.add({ type: "error", error: "cancelled" });
+  assert.equal(meter.total().inputTokens, 300);
+});
+
+test("Claude's final cumulative result replaces message subtotals instead of double counting", () => {
+  const meter = new UsageAccumulator();
+  meter.add({ type: "assistant", message: { id: "a", usage: { input_tokens: 100, output_tokens: 20 } } });
+  meter.add({ type: "assistant", message: { id: "a", usage: { input_tokens: 100, output_tokens: 25 } } });
+  assert.equal(meter.total().outputTokens, 25);
+  const result = { type: "result", usage: { input_tokens: 250, output_tokens: 50 }, total_cost_usd: 0.04 };
+  meter.add(result);
+  meter.add(result);
+  assert.equal(meter.total().inputTokens, 250);
+  assert.equal(meter.total().cost, 0.04);
+});
+
+test("rejects invalid usage numbers instead of poisoning budgets with NaN", () => {
+  assert.deepEqual(eventUsage({ tokens: { input: -1, output: "oops", reasoning: Infinity }, cost: NaN }), {
+    inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0,
+  });
+});
 
 test("keeps streaming fragments together", () => {
   assert.equal(appendModelText("Open", "Bot"), "OpenBot");

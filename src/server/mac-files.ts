@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from "node:fs";
+import { existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -11,6 +11,23 @@ export type MacFileEntry = {
 };
 
 export type MacFileMove = { from: string; to: string };
+export type MacFileOrganizationResult = {
+  moved: MacFileMove[];
+  count: number;
+  complete: boolean;
+  remaining: MacFileMove[];
+  copies: MacFileMove[];
+  error?: string;
+};
+
+/** Partial work needs reconciliation, never a replay of the original batch. */
+export class MacOrganizationIncompleteError extends Error {
+  constructor(readonly result: MacFileOrganizationResult) {
+    const describe = (moves: MacFileMove[]) => moves.length ? moves.map((move) => `${JSON.stringify(move.from)} → ${JSON.stringify(move.to)}`).join("; ") : "None";
+    super(`File organization stopped before all moves finished. ${result.error || "Check the files before continuing."}\nMoved: ${describe(result.moved)}\nDestination copies retained with source still present or changed: ${describe(result.copies)}${result.copies.length ? "\nThese retained paths may still refer to the same file; they are not independent backups." : ""}\nUnfinished moves: ${describe(result.remaining)}\nDo not repeat completed moves or replay this batch. Inspect the listed paths and prepare a fresh review for any remaining work.`);
+    this.name = "MacOrganizationIncompleteError";
+  }
+}
 
 const TEXT_EXTENSIONS = new Set([
   ".csv", ".css", ".html", ".ini", ".js", ".json", ".jsx", ".log", ".md", ".mjs", ".py", ".rst", ".rtf", ".toml", ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml",
@@ -19,7 +36,7 @@ const TEXT_EXTENSIONS = new Set([
 export class MacFileAccess {
   readonly root: string;
 
-  constructor(root = homedir()) {
+  constructor(root = homedir(), private readonly fileOperations: { claimDestination: typeof linkSync; removeSource: typeof unlinkSync } = { claimDestination: linkSync, removeSource: unlinkSync }) {
     this.root = path.resolve(root);
   }
 
@@ -66,7 +83,7 @@ export class MacFileAccess {
     return { path: relative, content, characters: content.length };
   }
 
-  organize(moves: MacFileMove[]): { moved: Array<{ from: string; to: string }>; count: number } {
+  organize(moves: MacFileMove[]): MacFileOrganizationResult {
     if (!Array.isArray(moves) || moves.length < 1 || moves.length > 100) throw new Error("Choose between one and 100 files to organize at once.");
     const seenSources = new Set<string>(), seenTargets = new Set<string>();
     const plan = moves.map((move) => {
@@ -78,11 +95,39 @@ export class MacFileAccess {
       const info = lstatSync(source.target);
       if (!info.isFile() || info.isSymbolicLink()) throw new Error("Mac organization moves regular files only; existing folders and aliases stay in place.");
       if (existsSync(destination.target)) throw new Error(`Nothing was moved because ${destination.relative} already exists.`);
-      return { source, destination };
+      return { source, destination, identity: { dev: info.dev, ino: info.ino } };
     });
-    for (const item of plan) mkdirSync(path.dirname(item.destination.target), { recursive: true });
-    for (const item of plan) renameSync(item.source.target, item.destination.target);
-    const moved = plan.map((item) => ({ from: item.source.relative, to: item.destination.relative }));
-    return { moved, count: moved.length };
+    const moved: MacFileMove[] = [], copies: MacFileMove[] = [];
+    for (const [index, item] of plan.entries()) {
+      let claimed = false;
+      const pair = { from: item.source.relative, to: item.destination.relative };
+      try {
+        // Revalidate paths after earlier moves. A hard-link claim is atomic:
+        // unlike rename, it cannot replace a destination created after review.
+        // Cross-filesystem moves stop safely; there is no copy/delete fallback.
+        this.resolve(item.source.target); this.resolve(item.destination.target);
+        const before = lstatSync(item.source.target);
+        if (!before.isFile() || before.isSymbolicLink() || before.dev !== item.identity.dev || before.ino !== item.identity.ino) throw new Error("A source file changed. Review its current contents before moving it.");
+        mkdirSync(path.dirname(item.destination.target), { recursive: true });
+        this.fileOperations.claimDestination(item.source.target, item.destination.target);
+        claimed = true;
+        const current = lstatSync(item.source.target), destination = lstatSync(item.destination.target);
+        if (!current.isFile() || !destination.isFile() || current.isSymbolicLink() || destination.isSymbolicLink() || current.dev !== item.identity.dev || current.ino !== item.identity.ino || destination.dev !== item.identity.dev || destination.ino !== item.identity.ino) throw new Error("A source or destination changed during the move. Both paths were left in place for review.");
+        // This identity check detects ordinary concurrent changes; it is not a
+        // sandbox against hostile actors racing every filesystem operation.
+        this.fileOperations.removeSource(item.source.target);
+        moved.push(pair);
+      } catch (error) {
+        if (claimed) copies.push(pair);
+        const code = (error as NodeJS.ErrnoException).code;
+        const detail = code === "EEXIST" ? "A destination already exists. It was not overwritten."
+          : code === "EXDEV" ? "This move crosses filesystems. The source was kept; move it manually or choose a folder on the same disk."
+          : claimed ? "The destination was claimed, but the source could not be safely removed. Check both paths before continuing."
+          : code ? "A file or folder could not be accessed. Completed moves remain in place; unfinished sources were not removed."
+          : error instanceof Error ? error.message : "The remaining files could not be moved safely.";
+        return { moved, count: moved.length, complete: false, copies, remaining: plan.slice(index).map((pending) => ({ from: pending.source.relative, to: pending.destination.relative })), error: detail };
+      }
+    }
+    return { moved, count: moved.length, complete: true, copies, remaining: [] };
   }
 }

@@ -16,6 +16,7 @@
     <key>LSRequiresIPhoneOS</key><true/>
     <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
     <key>NSLocalNetworkUsageDescription</key><string>OpenBot connects to the private studio running on your Mac.</string>
+    <key>NSCameraUsageDescription</key><string>Scan the pairing QR code in OpenBot on your Mac. Camera images are not saved or uploaded.</string>
     <key>NSMicrophoneUsageDescription</key><string>OpenBot uses the microphone only when you choose to dictate a message.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>OpenBot turns speech into message text only after you tap the microphone.</string>
     <key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchBackground</string></dict>

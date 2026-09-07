@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { CodeProjectManager, parseGitHubRepository } from "./code-projects.js";
 
 test("grants bounded per-teammate coding access and records focused edits", () => {
@@ -35,13 +35,17 @@ test("grants bounded per-teammate coding access and records focused edits", () =
     manager.replace("nova", project.id, "src/main.ts", "'hello'", "'hello from OpenBot'");
     assert.match(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8"), /hello from OpenBot/);
     assert.equal(db.listCodeProjectEdits(project.id).length, 1);
+    const unsafe = manager.write("nova", project.id, "src/advisory.ts", "eval(userInput);\n");
+    assert.equal(unsafe.securityGuidance.warnings[0]?.rule, "dynamic-code");
+    const repaired = manager.replace("nova", project.id, "src/advisory.ts", "eval(userInput)", "JSON.parse(userInput)");
+    assert.deepEqual(repaired.securityGuidance.warnings, []);
     assert.equal(db.deleteCodeProject(project.id), true);
     assert.equal(db.listCodeProjects().length, 0);
-    assert.equal(db.listCodeProjectEdits(project.id).length, 1);
+    assert.equal(db.listCodeProjectEdits(project.id).length, 3);
     assert.equal(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8").includes("OpenBot"), true);
     const reconnected = db.createCodeProject({ name: "Sample app again", ...inspected, access: [{ botId: "pixel", canRead: true, canWrite: false, canRun: false }] });
     assert.equal(reconnected.id, project.id);
-    assert.equal(db.listCodeProjectEdits(project.id).length, 1);
+    assert.equal(db.listCodeProjectEdits(project.id).length, 3);
     db.close();
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -67,6 +71,125 @@ test("validates GitHub clone links without accepting credentials or extra paths"
   assert.throws(() => parseGitHubRepository("https://token@github.com/openai/codex"), /standard public or private/);
   assert.throws(() => parseGitHubRepository("https://github.com/openai/codex/issues"), /standard public or private/);
   assert.throws(() => parseGitHubRepository("https://example.com/openai/codex"), /standard public or private/);
+});
+
+function publicationProjectFixture() {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-publication-review-")), projectRoot = path.join(root, "app");
+  mkdirSync(projectRoot);
+  const git = (cwd: string, ...args: string[]) => {
+    const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    return String(result.stdout || "").trim();
+  };
+  git(projectRoot, "init", "-b", "main");
+  git(projectRoot, "remote", "add", "origin", "https://github.com/fixture/orders.git");
+  writeFileSync(path.join(projectRoot, "total.js"), "export const total = (price, quantity) => price;\n");
+  git(projectRoot, "add", "total.js");
+  git(projectRoot, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Baseline");
+  const db = new OpenBotDatabase(root), manager = new CodeProjectManager(db, root);
+  const project = db.createCodeProject({ name: "Orders", ...manager.inspectRoot(projectRoot), access: [{ botId: "nova", canRead: true, canWrite: true, canRun: true }, { botId: "pixel", canRead: true, canWrite: false, canRun: false }] });
+  const run = db.createRun({ botId: "nova", threadId: "team-room", prompt: "Fix order totals", status: "queued" });
+  manager.branch("nova", project.id, "openbot/fix-total", run.id);
+  const taskRoot = db.getCodeTaskWorkspace(run.id)!.rootPath;
+  manager.write("nova", project.id, "total.js", "export const total = (price, quantity) => price * quantity;\n", run.id);
+  manager.commit("nova", project.id, "Fix order quantities", ["total.js"], run.id);
+  const evidence = () => {
+    const head = manager.currentCommit("nova", project.id, run.id);
+    db.saveCodeCheck({ id: `check-${head}`, runId: run.id, projectId: project.id, command: "node --test", headCommit: head, status: "passed", exitCode: 0, startedAt: "2026-09-06T00:00:00Z", finishedAt: "2026-09-06T00:00:01Z", detail: "Storage fixture; real checks covered by code-delivery.test.ts." });
+    const reviewer = db.createRun({ botId: "pixel", threadId: "team-room", prompt: "Review this change", status: "queued", parentRunId: run.id });
+    db.recordCodeTaskReview({ sourceRunId: run.id, reviewerRunId: reviewer.id, projectId: project.id, reviewerBotId: "pixel", verdict: "approved", summary: "Quantity calculation is correct.", findings: [], headCommit: head });
+  };
+  evidence();
+  const input = { title: "Fix order totals", body: "Multiply by quantity and verify the focused fix.", draft: true };
+  return { root, projectRoot, taskRoot, db, manager, project, run, input, evidence, git, close: () => { db.close(); rmSync(root, { recursive: true, force: true }); } };
+}
+
+test("publication review freezes exact local changes, destination, checks, reviewer and grants", () => {
+  const fixture = publicationProjectFixture();
+  const { manager, project, run, input, git, taskRoot, db } = fixture;
+  try {
+    const review = manager.preparePublishReview("nova", project.id, input, run.id);
+    assert.equal(review.repository, "fixture/orders");
+    assert.equal(review.remoteUrl, "https://github.com/fixture/orders.git");
+    assert.equal(review.branch, "openbot/fix-total");
+    assert.equal(review.base, "main");
+    assert.deepEqual(review.files, ["total.js"]);
+    assert.match(review.diff, /price \* quantity/);
+    assert.match(review.diff, /Commit [a-f0-9]{40}/);
+    assert.equal(review.review.reviewerBotName, "Pixel");
+    assert.equal(review.checks[0]!.exitCode, 0);
+    assert.deepEqual(manager.assertPublishReview("nova", project.id, input, run.id, review), review);
+    assert.throws(() => manager.assertPublishReview("nova", project.id, { ...input, title: "Publish something else" }, run.id, review), /changed since this proposal/);
+    assert.throws(() => manager.assertPublishReview("nova", project.id, input, run.id, { ...review, baseCommit: "a".repeat(40) }), /changed since this proposal/);
+    git(taskRoot, "config", "remote.origin.pushurl", "https://github.com/other/orders.git");
+    assert.throws(() => manager.assertPublishReview("nova", project.id, input, run.id, review), /destination changed/);
+    git(taskRoot, "config", "--unset", "remote.origin.pushurl");
+    git(taskRoot, "config", "--add", "remote.origin.url", "https://github.com/fixture/extra.git");
+    assert.throws(() => manager.preparePublishReview("nova", project.id, input, run.id), /multiple push destinations/);
+    git(taskRoot, "config", "--unset-all", "remote.origin.url");
+    git(taskRoot, "config", "remote.origin.url", "https://github.com/fixture/orders.git");
+    db.setCodeProjectAccess(project.id, "nova", { canRead: true, canWrite: true, canRun: false });
+    assert.throws(() => manager.assertPublishReview("nova", project.id, input, run.id, review), /run access/);
+  } finally { fixture.close(); }
+});
+
+test("publication review includes reverted public files from outgoing commit history", () => {
+  const fixture = publicationProjectFixture();
+  const { manager, project, run, input } = fixture;
+  try {
+    manager.write("nova", project.id, "notes.txt", "This intermediate commit also leaves the Mac.\n", run.id);
+    manager.commit("nova", project.id, "Add implementation notes", ["notes.txt"], run.id);
+    manager.write("nova", project.id, "notes.txt", "Final concise note.\n", run.id);
+    manager.commit("nova", project.id, "Refine implementation notes", ["notes.txt"], run.id);
+    fixture.evidence();
+    const review = manager.preparePublishReview("nova", project.id, input, run.id);
+    assert.equal(review.commits.length, 3);
+    assert.match(review.diff, /This intermediate commit also leaves the Mac/);
+    assert.match(review.diff, /Final concise note/);
+  } finally { fixture.close(); }
+});
+
+test("a newer rejected independent review wins when both reviews share a millisecond", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-09-06T13:00:00Z") });
+  const fixture = publicationProjectFixture();
+  const { manager, project, run, input, db } = fixture;
+  try {
+    const snapshot = manager.preparePublishReview("nova", project.id, input, run.id);
+    const reviewer = db.createRun({ botId: "pixel", threadId: "team-room", prompt: "Review the missing boundary case", status: "queued", parentRunId: run.id });
+    const rejected = db.recordCodeTaskReview({ sourceRunId: run.id, reviewerRunId: reviewer.id, projectId: project.id, reviewerBotId: "pixel", verdict: "changes_requested", summary: "Add a negative quantity case before publishing.", findings: ["Missing boundary coverage"], headCommit: snapshot.headCommit });
+    assert.equal(rejected.createdAt, snapshot.review.createdAt);
+    assert.equal(db.latestCodeTaskReview(run.id)!.id, rejected.id);
+    assert.throws(() => manager.assertPublishReview("nova", project.id, input, run.id, snapshot), /still needs an independent code review/);
+  } finally { fixture.close(); }
+});
+
+test("publication review refuses protected files even when later removed from the final tree", () => {
+  const fixture = publicationProjectFixture();
+  const { manager, project, run, input, git, taskRoot } = fixture;
+  try {
+    writeFileSync(path.join(taskRoot, ".private-config"), "PRIVATE=fixture\n");
+    git(taskRoot, "add", ".private-config");
+    git(taskRoot, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Accidental private file");
+    git(taskRoot, "rm", ".private-config");
+    git(taskRoot, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Remove private file");
+    fixture.evidence();
+    assert.throws(() => manager.preparePublishReview("nova", project.id, input, run.id), /protected or unreadable file paths/);
+  } finally { fixture.close(); }
+});
+
+test("publication review refuses binary and oversized changes instead of hiding their diff", () => {
+  for (const kind of ["binary", "oversized"] as const) {
+    const fixture = publicationProjectFixture();
+    const { manager, project, run, input, git, taskRoot } = fixture;
+    try {
+      const file = kind === "binary" ? "data.bin" : "large.txt";
+      writeFileSync(path.join(taskRoot, file), kind === "binary" ? Buffer.from([0, 1, 2, 3]) : "long code line\n".repeat(3_000));
+      git(taskRoot, "add", file);
+      git(taskRoot, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Add larger change");
+      fixture.evidence();
+      assert.throws(() => manager.preparePublishReview("nova", project.id, input, run.id), kind === "binary" ? /Binary files/ : /too large or missing/);
+    } finally { fixture.close(); }
+  }
 });
 
 test("creates separate branches, reviews diffs, and commits only named files", () => {
@@ -139,6 +262,9 @@ test("keeps simultaneous coding tasks in isolated Git worktrees", () => {
     assert.equal(db.getCodeProjectEdit(firstEdit.editId)?.workspaceRunId, firstRun.id);
 
     manager.commit("nova", project.id, "Finish first task", ["value.ts"], firstRun.id);
+    assert.throws(() => manager.prepareIndependentReview("nova", project.id, firstRun.id), /Run project checks/);
+    // Storage-level fixture for review binding; real commands are covered by code-checks.test.ts.
+    db.saveCodeCheck({ id: "fixture-check", runId: firstRun.id, projectId: project.id, command: "fixture", headCommit: manager.currentCommit("nova", project.id, firstRun.id), status: "passed", exitCode: 0, startedAt: "2026-09-05T00:00:00Z", finishedAt: "2026-09-05T00:00:01Z", detail: "Test fixture" });
     const preparedReview = manager.prepareIndependentReview("nova", project.id, firstRun.id);
     assert.match(preparedReview.review.diff, /Committed task changes/);
     assert.match(preparedReview.review.diff, /value = 'first'/);

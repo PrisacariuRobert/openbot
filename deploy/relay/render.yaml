@@ -1,0 +1,26 @@
+# Private pilot. This creates PAID compute and a persistent disk when deployed.
+# Review Render's current total before confirming. No domain purchase required.
+services:
+  - type: web
+    name: openbot-relay-pilot
+    runtime: node
+    region: frankfurt
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: npm ci --omit=dev
+    startCommand: npm run relay:serve
+    healthCheckPath: /healthz
+    disk:
+      name: relay-identities
+      mountPath: /var/data/openbot-relay
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "26.8.1"
+      - key: OPENBOT_RELAY_BIND
+        value: 0.0.0.0
+      - key: OPENBOT_RELAY_DATABASE
+        value: /var/data/openbot-relay/hosts.sqlite
+      - key: OPENBOT_RELAY_ENROLLMENT_TOKEN
+        generateValue: true

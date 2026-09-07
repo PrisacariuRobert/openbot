@@ -9,6 +9,24 @@ import { parseFile as parseMediaFile } from "music-metadata";
 import sharp from "sharp";
 import type { Attachment, Bot, Message } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { renderCodeBenchmark, type CodeBenchmark } from "../shared/code-benchmark.js";
+import { usageLedger, usageLedgerMarkdown } from "./usage-ledger.js";
+import type { CodeDeliveryReceipt } from "./code-delivery.js";
+
+const codeDeliveryCaptures = new Map<string, Promise<Attachment | null>>();
+const receiptText = (value: string) => value.replace(/[\r\n]+/g, " ").replace(/[\\`*_{}\[\]<>]/g, "\\$&");
+function renderCodeDelivery(receipt: CodeDeliveryReceipt): string {
+  return [
+    "# Change delivered for review",
+    `Host-verified at ${receiptText(receipt.verifiedAt)}. This is a pull request, not a merge or deployment by OpenBot. The repository's own automations may run.`,
+    `## ${receiptText(receipt.title)}`, receipt.url,
+    `Repository: ${receiptText(receipt.repository)}\n\nAccount: ${receiptText(receipt.accountLogin)} on ${receiptText(receipt.host)}\n\nBranch: ${receiptText(receipt.branch)} → ${receiptText(receipt.base)}\n\nExact commit: ${receipt.headCommit}\n\nPull request: ${receipt.draft ? "Draft" : "Ready for review"}`,
+    "## Recorded checks", "These commands passed against this commit. They are evidence of execution, not a guarantee that every case is covered.",
+    ...receipt.checks.map((check) => `- ${receiptText(check.command)} — ${receiptText(check.finishedAt)}; ${check.headCommit}`),
+    "## Independent teammate review", `${receiptText(receipt.review.reviewerName)} reviewed ${receipt.review.headCommit}. Review reference: ${receiptText(receipt.review.id)}. This is an AI review, not a human sign-off.`,
+    "## Changed files", ...receipt.changedFiles.map((file) => `- ${receiptText(file)}`),
+  ].join("\n\n");
+}
 
 const execFileAsync = promisify(execFile);
 const MAX_EXTRACTED_CHARS = 100_000;
@@ -122,25 +140,34 @@ async function extractDocx(filePath: string): Promise<Pick<AttachmentAnalysis, "
   return { summary: extractedText ? "Word document · text ready" : "Word document · no readable text", extractedText: extractedText || null, metadata: { sections: sections.length } };
 }
 
-function csvRows(text: string, delimiter: string): string[][] {
+function csvRows(text: string, delimiter: string) {
   const rows: string[][] = [], row: string[] = [];
-  let cell = "", quoted = false;
-  for (let index = 0; index < text.length && rows.length < 500; index += 1) {
+  let cell = "", quoted = false, closedQuote = false, count = 0, width = 0, columns = 0, clipped = false;
+  text = text.replace(/^\uFEFF/, "");
+  const finishCell = () => { if (rows.length < 500 && columns < 30) row.push(cell); columns++; cell = ""; closedQuote = false; };
+  const finishRow = () => { finishCell(); count++; width = Math.max(width, columns); if (rows.length < 500) rows.push([...row]); row.length = 0; columns = 0; };
+  for (let index = 0; index < text.length; index += 1) {
     const character = text[index]!;
     if (character === "\"") {
       if (quoted && text[index + 1] === "\"") { cell += "\""; index += 1; }
-      else quoted = !quoted;
-    } else if (!quoted && character === delimiter) { row.push(cell); cell = ""; }
-    else if (!quoted && character === "\n") { row.push(cell.replace(/\r$/, "")); rows.push([...row]); row.length = 0; cell = ""; }
-    else cell += character;
+      else if (quoted) { quoted = false; closedQuote = true; }
+      else if (!cell && !closedQuote) quoted = true;
+      else throw new Error("Invalid quoting in delimited file.");
+    } else if (!quoted && character === delimiter) finishCell();
+    else if (!quoted && (character === "\n" || character === "\r")) { if (character === "\r" && text[index + 1] === "\n") index++; finishRow(); }
+    else {
+      if (closedQuote) throw new Error("Unexpected text after closing quote.");
+      if (cell.length < 100_000) cell += character; else clipped = true;
+    }
   }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  if (quoted) throw new Error("Unclosed quoted field.");
+  if (cell || columns || closedQuote) finishRow();
+  return { rows, count, width, partial: count > rows.length || width > 30 || clipped };
 }
 
 function spreadsheetCell(xml: string, sharedStrings: string[]): string {
   const type = xml.match(/\bt="([^"]+)"/)?.[1], raw = xml.match(/<v>([\s\S]*?)<\/v>/)?.[1] || "";
-  if (type === "s") return sharedStrings[Number(raw)] || "";
+  if (type === "s") return /^\d+$/.test(raw) && sharedStrings[Number(raw)] !== undefined ? sharedStrings[Number(raw)]! : "[Unavailable shared string]";
   if (type === "inlineStr") return xmlText([...xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((match) => match[1] || "").join(""));
   if (type === "b") return raw === "1" ? "TRUE" : "FALSE";
   return xmlText(raw);
@@ -148,30 +175,57 @@ function spreadsheetCell(xml: string, sharedStrings: string[]): string {
 
 async function extractWorkbook(filePath: string, extension: string): Promise<Pick<AttachmentAnalysis, "summary" | "extractedText" | "metadata">> {
   if (extension === ".csv" || extension === ".tsv") {
-    const rows = csvRows(await readFile(filePath, "utf8"), extension === ".tsv" ? "\t" : ",");
-    const width = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
-    return { summary: `1 sheet · ${rows.length.toLocaleString()} rows`, extractedText: boundedText(`Sheet: ${path.basename(filePath)} (${rows.length} rows × ${width} columns)\n${rows.map((row) => row.slice(0, 30).join("\t")).join("\n")}`) || null, metadata: { sheets: 1, rows: rows.length, columns: width } };
+    const parsed = csvRows(await readFile(filePath, "utf8"), extension === ".tsv" ? "\t" : ",");
+    // JSON row values preserve literal tabs/newlines inside quoted cells.
+    const preview = parsed.rows.map((row, index) => `Row ${index + 1}: ${JSON.stringify(row)}`).join("\n");
+    const partial = parsed.partial || preview.length > MAX_EXTRACTED_CHARS - 1000;
+    return { summary: `1 sheet · ${parsed.count.toLocaleString()} rows${partial ? " · partial preview" : ""}`, extractedText: boundedText(`Coverage: ${partial ? "PARTIAL. Do not calculate whole-file totals from this preview. Read the original file for all rows and columns." : "All rows and columns included."}\nSheet: ${path.basename(filePath)} (${parsed.count} rows × ${parsed.width} columns)\n${preview}`) || null, metadata: { sheets: 1, rows: parsed.count, columns: parsed.width, rowsPreviewed: parsed.rows.length, partial } };
   }
-  let xmlBudget = 0, entries = 0;
+  let xmlBudget = 0, entries = 0, skipped = false;
   const archive = unzipSync(new Uint8Array(await readFile(filePath)), { filter: (entry) => {
-    const relevant = entry.name === "xl/workbook.xml" || entry.name === "xl/sharedStrings.xml" || /^xl\/worksheets\/sheet\d+\.xml$/i.test(entry.name);
-    if (!relevant || entry.originalSize > 3_000_000 || entries >= 24 || xmlBudget + entry.originalSize > 24_000_000) return false;
+    const relevant = ["xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/sharedStrings.xml"].includes(entry.name) || /^xl\/worksheets\/[^/]+\.xml$/i.test(entry.name);
+    if (!relevant) return false;
+    if (entry.originalSize > 3_000_000 || entries >= 24 || xmlBudget + entry.originalSize > 24_000_000) { skipped = true; return false; }
     entries += 1; xmlBudget += entry.originalSize; return true;
   } });
   const workbookXml = archive["xl/workbook.xml"] ? strFromU8(archive["xl/workbook.xml"]!) : "";
-  const sheetNames = [...workbookXml.matchAll(/<sheet\b[^>]*\bname="([^"]+)"/g)].map((match) => xmlText(match[1] || "")).slice(0, 20);
+  const attribute = (tag: string, key: string) => xmlText(tag.match(new RegExp(`(?:^|\\s)${key}=["']([^"']*)["']`))?.[1] || "");
+  const relations = archive["xl/_rels/workbook.xml.rels"] ? strFromU8(archive["xl/_rels/workbook.xml.rels"]!) : "";
+  const sheetPaths = new Map([...relations.matchAll(/<Relationship\b[^>]*\/?\s*>/g)].filter(([tag]) => attribute(tag, "TargetMode") !== "External").map(([tag]) => {
+    const target = attribute(tag, "Target");
+    return [attribute(tag, "Id"), path.posix.normalize(target.startsWith("/") ? target.slice(1) : `xl/${target}`)];
+  }));
+  const sheetDescriptors = [...workbookXml.matchAll(/<sheet\b[^>]*\/?\s*>/g)].map(([tag]) => ({ name: attribute(tag, "name"), file: sheetPaths.get(attribute(tag, "r:Id") || attribute(tag, "r:id")), hidden: ["hidden", "veryHidden"].includes(attribute(tag, "state")) }));
+  const sheetNames = sheetDescriptors.map((sheet) => sheet.name);
   const sharedXml = archive["xl/sharedStrings.xml"] ? strFromU8(archive["xl/sharedStrings.xml"]!) : "";
   const sharedStrings = [...sharedXml.matchAll(/<si>([\s\S]*?)<\/si>/g)].map((match) => xmlText([...(match[1] || "").matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((text) => text[1] || "").join("")));
-  const sheets = Object.entries(archive).filter(([name]) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name)).sort(([left], [right]) => Number(left.match(/\d+/)?.[0] || 0) - Number(right.match(/\d+/)?.[0] || 0));
-  let totalRows = 0;
-  const previews = sheets.slice(0, 20).map(([, bytes], index) => {
+  const sheets = Object.entries(archive).filter(([name]) => /^xl\/worksheets\/[^/]+\.xml$/i.test(name));
+  let totalRows = 0, formulas = 0, partial = skipped || sheets.length > 20 || sheetDescriptors.some((sheet) => !sheet.file || !archive[sheet.file]);
+  const previews = sheets.slice(0, 20).map(([file, bytes]) => {
     const xml = strFromU8(bytes), rows = [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)];
+    if (rows.length > 500 || /<(?:\w+:)?mergeCell\b|<\w+:(?:row|c)\b/.test(xml)) partial = true;
     totalRows += rows.length;
-    const lines = rows.slice(0, 500).map((row) => [...((row[1] || "").matchAll(/<c\b[^>]*>[\s\S]*?<\/c>/g))].slice(0, 30).map((cell) => spreadsheetCell(cell[0], sharedStrings)).join("\t"));
-    const name = sheetNames[index] || `Sheet ${index + 1}`;
-    return `Sheet: ${name} (${rows.length} rows)\n${lines.join("\n")}`;
+    const lines = rows.slice(0, 500).map((row) => {
+      const cells = [...((row[1] || "").matchAll(/<c\b[^>]*(?:\/>|>[\s\S]*?<\/c>)/g))];
+      if (cells.length > 30) partial = true;
+      return cells.slice(0, 30).map(([cell]) => {
+        const ref = attribute(cell.slice(0, cell.indexOf(">") + 1), "r");
+        if (!/^[A-Z]{1,3}[1-9]\d{0,6}$/.test(ref)) partial = true;
+        const formula = /<f\b/.test(cell);
+        if (formula) formulas++;
+        const value = spreadsheetCell(cell, sharedStrings);
+        if (value === "[Unavailable shared string]") partial = true;
+        return `${ref || "Unknown cell"}=${JSON.stringify(value)}${formula ? " [FORMULA CACHE: may be stale; not recalculated]" : ""}`;
+      }).join("\t");
+    });
+    const descriptor = sheetDescriptors.find((sheet) => sheet.file === file);
+    if (!descriptor) partial = true;
+    return `Sheet: ${descriptor?.name || `Unmapped worksheet ${file}`}${descriptor?.hidden ? " [hidden]" : ""} (${rows.length} stored rows)\n${lines.join("\n")}`;
   });
-  return { summary: `${sheets.length} sheet${sheets.length === 1 ? "" : "s"} · ${totalRows.toLocaleString()} rows`, extractedText: boundedText(previews.join("\n\n")) || null, metadata: { sheets: sheets.length, rows: totalRows, sheetNames: sheetNames.join(", ").slice(0, 500) } };
+  if (!sheets.length) partial = true;
+  const preview = previews.join("\n\n");
+  partial ||= formulas > 0 || preview.length > MAX_EXTRACTED_CHARS - 1000;
+  return { summary: `${sheets.length} worksheet parts · ${totalRows.toLocaleString()} stored rows${partial ? " · partial preview" : ""}`, extractedText: boundedText(`Coverage: ${partial ? "PARTIAL. Do not assume this is the complete or recalculated workbook." : "Stored cell values included within preview bounds."}\nCells retain their original addresses. Number/date formats, charts, images and layout are not rendered. Formulas are cached values only; macros and external links are never executed.\n${preview}`) || null, metadata: { sheets: sheets.length, rows: totalRows, formulasPreviewed: formulas, partial, sheetNames: sheetNames.join(", ").slice(0, 500) } };
 }
 
 async function extractPptx(filePath: string): Promise<Pick<AttachmentAnalysis, "summary" | "extractedText" | "metadata">> {
@@ -246,7 +300,7 @@ export async function inspectAttachment(filePath: string, name: string, supplied
       const extractedText = boundedText(buffer.toString("utf8"));
       content = { summary: `${extractedText.split("\n").length} lines · text ready`, extractedText: extractedText || null, metadata: { lines: extractedText ? extractedText.split("\n").length : 0 } };
     } else return { ...base, processingStatus: "unsupported", summary: "Saved safely · this file type has no local preview yet", extractedText: null, metadata: {} };
-    return { ...base, ...content };
+    return { ...base, ...content, ...(content.metadata.partial === true ? { processingStatus: "partial" as const } : {}) };
   } catch {
     return { ...base, processingStatus: "partial", summary: kind === "image" || kind === "audio" || kind === "video" ? `${kind[0]!.toUpperCase()}${kind.slice(1)} saved · the selected AI may still understand it` : "Saved safely · preview could not be prepared", extractedText: null, metadata: {} };
   }
@@ -306,6 +360,82 @@ export class AttachmentService {
       const analysis = await inspectAttachment(destination, name, extensionMime[path.extname(name).toLowerCase()] || "application/octet-stream");
       const artifactKey = `${bot.id}:${path.relative(workspace, source)}`, previous = this.db.latestArtifact(message.threadId, artifactKey);
       captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: analysis.detectedMime, size: info.size, storagePath: destination, analysis, source: "artifact", artifactKey, revision: (previous?.revision || 0) + 1, replacesAttachmentId: previous?.id || null }));
+    }
+    return captured;
+  }
+
+  async captureCodeDelivery(receipt: CodeDeliveryReceipt): Promise<Attachment | null> {
+    const notification = this.db.extensionRecord<{ messageId: string }>("code-delivery-notification", receipt.runId);
+    const message = notification ? this.db.getMessage(notification.messageId) : null;
+    const saved = this.db.extensionRecord<CodeDeliveryReceipt>("code-delivery", receipt.runId);
+    if (!message || !saved || saved.url !== receipt.url || saved.headCommit !== receipt.headCommit) return null;
+    const artifactKey = `code-delivery:${receipt.runId}`;
+    if (this.db.latestArtifact(message.threadId, artifactKey)) return null;
+    const lockKey = `${this.db.dataDir}:${artifactKey}`;
+    const pending = codeDeliveryCaptures.get(lockKey);
+    if (pending) return pending;
+    const capture = (async () => {
+      const name = "code-delivery.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      const content = renderCodeDelivery(saved);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      return this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey, revision: 1 });
+    })();
+    codeDeliveryCaptures.set(lockKey, capture);
+    try { return await capture; }
+    finally { codeDeliveryCaptures.delete(lockKey); }
+  }
+
+  async captureWorkReports(message: Message): Promise<Attachment[]> {
+    if (!message.runId) return [];
+    const captured: Attachment[] = [];
+    if (usageLedger(this.db, message.runId).attempts.length) {
+      const name = "provider-usage.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      const content = usageLedgerMarkdown(this.db, message.runId);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `usage:${message.runId}`, revision: 1 }));
+    }
+    for (const snapshot of this.db.listWorkSnapshots(message.runId)) {
+      const report = this.db.getWorkReport(snapshot.id);
+      if (!report) continue;
+      const name = `${snapshot.kind === "morning" ? "morning-brief" : snapshot.kind === "meeting" ? "meeting-prep" : snapshot.kind === "weekly" ? "weekly-review" : "inbox-follow-ups"}-${snapshot.fetchedAt.slice(0, 10)}.md`;
+      const directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, report.markdown, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(report.markdown), storagePath: destination, analysis, source: "artifact", artifactKey: `work-report:${snapshot.id}`, revision: 1 }));
+    }
+    const delivery = this.db.extensionRecord<CodeDeliveryReceipt>("code-delivery", message.runId);
+    if (delivery && delivery.botId === message.senderId && delivery.runId === message.runId) {
+      // Repair a previously failed file capture on the original host message;
+      // do not add a duplicate receipt to a later model response.
+      await this.captureCodeDelivery(delivery);
+    }
+    const checks = this.db.listCodeChecks(message.runId);
+    const experiment = this.db.extensionRecord<CodeBenchmark>("code-benchmark", message.runId);
+    if (experiment) {
+      const name = "project-experiment.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      const content = renderCodeBenchmark(experiment);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `code-benchmark:${message.runId}`, revision: 1 }));
+    }
+    if (checks.length) {
+      const name = "code-checks.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
+      const content = ["# Recorded code checks", "Host-recorded command results, newest first. A pass records an exit status against a clean commit, not proof of meaningful test coverage. Compare the exact commit with the code you plan to use; old checks do not cover later changes.", ...checks.map((check) => `## ${check.status} · ${check.headCommit.slice(0, 12)}\n\n${check.finishedAt || "Not finished"} · Exit: ${check.exitCode ?? "not available"}\n\n    ${check.command.replace(/\n/g, "\n    ")}\n\n${check.detail}`)].join("\n\n");
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const destination = path.join(directory, name);
+      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
+      const analysis = await inspectAttachment(destination, name, "text/markdown");
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `code-checks:${message.runId}`, revision: 1 }));
     }
     return captured;
   }

@@ -8,7 +8,18 @@ const riskyPatterns: Array<[RegExp, string]> = [
 ];
 
 export function approvalReason(prompt: string): string | null {
-  const actionable = prompt.replace(/\b(?:do\s+not|don't|never)\s+(?:try\s+to\s+|attempt\s+to\s+)?(?:delete|remove|erase|wipe|drop|truncate|git\s+push|publish|deploy|release|merge\s+(?:the\s+)?pr|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|use\s+(?:an?\s+)?(?:password|passcode|api[ _-]?key|secret|credit\s+card|bank\s+account))\b[^,.;]*?(?=\s+\b(?:but|then)\b|[,.;]|$)/gi, "[action explicitly excluded]");
+  // A clear coordinated prohibition shares "do not" across its list:
+  // "Do not install packages, push, publish, or change my checkout."
+  // Only accept explicit OR lists of recognized verbs. Ambiguous conjunctions
+  // and contrast/sequence clauses stay subject to the conservative detector.
+  const withoutExcludedLists = prompt.replace(/\b(?:do\s+not|don't|never)\s+[^.;!?\n]+/gi, (clause) => {
+    const actions = clause.replace(/^(?:do\s+not|don't|never)\s+/i, "");
+    if (!/\s+or\s+/i.test(actions) || /\b(?:but|then|instead|however|also|actually|afterwards|except)\b/i.test(actions)) return clause;
+    const parts = actions.split(/,\s*(?:or\s+)?|\s+or\s+/i);
+    const excludedVerb = /^(?:delete|remove|erase|wipe|drop|truncate|git\s+push|push|publish|deploy|release|merge|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|install|access|change|modify|overwrite)\b/i;
+    return parts.length >= 2 && parts.every((part) => excludedVerb.test(part.trim())) ? "[actions explicitly excluded]" : clause;
+  });
+  const actionable = withoutExcludedLists.replace(/\b(?:do\s+not|don't|never)\s+(?:try\s+to\s+|attempt\s+to\s+)?(?:delete|remove|erase|wipe|drop|truncate|git\s+push|publish|deploy|release|merge\s+(?:the\s+)?pr|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|use\s+(?:an?\s+)?(?:password|passcode|api[ _-]?key|secret|credit\s+card|bank\s+account))\b[^,.;]*?(?=\s+\b(?:but|then)\b|[,.;]|$)/gi, "[action explicitly excluded]");
   for (const [pattern, reason] of riskyPatterns) {
     if (reason === "This may communicate with other people." && /\bmessage_teammate\b/i.test(actionable)) continue;
     if (pattern.test(actionable)) return reason;
@@ -27,8 +38,28 @@ export function commandApprovalReason(command: string): string | null {
   return commandRisks.find(([pattern]) => pattern.test(command))?.[1] || null;
 }
 
-export function browserApprovalReason(action: "open" | "click" | "type", value: string): string | null {
-  if (action === "type" && /password|passcode|secret|token|credit.?card|checkout|payment/i.test(value)) return "This browser action may enter private or payment information.";
-  if (action === "click" && /send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(value)) return "This click may create an external or irreversible action.";
+export interface BrowserTarget {
+  url: string;
+  tag: string;
+  role: string;
+  label: string;
+  inputType: string;
+  autocomplete: string;
+  href: string;
+  formMethod: string;
+  searchForm: boolean;
+}
+
+export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
+  const description = `${value} ${target?.label || ""} ${target?.inputType || ""} ${target?.autocomplete || ""}`;
+  if (action === "type" && /password|passcode|secret|token|credit.?card|checkout|payment|one-time-code|cc-/i.test(description)) return "This browser action may enter private or payment information.";
+  if (action === "click") {
+    if (/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(description)) return "This click may create an external or irreversible action.";
+    // A CSS selector is not evidence of intent: #primary can mean Send.
+    // Permit observed navigation/search; review other controls by default.
+    if (target?.tag === "a" && /^https?:/i.test(target.href)) return null;
+    if (target?.searchForm && target.formMethod === "get" && /^(search|find)$/i.test(target.label.trim())) return null;
+    return "Review this browser control before it runs; it may change data or send information.";
+  }
   return null;
 }

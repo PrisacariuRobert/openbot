@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { OpenBotDatabase } from "./database.js";
+import { OpenBotDatabase } from "./testing/database.js";
 import { heartbeatURL, publicHeartbeatAddress, RunnerExternalHeartbeatMonitor, sendExternalHeartbeat } from "./external-heartbeat.js";
 
 test("accepts only bounded public HTTPS heartbeat addresses", () => {

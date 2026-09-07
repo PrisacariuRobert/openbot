@@ -7,8 +7,8 @@
   "id": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f2ee",
-  "theme_color": "#6757d9",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "categories": ["productivity", "utilities"],
   "shortcuts": [
     { "name": "Open the studio", "short_name": "Studio", "url": "/" }

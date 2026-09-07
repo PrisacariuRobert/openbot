@@ -1,6 +1,103 @@
 # OpenBot Milestones
 
-All milestones below are implemented in the current repository and were verified on September 2, 2026.
+## Locked-host continuation — checked saved skills
+
+Added real supervised skill checks with explicit expected outcomes and owner review, two distinct input identities, exact revision/setup and account-generation binding, expiry, all routine enable/dispatch gates and queued-job rechecks. Web and native Mac/iPhone controls share the owner API. The teaching panel also handles host outages without unhandled polling errors or retrying a check. [Evidence and open boundaries](QA_WORKFLOW_CHECKS.md). This closes the explicit `/skill` scheduling enforcement slice, not all of C or the A–F plan.
+
+## 0.37 continuation — reusable workflows and safer continuity
+
+Implemented a shared six-recipe library with real safe-example checks and strict settings-only round-trips; protected, expiring, source-attributed private memory; opt-in deduplicated in-app suggestion digests; and a shared teaching/task browser profile with private-field placeholders. Browser experiment acceptance now covers real DOM/keyboard/label invariants, an improvable fixture, unchanged input and a faster broken candidate. [Verification and open A–F gates](QA_0.37.md). These changes do not establish real-account reference-workflow success, universal app control, two-provider parity or public release readiness.
+
+## 0.36 continuation — connected work and evidence
+
+Implemented scoped multi-app morning/weekly briefs, owner-approved local follow-up tracking, a bounded MCP OAuth/public-registration subset, explicit provider-usage receipts and exact-commit command experiments. Validation: 306 server/shared tests, production desktop/390px flows, native Mac/iPhone simulator checks, real Docker repair checks and four live Spark 1.3 fixture workflows. [Detailed evidence, operational caveat and remaining A–F gates](QA_0.36.md). These slices do not mark the complete competitive plan or public distribution ready.
+
+Historical milestones below were implemented in the repository. The current milestone was verified on September 5, 2026; older verification dates remain attached to their original evidence.
+
+## M38 — Packaged Mac startup and shared job budgets
+
+Hermes-inspired extension follow-up: implemented real Streamable HTTP MCP connections with host-side tokens, explicit per-teammate grants, schema/access rechecks, bounded source receipts and uncertain-write recovery. Reviewed text-only community skills include explicit references and pinned content; unsupported runtime policies/scripts block import. Private memory can be corrected, searched or removed without silently resuming stale sessions. Native Mac/iPhone and web setup controls share the same API. Live Spark evaluation found and fixed tool-discovery search being mistaken for absent access. [Checks, observed failures and remaining gaps](QA_OPEN_EXTENSIONS.md). This closes a bounded interoperability gap, not the entire marketplace or competitor gap.
+
+Checked-outcome follow-up: exact decimal CSV summaries, non-overwriting XLSX export, and current-source attachment delivery to private consultants. Real Spark 1.3 evaluation uncovered a false approval prompt and a stale-source consultation bug; both now have regression coverage. [Evidence and explicit remaining limits](QA_CHECKED_OUTCOMES.md). Outcome checks take priority over a self-reported “finished” message.
+
+Fresh-research follow-up: removed automatic provider/model assignment across fresh web/Mac/iPhone setup; protected existing choices; added a real fresh-browser flow and dispatch/restart tests. Corrected spreadsheet previews that silently lost coverage or cell positions. Two free models passed four live source-artifact/private-consultation workflows, with slow consultation explicitly recorded. [Evidence](QA_PROVIDER_CHOICE.md). This closes specific defects, not all competitor/release gaps.
+
+General app-reading follow-up: bounded Accessibility text, encrypted persistent source receipts, authenticated Markdown download, permission/cancellation rechecks and a per-run read cap. Script/compiler fixtures cover text/cells, recognized protected fields and unavailable windows. Real arbitrary-app verification remains blocked by the locked Mac. [Updated competitor assessment](COMPETITOR_RECHECK_2026-09-05.md) and [plugin interoperability](PLUGIN_INTEROPERABILITY.md) keep shipped work separate from unimplemented compatibility.
+
+Functional follow-up: bounded Mac Mail/Calendar fallback, source provenance, access-aware starter selection and native/web source gates are implemented. See [the fallback test record](QA_MAC_FALLBACK.md). OS-consent/live personal-app verification is blocked while the Mac is locked; this milestone does not claim that check passed.
+
+Status: owner-operated 0.35.0 development beta; see the evidence record for completed checks
+
+- Report starters across web/Mac/iPhone require a saved matching report; one bounded repair cannot silently become an unverified success
+- Meeting Prep reads bounded event/mail/Drive context with explicit gaps and candidate-relevance limits
+- Actual OpenCode transport checks report-only and ordinary-agent permission filtering; internal tool tokens are scoped per teammate/run
+- Real JavaScript and Python Docker checks fail before and pass after implementation-only fixes using disposable check views
+- Packaging includes OpenCode and Node with version-matched licenses; model accounts remain user-owned
+
+- The macOS release package embeds its own Node executable, production UI, server, dependencies, skills, and runner launcher
+- Local startup reuses a healthy studio or launches the bundled child runner; remote connections do not start local services
+- A fresh data home uses Application Support; existing configured service homes are preserved and unknown/missing locations fail closed
+- No automatic data move, service replacement, runtime rollback, or locked-login recovery is claimed
+- Coordinator, nested consultations, and steered follow-ups share a persisted usage total; over-budget families stop without stopping unrelated work
+- The LaunchAgent receives the exact data home explicitly and keeps shell-free arguments, private logs, foreground handoff, process-group termination, and powered-on/awake limits
+- A deterministic packaging command embeds the runner into any built `OpenBot.app`, re-signs the complete bundle, and verifies the resulting signature
+
+Verification: behavior tests cover shared usage, cancellation/approval cleanup, restart and steering continuity; native unit tests cover existing/fresh data-home selection and rejection. Exact build, package, runtime and regression results are recorded in [QA_0.35](QA_0.35.md). No migration was run on the owner's studio.
+
+Remaining: Developer ID signing, hardened runtime, notarization, Sparkle or another signed update channel, clean second-Mac Gatekeeper/onboarding proof, Windows packaging, powered-off local execution, and repeated real-model competitor acceptance are not claimed.
+
+## M37 — Native macOS studio
+
+Status: complete in source for the owner-operated 0.34.0 development beta
+
+- A genuine SwiftUI/AppKit Mac application connects directly to the authenticated OpenBot API; it contains no WebKit or embedded web interface
+- Native conversations include thread switching, teammate targeting, messages, attachments, reply context, reactions, private studio search, shared draft continuity, live run progress, approval/cancel controls, and downloadable results
+- Native Work exposes the three source-backed jobs with live Google readiness and recovery, while native Live Studio shows teammate state, attention, recent action receipts, and uncertain-action reconciliation
+- A dedicated macOS Keychain identity protects saved access, the same-Mac runner pairs automatically through its loopback-only access endpoint, remote hosts require HTTPS, address-only deep links reject embedded credentials, and launch-only development access stays in memory
+- Native code-drawn mascots use the saved teammate shape, colour, and work state with independent blink/motion and reduced-motion support
+- Native menus and keyboard commands expose settings, message focus, Work, and Live Studio without depending on a browser tab
+- Optional native attention alerts contain only a generic approval/interruption count and stay off until the owner enables them
+- Native Automations creates and edits every supported schedule/app-event trigger, deletes routines safely, rotates one-time signed-hook secrets, pauses or resumes work, and requires explicit confirmation before a manual run
+- Native AI Connections exposes real provider readiness, supported subscription sign-in and code completion, and hosted API or localhost-model setup/editing/removal while keeping stored secrets off the client response; removal is blocked until every teammate is reassigned
+- Native provider-to-teammate assignment, code-project folder/GitHub connection, per-teammate project grants, base/task-worktree diff review, guarded edit restoration, safe disconnect, and terminal/browser/Mac capability controls cover the main everyday administration path
+- Native draft source handling is shared end to end, so Mac edits hand off to web and iPhone instead of failing the server contract
+- Native Apps & Tools exposes supported connection flows and explicit teammate read/write grants; Skill Library supports starter install, edit, immutable history, non-destructive rollback, assignment, bounded import, non-overwriting export, and confirmed deletion
+- Google Drive text/Markdown creation and Calendar events, invitations, guest notifications, and optional Meet links now use separate teammate write grants, scope-aware reconnect prompts, exact approval previews, and the crash-safe one-time action ledger across both model runtimes
+- Native Live Studio controls the isolated teammate browser, and native Teach records visible browser demonstrations with private non-chat typing before saving a readable versioned skill
+- Native Teammates creates, edits, and cleanly duplicates roles, instructions, provider/model assignments, capabilities, weekly budgets, and recolorable code-drawn characters; Workspace Files provides bounded read-only review without exposing host paths
+- Native Live Studio can enable or remove the existing login/crash LaunchAgent protection from the local Mac
+- Text deliverables can include bounded workspace-file evidence; OpenBot reopens the file itself, checks requested size/content, records a short fingerprint, and labels host evidence separately from teammate-reported checks
+
+Verification: the complete TypeScript release gate with 171 tests, native source contract, macOS build and thirteen macOS unit tests pass. Disposable API checks proved teammate create/update/duplicate choices, bounded workspace preview, and symlink-safe host verification; live-runner checks proved teaching and the full signed-automation lifecycle without sending a model request. See [QA_0.34](QA_0.34.md).
+
+Remaining: the current app is an ad-hoc development build. Developer ID signing, hardened runtime, notarization, automatic updates, fresh-Mac packaging of the runner, Windows support, native self-hosted OAuth/event setup, and repeated real-model competitor acceptance runs are not claimed.
+
+## M36 — Crash-safe approved actions
+
+Status: complete in source for the owner-operated 0.33.0 development beta
+
+- Every approved command, email, post, issue, browser/app interaction, and connected-app update receives a durable receipt and immutable payload fingerprint before execution
+- One atomic claim prevents competing processes or repeated decisions from dispatching the same saved action twice
+- Approved but unstarted actions survive restart and run before model work resumes
+- A restart during the remote call records an uncertain outcome, blocks the task, and never retries automatically
+- Web and native Live Studio let the owner confirm **It happened** or **It didn’t happen**, then resume with outcome-specific instructions that prohibit a false success or duplicate retry
+- Recent action history is available on both clients without including the private saved request body in the public state payload
+- Approval decisions are now first-writer-wins, and denying an action removes any prepared dispatch
+
+Verification: deterministic database fixtures cover single claim, decision races, changed payloads, prepared-action restart, uncertain-action restart, immutable reconciliation, denied-action cleanup, and public-state privacy. The complete release gate passed with 164 TypeScript tests, type checking, and the production build; the native iPhone Simulator build and all 7 native tests passed. Desktop and 390 px Live Studio layouts were reviewed with completed, failed, and uncertain receipts. See [QA_0.33](QA_0.33.md).
+
+## M35 — Native dependable Work
+
+Status: complete in source for the owner-operated 0.32.0 native beta
+
+- The real SwiftUI app has a first-class Work destination for Morning Brief, Meeting Prep, and Inbox Follow-ups
+- Native jobs use the same source, coverage, time-zone, local-draft, and no-write requirements as their web equivalents
+- The phone reads live authenticated connector readiness and prevents a job from starting until its required Gmail, Calendar, and Drive services are available
+- Missing OAuth access can begin from iPhone in one tap; disabled Google APIs open their exact HTTPS Cloud enable page, and readiness refreshes when the owner returns
+- Missing apps remain readable and are named in plain language; ready jobs enter the shared team room so desktop and phone continue one durable conversation
+- Code-drawn runtime-colored teammates remain animated, contained, and Reduce Motion-aware; Work copy uses Dynamic Type-aware native styles and an accessibility-size layout
+
+Verification: Xcode 27.0 beta builds the app and Share extension for the booted iPhone 17 Pro simulator. Six native unit tests plus default-size and accessibility-XXXL live UI runs pass against the running owner studio without a model request. Simulator visual QA caught and fixed mascot overflow and excessive disabled opacity. Physical-device, cellular, production APNs, signing/TestFlight, complete native settings, and the repeated two-model M2 workflow gate remain open. See [the 0.32 validation record](QA_0.32.md).
 
 ## M0 — Working local teammate studio
 
@@ -504,3 +601,22 @@ Status: complete in source for the owner-operated 0.27.0 release
 - The replacement must become healthy; partial or failed imports restore the prior home and keep a recoverable copy instead of silently losing data
 
 Verification: 110 automated tests cover safe URL parsing, private/reserved address rejection, mixed public/private DNS rejection, encrypted durable heartbeat state, success/failure receipts, disabled silence, secret-free authenticated export, complete restore, incorrect-passphrase rejection, and ciphertext tamper rejection alongside every earlier product contract. TypeScript, production build, release/native checks, iOS simulator tests, shell/Node syntax, responsive desktop/phone visual QA, and the Linux private-runner build/boot/Home-check CI gate form the release gate.
+
+## M34 — Connections that act
+
+Status: complete in source for the owner-operated 0.28.0 release
+
+- Slack mentions, messages, and reactions can wake a selected teammate through a provider-signed Events API request, with an optional exact-channel filter
+- Notion page, comment, and database activity can wake a selected teammate through a verified and signed webhook, with an optional page/data-source entity filter
+- Both providers use a private rotating event address, encrypted verification material, provider HMAC checks, bounded inputs, stable delivery IDs, burst limits, durable receipts, replay, failure attention, and automatic pause after repeated failure
+- Slack requests enforce the provider timestamp replay window and bot-authored messages are ignored to prevent feedback loops
+- Apps & Tools explains provider setup in plain language, shows when live events are ready, copies only the values the owner needs, and rotates compromised addresses in one action
+- The responsive automation builder exposes provider-specific choices without technical request fields; connected-app readiness and each teammate's read permission are checked before enabling the routine
+- OpenCode and Claude Code teammates can create Slack and Notion event routines naturally in chat through the same validated server action
+- Connector manifest v2 declares event capability and authenticity for every built-in app, and the published admission contract defines permission, approval, provenance, payload, revocation, and test expectations
+- Third-party executable connector installation remains disabled until signed provenance, dependency isolation, network allowlists, permission diffs, and update/revocation behavior are implemented
+
+Verification: 113 automated tests cover provider signatures, replay-window and loop prevention, reaction/comment filters, encrypted secrets, private-address rotation, manifest validation, and natural-routine contracts alongside every earlier product boundary. TypeScript, production build, release/native checks, signed live-shaped Slack/Notion delivery, duplicate replay, and responsive 1280×800/390×844 visual QA pass. Real Slack/Notion account consent and publicly reachable provider delivery remain owner-environment checks.
+## Included-methods delivery — 5 September 2026
+
+Implemented and verified: default skill catalog across clients, current-task method discovery, durable opt-outs, pinned upstream credits, local code-security advisory subset and signed physical-iPhone personal preview installation. See [the acceptance record](QA_INCLUDED_SKILLS.md) for 248 passing tests, two live Spark outcomes, the discovery failure fixed during testing and the phone tests still awaiting the owner. This is not an all-plugins or all-gaps-closed milestone.

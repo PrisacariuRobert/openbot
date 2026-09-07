@@ -1,0 +1,144 @@
+/* Settings are part of Studio, not a second application or legacy theme. */
+.capabilities {
+  --bg: var(--canvas); --paper: var(--surface); --card: var(--surface); --text: var(--ink);
+  --text-secondary: var(--secondary); --text-muted: var(--muted); --border: var(--line);
+  --purple: var(--strong); --purple-light: var(--surface-muted); --accent: var(--strong);
+  --accent-soft: var(--surface-muted); --green: var(--ink); --red: var(--ink); --orange: var(--ink);
+  --shadow: none; --shadow-soft: none;
+  min-width: 0; font-size: 14px; line-height: 1.5;
+}
+.capabilities *, .capabilities *::before, .capabilities *::after { min-width: 0; }
+.capabilities p { color: var(--secondary); line-height: 1.5; margin: 8px 0 16px; overflow-wrap: anywhere; }
+.capabilities h3 { margin: 0 0 12px; font-size: 18px; letter-spacing: -.035em; line-height: 1.25; }
+.capabilities h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.capabilities small { display: block; color: var(--muted); line-height: 1.45; font-size: 12px; }
+.capabilities strong, .capabilities code { overflow-wrap: anywhere; }
+.capabilities svg { flex-shrink: 0; vertical-align: middle; }
+.capabilities .connector-symbol { display: block; width: 28px; height: 28px; flex: 0 0 28px; filter: var(--brand-filter); }
+.capabilities fieldset { border: 0; margin: 8px 0; padding: 0; min-width: 0; }
+.capabilities legend { padding: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--secondary); }
+.capabilities .purpose-disclosure > summary, .capabilities .daily-work-disclosure > summary { display: flex; align-items: center; gap: 12px; list-style: none; }
+.capabilities .purpose-disclosure > summary::-webkit-details-marker, .capabilities .daily-work-disclosure > summary::-webkit-details-marker { display: none; }
+.capabilities .purpose-disclosure > summary > span, .capabilities .daily-work-disclosure > summary > span { flex: 1; }
+.capabilities .purpose-disclosure > summary > svg:last-child, .capabilities .daily-work-disclosure > summary > svg:last-child { width: 16px; height: 16px; color: var(--muted); }
+.capabilities .app-search { display: flex; gap: 10px; align-items: center; margin-block: 20px; }
+.capabilities .connector-card { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.capabilities .connector-card-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.capabilities .connector-card-main p { font-size: 13px; margin-block: 8px; }
+.capabilities .connector-catalog { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
+.capabilities .connector-card-title b { font-size: 11px; font-weight: 500; color: var(--secondary); }
+.capabilities .connector-card-icon { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; display: grid; place-items: center; background: var(--surface-muted); }
+.capabilities .routine-form-intro { display: flex; gap: 12px; align-items: center; }
+.capabilities .routine-form-intro small { margin-top: 4px; }
+.capabilities .capability-pills { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 12px; }
+.capabilities .capability-pills > span { display: inline-flex; gap: 6px; align-items: center; font-size: 11px; color: var(--secondary); padding: 5px 8px; background: var(--surface-muted); border-radius: 6px; }
+.capabilities .capability-pills .connector-symbol { width: 14px; height: 14px; flex-basis: 14px; }
+.capabilities .shape-options, .capabilities .color-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.capabilities .shape-options button { display: grid; gap: 4px; justify-items: center; padding: 8px; min-width: 72px; }
+.capabilities .color-options button { padding: 3px; border-radius: 8px; }
+.capabilities .shape-options button span { font-size: 11px; }
+.capabilities .custom-character-color { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.capabilities button, .capabilities .button-secondary, .capabilities .button-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px;
+  min-height: 38px; font-size: 13px; font-weight: 500; line-height: 1.35; white-space: normal;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); box-shadow: none;
+}
+.capabilities button:hover:not(:disabled) { background: var(--hover); border-color: var(--line-strong); }
+.capabilities .button-primary, .capabilities button[type="submit"] { background: var(--strong); border-color: var(--strong); color: var(--on-strong); }
+.capabilities .button-primary:hover:not(:disabled), .capabilities button[type="submit"]:hover:not(:disabled) { background: var(--strong); opacity: .85; }
+.capabilities button:focus-visible, .capabilities input:focus-visible, .capabilities textarea:focus-visible, .capabilities select:focus-visible, .capabilities summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.capabilities input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), .capabilities select, .capabilities textarea {
+  width: 100%; min-height: 42px; padding: 10px 12px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: none; font: inherit; font-size: 14px;
+}
+.capabilities textarea { min-height: 110px; resize: vertical; }
+.capabilities input[type="checkbox"], .capabilities input[type="radio"] { width: 16px; height: 16px; flex: 0 0 16px; accent-color: var(--strong); }
+.capabilities input[type="file"] { max-width: 100%; }
+.capabilities .field, .capabilities label:has(> select), .capabilities label:has(> textarea) { display: grid; gap: 8px; margin-bottom: 16px; }
+.capabilities .field > span, .capabilities label > span:first-child { font-size: 13px; font-weight: 500; color: var(--secondary); }
+.capabilities .toggle-row, .capabilities .checkbox-field { display: flex; gap: 12px; align-items: center; padding-block: 12px; }
+.capabilities .toggle-row > span { flex: 1; }
+.capabilities form { display: grid; gap: 12px; }
+.capabilities details { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-block: 16px; }
+.capabilities summary { cursor: pointer; font-size: 14px; font-weight: 550; padding-block: 2px; }
+.capabilities details[open] > summary { margin-bottom: 18px; }
+.capabilities pre { padding: 14px; overflow: auto; max-width: 100%; background: var(--surface-muted); border-radius: 8px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.capabilities code { font-size: .88em; }
+.capabilities img { max-width: 100%; height: auto; }
+.capabilities .panel-error, .capabilities .capability-notice, .capabilities .panel-note, .capabilities .approval-warning { padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); color: var(--ink); }
+.capabilities [class$="-panel"], .capabilities [class$="-list"], .capabilities [class$="-stack"] { display: grid; gap: 16px; }
+.capabilities [class$="-card"], .capabilities [class$="-section"], .capabilities .model-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none; }
+.capabilities [class$="-grid"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 16px; }
+.capabilities [class$="-header"], .capabilities [class$="-heading"], .capabilities [class$="-actions"], .capabilities [class$="-toolbar"] { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-block: 8px 16px; }
+.capabilities [class$="-actions"] { justify-content: flex-end; }
+.capabilities [class$="-status"], .capabilities [class$="-badge"], .capabilities .tag { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 6px; font-size: 12px; background: var(--surface-muted); color: var(--secondary); }
+.capabilities [class$="-tabs"], .capabilities [class$="-segmented"], .capabilities .segmented { display: flex; flex-wrap: wrap; padding: 3px; gap: 4px; background: var(--surface-muted); border-radius: 10px; margin-block: 8px 16px; }
+.capabilities [class$="-tabs"] > button, .capabilities .segmented > button { flex: 1; background: transparent; border-color: transparent; }
+.capabilities button.active, .capabilities button.selected, .capabilities button[aria-pressed="true"] { background: var(--selection); border-color: var(--line-strong); color: var(--ink); }
+.capabilities .connector-hero, .capabilities .control-hero, .capabilities .remote-hero, .capabilities .teach-hero { padding: 0 0 24px; margin-bottom: 20px; border-bottom: 1px solid var(--line); background: none; box-shadow: none; }
+.capabilities .connector-hero-art, .capabilities .hero-orb, .capabilities .remote-orbit, .capabilities .control-kicker { display: none; }
+.capabilities .connector-hero h3, .capabilities .remote-hero h3 { font-size: 23px; max-width: 30ch; }
+.capabilities .connector-hero p { max-width: 58ch; }
+.capabilities .room-cluster { display: flex; align-items: center; gap: 4px; }
+.capabilities .provider-logo, .capabilities .connector-logo, .capabilities .connector-icon { width: 42px; height: 42px; display: grid; place-items: center; flex-shrink: 0; }
+.capabilities .connector-card { position: relative; display: grid; gap: 10px; }
+.capabilities .connector-catalog-head, .capabilities .connector-card-head { display: flex; gap: 12px; align-items: flex-start; }
+.capabilities .connector-card h4 { font-size: 16px; }
+.capabilities .connector-capabilities { display: flex; flex-wrap: wrap; gap: 6px; }
+.capabilities .connector-capabilities > span { border-radius: 5px; padding: 4px 7px; background: var(--surface-muted); font-size: 11px; }
+.capabilities .live-browser-frame, .capabilities .computer-preview, .capabilities .browser-screen { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.capabilities .live-browser-image { display: block; width: 100%; padding: 0; border: 0; }
+.capabilities .live-browser-frame img { display: block; width: 100%; }
+.capabilities .browser-address, .capabilities .takeover-input, .capabilities .inline-field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.capabilities .browser-address input, .capabilities .takeover-input input { flex: 1; min-width: 160px; }
+.capabilities .takeover-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.capabilities .routine-form { padding: 20px; border: 1px solid var(--line); border-radius: 14px; }
+.capabilities .routine-weekdays, .capabilities .schedule-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.capabilities .file-row, .capabilities .search-result, .capabilities .control-tool { display: flex; gap: 12px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+.capabilities .file-row > span, .capabilities .search-result > span { flex: 1; }
+.capabilities .mascot-choices, .capabilities .color-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.capabilities .color-choices button { width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; }
+.capabilities .capability-owner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.capabilities .capability-owner > span { color: var(--muted); font-size: 12px; }
+.capability-review { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 24px; }
+.capabilities .provider-settings { --ai-text: var(--ink); --ai-muted: var(--secondary); --ai-line: var(--line); }
+.capabilities .provider-settings [class^="ai-"] { color: inherit; }
+.capabilities .provider-settings :is(.ai-mode-switch, .ai-notice, .ai-model-search, .ai-terminal) { background: var(--surface-muted); color: var(--ink); }
+.capabilities .provider-settings :is(.ai-source-card, .ai-provider-card, .ai-connect-card, .ai-key-form, .ai-model-menu) { background: var(--surface); color: var(--ink); }
+.capabilities .live-desk-grid, .capabilities .skill-template-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.capabilities .studio-search-results, .capabilities .conversation-organizer, .capabilities .connector-event-setup, .capabilities .private-runner-guide { display: grid; gap: 12px; }
+.capabilities .runner-presence { display: flex; gap: 12px; align-items: center; }
+.capabilities .oauth-setup-disclosure { background: var(--surface-muted); }
+.detail-drawer:has(.capabilities) { width: min(880px, 100vw); }
+.detail-drawer:has(.capability-computer), .detail-drawer:has(.capability-live) { width: min(1120px, 100vw); }
+@media (max-width: 600px) {
+  .capabilities [class$="-grid"] { grid-template-columns: minmax(0, 1fr); }
+  .capabilities [class$="-card"], .capabilities [class$="-section"], .capabilities .routine-form { padding: 16px; }
+  .capabilities input:not([type="checkbox"]):not([type="radio"]), .capabilities textarea, .capabilities select { font-size: 16px; }
+}
+
+/* Artifacts — finished work as first-class objects. */
+.capability-artifacts .friendly-note { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); margin-block: 4px 16px; }
+.capability-artifacts .friendly-note p { margin: 0; }
+.capability-artifacts .file-list { display: grid; gap: 8px; }
+.capability-artifacts .file-list > button { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.capability-artifacts .file-list > button:hover { background: var(--surface-muted); }
+.capability-artifacts .file-list > button strong { display: block; font-weight: 500; font-size: 13px; }
+.capability-artifacts .file-list > button small { color: var(--muted); }
+.capability-artifacts .artifact-revision { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.capability-artifacts .artifact-revision strong { display: block; font-weight: 500; font-size: 13px; }
+.capability-artifacts .artifact-revision small { color: var(--muted); }
+.capability-artifacts .artifact-revision-actions { display: inline-flex; gap: 8px; }
+.capability-artifacts .artifact-revision-actions a { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--secondary); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; text-decoration: none; }
+.capability-artifacts .artifact-revision-actions a:hover { background: var(--surface-muted); color: var(--ink); }
+.capability-artifacts button.text-action { background: none; border: 0; cursor: pointer; font: inherit; }
+
+/* Setup checklist — first-run readiness in the control panel. */
+.capability-control .setup-checklist { display: grid; gap: 8px; }
+.capability-control .setup-checklist > div { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.capability-control .setup-checklist > div.done { color: var(--muted); }
+.capability-control .setup-checklist > div.done svg { color: var(--secondary); }
+.capability-control .setup-checklist strong { display: block; font-weight: 500; font-size: 13px; }
+.capability-control .setup-checklist small { color: var(--muted); }
+.capability-control .setup-checklist a { font-size: 12px; color: var(--secondary); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; text-decoration: none; white-space: nowrap; }
+.capability-control .setup-checklist a:hover { background: var(--surface-muted); color: var(--ink); }

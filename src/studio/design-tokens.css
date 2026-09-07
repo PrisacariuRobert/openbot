@@ -1,0 +1,207 @@
+/* One semantic palette. Character colors are deliberately outside this system. */
+:root,
+:root[data-appearance="light"] {
+  color-scheme: light;
+  --canvas: #fff;
+  --surface: #fff;
+  --sidebar: #f6f6f6;
+  --surface-muted: #f1f1f1;
+  --hover: #f3f3f3;
+  --selection: #e9e9e9;
+  --ink: #202020;
+  --secondary: #525252;
+  --muted: #6b6b6b;
+  --line: #e5e5e5;
+  --line-strong: #a7a7a7;
+  --focus: #525252;
+  --strong: #202020;
+  --on-strong: #fff;
+  --code-strong: #393939;
+  --brand-filter: grayscale(1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    color-scheme: dark;
+    --canvas: #171717;
+    --surface: #1e1e1e;
+    --sidebar: #151515;
+    --surface-muted: #282828;
+    --hover: #2c2c2c;
+    --selection: #353535;
+    --ink: #efefef;
+    --secondary: #cecece;
+    --muted: #ababab;
+    --line: #373737;
+    --line-strong: #727272;
+    --focus: #dadada;
+    --strong: #ededed;
+    --on-strong: #202020;
+    --code-strong: #d4d4d4;
+    --brand-filter: grayscale(1) invert(1);
+  }
+}
+:root[data-appearance="dark"] {
+  color-scheme: dark;
+  --canvas: #171717;
+  --surface: #1e1e1e;
+  --sidebar: #151515;
+  --surface-muted: #282828;
+  --hover: #2c2c2c;
+  --selection: #353535;
+  --ink: #efefef;
+  --secondary: #cecece;
+  --muted: #ababab;
+  --line: #373737;
+  --line-strong: #727272;
+  --focus: #dadada;
+  --strong: #ededed;
+  --on-strong: #202020;
+  --code-strong: #d4d4d4;
+  --brand-filter: grayscale(1) invert(1);
+}
+html,
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.workspace {
+  background: var(--canvas);
+}
+.sidebar,
+.conversation-context {
+  background: var(--sidebar);
+}
+.from-you .message-file {
+  color: var(--ink);
+  background: var(--surface);
+}
+.from-you .prose a:not(.message-file) {
+  text-underline-offset: 3px;
+}
+.topbar button {
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+.topbar button:hover {
+  background: var(--hover);
+}
+.topbar .conversation-identity:focus-visible {
+  outline-offset: -2px;
+}
+.conversation-row {
+  transition: background 120ms ease;
+}
+.composer {
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.composer:focus-within {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.chat-scroll {
+  scrollbar-gutter: stable;
+}
+.sidebar-conversations {
+  overflow-y: auto;
+  min-height: 0;
+}
+.conversation-row[aria-current="page"] {
+  background: var(--selection);
+}
+.send:disabled {
+  opacity: 1;
+  background: var(--selection);
+  color: var(--muted);
+}
+.appearance-setting {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.browser-access-card {
+  border-block: 1px solid var(--line);
+  padding: 15px 0;
+  margin: 10px 0 20px;
+}
+.browser-access-card summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.browser-access-card summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--muted);
+}
+.browser-access-card[open] summary::after {
+  content: "−";
+}
+.browser-access-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 13px;
+}
+.browser-paths {
+  display: grid;
+  gap: 10px;
+  padding-block: 17px 0;
+}
+.browser-paths > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+.browser-paths small {
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+}
+button[aria-label]:not(:disabled) {
+  touch-action: manipulation;
+}
+@media (max-width: 720px) {
+  .composer textarea {
+    font-size: 16px;
+  }
+  .topbar button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .composer-bar .add-file,
+  .choice-compact .choice-trigger {
+    min-height: 40px;
+  }
+  .choice-popover > button {
+    min-height: 44px;
+  }
+  .chat-compose {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar button,
+  .conversation-row,
+  .composer {
+    transition: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --line: var(--line-strong);
+  }
+  .composer,
+  .message-file,
+  .choice-trigger {
+    border-width: 2px;
+  }
+}
