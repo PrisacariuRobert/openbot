@@ -672,6 +672,11 @@ try {
     `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
   );
 } finally {
+  // Drain intercepted polling before disposing its request context, so teardown
+  // cannot mask an assertion failure with an unhandled route.fetch rejection.
+  for (const context of browser?.contexts() ?? []) {
+    for (const page of context.pages()) await page.unrouteAll({ behavior: "wait" });
+  }
   await browser?.close();
   child.kill("SIGTERM");
   for (
