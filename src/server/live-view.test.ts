@@ -121,3 +121,43 @@ test("a viewer leaving while the source is still starting prevents a leaked sour
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(stopped, true);
 });
+
+test("a late viewer immediately receives the idle screen; offline and ended sessions discard it", async () => {
+  let emit!: (event: LiveViewEvent) => void;
+  let starts = 0, stops = 0;
+  const hub = new LiveViewHub(async (_id, callback) => { starts++; emit = callback; return { stop() { stops++; } }; });
+  const first = () => {}, seen: LiveViewEvent[] = [];
+  hub.subscribe("nova", first); await Promise.resolve();
+  const ready = { type: "status", browser: "ready", title: "Fixture inbox" } as const;
+  emit(ready); emit({ type: "frame", jpeg: "old" }); emit({ type: "frame", jpeg: "current" });
+  const late = (event: LiveViewEvent) => seen.push(event);
+  hub.subscribe("nova", late);
+  assert.equal(starts, 1);
+  assert.deepEqual(seen, [ready, { type: "frame", jpeg: "current" }]);
+  emit({ type: "status", browser: "unavailable" });
+  emit({ type: "frame", jpeg: "late-offline-frame" });
+  const offline: LiveViewEvent[] = [], third = (event: LiveViewEvent) => offline.push(event);
+  hub.subscribe("nova", third);
+  assert.deepEqual(offline, [{ type: "status", browser: "unavailable" }]);
+  for (const viewer of [first, late, third]) hub.unsubscribe("nova", viewer);
+  assert.equal(stops, 1);
+  const reopened: LiveViewEvent[] = [], fourth = (event: LiveViewEvent) => reopened.push(event);
+  hub.subscribe("nova", fourth); await Promise.resolve();
+  assert.deepEqual(reopened, [], "A new session must not reuse private frames from its predecessor");
+  hub.unsubscribe("nova", fourth);
+});
+
+test("a retired source cannot emit into, stop or fail a replacement session", async () => {
+  const pending: Array<{ emit: (event: LiveViewEvent) => void; resolve: (source: LiveViewSource) => void; reject: (error: Error) => void }> = [];
+  const hub = new LiveViewHub((_id, emit) => new Promise((resolve, reject) => pending.push({ emit, resolve, reject })));
+  const first = () => {}, seen: LiveViewEvent[] = [], second = (event: LiveViewEvent) => seen.push(event);
+  hub.subscribe("nova", first); hub.unsubscribe("nova", first); hub.subscribe("nova", second);
+  pending[0]!.emit({ type: "frame", jpeg: "private-old-frame" });
+  pending[0]!.reject(new Error("old failure"));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  pending[1]!.emit({ type: "frame", jpeg: "new-frame" });
+  let stopped = 0;
+  pending[1]!.resolve({ stop() { stopped++; } }); await Promise.resolve();
+  assert.deepEqual(seen, [{ type: "frame", jpeg: "new-frame" }]);
+  hub.unsubscribe("nova", second); assert.equal(stopped, 1);
+});

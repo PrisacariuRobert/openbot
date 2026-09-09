@@ -24,6 +24,8 @@ test("a consultation that cannot start reports its failure privately and release
     assert.match(db.getRun(child.id)?.error || "", /model is not configured/);
     assert.equal(db.getRun(parent.id)?.status, "queued");
     assert.equal(db.getRun(parent.id)?.consultationPending, false);
+    assert.match(db.getRun(parent.id)?.prompt || "", /Never upgrade a partial review to a pass/);
+    assert.match(db.getRun(parent.id)?.prompt || "", /do not close out older unrelated requests/);
     assert.match(db.listAgentInbox("pixel", "team-room")[0]?.body || "", /could not start/);
     assert.equal(db.getState("team-room").messages.some((message) => message.runId === child.id), false);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
@@ -42,6 +44,26 @@ test("current task prompts surface relevant methods, honor opt-outs and preserve
     new CommunitySkills(db).remove("bundled-document-to-action-items");
     assert.doesNotMatch(runner["buildPrompt"](run, db.getBot("nova")!, true), /bundled-document-to-action-items/);
     assert.doesNotMatch(runner["buildPrompt"]({ ...run, expectedWorkKind: "morning" }, db.getBot("nova")!, false), /Reviewed methods already available/);
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("only private findings from this job family enter the active prompt", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-signal-context-")), db = new OpenBotDatabase(root);
+  try {
+    const old = db.createRun({ threadId: "bot-pixel", botId: "nova", prompt: "Old task", status: "completed" });
+    const run = db.createRun({ threadId: "bot-pixel", botId: "pixel", prompt: "Current check", status: "running" });
+    const helper = db.createRun({ threadId: "bot-pixel", botId: "nova", parentRunId: run.id, prompt: "Current review", status: "completed" });
+    for (const [id, body] of [[old.id, "UNRELATED PRIVATE FINDING"], [helper.id, "CURRENT PRIVATE FINDING"]]) {
+      db.addAgentMessage({ threadId: "bot-pixel", fromBotId: "nova", toBotId: "pixel", body: body!, kind: "finding", expectsReply: false, runId: id!, hopCount: 1, dedupeKey: id! });
+    }
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const prompt = runner["buildPrompt"](run, db.getBot("pixel")!, true);
+    assert.match(prompt, /CURRENT PRIVATE FINDING/);
+    assert.doesNotMatch(prompt, /UNRELATED PRIVATE FINDING/);
+    assert.match(prompt, /Host action receipts/);
+    const newPrompt = runner["buildPrompt"](run, db.getBot("pixel")!, false);
+    assert.match(newPrompt, /new request/);
+    assert.doesNotMatch(newPrompt, /Continue the existing task/);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

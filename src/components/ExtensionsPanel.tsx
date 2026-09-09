@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { BookOpen, Cable, Check, LoaderCircle, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BookOpen, Cable, Check, Download, LoaderCircle, Plus, Search, Trash2, Upload } from "lucide-react";
 import type { Bot } from "../shared/types";
 import type { CommunitySkill, McpConnection } from "../shared/extensions";
 import type { PrivateMemory } from "../shared/private-memory";
@@ -13,18 +13,20 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
 }
 type Preview = Omit<CommunitySkill, "id" | "botIds" | "installedAt">;
 
-export function ExtensionsPanel({ bots, skillsOnly = false }: { bots: Bot[]; skillsOnly?: boolean }) {
+export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { bots: Bot[]; skillsOnly?: boolean; selectedBotId?: string }) {
   const [tab, setTab] = useState<"connections" | "skills" | "memory">(skillsOnly ? "skills" : "connections");
   const [state, setState] = useState<{ connections: McpConnection[]; skills: CommunitySkill[]; oauth?: { hostOnly: boolean } }>({ connections: [], skills: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
-  const [botId, setBotId] = useState(bots[0]?.id || "");
+  const [localBotId, setBotId] = useState(bots[0]?.id || "");
+  const botId = selectedBotId ?? localBotId;
   const [skillSearch, setSkillSearch] = useState("");
   const [name, setName] = useState(""), [url, setUrl] = useState(""), [token, setToken] = useState(""), [loopback, setLoopback] = useState(false);
   const [mode, setMode] = useState<"http" | "stdio">("http"); const [command, setCommand] = useState(""); const [argsText, setArgsText] = useState(""); const [envText, setEnvText] = useState("");
   const [source, setSource] = useState(""), [markdown, setMarkdown] = useState(""), [preview, setPreview] = useState<Preview | null>(null);
+  const skillFile = useRef<HTMLInputElement>(null);
   const [memories, setMemories] = useState<PrivateMemory[]>([]), [memoryKey, setMemoryKey] = useState(""), [memoryText, setMemoryText] = useState("");
   const [memoryRevision, setMemoryRevision] = useState<string | undefined>(), [memoryExpiry, setMemoryExpiry] = useState("");
-  useEffect(() => { setMemoryRevision(undefined); setMemoryExpiry(""); }, [botId]);
+  useEffect(() => { setMemories([]); setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }, [botId]);
   const load = async () => setState(await request(""));
   useEffect(() => { void load().catch((error) => setError(String(error.message))); }, []);
   useEffect(() => {
@@ -48,7 +50,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false }: { bots: Bot[]; ski
   return <section className={`extensions-panel ${skillsOnly ? "included-library" : ""}`} aria-label="Open extensions">
     <header><div><span className="extension-eyebrow">Made to work your way</span><h3>{skillsOnly ? "Ready-to-use skills" : "Tools, skills & memory"}</h3><p>{skillsOnly ? "Useful methods, already here. Your teammates choose the right one for your task." : "Use an included skill, add an open connection, or correct what a teammate remembers."}</p></div><Cable size={24} aria-hidden="true" /></header>
     {!skillsOnly && <nav aria-label="Extension sections">{([['connections', 'Connections'], ['skills', 'Skills'], ['memory', 'Memory']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setError(""); setNotice(""); }}>{label}</button>)}</nav>}
-    <label className="extension-teammate">Teammate<select value={botId} onChange={(event) => { setBotId(event.target.value); setMemories([]); setMemoryKey(""); setMemoryText(""); }}>{bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
+    {selectedBotId === undefined && <label className="extension-teammate">Teammate<select value={botId} onChange={(event) => { setBotId(event.target.value); }}>{bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>}
     {error && <p role="alert" className="extension-error">{error}</p>}{notice && <p role="status" className="extension-notice"><Check size={16} />{notice}</p>}
     <fieldset disabled={busy || !botId}>
     {tab === "connections" && <>
@@ -111,13 +113,33 @@ export function ExtensionsPanel({ bots, skillsOnly = false }: { bots: Bot[]; ski
     {tab === "skills" && <>
       <label className="app-search"><Search size={16} /><input type="search" aria-label="Find a skill" placeholder="Find a skill" value={skillSearch} onChange={(event) => setSkillSearch(event.target.value)} /></label>
       <p>Included skills are ready for every teammate, including new ones. Turn any off below. They add useful methods—not account access or new software. You can also review and add your own.</p>
-      {state.skills.filter((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(skillSearch.toLowerCase())).map((skill) => <article className="extension-card" key={skill.id}><div className="extension-card-heading"><div><h4><BookOpen size={16} />{skill.name.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</h4><p>{skill.description}</p><small>{skill.bundled ? "Included · " : "Imported · "}{skill.license} · pinned {skill.digest.slice(0, 10)}</small></div><button type="button" aria-label={`${skill.bundled ? "Disable" : "Remove"} ${skill.name}`} onClick={() => { if (window.confirm(skill.bundled ? `Disable ${skill.name} for current and future teammates? You can re-enable it for a teammate below.` : `Remove ${skill.name} from this studio?`)) void run(() => request(`/skills/${skill.id}`, "DELETE"), skill.bundled ? "Skill disabled. You can re-enable it for any teammate." : "Skill removed."); }}><Trash2 size={16} /></button></div>
+      {state.skills.filter((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(skillSearch.toLowerCase())).map((skill) => <article className="extension-card" key={skill.id}><div className="extension-card-heading"><div><h4><BookOpen size={16} />{skill.name.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</h4><p>{skill.description}</p><small>{skill.bundled ? "Included · " : "Imported · "}{skill.license} · pinned {skill.digest.slice(0, 10)}</small></div><div className="extension-actions"><button type="button" aria-label={`Share ${skill.name}`} onClick={() => void run(async () => {
+          const shared = await request<{ kind: string; version: number; name: string; bundle: { files: Record<string, string>; source: string } }>(`/skills/${skill.id}/share`);
+          const url = URL.createObjectURL(new Blob([`${JSON.stringify(shared, null, 2)}\n`], { type: "application/json" }));
+          const link = document.createElement("a");
+          link.href = url; link.download = `${shared.name}.openbot-skill.json`;
+          document.body.appendChild(link); link.click(); link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1_000);
+        }, "Skill file downloaded. The importer reviews the exact bundle before installing.")}><Download size={16} /></button><button type="button" aria-label={`${skill.bundled ? "Disable" : "Remove"} ${skill.name}`} onClick={() => { if (window.confirm(skill.bundled ? `Disable ${skill.name} for current and future teammates? You can re-enable it for a teammate below.` : `Remove ${skill.name} from this studio?`)) void run(() => request(`/skills/${skill.id}`, "DELETE"), skill.bundled ? "Skill disabled. You can re-enable it for any teammate." : "Skill removed."); }}><Trash2 size={16} /></button></div></div>
         <label className="extension-check"><input type="checkbox" checked={skill.botIds.includes(botId)} onChange={(event) => void run(() => request(`/skills/${skill.id}/access`, "PATCH", { botIds: event.target.checked ? [...skill.botIds, botId] : skill.botIds.filter((id) => id !== botId) }), "Skill access updated.")} />Available to {bots.find((bot) => bot.id === botId)?.name}</label>
         <details><summary>Reviewed source & instructions</summary><p>{skill.source}</p><pre>{skill.instructions}</pre></details>
       </article>)}
       {skillSearch && !state.skills.some((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(skillSearch.toLowerCase())) && <p>No matching skills. Try another name.</p>}
       <details className="extension-add"><summary><Plus size={16} />Review a community skill</summary>
         <form onSubmit={(event) => { event.preventDefault(); void run(async () => setPreview(await request<Preview>("/skills/fetch", "POST", { url: source })), "Downloaded for review. Not installed yet."); }}><label>Raw SKILL.md address<input type="url" required value={source} placeholder="https://raw.githubusercontent.com/…/SKILL.md" onChange={(event) => { setSource(event.target.value); setPreview(null); }} /></label><button type="submit">Load from URL</button></form>
+        <div className="extension-divider">or open a shared skill file</div>
+        <input ref={skillFile} type="file" className="visually-hidden" accept=".json,application/json" onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (skillFile.current) skillFile.current.value = "";
+          if (!file) return;
+          void run(async () => {
+            if (file.size > 256_000) throw new Error("That skill file is too large. Choose one under 256 KB.");
+            const shared = JSON.parse(await file.text()) as { kind?: unknown; bundle?: unknown };
+            if (shared.kind !== "openbot-skill" || !shared.bundle) throw new Error("That file is not an OpenBot skill file.");
+            setPreview(await request<Preview>("/skills/inspect", "POST", shared.bundle));
+          }, "Shared skill loaded for review. Not installed yet.");
+        }} />
+        <button type="button" onClick={() => skillFile.current?.click()}><Upload size={15} />Open shared file</button>
         <div className="extension-divider">or paste a self-contained SKILL.md</div>
         <label>Skill contents<textarea rows={7} value={markdown} placeholder={'---\nname: meeting-review\ndescription: Review meeting notes\n---\nYour instructions…'} onChange={(event) => { setMarkdown(event.target.value); setPreview(null); }} /></label>
         <button type="button" disabled={!markdown.trim()} onClick={() => void run(async () => setPreview(await request<Preview>("/skills/inspect", "POST", { files: { "SKILL.md": markdown }, source: "Manually provided by the studio owner" })), "Ready to review. Not installed yet.")}>Review pasted skill</button>

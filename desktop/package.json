@@ -1,0 +1,84 @@
+{
+  "name": "openbot-desktop",
+  "productName": "OpenBot",
+  "version": "0.37.0-beta.1",
+  "description": "OpenBot desktop shell — your AI team, on the computer you own.",
+  "author": "Robert Prisacariu",
+  "license": "MIT",
+  "private": true,
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "app.openbot.desktop",
+    "productName": "OpenBot",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.mjs",
+      "navigation.mjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime/openbot",
+        "to": "openbot"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}

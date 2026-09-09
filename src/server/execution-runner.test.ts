@@ -15,6 +15,12 @@ import {
 
 // Real OS processes, no model credentials or external requests. A child fixture
 // can deliberately hang, ignore TERM, stream malformed output or report usage.
+function assertNoFalseFinishedAnswer(db: OpenBotDatabase, run: { id: string; threadId: string }) {
+  const messages = db.getState(run.threadId).messages.filter(message => message.runId === run.id);
+  assert.equal(messages.some(message => message.senderType === "bot"), false, "A failed runtime must not publish a finished answer");
+  assert.equal(messages.filter(message => message.senderType === "system" && message.eventType === "run_stopped").length, 1, "The host must report the failure once in the conversation");
+}
+
 function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expectedWorkKind?: "morning" | "inbox") {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-execution-test-"));
   const db = new OpenBotDatabase(root);
@@ -96,9 +102,47 @@ test("exit zero after a tool or explicit runtime error cannot post a false finis
       const run = await f.start();
       assert.equal(run.status, "failed");
       assert.equal(run.partialText, "Starting work.");
-      assert.equal(f.db.getState(run.threadId).messages.some(message => message.runId === run.id), false);
+      assertNoFalseFinishedAnswer(f.db, run);
     } finally { await f.close(); }
   }
+});
+
+test("a clean exit after a completed read gets one same-task continuation, retaining usage and avoiding premature delivery", async () => {
+  const f = fixture(`import fs from 'node:fs';
+const marker='.continued-once';
+console.log(JSON.stringify({type:'step_finish',sessionID:'continuation-session',part:{id:fs.existsSync(marker)?'second':'first',tokens:{input:100,output:20}}}));
+if (!fs.existsSync(marker)) {fs.writeFileSync(marker,'yes');console.log(JSON.stringify({type:'tool_use',part:{type:'tool',tool:'workspace_read',state:{status:'completed'}}}));}
+else console.log(JSON.stringify({type:'text',text:'Checked the saved result. Nothing was repeated.'}));`);
+  try {
+    const first = await f.start();
+    assert.equal(first.status, 'queued');
+    assert.equal(first.completionRepairCount, 1);
+    assert.equal(first.inputTokens, 100);
+    assert.equal(f.db.getState(first.threadId).messages.some(message => message.runId === first.id), false);
+    const second = await f.start();
+    assert.equal(second.id, first.id);
+    assert.equal(second.status, 'completed');
+    assert.equal(second.inputTokens, 200);
+    assert.equal(second.completionRepairCount, 1);
+    assert.match(second.summary!, /Nothing was repeated/);
+  } finally { await f.close(); }
+});
+
+test("intermediate continuation cannot loop or turn an unconfirmed write into an automatic retry", async () => {
+  const f = fixture(`console.log(JSON.stringify({type:'tool_use',part:{type:'tool',tool:'task_plan',state:{status:'completed'}}}));`);
+  try {
+    assert.equal((await f.start()).status, 'queued');
+    const second = await f.start();
+    assert.equal(second.status, 'failed');
+    assert.equal(second.completionRepairCount, 1);
+    assertNoFalseFinishedAnswer(f.db, second);
+  } finally { await f.close(); }
+  const write = fixture(`console.log(JSON.stringify({type:'tool_use',part:{type:'tool',tool:'browser_click',state:{status:'completed'}}}));`);
+  try {
+    const result = await write.start();
+    assert.equal(result.status, 'failed');
+    assert.equal(result.completionRepairCount, 0);
+  } finally { await write.close(); }
 });
 
 test(
@@ -118,12 +162,7 @@ test(
       assert.equal(run.partialText, "Partial work");
       assert.equal(f.child().signalCode, "SIGKILL");
       assert.ok(run.activeDurationMs >= 100);
-      assert.equal(
-        f.db
-          .getState(run.threadId)
-          .messages.some((message) => message.runId === run.id),
-        false,
-      );
+      assertNoFalseFinishedAnswer(f.db, run);
     } finally {
       await f.close();
     }
@@ -203,12 +242,7 @@ test(
     try {
       const result = await log.start();
       assert.equal(result.status, "failed");
-      assert.equal(
-        log.db
-          .getState(result.threadId)
-          .messages.some((message) => message.runId === result.id),
-        false,
-      );
+      assertNoFalseFinishedAnswer(log.db, result);
     } finally {
       await log.close();
     }
@@ -254,7 +288,8 @@ test(
     );
     try {
       const result = await f.start();
-      assert.match(result.error || "", /task reached its token limit/);
+      assert.equal(result.status, "awaiting_approval");
+      assert.equal(f.db.getApproval(result.approvalId!)?.kind, "budget");
       assert.equal(result.inputTokens, 55);
       const reopened = new OpenBotDatabase(f.db.rootDir);
       try {
@@ -347,6 +382,24 @@ test(
   },
 );
 
+for (const nextStatus of ["queued", "running", "cancelled"] as const) {
+  test(`approval shutdown preserves a fast ${nextStatus} decision`, { timeout: 5000 }, async () => {
+    const f = fixture('console.log(JSON.stringify({type:"step_finish",part:{id:"a",tokens:{input:10,output:2}}}));setInterval(()=>{},1000)');
+    try {
+      const done = f.start();
+      await once(f.child().stdout!, "data");
+      f.db.createApproval({ runId: f.run.id, botId: "nova", kind: "external", reason: "Review", actionLabel: "Send fixture", action: {} });
+      f.runner.pauseForApproval(f.run.id);
+      assert.equal(f.runner.isApprovalPaused(f.run.id), true, "The retiring worker loses tool access immediately");
+      f.db.updateRun(f.run.id, { status: nextStatus });
+      const result = await done;
+      assert.equal(result.status, nextStatus, "An old child's SIGTERM must not cancel a queued continuation or approved action in flight");
+      assert.equal(result.inputTokens, 10);
+      assert.equal(f.runner.isApprovalPaused(f.run.id), false);
+    } finally { await f.close(); }
+  });
+}
+
 test(
   "shutdown waits for an uncooperative worker before requeuing its saved work",
   { timeout: 5000 },
@@ -384,15 +437,15 @@ test("a shared job cap stops running, queued, and approval-waiting consultants w
     const approval = f.db.createApproval({ runId: nested.id, botId: "scout", kind: "external", reason: "Review", actionLabel: "Send", action: {} });
     const other = f.db.createRun({ threadId: f.run.threadId, botId: "scout", prompt: "Unrelated task", status: "queued" });
     const result = await f.start();
-    assert.equal(result.status, "failed");
-    assert.match(result.error || "", /shared token limit/);
-    assert.equal(f.db.getRun(pending.id)?.status, "cancelled");
-    assert.equal(f.db.getRun(nested.id)?.status, "cancelled");
+    assert.equal(result.status, "awaiting_approval");
+    assert.equal(f.db.getApproval(result.approvalId!)?.kind, "budget");
+    assert.equal(f.db.getRun(pending.id)?.status, "awaiting_approval");
+    assert.equal(f.db.getRun(nested.id)?.status, "awaiting_approval");
     assert.equal(f.db.getRun(finished.id)?.status, "completed");
     assert.ok(!f.db.listApprovals().some((item) => item.id === approval.id));
     assert.equal(f.db.getRun(other.id)?.status, "queued");
     assert.equal(f.db.getJobUsage(result.id).totalTokens, 75);
-    assert.ok(!f.db.getState(result.threadId).messages.some((message) => message.runId === result.id));
+    assert.equal(f.db.listMessages(result.threadId).filter(message => message.runId === result.id && message.senderType === 'bot').length, 0);
   } finally { await f.close(); }
 });
 
@@ -410,8 +463,9 @@ test("steering and a database restart cannot reset the shared job allowance", as
     } finally { reopened.close(); }
     f.runner["executeRun"](next);
     assert.equal(f.child(), undefined, "No model process may start once the family is over budget");
-    assert.equal(f.db.getRun(next.id)?.status, "cancelled");
-    assert.match(f.db.getRun(f.run.id)?.error || "", /shared token limit/);
+    assert.equal(f.db.getRun(next.id)?.status, "awaiting_approval");
+    assert.equal(f.db.getRun(f.run.id)?.status, "cancelled", "Do not resurrect the historical root");
+    assert.equal(f.db.getApproval(f.db.getRun(next.id)!.approvalId!)?.kind, "budget");
   } finally { await f.close(); }
 });
 
@@ -425,8 +479,8 @@ test("a consultant's recorded usage stops its running coordinator without stoppi
     f.db.updateRun(sibling.id, { inputTokens: 50 });
     assert.equal(f.runner["enforceJobBudget"](sibling.id), true);
     const result = await done;
-    assert.equal(result.status, "failed");
-    assert.equal(f.db.getRun(sibling.id)?.status, "cancelled");
+    assert.equal(result.status, "awaiting_approval");
+    assert.equal(f.db.getRun(sibling.id)?.status, "awaiting_approval");
     assert.equal(f.db.getRun(root.id)?.status, "waiting_for_teammate", "Unrelated coordinator is unaffected");
   } finally { await f.close(); }
 });
@@ -439,9 +493,9 @@ test("parallel consultants share one budget and cannot resume their waiting coor
     const first = f.db.createRun({ threadId: f.run.threadId, botId: "pixel", parentRunId: f.run.id, prompt: "First part", status: "queued" });
     const second = f.db.createRun({ threadId: f.run.threadId, botId: "scout", parentRunId: f.run.id, prompt: "Second part", status: "queued" });
     const results = await Promise.all([f.start(first.id), f.start(second.id)]);
-    assert.deepEqual(results.map((run) => run.status), ["cancelled", "cancelled"]);
+    assert.deepEqual(results.map((run) => run.status), ["awaiting_approval", "awaiting_approval"]);
     assert.equal(f.db.getJobUsage(f.run.id).totalTokens, 60);
-    assert.equal(f.db.getRun(f.run.id)?.status, "failed");
+    assert.equal(f.db.getRun(f.run.id)?.status, "awaiting_approval");
     assert.equal(f.runner["resumeCoordinatorIfReady"](f.run.id), false);
     assert.equal(f.db.listRuns(f.run.threadId).filter((run) => run.status === "running").length, 0);
   } finally { await f.close(); }
@@ -463,7 +517,7 @@ test("a promised report is repaired once, then fails honestly without publishing
     assert.equal(second.status, "failed");
     assert.match(second.error || "", /did not save/);
     assert.equal(second.inputTokens, 20);
-    assert.ok(!f.db.getState(second.threadId).messages.some((message) => message.runId === second.id));
+    assertNoFalseFinishedAnswer(f.db, second);
     const steered = f.db.createRun({ botId: "nova", threadId: second.threadId, prompt: "Continue", status: "queued", steeredFromRunId: second.id });
     assert.equal(steered.expectedWorkKind, "morning");
     assert.equal(steered.completionRepairCount, 1);

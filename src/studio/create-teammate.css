@@ -43,6 +43,26 @@
 .custom-character-color input { padding: 2px; width: 40px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); filter: grayscale(1); }
 .appearance-editor { border-top: 1px solid var(--line); margin: 22px 0; padding-top: 16px; }
 .appearance-editor summary { cursor: pointer; font-size: 13px; }
+.profile-import { border-top: 1px solid var(--line); margin: 18px 0 0; padding-top: 16px; display: grid; gap: 12px; }
+.profile-import summary { cursor: pointer; font-size: 13px; color: var(--secondary); }
+.profile-import[open] { padding-bottom: 4px; }
+.profile-import label { display: grid; gap: 8px; color: var(--secondary); font-size: 13px; font-weight: 500; }
+.profile-import input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; background: var(--surface); color: inherit; }
+.import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.import-actions > button:not(.text-action) { min-height: 36px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.import-actions > button:not(.text-action):disabled { opacity: .5; cursor: default; }
+.import-plan { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted, #f4f4f4); font-size: 13px; }
+.import-plan p { margin: 0; }
+.import-plan .import-role { color: var(--secondary); font-size: 12px; }
+.import-plan ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.import-plan .import-skipped { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.team-template-list { display: grid; gap: 6px; }
+.team-template-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.team-template-row > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.team-template-row strong { font-size: 13px; font-weight: 550; color: var(--ink); }
+.team-template-row small { font-size: 11.5px; color: var(--muted); }
+.team-template-row button { min-height: 32px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: inherit; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.team-template-row button:disabled { opacity: .5; cursor: default; }
 .appearance-preview { display: flex; align-items: center; gap: 15px; padding-top: 16px; }
 .appearance-preview p { color: var(--muted); font-size: 13px; }
 .create-teammate :is(input, textarea, select) {
@@ -162,3 +182,10 @@
     font-size: 29px;
   }
 }
+.sheet-mode { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-muted, #f4f4f4); }
+.sheet-mode button { flex: 1; min-height: 34px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--secondary); font: inherit; font-size: 12.5px; font-weight: 550; cursor: pointer; white-space: nowrap; }
+.sheet-mode button.current { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.profile-import-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.profile-import-panel > .panel-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.profile-import-panel label { display: grid; gap: 8px; color: var(--secondary); font-size: 13px; font-weight: 500; }
+.profile-import-panel input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; background: var(--surface); color: inherit; }

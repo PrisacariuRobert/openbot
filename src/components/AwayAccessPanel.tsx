@@ -3,7 +3,7 @@ import { CheckCircle2, Globe2, LoaderCircle, QrCode, Smartphone } from "lucide-r
 import "./away-access-panel.css";
 
 type Device = { id: string; name: string; revokedAt: number | null; lastUsedAt: number };
-type Status = { ready: boolean; detail: string; checkedAt: number; devices: Device[] };
+type Status = { ready: boolean; url?: string | null; detail: string; checkedAt: number; devices: Device[] };
 type Invitation = { qr: string; expiresAt: number };
 async function request<T>(path: string, method = "GET"): Promise<T> {
   const response = await fetch(`/api/access${path}`, { method, credentials: "same-origin" });
@@ -49,11 +49,11 @@ export function AwayAccessPanel() {
   return <section className="away-pairing" aria-label="Away access">
     <div className="away-pairing-heading"><span className="away-pairing-icon"><Globe2 size={23} /></span><div>
       <h3>{status?.ready ? "Away access is ready" : "Your studio, wherever you are"}</h3>
-      <p>Just OpenBot on your Mac and iPhone. No extra apps.</p>
+      <p>Your team on your iPhone. No VPN app needed.</p>
     </div></div>
     <div className={`away-pairing-state ${status?.ready ? "ready" : ""}`}>
       {busy ? <LoaderCircle className="spinner" size={19} /> : status?.ready ? <CheckCircle2 size={19} /> : <Globe2 size={19} />}
-      <div><strong>{status?.ready ? "Secure connection checked" : status ? "Relay setup is still needed" : "Checking your connection…"}</strong>
+      <div><strong>{status?.ready ? "Secure connection checked" : status?.url ? "Waiting for the secure address" : status ? "Set up an internet connection" : "Checking your connection…"}</strong>
       <p>{status?.detail || "Checking the studio address and access protection."}</p></div>
     </div>
     {status?.ready && <>

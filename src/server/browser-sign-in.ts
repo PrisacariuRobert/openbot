@@ -51,12 +51,13 @@ export class BrowserSignIns {
     if (block) throw new Error(block);
     const site = new URL(siteOrigin).hostname;
     const approval = this.db.createApproval({ botId, runId, kind: "browser",
-      reason: `${bot.name} needs you to sign in at ${site}. Your task is saved and will wait for you.`,
+      reason: `${bot.name} needs you to sign in at ${site}. Your task is saved and will wait. A visible Chrome window opens for this sign-in on the Mac running OpenBot — finish it there or on the private screen below; both drive the same browser.`,
       actionLabel: `Sign in to ${site}`,
       action: { type: "browser_sign_in", botId, args: { siteOrigin } },
     });
+    this.db.addActivity({ runId, botId, kind: "status", label: "Waiting on you to sign in", detail: `${site} · a visible Chrome window opens for the private handoff` });
     this.db.addMessage({ threadId: run.threadId, senderType: "system", senderId: "openbot", runId,
-      body: `${bot.name} needs your sign-in at ${site}. Open the sign-in request below, finish privately, then continue. Don’t send your password or verification code in chat.` });
+      body: `${bot.name} needs your sign-in at ${site}. A visible Chrome window opens on your Mac — finish it there or on the private screen below. Don’t send your password or verification code in chat.` });
     this.db.enqueueNotification({ dedupeKey: `browser-sign-in:${approval.id}`, kind: "approval",
       title: `${bot.name} needs your sign-in`, body: `Sign in at ${site}, then continue your saved task.`, url: `/studio.html?thread=${encodeURIComponent(run.threadId)}` });
     return approval;

@@ -1,0 +1,24 @@
+/* One stable shell for Settings and its subpages, also before lazy panels load. */
+.detail-drawer.settings-drawer { width: min(780px, 100vw); }
+.detail-drawer.settings-drawer:has(.capability-computer) { width: min(1120px, 100vw); }
+.settings-drawer > header { min-height: 76px; gap: 16px; padding: 16px 28px; }
+.settings-drawer > header h2 { flex: 1; color: var(--ink); font-size: 16px; font-weight: 600; }
+.settings-drawer > header > button { min-width: 40px; min-height: 40px; border-radius: 50%; }
+.settings-drawer > header > button:hover { background: var(--hover); }
+.settings-drawer > header .drawer-back { display: inline-flex; gap: 4px; padding: 0 10px 0 0; border-radius: 8px; font-size: 13px; }
+.settings-drawer .drawer-body { max-width: 780px; margin-inline: auto; padding: 28px; }
+.settings-drawer:has(.capability-computer) .drawer-body { max-width: none; }
+.settings-section-title { margin: 28px 0 8px; font-size: 12px; font-weight: 600; color: var(--secondary); }
+.settings-drawer .auto-review-intro > svg { flex: none; margin-top: 3px; }
+.settings-drawer .auto-review-intro small { display: block; margin-top: 5px; font-size: 12px; }
+.settings-drawer .auto-review-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.settings-drawer .auto-review-form :is(select, input) { min-width: 0; width: 100%; min-height: 42px; font-size: 13px; }
+.settings-drawer .auto-review-form input { grid-column: 1 / -1; }
+.settings-drawer .auto-review-form button { grid-column: 1 / -1; justify-self: end; min-height: 40px; }
+@media (max-width: 600px) {
+  .detail-drawer.settings-drawer { inset: 0; height: 100svh; max-height: 100svh; border-radius: 0; }
+  .settings-drawer > header { padding: 12px 16px; min-height: 64px; }
+  .settings-drawer .drawer-body { padding: 20px; }
+  .settings-drawer .auto-review-form { grid-template-columns: minmax(0, 1fr); }
+  .settings-drawer .auto-review-form :is(select, input) { font-size: 16px; }
+}

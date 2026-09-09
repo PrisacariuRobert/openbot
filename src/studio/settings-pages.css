@@ -1,0 +1,209 @@
+/* Inner Settings pages. Explicit component layouts keep expanded forms in the
+   same design system; do not style arbitrary class suffixes as product cards. */
+.capabilities .connected-account { display: grid; gap: 20px; padding-block: 16px; border-block: 1px solid var(--line); }
+.capabilities .connected-account-top { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.capabilities .connected-account-top > span:last-of-type { flex: 1; min-width: min(220px, 100%); }
+.capabilities .connected-account-top strong { font-size: 15px; }
+.capabilities .connected-account-top small { margin-top: 4px; }
+.capabilities .google-app-stack { display: flex; align-items: center; gap: 6px; }
+.capabilities .google-app-stack > i { display: grid; place-items: center; width: 30px; height: 30px; }
+.capabilities .google-app-stack .connector-symbol { width: 24px; height: 24px; flex-basis: 24px; }
+.capabilities .workspace-checks { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.capabilities .google-service-recovery { display: grid; gap: 16px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.capabilities .google-service-recovery-copy { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px 12px; }
+.capabilities .google-service-recovery-copy > svg { grid-row: 1 / 3; }
+.capabilities .google-service-recovery-copy p { margin: 4px 0 0; font-size: 13px; }
+.capabilities .google-service-recovery-list { display: grid; gap: 12px; }
+.capabilities .google-service-recovery-list > div { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.capabilities .google-service-recovery-list strong { flex: 1; min-width: 140px; font-size: 14px; }
+.capabilities .google-service-recovery-list a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding-inline: 8px; }
+.capabilities .connector-access-list { display: grid; gap: 0; }
+.capabilities .connector-access-list > div { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 4px 12px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.capabilities .connector-access-list > div > .mascot { width: 36px; height: 36px; }
+.capabilities .connector-access-list strong { font-size: 14px; }
+.capabilities .service-access-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; grid-column: 1 / -1; padding-top: 12px; }
+.capabilities .service-access-buttons button { min-width: 0; min-height: 40px; border-radius: 10px; gap: 6px; }
+.capabilities .connector-events { display: grid; }
+.capabilities .connector-events > div { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.capabilities .connector-events strong { display: block; font-size: 13px; line-height: 1.5; font-weight: 550; }
+.capabilities .connector-events small { margin-top: 4px; overflow-wrap: anywhere; }
+.capabilities .connector-events time { padding-top: 3px; font-size: 11px; white-space: nowrap; color: var(--muted); }
+.capabilities .connector-events .event-state { display: grid; place-items: center; width: 28px; height: 28px; background: var(--surface-muted); border-radius: 50%; color: var(--secondary); }
+.capabilities .away-pairing { padding: 20px; background: var(--surface); border-color: var(--line); }
+.capabilities .away-pairing-heading { justify-content: flex-start; flex-wrap: nowrap; margin: 0; }
+.capabilities .away-pairing-heading > div { flex: 1; }
+.capabilities .away-pairing-icon { flex: 0 0 38px; background: var(--surface-muted); color: var(--secondary); }
+.capabilities .away-pairing-state { background: var(--surface-muted); color: var(--ink); border-color: var(--line); }
+.capabilities .away-pairing :is(h3, h4, strong) { color: var(--ink); }
+.capabilities .away-pairing :is(p, small) { color: var(--secondary); }
+.capabilities .away-pairing .away-pairing-primary { background: var(--strong); color: var(--on-strong); border-radius: 22px; }
+.capabilities .away-pairing-footer { padding-top: 4px; }
+.capabilities .away-devices > div { flex-wrap: wrap; }
+@media (max-width: 420px) {
+  .capabilities .service-access-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .capabilities .away-pairing { padding: 16px; }
+}
+.capabilities :is(.control-hero, .remote-hero, .connector-hero, .teach-hero) {
+  padding-bottom: 20px;
+  margin-bottom: 0;
+}
+.capabilities .field { margin-bottom: 8px; }
+.capabilities :is(.routine-fieldset, .conversation-organizer) > legend {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.capabilities :is(.delegation-actions, .conversation-organizer > div, .skill-portability-bar) {
+  display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px;
+  margin: 4px 0;
+}
+.capabilities :is(.friendly-note, .security-footnote, .oauth-boundary) {
+  display: flex; align-items: flex-start; gap: 12px; padding: 16px 0;
+  color: var(--secondary); font-size: 13px;
+}
+.capabilities :is(.friendly-note, .security-footnote, .oauth-boundary) > svg { flex: none; margin-top: 2px; }
+.capabilities :is(.friendly-note, .security-footnote, .oauth-boundary) p { margin: 0; }
+.capabilities :is(.computer-disclosure, .bot-appearance) > summary {
+  display: flex; align-items: center; gap: 10px; list-style: none;
+}
+.capabilities :is(.computer-disclosure, .bot-appearance) > summary::-webkit-details-marker { display: none; }
+.capabilities .computer-disclosure > summary > span { flex: 1; }
+.capabilities .bot-appearance > summary small { margin-left: auto; font-weight: 400; }
+.capabilities .bot-appearance > summary::after { content: "+"; color: var(--secondary); font-size: 18px; }
+.capabilities .bot-appearance[open] > summary::after { content: "−"; }
+
+/* Teammate preferences: identity, instructions, access, then organization. */
+.capabilities .bot-editor { gap: 20px; }
+.capabilities .bot-hero { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; align-items: center; }
+.capabilities .bot-hero > svg { grid-row: 1 / 3; width: 64px; height: 64px; }
+.capabilities .bot-hero > h3 { margin: 0; align-self: end; font-size: 18px; }
+.capabilities .bot-hero > p { margin: 3px 0 0; align-self: start; font-size: 13px; }
+.capabilities .bot-hero .capability-pills { grid-column: 1 / -1; padding: 14px 0 0; }
+.capabilities .bot-editor > details { margin: 0; }
+.capabilities .switch-list { display: grid; gap: 0; border-block: 1px solid var(--line); }
+.capabilities .switch-list > label { display: flex; align-items: center; gap: 16px; min-height: 72px; padding: 16px 0; }
+.capabilities .switch-list > label + label { border-top: 1px solid var(--line); }
+.capabilities .switch-list > label > span { flex: 1; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px 10px; }
+.capabilities .switch-list > label small { grid-column: 2; font-weight: 400; }
+.capabilities .switch-list > div { padding: 0 0 16px 30px; }
+.capabilities .switch-list .delegation-actions { margin-bottom: 12px; }
+.capabilities .teach-callout { display: flex; text-align: left; gap: 12px; padding: 16px; }
+.capabilities .teach-callout > span { flex: 1; }
+.capabilities .teach-callout small { margin-top: 3px; }
+.capabilities .conversation-organizer p { margin: 0 0 8px; }
+
+/* Preference switches keep their native checkbox semantics and label targets.
+   Approval checkboxes elsewhere deliberately retain their ordinary appearance. */
+.capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"] {
+  appearance: none; position: relative; flex: 0 0 40px; width: 40px; height: 24px;
+  margin: 0; border: 1px solid var(--line-strong); border-radius: 20px;
+  background: var(--selection); cursor: pointer; transition: background .16s ease;
+}
+.capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"]::after {
+  content: ""; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px;
+  border-radius: 50%; background: #fff; border: 1px solid var(--line);
+  transition: transform .16s ease;
+}
+.capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"]:checked { background: var(--strong); border-color: var(--strong); }
+.capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"]:checked::after { transform: translateX(16px); background: var(--on-strong); border-color: transparent; }
+.capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input:disabled { opacity: .4; cursor: not-allowed; }
+.capabilities .studio-access-card { align-items: center; }
+
+/* Routines and every trigger-specific form share the same alignment. */
+.capabilities .routine-form { padding: 0; border: 0; border-radius: 0; gap: 24px; }
+.capabilities .routine-form-head { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.capabilities .routine-form-head strong { font-size: 18px; }
+.capabilities .routine-teammates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.capabilities .routine-teammates button { display: grid; grid-template-columns: 32px minmax(0, 1fr) 14px; gap: 8px; text-align: left; padding: 12px 10px; }
+.capabilities .routine-teammates button > svg:first-child { width: 32px; height: 32px; }
+.capabilities .routine-teammates b { font-size: 13px; }
+.capabilities .routine-teammates small { font-size: 11px; font-weight: 400; overflow-wrap: anywhere; }
+.capabilities .trigger-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.capabilities .trigger-fields.one { grid-template-columns: minmax(0, 1fr); }
+.capabilities .trigger-fields label { display: grid; gap: 8px; margin: 0; align-content: start; font-size: 13px; color: var(--secondary); }
+.capabilities .trigger-fields .wide { grid-column: 1 / -1; }
+.capabilities .routine-start { display: flex; align-items: center; gap: 12px; padding-block: 16px; border-block: 1px solid var(--line); }
+.capabilities .routine-start > span { flex: 1; }
+.capabilities .routine-start > i { display: none; }
+.capabilities .routine-preview { display: flex; align-items: flex-start; gap: 10px; color: var(--secondary); }
+.capabilities .routine-preview p { margin: 0; font-size: 13px; }
+.capabilities .routine-preview > svg { margin-top: 3px; }
+.capabilities .routine-health, .capabilities .routine-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.capabilities .routine-history-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+
+/* Activity's expanded computers are real, readable preview cards. */
+.capabilities .live-hero > div > span { display: block; font-size: 11px; color: var(--secondary); margin-bottom: 6px; }
+.capabilities .live-desk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.capabilities .live-desk { border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 16px; }
+.capabilities .live-desk > header { display: flex; align-items: center; gap: 10px; }
+.capabilities .live-desk > header > svg { width: 38px; height: 38px; }
+.capabilities .live-desk > header > span { flex: 1; }
+.capabilities .live-desk i { font-style: normal; font-size: 11px; color: var(--secondary); }
+.capabilities .desk-screen { width: 100%; min-height: 132px; position: relative; overflow: hidden; background: var(--surface-muted); border-color: transparent; }
+.capabilities .desk-screen > span { display: grid; gap: 8px; justify-items: center; padding: 8px; }
+.capabilities .desk-screen > i { position: absolute; right: 10px; bottom: 8px; }
+.capabilities .desk-screen b { font-size: 12px; font-weight: 500; }
+.capabilities .desk-screen img { width: 100%; display: block; }
+.capabilities .desk-work > p { margin: 6px 0 0; font-size: 12px; }
+.capabilities .live-desk > footer { display: flex; flex-wrap: wrap; gap: 8px; }
+.capabilities .action-history-list article, .capabilities .hidden-bot-list > div { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.capabilities :is(.action-history-list article, .hidden-bot-list > div) > span:nth-child(2) { flex: 1; }
+.capabilities .action-history-list time { font-size: 11px; color: var(--secondary); }
+.capabilities :is(.calm-card, .empty-signal, .now-list > div, .attention-list > div) { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.capabilities .calm-card .room-cluster { flex: none; }
+.capabilities .calm-card .room-cluster svg { width: 32px; height: 32px; }
+.capabilities :is(.calm-card, .empty-signal) small { margin-top: 4px; }
+.capabilities .signal-route { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.capabilities .signal-list article { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.capabilities .signal-route b { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--secondary); }
+
+/* Files, app sign-in and phone setup keep long paths inside the content area. */
+.capabilities :is(.callback-row, .access-key-row) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-block: 12px; }
+.capabilities .callback-row code, .capabilities .access-key-row > span { flex: 1; min-width: 140px; }
+.capabilities .access-key-row code { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.capability-files .file-list > button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; }
+.capability-files .file-list > button > span { flex: 1; overflow-wrap: anywhere; }
+.capabilities .file-preview-title { display: flex; align-items: center; gap: 10px; padding-block: 20px 4px; }
+.capabilities .file-preview > pre { max-height: 65svh; }
+.capabilities :is(.project-new-access, .project-access-grid) > label { display: flex; gap: 10px; align-items: center; margin: 0; min-height: 52px; }
+.capabilities :is(.project-new-access, .project-access-grid) > label > span { flex: 1; min-width: 50px; }
+.capabilities :is(.project-new-access, .project-access-grid) select { flex: 0 1 210px; width: auto; max-width: 58%; min-height: 42px; }
+
+/* Extensions are a page, not a second white application nested in Settings. */
+.capabilities .extensions-panel { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.capabilities .extensions-panel h3 { font-size: 18px; margin: 0 0 6px; }
+.capabilities .extension-eyebrow { display: none; }
+.capabilities .extensions-panel .extension-card { background: var(--surface); color: var(--ink); }
+.capabilities .extensions-panel .extension-card h4 { color: var(--ink); }
+.capabilities .extension-actions { flex-wrap: wrap; }
+.capabilities .skill-owner-switcher, .capabilities .skill-owner-switcher > span { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.capabilities .skill-owner-switcher > span { flex: 1; }
+.capabilities .skill-owner-switcher > label { margin: 0; max-width: 220px; }
+.capabilities .teach-visual { float: right; margin: 0 0 12px 16px; }
+.capabilities .teach-visual > svg { width: 52px; height: 52px; }
+.capabilities .teaching-journey { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 0; margin: 0 0 16px; }
+.capabilities .teaching-journey li { display: flex; align-items: flex-start; gap: 8px; }
+.capabilities .teaching-journey li > span { flex: none; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 11px; }
+.capabilities .teaching-journey small { margin-top: 4px; }
+.capabilities .skill-portability-bar { padding-block: 12px; border-block: 1px solid var(--line); }
+.capabilities .skill-portability-bar small { flex-basis: 100%; }
+
+@media (max-width: 600px) {
+  .capabilities :is(.live-desk-grid, .routine-teammates, .trigger-fields, .teaching-journey) { grid-template-columns: minmax(0, 1fr); }
+  .capabilities :is(button, .button-secondary, .button-primary) { min-height: 44px; }
+  .capabilities .routine-teammates button { grid-template-columns: 32px minmax(0, 1fr) 14px; }
+  .capabilities .switch-list > div { padding-left: 0; }
+  .capabilities .live-attention article > button { grid-column: 2 / -1; justify-self: start; }
+  .capabilities .extension-tool { grid-template-columns: minmax(0, 1fr); }
+  .capabilities .extension-card-heading { flex-wrap: wrap; }
+  .capabilities .skill-owner-switcher { align-items: stretch; }
+  .capabilities .skill-owner-switcher > span { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capabilities input[type="checkbox"], .capabilities input[type="checkbox"]::after { transition: none; }
+  .capabilities .studio-access-state.on i { animation: none; }
+}
+@media (forced-colors: active) {
+  .capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"] { appearance: auto; }
+  .capabilities :is(.studio-access-card, .switch-list > label, .routine-start) input[type="checkbox"]::after { display: none; }
+}

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.37.0-beta.1 — 2026-09-07
+
+First public beta candidate: owner-hosted AI teammates on Mac, Linux and Windows (terminal bundles) plus the Mac desktop app. Bring your own AI connection; the studio runs on your hardware and your data stays in your data directory.
+
+- Artifacts are first-class objects: a studio-wide index with per-artifact revision history on web, Mac and API
+- Self-extending studio: a teammate that hits a missing capability can propose writing its own tool; approving restarts the task with your coding model
+- Memory with meaning: optional owner-chosen embeddings connection blends meaning similarity with keyword ranking, with automatic keyword fallback
+- Visible teamwork: live delegations show who waits on whom, with owner recall; teammates retire (history preserved) and seat caps govern roster size
+- YOLO mode: one switch skips every approval with full ledger recording; access grants never change
+- Guided setup: a three-step readiness checklist (runtime, connection, teammate) until the studio works
+- Portable setup: export/import teammates (routines arrive paused, credentials blocked) and share community skill files through the normal review flow
+- Per-teammate security boundaries, weekly token budgets, approved-action receipts, semantic and keyword memory, group chats, routines and automations, web/Mac/iPhone clients
+- Beta limits: unsigned builds with no auto-update (Mac app needs right-click Open on first launch); no managed cloud — the host Mac/PC stays awake for local jobs; Chrome and Docker optional; provider accounts, model costs and OAuth consent remain yours
+
 ## Working tree
 
 - Added **OpenBot-In-Motion**, a 64-second instrumental product-film revision based on the current native conversation UI and shared mascot shapes. It adds request close-ups, animated character handoffs, real-layout file and approval treatments and a desktop-to-phone pullback while keeping the complete work story. Previous cuts remain intact; this is staged marketing, not new runtime functionality or release proof.

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Intentionally minimal: OpenBot is distributed with a Developer ID
+	(never sandboxed) because it runs a loopback-only studio server and spawns
+	its bundled Node/opencode processes. No sandbox, camera, microphone or
+	network entitlements are needed. Hardened runtime is applied at signing
+	time for notarization. -->
+</dict>
+</plist>

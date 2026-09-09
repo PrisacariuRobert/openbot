@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { calendarDeliveryBody, calendarDeliveryMatches, type CalendarDeliveryEvent } from "./calendar-delivery.js";
+import { gmailReplyInputSchema, gmailReplyReviewSchema, type GmailReplyReview } from "../shared/gmail-reply.js";
+import { prepareGmailReply, replyDeliveryId, rawReply, gmailReplyMatches } from "./gmail-reply.js";
 import { ApprovalReviewChangedError, ApprovedConnectorOutcomeUncertainError } from "./approval-review-binding.js";
 import type { CalendarEventSummary, ConnectorCatalogEntry, DriveFileDetail, DriveFileSummary, GmailMessageDetail, GmailMessageSummary, GoogleConnectorService } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
@@ -76,7 +78,7 @@ export function googleServiceCapabilities(connected: boolean, scopes: string[]) 
 export function connectorCatalog(connected: boolean, scopes: string[] = []): ConnectorCatalogEntry[] {
   const capability = googleServiceCapabilities(connected, scopes);
   return [
-    { id: "gmail", name: "Gmail", description: "Search and read mail, then send only after your approval.", badge: connected && !capability.gmail.write ? "Read ready · reconnect to send" : "Available now", availability: "live", connected: capability.gmail.read, writeConnected: capability.gmail.write, capabilities: ["Search inbox", "Read messages", "Approval-safe sending"] },
+    { id: "gmail", name: "Gmail", description: "Read mail, reply in its conversation and review before sending.", badge: connected && !capability.gmail.write ? "Read ready · reconnect to send" : "Available now", availability: "live", connected: capability.gmail.read, writeConnected: capability.gmail.write, capabilities: ["Search inbox", "Read messages", "Reviewed replies", "Approval-safe sending"] },
     { id: "google-drive", name: "Google Drive", description: "Find documents, read current context, and create reviewed text files.", badge: connected && !capability["google-drive"].write ? "Read ready · reconnect to create" : "Available now", availability: "live", connected: capability["google-drive"].read, writeConnected: capability["google-drive"].write, capabilities: ["Search files", "Read documents", "Approval-safe file creation"] },
     { id: "google-calendar", name: "Google Calendar", description: "Check your schedule and add a reviewed event or invitation.", badge: connected && !capability["google-calendar"].write ? "Read ready · reconnect to create" : "Available now", availability: "live", connected: capability["google-calendar"].read, writeConnected: capability["google-calendar"].write, capabilities: ["Read schedule", "See event details", "Approval-safe event creation"] },
     { id: "slack", name: "Slack", description: "Summarize channels and prepare carefully reviewed replies.", badge: "Planned", availability: "next", connected: false, capabilities: ["Search", "Read", "Approval-safe replies"] },
@@ -296,6 +298,58 @@ export class GoogleWorkspaceConnector {
     const result = await this.request<{ id?: string; threadId?: string }>("/gmail/v1/users/me/messages/send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ raw: buildRawEmail(input) }) });
     if (!result.id) throw new Error("Gmail did not confirm that the message was sent.");
     return { id: result.id, threadId: result.threadId || "" };
+  }
+
+  async prepareReply(input: { messageId: string; body: string }): Promise<GmailReplyReview> {
+    const parsed = gmailReplyInputSchema.parse(input);
+    const version = this.db.connectorAuthorizationVersion(CONNECTOR_ID), account = this.db.getConnector(CONNECTOR_ID)?.accountEmail;
+    if (!account) throw new Error("Reconnect Gmail so the replying account can be reviewed.");
+    const message = await this.request<GmailMessage>(`/gmail/v1/users/me/messages/${encodeURIComponent(parsed.messageId)}?format=full`);
+    if (version !== this.db.connectorAuthorizationVersion(CONNECTOR_ID)) throw new ApprovalReviewChangedError();
+    if (message?.id !== parsed.messageId || !message.threadId) throw new Error("Gmail did not return the requested original message.");
+    const params = new URLSearchParams({ format: "metadata" });
+    for (const name of ["Message-ID", "From", "Reply-To", "Subject", "References"]) params.append("metadataHeaders", name);
+    const thread = await this.request<{ id?: string; messages?: GmailMessage[] }>(`/gmail/v1/users/me/threads/${encodeURIComponent(message.threadId)}?${params}`);
+    if (version !== this.db.connectorAuthorizationVersion(CONNECTOR_ID)) throw new ApprovalReviewChangedError();
+    if (thread?.id !== message.threadId || !Array.isArray(thread.messages)) throw new Error("The original conversation is unavailable.");
+    return prepareGmailReply(message, thread.messages, parsed.body, account);
+  }
+
+  async reply(input: GmailReplyReview, approvalId: string) {
+    const review = gmailReplyReviewSchema.parse(input), version = this.db.connectorAuthorizationVersion(CONNECTOR_ID);
+    const assertSameAccount = () => { if (version !== this.db.connectorAuthorizationVersion(CONNECTOR_ID)) throw new ApprovalReviewChangedError(true); };
+    const current = await this.prepareReply({ messageId: review.messageId, body: review.body });
+    if (JSON.stringify(current) !== JSON.stringify(review)) throw new ApprovalReviewChangedError();
+    const deliveryId = replyDeliveryId(approvalId);
+    const raw = rawReply(buildRawEmail(review), review, deliveryId);
+    let accepted: { id?: string; threadId?: string } | undefined;
+    try {
+      accepted = await this.request("/gmail/v1/users/me/messages/send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ raw, threadId: review.threadId }) });
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      assertSameAccount();
+      // A lost response is not permission to send again. Search once instead.
+    }
+    const recovered = !accepted?.id || accepted.threadId !== review.threadId;
+    try {
+      let messageId = accepted?.id;
+      if (recovered) {
+        const params = new URLSearchParams({ q: `in:sent rfc822msgid:${deliveryId.slice(1, -1)}`, maxResults: "2", includeSpamTrash: "true" });
+        const matches = await this.request<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(`/gmail/v1/users/me/messages?${params}`);
+        assertSameAccount();
+        if (matches?.nextPageToken || matches?.messages?.length !== 1) throw new ApprovedConnectorOutcomeUncertainError();
+        messageId = matches.messages[0]!.id;
+      }
+      if (!messageId || !/^[A-Za-z0-9_-]{4,200}$/.test(messageId)) throw new ApprovedConnectorOutcomeUncertainError();
+      const sent = await this.request<GmailMessage>(`/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`);
+      assertSameAccount();
+      if (!gmailReplyMatches(review, deliveryId, sent)) throw new ApprovedConnectorOutcomeUncertainError();
+      return { id: messageId, threadId: review.threadId, to: review.to, recovered, webLink: `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(review.account)}#all/${encodeURIComponent(review.threadId)}` };
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
   }
 
   async searchDrive(query: string, maxResults = 8, signal?: AbortSignal): Promise<DriveFileSummary[]> {

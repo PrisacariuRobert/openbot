@@ -4,18 +4,24 @@ import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const demo = process.argv.includes("--demo");
-const studio = process.argv.includes("--studio");
-const stem = studio
-  ? "openbot-studio-motion"
-  : demo
-    ? "openbot-workflow-demo"
-    : "openbot-pulse";
-const gapStart = studio ? 50 : demo ? 34.5 : 35;
-const gapEnd = studio ? 52 : demo ? 37 : 39;
-const resolve = studio ? 60.5 : demo ? 78.5 : 50.5;
+const choice = process.argv.includes("--choice");
+const launch = process.argv.includes("--launch") || choice;
+const studio = process.argv.includes("--studio") || launch;
+const stem = choice
+  ? "openbot-launch-choice"
+  : launch
+    ? "openbot-launch-refined"
+    : studio
+      ? "openbot-studio-motion"
+      : demo
+        ? "openbot-workflow-demo"
+        : "openbot-pulse";
+const gapStart = launch ? 35 : studio ? 50 : demo ? 34.5 : 35;
+const gapEnd = launch ? 36.5 : studio ? 52 : demo ? 37 : 39;
+const resolve = choice ? 68.5 : studio ? 60.5 : demo ? 78.5 : 50.5;
 const inGap = (time) => time >= gapStart && time < gapEnd;
 const sr = 48000,
-  seconds = studio ? 64 : demo ? 82 : 54,
+  seconds = choice ? 72 : studio ? 64 : demo ? 82 : 54,
   length = sr * seconds;
 const channels = [new Float32Array(length), new Float32Array(length)];
 let seed = 70954;
@@ -175,7 +181,7 @@ const progression = [
   [41, [53, 57, 60, 65]],
   [36, [48, 55, 60, 64]],
 ];
-for (let bar = 2; bar < (studio ? 31 : demo ? 40 : 26); bar++) {
+for (let bar = 2; bar < (choice ? 35 : studio ? 31 : demo ? 40 : 26); bar++) {
   const at = bar * 2;
   const [root, notes] = progression[Math.floor((bar - 2) / 2) % 4];
   const section = studio
@@ -185,9 +191,9 @@ for (let bar = 2; bar < (studio ? 31 : demo ? 40 : 26); bar++) {
         ? 0.85
         : at < 30
           ? 1.1
-          : at < 34
+          : at < (launch ? 37 : 34)
             ? 0.48
-            : at < 48
+            : at < (launch ? 54 : 48)
               ? 1.05
               : at < 52
                 ? 0.5
@@ -252,17 +258,28 @@ for (let bar = 2; bar < (studio ? 31 : demo ? 40 : 26); bar++) {
   }
 }
 // Picture accents. Quiet decision, then a renewed lift when the conversation travels.
-for (const at of studio
+for (const at of choice
   ? [
-      1.5, 2.7, 4, 7, 8, 9.75, 13.7, 16.4, 20, 23.5, 26.6, 30, 33.55, 34.15,
-      36.2, 37.7, 39.5, 42, 43.6, 45.6, 48, 52, 54, 56.6, 58, 60.5,
+      2.25, 3.2, 4.75, 8, 10.2, 13, 15.25, 20, 21.8, 24, 26.75, 30, 32.5, 35.5,
+      36.5, 39.5, 42, 44.3, 47.3, 49, 51, 54, 55.5, 57, 58.25, 62, 63.5, 66.25,
+      68.5,
     ]
-  : demo
+  : launch
     ? [
-        4, 7, 10.1, 15, 18.65, 23, 29, 35.45, 37, 39.8, 42.6, 44.95, 47.45, 49,
-        54.15, 59, 65.2, 67, 71.5, 74, 78,
+        2.25, 3.2, 4.75, 8, 10.2, 13, 15.25, 20, 21.8, 24, 26.75, 30, 32.5,
+        35.5, 36.5, 39.5, 42, 44.3, 47.3, 49, 51, 54, 55.5, 58.25, 60.5,
       ]
-    : [4, 8, 11, 16, 18, 20, 22, 24, 28, 31, 44, 48]) {
+    : studio
+      ? [
+          1.5, 2.7, 4, 7, 8, 9.75, 13.7, 16.4, 20, 23.5, 26.6, 30, 33.55, 34.15,
+          36.2, 37.7, 39.5, 42, 43.6, 45.6, 48, 52, 54, 56.6, 58, 60.5,
+        ]
+      : demo
+        ? [
+            4, 7, 10.1, 15, 18.65, 23, 29, 35.45, 37, 39.8, 42.6, 44.95, 47.45,
+            49, 54.15, 59, 65.2, 67, 71.5, 74, 78,
+          ]
+        : [4, 8, 11, 16, 18, 20, 22, 24, 28, 31, 44, 48]) {
   kick(at, 0.23);
   sweep(at - 0.32, 0.55, 0.11);
 }

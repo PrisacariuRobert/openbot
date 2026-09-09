@@ -1,6 +1,14 @@
-# OpenBot 0.37.0
+# OpenBot 0.37.0-beta.1
 
-Your AI teammates, on a computer you control. Give a teammate a job, choose its AI connection, let it work with the tools you allow and review sensitive actions before they happen. OpenBot combines conversation, private browser sessions, routines and project work in an open-source application with playful, customizable characters.
+### Your AI team. Your models. Your computer.
+
+Give specialists real work. They research, build, review and coordinate with each other — while you control their models, tools, permissions and data. Every substantial job ends with evidence of what actually happened: sources, checks, approvals, usage and what — if anything — is still uncertain.
+
+| | |
+|---|---|
+| **A real team** | Different roles, different models per teammate, private collaboration with handoffs and group chats. |
+| **Work you can trust** | Sensitive actions wait for your review with a complete, fingerprint-bound preview. Results carry sources, host-verified checks, independent teammate review and per-job usage. |
+| **Yours by design** | Open source. Runs on your Mac or private host. Bring any AI account, API key or local model — OpenBot supplies no subscription and resells no tokens. |
 
 **Mac-first development beta.** Native Mac is the primary release target; iPhone is a companion preview, and the web client uses the same owner-hosted service. This is not yet a signed public installer, hosted cloud service or proven drop-in Grok Bot replacement. [First public release checklist](docs/FIRST_PUBLIC_RELEASE.md) · [Latest candidate evidence](docs/QA_BETA_CANDIDATE.md) · [Contribute](CONTRIBUTING.md) · [Report a vulnerability](SECURITY.md).
 
@@ -17,7 +25,7 @@ npm run dev
 
 Open [OpenBot](http://127.0.0.1:4310/), create a teammate and choose its provider and model. Install the selected execution runtime when needed; no subscription or model allowance is supplied by OpenBot. Browser work needs Chrome/Chromium; isolated computer/code checks need Docker. These are capability-specific dependencies, not requirements for opening the interface. [Full setup](#start) · [Build the native Mac app](macos/README.md) · [iPhone preview](ios/README.md).
 
-## What's new in 0.37.0
+## What's new in 0.37.0-beta.1
 
 - **Native detail polish — build 42:** Activity is a focused review list, permissions use expandable teammate rows, group identities no longer squeeze the mascot stack into the title, and the compact routine editor keeps “When / At” together with matching outlined/primary buttons. Existing controls and approval boundaries remain. [Check details](docs/QA_DETAIL_POLISH_2026-09-07.md).
 - **Introduction film:** the new 64-second **In motion** cut follows the native conversation layout and shared animated mascot shapes, with close-ups, teammate handoffs and desktop-to-phone choreography. One client-review request covers sign-in, teamwork, an approved tool plan, checks, delivered files, email review and reuse. This staged film is not proof of autonomous execution or release readiness. Editable source, checks and earlier cuts remain in [marketing/intro-film](marketing/intro-film/README.md); capability notes stay outside the film.
@@ -82,7 +90,7 @@ Open [OpenBot](http://127.0.0.1:4310/), create a teammate and choose its provide
 
 **New in this working tree:** [live computer view and explicit takeover](docs/QA_LIVE_VIEW.md). A teammate's open browser now streams live into the conversation pane, a studio Agent Computer dialog, and the iPhone app. Watching is read-only, never starts a browser and grants no access; a separate Take control step enables click-to-act and the private keyboard for sign-ins and checks. Verified with hub unit tests and a two-viewer live smoke test.
 
-**New in this working tree:** memory retrieval that ranks instead of filters. `memory_search` returns relevance-ranked saved notes; new tasks carry bounded, keyword-ranked background context from related past conversation, and a task cannot quietly save a near-duplicate of a protected owner note under another name. All local and deterministic — no model calls; embeddings remain a future upgrade. See [the turnkey relay deploy](deploy/private-runner/README.md) for `setup.sh --relay` away access.
+**New in this working tree:** memory retrieval that ranks instead of filters. `memory_search` returns relevance-ranked saved notes; new tasks carry bounded, keyword-ranked background context from related past conversation, and a task cannot quietly save a near-duplicate of a protected owner note under another name. Retrieval is local and deterministic; if the owner connects an embeddings endpoint in Control center, matches blend meaning similarity with the keyword score and fall back to keyword ranking automatically. See [the turnkey relay deploy](deploy/private-runner/README.md) for `setup.sh --relay` away access.
 
 **New in this working tree:** [owner-authored Auto Review rules](docs/QA_AUTO_REVIEW.md). In Settings, write Require-Approval rules that always stop a matching task, command or browser action for your decision, or narrow Always-Allow rules that trim repeat review prompts for isolated commands. Deterministic rule matching with Require-Approval precedence; no model is involved and unmatched behavior is unchanged.
 
@@ -303,6 +311,12 @@ npm run dev
 ```
 
 Open [OpenBot](http://127.0.0.1:4310/). Older `/studio.html` links open the same interface; settings no longer return to a separate old application. For the native Mac build/package path, see [macos/README.md](macos/README.md). Start with a read-only task and enable tools only as needed.
+
+Settings and their subpages share a consistent drawer with a way back; phone settings use the full screen. Providers, apps, teammates, routines, permissions, projects, skills, files, results and recovery are directly accessible from Settings. Expanded forms share the same neutral palette and controls. The Skills page uses one teammate selector for both included skills and teaching.
+
+`npm run test:unified-studio` checks routes, light/dark themes, phone/desktop containment and draft preservation with a disposable host. Run `OPENBOT_EXPANDED_SETTINGS=1 npm run test:unified-studio` to also check disclosures, all routine triggers, schedule variants, API/local-model forms, project forms, community connections and file previews. See [settings UI verification](docs/QA_SETTINGS_SUBPAGES.md) for scope and limits.
+
+`npx tsx scripts/capture-marketing-ui.ts` captures the real shared interface with sample data for the website, without contacting your accounts or running a model. The current 60-second introduction animates the same conversation-first layout and vector mascots; it is a staged product story, not a real-account recording or a Settings tour. See [film direction and checks](marketing/intro-film/LAUNCH_REVIEW.md).
 
 Run the full local verification suite with:
 

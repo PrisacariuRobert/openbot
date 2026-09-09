@@ -20,3 +20,12 @@ coverage/
 *.xcuserstate
 xcuserdata/
 DerivedData/
+
+# Desktop shell build input and output
+desktop/runtime/
+desktop/release/
+desktop/node_modules/
+
+# Per-machine CLI state and generated Electron executable locator.
+.local/
+desktop/path.txt

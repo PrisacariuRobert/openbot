@@ -58,6 +58,22 @@ struct StudioState: Decodable {
     func failedRuns(in threadID: String) -> [StudioRun] {
         allRuns.filter { $0.threadId == threadID && $0.status == "failed" }
     }
+
+    func failure(for message: StudioMessage) -> StudioRun? {
+        guard message.senderType == "system", let id = message.runId else { return nil }
+        return failedRuns(in: message.threadId).first { $0.id == id }
+    }
+
+    /// Older hosts may not have emitted a system message. Only put a recent
+    /// orphan at the bottom; historical failures remain available in Activity.
+    func unplacedFailures(in threadID: String) -> [StudioRun] {
+        let conversation = messages.filter { $0.threadId == threadID }
+        let represented = Set(conversation.filter { $0.senderType == "system" }.compactMap(\.runId))
+        let latestUser = conversation.last { $0.senderType == "user" }?.createdAt
+        return failedRuns(in: threadID).filter {
+            !represented.contains($0.id) && (latestUser == nil || $0.startedAt == nil || $0.startedAt! >= latestUser!)
+        }
+    }
 }
 
 struct StudioAttentionItem: Identifiable, Hashable {
@@ -554,6 +570,8 @@ struct StudioBrowserTakeoverResult: Decodable, Hashable {
 }
 
 struct StudioRun: Decodable, Identifiable, Hashable {
+    var startedAt: String? = nil
+    var activities: [StudioRunActivity]? = nil
     let id: String
     let threadId: String
     let botId: String
@@ -572,6 +590,12 @@ struct StudioRun: Decodable, Identifiable, Hashable {
         let detail = error?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return detail.isEmpty ? "The task stopped before a finished result could be confirmed." : detail
     }
+}
+
+struct StudioRunActivity: Decodable, Hashable {
+    let kind: String
+    let label: String
+    let detail: String?
 }
 
 struct StudioRunner: Decodable, Hashable {

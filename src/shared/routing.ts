@@ -10,6 +10,21 @@ export function mentionedBotIds(body: string, bots: Pick<Bot, "id" | "name">[]):
   return bots.filter((bot) => tokens.has(mentionSlug(bot.name)) || tokens.has(mentionSlug(bot.id))).map((bot) => bot.id);
 }
 
+/** Teammates a bot's reply pulls into a group conversation. Unlike owner
+ * mentions, @everyone/@team never fan out from a bot: only explicit,
+ * existing members respond, so one reply can never wake the whole roster. */
+export function botReplyMentions(body: string, bots: Pick<Bot, "id" | "name">[]): string[] {
+  const tokens = new Set(Array.from(body.matchAll(/(?:^|\s)@([\p{L}\p{N}_-]+)/gu), (match) => mentionSlug(match[1] || "")));
+  for (const reserved of ["everyone", "team", "user", "owner", "me"]) tokens.delete(reserved);
+  return bots.filter((bot) => bot.id && (tokens.has(mentionSlug(bot.name)) || tokens.has(mentionSlug(bot.id)))).map((bot) => bot.id);
+}
+
+/** A bot handing a judgment call to the owner ("@user", "@owner") instead of
+ * answering alone. Drives the thread's Needs-you state; it never starts runs. */
+export function replyEscalatesToOwner(body: string): boolean {
+  return /(?:^|\s)@(?:user|owner)\b/i.test(body);
+}
+
 function routingScore(body: string, bot: Pick<Bot, "role" | "instructions">): number {
   const haystack = body.toLowerCase();
   const profile = `${bot.role} ${bot.instructions}`.toLowerCase();

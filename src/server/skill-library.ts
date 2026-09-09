@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { SkillStep, SkillTemplate } from "../shared/types.js";
+import { skillStartingUrlSchema } from "../shared/skill-authoring.js";
 
 const stepSchema = z.object({
   type: z.enum(["navigate", "click", "input", "submit"]),
@@ -14,7 +15,7 @@ const definitionSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().min(1).max(300),
   instructions: z.string().trim().min(1).max(5_000),
-  startUrl: z.string().url().max(2_000),
+  startUrl: skillStartingUrlSchema,
   steps: z.array(stepSchema).max(80),
   version: z.number().int().min(1).max(10_000).default(1),
 }).strict();
@@ -103,7 +104,7 @@ export function skillSecretFindings(skill: SkillDefinition): string[] {
       findings.add(`${where} is not a valid web address`);
     }
   };
-  inspectUrl(skill.startUrl, "Starting page");
+  if (skill.startUrl) inspectUrl(skill.startUrl, "Starting page");
   skill.steps.forEach((step, index) => {
     inspectUrl(step.url, `Step ${index + 1}`);
     if (step.value && /password|secret|token|passcode|one.?time|api.?key/i.test(`${step.label || ""} ${step.selector || ""}`) && !placeholder(step.value)) {
@@ -129,4 +130,34 @@ export function parseSkillPackage(input: unknown): SkillDefinition {
 
 export function skillTemplate(id: string): TemplateDefinition | null {
   return SKILL_TEMPLATES.find((template) => template.id === id) || null;
+}
+
+/** Parse an agentskills.io-style SKILL.md: YAML frontmatter with at least
+ * `name:` and `description:`, then the instructions body. Single-line
+ * frontmatter values; the first web address in the body becomes the
+ * starting point. */
+export function parseAgentsSkillMarkdown(markdown: string): { name: string; description: string; instructions: string; startUrl: string } {
+  const normalized = markdown.replace(/\r\n/g, "\n");
+  if (!normalized.startsWith("---")) throw new Error("An agentskills.io SKILL.md starts with YAML frontmatter — a --- line, name and description, then a second --- line.");
+  const end = normalized.indexOf("\n---", 3);
+  if (end === -1) throw new Error("The frontmatter is not closed. End it with a second --- line.");
+  const frontmatter = normalized.slice(4, end);
+  const body = normalized.slice(end + 4).replace(/^\n+/, "").trim();
+  const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g, "");
+  const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g, "");
+  if (!name || !description) throw new Error("The frontmatter needs at least `name:` and `description:` fields.");
+  if (name.length > 80) throw new Error("Keep the skill name under 80 characters.");
+  if (description.length > 300) throw new Error("Keep the description under 300 characters.");
+  if (!body) throw new Error("The skill needs instructions below the frontmatter.");
+  const startUrl = body.match(/https?:\/\/[^\s)\]>"',]+/)?.[0]?.slice(0, 2_000) ?? "";
+  return { name, description, instructions: body.slice(0, 5_000), startUrl };
+}
+
+/** The same skill in the open agentskills.io shape: frontmatter plus body,
+ * importable by any compatible tool. */
+export function toAgentsSkillMarkdown(input: { name: string; slug: string; description: string; instructions: string; steps: unknown[] }): string {
+  const stepLines = (input.steps as Array<{ type?: string; url?: string; selector?: string; value?: string }>).map((step, index) =>
+    `${index + 1}. ${step.type || "step"}${step.url ? ` at ${step.url}` : ""}${step.selector ? ` on ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""}`);
+  const body = stepLines.length ? `${input.instructions}\n\n## Recorded steps (observations, not authority)\n\n${stepLines.join("\n")}` : input.instructions;
+  return `---\nname: ${input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}\ndescription: ${JSON.stringify(input.description)}\n---\n\n# ${input.name}\n\n${body}\n`;
 }

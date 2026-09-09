@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -27,15 +28,18 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  ShieldQuestion,
   SlidersHorizontal,
   UsersRound,
   X,
   Zap,
 } from "lucide-react";
+import { BrowserSignInPanel } from "../components/BrowserSignInPanel";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Temporal } from "@js-temporal/polyfill";
 import { calendarMonthDays } from "../shared/calendar-grid";
+import { activeNowBots } from "../shared/presence";
 import type {
   AppState,
   Bot,
@@ -160,6 +164,9 @@ function Empty({ title, children }: { title: string; children?: ReactNode }) {
 function eventTitle(message: Message): string {
   const data = message.eventData || {};
   switch (message.eventType) {
+    case "run_stopped":
+    case "action_completed":
+      return String(data.title || "Task update");
     case "routine_created":
       return `Created Routine ${data.name ?? message.body}`;
     case "routine_run":
@@ -182,7 +189,7 @@ function eventDetail(message: Message): string {
     case "handoff":
       return String(data.task ?? message.body).replace(/\s+/g, " ").trim();
     case "teammate_message":
-      return data.expectsReply === "true" ? "Waiting for their reply" : "Update shared";
+      return data.expectsReply === "true" ? "Reply requested" : "Update shared";
     default:
       return message.body;
   }
@@ -218,11 +225,22 @@ export function Studio() {
     if (targetThread) url.searchParams.set("thread", targetThread);
     history.pushState(null, "", url);
   }
+  function openSettings() {
+    setCapability(null);
+    setDetail({ kind: "settings" });
+    const url = new URL(location.href);
+    url.searchParams.set("panel", "settings");
+    history.pushState(null, "", url);
+  }
   useEffect(() => {
     const follow = (event: MouseEvent) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element).closest<HTMLAnchorElement>("a[href]");
       if (!anchor) return;
+      // An explicit target (e.g. the provider setup link in the creation
+      // sheet, "opens separately so you won't lose this draft") wins over
+      // in-page capability routing.
+      if (anchor.target && anchor.target !== "_self") return;
       const url = new URL(anchor.href, location.href), panel = url.searchParams.get("panel");
       if (url.origin !== location.origin || !["/", "/studio.html"].includes(url.pathname) || !isCapabilityPanel(panel)) return;
       event.preventDefault(); openCapability(panel, url.searchParams.get("thread") || undefined);
@@ -240,11 +258,46 @@ export function Studio() {
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null),
+    [mentionAt, setMentionAt] = useState(0);
+  const mentionChoices = useMemo(() => {
+    const current = state?.threads.find((item) => item.id === thread) || null;
+    if (!current || current.kind !== "room") return [];
+    const members = current.botIds
+      ? (state?.bots || []).filter((bot) => current.botIds?.includes(bot.id))
+      : state?.bots || [];
+    return [
+      ...members.map((bot) => ({ key: bot.id, insert: bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), label: bot.name, detail: bot.role, face: <Face bot={bot} size={22} /> })),
+      { key: "everyone", insert: "everyone", label: "everyone", detail: "The whole team", face: <MessageCircle size={16} /> },
+    ];
+  }, [state, thread]);
+  const visibleMentions = mention
+    ? mentionChoices.filter((choice) => choice.insert.includes(mention.query.toLowerCase()))
+    : [];
+  const readMention = (value: string, caret: number) => {
+    const match = value.slice(0, caret).match(/(?:^|\s)@([A-Za-z0-9_-]*)$/);
+    return match ? { start: caret - match[1]!.length - 1, query: match[1]! } : null;
+  };
+  const applyMention = (insert: string) => {
+    const textarea = input.current;
+    if (!textarea || !mention) return;
+    const caret = textarea.selectionStart;
+    const before = draft.slice(0, mention.start);
+    const next = `${before}@${insert} ${draft.slice(caret).replace(/^\s+/, "")}`;
+    setDraft(next);
+    setMention(null);
+    requestAnimationFrame(() => {
+      const position = before.length + insert.length + 2;
+      textarea.focus();
+      textarea.setSelectionRange(position, position);
+    });
+  };
   const [libraryTab, setLibraryTab] = useState<"apps" | "skills">("apps"),
     [query, setQuery] = useState("");
   const [conversationQuery, setConversationQuery] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
   const [takeoverBot, setTakeoverBot] = useState<Bot | null>(null);
+  const [signInPane, setSignInPane] = useState<string | null>(null);
   const [narrow, setNarrow] = useState(() => window.innerWidth < 1050);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1049px)");
@@ -252,6 +305,16 @@ export function Studio() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  // Split view: when a teammate waits on a private sign-in in this
+  // conversation, open the live website beside the chat, the way a second
+  // column of work belongs next to the conversation. It closes itself once
+  // the handoff is decided, and the task card reopens it on request.
+  const pendingSignInId = useMemo(() => {
+    if (!state || narrow) return null;
+    const threadRuns = new Set(state.runs.filter((run) => run.threadId === thread).map((run) => run.id));
+    return state.approvals.find((approval) => approval.kind === "browser" && approval.requiresSignIn === true && approval.status === "pending" && threadRuns.has(approval.runId))?.id || null;
+  }, [state, thread, narrow]);
+  useEffect(() => { setSignInPane(pendingSignInId); }, [pendingSignInId]);
   const [calendarDate, setCalendarDate] = useState(dayKey(new Date()));
   const [month, setMonth] = useState(dayKey(new Date()).slice(0, 7) + "-01");
   const input = useRef<HTMLTextAreaElement>(null),
@@ -370,6 +433,12 @@ export function Studio() {
     setPage(next);
     setQuery("");
     setDetail(null);
+    setCapability(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("panel")) {
+      url.searchParams.delete("panel");
+      window.history.pushState(null, "", url);
+    }
   };
   const startPrompt = (text: string) => {
     setPage("chat");
@@ -391,6 +460,8 @@ export function Studio() {
         bot.model,
     ),
   );
+  const budgetBot = state?.bots.find(bot => bot.id === (recipient || state.threads.find(item => item.id === thread)?.botId));
+  const budgetReached = budgetBot && budgetBot.weeklyTokenBudget > 0 && budgetBot.tokensUsedThisWeek >= budgetBot.weeklyTokenBudget;
   const send = async (event: FormEvent) => {
     event.preventDefault();
     if (
@@ -455,6 +526,23 @@ export function Studio() {
   const uncertain =
     state?.approvedActions.filter((action) => action.status === "uncertain") ||
     [];
+  const yoloMode = state?.settings.yoloMode === true;
+  const [modeBusy, setModeBusy] = useState(false);
+  async function toggleMode() {
+    if (modeBusy) return;
+    const next = !yoloMode;
+    if (next && !window.confirm("YOLO mode auto-approves every new review exactly as if you had approved it instantly. Sign-ins, access grants and unapprovable reviews still pause. Turn it on?")) return;
+    setModeBusy(true);
+    try {
+      const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ yoloMode: next }) });
+      if (!response.ok) throw new Error("The mode could not be changed.");
+      setRefresh((value) => value + 1);
+    } catch {
+      setError("The mode could not be changed. Try again.");
+    } finally {
+      setModeBusy(false);
+    }
+  }
   const alerts =
     state?.automationAlerts.filter((alert) => !alert.resolvedAt) || [];
   const otherApprovals =
@@ -538,6 +626,13 @@ export function Studio() {
         onChange={(event) => {
           setDraft(event.target.value);
           setDraftNotice("");
+          const info = readMention(event.target.value, event.target.selectionStart);
+          setMention(info);
+          setMentionAt(0);
+        }}
+        onSelect={(event) => {
+          const info = readMention(event.currentTarget.value, event.currentTarget.selectionStart ?? 0);
+          setMention(info);
         }}
         placeholder={
           !composerDraft.ready
@@ -550,6 +645,27 @@ export function Studio() {
         }
         rows={1}
         onKeyDown={(event) => {
+          if (mention && visibleMentions.length > 0) {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setMentionAt((index) => (index + 1) % visibleMentions.length);
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setMentionAt((index) => (index - 1 + visibleMentions.length) % visibleMentions.length);
+              return;
+            }
+            if (event.key === "Escape") {
+              setMention(null);
+              return;
+            }
+            if (event.key === "Enter" || event.key === "Tab") {
+              event.preventDefault();
+              applyMention(visibleMentions[mentionAt % visibleMentions.length]!.insert);
+              return;
+            }
+          }
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
@@ -560,7 +676,36 @@ export function Studio() {
           }
         }}
       />
+      {mention && visibleMentions.length > 0 && (
+        <div className="composer-mention" role="listbox" aria-label="Mention a teammate">
+          {visibleMentions.map((choice, index) => (
+            <button
+              type="button"
+              key={choice.key}
+              role="option"
+              aria-selected={index === mentionAt % visibleMentions.length}
+              className={index === mentionAt % visibleMentions.length ? "current" : ""}
+              onMouseDown={(event) => { event.preventDefault(); applyMention(choice.insert); }}
+              onMouseEnter={() => setMentionAt(index)}
+            >
+              {choice.face}
+              <span><strong>{choice.label}</strong><small>{choice.detail}</small></span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="composer-bar">
+        <button
+          type="button"
+          className={`composer-mode ${yoloMode ? "yolo" : ""}`}
+          onClick={() => void toggleMode()}
+          disabled={modeBusy}
+          aria-pressed={yoloMode}
+          title={yoloMode ? "YOLO mode is on: reviews are auto-approved. Click to go back to asking first." : "Ask first: new work waits for your approval. Click for YOLO mode."}
+        >
+          <ShieldQuestion size={15} />
+          {yoloMode ? "YOLO" : "Ask first"}
+        </button>
         <button
           type="button"
           className="add-file"
@@ -618,9 +763,16 @@ export function Studio() {
           Choose your AI connection to send a message <ArrowRight size={13} />
         </a>
       )}
+      {budgetReached && !sendError && (
+        <p className="send-error" role="status">
+          {budgetBot.name} has reached the weekly budget configured in OpenBot. Your provider’s allowance is separate.{" "}
+          <button type="button" onClick={() => openCapability("bot", budgetBot.threadId)}>Review budget</button>
+        </p>
+      )}
       {sendError && (
         <p className="send-error" role="alert">
           {sendError} Your draft has been kept.
+          {budgetReached && <button type="button" onClick={() => openCapability("bot", budgetBot.threadId)}>Review budget</button>}
         </p>
       )}
       {attached.error && (
@@ -707,6 +859,7 @@ export function Studio() {
       <ChevronRight size={14} />
     </button>
   );
+  const activeNow = activeNowBots(state?.bots || []);
   const conversationRows = state?.threads
     .filter(
       (item) =>
@@ -734,6 +887,7 @@ export function Studio() {
           <span className="conversation-copy">
             <span className="conversation-heading">
               <strong>{item.title}</strong>
+              {item.needsYou && <span className="needs-you-pill">Needs you</span>}
               {item.lastMessageAt && (
                 <time>
                   {dayKey(item.lastMessageAt) === dayKey(new Date())
@@ -761,7 +915,7 @@ export function Studio() {
     });
   return (
     <div
-      className={`studio-shell ${contextOpen && !narrow && page === "chat" ? "with-context" : ""}`}
+      className={`studio-shell ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
     >
       <aside className="sidebar">
         <a className="wordmark" href="/">
@@ -791,6 +945,17 @@ export function Studio() {
               </button>
             </span>
           </header>
+          {activeNow.length > 0 && (
+            <div className="active-now" aria-label="Working right now">
+              {activeNow.map((bot) => (
+                <button key={bot.id} type="button" className="active-now-chip" title={`${bot.name} is working right now`} onClick={() => openThread(bot.threadId)}>
+                  <Face bot={bot} size={19} />
+                  <span>{bot.name}</span>
+                  <i aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
@@ -807,7 +972,7 @@ export function Studio() {
             <span>{online ? "Studio connected" : "Reconnecting"}</span>
             <button
               aria-label="Settings"
-              onClick={() => setDetail({ kind: "settings" })}
+              onClick={openSettings}
             >
               <Settings2 size={17} />
             </button>
@@ -878,7 +1043,7 @@ export function Studio() {
           <div className="error-banner" role="alert">
             <span>{error}</span>
             <button onClick={() => setRefresh((n) => n + 1)}>Try again</button>
-            <button onClick={() => setDetail({ kind: "settings" })}>Settings</button>
+            <button onClick={openSettings}>Settings</button>
           </div>
         )}
         {!state ? (
@@ -1346,13 +1511,14 @@ export function Studio() {
                           message.senderType === "system";
                         if (message.kind === "event") {
                           return (
-                            <div className="chat-event" key={message.id} data-event={message.eventType || "note"}>
+                            <div className="chat-event" key={message.id} data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
                                 {message.eventType === "routine_created" ? <Clock size={14} /> : message.eventType === "handoff" ? <ArrowRightLeft size={14} /> : message.eventType === "routine_run" ? <Zap size={14} /> : <MessageCircle size={14} />}
                               </span>
                               <span>
                                 <strong>{eventTitle(message)}</strong>
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
+                                {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button>; })()}
                               </span>
                             </div>
                           );
@@ -1392,7 +1558,7 @@ export function Studio() {
                     {state.activeThreadId === thread &&
                       state.approvals.filter((approval) => approval.status === "pending").map((approval) => {
                         const run = state.runs.find((item) => item.id === approval.runId);
-                        return run ? <RunControls key={approval.id} run={run} approval={approval} onChange={() => setRefresh((value) => value + 1)} /> : null;
+                        return run ? <RunControls key={approval.id} run={run} approval={approval} onChange={() => setRefresh((value) => value + 1)} onSignInPane={page === "chat" ? (id) => setSignInPane(id) : undefined} /> : null;
                       })}
                     {state.activeThreadId === thread &&
                       state.runs
@@ -1440,6 +1606,18 @@ export function Studio() {
           </>
         )}
       </main>
+      {signInPane && !narrow && page === "chat" && (
+        <aside className="browser-pane" aria-label="Private browser">
+          <header>
+            <h2>Private browser</h2>
+            <button aria-label="Close the private browser" onClick={() => setSignInPane(null)}>
+              <X size={19} />
+            </button>
+          </header>
+          <BrowserSignInPanel key={signInPane} approvalId={signInPane} disabled={false}
+            onBusyChange={() => {}} onInteraction={() => {}} />
+        </aside>
+      )}
       {contextOpen && !narrow && page === "chat" && state && (
         <aside
           className="conversation-context"
@@ -1465,12 +1643,13 @@ export function Studio() {
           />
         </aside>
       )}
-      {capability && state && <Drawer title={capabilityTitles[capability]} onClose={() => openCapability(null)}>
-        <Suspense fallback={<p className="quiet-copy" role="status">Opening {capabilityTitles[capability].toLowerCase()}…</p>}><CapabilityPanelHost panel={capability} state={state} threadId={thread} onOpen={(panel) => openCapability(panel)} onThread={(id) => { openCapability(null, id); openThread(id); }} onChange={() => setRefresh((n) => n + 1)} /></Suspense>
+      {capability && state && <Drawer title={capabilityTitles[capability]} settings onBack={openSettings} onClose={() => openCapability(null)}>
+        <Suspense fallback={<p className="quiet-copy" role="status">Opening {capabilityTitles[capability].toLowerCase()}…</p>}><CapabilityPanelHost key={capability} panel={capability} state={state} threadId={thread} onOpen={(panel) => openCapability(panel)} onThread={(id) => { openCapability(null, id); openThread(id); }} onChange={() => setRefresh((n) => n + 1)} /></Suspense>
       </Drawer>}
       {detail && (
         <Drawer
-          onClose={() => setDetail(null)}
+          settings={detail.kind === "settings"}
+          onClose={() => detail.kind === "settings" ? openCapability(null) : setDetail(null)}
           title={
             detail.kind === "context"
               ? "Conversation details"
@@ -1516,7 +1695,7 @@ export function Studio() {
                   <ChevronRight size={16} />
                 </button>
               ))}
-              <button onClick={() => setDetail({ kind: "settings" })}>
+              <button onClick={openSettings}>
                 <Settings2 size={19} />
                 <span>Settings & AI connections</span>
                 <ChevronRight size={16} />
@@ -1623,12 +1802,14 @@ export function Studio() {
                   </span>
                   <ChevronRight size={16} />
                 </a>
-                <button onClick={() => navigate("library")}>
+                <a href="/?panel=connectors">
                   <span>
-                    Apps & skills<small>Choose what your team can use</small>
+                    Apps & tools<small>Connect accounts and choose access</small>
                   </span>
                   <ChevronRight size={16} />
-                </button>
+                </a>
+                <a href="/?panel=bot"><span>Teammates<small>Character, instructions and individual limits</small></span><ChevronRight size={16} /></a>
+                <a href="/?panel=routines"><span>Routines<small>Schedule work and manage triggers</small></span><ChevronRight size={16} /></a>
                 <a href="/?panel=remote">
                   <span>
                     Your phone<small>Pair and manage away access</small>
@@ -1642,11 +1823,18 @@ export function Studio() {
                   <ChevronRight size={16} />
                 </a>
               </div>
+              <h3 className="settings-section-title">Workspace</h3>
+              <div className="settings-list">
+                <a href="/?panel=projects"><span>Projects<small>Build and test in folders you choose</small></span><ChevronRight size={16} /></a>
+                <a href="/?panel=teach"><span>Skills & recipes<small>Included methods and your own workflows</small></span><ChevronRight size={16} /></a>
+                <a href="/?panel=files"><span>Files<small>Each teammate’s private workspace</small></span><ChevronRight size={16} /></a>
+                <a href="/?panel=artifacts"><span>Finished work<small>Open results and their revisions</small></span><ChevronRight size={16} /></a>
+                <a href="/?panel=live"><span>Activity & recovery<small>Review results and work needing a hand</small></span><ChevronRight size={16} /></a>
+              </div>
               <details className="auto-review-details">
-                <summary>Auto Review rules — decide when actions stop for you</summary>
+                <summary>Advanced approval rules</summary>
                 <AutoReviewRules />
               </details>
-              <div className="settings-list"><a href="/?panel=projects"><span>Projects<small>Build and test in folders you choose</small></span><ChevronRight size={16} /></a><a href="/?panel=teach"><span>Skills & recipes<small>Included methods and your own workflows</small></span><ChevronRight size={16} /></a><a href="/?panel=live"><span>Activity & recovery<small>Review results and work needing a hand</small></span><ChevronRight size={16} /></a></div>
             </>
           )}
           {detail.kind === "search" && (
@@ -1806,10 +1994,14 @@ function Drawer({
   title,
   children,
   onClose,
+  onBack,
+  settings = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  onBack?: () => void;
+  settings?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -1821,10 +2013,15 @@ function Drawer({
       prior?.focus();
     };
   }, []);
+  useEffect(() => {
+    // A subpage starts at its heading, never at the previous panel's scroll.
+    ref.current?.scrollTo({ top: 0 });
+    ref.current?.querySelector(".drawer-body")?.scrollTo({ top: 0 });
+  }, [title]);
   return (
     <dialog
       ref={ref}
-      className="detail-drawer"
+      className={`detail-drawer${settings ? " settings-drawer" : ""}`}
       aria-label={title}
       onCancel={onClose}
       onKeyDown={(event) => {
@@ -1858,6 +2055,7 @@ function Drawer({
       }}
     >
       <header>
+        {onBack && <button className="drawer-back" aria-label="Back to settings" onClick={onBack}><ChevronLeft size={17} /><span>Settings</span></button>}
         <h2>{title}</h2>
         <button autoFocus aria-label="Close" onClick={onClose}>
           <X size={20} />

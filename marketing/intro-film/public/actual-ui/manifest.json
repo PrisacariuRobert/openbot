@@ -1,0 +1,79 @@
+{
+  "capturedAt": "2026-09-08T11:09:25.761Z",
+  "realInterface": true,
+  "sampleDataOnly": true,
+  "captures": [
+    {
+      "name": "team",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "day",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "build",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "settings",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "accounts",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "api",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "api-form",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "models",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "routines",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "permissions",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "self-extend",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    },
+    {
+      "name": "creator",
+      "source": "src/studio/Studio.tsx and its real components; synthetic API data",
+      "width": 2880,
+      "height": 1780
+    }
+  ]
+}

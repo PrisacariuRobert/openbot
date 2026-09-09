@@ -78,6 +78,9 @@ export interface Thread {
   createdAt: string;
   updatedAt: string;
   unreadCount: number;
+  /** The thread is waiting on the owner: an approval is open in it, or a
+   * teammate escalated with @user/@owner in the current turn. */
+  needsYou?: boolean;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
 }
@@ -239,6 +242,63 @@ export interface Readiness {
   steps: ReadinessStep[];
 }
 
+export interface RunReceiptCheck {
+  label: string;
+  passed: boolean;
+  source: "host" | "teammate";
+  detail: string | null;
+}
+
+export interface RunReceiptEntry {
+  botName: string;
+  role: string | null;
+  model: string | null;
+  status: RunStatus;
+  tokens: number;
+  cost: number;
+}
+
+export interface RunReceiptWorkLog {
+  label: string;
+  detail: string | null;
+  at: string;
+}
+
+export interface RunReceiptArtifact {
+  name: string;
+  mime: string;
+  revision: number;
+  url: string | null;
+}
+
+export interface RunReceiptExternalAction {
+  label: string;
+  status: ApprovedActionStatus;
+  detail: string | null;
+}
+
+/** A host-recorded account of one job, with explicit evidence provenance
+ * and uncertainty. Not a cryptographic signature or a guarantee of success. */
+export interface RunReceipt {
+  runId: string;
+  threadId: string;
+  botName: string;
+  goal: string | null;
+  deliverable: string | null;
+  status: RunStatus;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  team: RunReceiptEntry[];
+  checks: RunReceiptCheck[];
+  workLog: RunReceiptWorkLog[];
+  artifacts: RunReceiptArtifact[];
+  externalActions: RunReceiptExternalAction[];
+  uncertainty: string[];
+  usage: { tokens: number; cost: number; runs: number };
+}
+
 export interface Run {
   expectedWorkKind?: "morning" | "inbox" | "meeting" | "weekly" | null;
   completionRepairCount?: number;
@@ -251,6 +311,10 @@ export interface Run {
   botColor: string;
   parentRunId: string | null;
   steeredFromRunId: string | null;
+  /** Group-discipline linkage: the teammate reply that @mentioned this run
+   * into the conversation. Lets the follow-up quote its trigger and keeps the
+   * reply chain (and its round cap) computable from host records. */
+  triggerMessageId?: string | null;
   routineId: string | null;
   automationEventId: string | null;
   attemptCount: number;
@@ -284,7 +348,9 @@ export interface Approval {
   runId: string;
   botId: string;
   botName: string;
-  kind: "prompt" | "terminal" | "browser" | "external";
+  kind: "prompt" | "terminal" | "browser" | "external" | "budget";
+  /** Presentation hint only; a browser click is not a sign-in handoff. */
+  requiresSignIn?: boolean;
   reason: string;
   actionLabel: string;
   status: "pending" | "approved" | "denied";
@@ -822,7 +888,10 @@ export interface TaughtWorkflow {
   startUrl: string;
   stepCount: number;
   version: number;
-  source: "taught" | "imported" | "template" | "assigned";
+  /** Turned off by the owner: not routable, and its skill files are removed
+   * from the teammate's harness directories. */
+  disabled?: boolean;
+  source: "taught" | "imported" | "template" | "assigned" | "proposed";
   createdAt: string;
   updatedAt: string;
 }

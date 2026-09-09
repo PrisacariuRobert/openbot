@@ -22,7 +22,7 @@ async function request(route: string, body?: unknown, method = "POST") {
 }
 async function start() {
   child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], { cwd: path.resolve(import.meta.dirname, ".."), stdio: "ignore",
-    env: { ...process.env, OPENBOT_LOAD_ENV: "0", OPENBOT_DATA_DIR: data, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" } });
+    env: { ...process.env, OPENBOT_LOAD_ENV: "0", OPENBOT_SEED_STARTER_BOTS: "1", OPENBOT_DATA_DIR: data, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" } });
   for (let n = 0; n < 100; n++) { try { if ((await request("/api/healthz")).ok) return; } catch {} await delay(150); }
   throw new Error("Disposable schedule host did not start");
 }

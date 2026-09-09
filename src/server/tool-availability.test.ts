@@ -21,6 +21,7 @@ test("standard reports expose only source collection and saved results", () => {
     assert.equal(flags.task_plan, false);
     assert.equal(flags.read, false);
     assert.equal(flags.spreadsheet_export, false);
+    assert.equal(flags.spreadsheet_inspect, false);
     assert.equal(flags.table_summary, false);
     const workspace = prepareWorkspace(db, db.getBot("nova")!, true);
     const configuration = JSON.parse(readFileSync(path.join(workspace, "opencode.json"), "utf8"));
@@ -51,6 +52,7 @@ test("keeps irrelevant app schemas out of a file-only task and updates after cap
     assert.equal(flags.task_plan, undefined);
     assert.equal(flags.message_teammate, undefined);
     assert.equal(flags.spreadsheet_export, true);
+    assert.equal(flags.spreadsheet_inspect, true);
     assert.equal(flags.table_summary, true);
     const workspace = prepareWorkspace(db, bot);
     const config = JSON.parse(

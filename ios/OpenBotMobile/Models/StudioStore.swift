@@ -52,6 +52,7 @@ final class StudioStore: ObservableObject {
         try await client.recipeData(path, botID: botID, method: method, body: body)
     }
     private var eventTask: Task<Void, Never>?
+    private var syncTask: Task<Void, Never>?
     private var refreshInProgress = false
     private var refreshAgain = false
     private var shareImportInProgress = false
@@ -114,15 +115,26 @@ final class StudioStore: ObservableObject {
     var routines: [StudioRoutine] { state.routines ?? [] }
 
     func start() async {
+        stop()
+        eventTask = Task { [weak self] in await self?.eventLoop() }
+        // An SSE connection can silently stall during a Wi-Fi/cellular handoff.
+        // Keep a bounded foreground refresh as a backstop, not a second history.
+        syncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                await self?.refresh(silent: true)
+            }
+        }
         await refresh()
         await refreshConnectors()
-        eventTask?.cancel()
-        eventTask = Task { [weak self] in await self?.eventLoop() }
     }
 
     func stop() {
         eventTask?.cancel()
         eventTask = nil
+        syncTask?.cancel()
+        syncTask = nil
+        isLive = false
     }
 
     func chooseThread(_ id: String) async {
@@ -905,9 +917,12 @@ final class StudioStore: ObservableObject {
     private func eventLoop() async {
         while !Task.isCancelled {
             do {
+                await refresh(silent: true)
+                guard !Task.isCancelled else { return }
                 try await client.listenForEvents { [weak self] in
                     await self?.refresh(silent: true)
                 }
+                guard !Task.isCancelled else { return }
                 isLive = false
             } catch {
                 guard !Task.isCancelled else { return }

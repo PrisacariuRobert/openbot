@@ -1,0 +1,67 @@
+name: Desktop installers
+
+# Per-platform builds of the Electron desktop shell (roadmap item D4).
+# Unsigned artifacts; code signing lands when owner credentials exist.
+# Attach mode and packaged mode share the same web client, so a green build
+# plus a smoke boot of the packaged runtime is the evidence bar here.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: openbot-desktop-win-x64
+          - os: ubuntu-latest
+            platform: linux
+            artifact: openbot-desktop-linux-x64
+          - os: macos-latest
+            platform: mac
+            artifact: openbot-desktop-mac-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the web client the shell serves
+        working-directory: .
+        run: npm run build
+      - name: Build installer
+        working-directory: desktop
+        run: npx electron-builder --${{ matrix.platform }} --publish never
+        env:
+          # Skip platform-specific signing; artifacts are for direct download.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.dmg
+          if-no-files-found: error

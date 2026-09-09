@@ -43,7 +43,9 @@ final class OpenBotMobileUITests: XCTestCase {
             access.typeText(key)
             app.buttons["connect-studio"].tap()
         }
-        XCTAssertTrue(listTitle.waitForExistence(timeout: 12))
+        let connected = listTitle.waitForExistence(timeout: 12)
+        if !connected { keepScreenshot("Synthetic connection failure") }
+        XCTAssertTrue(connected, app.debugDescription)
         keepScreenshot("Approved direction — native conversation list")
         if marker?["attention"] == "included" {
             let attention = app.buttons["native-needs-attention"]
@@ -91,6 +93,25 @@ final class OpenBotMobileUITests: XCTestCase {
 
         // The draft must survive returning to the list and revisiting a thread.
         let message = app.textFields["native-message-field"]
+        let controls = [app.buttons["Message options"], app.buttons["Start voice capture"], app.buttons["native-send-message"]]
+        for control in controls {
+            XCTAssertLessThan(abs(control.frame.midY - message.frame.midY), 3, "Composer controls must share one center line")
+        }
+        if marker?["sync"] == "included" {
+            let syncMessage = "Sync check \(UUID().uuidString.prefix(8))"
+            message.tap()
+            message.typeText(syncMessage)
+            let enteredSync = expectation(for: NSPredicate(format: "value == %@", syncMessage), evaluatedWith: message)
+            await fulfillment(of: [enteredSync], timeout: 4)
+            app.buttons["native-send-message"].tap()
+            XCTAssertTrue(app.staticTexts[syncMessage].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Checking the synthetic example"].waitForExistence(timeout: 5))
+            keepScreenshot("Phone — sent message and working progress")
+            XCUIDevice.shared.press(.home)
+            app.activate()
+            XCTAssertTrue(app.staticTexts["Synthetic sync check complete. No real task was run."].waitForExistence(timeout: 20))
+            keepScreenshot("Phone — result after resuming without SSE events")
+        }
         message.tap()
         message.typeText("Draft continuity check")
         // Distinguish keyboard delivery from draft persistence. Do not navigate

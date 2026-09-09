@@ -33,7 +33,6 @@ export function useLiveComputer(botId: string | undefined) {
   const [frame, setFrame] = useState<string | null>(null);
   const [browserState, setBrowserState] = useState<LiveComputerState>("connecting");
   const [title, setTitle] = useState<string | null>(null);
-  const visibleRef = useRef(true);
   useEffect(() => {
     setFrame(null);
     setTitle(null);
@@ -41,34 +40,44 @@ export function useLiveComputer(botId: string | undefined) {
     if (!botId) return;
     let source: EventSource | null = null;
     let disposed = false;
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
     const connect = () => {
-      if (disposed || source || !visibleRef.current) return;
+      if (disposed || source || document.hidden) return;
       source = new EventSource(`/api/bots/${encodeURIComponent(botId)}/computer/live`);
+      const current = source;
+      startupTimer = setTimeout(() => {
+        if (!disposed && source === current) { setBrowserState("unavailable"); setFrame(null); setTitle(null); }
+      }, 10_000);
       source.onmessage = (message) => {
+        if (disposed || source !== current) return;
         let event: LiveViewEvent;
         try {
           event = JSON.parse(message.data) as LiveViewEvent;
         } catch {
           return;
         }
-        if (event.type === "frame") setFrame(`data:image/jpeg;base64,${event.jpeg}`);
+        if (event.type === "frame") { clearTimeout(startupTimer); setFrame(`data:image/jpeg;base64,${event.jpeg}`); }
         else if (event.type === "status") {
+          clearTimeout(startupTimer);
           setBrowserState(event.browser);
           setTitle(event.title ?? null);
+          if (event.browser !== "ready") setFrame(null);
         }
       };
       // A missing/offline stream must not look like an endless initial load.
       // EventSource still retries normally and a later frame/status recovers it.
-      source.onerror = () => { if (!disposed) setBrowserState("unavailable"); };
+      source.onerror = () => { if (!disposed && source === current) { clearTimeout(startupTimer); setBrowserState("unavailable"); setFrame(null); setTitle(null); } };
     };
     const disconnect = () => {
+      clearTimeout(startupTimer);
       source?.close();
       source = null;
+      setFrame(null);
+      setTitle(null);
     };
     const onVisibility = () => {
-      visibleRef.current = !document.hidden;
       if (document.hidden) disconnect();
-      else connect();
+      else { setBrowserState("connecting"); connect(); }
     };
     document.addEventListener("visibilitychange", onVisibility);
     connect();
@@ -146,7 +155,7 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
     };
   }, []);
   const run = async (action: () => Promise<unknown>) => {
-    if (busy) return;
+    if (!armed || busy) return;
     setBusy(true);
     setNotice("");
     try {
@@ -234,6 +243,7 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
           className={armed ? "takeover-switch armed" : "takeover-switch"}
           onClick={() => {
             setArmed((value) => !value);
+            setEntry("");
             setNotice("");
           }}
           aria-pressed={armed}
@@ -249,12 +259,13 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
         >
           <Globe2 size={14} />
           <input
+            disabled={!armed || busy}
             value={address}
             onChange={(event) => setAddress(event.target.value)}
             placeholder="Open a page in this browser"
             aria-label="Browser address"
           />
-          <button disabled={busy || !address.trim()}>Open</button>
+          <button disabled={!armed || busy || !address.trim()}>Open</button>
         </form>
       </div>
       <div className="takeover-screen-frame">
@@ -314,6 +325,7 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
           }}
         >
           <input
+            disabled={!armed || busy || !ready}
             type="password"
             value={entry}
             onChange={(event) => setEntry(event.target.value)}
@@ -321,16 +333,16 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
             autoComplete="off"
             aria-label="Private text to type into the focused field"
           />
-          <button type="button" disabled={busy || !entry || !ready} onClick={() => typeEntry(true)}>
+          <button type="button" disabled={!armed || busy || !entry || !ready} onClick={() => typeEntry(true)}>
             Replace
           </button>
-          <button className="primary" disabled={busy || !entry || !ready}>
+          <button className="primary" disabled={!armed || busy || !entry || !ready}>
             Type
           </button>
         </form>
         <div className="takeover-keys">
           {TAKEOVER_KEYS.map((key) => (
-            <button key={key} disabled={busy || !ready} onClick={() => sendKey(key)}>
+            <button key={key} disabled={!armed || busy || !ready} onClick={() => sendKey(key)}>
               {key}
             </button>
           ))}

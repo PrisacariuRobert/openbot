@@ -34,7 +34,7 @@ struct ConnectionView: View {
                                 .font(.system(size: 16, weight: .bold, design: .default))
                                 .frame(maxWidth: .infinity, minHeight: 54)
                         }
-                        .buttonStyle(.plain).foregroundStyle(.white)
+                        .buttonStyle(.plain).foregroundStyle(StudioPalette.userInk)
                         .background(OpenBotTheme.purple, in: RoundedRectangle(cornerRadius: 12))
                         .disabled(session.isConnecting)
                         .accessibilityIdentifier("scan-pairing-code")
@@ -77,7 +77,7 @@ struct ConnectionView: View {
                             .font(.system(size: 16, weight: .bold, design: .default))
                             .frame(maxWidth: .infinity, minHeight: 54)
                         }
-                        .buttonStyle(.plain).foregroundStyle(.white)
+                        .buttonStyle(.plain).foregroundStyle(StudioPalette.userInk)
                         .accessibilityIdentifier("connect-studio")
                         .background(OpenBotTheme.purple, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .disabled(session.isConnecting)
@@ -85,12 +85,11 @@ struct ConnectionView: View {
                         }
                     }
                     .padding(20)
-                    .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.black.opacity(0.06)))
+                    .background(StudioPalette.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                     VStack(alignment: .leading, spacing: 10) {
-                        reassurance("Only OpenBot. No extra apps on your Mac or iPhone.", icon: "checkmark.shield.fill")
+                        reassurance("Connect once. No VPN app needed on your iPhone.", icon: "checkmark.shield.fill")
                         reassurance("Your phone’s connection is saved securely. Remove it from your Mac at any time.", icon: "lock.shield.fill")
-                        reassurance("Away access needs the OpenBot relay online and your Mac awake, or a private always-on host.", icon: "globe.americas.fill")
+                        reassurance("For away access, keep your Mac awake and online, or use a private always-on host.", icon: "globe.americas.fill")
                     }
                     Spacer(minLength: 20)
                 }

@@ -59,6 +59,7 @@ export function registerExtensionRoutes(app: Express, db: OpenBotDatabase, onCha
     skills.assign(String(request.params.id), input.botIds); return { saved: true };
   }));
   app.delete("/api/extensions/skills/:id", route((request) => { skills.remove(String(request.params.id)); return { removed: true }; }));
+  app.get("/api/extensions/skills/:id/share", route((request) => skills.shareBundle(String(request.params.id))));
   app.get("/api/extensions/memory/:botId", route((request) => db.memoryEntries(String(request.params.botId), true)));
   app.patch("/api/extensions/memory/:botId", route((request) => {
     const input = memoryEdit.parse(request.body);
