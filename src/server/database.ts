@@ -1,4 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
+import { TASK_TOKEN_TOP_UP, taskTokenAmountSchema, taskTokenRequestSchema, type TaskTokenPolicy, type TaskTokenReview } from "../shared/task-token-budget.js";
+import type { ExecutionLimits } from "./execution-policy.js";
 import { BUNDLED_ACCESS_KIND, bundledSkillsRevision } from "./bundled-skills.js";
 import { rankMemories, nearDuplicateNote, rankTexts } from "./memory-retrieval.js";
 import type { AutoReviewRule } from "./auto-review.js";
@@ -18,6 +20,9 @@ import type {
   Attachment,
   ArtifactSummary,
   AutomationAlert,
+  RunReceipt,
+  RunReceiptCheck,
+  RunReceiptEntry,
   Delegation,
   AutomationEvent,
   AutomationEventStatus,
@@ -57,6 +62,7 @@ import type {
 } from "../shared/types.js";
 import { SecretVault } from "./vault.js";
 import { legacyCadence, normalizeRoutineInterval } from "../shared/routines.js";
+import { replyEscalatesToOwner } from "../shared/routing.js";
 import { intervalSchedule, nextRoutineOccurrence, routineScheduleInput, scheduleLabel, type RoutineSchedule } from "../shared/calendar-schedule.js";
 import { skillSlug } from "../shared/skills.js";
 import type { AttachmentAnalysis } from "./attachments.js";
@@ -803,6 +809,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "cache_read_tokens INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "cost REAL NOT NULL DEFAULT 0");
     this.addColumn("runs", "parent_run_id TEXT");
+    this.addColumn("runs", "trigger_message_id TEXT");
     this.addColumn("runs", "steered_from_run_id TEXT");
     this.addColumn("runs", "routine_id TEXT");
     this.addColumn("runs", "consultation_pending INTEGER NOT NULL DEFAULT 0");
@@ -851,6 +858,7 @@ export class OpenBotDatabase {
     this.addColumn("connectors", "event_secret_ciphertext TEXT");
     this.addColumn("connectors", "event_verified_at TEXT");
     this.addColumn("taught_workflows", "skill_slug TEXT");
+    this.addColumn("taught_workflows", "disabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("taught_workflows", "description TEXT NOT NULL DEFAULT ''");
     this.addColumn("taught_workflows", "instructions TEXT NOT NULL DEFAULT ''");
     this.addColumn("taught_workflows", "version INTEGER NOT NULL DEFAULT 1");
@@ -1226,6 +1234,16 @@ export class OpenBotDatabase {
   }
 
   listThreads(): Thread[] {
+    // Needs-you per thread: an open owner approval, or a teammate handing a
+    // judgment call to the owner (@user/@owner) in the current turn. The
+    // escalation scan is re-validated in JS so substrings like "bob@user"
+    // never raise a false badge.
+    const openApprovals = new Set((this.db.prepare("SELECT DISTINCT thread_id FROM runs WHERE status='awaiting_approval' AND parent_run_id IS NULL").all() as Row[]).map((row) => String(row.thread_id)));
+    const escalationRows = this.db.prepare(`SELECT m.thread_id AS thread_id, m.body AS body FROM messages m
+      WHERE m.sender_type='bot'
+      AND m.rowid > COALESCE((SELECT MAX(m2.rowid) FROM messages m2 WHERE m2.thread_id=m.thread_id AND m2.sender_type='user'), 0)
+      AND (m.body LIKE '%@user%' OR m.body LIKE '%@owner%')`).all() as Row[];
+    const escalations = new Set(escalationRows.filter((row) => replyEscalatesToOwner(String(row.body))).map((row) => String(row.thread_id)));
     return (this.db.prepare(`SELECT t.*,
       (SELECT GROUP_CONCAT(tb.bot_id, ',') FROM thread_bots tb WHERE tb.thread_id=t.id) member_ids,
       (SELECT substr(m.body,1,240) FROM messages m LEFT JOIN runs r ON r.id=m.run_id WHERE m.thread_id=t.id AND r.parent_run_id IS NULL ORDER BY m.created_at DESC,m.rowid DESC LIMIT 1) last_message,
@@ -1235,12 +1253,42 @@ export class OpenBotDatabase {
       botIds: String(row.member_ids || "").split(",")[0] ? String(row.member_ids).split(",") : undefined,
       section: row.section_name ? String(row.section_name) : null, pinned: asBoolean(row.pinned), hidden: asBoolean(row.hidden),
       createdAt: String(row.created_at), updatedAt: String(row.updated_at), unreadCount: 0,
+      needsYou: openApprovals.has(String(row.id)) || escalations.has(String(row.id)),
       lastMessage: row.last_message == null ? null : String(row.last_message), lastMessageAt: row.last_message_at == null ? null : String(row.last_message_at),
     }));
   }
 
   getThread(id: string): Thread | null {
     return this.listThreads().find((thread) => thread.id === id) || null;
+  }
+
+  /** One group turn = everything since the owner's last message. Counts the
+   * teammate replies the turn has already spent (the reply budget), whether
+   * anyone escalated to the owner, and whether the cap notice already fired,
+   * so the same refusal never spams the room. */
+  groupTurnState(threadId: string): { botMessages: number; escalates: boolean; capNotePosted: boolean } {
+    const threshold = this.db.prepare("SELECT MAX(rowid) AS last FROM messages WHERE thread_id=? AND sender_type='user'").get(threadId) as Row | undefined;
+    const since = Number(threshold?.last || 0);
+    const rows = this.db.prepare("SELECT sender_type, body, event_type FROM messages WHERE thread_id=? AND rowid > ? AND sender_type IN ('bot','system')").all(threadId, since) as Row[];
+    return {
+      botMessages: rows.filter((row) => String(row.sender_type) === "bot").length,
+      escalates: rows.some((row) => String(row.sender_type) === "bot" && replyEscalatesToOwner(String(row.body))),
+      capNotePosted: rows.some((row) => String(row.event_type) === "group-cap"),
+    };
+  }
+
+  /** How many teammate replies a message sits behind in its reply chain (an
+   * owner message or a thread start is depth 0; each teammate reply adds 1).
+   * This is the group "round" counter: it keeps @mention chains from folding
+   * in on themselves. */
+  replyChainDepth(messageId: string): number {
+    const row = this.db.prepare(`WITH RECURSIVE chain(id, reply_to, bot_hops) AS (
+      SELECT id, reply_to_id, 0 FROM messages WHERE id = ?
+      UNION ALL
+      SELECT m.id, m.reply_to_id, chain.bot_hops + 1 FROM messages m JOIN chain ON m.id = chain.reply_to
+      WHERE m.sender_type='bot' AND chain.bot_hops < 8
+    ) SELECT COALESCE(MAX(bot_hops), 0) AS depth FROM chain`).get(messageId) as Row | undefined;
+    return Number(row?.depth || 0);
   }
 
   /** Group membership, richest first: explicit room members, then all bots
@@ -1586,7 +1634,7 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"] }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; triggerMessageId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"] }): Run {
     if (this.getBot(input.botId)?.retiredAt) throw new Error("This teammate is retired. Restore them before starting new work.");
     if (input.routineId) {
       const routine = this.getRoutine(input.routineId);
@@ -1594,8 +1642,8 @@ export class OpenBotDatabase {
     }
     const id = randomUUID();
     const tracked = shouldTrackTask(input.prompt, Boolean(input.parentRunId || input.steeredFromRunId || input.routineId));
-    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,routine_id,automation_event_id,progress_at,attachment_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.routineId ?? null, input.automationEventId ?? null, now(), JSON.stringify([...new Set(input.attachmentIds || [])].slice(0, 6)),
+    this.db.prepare(`INSERT INTO runs (id,thread_id,bot_id,prompt,status,approval_reason,created_at,parent_run_id,steered_from_run_id,trigger_message_id,routine_id,automation_event_id,progress_at,attachment_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, input.threadId, input.botId, input.prompt, input.status, input.approvalReason ?? null, now(), input.parentRunId ?? null, input.steeredFromRunId ?? null, input.triggerMessageId ?? null, input.routineId ?? null, input.automationEventId ?? null, now(), JSON.stringify([...new Set(input.attachmentIds || [])].slice(0, 6)),
     );
     this.db.prepare(`UPDATE runs SET task_goal=?,task_deliverable=?,task_approval_boundary=?,task_required_apps_json='[]',task_stage=?,task_steps_json=?,verification_status='pending',verification_summary=NULL,verification_checks_json='[]' WHERE id=?`).run(
       tracked ? taskGoal(input.prompt) : null, tracked ? "A finished, reviewable result in this conversation" : null, input.approvalReason ?? null,
@@ -1640,7 +1688,7 @@ export class OpenBotDatabase {
     return {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
-      steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
+      steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, triggerMessageId: row.trigger_message_id ? String(row.trigger_message_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
       attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
@@ -1685,6 +1733,99 @@ export class OpenBotDatabase {
       rootRunId: String(root.id), runIds: rows.map((row) => String(row.id)),
       totalTokens: rows.reduce((sum, row) => sum + Number(row.input_tokens || 0) + Number(row.output_tokens || 0) + Number(row.reasoning_tokens || 0), 0),
     };
+  }
+
+  taskTokenPolicy(runId: string): TaskTokenPolicy {
+    const root = this.getJobUsage(runId).rootRunId;
+    return this.extensionRecord<TaskTokenPolicy>("task-token-budget", root) || { extraTokens: 0, revision: 0, pendingApprovalId: null, paused: [] };
+  }
+
+  /** Host-only, durable pause of the whole outcome. Model tools cannot grant
+   * tokens. Unexecuted action reviews are withdrawn, not silently approved. */
+  pauseForTaskTokens(runId: string): Approval | null {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const usage = this.getJobUsage(runId), policy = this.taskTokenPolicy(runId);
+      if (policy.pendingApprovalId) { this.db.exec("COMMIT"); return this.getApproval(policy.pendingApprovalId); }
+      const active = usage.runIds.map(id => this.getRun(id)!).filter(run => ["queued", "running", "awaiting_approval", "waiting_for_teammate"].includes(run.status));
+      if (!active.length) { this.db.exec("COMMIT"); return null; }
+      const owner = active.find(run => run.id === usage.rootRunId) || active.find(run => !run.parentRunId) || active.find(run => run.id === runId) || active[0]!;
+      policy.paused = active.map(run => ({ id: run.id, status: run.status as TaskTokenPolicy["paused"][number]["status"] }));
+      for (const run of active) {
+        this.db.prepare("DELETE FROM approved_actions WHERE run_id=? AND status='prepared'").run(run.id);
+        this.db.prepare("UPDATE approvals SET status='denied',decided_at=? WHERE run_id=? AND status='pending'").run(now(), run.id);
+        this.updateRun(run.id, { status: "awaiting_approval", taskStage: "waiting", error: null, finishedAt: null, approvalReason: "This task needs your permission to use more tokens." });
+        this.db.prepare("UPDATE runs SET approval_id=NULL WHERE id=?").run(run.id);
+      }
+      const approval = this.createApproval({ runId: owner.id, botId: owner.botId, kind: "budget", reason: "OpenBot paused this task at its token limit. Saved work and completed actions are kept. You decide whether it can use more.", actionLabel: `Allow ${TASK_TOKEN_TOP_UP.toLocaleString()} more tokens for this task`, action: { type: "task_tokens", botId: owner.botId, args: { rootRunId: usage.rootRunId, additionalTokens: TASK_TOKEN_TOP_UP, revision: policy.revision } } });
+      policy.pendingApprovalId = approval.id;
+      this.saveExtensionRecord("task-token-budget", usage.rootRunId, policy);
+      this.addActivity({ runId: owner.id, botId: owner.botId, kind: "status", label: "Paused for more tokens", detail: "This task is waiting for a bounded allowance. Other tasks, weekly limits and action permissions are unchanged." });
+      this.db.exec("COMMIT");
+      return approval;
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+
+  setTaskTokenAmount(approvalId: string, amount: unknown): Approval | null {
+    const parsed = taskTokenAmountSchema.safeParse(amount);
+    const approval = this.getApproval(approvalId), action = taskTokenRequestSchema.safeParse(this.getApprovalAction(approvalId));
+    if (!parsed.success || !approval || approval.kind !== "budget" || approval.status !== "pending" || !action.success) return null;
+    const policy = this.taskTokenPolicy(approval.runId);
+    if (policy.pendingApprovalId !== approvalId || policy.revision !== action.data.args.revision) return null;
+    action.data.args.additionalTokens = parsed.data;
+    this.db.prepare("UPDATE approvals SET action_json=?,action_label=? WHERE id=? AND status='pending'").run(JSON.stringify(action.data), `Allow ${parsed.data.toLocaleString()} more tokens for this task`, approvalId);
+    return this.getApproval(approvalId);
+  }
+
+  taskTokenReview(approvalId: string, limits: Pick<ExecutionLimits, "maxTokens" | "maxJobTokens">): TaskTokenReview | null {
+    const approval = this.getApproval(approvalId), parsed = taskTokenRequestSchema.safeParse(this.getApprovalAction(approvalId));
+    if (!approval || approval.kind !== "budget" || !parsed.success || parsed.data.botId !== approval.botId) return null;
+    const usage = this.getJobUsage(approval.runId), policy = this.taskTokenPolicy(approval.runId);
+    if (usage.rootRunId !== parsed.data.args.rootRunId || policy.pendingApprovalId !== approvalId || policy.revision !== parsed.data.args.revision || approval.status !== "pending") return null;
+    const paused = policy.paused.map(item => this.getRun(item.id)).filter((run): run is Run => Boolean(run));
+    const overrun = Math.max(policy.extraTokens, usage.totalTokens - limits.maxJobTokens, ...paused.map(run => run.inputTokens + run.outputTokens + run.reasoningTokens - limits.maxTokens));
+    const extraTokens = overrun + parsed.data.args.additionalTokens;
+    const inFlight = usage.runIds.some(id => this.db.prepare("SELECT 1 FROM approved_actions WHERE run_id=? AND status='running'").get(id));
+    const budgetBlocked = paused.some(run => !this.budgetAvailable(run.botId).allowed);
+    const invalid = !paused.length || paused.some(run => run.status !== "awaiting_approval" || !this.getBot(run.botId) || this.getBot(run.botId)?.retiredAt) || !policy.paused.some(item => item.id === approval.runId) || !Number.isSafeInteger(extraTokens);
+    return {
+      usedTokens: usage.totalTokens, currentJobLimit: limits.maxJobTokens + policy.extraTokens,
+      newJobLimit: limits.maxJobTokens + extraTokens, additionalTokens: parsed.data.args.additionalTokens, extraTokens,
+      models: [...new Set(paused.map(run => `${run.botName}: ${run.modelOverride || this.getBot(run.botId)?.model || 'No model selected'}`))],
+      limitation: invalid ? "This task changed. Refresh its status before deciding." : inFlight ? "An already-approved action is finishing. Wait for its recorded result before continuing." : budgetBlocked ? "A teammate's weekly allowance is also exhausted. This task-only approval cannot override it." : null,
+    };
+  }
+
+  /** The owner route checks a fresh review fingerprint before entering this
+   * atomic grant. Counters, receipts, sessions, plans and permissions stay put. */
+  decideTaskTokens(approvalId: string, decision: "approved" | "denied", limits: Pick<ExecutionLimits, "maxTokens" | "maxJobTokens">): Approval | null {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const approval = this.getApproval(approvalId), action = taskTokenRequestSchema.safeParse(this.getApprovalAction(approvalId));
+      if (!approval || !action.success || approval.status !== "pending") { this.db.exec("COMMIT"); return null; }
+      const policy = this.taskTokenPolicy(approval.runId), review = this.taskTokenReview(approvalId, limits);
+      if (policy.pendingApprovalId !== approvalId || (decision === "approved" && (!review || review.limitation))) { this.db.exec("COMMIT"); return null; }
+      this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=? AND status='pending'").run(decision, now(), approvalId);
+      for (const item of policy.paused) {
+        const run = this.getRun(item.id);
+        if (!run || run.status !== "awaiting_approval") continue;
+        if (decision === "denied") {
+          this.updateRun(run.id, { status: "cancelled", finishedAt: now(), approvalReason: null, taskStage: "blocked" });
+          this.finishRunTask(run.id, "cancelled");
+        } else {
+          // A coordinator must still wait for its unfinished consultants.
+          this.updateRun(run.id, { status: run.consultationPending ? "waiting_for_teammate" : "queued", taskStage: run.consultationPending ? "waiting" : "working", approvalReason: null, error: null, finishedAt: null, progressAt: now() });
+        }
+        this.db.prepare("UPDATE runs SET approval_id=NULL WHERE id=?").run(run.id);
+      }
+      if (decision === "approved") { policy.extraTokens = review!.extraTokens; policy.revision += 1; }
+      policy.pendingApprovalId = null; policy.paused = [];
+      this.saveExtensionRecord("task-token-budget", action.data.args.rootRunId, policy);
+      this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE run_id=? AND kind='approval' AND resolved_at IS NULL").run(now(), approval.runId);
+      this.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: decision === "approved" ? "More tokens approved by you" : "Additional tokens declined", detail: decision === "approved" ? `${action.data.args.additionalTokens.toLocaleString()} more tokens for this outcome; resuming saved progress, not repeating completed actions.` : "The task is stopped. Saved work and completed actions are kept." });
+      this.db.exec("COMMIT");
+      return this.getApproval(approvalId);
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
 
   listRuns(threadId: string): Run[] {
@@ -1807,6 +1948,10 @@ export class OpenBotDatabase {
 
   retryMissingWorkReport(id: string): boolean {
     return this.db.prepare("UPDATE runs SET status='queued',completion_repair_count=completion_repair_count+1,partial_text=NULL,summary=NULL,error=NULL,finished_at=NULL,progress_at=? WHERE id=? AND status='running' AND expected_work_kind IS NOT NULL AND completion_repair_count=0").run(now(), id).changes === 1;
+  }
+
+  retryIntermediateTurn(id: string): boolean {
+    return this.db.prepare("UPDATE runs SET status='queued',completion_repair_count=1,finished_at=NULL,error=NULL,progress_at=? WHERE id=? AND status='running' AND expected_work_kind IS NULL AND completion_repair_count=0").run(now(), id).changes === 1;
   }
 
   requireWorkReport(id: string, kind: NonNullable<Run["expectedWorkKind"]>) {
@@ -1945,10 +2090,10 @@ export class OpenBotDatabase {
       }
     } else {
       stage = "blocked";
-      if (verificationStatus === "pending") {
+      if (verificationStatus === "pending" || outcome === "failed") {
         verificationStatus = "blocked";
         verificationSummary = outcome === "cancelled" ? "Stopped by the user." : (detail || "The work stopped before it could be checked.").slice(0, 500);
-        checks = [];
+        if (outcome === "cancelled") checks = [];
       }
       const active = steps.find((step) => step.status === "active");
       if (active) { active.status = "blocked"; active.detail = verificationSummary; }
@@ -1956,6 +2101,11 @@ export class OpenBotDatabase {
     this.db.prepare("UPDATE runs SET task_stage=?,task_steps_json=?,verification_status=?,verification_summary=?,verification_checks_json=?,progress_at=? WHERE id=?").run(
       stage, JSON.stringify(steps), verificationStatus, verificationSummary, JSON.stringify(checks), now(), id,
     );
+    if (outcome === "failed" && !run.parentRunId && !this.db.prepare("SELECT 1 FROM messages WHERE run_id=? AND event_type='run_stopped'").get(id)) {
+      const reason = detail || run.error || "The task stopped before it finished.";
+      const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : "Work stopped";
+      this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId } });
+    }
     return this.getRun(id)!.task;
   }
 
@@ -1981,6 +2131,7 @@ export class OpenBotDatabase {
       connectors, serviceErrors,
       codeProjects,
       bundledSkillsRevision,
+      learnedSkills: this.listWorkflows(botId).map(({ id, version, disabled, skillSlug }) => ({ id, version, disabled, skillSlug })).sort((a, b) => a.id.localeCompare(b.id)),
       bundledSkillAccess: this.extensionRecords(BUNDLED_ACCESS_KIND),
       extensions: ["mcp", "community-skill"].map((kind) => this.extensionRecords<Record<string, unknown>>(kind).map(({ id, value }) => ({ id, revision: value.revision || value.digest, access: kind === "mcp" ? (value.grants as Record<string, unknown>)?.[botId] : (value.botIds as string[])?.includes(botId) }))),
       memoryRevision: this.extensionRecord<string>("memory-revision", botId),
@@ -2001,6 +2152,47 @@ export class OpenBotDatabase {
     return row?.session_id ? String(row.session_id) : null;
   }
 
+  taskSession(runId: string, fingerprint: string, maxContext: number): { sessionId: string | null; continuing: boolean; reason: string } {
+    const run = this.getRun(runId);
+    if (!run) throw new Error("This task no longer exists.");
+    // Reuse only this invocation or its steering ancestors, never a sibling's
+    // private consultation. Parent/child jobs own separate runtime sessions.
+    const ancestors = new Set([run.id]);
+    let previous = run.steeredFromRunId;
+    while (previous && !ancestors.has(previous)) { ancestors.add(previous); previous = this.getRun(previous)?.steeredFromRunId || null; }
+    const candidates = this.db.prepare(`SELECT r.id,r.session_id,r.status,r.input_tokens,r.cache_read_tokens,r.parent_run_id,r.routine_id,r.expected_work_kind FROM runs r JOIN model_sessions s ON s.session_id=r.session_id
+      WHERE r.thread_id=? AND r.bot_id=? AND s.capability_fingerprint=? ORDER BY r.created_at DESC,r.rowid DESC`).all(run.threadId, run.botId, fingerprint) as Row[];
+    const sameTask = candidates.find(row => ancestors.has(String(row.id)));
+    // The queue claim sets startedAt before the first provider invocation.
+    // It is not evidence of an existing task context on its own.
+    const continuing = Boolean(run.steeredFromRunId || run.modelSteps || run.inputTokens || run.outputTokens || run.activeDurationMs || run.attemptCount > 1);
+    if (sameTask) return { sessionId: String(sameTask.session_id), continuing: true, reason: "same_task" };
+    if (continuing) return { sessionId: null, continuing: true, reason: "context_changed" };
+    if (run.parentRunId || run.routineId || run.expectedWorkKind) return { sessionId: null, continuing: false, reason: "isolated_task" };
+    const latest = candidates[0];
+    if (!latest) return { sessionId: null, continuing: false, reason: "new_context" };
+    if (latest.status !== "completed" || latest.parent_run_id || latest.routine_id || latest.expected_work_kind) return { sessionId: null, continuing: false, reason: "isolated_task" };
+    const observed = this.extensionRecord<{ peakInputTokens: number }>("model-session-context", String(latest.session_id));
+    const footprint = observed?.peakInputTokens ?? (Number(latest.input_tokens || 0) + Number(latest.cache_read_tokens || 0));
+    if (!Number.isFinite(footprint) || footprint <= 0 || footprint >= maxContext) return { sessionId: null, continuing: false, reason: "fresh_working_context" };
+    return { sessionId: String(latest.session_id), continuing: false, reason: "small_context" };
+  }
+
+  recordSessionContext(sessionId: string, inputTokens: number) {
+    if (!Number.isFinite(inputTokens) || inputTokens < 0) return;
+    const previous = this.extensionRecord<{ peakInputTokens: number }>("model-session-context", sessionId)?.peakInputTokens || 0;
+    if (inputTokens > previous) this.saveExtensionRecord("model-session-context", sessionId, { peakInputTokens: inputTokens });
+  }
+
+  conversationSearch(threadId: string, query: string) {
+    const rows = this.db.prepare("SELECT id,body,sender_type,created_at FROM messages WHERE thread_id=? AND sender_type IN ('user','bot') ORDER BY created_at DESC,rowid DESC LIMIT 400").all(threadId) as Row[];
+    return rankTexts(query, rows.map(row => ({ id: String(row.id), body: String(row.body), sender_type: String(row.sender_type), created_at: String(row.created_at), text: String(row.body) })), 5).map(({ item }) => {
+      const body = String(item.body), term = query.trim().split(/\s+/).find(word => body.toLowerCase().includes(word.toLowerCase()));
+      const start = term ? Math.max(0, body.toLowerCase().indexOf(term.toLowerCase()) - 300) : 0;
+      return { messageId: String(item.id), speaker: String(item.sender_type), at: String(item.created_at), excerpt: body.slice(start, start + 2_400), shortened: start > 0 || body.length > 2_400 };
+    });
+  }
+
   createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown }): Approval {
     const id = randomUUID();
     const run = this.getRun(input.runId);
@@ -2014,8 +2206,11 @@ export class OpenBotDatabase {
   }
 
   private approvalFromRow(row: Row): Approval {
+    let requiresSignIn = false;
+    try { requiresSignIn = row.kind === "browser" && JSON.parse(String(row.action_json || "null"))?.type === "browser_sign_in"; } catch { /* Invalid actions cannot open a private sign-in panel. */ }
     return {
       id: String(row.id), runId: String(row.run_id), botId: String(row.bot_id), botName: String(row.bot_name), kind: row.kind as Approval["kind"],
+      requiresSignIn,
       reason: String(row.reason), actionLabel: String(row.action_label), status: row.status as Approval["status"],
       createdAt: String(row.created_at), decidedAt: row.decided_at ? String(row.decided_at) : null,
     };
@@ -2063,6 +2258,75 @@ export class OpenBotDatabase {
     return row ? this.approvedActionFromRow(row) : null;
   }
 
+  /** A host-recorded account of one job, not a cryptographic signature.
+   * Checks retain their host/teammate provenance and unresolved work is
+   * explicit; a completed model turn is not proof of a completed outcome. */
+  buildRunReceipt(runId: string): RunReceipt | null {
+    const run = this.getRun(runId);
+    if (!run) return null;
+    const job = this.getJobUsage(run.id);
+    const jobRunIds = [...new Set(job.runIds)];
+    const coordinator = this.getBot(run.botId);
+    const team: RunReceiptEntry[] = [{
+      botName: run.botName, role: coordinator?.role || null, model: coordinator?.model || null, status: run.status,
+      tokens: run.inputTokens + run.outputTokens + run.reasoningTokens, cost: run.cost,
+    }];
+    for (const child of this.listChildRuns(run.id)) {
+      const bot = this.getBot(child.botId);
+      team.push({
+        botName: child.botName, role: bot?.role || null, model: bot?.model || null, status: child.status,
+        tokens: child.inputTokens + child.outputTokens + child.reasoningTokens, cost: child.cost,
+      });
+    }
+    const checks: RunReceiptCheck[] = run.task.verificationChecks.map((check) => ({ label: check.label, passed: check.passed, source: check.source === "host" ? "host" : "teammate", detail: check.detail ?? null }));
+    const story = run.activities.filter((activity) => ["tool", "file", "handoff", "message"].includes(activity.kind));
+    const workLog = (story.length ? story : run.activities).slice(0, 14).map((activity) => ({ label: activity.label, detail: activity.detail, at: activity.createdAt }));
+    const placeholders = jobRunIds.map(() => "?").join(",");
+    const artifactRows = jobRunIds.length
+      ? this.db.prepare(`SELECT a.* FROM attachments a JOIN messages m ON m.id = a.message_id WHERE a.source='artifact' AND m.run_id IN (${placeholders}) ORDER BY a.created_at DESC LIMIT 12`).all(...jobRunIds) as Row[]
+      : [];
+    const artifacts = artifactRows.map((row) => {
+      const attachment = this.attachmentFromRow(row);
+      return { name: attachment.name, mime: attachment.mime, revision: attachment.revision, url: attachment.url };
+    });
+    // Query this job directly. Filtering the global activity feed lost old
+    // actions once other jobs filled its limit, hiding uncertain deliveries.
+    const externalActions = (this.db.prepare(this.approvedActionSelect(`WHERE aa.run_id IN (${placeholders || "''"}) ORDER BY aa.created_at ASC,aa.id ASC`)).all(...jobRunIds) as Row[])
+      .map((row) => this.approvedActionFromRow(row))
+      .map((action) => ({ label: action.actionLabel, status: action.status, detail: action.resultSummary || action.lastError }));
+    const uncertainty: string[] = [];
+    if (run.status === "failed") uncertainty.push(run.error || "The task failed without a recorded reason.");
+    else if (run.status !== "completed") uncertainty.push(`The task is ${run.status}; its outcome is not complete.`);
+    if (run.status === "completed") {
+      if (run.task.verificationStatus !== "passed") uncertainty.push(`Task verification is ${run.task.verificationStatus}, not passed.`);
+      if (!checks.some((check) => check.source === "host" && check.passed)) uncertainty.push("No passed host checks are recorded. A teammate's completion message is not independent verification.");
+    }
+    for (const check of checks) if (!check.passed) uncertainty.push(`Check failed (${check.source}): ${check.label}. ${check.detail || ""}`.trim());
+    for (const child of this.listChildRuns(run.id)) {
+      if (child.status !== "completed") uncertainty.push(`${child.botName}: ${child.error || `Consultation is ${child.status}, not completed.`}`);
+    }
+    const pendingApprovals = this.db.prepare(`SELECT action_label FROM approvals WHERE run_id IN (${placeholders || "''"}) AND status='pending'`).all(...jobRunIds) as Row[];
+    for (const approval of pendingApprovals) uncertainty.push(`Awaiting your approval: ${String(approval.action_label)}.`);
+    for (const action of externalActions) {
+      if (action.status === "uncertain") uncertainty.push(`Uncertain: ${action.label}. ${action.detail || "Check the destination before retrying."}`);
+      if (action.status === "failed") uncertainty.push(`Failed: ${action.label}. ${action.detail || ""}`.trim());
+      if (action.status === "prepared" || action.status === "running") uncertainty.push(`Not confirmed yet: ${action.label} (${action.status}). Check the destination before retrying.`);
+      if (action.status === "confirmed_not_completed") uncertainty.push(`Not completed: ${action.label}. ${action.detail || "The owner confirmed this action did not complete."}`);
+    }
+    const cost = this.db.prepare(`SELECT COALESCE(SUM(cost),0) AS cost FROM runs WHERE id IN (${placeholders || "''"})`).get(...jobRunIds) as Row;
+    const finished = run.finishedAt ? Date.parse(run.finishedAt) : null;
+    const started = run.startedAt ? Date.parse(run.startedAt) : null;
+    return {
+      runId: run.id, threadId: run.threadId, botName: run.botName,
+      goal: run.task.tracked ? run.task.goal.split(" Automation context")[0]?.trim() || null : null,
+      deliverable: run.task.tracked ? run.task.deliverable : null,
+      status: run.status, error: run.error, startedAt: run.startedAt, finishedAt: run.finishedAt,
+      durationMs: started !== null && finished !== null && finished > started ? finished - started : null,
+      team, checks, workLog, artifacts, externalActions, uncertainty,
+      usage: { tokens: job.totalTokens, cost: Number(cost.cost || 0), runs: jobRunIds.length },
+    };
+  }
+
   listApprovedActions(limit = 30): ApprovedActionReceipt[] {
     return (this.db.prepare(this.approvedActionSelect("ORDER BY aa.created_at DESC", "LIMIT ?")).all(Math.max(1, Math.min(limit, 100))) as Row[])
       .map((row) => this.approvedActionFromRow(row));
@@ -2080,10 +2344,19 @@ export class OpenBotDatabase {
   }
 
   completeApprovedAction(approvalId: string, resultSummary: string): ApprovedActionReceipt | null {
-    const result = this.db.prepare("UPDATE approved_actions SET status='completed',result_summary=?,last_error=NULL,finished_at=? WHERE approval_id=? AND status='running'")
-      .run(resultSummary.slice(0, 2_000), now(), approvalId);
-    if (result.changes !== 1) return null;
-    return this.getApprovedAction(approvalId);
+    this.db.exec("SAVEPOINT approved_action_result");
+    try {
+      const result = this.db.prepare("UPDATE approved_actions SET status='completed',result_summary=?,last_error=NULL,finished_at=? WHERE approval_id=? AND status='running'")
+        .run(resultSummary.slice(0, 2_000), now(), approvalId);
+      const receipt = result.changes === 1 ? this.getApprovedAction(approvalId)! : null;
+      const run = receipt ? this.getRun(receipt.runId) : null;
+      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel } });
+      this.db.exec("RELEASE approved_action_result");
+      return receipt;
+    } catch (error) {
+      this.db.exec("ROLLBACK TO approved_action_result; RELEASE approved_action_result");
+      throw error;
+    }
   }
 
   failApprovedAction(approvalId: string, error: string): ApprovedActionReceipt | null {
@@ -2115,7 +2388,7 @@ export class OpenBotDatabase {
 
   decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
     const approval = this.getApproval(id);
-    if (!approval || approval.status !== "pending") return null;
+    if (!approval || approval.status !== "pending" || approval.kind === "budget") return null;
     const result = this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=? AND status='pending'").run(decision, now(), id);
     if (result.changes !== 1) return null;
     if (decision === "approved") {
@@ -2133,6 +2406,11 @@ export class OpenBotDatabase {
   cancelRun(id: string): Run | null {
     const run = this.getRun(id);
     if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return null;
+    const tokens = this.taskTokenPolicy(id);
+    if (tokens.pendingApprovalId) {
+      this.decideTaskTokens(tokens.pendingApprovalId, "denied", { maxTokens: 0, maxJobTokens: 0 });
+      return this.getRun(id);
+    }
     const approval = run.approvalId ? this.getApproval(run.approvalId) : null;
     if (approval?.status === "pending") this.decideApproval(approval.id, "denied");
     else {
@@ -3167,9 +3445,20 @@ export class OpenBotDatabase {
       description: String(row.description || `Repeat the saved ${row.name} workflow.`),
       instructions: String(row.instructions || `Start at ${row.start_url}, follow the demonstrated steps, and verify the result.`),
       startUrl: String(row.start_url), stepCount: jsonArray<unknown>(row.steps_json).length, version: Number(row.version || 1),
-      source: (["taught", "imported", "template", "assigned"].includes(String(row.source)) ? String(row.source) : "taught") as TaughtWorkflow["source"],
+      disabled: asBoolean(row.disabled),
+      source: (["taught", "imported", "template", "assigned", "proposed"].includes(String(row.source)) ? String(row.source) : "taught") as TaughtWorkflow["source"],
       createdAt: String(row.created_at), updatedAt: String(row.updated_at || row.created_at),
     };
+  }
+
+  /** Per-skill enablement: a disabled skill stays in the library but is not
+   * routable and its skill files are removed from the teammate's harness
+   * directories, so the model cannot load it at all. */
+  setWorkflowEnabled(id: string, enabled: boolean): TaughtWorkflow | null {
+    const workflow = this.getWorkflowRecord(id)?.workflow;
+    if (!workflow) return null;
+    this.db.prepare("UPDATE taught_workflows SET disabled=?, updated_at=? WHERE id=?").run(enabled ? 0 : 1, now(), id);
+    return this.listWorkflows(workflow.botId).find((entry) => entry.id === id) || null;
   }
 
   listWorkflows(botId?: string): TaughtWorkflow[] {

@@ -27,6 +27,23 @@ export function readCookie(raw: string | undefined, key: string): string | null 
   return null;
 }
 
+/** Browser writes must come from this studio, not another same-site subdomain.
+ * Native clients send explicit credentials and normally have no Origin/Fetch
+ * Metadata. Never infer the public origin from attacker-controlled proxy headers.
+ */
+export function browserWriteAllowed(request: { method: string; socket: { remoteAddress?: string }; headers: IncomingHttpHeaders }, appUrl: string): boolean {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return true;
+  if (trustedLocalRequest(request)) return true;
+  const origin = request.headers.origin;
+  if (!origin) return !request.headers["sec-fetch-site"];
+  try { return origin === new URL(appUrl).origin; } catch { return false; }
+}
+
+export function useSecureSessionCookie(appUrl: string, encrypted: boolean, relay: boolean): boolean {
+  // HTTPS may terminate at an outbound tunnel while Express still sees HTTP.
+  return encrypted || relay || new URL(appUrl).protocol === "https:";
+}
+
 type AttemptWindow = { failures: number; resetAt: number };
 
 export class LoginAttemptGate {

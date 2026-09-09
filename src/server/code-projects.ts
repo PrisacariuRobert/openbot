@@ -11,6 +11,39 @@ import { codePublicationReviewSchema, type CodePublicationInput, type CodePublic
 import { githubCliEnvironment } from "./github.js";
 import { GitHubWriteUncertainError, withPinnedGitHubWriteIdentity, type GitHubWriteIdentity, type PinnedGitHubWriter } from "./github-write-identity.js";
 
+export interface CrossModelCandidate {
+  id: string;
+  name: string;
+  retiredAt?: string | null;
+  providerInstanceId: string | null;
+  model: string;
+}
+
+/** Cross-model independent review: when the studio has other model classes
+ * available, a review must not come from the author's own provider+model —
+ * a second opinion that shares the author's blind spots is not independent.
+ * Single-model studios degrade gracefully. */
+export function crossModelReviewDecision(input: {
+  author: { providerInstanceId: string | null; model: string };
+  target: { id: string; providerInstanceId: string | null; model: string } | null;
+  candidates: CrossModelCandidate[];
+}): { allowed: boolean; error: string | null; eligibleNames: string[] } {
+  if (!input.target) return { allowed: false, error: "Choose a teammate to review the code.", eligibleNames: [] };
+  const sameModel = (input.target.providerInstanceId || "") === (input.author.providerInstanceId || "")
+    && (input.target.model || "") === (input.author.model || "");
+  if (!sameModel) return { allowed: true, error: null, eligibleNames: [] };
+  const eligible = input.candidates.filter((candidate) =>
+    candidate.id !== input.target!.id && !candidate.retiredAt
+    && ((candidate.providerInstanceId || "") !== (input.author.providerInstanceId || "")
+      || (candidate.model || "") !== (input.author.model || "")));
+  if (!eligible.length) return { allowed: true, error: null, eligibleNames: [] };
+  return {
+    allowed: false,
+    error: `Independent review should run on a different model than the author's. ${eligible.map((candidate) => candidate.name).join(", ")} can review this project — or connect another AI service and add a reviewer from it.`,
+    eligibleNames: eligible.map((candidate) => candidate.name),
+  };
+}
+
 const SKIP_DIRECTORIES = new Set([".git", ".openbot", "node_modules", "dist", "build", "coverage", ".next", ".turbo", "vendor"]);
 const SAFE_HIDDEN_DIRECTORIES = new Set([".github"]);
 const MAX_FILE_BYTES = 1_000_000;

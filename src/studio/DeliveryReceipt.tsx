@@ -7,9 +7,10 @@ export function DeliveryReceipt({ run }: { run?: Run }) {
   const task = run.task, checks = task.verificationChecks;
   const hosts = checks.filter((check) => check.source === "host");
   const passed = task.verificationStatus === "passed";
-  const label = passed ? hosts.length === checks.length && checks.length > 0 ? "Verified by OpenBot" : hosts.length ? "Partly verified by OpenBot" : "Checks reported by teammate" : task.verificationStatus === "partial" ? "Finished with a note" : "Result delivered";
+  const label = passed ? hosts.length === checks.length && checks.length > 0 ? "Recorded checks passed" : hosts.length ? "Some checks passed" : "Checks reported by teammate" : task.verificationStatus === "partial" ? "Finished with a note" : "Result delivered";
   return <details className="delivery-receipt"><summary><ShieldCheck size={15} /><span>{label}</span></summary>
-    {task.verificationSummary && <p>{task.verificationSummary}</p>}
+    {task.verificationSummary && <p>Teammate summary: {task.verificationSummary}</p>}
+    {hosts.length > 0 && <p>OpenBot checked only the evidence described below. A file check does not verify every claim in the result.</p>}
     <ul>{checks.map((check, index) => <li key={index}><Check size={13} opacity={check.passed ? 1 : .35} /><div><strong>{check.label}</strong><small>{check.source === "host" ? "Host check" : "Teammate report"} · {check.passed ? "Passed" : "Not confirmed"}{check.detail ? ` · ${check.detail}` : ""}</small></div></li>)}</ul>
     {task.steps.length > 0 && <p className="delivery-progress">{task.steps.filter((step) => step.status === "completed").length} of {task.steps.length} steps completed.</p>}
   </details>;

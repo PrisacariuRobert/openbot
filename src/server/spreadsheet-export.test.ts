@@ -35,10 +35,34 @@ test("XLSX export preserves sources and IDs, returns hashes, and never turns tex
   assert.match(sheet, /<c r="C2" t="n"><v>12.50<\/v>/);
   assert.match(sheet, /<c r="B2" t="inlineStr"><is><t xml:space="preserve">=SUM\(A1:A2\)/);
   assert.doesNotMatch(sheet, /<f[ >]/);
+  assert.equal(receipt.formulaCount, 0);
+  assert.equal(receipt.literalFormulaCells, 1);
+  assert.match(receipt.warning!, /will NOT calculate/);
   assert.match(sheet, /state="frozen"/);
   assert.ok(Object.keys(archive).every((name) => !/vba|externalLink/i.test(name)));
   assert.throws(() => exportSpreadsheet(root, input), /already exists/);
   assert.deepEqual(readFileSync(path.join(root, receipt.path)), bytes);
+}));
+
+test('explicit local formulas are real formula cells without changing source values or enabling CSV injection', () => fixture(root => {
+  const source = 'ID,Amount,Total\n001,24.50,\n002,-5.00,\n003,0.00,\n';
+  writeFileSync(path.join(root, 'source.csv'), source);
+  const result = exportSpreadsheet(root, { filename: 'formula.xlsx', sheets: [{ name: 'Data', csvPath: 'source.csv', numberColumns: [2], formulas: [{ cell: 'C2', formula: '=SUM(B2:B4)' }, {cell:'C3',formula:'=SUMIFS(B2:B4,A2:A4,"001")'}, {cell:'C4',formula:'=IF(COUNTIFS(A2:A4,"002")=1,0,1)'}] }] });
+  const files = unzipSync(readFileSync(path.join(root, result.path)));
+  assert.equal(result.formulaCount, 3);
+  assert.equal(result.literalFormulaCells, 0);
+  assert.match(strFromU8(files['xl/worksheets/sheet1.xml']), /<c r="C2"><f>SUM\(B2:B4\)<\/f><\/c>/);
+  assert.match(strFromU8(files['xl/workbook.xml']), /fullCalcOnLoad="1"/);
+  assert.equal(readFileSync(path.join(root, 'source.csv'), 'utf8'), source);
+}));
+
+test('formula export rejects external effects, unbounded references, unknown sheets and overwriting data', () => fixture(root => {
+  writeFileSync(path.join(root, 'source.csv'), 'ID,Amount,Total\n001,10,\n');
+  for (const formula of ['=WEBSERVICE("https://example.test")', '=HYPERLINK("https://example.test")', "='[book.xlsx]Data'!A2", "=cmd|' /C calc'!A2", '=INDIRECT("A2")', '=SUM(B:B)', '=Unknown!B2', '=SUM(B2:B3', '=JAVASCRIPT(1)', '=XFD2', '=SUM({1,2})']) {
+    assert.throws(() => exportSpreadsheet(root, { filename: 'invalid.xlsx', sheets: [{ name: 'Data', csvPath: 'source.csv', formulas: [{ cell: 'C2', formula }] }] }), formula);
+  }
+  for (const cell of ['A1', 'B2', 'Z9']) assert.throws(() => exportSpreadsheet(root, { filename: 'invalid.xlsx', sheets: [{ name: 'Data', csvPath: 'source.csv', formulas: [{cell,formula:'=SUM(B2:B2)'}] }] }));
+  assert.deepEqual(readdirSync(root), ['source.csv']);
 }));
 
 test("invalid numbers and Excel precision loss fail before creating a workbook", () => fixture((root) => {

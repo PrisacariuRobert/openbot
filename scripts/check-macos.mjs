@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { appleMarketingVersion } from "./lib/release-version.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -53,9 +54,10 @@ const swift = required
   .map((file) => readFileSync(path.join(root, file), "utf8"))
   .join("\n");
 
-if (!project.includes(`MARKETING_VERSION: ${packageJson.version}`)) throw new Error(`The macOS marketing version is not ${packageJson.version}.`);
+const marketingVersion = appleMarketingVersion(packageJson.version);
+if (project.match(/MARKETING_VERSION:\s*(\S+)/)?.[1] !== marketingVersion) throw new Error(`The macOS marketing version is not ${marketingVersion}.`);
 const buildNumber = project.match(/CURRENT_PROJECT_VERSION:\s*(\d+)/)?.[1];
-if (!buildNumber || !generatedProject.includes(`CURRENT_PROJECT_VERSION = ${buildNumber};`) || !generatedProject.includes(`MARKETING_VERSION = ${packageJson.version};`)) {
+if (!buildNumber || !generatedProject.includes(`CURRENT_PROJECT_VERSION = ${buildNumber};`) || !generatedProject.includes(`MARKETING_VERSION = ${marketingVersion};`)) {
   throw new Error("The generated macOS project version is out of sync with project.yml and package.json.");
 }
 if (!project.includes("app.openbot.desktop") || !plist.includes("NSAllowsLocalNetworking") || !plist.includes("<string>openbot</string>")) {

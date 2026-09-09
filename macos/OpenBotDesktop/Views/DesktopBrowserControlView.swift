@@ -12,6 +12,8 @@ struct DesktopBrowserControlView: View {
         store.browserComputer?.botId == bot.id ? store.browserComputer : nil
     }
     private var screenshot: NSImage? { status?.screenshot.flatMap(Self.image(from:)) }
+    private var liveImage: NSImage? { store.browserLiveFrame.flatMap(NSImage.init(data:)) }
+    private var connected: Bool { store.browserLiveState == "ready" || status?.browser == "ready" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,9 +25,9 @@ struct DesktopBrowserControlView: View {
                         .font(.system(size: 11, weight: .medium, design: .default)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label(status?.browser == "ready" ? "Connected" : "Ready on demand", systemImage: "circle.fill")
+                Label(connected ? "Live" : "Ready on demand", systemImage: "circle.fill")
                     .font(.system(size: 9.5, weight: .bold, design: .default))
-                    .foregroundStyle(status?.browser == "ready" ? DesktopTheme.green : .secondary)
+                    .foregroundStyle(connected ? DesktopTheme.green : .secondary)
                 Button("Done") { dismiss() }.buttonStyle(.bordered).controlSize(.small)
             }
             .padding(.horizontal, 18).padding(.vertical, 12).background(.ultraThinMaterial)
@@ -85,6 +87,7 @@ struct DesktopBrowserControlView: View {
         .frame(width: 930, height: 720)
         .background(DesktopTheme.paper)
         .task {
+            store.startLiveView(botID: bot.id)
             await store.refreshBrowser(botID: bot.id, reportErrors: true)
             if let current = status?.currentUrl { address = current }
             while !Task.isCancelled {
@@ -92,15 +95,16 @@ struct DesktopBrowserControlView: View {
                 if !Task.isCancelled { await store.refreshBrowser(botID: bot.id) }
             }
         }
+        .onDisappear { store.stopLiveView() }
         .onChange(of: status?.currentUrl) { _, value in
             if let value, !value.isEmpty { address = value }
         }
     }
 
     @ViewBuilder private var browserScreen: some View {
-        if let screenshot {
+        if let image = liveImage ?? screenshot {
             GeometryReader { proxy in
-                Image(nsImage: screenshot)
+                Image(nsImage: image)
                     .resizable().interpolation(.medium).aspectRatio(1280.0 / 820.0, contentMode: .fit)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .contentShape(Rectangle())

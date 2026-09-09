@@ -54,9 +54,9 @@ Install the resulting `Debug-iphoneos/OpenBot.app` with Xcode or `xcrun devicect
 
 ### Phone test checklist
 
-1. On the Mac, open Remote access and copy the private host address and access key. Enter them in the native iPhone app. Do not post the key in chat, commit it or put it into a URL.
-2. For use away from home, connect Tailscale on the iPhone to the same private network as the host, then use the host's Tailscale address. The Mac/private runner must remain on. Do not forward the HTTP port to the public internet.
+1. On the Mac, open Away access. Wait for the HTTPS and privacy checks to pass, then show a QR code. In the native iPhone app, choose **Scan my Mac’s QR code** and confirm the studio address. Never post the code or private key publicly.
+2. A configured HTTPS tunnel or hosted relay works without a VPN app on the phone. Keep the Mac awake and online. See [personal Mac away access](../docs/AWAY_ACCESS_PERSONAL_MAC.md). Do not forward the HTTP port to the public internet.
 3. Open Tools, skills & memory → Skills: the seven included methods should already be there. You do not need to import or enable each one.
 4. Paste short meeting notes and ask for an action list. Check that missing owners and dates stay unresolved and decisions are not confused with suggestions.
 5. Ask one teammate to consult another: expect one consolidated final answer. Open an attachment and try an approval preview; decline any real external change you do not want.
-6. Turn Wi-Fi off while Tailscale stays connected. Send a new message, background/reopen the app and check that the same conversation returns without duplicate sends. Report any error and which step triggered it. This is a user acceptance check, not yet a verified cellular claim.
+6. Turn Wi-Fi off and use cellular data. Send a harmless message, background/reopen the app and check that the same conversation returns without duplicate sends. Report any error and which step triggered it. This is a user acceptance check, not automatically proven by a build or local transport test.

@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFileSync, statSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import './check-flow-timeline.mjs';
+const output = 'out/openbot-connected-flow.mp4';
+const probe = JSON.parse(execFileSync('ffprobe', ['-v','error','-show_streams','-show_format','-of','json',output],{encoding:'utf8'}));
+const video = probe.streams.find(s=>s.codec_type==='video');
+const audio = probe.streams.find(s=>s.codec_type==='audio');
+assert.equal(video.codec_name,'h264');
+assert.equal(video.width,1920);
+assert.equal(video.height,1080);
+assert.equal(video.r_frame_rate,'60/1');
+assert.equal(Number(video.nb_frames),3600);
+assert.equal(audio.channels,2);
+assert.ok(Math.abs(Number(probe.format.duration)-60)<.15);
+execFileSync('ffmpeg',['-v','error','-i',output,'-f','null','-'],{stdio:'pipe'});
+console.log(JSON.stringify({output,frames:3600,duration:probe.format.duration,decodedWithoutErrors:true,bytes:statSync(output).size,sha256:createHash('sha256').update(readFileSync(output)).digest('hex'),scope:'Animated staged demonstration based on app navigation; not a real-account screen recording.'},null,2));

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LoginAttemptGate, readCookie, trustedLocalRequest } from "./auth-security.js";
+import { LoginAttemptGate, readCookie, trustedLocalRequest, browserWriteAllowed, useSecureSessionCookie } from "./auth-security.js";
 
 test("only genuine local owner requests bypass authentication", () => {
   const local = { socket: { remoteAddress: "127.0.0.1" }, headers: { host: "127.0.0.1:4311" } };
@@ -42,4 +42,21 @@ test("bounds tracked clients during a distributed failure flood", () => {
   assert.equal(gate.check("first", 130).allowed, true);
   assert.equal(gate.check("second", 130).allowed, false);
   assert.equal(gate.check("third", 130).allowed, false);
+});
+
+test("a remote browser cannot mutate a studio from a sibling domain or a forged origin", () => {
+  const url = "https://app.openbots.foundation", request = { method: "POST", socket: { remoteAddress: "127.0.0.1" }, headers: { host: "app.openbots.foundation", "cf-connecting-ip": "192.0.2.1" } };
+  assert.ok(browserWriteAllowed({ ...request, headers: { ...request.headers, origin: url } }, url));
+  assert.ok(browserWriteAllowed(request, url), "Native bearer clients are still supported");
+  for (const origin of ["https://openbots.foundation", "https://evil.example", "null", `${url}.evil.example`]) {
+    assert.equal(browserWriteAllowed({ ...request, headers: { ...request.headers, origin } }, url), false);
+  }
+  assert.equal(browserWriteAllowed({ ...request, headers: { ...request.headers, "sec-fetch-site": "same-site" } }, url), false);
+  assert.ok(browserWriteAllowed({ method: "POST", socket: { remoteAddress: "127.0.0.1" }, headers: { host: "127.0.0.1:4311", origin: "http://127.0.0.1:4310" } }, url));
+});
+
+test("a configured HTTPS tunnel always issues Secure session cookies without trusting forwarded headers", () => {
+  assert.equal(useSecureSessionCookie("https://app.openbots.foundation", false, false), true);
+  assert.equal(useSecureSessionCookie("http://127.0.0.1:4311", false, false), false);
+  assert.equal(useSecureSessionCookie("http://127.0.0.1:4311", false, true), true);
 });

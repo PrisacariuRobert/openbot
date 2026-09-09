@@ -14,6 +14,8 @@
     "scripts/benchmark-expenses.ts",
     "scripts/benchmark-workflows.ts",
     "scripts/test-productivity-runtime.ts",
+    "scripts/test-skill-authoring-ui.ts",
+    "scripts/test-customer-workflow-ui.ts",
     "scripts/test-browser-sign-in.ts",
     "scripts/test-browser-session-workflows.ts"
   ]

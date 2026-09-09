@@ -130,6 +130,7 @@ import type {
   RunnerCareStatus,
   RunnerHealth,
   Run,
+  RunReceipt,
   SlackMessageSummary,
   SkillTemplate,
   SkillVersion,
@@ -297,6 +298,7 @@ export function ControlPanel({
   onSetMaxTeammates,
   onRestoreTeammate,
   onSetYoloMode,
+  onImportTeammate,
 }: {
   state: AppState;
   onNotify: () => void;
@@ -313,6 +315,7 @@ export function ControlPanel({
   onSetMaxTeammates: (max: number) => Promise<void>;
   onRestoreTeammate: (id: string) => Promise<void>;
   onSetYoloMode: (enabled: boolean) => Promise<void>;
+  onImportTeammate: (bundle: unknown) => Promise<{ name: string; skills: number; routines: number }>;
 }) {
   const active = state.bots.filter((bot) =>
     ["working", "waiting"].includes(bot.status),
@@ -331,6 +334,7 @@ export function ControlPanel({
   const [embeddingsModelDraft, setEmbeddingsModelDraft] = useState(
     state.settings.embeddingsModel || "",
   );
+  const teammateImportInput = useRef<HTMLInputElement>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   useEffect(() => {
     const abort = new AbortController();
@@ -607,6 +611,28 @@ export function ControlPanel({
             }}
           />
         </label>
+        <div className="delegation-actions">
+          <input
+            ref={teammateImportInput}
+            type="file"
+            className="visually-hidden"
+            accept=".json,application/json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (teammateImportInput.current) teammateImportInput.current.value = "";
+              if (!file) return;
+              void (async () => {
+                if (file.size > 256_000) throw new Error("That teammate file is too large. Choose one under 256 KB.");
+                const bundle = JSON.parse(await file.text()) as unknown;
+                const imported = await onImportTeammate(bundle);
+                window.alert(`Imported ${imported.name} as a new teammate${imported.routines ? ` with ${imported.routines} paused routine${imported.routines === 1 ? "" : "s"}` : ""}. Choose an AI connection for them before starting work.`);
+              })().catch((error: Error) => window.alert(error instanceof SyntaxError ? "That file is not an OpenBot teammate file." : error.message || "This teammate could not be imported."));
+            }}
+          />
+          <button type="button" onClick={() => teammateImportInput.current?.click()}>
+            <Download size={15} /> Import teammate
+          </button>
+        </div>
         {state.retiredBots.length > 0 && (
           <div className="signal-list">
             {state.retiredBots.map((bot) => (
@@ -1281,6 +1307,18 @@ export function LiveStudioPanel({
   const attentionRuns = state.studioRuns.filter((run) =>
     ["awaiting_approval", "failed"].includes(run.status),
   );
+  // Repeated identical failures collapse into one card with a count, so four
+  // crashed runs do not read as four emergencies. The first run of each group
+  // (the newest) carries the message.
+  const groupedAttentionRuns = Array.from(
+    attentionRuns.reduce((groups, run) => {
+      const key = `${run.botId}:${run.status}`;
+      const group = groups.get(key);
+      if (group) group.count += 1;
+      else groups.set(key, { run, count: 1 });
+      return groups;
+    }, new Map<string, { run: (typeof attentionRuns)[number]; count: number }>()),
+  ).map(([, group]) => group);
   const approvedActions = state.approvedActions || [];
   const uncertainActions = approvedActions.filter(
     (action) => action.status === "uncertain",
@@ -1300,6 +1338,10 @@ export function LiveStudioPanel({
     (bot) => state.threads.find((thread) => thread.id === bot.threadId)?.hidden,
   );
   const activeWork = state.studioRuns.filter((run) => ["queued", "running", "waiting_for_teammate"].includes(run.status));
+  const finishedWork = state.studioRuns
+    .filter((run) => !run.parentRunId && ["completed", "failed"].includes(run.status))
+    .sort((a, b) => (b.finishedAt || "").localeCompare(a.finishedAt || ""))
+    .slice(0, 5);
   return (
     <div className="live-studio-panel">
       <div className="live-hero">
@@ -1363,7 +1405,7 @@ export function LiveStudioPanel({
               <button onClick={() => void onResolveAction(action.id, "not_completed")}>It didn’t happen</button>
             </article>
           ))}
-          {attentionRuns.slice(0, 5).map((run) => (
+          {groupedAttentionRuns.slice(0, 5).map(({ run, count }) => (
             <article key={run.id}>
               <Mascot
                 bot={{
@@ -1381,6 +1423,7 @@ export function LiveStudioPanel({
                     : `${run.botName} needs your okay`}
                 </strong>
                 <small>
+                  {count > 1 ? `${count} tasks like this. Latest: ` : ""}
                   {run.error || run.approvalReason || run.task.goal}
                 </small>
               </span>
@@ -1418,6 +1461,31 @@ export function LiveStudioPanel({
           <button className="icon-button" aria-label={`Stop ${run.botName}'s task`} onClick={() => void onCancel(run.id)}><Square size={13} /></button>
         </article>)}
       </section>}
+      {finishedWork.length > 0 && (
+        <section className="receipt-list" aria-label="Finished work">
+          <div className="panel-section-heading">
+            <div>
+              <h3>Finished work</h3>
+              <p>Open the receipt: what happened, what was checked and what it cost.</p>
+            </div>
+            <span className="bounded-badge">Signed</span>
+          </div>
+          <div className="receipt-list-rows">
+            {finishedWork.map((run) => (
+              <article key={run.id}>
+                <span className={`action-history-icon ${run.status === "completed" ? "done" : "attention"}`}>
+                  {run.status === "completed" ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
+                </span>
+                <span>
+                  <strong>{run.task.goal || run.prompt}</strong>
+                  <small>{run.botName} · {relativeTime(run.finishedAt)}{run.status === "failed" ? " · needs a hand" : ""}</small>
+                </span>
+                <button onClick={() => onReview(run.id)}>Receipt</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {approvedActions.length > 0 && (
         <section className="action-history">
           <div className="panel-section-heading">
@@ -3953,8 +4021,8 @@ export function ConnectorPanel({
               <div>
                 <h3>Who can use each app</h3>
                 <p>
-                  OpenBot adds per-teammate controls that shared plugin accounts
-                  usually lack.
+                  Choose what each teammate can read or prepare. Sending and
+                  creating still wait for your approval.
                 </p>
               </div>
             </div>
@@ -3998,7 +4066,7 @@ export function ConnectorPanel({
                         <Search size={13} /> Inbox
                       </button>
                       <button
-                        className={gmail?.canSend ? "on send" : "send"}
+                        className={gmail?.canSend ? "on connector-send" : "connector-send"}
                         aria-pressed={Boolean(gmail?.canSend)}
                         disabled={
                           !gmailReady || busy === `access-gmail-${bot.id}`
@@ -4216,7 +4284,7 @@ export function ConnectorPanel({
             <div>
               <h3>Recent app activity</h3>
               <p>
-                A clear trail without exposing private message or page contents
+                Your team's recent work in connected apps.
               </p>
             </div>
           </div>
@@ -4293,6 +4361,231 @@ export function RemotePanel({ bots, runner, installPrompt, onInstalled, onNotice
   </div>;
 }
 
+/** Watch the teammate's own browser inside the studio: live screencast frames
+ * from the host, click/type/key takeover, and an address bar to open pages.
+ * Same private profile the agent uses; watching never grants new access. */
+function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (message: string) => void }) {
+  const [meta, setMeta] = useState<{ url: string; title: string } | null>(null);
+  const [frame, setFrame] = useState<string | null>(null);
+  const [address, setAddress] = useState("");
+  const [typeValue, setTypeValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const screen = useRef<HTMLDivElement>(null);
+  const stopped = useRef(false);
+  useEffect(() => {
+    stopped.current = false;
+    const watch = async () => {
+      if (stopped.current) return;
+      try {
+        const [frameResponse, metaResponse] = await Promise.all([
+          fetch(`/api/bots/${encodeURIComponent(botId)}/browser/live-frame`, { cache: "no-store" }),
+          fetch(`/api/bots/${encodeURIComponent(botId)}/browser/live-meta`, { cache: "no-store" }),
+        ]);
+        if (frameResponse.ok) {
+          const blob = await frameResponse.blob();
+          setFrame((current) => {
+            const next = URL.createObjectURL(blob);
+            if (current) URL.revokeObjectURL(current);
+            return next;
+          });
+        }
+        if (metaResponse.ok) setMeta(await metaResponse.json() as { url: string; title: string });
+      } catch { /* Keep the last frame; the timer retries. */ }
+    };
+    void watch();
+    const timer = window.setInterval(() => void watch(), 700);
+    return () => { stopped.current = true; window.clearInterval(timer); setFrame((current) => { if (current) URL.revokeObjectURL(current); return null; }); void fetch(`/api/bots/${encodeURIComponent(botId)}/browser/live-stop`, { method: "POST" }); };
+  }, [botId]);
+  useEffect(() => { setMeta(null); setFrame(null); setError(""); }, [botId]);
+  const act = async (route: string, body: Record<string, unknown>) => {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The browser did not respond.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const take = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!screen.current || busy) return;
+    const rect = screen.current.getBoundingClientRect();
+    void act("takeover/click", { x: ((event.clientX - rect.left) / rect.width) * 1280, y: ((event.clientY - rect.top) / rect.height) * 820 });
+  };
+  return (
+    <div className="in-app-browser">
+      <form
+        className="inline-field"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (address.trim()) void act("open", { url: address.trim() });
+        }}
+      >
+        <input
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+          placeholder={meta?.url || "Address to open"}
+          aria-label="Browser address"
+          maxLength={2_048}
+        />
+        <button disabled={busy}>Go</button>
+      </form>
+      <div
+        ref={screen}
+        className={`in-app-browser-screen ${busy ? "busy" : ""}`}
+        onClick={take}
+        role="button"
+        aria-label="Live browser view. Click to take control."
+      >
+        {frame ? (
+          <img src={frame} alt="Live browser" />
+        ) : (
+          <p className="panel-note">{busy ? "Connecting…" : "Waiting for the first frame…"}</p>
+        )}
+        <i><MousePointer2 size={12} /> Click the screen to act for {botId && "this teammate"}</i>
+      </div>
+      <div className="in-app-browser-keys">
+        {(["Enter", "Tab", "Backspace", "Escape"] as const).map((key) => (
+          <button key={key} disabled={busy} onClick={() => void act("takeover/key", { key })}>{key}</button>
+        ))}
+      </div>
+      <form
+        className="inline-field"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (typeValue.trim()) {
+            void act("takeover/type", { value: typeValue });
+            setTypeValue("");
+          }
+        }}
+      >
+        <input
+          value={typeValue}
+          onChange={(event) => setTypeValue(event.target.value)}
+          placeholder="Type into the page"
+          aria-label="Text to enter in the page"
+          maxLength={4_000}
+        />
+        <button disabled={busy || !typeValue.trim()}>Type</button>
+      </form>
+      {error && <p className="panel-error">{error}</p>}
+      {meta && <small className="in-app-browser-url">{meta.title || "(untitled)"} · {meta.url}</small>}
+    </div>
+  );
+}
+
+function BrowserSiteData({ botId }: { botId: string }) {
+  const [open, setOpen] = useState(false);
+  const [sites, setSites] = useState<Array<{ site: string; cookies: number }> | null>(null);
+  const [note, setNote] = useState("");
+  const load = async () => {
+    const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/sites`, { cache: "no-store" });
+    if (response.ok) setSites(await response.json() as Array<{ site: string; cookies: number }>);
+  };
+  useEffect(() => {
+    if (open) void load().catch(() => setSites([]));
+  }, [open, botId]);
+  async function clear(site?: string) {
+    const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/sites/clear`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(site ? { site } : {}),
+    });
+    const result = await response.json() as { cleared?: number; error?: string };
+    if (!response.ok) throw new Error(result.error || "The sign-out did not finish.");
+    setNote(site ? `Signed out of ${site} (${result.cleared ?? 0} cookies).` : `Signed out everywhere (${result.cleared ?? 0} cookies).`);
+    await load().catch(() => {});
+  }
+  return (
+    <details
+      className="browser-site-data"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>Private browser data</summary>
+      <small className="panel-note">
+        Sites holding sessions in {`this teammate's`} browser. Signing out clears one
+        site{`'s`} cookies and storage; other sites stay signed in. Values are never shown.
+      </small>
+      {sites && sites.length === 0 && <small className="panel-note">Nothing stored yet.</small>}
+      {sites && sites.length > 0 && (
+        <div className="browser-site-rows">
+          {sites.map((entry) => (
+            <div className="browser-site-row" key={entry.site}>
+              <span>{entry.site}</span>
+              <small>{entry.cookies} {entry.cookies === 1 ? "cookie" : "cookies"}</small>
+              <button type="button" onClick={() => void clear(entry.site).catch((error: Error) => setNote(error.message))}>Sign out</button>
+            </div>
+          ))}
+          <button type="button" className="browser-site-clear-all" onClick={() => void clear().catch((error: Error) => setNote(error.message))}>Sign out everywhere</button>
+        </div>
+      )}
+      {note && <small role="status">{note}</small>}
+    </details>
+  );
+}
+
+function SkillToggles({ botId }: { botId: string }) {
+  const [open, setOpen] = useState(false);
+  const [skills, setSkills] = useState<TaughtWorkflow[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const load = async () => {
+    const response = await fetch("/api/workflows", { cache: "no-store" });
+    if (response.ok) setSkills(((await response.json()) as TaughtWorkflow[]).filter((workflow) => workflow.botId === botId));
+  };
+  useEffect(() => {
+    if (open) void load().catch(() => setSkills([]));
+  }, [open, botId]);
+  async function toggle(workflow: TaughtWorkflow) {
+    setBusyId(workflow.id);
+    setNote("");
+    try {
+      const response = await fetch(`/api/workflows/${encodeURIComponent(workflow.id)}/enabled`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: Boolean(workflow.disabled) }),
+      });
+      const result = await response.json() as TaughtWorkflow & { error?: string };
+      if (!response.ok) throw new Error(result.error || "The skill could not be updated.");
+      setSkills((current) => (current || []).map((entry) => (entry.id === workflow.id ? result : entry)));
+    } catch (cause) {
+      setNote(cause instanceof Error ? cause.message : "The skill could not be updated.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  return (
+    <fieldset className="conversation-organizer skill-toggles">
+      <legend>Skills</legend>
+      <p>Turn off a skill and this teammate loses it: it cannot be invoked and is removed from their working files until you turn it back on.</p>
+      <button type="button" className="skill-toggles-open" onClick={() => { setOpen(true); void load().catch(() => setSkills([])); }}>{open ? "Refresh skills" : "Show skills"}</button>
+      {open && (skills?.length ? (
+        <div className="skill-toggle-rows">
+          {skills.map((workflow) => (
+            <div className="skill-toggle-row" key={workflow.id}>
+              <span>
+                <strong>{workflow.name}</strong>
+                <small>{workflow.source === "taught" ? "taught" : workflow.source === "proposed" ? "from a receipt" : workflow.source}{workflow.disabled ? " · off" : ""}</small>
+              </span>
+              <label className="switch-field">
+                <input
+                  type="checkbox"
+                  checked={!workflow.disabled}
+                  disabled={busyId === workflow.id}
+                  onChange={() => void toggle(workflow)}
+                />
+                <span>{workflow.disabled ? "Off" : "On"}</span>
+              </label>
+            </div>
+          ))}
+        </div>
+      ) : <small className="panel-note">{skills ? "No skills yet. Teach one from their browser, or import a profile." : "Loading…"}</small>)}
+      {note && <small role="alert">{note}</small>}
+    </fieldset>
+  );
+}
+
 export function BotPanel({
   bot,
   thread,
@@ -4328,7 +4621,8 @@ export function BotPanel({
   });
   const [section, setSection] = useState(thread.section || ""),
     [saved, setSaved] = useState(false),
-    [duplicating, setDuplicating] = useState(false);
+    [duplicating, setDuplicating] = useState(false),
+    [liveView, setLiveView] = useState(false);
   const assignedModels = provider?.instances.find(
     (instance) => instance.id === bot.providerInstanceId,
   )?.models || [form.model];
@@ -4443,7 +4737,10 @@ export function BotPanel({
           )}
         </div>
       </div>
-      <AppearancePicker name={bot.name} shape={form.mascot} color={form.color} onShape={(mascot) => setForm({ ...form, mascot })} onColor={(color) => setForm({ ...form, color })} />
+      <details className="bot-appearance">
+        <summary>Customize character <small>Shape and color</small></summary>
+        <AppearancePicker name={bot.name} shape={form.mascot} color={form.color} onShape={(mascot) => setForm({ ...form, mascot })} onColor={(color) => setForm({ ...form, color })} />
+      </details>
       <label className="field">
         <span>What {bot.name} is great at</span>
         <input
@@ -4516,7 +4813,42 @@ export function BotPanel({
             }
           />
         </label>
+        {form.browserEnabled && (
+          <div>
+            <div className="delegation-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/window`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                    const result = (await response.json()) as { error?: string; hint?: string };
+                    if (!response.ok) throw new Error(result.error || "The browser window could not be opened.");
+                    window.alert(result.hint || "The browser window is open.");
+                  })().catch((error: Error) => window.alert(error.message));
+                }}
+              >
+                <ExternalLink size={15} />
+                Open browser window
+              </button>
+              <button type="button" className={liveView ? "is-on" : ""} onClick={() => setLiveView(!liveView)}>
+                {liveView ? <ChevronDown size={15} /> : <MonitorPlay size={15} />}
+                {liveView ? "Hide live view" : "View in app"}
+              </button>
+            </div>
+            <small>
+              Drive it yourself in the window, or watch {bot.name} work right
+              here. The browser belongs to this teammate either way.
+            </small>
+            {liveView && (
+              <InAppBrowserView botId={bot.id} onNotice={(message) => window.alert(message)} />
+            )}
+            <BrowserSiteData botId={bot.id} />
+          </div>
+        )}
       </div>
+      <SkillToggles botId={bot.id} />
+      <details className="bot-conversation">
+        <summary>Organize this conversation</summary>
       <fieldset className="conversation-organizer">
         <legend>Conversation</legend>
         <p>Keep a growing team tidy without losing any work.</p>
@@ -4555,6 +4887,27 @@ export function BotPanel({
           </button>
           <button
             type="button"
+            onClick={() => {
+              void (async () => {
+                const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/share`);
+                if (!response.ok) throw new Error("This teammate could not be shared.");
+                const bundle = await response.json();
+                const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `teammate-${bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "teammate"}.openbot.json`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1_000);
+              })().catch(() => window.alert("This teammate could not be shared."));
+            }}
+          >
+            <Download size={15} />
+            Share setup
+          </button>
+          <button
+            type="button"
             className="quiet-danger"
             onClick={() => void onUpdateThread({ hidden: true })}
           >
@@ -4583,6 +4936,7 @@ export function BotPanel({
           result, stops active work, and frees their seat.
         </small>
       </fieldset>
+      </details>
       <button type="button" className="teach-callout" onClick={onOpenTeach}>
         <WandSparkles size={19} />
         <span>
@@ -6037,12 +6391,14 @@ export function TeachPanel({
   onBotChange,
   onUse,
   onNotice,
+  hideOwnerSwitcher = false,
 }: {
   bot: Bot;
   bots: Bot[];
   onBotChange: (botId: string) => void;
   onUse: (workflow: TaughtWorkflow) => Promise<void>;
   onNotice: (message: string) => void;
+  hideOwnerSwitcher?: boolean;
 }) {
   const [name, setName] = useState(""),
     [startUrl, setStartUrl] = useState("https://example.com"),
@@ -6293,7 +6649,7 @@ export function TeachPanel({
   };
   return (
     <div className="teach-panel skill-library">
-      <div className="skill-owner-switcher">
+      {!hideOwnerSwitcher && <div className="skill-owner-switcher">
         <span>
           <Mascot bot={bot} size="medium" />
           <span>
@@ -6311,7 +6667,7 @@ export function TeachPanel({
             ))}
           </select>
         </label>
-      </div>
+      </div>}
       <div className={`teach-hero ${recording ? "recording" : ""}`}>
         <div className="teach-visual">
           <Mascot
@@ -6433,8 +6789,8 @@ export function TeachPanel({
                 <span>
                   <strong>/{workflow.skillSlug}</strong>
                   <small>
-                    {workflow.name} · v{workflow.version} · {workflow.stepCount} steps ·{" "}
-                    {new URL(workflow.startUrl).hostname}
+                    {workflow.name} · v{workflow.version} · {workflow.stepCount ? `${workflow.stepCount} recorded steps` : "Reusable instructions"} ·{" "}
+                    {workflow.startUrl ? new URL(workflow.startUrl).hostname : "No starting website needed"}
                   </small>
                   <em>{workflow.description}</em>
                 </span>
@@ -6539,11 +6895,12 @@ export function TeachPanel({
             />
           </label>
           <label className="field">
-            <span>Starting web page</span>
+            <span>Starting web page (optional)</span>
             <input
               value={editUrl}
               onChange={(event) => setEditUrl(event.target.value)}
-              required
+              type="url"
+              placeholder="Leave empty for file or project work"
             />
           </label>
           <div className="form-actions">
@@ -6705,4 +7062,162 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
       )}
     </div>
   );
+}
+
+const receiptStatusLabels: Record<string, string> = {
+  queued: "Queued", running: "Working", awaiting_approval: "Waiting on you",
+  completed: "Completed", failed: "Failed", cancelled: "Stopped", steering: "Working",
+};
+
+export function WorkReceipt({ runId }: { runId: string }) {
+  const [receipt, setReceipt] = useState<RunReceipt | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<string | null>(null);
+  const [proposing, setProposing] = useState(false);
+  useEffect(() => {
+    const abort = new AbortController();
+    setReceipt(null);
+    setError(null);
+    setProposal(null);
+    void fetch(`/api/runs/${encodeURIComponent(runId)}/receipt`, { signal: abort.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The receipt is unavailable for this task.");
+        const result = (await response.json()) as RunReceipt;
+        if (!abort.signal.aborted) setReceipt(result);
+      })
+      .catch((cause) => { if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : "The receipt is unavailable."); });
+    return () => abort.abort();
+  }, [runId]);
+  async function propose() {
+    if (proposing || proposal) return;
+    setProposing(true);
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/skill-draft`, { method: "POST", headers: { "Content-Type": "application/json" } });
+      const result = await response.json() as { created?: boolean; name?: string; botName?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || "The skill draft could not be saved.");
+      setProposal(result.created
+        ? `Saved “${result.name}” as a draft linked to this task’s receipt. Review two different test inputs in the skill’s Checks before scheduling.`
+        : `This task is already saved as “${result.name}”.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The skill draft could not be saved.");
+    } finally {
+      setProposing(false);
+    }
+  }
+  if (error) return <p className="work-receipt-missing">{error}</p>;
+  if (!receipt) return <p className="work-receipt-missing">Assembling the receipt…</p>;
+  const status = receiptStatusLabels[receipt.status] || receipt.status;
+  const duration = receipt.durationMs ? formatReceiptDuration(receipt.durationMs) : null;
+  return (
+    <article className="work-receipt" aria-label="Work receipt">
+      <header className="work-receipt-head">
+        <div className="work-receipt-title">
+          <ShieldCheck size={17} aria-hidden />
+          <h4>Work receipt</h4>
+          <span className={`work-receipt-status is-${receipt.status}`}>{status}</span>
+          {duration && <span className="work-receipt-duration">{duration}</span>}
+        </div>
+        {(receipt.goal || receipt.deliverable) && (
+          <p className="work-receipt-goal">
+            {receipt.goal}
+            {receipt.deliverable && receipt.goal && receipt.deliverable !== receipt.goal ? ` — ${receipt.deliverable}` : ""}
+          </p>
+        )}
+        {receipt.status === "failed" && receipt.error && <p className="work-receipt-warn">{receipt.error}</p>}
+      </header>
+
+      {receipt.team.length > 1 && (
+        <section className="work-receipt-team">
+          <h5>Team</h5>
+          {receipt.team.map((member, index) => (
+            <div className="work-receipt-row" key={index}>
+              <span className="work-receipt-strong">{member.botName}</span>
+              <span className="work-receipt-dim">{member.role || "Teammate"}</span>
+              <span className="work-receipt-dim">{member.model || "Default model"}</span>
+              <span className="work-receipt-num">{member.tokens.toLocaleString()} tok</span>
+              <span className={`work-receipt-status is-${member.status}`}>{receiptStatusLabels[member.status] || member.status}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {receipt.checks.length > 0 && (
+        <section className="work-receipt-checks">
+          <h5>Checks</h5>
+          {receipt.checks.map((check, index) => (
+            <div className="work-receipt-row" key={index}>
+              <span className={check.passed ? "work-receipt-ok" : "work-receipt-warn"}>{check.passed ? "✓" : "✕"}</span>
+              <span>{check.label}</span>
+              <span className={`work-receipt-source is-${check.source}`}>{check.source === "host" ? check.passed ? "Verified here" : "Host check failed" : "Teammate-reported"}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {receipt.workLog.length > 0 && (
+        <section className="work-receipt-log">
+          <h5>Work log</h5>
+          <ul>
+            {receipt.workLog.slice(0, 6).map((entry, index) => (
+              <li key={index}><span>{entry.label}</span>{entry.detail && <span className="work-receipt-dim">{entry.detail}</span>}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {receipt.artifacts.length > 0 && (
+        <section className="work-receipt-files">
+          <h5>Delivered</h5>
+          {receipt.artifacts.map((artifact, index) => (
+            <a className="work-receipt-file" key={index} href={artifact.url || "#"} target="_blank" rel="noreferrer">
+              <FileText size={14} aria-hidden />
+              <span>{artifact.name}</span>
+              {artifact.revision > 1 && <span className="work-receipt-dim">v{artifact.revision}</span>}
+            </a>
+          ))}
+        </section>
+      )}
+
+      {receipt.externalActions.length > 0 && (
+        <section className="work-receipt-actions">
+          <h5>External actions</h5>
+          {receipt.externalActions.map((action, index) => (
+            <div className="work-receipt-row" key={index}>
+              <span>{action.label}</span>
+              <span className={`work-receipt-status is-${action.status}`}>{action.status}</span>
+              {action.detail && <span className="work-receipt-dim">{action.detail}</span>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      <footer className="work-receipt-foot">
+        <span><Coins size={13} aria-hidden /> {receipt.usage.tokens.toLocaleString()} tokens{receipt.usage.cost > 0 ? ` · $${receipt.usage.cost.toFixed(4)}` : ""}</span>
+        <span><Users size={13} aria-hidden /> {receipt.usage.runs} {receipt.usage.runs === 1 ? "run" : "runs"}</span>
+        {receipt.uncertainty.length === 0
+          ? <span className="work-receipt-ok">No unresolved items recorded</span>
+          : <span className="work-receipt-warn">{receipt.uncertainty.length} uncertain {receipt.uncertainty.length === 1 ? "item" : "items"} — see below</span>}
+      </footer>
+      {receipt.uncertainty.length > 0 && (
+        <ul className="work-receipt-uncertain">
+          {receipt.uncertainty.slice(0, 4).map((line, index) => <li key={index}>{line}</li>)}
+        </ul>
+      )}
+      {receipt.status === "completed" && (
+        <div className="work-receipt-propose">
+          {proposal
+            ? <p role="status">{proposal}</p>
+            : <button type="button" disabled={proposing} onClick={() => void propose()}>{proposing ? "Drafting…" : "Save as a skill draft"}</button>}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function formatReceiptDuration(ms: number) {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }

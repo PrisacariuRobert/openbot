@@ -9,6 +9,8 @@ import { FullIntroduction, fullIntroductionMetadata } from "./FullIntroduction";
 import { PulseFilm } from "./PulseFilm";
 import { DemoFilm } from "./DemoFilm";
 import { StudioFilm } from "./StudioFilm";
+import { LaunchFilm } from "./LaunchFilm";
+import { ActualStudioFilm } from "./ActualStudioFilm";
 import { Ask } from "./story/01-Ask";
 import { TeamStory } from "./story/02-Team";
 import { ResultsStory } from "./story/03-Results";
@@ -44,6 +46,22 @@ loadFont({
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Composition
+        id="OpenBot-A-Little-More-Possible"
+        component={LaunchFilm}
+        durationInFrames={3600}
+        fps={60}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="OpenBot-Screen-Tour-Archive"
+        component={ActualStudioFilm}
+        durationInFrames={4320}
+        fps={60}
+        width={1920}
+        height={1080}
+      />
       <Composition
         id="OpenBot-In-Motion"
         component={StudioFilm}

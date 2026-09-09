@@ -66,6 +66,11 @@
       </CommandLineArguments>
       <EnvironmentVariables>
          <EnvironmentVariable
+            key = "OPENBOT_READONLY_HOST"
+            value = "$(OPENBOT_READONLY_HOST)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
             key = "OPENBOT_TEST_ACCESS_KEY"
             value = "$(OPENBOT_TEST_ACCESS_KEY)"
             isEnabled = "YES">

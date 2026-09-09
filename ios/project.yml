@@ -45,6 +45,7 @@ targets:
         - OpenBotMobileTests
         - OpenBotMobileUITests
       environmentVariables:
+        OPENBOT_READONLY_HOST: "$(OPENBOT_READONLY_HOST)"
         OPENBOT_TEST_SERVER: "$(OPENBOT_TEST_SERVER)"
         OPENBOT_TEST_ACCESS_KEY: "$(OPENBOT_TEST_ACCESS_KEY)"
 

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { stageAppPackage } from "./lib/staged-app-package.mjs";
+import { appleMarketingVersion } from "./lib/release-version.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const app = path.resolve(process.argv[2] || "");
@@ -13,7 +14,7 @@ if (!process.argv[2] || !app.endsWith(".app") || !existsSync(path.join(app, "Con
 if (process.platform !== "darwin") throw new Error("The native OpenBot app can only be packaged on macOS.");
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 const appVersion = spawnSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleShortVersionString", path.join(app, "Contents/Info.plist")], { encoding: "utf8" });
-if (appVersion.status !== 0 || appVersion.stdout.trim() !== packageJson.version) throw new Error("Build the matching native app version before packaging its runner. The existing package was not changed.");
+if (appVersion.status !== 0 || appVersion.stdout.trim() !== appleMarketingVersion(packageJson.version)) throw new Error("Build the matching native app version before packaging its runner. The existing package was not changed.");
 const required = ["dist", "node_modules", "src", "skills", "LICENSE", "THIRD_PARTY_NOTICES.md", "package.json", "package-lock.json", "scripts/background-runner.mjs"];
 const openCodePath = [process.env.OPENBOT_OPENCODE_BINARY, path.join(homedir(), ".opencode/bin/opencode"), "/opt/homebrew/bin/opencode", "/usr/local/bin/opencode"].find((candidate) => candidate && existsSync(candidate));
 if (!openCodePath) throw new Error("Install the official OpenCode build on the packaging Mac, or set OPENBOT_OPENCODE_BINARY. The desktop package must include its model runtime.");

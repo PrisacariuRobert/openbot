@@ -76,11 +76,16 @@ struct StudioContainerView: View {
             Task { await openRequestedThread() }
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .background { store.stop(); return }
             guard phase == .active else { return }
             Task {
+                await store.start()
                 await store.importSharedInbox()
-                await store.refreshConnectors()
             }
+        }
+        .onChange(of: network.isOnline) { _, online in
+            guard online, scenePhase == .active else { return }
+            Task { await store.start() }
         }
         .sheet(isPresented: $showingThreads) {
             ThreadPickerView(store: store) { id in
@@ -614,6 +619,9 @@ private struct NativeConversationView: View {
                     }
                     ForEach(Array(messageList.enumerated()), id: \.element.id) { index, message in
                         let startsGroup = index == 0 || messageList[index - 1].senderId != message.senderId || messageList[index - 1].senderType == "system"
+                        if let failure = store.state.failure(for: message) {
+                            StudioFailureNotice(run: failure, onReview: onReviewActivity).id(message.id)
+                        } else {
                         NativeMessageBubble(
                             message: message,
                             bot: message.senderId.flatMap { id in store.state.bots.first(where: { $0.id == id }) },
@@ -622,13 +630,14 @@ private struct NativeConversationView: View {
                             onOpenAttachment: { attachment in await store.download(attachment) }
                         )
                         .id(message.id)
+                        }
                     }
                     ForEach(store.activeRuns.filter { $0.threadId == store.selectedThreadID }) { run in
                         let approval = store.state.approvals.first { $0.runId == run.id && $0.botId == run.botId && $0.status == "pending" }
                         NativeRunCard(run: run, canReview: approval != nil, onReview: { approvalForReview = approval }, onCancel: { Task { await store.cancel(run) } })
                             .id("run-\(run.id)")
                     }
-                    ForEach(store.state.failedRuns(in: store.selectedThreadID)) { run in
+                    ForEach(store.state.unplacedFailures(in: store.selectedThreadID)) { run in
                         StudioFailureNotice(run: run, onReview: onReviewActivity)
                             .padding(.top, 12)
                             .id("failed-\(run.id)")
@@ -892,6 +901,9 @@ private struct NativeRunCard: View {
                 Text(reason)
                     .font(.system(size: 13.5, design: .default))
                     .foregroundStyle(.secondary)
+            } else if let activity = run.activities?.last(where: { ["tool", "message", "status"].contains($0.kind) }) {
+                Text(activity.kind == "message" ? activity.detail ?? activity.label : activity.label)
+                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
             }
             HStack {
                 if waitingForApproval {
@@ -929,6 +941,7 @@ private struct NativeComposer: View {
     @State private var composerThreadID: String?
     @State private var sendingDrafts: [String: String] = [:]
     @State private var showingAI = false
+    @State private var preparingSend = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -1026,7 +1039,7 @@ private struct NativeComposer: View {
                     }
                 }
             }
-            HStack(alignment: .bottom, spacing: 9) {
+            HStack(alignment: .center, spacing: 4) {
                 Menu {
                     Button("Attach files", systemImage: "paperclip") { showingFiles = true }
                     Menu("Choose a teammate", systemImage: "person.crop.circle") {
@@ -1045,7 +1058,7 @@ private struct NativeComposer: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 20, weight: .regular))
-                        .frame(width: 38, height: 42)
+                        .frame(width: 44, height: 44)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityLabel("Message options")
@@ -1053,6 +1066,7 @@ private struct NativeComposer: View {
                 TextField("Message \(store.activeBot?.name ?? "the studio")", text: $draft,
                           prompt: Text("Message \(store.activeBot?.name ?? "the studio")").foregroundColor(StudioPalette.muted), axis: .vertical)
                     .font(.body)
+                    .frame(minHeight: 44, alignment: .center)
                     .lineLimit(1...5)
                     .focused($focused)
                     .submitLabel(.send)
@@ -1069,7 +1083,7 @@ private struct NativeComposer: View {
                 } label: {
                     Image(systemName: voice.isListening ? "stop.fill" : "mic.fill")
                         .font(.system(size: voice.isListening ? 13 : 16, weight: .bold))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 44, height: 44)
                         .foregroundStyle(voice.isListening ? StudioPalette.userInk : OpenBotTheme.lavender)
                         .background(voice.isListening ? Color.primary : Color.clear, in: Circle())
                 }
@@ -1080,7 +1094,7 @@ private struct NativeComposer: View {
                         if store.isSending { ProgressView().tint(StudioPalette.userInk) }
                         else { Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)) }
                     }
-                    .frame(width: 42, height: 42)
+                    .frame(width: 44, height: 44)
                     .foregroundStyle(StudioPalette.userInk)
                     .background(
                         draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingFiles.isEmpty
@@ -1089,7 +1103,7 @@ private struct NativeComposer: View {
                         in: Circle()
                     )
                 }
-                .disabled(store.isSending || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingFiles.isEmpty))
+                .disabled(preparingSend || store.isSending || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingFiles.isEmpty))
                 .accessibilityIdentifier("native-send-message")
             }
             .padding(.horizontal, 6).padding(.vertical, 6)
@@ -1150,18 +1164,24 @@ private struct NativeComposer: View {
     }
 
     private func send() {
-        guard !store.isSending else { return }
+        guard !store.isSending, !preparingSend else { return }
         // No AI yet: sending would only fail on the host. Open the chooser now.
         if store.needsProviderChoice { showingAI = true; return }
-        let message = draft
-        let files = pendingFiles
         let destination = composerThreadID ?? store.selectedThreadID
         let recipient = targetBotID
-        draftSaveTask?.cancel()
-        sendingDrafts[destination] = message
+        preparingSend = true
+        focused = false
         voice.finish()
         Task {
-            defer { sendingDrafts[destination] = nil }
+            // Commit pending keyboard composition/autocorrection before taking
+            // the outgoing snapshot. Prevent double taps during that handoff.
+            await Task.yield()
+            defer { preparingSend = false; sendingDrafts[destination] = nil }
+            guard store.selectedThreadID == destination else { return }
+            let message = draft
+            let files = pendingFiles
+            draftSaveTask?.cancel()
+            sendingDrafts[destination] = message
             if await store.send(message, targetBotID: recipient, files: files, threadID: destination) {
                 if localDrafts[destination] == message { localDrafts[destination] = "" }
                 localFiles[destination]?.removeAll { files.contains($0) }

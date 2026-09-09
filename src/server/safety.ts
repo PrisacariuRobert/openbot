@@ -48,6 +48,7 @@ export interface BrowserTarget {
   href: string;
   formMethod: string;
   searchForm: boolean;
+  review?: { url: string; label: string; control: string; fields: Array<{ label: string; value: string }>; complete: boolean };
 }
 
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {

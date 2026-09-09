@@ -28,6 +28,17 @@ test("dispatches each approved action at most once and exposes only a bounded re
     const completed = f.db.completeApprovedAction(f.approval.id, "Gmail accepted the message as abc123.");
     assert.equal(completed?.status, "completed");
     assert.equal(completed?.resultSummary, "Gmail accepted the message as abc123.");
+    assert.equal(f.db.completeApprovedAction(f.approval.id, "duplicate"), null);
+    const posted = f.db.listMessages('team-room').filter(message => message.eventType === 'action_completed');
+    assert.equal(posted.length, 1); assert.match(posted[0]!.body, /Gmail accepted/);
+    f.db.cancelRun(f.run.id); // Mirrors budget shutdown retiring an active worker.
+    f.db.updateRun(f.run.id, { status: 'failed', error: 'This job reached its shared token limit.' });
+    f.db.finishRunTask(f.run.id, 'failed', 'This job reached its shared token limit.');
+    f.db.finishRunTask(f.run.id, 'failed', 'This job reached its shared token limit.');
+    const stopped = f.db.listMessages('team-room').filter(message => message.eventType === 'run_stopped');
+    assert.equal(stopped.length, 1); assert.equal(stopped[0]!.eventData?.title, 'Task limit reached');
+    assert.match(f.db.getRun(f.run.id)?.task.verificationSummary || '', /shared token limit/);
+    assert.equal(f.db.getApprovedAction(f.approval.id)?.status, 'completed');
     const publicState = JSON.stringify(f.db.getState("team-room"));
     assert.equal(publicState.includes("private body marker"), false, "action receipts must not expose the saved request body");
   } finally {
@@ -47,6 +58,22 @@ test("denying an action removes any prepared dispatch before it can run", () => 
     f.db.close();
     rmSync(f.root, { recursive: true, force: true });
   }
+});
+
+test("action acknowledgment and completion are atomic if conversation storage fails", () => {
+  const f = fixture();
+  const addMessage = f.db.addMessage;
+  try {
+    f.db.prepareApprovedAction({ approvalId: f.approval.id, runId: f.run.id, botId: "nova", actionType: "gmail_send", action: f.action });
+    f.db.decideApproval(f.approval.id, "approved");
+    f.db.claimApprovedAction(f.approval.id);
+    f.db.addMessage = () => { throw new Error("Fixture message storage unavailable"); };
+    assert.throws(() => f.db.completeApprovedAction(f.approval.id, "Service accepted the message."), /storage unavailable/);
+    assert.equal(f.db.getApprovedAction(f.approval.id)?.status, "running", "No completed receipt without its acknowledgment");
+    assert.equal(f.db.listMessages(f.run.threadId).some(message => message.eventType === "action_completed"), false);
+    f.db.markApprovedActionUncertain(f.approval.id, "Check the destination; do not repeat this action.");
+    assert.equal(f.db.claimApprovedAction(f.approval.id), null, "A storage failure cannot authorize another external attempt");
+  } finally { f.db.addMessage = addMessage; f.db.close(); rmSync(f.root, { recursive: true, force: true }); }
 });
 
 test("a restart never blindly replays an action whose remote outcome is uncertain", () => {

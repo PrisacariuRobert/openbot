@@ -68,3 +68,5 @@
   font-size: 13px;
   text-underline-offset: 3px;
 }
+.run-token-amount { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+.run-token-amount select { font: inherit; color: inherit; background: transparent; border: 1px solid var(--border, #d6d6d6); border-radius: 10px; padding: 8px 12px; min-height: 40px; }

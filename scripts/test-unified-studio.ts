@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer as createSocket } from "node:net";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -29,7 +29,7 @@ try {
   for(let n=0;n<100;n++){try{if((await fetch(host+"/api/healthz")).ok){ready=true;break;}}catch{}await delay(150);}
   assert.ok(ready,"Disposable host starts"); await vite.listen();
   const address = vite.httpServer!.address(); assert(address && typeof address === "object");
-  const base = `http://127.0.0.1:${address.port}`;
+  const base = process.env.OPENBOT_BUILT_UI ? host : `http://127.0.0.1:${address.port}`;
   browser = await chromium.launch({executablePath:process.env.OPENBOT_CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",headless:true});
   const page = await browser.newPage({viewport:{width:1440,height:960}});
   page.setDefaultTimeout(12_000);
@@ -37,6 +37,11 @@ try {
   const mutations:string[]=[];
   let allowDraft = false;
   await page.route("**/api/**",route=>{
+    const pathname = new URL(route.request().url()).pathname;
+    // Layout fixtures do not enumerate the owner's real project folders/files.
+    if(pathname === "/api/code-projects" && route.request().method() === "GET") return route.fulfill({json:{projects:[],edits:[],workspaces:[],reviews:[],suggestions:[]}});
+    if(/^\/api\/bots\/[^/]+\/files$/.test(pathname)) return route.fulfill({json:[{path:"example-project/notes-for-the-team.md",kind:"file",size:256} ]});
+    if(/^\/api\/bots\/[^/]+\/file$/.test(pathname)) return route.fulfill({json:{path:"example-project/notes-for-the-team.md",content:"# Sample workspace\n\nThis is disposable UI test data, not an owner file."}});
     if(allowDraft && new URL(route.request().url()).pathname.startsWith("/api/drafts/")) return route.continue();
     // This POST only calculates future dates; it does not save or run a routine.
     if(new URL(route.request().url()).pathname === "/api/routines/preview") return route.continue();
@@ -47,11 +52,13 @@ try {
     return route.continue();
   });
   let checks=0;
+  const expandedFailures:string[]=[];
   for(const width of process.env.OPENBOT_UI_FOCUS ? [] : [1440,390]) {
     await page.setViewportSize({width,height:width===390?844:960});
     for(const appearance of ["light","dark"] as const) {
       await page.emulateMedia({colorScheme:appearance,reducedMotion:"reduce"});
-      for(const route of ["/?thread=bot-pixel","/studio.html?thread=bot-pixel","/?panel=settings","/?panel=provider","/?panel=connectors","/?panel=routines","/?panel=bot","/?panel=computer","/?panel=files","/?panel=teach","/?panel=projects","/?panel=remote","/?panel=live","/?panel=control","/?panel=search"]) {
+      for(const route of ["/?thread=bot-pixel","/studio.html?thread=bot-pixel","/?panel=settings","/?panel=provider","/?panel=connectors","/?panel=routines","/?panel=bot","/?panel=computer","/?panel=files","/?panel=artifacts","/?panel=teach","/?panel=projects","/?panel=remote","/?panel=live","/?panel=control","/?panel=search"]) {
+        if (process.env.OPENBOT_PANEL_FOCUS && !route.includes(`panel=${process.env.OPENBOT_PANEL_FOCUS}`)) continue;
         await page.goto(base+route);
         // An open modal correctly makes the background composer inert to
         // assistive technology, so use DOM presence for this shell assertion.
@@ -68,13 +75,106 @@ try {
         assert.equal(await page.locator(".app-shell, .sheet, .mascot, .mascot-art").count(),0,`${route}: retired shell absent`);
         assert.equal(await page.getByText("Current app",{exact:true}).count(),0);
         const overflow = await page.evaluate(()=>({page:document.documentElement.scrollWidth>innerWidth,dialogs:[...document.querySelectorAll("dialog")].some(el=>el.scrollWidth>el.clientWidth+1)}));
+        if (overflow.dialogs) {
+          console.log(await page.locator("dialog").evaluate(dialog => [...dialog.querySelectorAll("*")].filter(el => el.getBoundingClientRect().right > dialog.getBoundingClientRect().right + 1).map(el => ({ tag: el.tagName, class: el.className, width: el.getBoundingClientRect().width }))));
+          await page.screenshot({path:path.join(output,`${width}-${appearance}-${panel}-overflow.png`)});
+        }
         assert.deepEqual(overflow,{page:false,dialogs:false},`${width}/${appearance}/${panel}: contained layout`);
         if(!route.startsWith("/studio")) await page.screenshot({path:path.join(output,`${width}-${appearance}-${panel}.png`)});
+        if(process.env.OPENBOT_EXPANDED_SETTINGS && route.includes("panel=")) {
+          // Exercise disclosures through their real controls. No changes to
+          // account, permission or routine settings are allowed by the route guard.
+          for(let n=0;n<40;n++) {
+            const next = page.locator("dialog details:not([open]) > summary:visible").first();
+            if(!await next.count()) break;
+            await next.click();
+          }
+          await delay(200);
+          const dialog = page.getByRole("dialog");
+          const overflow = await dialog.evaluate(el=>el.scrollWidth>el.clientWidth+1);
+          if(overflow) {
+            expandedFailures.push(`${width}/${appearance}/${panel}`);
+            console.log("Expanded overflow", await dialog.evaluate(el=>[...el.querySelectorAll("*")].filter(node=>node.getBoundingClientRect().right>el.getBoundingClientRect().right+1).slice(0,12).map(node=>({tag:node.tagName,class:node.className,width:node.getBoundingClientRect().width}))));
+          }
+          writeFileSync(path.join(output,`${width}-${appearance}-${panel}-expanded.txt`),await dialog.innerText());
+          const scrollHeight = await dialog.evaluate(el=>el.scrollHeight);
+          for(const [label,ratio] of [["top",0],["middle",.5],["end",1]] as const) {
+            await dialog.evaluate((el,ratio)=>{el.scrollTop=(el.scrollHeight-el.clientHeight)*ratio;},ratio);
+            await page.screenshot({path:path.join(output,`${width}-${appearance}-${panel}-expanded-${label}.png`)});
+          }
+          console.log(`Expanded ${width}/${appearance}/${panel}: ${scrollHeight}px`);
+          const captureForm = async (name:string) => {
+            await delay(150);
+            const overflow = await dialog.evaluate(el=>el.scrollWidth>el.clientWidth+1);
+            assert.equal(overflow,false,`${width}/${appearance}/${panel}/${name}: form stays contained`);
+            await page.screenshot({path:path.join(output,`${width}-${appearance}-${panel}-${name}.png`)});
+            checks++;
+          };
+          if(panel === "routines") {
+            const trigger = dialog.getByLabel("What starts it?",{exact:true});
+            for(const value of ["webpage","calendar","github","todoist","dropbox","slack","notion","webhook","schedule"]) {
+              await trigger.selectOption(value);
+              await trigger.scrollIntoViewIfNeeded();
+              await captureForm(`trigger-${value}`);
+            }
+            for(const value of ["custom","once","interval","weekdays"]) {
+              await dialog.getByLabel("Repeat",{exact:true}).selectOption(value);
+              await dialog.getByLabel("Repeat",{exact:true}).scrollIntoViewIfNeeded();
+              await captureForm(`repeat-${value}`);
+            }
+          }
+          if(panel === "projects") {
+            await dialog.getByRole("button",{name:"Get from GitHub",exact:true}).click();
+            for(const label of await dialog.locator(".project-new-access > label > span").all()) assert.ok((await label.boundingBox())!.width>=50,"Project access keeps teammate names readable beside the picker");
+            await captureForm("github-form");
+            await dialog.getByRole("button",{name:"Cancel",exact:true}).click();
+            await dialog.getByRole("button",{name:"Connect a folder",exact:true}).click();
+            await captureForm("folder-form");
+          }
+          if(panel === "provider") {
+            await dialog.getByRole("button",{name:"API & local models",exact:true}).click();
+            await dialog.getByRole("button",{name:"Add API or local model",exact:true}).click();
+            await captureForm("api-form");
+            await dialog.getByLabel("Provider",{exact:true}).selectOption("custom");
+            await captureForm("custom-api-form");
+          }
+          if(panel === "connectors") {
+            const extensions = dialog.locator(".extensions-panel");
+            await extensions.getByRole("combobox",{name:/^Connection type/}).selectOption("stdio");
+            await captureForm("local-mcp-form");
+            for(const name of ["Memory","Skills"]) {
+              await extensions.getByRole("button",{name,exact:true}).click();
+              await captureForm(name.toLowerCase());
+            }
+          }
+          if(panel === "files") {
+            await dialog.getByRole("button",{name:/example-project\/notes/}).click();
+            await dialog.locator(".file-preview").waitFor();
+            await captureForm("file-preview");
+            await dialog.getByRole("button",{name:"All files",exact:true}).click();
+            await dialog.locator(".file-list").waitFor();
+          }
+          if(panel === "teach") {
+            // Color-token regression: dark surfaces must never inherit dark
+            // text from the retired standalone extension theme.
+            const colors = await dialog.locator(".extension-card h4").first().evaluate(el=>({text:getComputedStyle(el).color,ink:getComputedStyle(document.documentElement).getPropertyValue("--ink").trim()}));
+            const rgb = colors.ink.slice(1).match(/.{2}/g)!.map(part=>parseInt(part,16));
+            assert.equal(colors.text,`rgb(${rgb.join(", ")})`,"Skill cards use the active theme's readable text color");
+            assert.equal(await dialog.locator(".extensions-panel input.visually-hidden").first().evaluate(el=>el.getBoundingClientRect().width),1,"Hidden skill upload stays hidden");
+            assert.equal(await dialog.getByRole("combobox",{name:"Teammate",exact:true}).count(),1,"One owner choice controls the whole Skills page");
+            await dialog.getByRole("combobox",{name:"Teammate",exact:true}).click();
+            await dialog.getByRole("option",{name:/^Pixel/}).click();
+            await dialog.getByRole("checkbox",{name:"Available to Pixel",exact:true}).first().waitFor();
+            assert.equal(await dialog.getByRole("checkbox",{name:"Available to Nova",exact:true}).count(),0,"Skill access follows the selected teammate");
+            await captureForm("pixel-skills");
+          }
+        }
         checks++;
       }
     }
   }
   assert.deepEqual(errors,[],"All migrated panels mount without browser exceptions");
+  assert.deepEqual(expandedFailures,[],"Expanded settings forms stay contained");
   assert.deepEqual(mutations,[],"Opening settings must not run tasks or change permissions");
   allowDraft = true;
   await page.setViewportSize({width:1440,height:960});
@@ -86,6 +186,16 @@ try {
   await page.getByRole("button",{name:"Settings",exact:true}).click();
   await page.getByRole("dialog").getByRole("link",{name:"Your AI Choose providers and models"}).click();
   await page.locator(".capability-provider").waitFor();
+  await page.goBack();
+  await page.getByRole("heading", {name:"Settings",exact:true}).waitFor();
+  assert.equal(await composer.inputValue(), "Keep this draft while I choose my AI.", "Browser back returns to Settings and keeps the draft");
+  await page.goForward();
+  await page.locator(".capability-provider").waitFor();
+  await page.getByRole("button", {name:"Back to settings",exact:true}).click();
+  await page.getByRole("heading", {name:"Settings",exact:true}).waitFor();
+  for(const panel of ["provider","connectors","bot","routines","remote","control","projects","teach","files","artifacts","live"]) {
+    assert.equal(await page.getByRole("dialog").locator(`a[href='/?panel=${panel}']`).count(),1,`${panel} is reachable directly from Settings`);
+  }
   await page.getByRole("dialog").getByRole("button",{name:"Close",exact:true}).click();
   assert.equal(await composer.inputValue(),"Keep this draft while I choose my AI.");
   assert.equal(await composer.getAttribute("data-migration-check"),"same-composer","Settings navigation keeps the conversation mounted");

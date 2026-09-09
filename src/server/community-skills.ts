@@ -125,8 +125,15 @@ export class CommunitySkills {
     skill.botIds = [...new Set(botIds)];
     this.db.saveExtensionRecord(KIND, id, skill);
   }
-  remove(id: string) {
-    if (included.some((skill) => skill.id === id)) {
+  /** Portable skill file. The bundle is exactly what the importer reviews:
+   * instructions and text references only, never grants or credentials. */
+  shareBundle(id: string): { kind: "openbot-skill"; version: 1; name: string; bundle: { files: Record<string, string>; source: string } } {
+    const skill = this.list().find((entry) => entry.id === id);
+    if (!skill) throw new Error("Skill not found.");
+    return { kind: "openbot-skill", version: 1, name: skill.name, bundle: { files: skill.files, source: skill.source } };
+  }
+
+  remove(id: string) {    if (included.some((skill) => skill.id === id)) {
       this.db.saveExtensionRecord(BUNDLED_ACCESS_KIND, id, { enabledByDefault: false, overrides: {} } satisfies BundledSkillAccess);
     } else this.db.deleteExtensionRecord(KIND, id);
   }

@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const names = ["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search"];
+const names = ["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "skill_propose", "gmail_reply", "table_reconcile"];
 
 test("Claude's real stdio bridge forwards extension tools with host-bound credentials and surfaces host failures", { timeout: 15_000 }, async () => {
   const calls: Record<string, unknown>[] = [];
@@ -37,15 +37,20 @@ test("Claude's real stdio bridge forwards extension tools with host-bound creden
   try {
     await rpc("initialize", { protocolVersion: "2025-03-26" });
     const listed = await rpc("tools/list");
+    assert.deepEqual(listed.tools.find((tool: {name: string}) => tool.name === "spreadsheet_inspect").inputSchema.required, ["path"]);
+    const spreadsheet = listed.tools.find((tool: {name: string}) => tool.name === 'spreadsheet_export');
+    assert.equal(spreadsheet.inputSchema.properties.sheets.items.properties.formulas.type, 'array');
+    assert.deepEqual(spreadsheet.inputSchema.properties.sheets.items.properties.formulas.items.required, ['cell', 'formula']);
     for (const name of names) {
       assert.ok(listed.tools.some((tool: { name: string }) => tool.name === name));
-      const result = await rpc("tools/call", { name, arguments: { query: "Cedar" } });
+      const args = name === "skill_propose" ? { name: "Cedar check", description: "Check a supplied project", instructions: "Inspect the supplied project and verify the result.", startUrl: "" } : name === "gmail_reply" ? { messageId: "message001", body: "Here is the reviewed result." } : name === "table_reconcile" ? { leftPath: "ledger.csv", rightPath: "receipts.csv", leftKey: "id", rightKey: "id" } : { query: "Cedar" };
+      const result = await rpc("tools/call", { name, arguments: args });
       assert.equal(result.isError, false);
       assert.equal(JSON.parse(result.content[0].text).action, name);
       assert.ok(!JSON.stringify(result).includes("fixture-run-token"));
     }
     const denied = await rpc("tools/call", { name: "connected_call", arguments: { fail: true } });
     assert.equal(denied.isError, true); assert.match(denied.content[0].text, /no longer shared/);
-    assert.equal(calls.length, 6);
+    assert.equal(calls.length, names.length + 1);
   } finally { child.kill("SIGTERM"); await exited; lines.close(); server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); }
 });

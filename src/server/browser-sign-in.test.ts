@@ -21,6 +21,7 @@ test("generic website handoff saves only its origin and the original task, not l
   try {
     const a = handoffs.request("nova", run.id, "https://support.example.test/login?code=PRIVATE_CODE#PRIVATE_STATE");
     assert.equal(db.getRun(run.id)?.status, "awaiting_approval");
+    assert.equal(a.requiresSignIn, true, "Only a genuine sign-in handoff automatically opens the private browser panel");
     assert.equal(db.getRun(run.id)?.prompt, run.prompt);
     assert.equal(handoffs.request("nova", run.id, "https://different.test" ).id, a.id);
     assert.equal(db.pendingNotifications().filter((notification) => notification.kind === "approval").length, 1);

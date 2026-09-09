@@ -200,7 +200,8 @@ test("a repaired isolated project produces exact reviewed publication evidence a
       assert.match(artifactText, /total\.cjs/);
       const sameNotification = reopened.recordCodeDeliveryResult(delivery);
       assert.equal(sameNotification.message.id, notification.messageId);
-      assert.equal(reopened.listMessages(f.run.threadId).filter(item => item.senderType === "system" && item.body.includes(published.url)).length, 1);
+      assert.equal(reopened.listMessages(f.run.threadId).filter(item => item.senderType === "system" && item.eventType !== "action_completed" && item.body.includes(published.url)).length, 1);
+      assert.equal(reopened.listMessages(f.run.threadId).filter(item => item.eventType === "action_completed" && item.runId === f.run.id).length, 1, "The action has one immediate host acknowledgment, separate from the detailed delivery artifact");
       assert.equal(reopened.listMessages(f.run.threadId).flatMap(item => item.attachments).filter(artifact => artifact.name === "code-delivery.md").length, 1);
       const falseClaimRun = reopened.createRun({ botId: "nova", threadId: f.run.threadId, status: "completed", prompt: "Fixture without a delivery" });
       const falseClaim = reopened.addMessage({ threadId: f.run.threadId, senderType: "bot", senderId: "nova", runId: falseClaimRun.id, body: `Published successfully at ${published.url}. All done!` });

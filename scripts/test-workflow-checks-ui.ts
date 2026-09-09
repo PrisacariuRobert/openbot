@@ -53,7 +53,7 @@ try {
   page.setDefaultTimeout(10_000);
   const errors: string[] = []; page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(base + "/?panel=teach");
-  await page.getByText("Teach and manage your own workflows", { exact: true }).click();
+  await page.getByText("Your learned workflows", { exact: true }).click();
   await page.getByRole("button", { name: "Checks", exact: true }).click();
   const panel = page.getByRole("region", { name: "Checks for Support read" });
   await panel.getByText(/Check two different inputs and review/).waitFor();

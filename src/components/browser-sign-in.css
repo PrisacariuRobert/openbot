@@ -1,28 +1,35 @@
-.browser-sign-in { display: grid; gap: 12px; min-width: 0; margin-block: 16px; padding: 16px; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 16px; }
+.browser-sign-in { display: flex; flex-direction: column; gap: 10px; min-width: 0; margin-block: 16px; padding: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #ddd); border-radius: 16px; }
 .browser-sign-in p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
-.browser-sign-in button { min-height: 36px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 9px; padding: 7px 12px; font: inherit; color: inherit; background: transparent; cursor: pointer; }
+.browser-sign-in button { min-height: 34px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 9px; padding: 6px 12px; font: inherit; color: inherit; background: transparent; cursor: pointer; }
 .browser-sign-in button:disabled { opacity: .5; cursor: default; }
-.browser-sign-in-address { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
-.browser-sign-in-address strong { flex: 1; min-width: 100px; }
-.browser-sign-in .browser-sign-in-screen { display: block; width: 100%; padding: 0; overflow: hidden; line-height: 0; border: 0; border-radius: 8px; cursor: crosshair; }
-.browser-sign-in-screen img { display: block; width: 100%; height: auto; }
-.browser-sign-in form { display: grid; gap: 8px; font-size: 13px; }
-.browser-sign-in-input { display: flex; gap: 8px; flex-wrap: wrap; }
-.browser-sign-in-input input { flex: 1; min-width: 120px; width: 100%; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 9px; padding: 9px 12px; color: inherit; background: transparent; font: inherit; }
-.browser-sign-in-keys { display: flex; flex-wrap: wrap; gap: 8px; }
-.browser-sign-in .browser-sign-in-hint { font-size: 12px; opacity: .75; }
-.browser-sign-in { margin: 8px 0; padding: 20px; background: var(--surface, #fff); border-color: var(--line, #ddd); }
 .browser-sign-in-title { display: flex; align-items: center; gap: 12px; }
 .browser-sign-in-title > svg { flex-shrink: 0; }
-.browser-sign-in-title div { min-width: 0; display: grid; gap: 4px; }
+.browser-sign-in-title div { min-width: 0; display: grid; gap: 3px; }
 .browser-sign-in-title strong { font-size: 15px; overflow-wrap: anywhere; }
 .browser-sign-in-title span { color: var(--secondary, #666); font-size: 12px; }
-.browser-sign-in-address { padding: 10px 12px; background: var(--surface-muted, #f4f4f4); border-radius: 8px; }
-.browser-sign-in-address strong { flex-basis: 150px; }
-.browser-sign-in-address > span { flex-basis: 100%; color: var(--secondary, #666); }
-.browser-sign-in-address button { min-height: 32px; padding: 7px; border: 0; display: grid; place-items: center; }
-.browser-sign-in .browser-sign-in-keyboard { padding: 10px 0; border-block: 1px solid var(--line, #ddd); }
-.browser-sign-in-keyboard[open] .browser-sign-in-keys { margin-block: 12px; }
-.run-controls > label { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
-.run-controls > label input { margin-top: 3px; accent-color: var(--strong, #111); flex-shrink: 0; }
-@media(max-width: 600px) { .browser-sign-in { padding: 16px; } .browser-sign-in-input input { font-size: 16px; } }
+.browser-sign-in-badge { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; font-size: 11px; font-style: normal; font-weight: 500; letter-spacing: .02em; color: var(--secondary, #666); border: 1px solid var(--line, #ddd); border-radius: 999px; padding: 4px 10px; }
+.browser-sign-in-badge span { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.browser-sign-in-badge[data-live="true"] { color: #1d7a46; border-color: color-mix(in srgb, #1d7a46 30%, transparent); }
+.browser-sign-in-badge[data-live="true"] span { background: #1d7a46; animation: browser-sign-in-pulse 2.2s ease-in-out infinite; }
+@keyframes browser-sign-in-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.browser-sign-in-bar { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; background: var(--surface-muted, #f4f4f4); border-radius: 9px; }
+.browser-sign-in-url { flex: 1; min-width: 0; font-size: 12px; color: var(--ink, #111); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browser-sign-in-bar button { min-height: 28px; width: 28px; padding: 0; display: grid; place-items: center; border: 0; flex-shrink: 0; }
+.browser-sign-in-screen { position: relative; min-height: 120px; overflow: hidden; border: 1px solid var(--line, #ddd); border-radius: 10px; line-height: 0; outline-offset: 2px; }
+.browser-sign-in-screen:focus-visible { outline: 2px solid var(--strong, #111); }
+.browser-sign-in-screen img { display: block; width: 100%; height: auto; user-select: none; }
+.browser-sign-in-waiting { display: grid; min-height: 120px; place-items: center; line-height: 1.5; font-size: 13px; color: var(--secondary, #666); }
+.browser-sign-in .browser-sign-in-hint { font-size: 12px; opacity: .75; }
+.browser-sign-in-bridge-link { border: 0 !important; padding: 2px 0 !important; min-height: 24px !important; font-size: 12px; color: var(--secondary, #525252); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; background: none; justify-self: start; }
+.browser-sign-in-bridge { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line, #ddd); border-radius: 10px; background: var(--surface-muted, #f4f4f4); font-size: 13px; }
+.browser-sign-in-bridge strong { font-size: 13px; }
+.browser-sign-in-bridge ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.5; }
+.browser-sign-in-bridge em { font-style: normal; font-weight: 600; overflow-wrap: anywhere; }
+.browser-sign-in-bridge-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.browser-sign-in-bridge-actions > button:not(.browser-sign-in-bridge-link) { min-height: 34px; padding: 7px 12px; border: 1px solid var(--line-strong, #a7a7a7); border-radius: 9px; background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; }
+.browser-sign-in-bridge p { font-size: 12px; opacity: .8; }
+.browser-sign-in-bridge-done { font-size: 12px; padding: 10px 12px; border-radius: 9px; background: var(--surface-muted, #f4f4f4); }
+.browser-sign-in [role="alert"] { font-size: 13px; color: #a33c2e; }
+.browser-sign-in-warn { font-size: 12.5px; color: #8a5a10; padding: 8px 12px; border: 1px solid color-mix(in srgb, #8a5a10 30%, transparent); border-radius: 9px; background: color-mix(in srgb, #8a5a10 7%, transparent); }
+.browser-sign-in [role="alert"] button { min-height: 28px; padding: 4px 10px; font-size: 12px; }
+@media(max-width: 600px) { .browser-sign-in { padding: 12px; } }

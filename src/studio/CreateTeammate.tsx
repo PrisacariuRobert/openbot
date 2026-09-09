@@ -6,6 +6,25 @@ import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
 import "./create-teammate.css";
 
+interface ImportPlan {
+  kind: string;
+  name: string;
+  role: string;
+  instructionsTruncated: boolean;
+  memories: Array<{ kind: string; text: string }>;
+  skills: Array<{ name: string; slug: string; description: string; files: number }>;
+  hints: { provider: string | null; model: string | null };
+  skipped: string[];
+  warnings: string[];
+}
+
+interface TeamTemplate {
+  id: string;
+  name: string;
+  description: string;
+  members: Array<{ name: string; role: string }>;
+}
+
 export function CreateTeammate({
   onCreated,
 }: {
@@ -22,6 +41,36 @@ export function CreateTeammate({
   const [providers, setProviders] = useState<ProviderStatus | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [importPath, setImportPath] = useState(""),
+    [importPlan, setImportPlan] = useState<ImportPlan | null>(null),
+    [importBusy, setImportBusy] = useState(false),
+    [importNote, setImportNote] = useState("");
+  const [sheetMode, setSheetMode] = useState<"create" | "import">("create");
+  const [teamTemplates, setTeamTemplates] = useState<TeamTemplate[] | null>(null),
+    [teamBusy, setTeamBusy] = useState<string | null>(null),
+    [teamNote, setTeamNote] = useState(""),
+    [teamError, setTeamError] = useState("");
+  useEffect(() => {
+    void fetch("/api/team-templates").then(async (response) => {
+      if (response.ok) setTeamTemplates(await response.json() as TeamTemplate[]);
+    }).catch(() => { /* The starter-team option simply stays hidden. */ });
+  }, []);
+  async function installTeam(template: TeamTemplate) {
+    setTeamBusy(template.id);
+    setTeamNote("");
+    setTeamError("");
+    try {
+      const response = await fetch(`/api/team-templates/${encodeURIComponent(template.id)}/install`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const result = await response.json() as { bots?: Bot[]; error?: string };
+      if (!response.ok || !result.bots?.length) throw new Error(result.error || "The team could not be created.");
+      setTeamNote(`${result.bots.map((bot) => bot.name).join(", ")} joined the roster. Connect a model for each in their settings.`);
+      onCreated(result.bots[0]!);
+    } catch (cause) {
+      setTeamError(cause instanceof Error ? cause.message : "The team could not be created.");
+    } finally {
+      setTeamBusy(null);
+    }
+  }
   const submitting = useRef(false);
   useEffect(() => {
     const returned = () => setReload((value) => value + 1);
@@ -82,6 +131,49 @@ export function CreateTeammate({
       setBusy(false);
     }
   }
+  async function previewImport() {
+    setImportBusy(true);
+    setImportNote("");
+    setError("");
+    try {
+      const response = await fetch("/api/imports/profile/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: importPath.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "That folder could not be read.");
+      setImportPlan(result as ImportPlan);
+    } catch (cause) {
+      setImportPlan(null);
+      setImportNote(cause instanceof Error ? cause.message : "That folder could not be read.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+  async function applyImport() {
+    if (submitting.current || !importPlan) return;
+    submitting.current = true;
+    setImportBusy(true);
+    setImportNote("");
+    setError("");
+    try {
+      const response = await fetch("/api/imports/profile/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: importPath.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "The import did not finish.");
+      if (!result.bot) throw new Error("The import finished but the teammate is not visible yet. Refresh and check the roster.");
+      onCreated(result.bot as Bot);
+    } catch (cause) {
+      setImportNote(cause instanceof Error ? cause.message : "The import did not finish. Nothing was changed.");
+    } finally {
+      submitting.current = false;
+      setImportBusy(false);
+    }
+  }
   return (
     <form className="create-teammate" onSubmit={(event) => void create(event)}>
       <div className="new-character">
@@ -98,6 +190,28 @@ export function CreateTeammate({
           <strong>A job that matters to you.</strong>
         </p>
       </div>
+      <div className="sheet-mode" role="tablist" aria-label="How to add a teammate">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sheetMode === "create"}
+          className={sheetMode === "create" ? "current" : ""}
+          onClick={() => setSheetMode("create")}
+        >
+          Create new
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sheetMode === "import"}
+          className={sheetMode === "import" ? "current" : ""}
+          onClick={() => setSheetMode("import")}
+        >
+          Import from Hermes or OpenClaw
+        </button>
+      </div>
+      {sheetMode === "create" && (
+        <>
       <label>
         Name
         <input
@@ -197,6 +311,92 @@ export function CreateTeammate({
         with this new teammate. Studio-wide Mac access, if enabled, still
         applies. Browser and private-computer access start off.
       </p>
+      <details className="character-customize profile-import">
+        <summary>Start with a ready-made team</summary>
+        <small className="panel-note">Three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
+        {teamTemplates && (
+          <div className="team-template-list">
+            {teamTemplates.map((template) => (
+              <div className="team-template-row" key={template.id}>
+                <span>
+                  <strong>{template.name}</strong>
+                  <small>{template.description}</small>
+                </span>
+                <button
+                  type="button"
+                  disabled={teamBusy !== null}
+                  onClick={() => void installTeam(template)}
+                >
+                  {teamBusy === template.id ? "Creating…" : `Add ${template.members.length} teammates`}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {teamNote && <p role="status">{teamNote}</p>}
+        {teamError && <p role="alert" className="send-error">{teamError}</p>}
+      </details>
+        </>
+      )}
+      {sheetMode === "import" && (
+        <div className="profile-import-panel">
+          <p className="panel-note">Bring a teammate you already raised in <strong>Hermes</strong> or <strong>OpenClaw</strong>: their persona, memories and text skills move; keys and chat history stay put. Point this at the profile folder.</p>
+          <label>
+            Profile folder
+            <input
+              value={importPath}
+              onChange={(event) => setImportPath(event.target.value)}
+              placeholder="~/.hermes/profiles/researcher or ~/.openclaw"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <div className="import-actions">
+            <button
+              type="button"
+              disabled={importBusy || !importPath.trim()}
+              onClick={() => void previewImport()}
+            >
+              {importBusy && !importPlan ? "Checking…" : "Preview what moves"}
+            </button>
+            {importPlan && (
+              <button
+                type="button"
+                className="text-action"
+                disabled={importBusy}
+                onClick={() => void applyImport()}
+              >
+                {importBusy ? "Importing…" : "Import as a new teammate"}
+              </button>
+            )}
+          </div>
+          {importPlan && (
+            <div className="import-plan">
+              <p>
+                <strong>{importPlan.name}</strong> · {importPlan.kind} profile
+              </p>
+              {importPlan.role && <p className="import-role">{importPlan.role}</p>}
+              <ul>
+                <li>{importPlan.memories.length} memory notes</li>
+                <li>
+                  {importPlan.skills.length} skill{importPlan.skills.length === 1 ? "" : "s"}
+                  {importPlan.skills.length ? ` (${importPlan.skills.map((skill) => skill.name).slice(0, 3).join(", ")}${importPlan.skills.length > 3 ? "…" : ""})` : ""}
+                </li>
+                {importPlan.hints.model && (
+                  <li>Was using {importPlan.hints.model} — pick a connection after the import</li>
+                )}
+              </ul>
+              <p className="import-skipped">Not imported: {importPlan.skipped.join(" ")}</p>
+              {importPlan.warnings.map((warning) => (
+                <p key={warning} role="status">{warning}</p>
+              ))}
+            </div>
+          )}
+          {importNote && (
+            <p role="alert" className="send-error">{importNote}</p>
+          )}
+        </div>
+      )}
       {providers && providerId && !validSelection && model && (
         <p role="status">This connection or model is no longer available. Choose an available connection and model; your draft is still here.</p>
       )}
@@ -205,23 +405,25 @@ export function CreateTeammate({
           {error}
         </p>
       )}
-      <button
-        className="primary full-width"
-        disabled={
-          busy ||
-          !name.trim() ||
-          !role.trim() ||
-          !instructions.trim() ||
-          !validSelection
-        }
-      >
-        {busy ? (
-          <LoaderCircle size={17} className="spin" />
-        ) : (
-          <ArrowRight size={17} />
-        )}
-        {busy ? "Creating…" : "Create teammate"}
-      </button>
+      {sheetMode === "create" && (
+        <button
+          className="primary full-width"
+          disabled={
+            busy ||
+            !name.trim() ||
+            !role.trim() ||
+            !instructions.trim() ||
+            !validSelection
+          }
+        >
+          {busy ? (
+            <LoaderCircle size={17} className="spin" />
+          ) : (
+            <ArrowRight size={17} />
+          )}
+          {busy ? "Creating…" : "Create teammate"}
+        </button>
+      )}
     </form>
   );
 }

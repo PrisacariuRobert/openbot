@@ -1,4 +1,6 @@
 type Event = Record<string, unknown>;
+const continuationSafeTools = new Set(["task_plan", "task_progress", "conversation_search", "memory_search", "community_skill_read", "table_summary", "table_reconcile", "spreadsheet_inspect", "workspace_list", "workspace_read", "browser_snapshot", "code_list", "code_read", "code_search", "code_status", "code_diff"]);
+const safeTool = (name: unknown) => typeof name === "string" && continuationSafeTools.has(name.replace(/^mcp__openbot__/, ""));
 function record(value: unknown): Event | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Event : undefined;
 }
@@ -44,6 +46,10 @@ export class ModelOutput {
   private needsAnswer = false;
   private result: string | undefined;
   private failed = false;
+  private failureDescription: string | null = null;
+  private lastToolCompletedSafely = false;
+  private pendingSafeTools = new Set<string>();
+  private continuationBlocked = false;
   exceededLimit = false;
   currentText = "";
 
@@ -76,11 +82,37 @@ export class ModelOutput {
     if (this.exceededLimit || this.failed) return;
     if (event.type === "error" || (event.type === "result" && (event.is_error === true || (typeof event.subtype === "string" && event.subtype.startsWith("error"))))) {
       this.failed = true;
+      // Classify provider errors without exposing headers, keys, request bodies,
+      // or arbitrary provider text to the conversation.
+      const error = record(event.error);
+      const data = record(error?.data);
+      const message = String(data?.message ?? error?.message ?? "").slice(0, 4000);
+      const status = data?.statusCode;
+      if (status === 429 || /rate.limit|quota|usage.limit|insufficient.credit/i.test(message)) this.failureDescription = "Your AI provider reached a usage or rate limit. Your progress is saved. Wait for its allowance to reset or choose another connected model in Settings.";
+      else if (status === 401 || status === 403) this.failureDescription = "Your AI provider rejected its sign-in or access. Reconnect that provider in Settings, then try again. Your saved work is kept.";
+      else if (/MessageContent|json_parse_error|unsupported.*(file|media|image|document)/i.test(message)) this.failureDescription = "Your selected AI provider could not read this message or file format. Try a fresh task with the extracted text, or choose a model that supports the attachment. Your files are kept.";
+      else if (typeof status === "number" && status >= 500) this.failureDescription = "Your AI provider is temporarily unavailable. Your progress is saved. Try again later or choose another connected model.";
       return;
     }
     if (this.result !== undefined) return;
     const part = record(event.part), message = record(event.message);
     if (typeof part?.messageID === "string" && `message:${part.messageID}` !== this.group && this.seenGroups.has(`message:${part.messageID}`)) return;
+    if (this.runtime === "opencode" && (event.type === "tool_use" || part?.type === "tool")) {
+      const safe = safeTool(part?.tool ?? event.tool), status = record(part?.state)?.status;
+      const key = String(part?.id ?? part?.callID ?? part?.tool ?? event.tool);
+      if (!safe || status === "error") this.continuationBlocked = true;
+      if (status === "completed") this.pendingSafeTools.delete(key);
+      else this.pendingSafeTools.add(key);
+      this.lastToolCompletedSafely = safe && status === "completed";
+    }
+    if (this.runtime === "claude" && event.type === "user" && Array.isArray(message?.content)) {
+      for (const raw of message.content) {
+        const item = record(raw);
+        if (item?.type !== "tool_result") continue;
+        if (item.is_error === true || !this.pendingSafeTools.delete(String(item.tool_use_id))) { this.continuationBlocked = true; this.lastToolCompletedSafely = false; this.pendingSafeTools.clear(); break; }
+        this.lastToolCompletedSafely = this.pendingSafeTools.size === 0;
+      }
+    }
     if (this.runtime === "claude" && event.type === "result") {
       const text = eventText(event);
       if (text?.trim()) {
@@ -100,6 +132,12 @@ export class ModelOutput {
       if (!this.begin(typeof message?.id === "string" ? `message:${message.id}` : `assistant:${++this.sequence}`)) return;
       this.replace(text || ""); // Complete messages replace snapshots, not append them.
       this.needsAnswer = Array.isArray(message?.content) && message.content.some((item) => record(item)?.type === "tool_use");
+      if (this.needsAnswer && Array.isArray(message?.content)) {
+        this.lastToolCompletedSafely = false;
+        const calls = message.content.map(record).filter(item => item?.type === "tool_use");
+        if (!calls.every(item => safeTool(item?.name) && typeof item?.id === "string")) this.continuationBlocked = true;
+        for (const call of calls) this.pendingSafeTools.add(String(call!.id));
+      }
       return;
     }
     if (event.type === "text" && text !== null) {
@@ -117,8 +155,9 @@ export class ModelOutput {
 
   drainProgress(): string[] { return this.pendingUpdates.splice(0); }
   get finalText(): string { return this.failed || this.needsAnswer || this.exceededLimit ? "" : (this.result ?? this.currentText).trim(); }
+  get canContinueIntermediate(): boolean { return !this.failed && !this.continuationBlocked && this.pendingSafeTools.size === 0 && this.needsAnswer && !this.exceededLimit && this.lastToolCompletedSafely; }
   get failure(): string | null {
-    return this.failed ? "The AI runtime reported that it could not finish this task. Review its work before trying again."
+    return this.failed ? this.failureDescription ?? "The AI runtime reported that it could not finish this task. Review its work before trying again."
       : this.needsAnswer ? "The teammate stopped after an intermediate step without returning a finished answer. Its progress has been kept."
       : null;
   }

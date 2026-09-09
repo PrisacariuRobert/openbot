@@ -1,0 +1,248 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: "Pinned Node version (or latest)"
+        default: "latest"
+      opencode_version:
+        description: "Pinned opencode version (or latest)"
+        default: "latest"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/package-runtime-bundle.mjs --platform linux-x64 --node "${{ inputs.node_version || 'latest' }}" --opencode "${{ inputs.opencode_version || 'latest' }}" --out dist-release
+      - name: Smoke boot
+        run: |
+          node -e 'const m = require("./dist-release/openbot-" + require("./package.json").version + "-linux-x64/runtime-manifest.json"); if (m.version !== require("./package.json").version) process.exit(1);'
+          OPENBOT_DATA_DIR="$(mktemp -d)/data"
+          export OPENBOT_DATA_DIR
+          launcher=(./dist-release/openbot-*/openbot.sh)
+          "${launcher[0]}" &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for attempt in $(seq 1 60); do
+            echo "Checking runtime ($attempt/60)"
+            if curl --fail --silent http://127.0.0.1:4311/api/healthz; then
+              curl --fail --silent http://127.0.0.1:4311/api/readiness | node -e 'let v="";process.stdin.on("data",c=>v+=c);process.stdin.on("end",()=>{const r=JSON.parse(v);if(!Array.isArray(r.steps)||r.steps.length!==3)process.exit(1);})'
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openbot-linux-x64
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.sha256
+
+  bundle-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        shell: pwsh
+      - run: npm run build
+        shell: pwsh
+      - run: node scripts/package-runtime-bundle.mjs --platform win-x64 --node "${{ inputs.node_version || 'latest' }}" --opencode "${{ inputs.opencode_version || 'latest' }}" --out dist-release
+        shell: pwsh
+      - name: Smoke boot
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $manifest = Get-Content "dist-release/openbot-$version-win-x64/runtime-manifest.json" | ConvertFrom-Json
+          if ($manifest.version -ne $version) { exit 1 }
+          $env:OPENBOT_DATA_DIR = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+          $job = Start-Job -ScriptBlock { param($dir) & "$dir\openbot.ps1" } -ArgumentList (Resolve-Path "dist-release/openbot-$version-win-x64").Path
+          try {
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              try {
+                $health = Invoke-WebRequest -Uri "http://127.0.0.1:4311/api/healthz" -UseBasicParsing -TimeoutSec 2
+                if ($health.StatusCode -eq 200) { exit 0 }
+              } catch { Start-Sleep -Seconds 2 }
+            }
+            exit 1
+          } finally { $job | Stop-Job -PassThru | Remove-Job -Force }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openbot-win-x64
+          path: |
+            dist-release/*.zip
+            dist-release/*.sha256
+
+  app-macos:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Fetch opencode for packaging
+        run: |
+          VERSION="${{ inputs.opencode_version || 'latest' }}"
+          if [ "$VERSION" = "latest" ]; then VERSION="$(curl -fsSL https://api.github.com/repos/anomalyco/opencode/releases/latest | node -e 'let v="";process.stdin.on("data",c=>v+=c);process.stdin.on("end",()=>console.log(JSON.parse(v).tag_name))')"; fi
+          mkdir -p "$HOME/.opencode/bin"
+          curl -fsSL -o /tmp/opencode.zip "https://github.com/anomalyco/opencode/releases/download/${VERSION}/opencode-darwin-arm64.zip"
+          unzip -o /tmp/opencode.zip -d "$HOME/.opencode/bin"
+          echo "OPENBOT_OPENCODE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+      - name: Build native app
+        run: xcodebuild -project macos/OpenBotDesktop.xcodeproj -scheme OpenBotDesktop -configuration Debug -derivedDataPath /tmp/openbotDerived build
+      - name: Package with embedded runner
+        run: node scripts/package-macos-app.mjs /tmp/openbotDerived/Build/Products/Debug/OpenBot.app
+      - name: Smoke test package
+        run: node scripts/test-macos-package.mjs /tmp/openbotDerived/Build/Products/Debug/OpenBot.app
+      - name: Archive
+        run: |
+          VERSION="$(node -e 'console.log(require("./package.json").version)')"
+          mkdir -p dist-release
+          tar -czf "dist-release/openbot-${VERSION}-darwin-arm64.tar.gz" -C /tmp/openbotDerived/Build/Products/Debug OpenBot.app
+          (cd dist-release && shasum -a 256 "openbot-${VERSION}-darwin-arm64.tar.gz" > "openbot-${VERSION}-darwin-arm64.tar.gz.sha256")
+          cp /tmp/openbotDerived/Build/Products/Debug/OpenBot.app/Contents/Resources/OpenBotRuntime/runtime-manifest.json "dist-release/openbot-${VERSION}-darwin-arm64.manifest.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openbot-darwin-arm64
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.sha256
+            dist-release/*.manifest.json
+
+  publish:
+    # Always consume the final Mac artifact. When signing is configured, a
+    # failure blocks the draft instead of silently falling back to unsigned.
+    needs: [bundle-linux, bundle-windows, app-macos, sign-notarize]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: openbot-linux-x64
+          path: release-artifacts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: openbot-win-x64
+          path: release-artifacts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: openbot-darwin-arm64-final
+          path: release-artifacts
+      - run: gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "$RELEASE_TAG beta" --notes-file docs/RELEASE_BETA_NOTES.md release-artifacts/*
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Developer ID signing + notarization. Inactive until the owner adds the
+  # secrets below (Apple Developer Program membership required). With no
+  # secrets the job returns an explicitly unsigned artifact for draft review.
+  # Secrets: MACOS_CERT_P12 (base64 Developer ID Application .p12),
+  # MACOS_CERT_PASSWORD, APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_ISSUER,
+  # APPLE_API_KEY_P8 (base64 .p8). The .p12 is created from a CSR via
+  # developer.apple.com or Xcode → Settings → Accounts → Manage Certificates.
+  sign-notarize:
+    needs: [app-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check signing configuration
+        id: signing
+        run: |
+          if [ -n "$MACOS_CERT_P12" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No Developer ID certificate configured; preparing unsigned beta for draft review."
+          fi
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: openbot-darwin-arm64
+          path: signed
+      - name: Sign and notarize
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          set -eu
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID}" "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID}" "${APPLE_API_ISSUER:?Missing APPLE_API_ISSUER}" "${APPLE_API_KEY_P8:?Missing APPLE_API_KEY_P8}"
+          cd signed
+          tar -xzf openbot-*-darwin-arm64.tar.gz
+          umask 077
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          cleanup() {
+            rm -f cert.p12 AuthKey.p8 submit.zip
+            security delete-keychain "$KEYCHAIN" || true
+          }
+          trap cleanup EXIT
+          echo "$MACOS_CERT_P12" | base64 -d > cert.p12
+          security create-keychain -p actions "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p actions "$KEYCHAIN"
+          security import cert.p12 -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk '/Developer ID Application/{print $2; exit}')"
+          [ -n "$IDENTITY" ] || { echo "No Developer ID Application identity in the provided certificate."; exit 1; }
+          /usr/bin/codesign --force --deep --options runtime --preserve-metadata=entitlements --keychain "$KEYCHAIN" --sign "$IDENTITY" --timestamp OpenBot.app
+          /usr/bin/codesign --verify --deep --strict OpenBot.app
+          echo "$APPLE_API_KEY_P8" | base64 -d > AuthKey.p8
+          ditto -c -k --keepParent OpenBot.app submit.zip
+          xcrun notarytool submit submit.zip --key AuthKey.p8 --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple OpenBot.app
+          VERSION="$(node -e 'console.log(require("./OpenBot.app/Contents/Resources/OpenBotRuntime/package.json").version)')"
+          tar -czf "openbot-${VERSION}-darwin-arm64.tar.gz" OpenBot.app
+          shasum -a 256 "openbot-${VERSION}-darwin-arm64.tar.gz" > "openbot-${VERSION}-darwin-arm64.tar.gz.sha256"
+          rm -f cert.p12 AuthKey.p8 submit.zip
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openbot-darwin-arm64-final
+          path: |
+            signed/*.tar.gz
+            signed/*.sha256
+            signed/*.manifest.json
+          if-no-files-found: error

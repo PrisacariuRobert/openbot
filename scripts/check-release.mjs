@@ -77,7 +77,7 @@ if (!database.includes("updateThread(id") || !database.includes("duplicateBot(id
 if (!server.includes('"google_drive_create"') || !server.includes('"google_calendar_create"') || !server.includes("writeConnected") || !workspace.includes("google_drive_create") || !workspace.includes("google_calendar_create")) {
   failures.push("Google Drive file and Calendar event creation must stay scope-gated and approval-gated across both runtimes.");
 }
-if (!server.includes("verifyTaskChecks") || !workspace.includes("workspace_file evidence") || !verificationEvidence.includes("readWorkspaceFile") || !verificationEvidence.includes('source: "host"') || !app.includes("Verified by OpenBot")) {
+if (!server.includes("verifyTaskChecks") || !workspace.includes("workspace_file evidence") || !verificationEvidence.includes("readWorkspaceFile") || !verificationEvidence.includes('source: "host"') || !app.includes("Recorded checks passed") || !app.includes("A file check does not verify every claim")) {
   failures.push("Text deliverables must keep bounded host verification and distinguish it from teammate-reported checks.");
 }
 if (!styles.includes(".live-desk-grid") || !styles.includes(".studio-search-results") || !styles.includes(".conversation-organizer")) {

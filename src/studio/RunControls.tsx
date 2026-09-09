@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { LockKeyhole } from "lucide-react";
 import type { Approval, Run } from "../shared/types";
 import type { ApprovalPreview } from "../shared/approval-preview";
+import { TASK_TOKEN_OPTIONS } from "../shared/task-token-budget";
 import { BrowserSignInPanel } from "../components/BrowserSignInPanel";
 import "./run-controls.css";
 
@@ -8,10 +10,12 @@ export function RunControls({
   run,
   approval,
   onChange,
+  onSignInPane,
 }: {
   run: Run;
   approval?: Approval;
   onChange: () => void | Promise<void>;
+  onSignInPane?: (approvalId: string) => void;
 }) {
   const [preview, setPreview] = useState<ApprovalPreview | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -82,6 +86,24 @@ export function RunControls({
     } else setNeedsRefresh(false);
     return () => controller.abort();
   }, [run.id, approval?.id, approval?.status, pending, reload]);
+
+  async function chooseTokenAmount(additionalTokens: number) {
+    if (!approval || lock.current || !previewPending) return;
+    lock.current = true;
+    setBusy(true);
+    setReviewed(false);
+    const current = generation.current;
+    try {
+      const response = await fetch(`/api/approvals/${encodeURIComponent(approval.id)}/token-allowance`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ additionalTokens }) });
+      if (current !== generation.current) return;
+      if (!response.ok) throw new Error("The allowance could not be changed. Refresh before deciding.");
+      setReload(value => value + 1);
+    } catch (reason) {
+      if (current === generation.current) setError(reason instanceof Error ? reason.message : "Couldn’t update the allowance.");
+    } finally {
+      if (current === generation.current) { lock.current = false; setBusy(false); }
+    }
+  }
 
   async function act(action: "approved" | "denied" | "cancel") {
     if (lock.current || needsRefresh) return;
@@ -159,17 +181,27 @@ export function RunControls({
     <section className="run-controls" aria-label="Task controls">
       {pending && (
         <>
-          <strong>{preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}</strong>
+          <strong>{approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}</strong>
           {preview && <p>{preview.actionLabel}</p>}
           {preview && !preview.browserSignIn && <p className="run-control-note">{preview.reason}</p>}
-          {completeReview && preview?.browserSignIn && <BrowserSignInPanel key={approval!.id} approvalId={approval!.id} handoff={preview.browserSignIn} disabled={busy || needsRefresh || Boolean(notice)} onBusyChange={setSignInBusy} onInteraction={() => setReviewed(false)} />}
+          {preview?.taskTokens && <label className="run-token-amount">Extra tokens for this task
+            <select aria-label="Extra tokens for this task" value={preview.taskTokens.additionalTokens} disabled={busy || needsRefresh} onChange={event => void chooseTokenAmount(Number(event.target.value))}>
+              {TASK_TOKEN_OPTIONS.map(amount => <option key={amount} value={amount}>{amount.toLocaleString()}</option>)}
+            </select>
+          </label>}
+          {completeReview && preview?.browserSignIn && (onSignInPane
+            ? <div className="sign-in-pane-cta">
+                <p className="run-control-note">Sign in on the private screen beside this chat — it drives your teammate’s own browser, and passwords stay out of the conversation.</p>
+                <button type="button" className="primary" onClick={() => onSignInPane(approval!.id)}><LockKeyhole size={14} strokeWidth={2} />Open the private browser</button>
+              </div>
+            : <BrowserSignInPanel key={approval!.id} approvalId={approval!.id} handoff={preview.browserSignIn} disabled={busy || needsRefresh || Boolean(notice)} onBusyChange={setSignInBusy} onInteraction={() => setReviewed(false)} />)}
           {preview && preview.fields.length > 0 && (
             <details
               onToggle={(event) => {
                 if (event.currentTarget.open && !preview.browserSignIn) setReviewed(true);
               }}
             >
-              <summary>Review the full action</summary>
+              <summary>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
               <dl>
                 {preview.fields.map((field) => (
                   <div key={field.label}>
@@ -196,7 +228,7 @@ export function RunControls({
             <p role="status">Loading action details…</p>
           )}
           {preview?.limitation && (
-            <p className="run-control-note">{preview.limitation}</p>
+            <p className="run-control-note">{preview.limitation}{approval?.kind === "budget" && <button type="button" className="text-action" disabled={busy} onClick={() => setReload(value => value + 1)}>Refresh allowance</button>}</p>
           )}
           {previewPending && preview?.canApprove && !completeReview && !preview.limitation && (
             <p className="run-control-note">This review is incomplete or out of date. Refresh before approving. You can still decline it.</p>
@@ -210,7 +242,7 @@ export function RunControls({
                 disabled={busy || signInBusy || needsRefresh || !reviewed || Boolean(notice)}
                 onClick={() => void act("approved")}
               >
-                {preview?.browserSignIn ? "Continue task" : approval?.kind === "prompt"
+                {preview?.taskTokens ? `Allow ${preview.taskTokens.additionalTokens.toLocaleString()} more tokens` : preview?.browserSignIn ? "Continue task" : approval?.kind === "prompt"
                   ? "Allow task to start"
                   : "Approve action"}
               </button>

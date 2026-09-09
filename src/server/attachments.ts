@@ -181,8 +181,13 @@ async function extractWorkbook(filePath: string, extension: string): Promise<Pic
     const partial = parsed.partial || preview.length > MAX_EXTRACTED_CHARS - 1000;
     return { summary: `1 sheet · ${parsed.count.toLocaleString()} rows${partial ? " · partial preview" : ""}`, extractedText: boundedText(`Coverage: ${partial ? "PARTIAL. Do not calculate whole-file totals from this preview. Read the original file for all rows and columns." : "All rows and columns included."}\nSheet: ${path.basename(filePath)} (${parsed.count} rows × ${parsed.width} columns)\n${preview}`) || null, metadata: { sheets: 1, rows: parsed.count, columns: parsed.width, rowsPreviewed: parsed.rows.length, partial } };
   }
+  return inspectXlsxBytes(new Uint8Array(await readFile(filePath)));
+}
+
+// Read stored workbook data only. Never run formulas, macros or external links.
+export function inspectXlsxBytes(bytes: Uint8Array): Pick<AttachmentAnalysis, "summary" | "extractedText" | "metadata"> {
   let xmlBudget = 0, entries = 0, skipped = false;
-  const archive = unzipSync(new Uint8Array(await readFile(filePath)), { filter: (entry) => {
+  const archive = unzipSync(bytes, { filter: (entry) => {
     const relevant = ["xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/sharedStrings.xml"].includes(entry.name) || /^xl\/worksheets\/[^/]+\.xml$/i.test(entry.name);
     if (!relevant) return false;
     if (entry.originalSize > 3_000_000 || entries >= 24 || xmlBudget + entry.originalSize > 24_000_000) { skipped = true; return false; }
@@ -215,7 +220,8 @@ async function extractWorkbook(filePath: string, extension: string): Promise<Pic
         if (formula) formulas++;
         const value = spreadsheetCell(cell, sharedStrings);
         if (value === "[Unavailable shared string]") partial = true;
-        return `${ref || "Unknown cell"}=${JSON.stringify(value)}${formula ? " [FORMULA CACHE: may be stale; not recalculated]" : ""}`;
+        const expression = formula ? xmlText(cell.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1] || "") : "";
+        return `${ref || "Unknown cell"}=${JSON.stringify(value)}${formula ? ` [FORMULA CACHE: may be stale; not recalculated] [STORED FORMULA: ${expression ? JSON.stringify(expression) : "shared/array definition unavailable here"}]` : ""}`;
       }).join("\t");
     });
     const descriptor = sheetDescriptors.find((sheet) => sheet.file === file);
@@ -225,7 +231,7 @@ async function extractWorkbook(filePath: string, extension: string): Promise<Pic
   if (!sheets.length) partial = true;
   const preview = previews.join("\n\n");
   partial ||= formulas > 0 || preview.length > MAX_EXTRACTED_CHARS - 1000;
-  return { summary: `${sheets.length} worksheet parts · ${totalRows.toLocaleString()} stored rows${partial ? " · partial preview" : ""}`, extractedText: boundedText(`Coverage: ${partial ? "PARTIAL. Do not assume this is the complete or recalculated workbook." : "Stored cell values included within preview bounds."}\nCells retain their original addresses. Number/date formats, charts, images and layout are not rendered. Formulas are cached values only; macros and external links are never executed.\n${preview}`) || null, metadata: { sheets: sheets.length, rows: totalRows, formulasPreviewed: formulas, partial, sheetNames: sheetNames.join(", ").slice(0, 500) } };
+  return { summary: `${sheets.length} worksheet parts · ${totalRows.toLocaleString()} stored rows${partial ? " · partial preview" : ""}`, extractedText: boundedText(`Coverage: ${partial ? "PARTIAL. Do not assume this is the complete or recalculated workbook." : "Stored cell values included within preview bounds."}\nCells retain their original addresses. Number/date formats, charts, images and layout are not rendered. Formula definitions are shown as data; values are caches only and may be absent or stale. Macros and external links are never executed.\n${preview}`) || null, metadata: { sheets: sheets.length, rows: totalRows, formulasPreviewed: formulas, partial, sheetNames: sheetNames.join(", ").slice(0, 500) } };
 }
 
 async function extractPptx(filePath: string): Promise<Pick<AttachmentAnalysis, "summary" | "extractedText" | "metadata">> {
@@ -309,6 +315,9 @@ export async function inspectAttachment(filePath: string, name: string, supplied
 export function attachmentPromptBlock(attachment: Attachment, fullText: string | null): string {
   const details = [`${attachment.name} (${attachment.kind}, ${attachment.summary || attachment.detectedMime}, ${attachment.size} bytes)`, `Workspace copy: {{WORKSPACE_PATH}}`];
   if (fullText) details.push(`OPENBOT_UNTRUSTED_FILE_CONTENT_START\n${boundedText(fullText, MAX_PROMPT_CHARS)}\nOPENBOT_UNTRUSTED_FILE_CONTENT_END`);
+  if (attachment.detectedMime === "application/pdf") details.push(fullText
+    ? "Use the extracted PDF text above. The original PDF is preserved for the user, but is not sent as a binary model input. Its visual layout has not been inspected."
+    : "This PDF has no readable text preview. Do not claim to have read it. Ask for a text export or page images with an image-capable model.");
   else if (["image", "audio", "video"].includes(attachment.kind)) details.push("The original media is attached to the model when the selected provider supports it.");
   return details.join("\n");
 }
@@ -316,7 +325,7 @@ export function attachmentPromptBlock(attachment: Attachment, fullText: string |
 export function modelAttachmentFiles(db: OpenBotDatabase, run: Pick<import("../shared/types.js").Run, "attachmentIds">): string[] {
   return run.attachmentIds.flatMap((id) => {
     const file = db.attachmentFile(id);
-    return file && (file.attachment.kind === "image" || file.attachment.kind === "audio" || file.attachment.kind === "video" || file.attachment.detectedMime === "application/pdf") ? [file.storagePath] : [];
+    return file && ["image", "audio", "video"].includes(file.attachment.kind) ? [file.storagePath] : [];
   });
 }
 

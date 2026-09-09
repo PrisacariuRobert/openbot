@@ -14,7 +14,9 @@ export function toolAvailability(
 ): Record<string, boolean> {
   const flags: Record<string, boolean> = {
     spreadsheet_export: true,
+    spreadsheet_inspect: true,
     table_summary: true,
+    table_reconcile: true,
     bash: bot.computerEnabled,
     isolated_bash: bot.computerEnabled,
     connected_tools: new McpConnections(db).toolsFor(bot.id).length > 0,
@@ -22,6 +24,7 @@ export function toolAvailability(
     community_skill_search: new CommunitySkills(db).search(bot.id).length > 0,
     community_skill_read: new CommunitySkills(db).search(bot.id).length > 0,
     memory_search: true,
+    conversation_search: true,
   };
   const set = (names: string[], available: boolean) => {
     for (const name of names) flags[name] = available;
@@ -111,6 +114,7 @@ export function toolAvailability(
     set(app.read, readConnected && Boolean(access?.canRead));
     set(app.write, writeConnected && Boolean(access?.canSend));
   }
+  set(["gmail_reply"], Boolean(flags.gmail_read && flags.gmail_send));
   const selectedWorkSource = db.getWorkSources(bot.id).selections.some(({ service }) => db.getConnector(service)?.connected && db.getBotConnectorAccess(bot.id, service, service)?.canRead && db.getWorkSources(bot.id).connectionVersions[service] === db.connectorAuthorizationVersion(service));
   set(["work_collect", "work_report"], Boolean(selectedWorkSource || flags.gmail_read || flags.google_calendar_agenda || macFallbackAllowed(db, bot.id, "gmail") || macFallbackAllowed(db, bot.id, "google-calendar")));
   const projects = db.listCodeProjects(bot.id);
@@ -140,7 +144,7 @@ export function toolAvailability(
     ),
   );
   if (reportOnly) {
-    const names = [...Object.keys(flags), "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "code_projects", "code_review_result", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "read", "write", "edit", "glob", "grep", "list", "task", "todowrite", "todoread", "webfetch", "websearch", "question", "skill", "apply_patch", "lsp"];
+    const names = [...Object.keys(flags), "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "code_projects", "code_review_result", "task_plan", "task_progress", "task_verify", "skill_propose", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "read", "write", "edit", "glob", "grep", "list", "task", "todowrite", "todoread", "webfetch", "websearch", "question", "skill", "apply_patch", "lsp"];
     return { ...Object.fromEntries(names.map((name) => [name, false])), work_collect: flags.work_collect, work_report: flags.work_report };
   }
   return flags;

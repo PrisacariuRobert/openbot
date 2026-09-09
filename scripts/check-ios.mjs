@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { appleMarketingVersion } from "./lib/release-version.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -49,10 +50,11 @@ const privacy = readFileSync(path.join(root, "ios/OpenBotMobile/Resources/Privac
 const entitlements = readFileSync(path.join(root, "ios/OpenBotMobile/OpenBotMobile.entitlements"), "utf8");
 const sharePlist = readFileSync(path.join(root, "ios/OpenBotShare/Info.plist"), "utf8");
 const swift = required.filter((file) => file.endsWith(".swift")).map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
-if (!project.includes(`MARKETING_VERSION: ${packageJson.version}`)) throw new Error(`The iOS marketing version is not ${packageJson.version}.`);
+const marketingVersion = appleMarketingVersion(packageJson.version);
+if (project.match(/MARKETING_VERSION:\s*(\S+)/)?.[1] !== marketingVersion) throw new Error(`The iOS marketing version is not ${marketingVersion}.`);
 const buildNumber = project.match(/CURRENT_PROJECT_VERSION:\s*(\d+)/)?.[1];
 const generatedProject = readFileSync(path.join(root, "ios/OpenBotMobile.xcodeproj/project.pbxproj"), "utf8");
-if (!buildNumber || !generatedProject.includes(`CURRENT_PROJECT_VERSION = ${buildNumber};`) || !generatedProject.includes(`MARKETING_VERSION = ${packageJson.version};`)) throw new Error("The generated iOS project version is out of sync with project.yml and package.json.");
+if (!buildNumber || !generatedProject.includes(`CURRENT_PROJECT_VERSION = ${buildNumber};`) || !generatedProject.includes(`MARKETING_VERSION = ${marketingVersion};`)) throw new Error("The generated iOS project version is out of sync with project.yml and package.json.");
 if (!plist.includes("NSAllowsLocalNetworking") || !plist.includes("NSLocalNetworkUsageDescription")) throw new Error("The iOS app is missing its bounded local-network declaration.");
 if (!plist.includes("NSMicrophoneUsageDescription") || !plist.includes("NSSpeechRecognitionUsageDescription")) throw new Error("The iOS app is missing its deliberate voice-capture permission descriptions.");
 if (!plist.includes("<string>openbot</string>")) throw new Error("The safe OpenBot connection deep link is missing.");

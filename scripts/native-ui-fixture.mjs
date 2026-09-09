@@ -9,19 +9,40 @@ const names = ["Nova", "Milo", "Fern", "Orbit", "Pebble", "Sunny"];
 const bots = shapes.map((mascot, index) => ({ id: `bot-${index}`, name: names[index], mascot, color: colors[index], role: index ? "Your personal teammate" : "Research and planning", status: "ready", threadId: `thread-${index}` }));
 const threads = bots.map((bot, index) => ({ id: bot.threadId, title: bot.name, kind: "direct", botId: bot.id, updatedAt: now, lastMessage: index ? "Ready when you are." : "Your meeting brief is ready to review.", lastMessageAt: now }));
 const attentionQA = process.argv.includes("--attention");
+const syncQA = process.argv.includes("--sync");
+if (syncQA) for (const bot of bots) { bot.providerInstanceId = "synthetic-only"; bot.model = "synthetic-only"; }
+const sentMessages = [];
+const liveRuns = [];
 const studioRuns = attentionQA ? [{ id: "fixture-failed", threadId: threads[1].id, botId: bots[1].id, botName: bots[1].name, botMascot: bots[1].mascot, botColor: bots[1].color, attemptCount: 1, status: "failed", error: "The sample task stopped. Open the conversation to review it." }] : [];
 const automationAlerts = attentionQA ? [{ id: "fixture-alert", routineId: "fixture-routine", routineName: "Sample routine", message: "The sample routine needs your attention.", resolvedAt: null }] : [];
 const drafts = new Map();
 const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); response.end(JSON.stringify(body)); };
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
-  if (url.pathname === "/native-visual-fixture") return json(response, 200, { fixture: "openbot-native-visual-only", key, attention: attentionQA ? "included" : "none", progress: "included" });
+  if (url.pathname === "/native-visual-fixture") return json(response, 200, { fixture: "openbot-native-visual-only", key, attention: attentionQA ? "included" : "none", progress: "included", sync: syncQA ? "included" : "none" });
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     let body = ""; for await (const chunk of request) body += chunk;
     return json(response, JSON.parse(body).token === key ? 200 : 401, { ok: true });
   }
   if (request.headers.authorization !== `Bearer ${key}`) return json(response, 401, { error: "Synthetic fixture key required." });
   if (url.pathname === "/api/events") { response.writeHead(200, { "Content-Type": "text/event-stream" }); response.write(": fixture connected\n\n"); return; }
+  // Deliberately silent SSE: verify the phone recovers via foreground refresh.
+  // This opt-in scenario only changes in-memory synthetic messages, never tools.
+  if (syncQA && url.pathname === "/api/messages" && request.method === "POST") {
+    let raw = ""; for await (const chunk of request) raw += chunk;
+    const input = JSON.parse(raw), bot = bots.find(b => b.threadId === input.threadId);
+    if (!bot) return json(response, 400, { error: "Synthetic conversation required" });
+    const id = `synthetic-${Date.now()}`;
+    sentMessages.push({ id, threadId: input.threadId, senderType: "user", senderId: null, senderName: "You", body: input.body, createdAt: new Date().toISOString(), attachments: [] });
+    const run = { id: `run-${id}`, threadId: input.threadId, botId: bot.id, botName: bot.name, botMascot: bot.mascot, botColor: bot.color, attemptCount: 1, status: "running", activities: [{ kind: "status", label: "Checking the synthetic example", detail: null }] };
+    liveRuns.push(run);
+    drafts.delete(input.threadId);
+    setTimeout(() => {
+      run.status = "completed";
+      sentMessages.push({ id: `reply-${id}`, threadId: input.threadId, senderType: "bot", senderId: bot.id, senderName: bot.name, body: "Synthetic sync check complete. No real task was run.", createdAt: new Date().toISOString(), attachments: [] });
+    }, 10000);
+    return json(response, 202, { message: sentMessages.at(-1), runs: [run] });
+  }
   if (url.pathname === "/api/connectors") return json(response, 200, { catalog: [] });
   if (url.pathname === "/api/provider") return json(response, 200, { connected: false, cliAvailable: false, defaultModel: "", models: [], note: "Synthetic visual fixture; no provider or tools are installed.", instances: [], catalog: [], loginAttempts: [] });
   if (url.pathname.startsWith("/api/drafts/") && request.method === "PUT") {
@@ -34,7 +55,7 @@ const server = http.createServer(async (request, response) => {
     const thread = threads.find((item) => item.id === url.searchParams.get("threadId")) ?? threads[0];
     const bot = bots.find((item) => item.id === thread.botId);
     const message = (id, senderType, body) => ({ id, threadId: thread.id, senderType, senderId: senderType === "bot" ? bot.id : null, senderName: senderType === "bot" ? bot.name : "You", body, createdAt: now, attachments: [], progressUpdates: senderType === "bot" ? ["I’m checking the sample notes you provided."] : [] });
-    return json(response, 200, { bots, threads, messages: [message("user-1", "user", "Help me prepare for tomorrow’s design review."), message("bot-1", "bot", "I’ve brought the key decisions together.\n\n**For tomorrow**\n- Review the simplified onboarding.\n- Confirm the three changes we want to test.\n- Keep time for open questions.\n\nThe brief is ready whenever you are.")], runs: studioRuns.filter(run => run.threadId === thread.id), studioRuns, automationAlerts, approvals: [], workflows: [], draft: drafts.get(thread.id) ?? { threadId: thread.id, body: "", source: null, updatedAt: null }, usage: { totalTokens: 0, completedRuns: 1, activeRuns: 0 }, activeThreadId: thread.id });
+    return json(response, 200, { bots, threads, messages: [message("user-1", "user", "Help me prepare for tomorrow’s design review."), message("bot-1", "bot", "I’ve brought the key decisions together.\n\n**For tomorrow**\n- Review the simplified onboarding.\n- Confirm the three changes we want to test.\n- Keep time for open questions.\n\nThe brief is ready whenever you are."), ...sentMessages.filter(m => m.threadId === thread.id)], runs: [...studioRuns, ...liveRuns].filter(run => run.threadId === thread.id), studioRuns: [...studioRuns, ...liveRuns], automationAlerts, approvals: [], workflows: [], draft: drafts.get(thread.id) ?? { threadId: thread.id, body: "", source: null, updatedAt: null }, usage: { totalTokens: 0, completedRuns: 1, activeRuns: 0 }, activeThreadId: thread.id });
   }
   // A visual fixture must never execute or pretend to execute an action.
   return json(response, 405, { error: "This read-only visual fixture does not execute actions." });

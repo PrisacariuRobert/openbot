@@ -93,7 +93,8 @@ try {
   await creation.getByRole("link", { name: /^(Set up an AI connection|Connect another AI service)$/ }).click();
   const settings = await popup;
   settings.setDefaultTimeout(45_000);
-  const providerSheet = settings.getByRole("dialog", { name: "Your AI connections", exact: true });
+  // The provider setup renders as a full panel in the separate tab now.
+  const providerSheet = settings.locator(".provider-settings");
   await providerSheet.waitFor();
   await providerSheet.getByRole("button", { name: "API & local models", exact: true }).click();
   await providerSheet.getByRole("button", { name: "Add API or local model", exact: true }).click();

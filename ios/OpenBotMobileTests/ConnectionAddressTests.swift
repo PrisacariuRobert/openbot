@@ -3,6 +3,24 @@ import SwiftUI
 @testable import OpenBot
 
 final class ConnectionAddressTests: XCTestCase {
+    func testFailureNoticesStayAtTheirPositionInTheConversation() throws {
+        let data = Data(##"{"bots":[],"threads":[],"messages":[{"id":"failed-message","threadId":"t","senderType":"system","senderName":"Studio","body":"Stopped","createdAt":"2026-09-08T10:00:00Z","runId":"old","attachments":[]},{"id":"new-message","threadId":"t","senderType":"user","senderName":"You","body":"Hi","createdAt":"2026-09-09T10:00:00Z","attachments":[]}],"runs":[{"id":"old","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-08T09:00:00Z"},{"id":"orphan","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-07T09:00:00Z"}],"approvals":[],"workflows":[],"usage":{"totalTokens":0,"completedRuns":0,"activeRuns":0},"activeThreadId":"t"}"##.utf8)
+        let state = try JSONDecoder().decode(StudioState.self, from: data)
+        XCTAssertEqual(state.failure(for: state.messages[0])?.id, "old")
+        XCTAssertNil(state.failure(for: state.messages[1]))
+        XCTAssertTrue(state.unplacedFailures(in: "t").isEmpty)
+        XCTAssertEqual(state.failedRuns(in: "t").count, 2) // History stays in Activity.
+    }
+
+    func testCurrentLocalHostConversationContractReadOnly() async throws {
+        guard ProcessInfo.processInfo.environment["OPENBOT_READONLY_HOST"] == "1" else { throw XCTSkip("Opt-in local read-only contract check") }
+        let url = URL(string: "http://127.0.0.1:4311/api/state?threadId=bot-pixel")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let state = try JSONDecoder().decode(StudioState.self, from: data)
+        XCTAssertEqual(state.activeThreadId, "bot-pixel")
+        XCTAssertFalse(state.messages.isEmpty)
+    }
     func testPhoneUsesTheSameBundledBrandMarksAsMac() {
         for name in ["opencode", "openai", "claude", "github", "gitlab", "gmail", "google-calendar", "google-drive", "slack", "notion", "todoist", "dropbox"] {
             let asset = StudioBrandMark.assetName(for: name)

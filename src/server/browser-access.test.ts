@@ -7,6 +7,7 @@ import { OpenBotDatabase } from "./testing/database.js";
 import {
   browserAccessStatus,
   browserAccessText,
+  browserTaskDirection,
   browserNavigationBlock,
   browserServiceForUrl,
   browserWebsiteBlock,
@@ -99,6 +100,15 @@ test("an authorized structured connector is preferred; missing OAuth scope is no
       "API sign-in is not proof of a browser session",
     );
     assert.doesNotMatch(JSON.stringify(status), /fixture-only|fixture@example/);
+    const direction = browserTaskDirection(db, db.getBot(bot.id)!);
+    assert.match(direction, /Google Calendar: https:\/\/calendar.google.com\//);
+    assert.match(direction, /Do not ask whether to try/);
+    assert.match(direction, /verify the displayed account/);
+    assert.match(direction, /neither recipient delivery nor reading/);
+    db.setBotConnectorAccess(bot.id, { canRead: false, canSend: false }, 'google-calendar');
+    const denied = browserTaskDirection(db, db.getBot(bot.id)!);
+    assert.doesNotMatch(denied, /Google Calendar: https:/);
+    assert.match(denied, /Explicitly denied services: Google Calendar/);
   } finally {
     close();
   }

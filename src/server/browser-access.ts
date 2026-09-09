@@ -188,6 +188,20 @@ export function browserAccessStatus(
   };
 }
 
+/** Short authoritative routing injected into every model turn, not just a workspace file. */
+export function browserTaskDirection(db: OpenBotDatabase, bot: Bot) {
+  const routes = browserAccessStatus(db, bot).services;
+  const alternatives = routes.filter(route => route.preferred === 'browser');
+  const denied = routes.filter(route => route.browserState === 'read-denied');
+  return [
+    bot.browserEnabled ? 'Use your existing private browser for requested work when its connector is unavailable or does not support the needed operation. Do not ask whether to try an already-permitted read-only route; inspect it and continue the task.' : 'Browser access is off. Do not enable it yourself or assume a saved sign-in gives access.',
+    alternatives.length ? `Permitted browser alternatives (login still needs verification): ${alternatives.map(route => `${route.label}: ${route.url}`).join('; ')}.` : '',
+    denied.length ? `Explicitly denied services: ${denied.map(route => route.label).join(', ')}. Never bypass these restrictions through a website, Mac app or another teammate.` : '',
+    bot.browserEnabled ? 'Gmail, Calendar and Drive may share a Google sign-in inside this same persistent profile. Open the needed service and verify the displayed account; do not assume /u/0 is the intended account or copy credentials. If signed in correctly, continue without another setup question. Request private sign-in only if the service actually requires it. Existing action approvals still apply.' : '',
+    'For work spanning email and calendar, track both outcomes. If the message claims an event exists, create and verify the approved event first, then propose the message using that evidence. Never substitute the user’s intention for a completed event. A sent copy or sending API response proves neither recipient delivery nor reading. If one part fails, report what completed and what remains; never resend a completed message simply to finish the other part.',
+  ].filter(Boolean).join('\n');
+}
+
 export function browserAccessText(db: OpenBotDatabase, bot: Bot) {
   const status = browserAccessStatus(db, bot);
   const lines = status.services.map((route) => {

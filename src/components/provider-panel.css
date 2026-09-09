@@ -75,6 +75,7 @@
   box-shadow: 0 1px 3px #1b1b1b10;
 }
 .ai-list {
+  display: block;
   border: 1px solid var(--ai-line);
   border-radius: 16px;
   overflow: hidden;
@@ -121,9 +122,14 @@
   overflow-wrap: anywhere;
 }
 .ai-account-copy details {
-  margin-top: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   font-size: 12px;
 }
+.ai-account-copy details > summary { font-size: 12px; font-weight: 400; }
+.ai-account-copy details[open] > summary { margin-bottom: 0; }
 .ai-account-copy details p {
   padding-top: 6px;
 }

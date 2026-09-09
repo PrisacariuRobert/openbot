@@ -6,17 +6,23 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { appleMarketingVersion } from "./lib/release-version.mjs";
 
 // Exercises the actual packaged launch helper with disposable studio data.
 // Does not launch models, use connector accounts, or change login services.
 const app = path.resolve(process.argv[2] || "");
-assert.ok(process.argv[2] && app.endsWith(".app"), "Pass the packaged OpenBot.app path.");
+if (!process.argv[2] || !app.endsWith(".app")) {
+  // Packaging QA needs a built app; without one this is a skip, not a failure.
+  console.log("SKIP: pass the packaged OpenBot.app path to run packaging checks (node scripts/test-macos-package.mjs /path/to/OpenBot.app).");
+  process.exit(0);
+}
+assert.ok(app.endsWith(".app"), "Pass the packaged OpenBot.app path.");
 const signature = spawnSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", app], { encoding: "utf8" });
 assert.equal(signature.status, 0, signature.stderr || "The copied app's resource seal is invalid.");
 const runtime = path.join(app, "Contents/Resources/OpenBotRuntime");
 const manifest = JSON.parse(readFileSync(path.join(runtime, "runtime-manifest.json"), "utf8"));
 const appVersion = spawnSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleShortVersionString", path.join(app, "Contents/Info.plist")], { encoding: "utf8" });
-assert.equal(appVersion.status, 0); assert.equal(manifest.version, appVersion.stdout.trim(), "The native app and its embedded server must have the same version.");
+assert.equal(appVersion.status, 0); assert.equal(appleMarketingVersion(manifest.version), appVersion.stdout.trim(), "The native app and its embedded server must have the same release number.");
 assert.equal(JSON.parse(readFileSync(path.join(runtime, "package.json"), "utf8")).version, manifest.version);
 assert.equal(manifest.architecture, process.arch);
 assert.ok(existsSync(path.join(runtime, "licenses/OpenCode-LICENSE.txt")));

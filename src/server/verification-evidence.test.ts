@@ -15,6 +15,8 @@ test("host-verifies a bounded workspace file instead of trusting a reported pass
     assert.equal(passed.passed, true);
     assert.equal(passed.source, "host");
     assert.match(passed.detail || "", /SHA-256 [a-f0-9]{12}/);
+    assert.equal(passed.label, "Text-file check: launch.md");
+    assert.match(passed.detail || "", /not the correctness of claims/);
 
     const failed = verifyWorkspaceFileEvidence(root, "Includes owner", {
       kind: "workspace_file", path: "launch.md", contains: ["## Owner"],
@@ -32,6 +34,22 @@ test("host-verifies a bounded workspace file instead of trusting a reported pass
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("notes cannot certify unrelated workbook claims and binary files need a format-aware check", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-verification-scope-"));
+  try {
+    writeFileSync(path.join(root, "notes.md"), "The workbook formulas are correct.");
+    const [check] = verifyTaskChecks(root, [{ label: "Workbook formulas recalculated correctly", passed: true, evidence: { kind: "workspace_file", path: "notes.md" } }]);
+    assert.equal(check.passed, true); // Only the text file's readability passed.
+    assert.equal(check.label, "Text-file check: notes.md");
+    assert.doesNotMatch(check.label, /formulas|recalculated/);
+    assert.match(check.detail || "", /Checked readability only/);
+    writeFileSync(path.join(root, "binary.xlsx"), Buffer.from([0x50, 0x4b, 0, 0xff, 0x10]));
+    const binary = verifyWorkspaceFileEvidence(root, "Workbook identity", { kind: "workspace_file", path: "binary.xlsx" });
+    assert.equal(binary.passed, false);
+    assert.match(binary.detail || "", /UTF-8 text only/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("host verification does not follow a workspace symlink", () => {

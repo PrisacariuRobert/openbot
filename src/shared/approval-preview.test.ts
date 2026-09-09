@@ -21,6 +21,20 @@ const run = { id: "run", botId: "bot", prompt: "Draft an email for review." };
 const approvalPreview = (...args: Parameters<typeof buildPreview>) =>
   buildPreview(args[0], args[1], args[2], "fixture@example.test");
 
+test('browser review shows the exact control and visible fields without pretending an API account is the browser account', () => {
+  const input = { selector: '#save', targetFingerprint: 'a'.repeat(64), targetReview: { url: 'https://calendar.google.com/', label: 'Save', control: 'button', complete: true, fields: [{ label: 'Title', value: 'Dinner' }, { label: 'Time', value: '21:00 Europe/Brussels' }] } };
+  const action = { type: 'browser_click', botId: 'bot', args: input };
+  const browserApproval = { ...approval, kind: 'browser' as const };
+  const result = buildPreview(browserApproval, run, action);
+  assert.equal(result.canApprove, true); assert.equal(result.limitation, null);
+  assert.ok(result.fields.some(field => field.label === 'On the page: Title' && field.value === 'Dinner'));
+  assert.ok(result.fields.some(field => field.label === 'Private browser'));
+  assert.equal(result.fields.some(field => field.label === 'Connected account'), false);
+  for (const args of [{ selector: '#save', targetFingerprint: input.targetFingerprint }, { ...input, targetReview: { ...input.targetReview, complete: false } }, { ...input, targetReview: { ...input.targetReview, fields: [{ label: 'password', value: 'password=secret' }] } }, { ...input, targetFingerprint: 'invalid' }, { ...input, value: 'unreviewed' }]) assert.equal(buildPreview(browserApproval, run, { ...action, args }).canApprove, false);
+  const typed = buildPreview(browserApproval, run, { ...action, type: 'browser_type', args: { ...input, value: 'A complete replacement' } });
+  assert.equal(typed.canApprove, true); assert.ok(typed.fields.some(field => field.value === 'A complete replacement'));
+});
+
 function publicationFixture() {
   const snapshot: CodePublicationReview = {
     version: 1, projectId: "project", projectName: "Orders", ownerId: "owner", botId: "bot", runId: "run",

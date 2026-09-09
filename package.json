@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "version": "0.37.0",
+  "version": "0.37.0-beta.1",
   "private": true,
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",
@@ -12,6 +12,7 @@
     "dev:web": "vite",
     "build": "tsc --noEmit && vite build",
     "start": "NODE_ENV=production tsx src/server/index.ts",
+    "desktop": "npm --prefix desktop start",
     "test": "tsx --test --test-concurrency=4 src/**/*.test.ts",
     "test:provider-runtime": "tsx scripts/test-provider-runtime.ts",
     "test:onboarding": "tsx scripts/test-onboarding.ts",
@@ -21,6 +22,11 @@
     "test:browser-sessions": "tsx scripts/test-browser-session-workflows.ts",
     "test:browser-sign-in": "tsx scripts/test-browser-sign-in.ts",
     "test:workflow-checks-ui": "tsx scripts/test-workflow-checks-ui.ts",
+    "test:skill-authoring-ui": "tsx scripts/test-skill-authoring-ui.ts",
+    "test:customer-workflow-ui": "tsx scripts/test-customer-workflow-ui.ts",
+    "test:live-computer-ui": "tsx src/studio/LiveComputer.browser.ts",
+    "test:task-tokens-ui": "npm run build && tsx src/studio/TaskTokens.browser.ts",
+    "test:browser-workflow-ui": "npm run build && tsx src/studio/BrowserWorkflow.browser.ts",
     "test:studio-design": "tsx scripts/test-studio-design.ts",
     "test:new-studio": "tsx scripts/test-new-studio.ts",
     "test:first-teammate": "tsx scripts/test-first-teammate.ts",
@@ -32,6 +38,7 @@
     "test:conversation-flow": "npm run test:new-studio && npm run test:first-teammate && npm run test:run-controls && npm run test:draft-attachments",
     "benchmark:site-workflow": "tsx scripts/benchmark-site-workflow.ts",
     "test:away-access": "tsx scripts/test-away-access.ts",
+    "test:https-tunnel": "tsx scripts/test-https-tunnel.ts",
     "relay:serve": "tsx scripts/relay-server.ts",
     "test:code-runtime": "tsx scripts/test-code-runtime.ts",
     "test:productivity-runtime": "tsx scripts/test-productivity-runtime.ts",
@@ -45,9 +52,10 @@
     "check:macos": "node scripts/check-macos.mjs",
     "package:macos": "node scripts/package-macos-app.mjs",
     "test:macos-package": "node scripts/test-macos-package.mjs",
-    "test:packaging": "node --test scripts/test-staged-app-package.mjs",
+    "test:packaging": "node --test scripts/test-staged-app-package.mjs scripts/test-release-version.mjs scripts/test-release-workflow.mjs",
+    "test:desktop": "node --test desktop/*.test.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "verify": "npm run check:release && npm run check:ios && npm run check:macos && npm run test:packaging && npm test && npm run check && npm run check:acceptance && npm run build"
+    "verify": "npm run check:release && npm run check:ios && npm run check:macos && npm run test:packaging && npm run test:desktop && npm test && npm run check && npm run check:acceptance && npm run build"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",
