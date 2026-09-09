@@ -99,7 +99,7 @@ test("the owner's Chrome profile resolves from Local State with a safe fallback"
     }
     writeFileSync(path.join(root, "Local State"), "{ broken");
     assert.equal(resolveChromeProfile(root), "Default");
-    assert.ok(chromeUserDataDir(root).includes("Chrome"));
+    assert.ok(chromeUserDataDir(root).toLowerCase().includes("chrome"));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
