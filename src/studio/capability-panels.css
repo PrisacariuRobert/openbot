@@ -207,6 +207,7 @@
 .work-receipt .work-receipt-status { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-muted); color: var(--secondary); }
 .work-receipt .work-receipt-status.is-completed, .work-receipt .work-receipt-status.is-approved { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .work-receipt .work-receipt-status.is-failed, .work-receipt .work-receipt-status.is-uncertain { border-color: var(--ink); color: var(--ink); }
+.work-receipt .work-receipt-status.is-blocked { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .work-receipt .work-receipt-source { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
 .work-receipt .work-receipt-source.is-host { color: var(--ink); border-color: var(--ink); }
 .work-receipt-uncertain { margin: 0; padding: 10px 12px 10px 28px; border: 1px dashed var(--line); border-radius: 10px; background: var(--surface-muted); font-size: 12.5px; color: var(--ink); }

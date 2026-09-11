@@ -433,7 +433,11 @@ test("blocks work after a bot reaches its weekly budget", () => {
     db.updateBot("nova", { weeklyTokenBudget: 1 });
     const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "test", status: "queued" });
     db.updateRun(run.id, { inputTokens: 2 });
-    assert.deepEqual(db.budgetAvailable("nova"), { allowed: false, used: 2, budget: 1 });
+    assert.deepEqual(db.budgetAvailable("nova"), { allowed: false, used: 2, budget: 1, remaining: -1 });
+    assert.deepEqual(db.budgetAvailable("nova", 5_000), { allowed: false, used: 2, budget: 1, remaining: -1 });
+    db.updateBot("nova", { weeklyTokenBudget: 20_000 });
+    assert.deepEqual(db.budgetAvailable("nova", 5_000).allowed, true);
+    assert.deepEqual(db.budgetAvailable("nova", 5_000).remaining, 19_998);
     db.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
