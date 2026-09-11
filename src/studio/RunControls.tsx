@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LockKeyhole } from "lucide-react";
+import { CalendarDays, Coins, Globe, LockKeyhole, Mail } from "lucide-react";
 import type { Approval, Run } from "../shared/types";
 import type { ApprovalPreview } from "../shared/approval-preview";
 import { TASK_TOKEN_OPTIONS } from "../shared/task-token-budget";
@@ -185,14 +185,21 @@ export function RunControls({
     color: run.botColor || "#6757d9",
     variant: run.botMascot || "nova",
   };
+  const decisionIcon =
+    approval?.kind === "budget" ? <Coins size={13} strokeWidth={2} />
+    : approval?.kind === "browser" ? <Globe size={13} strokeWidth={2} />
+    : /mail|email|send|draft/i.test(preview?.actionLabel || "") ? <Mail size={13} strokeWidth={2} />
+    : /calendar|event|meeting|invite/i.test(preview?.actionLabel || "") ? <CalendarDays size={13} strokeWidth={2} />
+    : <LockKeyhole size={13} strokeWidth={2} />;
   return (
     <section className="run-controls" aria-label="Task controls">
       {pending && (
         <div className="decision-card">
+          <i className="decision-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, transparent, ${actor.color} 30%, ${actor.color} 70%, transparent)` }} />
           <div className="decision-top">
             <Character name={actor.name} color={actor.color} variant={actor.variant} size={44} />
             <div className="decision-title">
-              <p className="decision-eyebrow">
+              <p className="decision-eyebrow">{decisionIcon}
                 {approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}
               </p>
               {preview && <p className="decision-headline">{preview.actionLabel}</p>}
