@@ -234,7 +234,7 @@ try {
     git(source, "-c", "user.name=Acceptance Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Independent failing quantity fixture");
     const originalCommit = git(source, "rev-parse", "HEAD");
     const project = await api<{ id: string }>("/api/code-projects", { name: "Quantity fixture", rootPath: source, access: [{ botId: pixel.id, canRead: true, canWrite: true, canRun: true }] });
-    await api("/api/bots/pixel", { computerEnabled: true }, "PATCH");
+    await api(`/api/bots/${pixel.id}`, { computerEnabled: true }, "PATCH");
     const result = await run(pixel.threadId, pixel.id, "Fix the quantity calculation bug in the shared Quantity fixture project. First reproduce it with node total.test.cjs. Do not modify the existing tests. Work on your isolated task branch, make the smallest implementation fix, commit only total.cjs, rerun the original tests against that commit, and explain the evidence. Do not install packages, access the network, push, publish, or change my original checkout.");
     const previousDataDir = process.env.OPENBOT_DATA_DIR;
     process.env.OPENBOT_DATA_DIR = root;
