@@ -12,7 +12,7 @@ import { pageHash } from '../src/server/page-watch-source.js';
 import type { AppState, Routine, Run } from '../src/shared/types.js';
 
 const model = process.env.OPENBOT_BENCHMARK_MODEL;
-assert.ok(model?.startsWith('opencode/'), 'Set OPENBOT_BENCHMARK_MODEL explicitly. This check uses your selected provider allowance.');
+assert.ok(model?.startsWith('opencode/') || model?.startsWith('opencode-go/'), 'Set OPENBOT_BENCHMARK_MODEL explicitly. This check uses your selected provider allowance.');
 const root = mkdtempSync(path.join(tmpdir(), 'openbot-watch-live-'));
 const socket = createServer();
 await new Promise<void>(resolve => socket.listen(0, '127.0.0.1', resolve));
@@ -44,14 +44,15 @@ async function stop() {
 }
 try {
   await start();
-  await api('/api/bots/nova', { model, providerInstanceId: 'local-opencode', computerEnabled: false, browserEnabled: false, weeklyTokenBudget: 50000 }, 'PATCH');
+  const fixture = await api<{id:string;threadId:string}>('/api/bots', {name:'Watcher', emoji:'●', color:'#27a67a', mascot:'sprout', role:'Operator', instructions:'Follow monitoring instructions exactly and cite sources.', model, providerInstanceId:'local-opencode', computerEnabled:false, browserEnabled:false, weeklyTokenBudget:50000});
+  const watcherId = fixture.id, watcherThread = fixture.threadId;
   if (process.env.OPENBOT_BENCHMARK_CREATE_ONLY === '1') {
     const started = Date.now();
-    const submitted = await api<{runs: Run[]}>('/api/messages', {threadId:'bot-nova', targetBotIds:['nova'], body:'Create a paused page-change automation called Release watch draft. Watch https://example.com/ every hour. Only when its readable text changes, summarize the changes with the source link in this conversation. Keep it disabled for now. Do not fetch the page or run the job.'});
+    const submitted = await api<{runs: Run[]}>('/api/messages', {threadId:watcherThread, targetBotIds:[watcherId], body:'Create a paused page-change automation called Release watch draft. Watch https://example.com/ every hour. Only when its readable text changes, summarize the changes with the source link in this conversation. Keep it disabled for now. Do not fetch the page or run the job.'});
     assert.equal(submitted.runs?.length, 1, 'Conditional/paused request must reach the tool flow, not the unconditional schedule shortcut.');
     let state!: AppState; let creation: Run | undefined;
     for (let n = 0; n < 190; n++) {
-      state = await api('/api/state?threadId=bot-nova'); creation = state.runs.find(r => r.id === submitted.runs[0]!.id);
+      state = await api(`/api/state?threadId=${watcherThread}`); creation = state.runs.find(r => r.id === submitted.runs[0]!.id);
       if (creation && ['completed','failed','cancelled','awaiting_approval'].includes(creation.status)) break;
       await delay(1000);
     }
@@ -65,15 +66,15 @@ try {
     passed = true;
   } else {
   for (const pageUrl of ['https://localhost', 'http://example.com', 'https://example.com/?token=secret']) {
-    await assert.rejects(api('/api/routines', {name:'Rejected watch', botId:'nova', threadId:'bot-nova', prompt:'Read', triggerType:'webpage', triggerConfig:{pageUrl}, intervalMinutes:15}), /public HTTPS/);
+    await assert.rejects(api('/api/routines', {name:'Rejected watch', botId:watcherId, threadId:watcherThread, prompt:'Read', triggerType:'webpage', triggerConfig:{pageUrl}, intervalMinutes:15}), /public HTTPS/);
   }
-  const routine = await api<Routine>('/api/routines', { name: 'Synthetic baseline removal test', botId: 'nova', threadId: 'bot-nova', intervalMinutes: 15, triggerType: 'webpage', triggerConfig: {pageUrl: 'https://example.com'},
+  const routine = await api<Routine>('/api/routines', { name: 'Synthetic baseline removal test', botId: watcherId, threadId: watcherThread, intervalMinutes: 15, triggerType: 'webpage', triggerConfig: {pageUrl: 'https://example.com'},
     prompt: 'This is a synthetic acceptance exercise. The saved prior baseline includes a fabricated workshop notice. Write watch-report.md using only the supplied change evidence. State exactly what disappeared, cite the HTTPS source and observation time, and explain that the removed notice is a synthetic fixture, not an actual announcement by the website. Do not browse or contact any apps. Reopen the saved file, then link it in one brief answer. Do not create automations or send anything.' });
   let checked = await api<{watchStatus: NonNullable<Routine['watchStatus']>}>(`/api/routines/${routine.id}/run`, {confirmed:true});
   assert.equal(checked.watchStatus.state, 'baseline', checked.watchStatus.detail);
   checked = await api(`/api/routines/${routine.id}/run`, {confirmed:true});
   assert.equal(checked.watchStatus.state, 'unchanged', checked.watchStatus.detail);
-  const before = await api<AppState>('/api/state?threadId=bot-nova');
+  const before = await api<AppState>(`/api/state?threadId=${watcherThread}`);
   assert.equal(before.runs.length, 0);
   await stop();
   const db = new DatabaseSync(path.join(root, 'openbot.sqlite'));
@@ -89,7 +90,7 @@ try {
   assert.equal(checked.watchStatus.state, 'changed', checked.watchStatus.detail);
   let state!: AppState; let run: Run | undefined;
   for (let n = 0; n < 190; n++) {
-    state = await api<AppState>('/api/state?threadId=bot-nova'); run = state.runs.find(r => r.routineId === routine.id);
+    state = await api<AppState>(`/api/state?threadId=${watcherThread}`); run = state.runs.find(r => r.routineId === routine.id);
     if (run && ['completed','failed','cancelled','awaiting_approval'].includes(run.status)) break;
     await delay(1000);
   }
@@ -99,16 +100,16 @@ try {
   const receipt = await fetch(`${base}/api/routines/${routine.id}/events/${events[0]!.id}/evidence`, {headers:{authorization:`Bearer ${key}`}});
   assert.equal(receipt.status, 200); assert.match(receipt.headers.get('content-type')!, /text\/plain/);
   assert.match(await receipt.text(), /Synthetic fixture notice/);
-  const report = readFileSync(path.join(root, 'workspaces/nova/watch-report.md'), 'utf8');
+  const report = readFileSync(path.join(root, 'workspaces', watcherId, 'watch-report.md'), 'utf8');
   assert.match(report, /Monday/); assert.match(report, /10:00/); assert.match(report, /synthetic|fabricat/i);
   assert.match(report, /https:\/\/example.com/); assert.match(report, /remov|disappear|no longer/i);
-  for (let n = 0; n < 20 && !state.messages.some(m => m.runId === run!.id && m.attachments.length); n++) { await delay(100); state = await api('/api/state?threadId=bot-nova'); }
+  for (let n = 0; n < 20 && !state.messages.some(m => m.runId === run!.id && m.attachments.length); n++) { await delay(100); state = await api(`/api/state?threadId=${watcherThread}`); }
   assert.ok(state.messages.some(m => m.runId === run!.id && m.attachments.some(a => a.name === 'watch-report.md')), 'Missing downloadable report');
   checked = await api(`/api/routines/${routine.id}/run`, {confirmed:true});
   assert.equal(checked.watchStatus.state, 'unchanged');
-  assert.equal((await api<AppState>('/api/state?threadId=bot-nova')).runs.filter(r => r.routineId === routine.id).length, 1);
+  assert.equal((await api<AppState>(`/api/state?threadId=${watcherThread}`)).runs.filter(r => r.routineId === routine.id).length, 1);
   console.log(JSON.stringify({result:'PASS', model, workflow:'production page watch to reviewable report', source:'https://example.com', fixture:'synthetic line in prior local baseline', baselineModelRuns:0, unchangedModelRuns:0, changeModelRuns:1, elapsedMs:Date.now()-started, inputTokens:run!.inputTokens, outputTokens:run!.outputTokens, steps:run!.modelSteps, reportVerified:true, duplicateRun:false}));
-  console.log(`Evidence: ${root}/workspaces/nova/watch-report.md`);
+  console.log(`Evidence: ${root}/workspaces/${watcherId}/watch-report.md`);
   passed = true;
   }
 } finally {
