@@ -17,7 +17,7 @@ test("a consultation that cannot start reports its failure privately and release
     db.markRunConsultationPending(parent.id);
     db.pauseRunForConsultation(parent.id);
     db.updateBot("nova", { providerInstanceId: "local-opencode", model: "wrong-connection/model" });
-    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", runtimeCheck: () => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const }), attachments: new AttachmentService(db) });
     // Exercise the dispatch guard without invoking a real model or timer loop.
     runner["executeRun"](child);
     assert.equal(db.getRun(child.id)?.status, "failed");
@@ -34,7 +34,7 @@ test("a consultation that cannot start reports its failure privately and release
 test("current task prompts surface relevant methods, honor opt-outs and preserve bounded report mode", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-method-prompt-")), db = new OpenBotDatabase(root);
   try {
-    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", runtimeCheck: () => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const }), attachments: new AttachmentService(db) });
     const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Extract document obligations and action items from a policy", status: "queued" });
     const prompt = runner["buildPrompt"](run, db.getBot("nova")!, false);
     assert.match(prompt, /bundled-document-to-action-items/);
@@ -56,7 +56,7 @@ test("only private findings from this job family enter the active prompt", () =>
     for (const [id, body] of [[old.id, "UNRELATED PRIVATE FINDING"], [helper.id, "CURRENT PRIVATE FINDING"]]) {
       db.addAgentMessage({ threadId: "bot-pixel", fromBotId: "nova", toBotId: "pixel", body: body!, kind: "finding", expectsReply: false, runId: id!, hopCount: 1, dedupeKey: id! });
     }
-    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", attachments: new AttachmentService(db) });
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", runtimeCheck: () => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const }), attachments: new AttachmentService(db) });
     const prompt = runner["buildPrompt"](run, db.getBot("pixel")!, true);
     assert.match(prompt, /CURRENT PRIVATE FINDING/);
     assert.doesNotMatch(prompt, /UNRELATED PRIVATE FINDING/);

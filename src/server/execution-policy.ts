@@ -48,7 +48,15 @@ export type ExecutionStop =
   | "tokens"
   | "job_budget"
   | "weekly_budget"
-  | "output";
+  | "output"
+  | "tester_fault";
+
+/** Approximate floor for one bounded model step (prompt context plus a
+ * completion). Provider usage is reported after each step, so the weekly
+ * allowance cannot strictly bound an in-flight call: dispatch gates reserve
+ * this much headroom before starting new model work, and the ceiling binds
+ * accounted usage. The blocked/stopped messages say so explicitly. S3-P03. */
+export const WEEKLY_BUDGET_STEP_RESERVE = 5_000;
 export const executionStopMessage: Record<ExecutionStop, string> = {
   job_budget: "This job reached its shared token limit, including teammate consultations and follow-ups. OpenBot stopped the remaining work. Your files and progress are kept for review.",
   time: "This task reached its time limit. Your saved files and progress are kept. Review them before asking for a smaller next step.",
@@ -58,9 +66,11 @@ export const executionStopMessage: Record<ExecutionStop, string> = {
   tokens:
     "This task reached its token limit. Your saved work is kept. Review it before starting another task.",
   weekly_budget:
-    "This teammate reached the weekly token limit. Your saved work is kept. Review the budget in teammate settings before continuing.",
+    "This teammate reached the weekly token limit. Your saved work is kept. Review the budget in teammate settings before continuing. Provider usage is reported after each model step, so the limit applies to accounted usage and a final in-flight step can land just past it.",
   output:
     "The model returned too much output, so OpenBot stopped the run. Your saved files are kept. Try a more focused request.",
+  tester_fault:
+    "A tester-injected fault stopped this run after a verified artifact (source=tester_fault). Your saved work is kept.",
 };
 
 // Uses a monotonic clock. Runtime progress events count; log chatter does not.

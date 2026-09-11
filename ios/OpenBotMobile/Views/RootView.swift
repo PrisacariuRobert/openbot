@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var session: ConnectionSession
+    @AppStorage("dismissedPreviewBanner") private var dismissedPreviewBanner = false
 
     var body: some View {
         Group {
@@ -13,9 +14,22 @@ struct RootView: View {
         }
         #if OPENBOT_PERSONAL_PREVIEW
         .safeAreaInset(edge: .top) {
-            Text("Personal preview · Push and Share-sheet delivery unavailable")
-                .font(.caption2).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity).padding(6).background(.thinMaterial)
+            if !dismissedPreviewBanner {
+                HStack(spacing: 8) {
+                    Text("Personal preview · Push and Share-sheet delivery unavailable")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button { dismissedPreviewBanner = true } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                    }
+                    .accessibilityLabel("Dismiss preview notice")
+                }
+                .padding(.horizontal, 12).padding(.vertical, 4)
+                .background(.thinMaterial)
+            }
         }
         #endif
         .animation(.snappy(duration: 0.34), value: session.isAuthenticated)

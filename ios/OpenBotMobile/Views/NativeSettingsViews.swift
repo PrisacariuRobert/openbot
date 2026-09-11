@@ -156,6 +156,9 @@ struct NativeConversationDetails: View {
     @Environment(\.dismiss) private var dismiss
     @State private var previewURL: URL?
     @State private var computerBot: StudioBot?
+    @State private var showingSearch = false
+    @State private var showingProjects = false
+    @State private var showingFiles = false
     private var runs: [StudioRun] { store.activeRuns.filter { $0.threadId == store.selectedThreadID } }
     private var files: [StudioAttachment] {
         var paths = Set<String>()
@@ -201,12 +204,20 @@ struct NativeConversationDetails: View {
                     if let bot = store.activeBot {
                         section("Computer") { Button("Open \(bot.name)’s browser") { computerBot = bot } }
                     }
+                    section("Studio") {
+                        Button { showingSearch = true } label: { Label("Search everything", systemImage: "magnifyingglass") }
+                        Button { showingProjects = true } label: { Label("Code projects", systemImage: "chevron.left.forwardslash.chevron.right") }
+                        Button { showingFiles = true } label: { Label("Workspace & delivered files", systemImage: "folder") }
+                    }
                     section("Teammate") { Button("Appearance & preferences", action: onTeam) }
                 }.font(.system(size: 15)).padding(28)
             }.background(StudioPalette.paper).navigationTitle("Details").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }.tint(StudioPalette.ink).quickLookPreview($previewURL)
             .sheet(item: $computerBot) { bot in ComputerView(store: store, bot: bot) }
+            .sheet(isPresented: $showingSearch) { NativeSearchView(store: store) }
+            .sheet(isPresented: $showingProjects) { NativeProjectsView(store: store) }
+            .sheet(isPresented: $showingFiles) { NativeFilesView(store: store) }
     }
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {

@@ -201,7 +201,7 @@ export function RunControls({
                 if (event.currentTarget.open && !preview.browserSignIn) setReviewed(true);
               }}
             >
-              <summary>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
+              <summary onClick={() => { if (!preview.browserSignIn) setReviewed(true); }}>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
               <dl>
                 {preview.fields.map((field) => (
                   <div key={field.label}>

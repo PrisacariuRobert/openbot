@@ -26,7 +26,7 @@ test('message preflight preserves uploads, history and routing when a teammate b
     const schedule = await f.post('/api/messages', { threadId: 'bot-nova', body: 'Every day at 09:00 UTC check project progress' });
     assert.equal(schedule.status, 201, 'Saving a schedule itself needs no model tokens');
     assert.equal(f.db.listRuns('bot-nova').length, runs);
-    f.db.updateBot('nova', { weeklyTokenBudget: 1000 }); // Disposable fixture only, never owner settings.
+    f.db.updateBot('nova', { weeklyTokenBudget: 20000 }); // Disposable fixture only, never owner settings: must clear one bounded step reserve.
     const retry = await f.post('/api/messages', { threadId: 'bot-nova', body: 'Check the supplied records', attachmentIds: [uploaded.id] });
     assert.equal(retry.status, 202, await retry.clone().text());
     const { runs: accepted } = await retry.json() as { runs: Array<{ id: string }> };

@@ -37,7 +37,8 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   for (const [name, width, height] of [["desktop", 1440, 1000], ["phone", 390, 844], ["small-phone", 320, 740]] as const) {
     await page.setViewportSize({ width, height });
-    await page.goto(base, { waitUntil: "networkidle" });
+    await page.goto(base);
+    await delay(800);
     await page.locator(".chat-message").first().waitFor();
     // Markdown renders inside the conversation, not as raw asterisks.
     assert.ok(await page.locator(".chat-message strong").filter({ hasText: "calm plan" }).first().isVisible(), `${name}: markdown renders`);
@@ -49,18 +50,20 @@ try {
   }
   for (const panel of ["provider", "connectors", "routines", "teach", "live"] as const) {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto(base + "/?panel=" + panel, { waitUntil: "networkidle" });
-    await delay(400);
+    await page.goto(base + "/?panel=" + panel);
+    await delay(900);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert.ok(overflow <= 1, `${panel} panel overflows by ${overflow}px`);
     await page.screenshot({ path: path.join(output, `desktop-${panel}.png`) });
   }
   // Connector search narrows the catalog to the matching app.
-  await page.goto(base + "/?panel=connectors", { waitUntil: "networkidle" });
+  await page.goto(base + "/?panel=connectors");
+  await delay(600);
   await page.getByLabel("Find an app").fill("gmail");
   assert.equal(await page.locator(".connector-card").count(), 1);
   // Skill search reports empty results honestly.
-  await page.goto(base + "/?panel=teach", { waitUntil: "networkidle" });
+  await page.goto(base + "/?panel=teach");
+  await delay(600);
   await page.getByLabel("Find a skill").fill("not-a-real-skill");
   await page.getByText("No matching skills. Try another name.").waitFor();
   assert.deepEqual(errors, []);

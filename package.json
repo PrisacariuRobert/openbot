@@ -13,6 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "desktop": "npm --prefix desktop start",
+    "mcp": "node --import tsx mcp/openbot.ts",
     "test": "tsx --test --test-concurrency=4 src/**/*.test.ts",
     "test:provider-runtime": "tsx scripts/test-provider-runtime.ts",
     "test:onboarding": "tsx scripts/test-onboarding.ts",
@@ -60,6 +61,7 @@
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",
     "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "cheerio": "1.2.0",
     "express": "^5.2.1",
     "fflate": "^0.8.3",

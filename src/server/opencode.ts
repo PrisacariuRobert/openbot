@@ -10,12 +10,14 @@ import { browserTaskDirection } from "./browser-access.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { prepareConsultationFiles } from "./consultation-files.js";
 import { routeBotReply } from "./group-routing.js";
+import { decideTaskOutcome } from "./task-outcome.js";
 import { modelBelongsToConnection } from "../shared/provider-config.js";
 import { toolAvailability } from "./tool-availability.js";
 import { CommunitySkills } from "./community-skills.js";
 import { UsageEvidenceAccumulator, type UsageAttempt } from "./usage-ledger.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
-import { ExecutionMeter, executionLimits, executionStopMessage, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
+import { ExecutionMeter, executionLimits, executionStopMessage, WEEKLY_BUDGET_STEP_RESERVE, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
+import { opencodeCompatibility, RUNTIME_INCOMPATIBLE_MESSAGE, type RuntimeCompatibility } from "./runtime-compatibility.js";
 import { ModelOutput } from "./model-output.js";
 import { conversationBridge, MAX_REUSED_CONTEXT, reportedContextSize } from "./conversation-context.js";
 export { eventText, appendModelText } from "./model-output.js";
@@ -141,6 +143,8 @@ export interface OpenCodeRunnerOptions {
   attachments: AttachmentService;
   maxParallel?: number;
   limits?: ExecutionLimits;
+  // Gate 1a: injectable so tests and non-OpenCode runtimes are explicit.
+  runtimeCheck?: () => RuntimeCompatibility;
   // Allows real-process fault fixtures without invoking a model account.
   spawnProcess?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 }
@@ -149,6 +153,7 @@ export class OpenCodeRunner {
   private readonly running = new Map<string, ChildProcess>();
   private readonly restartQueue = new Set<string>();
   private readonly approvalPauses = new Set<string>();
+  private readonly faultStops = new Set<string>();
   private readonly processControls = new Map<string, { checkpoint: () => void; terminate: () => void }>();
   private readonly limits: ExecutionLimits;
   readonly instanceId = randomUUID();
@@ -194,6 +199,12 @@ export class OpenCodeRunner {
 
   isLeader() {
     return this.leader;
+  }
+
+  /** Gate 1a: arm a one-shot fault stop for a run. Called only from the
+   * staging-gated tester endpoint, and consumed exactly once by enforce(). */
+  injectFaultStop(runId: string) {
+    this.faultStops.add(runId);
   }
 
   wake() {
@@ -324,6 +335,28 @@ export class OpenCodeRunner {
     this.options.onChange();
   }
 
+  /** S5-P01 / S4-P01: a stopped task may already have host-checked files on
+   * disk. Register them as partial results against the stop notice so the
+   * receipt, artifact list and recovery UI can retrieve the exact bytes
+   * without another model run. Best-effort; never blocks the stop. */
+  private async captureStoppedResult(run: Run, bot: Bot) {
+    try {
+      const fresh = this.options.db.getRun(run.id);
+      const paths = (fresh?.task.verificationChecks || [])
+        .filter((check) => check.source === "host" && check.label.startsWith("Text-file check: "))
+        .map((check) => check.label.slice("Text-file check: ".length).trim())
+        .filter(Boolean);
+      if (!paths.length) return;
+      const message = this.options.db.messageForRunEvent(run.id, "run_stopped");
+      if (!message) return;
+      const captured = await this.options.attachments.captureStoppedResult(bot, message, paths);
+      if (captured.length) {
+        this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "file", label: captured.length === 1 ? "Saved a partial result" : `Saved ${captured.length} partial results`, detail: `${captured.map((artifact) => artifact.name).join(", ")} — kept from before the stop; this is not a completed delivery.` });
+        this.options.onChange();
+      }
+    } catch { /* Partial capture is best-effort; the stop notice still stands. */ }
+  }
+
   private async tick() {
     if (this.ticking || !this.leader || this.stopping) return;
     this.ticking = true;
@@ -335,9 +368,12 @@ export class OpenCodeRunner {
         const run = this.options.db.claimNextQueuedRun(excludedBotIds, this.instanceId);
         if (!run || this.running.has(run.id)) break;
         if (this.enforceJobBudget(run.id)) continue;
-        const budget = this.options.db.budgetAvailable(run.botId);
+        // S3-P03: reserve roughly one bounded model step before dispatch so
+        // a run that cannot afford another step is blocked before any model
+        // process starts — never after unreserved usage has landed.
+        const budget = this.options.db.budgetAvailable(run.botId, WEEKLY_BUDGET_STEP_RESERVE);
         if (!budget.allowed) {
-          const error = `Weekly token limit reached (${budget.used.toLocaleString()} of ${budget.budget.toLocaleString()}) in OpenBot. Your provider allowance is separate. Review teammate settings, choose another teammate, or wait for usage to leave the seven-day window.`;
+          const error = `Weekly token limit reached (${budget.used.toLocaleString()} of ${budget.budget.toLocaleString()} tokens accounted) in OpenBot — only ${Math.max(0, budget.remaining).toLocaleString()} remain, less than one bounded model step (~${WEEKLY_BUDGET_STEP_RESERVE.toLocaleString()} tokens) can be reserved, so no model was started. Provider usage is reported after each step, so the allowance applies to accounted usage. Your provider allowance is separate. Review teammate settings, choose another teammate, or wait for usage to leave the seven-day window.`;
           this.failBeforeStart(run, error, "Paused by budget");
           continue;
         }
@@ -409,11 +445,23 @@ export class OpenCodeRunner {
     const workspace = prepareWorkspace(this.options.db, bot, Boolean(run.expectedWorkKind));
     const sharedFiles = prepareConsultationFiles(this.options.db, run);
     const useClaude = provider?.runtime === "claude_code";
+    // Gate 1a: an unverified runtime fails closed for model execution only.
+    if (!useClaude) {
+      const compatibility = (this.options.runtimeCheck || opencodeCompatibility)();
+      if (compatibility.compatibility !== "verified") {
+        this.failBeforeStart(run, `${RUNTIME_INCOMPATIBLE_MESSAGE} Detected: ${compatibility.detectedVersion || "unknown"} (${compatibility.compatibility}).`, "Runtime not verified");
+        return;
+      }
+    }
     const capabilityFingerprint = this.options.db.botSessionFingerprint(bot.id) + `:execution-model:${model}:pdf-text-v2` + (run.expectedWorkKind ? `:workflow:${run.expectedWorkKind}` : "");
     const sessionChoice = this.options.db.taskSession(run.id, capabilityFingerprint, MAX_REUSED_CONTEXT);
     const previousSession = sessionChoice.sessionId;
     const task = this.options.db.startRunTask(run.id);
-    this.options.db.updateRun(run.id, { status: "running", startedAt: new Date().toISOString(), progressAt: new Date().toISOString(), partialText: "", taskStage: task?.stage || "planning" });
+    // S5/Hero audit: keep the logical task start immutable across
+    // consultations, approvals and resumes. Preserve the first segment's
+    // startedAt so the receipt's total duration spans the whole task, not
+    // just the last resumed segment.
+    this.options.db.updateRun(run.id, { status: "running", ...(run.startedAt ? {} : { startedAt: new Date().toISOString() }), progressAt: new Date().toISOString(), partialText: "", taskStage: task?.stage || "planning" });
     this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Woke up", detail: `Using ${model.replace(/^(opencode|claude-code)\//, "")}${model !== bot.model ? " · coding model" : ""}` });
     if (sessionChoice.reason === "fresh_working_context") this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Refreshed working context", detail: "Conversation and files kept. Starting this new request with bounded recent context instead of the old tool transcript." });
     this.options.onChange();
@@ -476,6 +524,20 @@ export class OpenCodeRunner {
     };
     const enforce = () => {
       if (stoppedFor || this.stopping) return;
+      // Gate 1a: a QA-armed fault injects a bounded stop through the normal
+      // failure path (source=tester_fault), so recovery behaves as usual.
+      if (this.faultStops.has(run.id)) {
+        this.faultStops.delete(run.id);
+        stoppedFor = "tester_fault";
+        checkpoint();
+        const faultError = executionStopMessage.tester_fault;
+        this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: faultError, partialText: responseText || null });
+        this.options.db.finishRunTask(run.id, "failed", faultError);
+        this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Tester fault injected", detail: "source=tester_fault · after_verified_artifact" });
+        terminate();
+        this.options.onChange();
+        return;
+      }
       if (this.enforceJobBudget(run.id)) return;
       const currentStatus = this.options.db.getRun(run.id)?.status;
       if (currentStatus === "cancelled" || currentStatus === "failed") { terminate(); return; }
@@ -569,6 +631,7 @@ export class OpenCodeRunner {
       };
       if (stoppedFor) {
         this.options.db.updateRun(run.id, finalUsage);
+        void this.captureStoppedResult(run, bot);
         this.shareChildOutcome(run, bot, `I could not finish the private consultation: ${executionStopMessage[stoppedFor]}`, true);
       } else if (current?.status === "failed") {
         // A shared budget or another host guard already decided the outcome.
@@ -632,9 +695,36 @@ export class OpenCodeRunner {
         } else {
           const message = this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id, replyToId: run.triggerMessageId || undefined });
           try {
+            // Host-generated evidence (usage ledger, work reports, code checks)
+            // is not the requested business deliverable. Keep it as evidence,
+            // but never let it satisfy a file-delivery requirement.
             const workArtifacts = await this.options.attachments.captureWorkReports(message);
-            const artifacts = [...workArtifacts, ...await this.options.attachments.captureArtifacts(bot, message, summary)];
+            const userArtifacts = await this.options.attachments.captureArtifacts(bot, message, summary);
+            // A host-checked workspace file is a real deliverable even when the
+            // model's prose did not link it (e.g. checkpoint.json). Register it.
+            const fresh = this.options.db.getRun(run.id);
+            const checkedPaths = (fresh?.task.verificationChecks || [])
+              .filter((check) => check.source === "host" && check.label.startsWith("Text-file check: "))
+              .map((check) => check.label.slice("Text-file check: ".length).trim())
+              .filter(Boolean);
+            const checkedArtifacts = checkedPaths.length ? await this.options.attachments.captureStoppedResult(bot, message, checkedPaths, false) : [];
+            const artifacts = [...workArtifacts, ...userArtifacts, ...checkedArtifacts];
             if (artifacts.length) this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "file", label: artifacts.length === 1 ? "Prepared your result file" : `Prepared ${artifacts.length} result files`, detail: artifacts.map((artifact) => artifact.name).join(", ") });
+            // OB-02: ending the process is not delivering the task. Decide the
+            // outcome from host records only: what was delivered and what was
+            // verified — never from the model's own claims about its answer.
+            const decided = decideTaskOutcome({
+              prompt: run.prompt,
+              deliveredArtifacts: userArtifacts.length + checkedArtifacts.length,
+              deliveredReports: reports.length,
+              verificationStatus: fresh?.task.verificationStatus ?? null,
+            });
+            if (decided.outcome) {
+              this.options.db.updateRun(run.id, { outcome: decided.outcome, ...(decided.error ? { error: decided.error } : {}) });
+              if (decided.outcome === "blocked") {
+                this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Blocked: no result from the inputs", detail: decided.error });
+              }
+            }
           } catch { /* A finished answer remains useful even if a result card cannot be prepared. */ }
           try {
             // Group discipline: a published reply may pull @named teammates
@@ -650,6 +740,7 @@ export class OpenCodeRunner {
         this.options.db.updateRun(run.id, { ...finalUsage, status: "failed", finishedAt, error, partialText: responseText || null });
         this.options.db.finishRunTask(run.id, "failed", error);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Couldn’t finish", detail: error });
+        void this.captureStoppedResult(run, bot);
         this.shareChildOutcome(run, bot, `I could not finish the private consultation: ${error}`, true);
       }
       this.options.onChange();
