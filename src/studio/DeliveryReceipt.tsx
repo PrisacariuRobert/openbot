@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, ShieldCheck, FileText, Download } from "lucide-react";
+import { Character } from "./Character";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
 
@@ -14,6 +15,7 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
   const kids = childRuns || [];
   const reviewed = kids.filter((r) => r.status === "completed");
   const reviewing = kids.filter((r) => !["completed", "failed", "cancelled"].includes(r.status));
+  const faceOf = (botId: string) => (teammates || []).find((b) => b.id === botId);
   const hosts = run.task.verificationChecks.filter((c) => c.source === "host");
   const checksLabel = run.task.verificationStatus === "passed"
     ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
@@ -21,9 +23,14 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
     <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}>
       <p className="delivery-strip">
         {reviewed.length > 0
-          ? <><Check size={13} /><span>Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
+          ? <><span className="delivery-faces">{reviewed.map((r) => {
+              const bot = faceOf(r.botId);
+              return bot
+                ? <Character key={r.id} name={bot.name} color={bot.color} variant={bot.mascot} size={22} />
+                : <Check key={r.id} size={13} />;
+            })}</span><span>Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
           : reviewing.length > 0
-            ? <span>{reviewing.map((r) => r.botName).join(", ")} {reviewing.length === 1 ? "is" : "are"} reviewing…</span>
+            ? <><i className="delivery-pulse" aria-hidden="true" /><span>{reviewing.map((r) => r.botName).join(", ")} {reviewing.length === 1 ? "is" : "are"} reviewing…</span></>
             : <span>Not yet reviewed</span>}
         <span aria-hidden="true">·</span>
         <span>{checksLabel}</span>
