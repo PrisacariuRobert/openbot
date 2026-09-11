@@ -21,7 +21,7 @@ function assertNoFalseFinishedAnswer(db: OpenBotDatabase, run: { id: string; thr
   assert.equal(messages.filter(message => message.senderType === "system" && message.eventType === "run_stopped").length, 1, "The host must report the failure once in the conversation");
 }
 
-function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expectedWorkKind?: "morning" | "inbox") {
+function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expectedWorkKind?: "morning" | "inbox", runtimeCheck?: () => { runtime: "opencode"; detectedVersion: string | null; compatibility: "verified" | "unsupported" | "unknown" }) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-execution-test-"));
   const db = new OpenBotDatabase(root);
   db.chooseInitialProvider("local-opencode", "opencode/muse-spark-1.2-contributor-free");
@@ -29,6 +29,7 @@ function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expected
   const runner = new OpenCodeRunner({
     db,
     internalToken: "fixture",
+    runtimeCheck: runtimeCheck || (() => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const })), 
     internalUrl: "http://127.0.0.1:1",
     onChange: () => {},
     attachments: new AttachmentService(db),
@@ -204,19 +205,42 @@ test(
 );
 
 test(
+  "a step reserve blocks dispatch before unreserved usage lands",
+  { timeout: 5000 },
+  async () => {
+    const f = fixture('console.log("must not spawn")');
+    try {
+      f.db.updateBot("nova", { weeklyTokenBudget: 100 });
+      f.runner["leader"] = true;
+      await f.runner["tick"]();
+      assert.equal(f.child(), undefined, "No model process may start without a reserved step");
+      const run = f.db.getRun(f.run.id)!;
+      assert.equal(run.status, "failed");
+      assert.match(run.error || "", /less than one bounded model step/);
+      assert.equal(run.inputTokens, 0, "Nothing was accounted because nothing was dispatched");
+      assert.equal(f.db.getBot("nova")?.tokensUsedThisWeek, 0);
+    } finally {
+      await f.close();
+    }
+  },
+);
+
+test(
   "a reported weekly budget overrun stops without posting a false success",
   { timeout: 5000 },
   async () => {
     const f = fixture(
-      'console.log(JSON.stringify({type:"step_finish",part:{id:"a",tokens:{input:110,output:5}}}));setInterval(()=>{},1000)',
+      'console.log(JSON.stringify({type:"step_finish",part:{id:"a",tokens:{input:7000,output:5}}}));setInterval(()=>{},1000)',
     );
     try {
-      f.db.updateBot("nova", { weeklyTokenBudget: 100 });
+      f.db.updateBot("nova", { weeklyTokenBudget: 20000 });
+      f.db.updateRun(f.run.id, { inputTokens: 14000 });
       const result = await f.start();
       assert.equal(result.status, "failed");
       assert.match(result.error || "", /weekly token limit/);
-      assert.equal(result.inputTokens, 110);
-      assert.equal(f.db.getBot("nova")?.tokensUsedThisWeek, 115);
+      assert.equal(result.inputTokens, 21000);
+      assert.equal(f.db.getBot("nova")?.tokensUsedThisWeek, 21005);
+      assertNoFalseFinishedAnswer(f.db, result);
     } finally {
       await f.close();
     }
@@ -537,5 +561,37 @@ test("only a matching saved report satisfies a starter's completion contract", a
     const finished = await f.start();
     assert.equal(finished.status, "completed");
     assert.equal(f.db.getState(finished.threadId).messages.filter((message) => message.runId === finished.id).length, 1);
+  } finally { await f.close(); }
+});
+
+test("an unverified runtime never spawns the model process", async () => {
+  const f = fixture('console.log("must not run")', {}, undefined, () => ({ runtime: "opencode", detectedVersion: "1.19.0", compatibility: "unsupported" }));
+  try {
+    f.runner["executeRun"](f.db.getRun(f.run.id)!);
+    assert.equal(f.child(), undefined, "no process may spawn under an unsupported runtime");
+    assert.equal(f.db.getRun(f.run.id)?.status, "failed");
+    assert.match(f.db.getRun(f.run.id)?.error || "", /runtime not verified/i);
+  } finally { await f.close(); }
+});
+
+test("an unknown runtime version also fails closed before spawning", async () => {
+  const f = fixture('console.log("must not run")', {}, undefined, () => ({ runtime: "opencode", detectedVersion: null, compatibility: "unknown" }));
+  try {
+    f.runner["executeRun"](f.db.getRun(f.run.id)!);
+    assert.equal(f.child(), undefined);
+    assert.match(f.db.getRun(f.run.id)?.error || "", /runtime not verified/i);
+  } finally { await f.close(); }
+});
+
+test("an armed tester fault stops the run through the normal failure path", { timeout: 5000 }, async () => {
+  const f = fixture('console.log(JSON.stringify({type:"text",text:"working"}));setInterval(()=>{},1000)');
+  try {
+    const done = f.start();
+    await once(f.child().stdout!, "data");
+    f.runner.injectFaultStop(f.run.id);
+    const result = await done;
+    assert.equal(result.status, "failed");
+    assert.match(result.error || "", /tester_fault/);
+    assertNoFalseFinishedAnswer(f.db, result);
   } finally { await f.close(); }
 });

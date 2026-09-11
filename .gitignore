@@ -1,6 +1,8 @@
 node_modules/
 dist/
+dist-staging/
 .openbot/
+.openbot-staging/
 .DS_Store
 *.log
 .env

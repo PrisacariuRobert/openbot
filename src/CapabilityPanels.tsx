@@ -4664,6 +4664,9 @@ export function BotPanel({
     setTimeout(() => setSaved(false), 1500);
   };
   const preview = { ...bot, mascot: form.mascot, color: form.color };
+  // S5-UX02: readiness must reflect the budget state, not claim "ready" for
+  // a teammate that cannot start another model step.
+  const budgetExhausted = bot.weeklyTokenBudget > 0 && bot.tokensUsedThisWeek >= bot.weeklyTokenBudget;
   return (
     <form className="bot-editor" onSubmit={submit}>
       <div
@@ -4677,7 +4680,9 @@ export function BotPanel({
             ? "Busy making progress"
             : bot.status === "waiting"
               ? "Patiently waiting for you"
-              : "Ready for something new"}
+              : budgetExhausted
+                ? `Paused — weekly budget reached (${compactNumber(bot.tokensUsedThisWeek)} of ${compactNumber(bot.weeklyTokenBudget)} tokens). Existing files stay available.`
+                : "Ready for something new"}
         </p>
         <div className="capability-pills">
           <span className={!form.computerEnabled ? "off" : ""}>
@@ -7106,7 +7111,7 @@ export function WorkReceipt({ runId }: { runId: string }) {
   }
   if (error) return <p className="work-receipt-missing">{error}</p>;
   if (!receipt) return <p className="work-receipt-missing">Assembling the receipt…</p>;
-  const status = receiptStatusLabels[receipt.status] || receipt.status;
+  const status = receipt.outcome === "blocked" ? "Blocked — no result" : receiptStatusLabels[receipt.status] || receipt.status;
   const duration = receipt.durationMs ? formatReceiptDuration(receipt.durationMs) : null;
   return (
     <article className="work-receipt" aria-label="Work receipt">
@@ -7114,7 +7119,7 @@ export function WorkReceipt({ runId }: { runId: string }) {
         <div className="work-receipt-title">
           <ShieldCheck size={17} aria-hidden />
           <h4>Work receipt</h4>
-          <span className={`work-receipt-status is-${receipt.status}`}>{status}</span>
+          <span className={`work-receipt-status is-${receipt.outcome === "blocked" ? "blocked" : receipt.status}`}>{status}</span>
           {duration && <span className="work-receipt-duration">{duration}</span>}
         </div>
         {(receipt.goal || receipt.deliverable) && (
@@ -7165,14 +7170,42 @@ export function WorkReceipt({ runId }: { runId: string }) {
         </section>
       )}
 
-      {receipt.artifacts.length > 0 && (
+      {receipt.inputs.length > 0 && (
         <section className="work-receipt-files">
-          <h5>Delivered</h5>
-          {receipt.artifacts.map((artifact, index) => (
+          <h5>Sources kept</h5>
+          {receipt.inputs.map((input, index) => (
+            <span className="work-receipt-file" key={index}>
+              <FileText size={14} aria-hidden />
+              <span>{input.name}</span>
+            </span>
+          ))}
+        </section>
+      )}
+
+      <section className="work-receipt-files">
+        <h5>{receipt.status === "completed" && receipt.outcome !== "blocked" ? "Delivered" : "Saved (partial)"}</h5>
+        {receipt.artifacts.filter((artifact) => artifact.classification !== "evidence").length > 0 ? receipt.artifacts.filter((artifact) => artifact.classification !== "evidence").map((artifact, index) => (
+          <a className="work-receipt-file" key={index} href={artifact.url || "#"} target="_blank" rel="noreferrer">
+            <FileText size={14} aria-hidden />
+            <span>{artifact.name}</span>
+            {artifact.revision > 1 && <span className="work-receipt-dim">v{artifact.revision}</span>}
+          </a>
+        )) : (
+          <p className="work-receipt-missing">
+            {receipt.status === "completed" && receipt.outcome !== "blocked"
+              ? "No result files are registered for this task."
+              : "No result files are registered for this task. Any sources listed above are kept; no output has been delivered."}
+          </p>
+        )}
+      </section>
+
+      {receipt.artifacts.some((artifact) => artifact.classification === "evidence") && (
+        <section className="work-receipt-files">
+          <h5>Evidence</h5>
+          {receipt.artifacts.filter((artifact) => artifact.classification === "evidence").map((artifact, index) => (
             <a className="work-receipt-file" key={index} href={artifact.url || "#"} target="_blank" rel="noreferrer">
               <FileText size={14} aria-hidden />
               <span>{artifact.name}</span>
-              {artifact.revision > 1 && <span className="work-receipt-dim">v{artifact.revision}</span>}
             </a>
           ))}
         </section>

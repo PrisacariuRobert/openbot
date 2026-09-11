@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { strFromU8, unzipSync } from "fflate";
@@ -12,6 +12,25 @@ import type { OpenBotDatabase } from "./database.js";
 import { renderCodeBenchmark, type CodeBenchmark } from "../shared/code-benchmark.js";
 import { usageLedger, usageLedgerMarkdown } from "./usage-ledger.js";
 import type { CodeDeliveryReceipt } from "./code-delivery.js";
+
+/** Content identity for revision semantics: identical bytes must not create a
+ * new content revision, only a provenance event. Returns null when unreadable. */
+async function fileSha256(filePath: string): Promise<string | null> {
+  try { return createHash("sha256").update(await readFile(filePath)).digest("hex"); } catch { return null; }
+}
+
+export type ArtifactClassification = "deliverable" | "evidence" | "internal";
+
+/** Gate 1: classification is explicit creation-time metadata, not a filename
+ * convention. Prefix/name inference is only a legacy fallback. */
+export function withClassification<T extends AttachmentAnalysis>(analysis: T, classification: ArtifactClassification): T {
+  return { ...analysis, metadata: { ...(analysis.metadata || {}), classification } };
+}
+
+export function attachmentClassification(attachment: Pick<Attachment, "metadata" | "name">): ArtifactClassification {
+  const value = attachment.metadata?.classification;
+  return value === "deliverable" || value === "evidence" || value === "internal" ? value : (/usage|checks|delivery|benchmark|work-report/i.test(attachment.name) ? "evidence" : "deliverable");
+}
 
 const codeDeliveryCaptures = new Map<string, Promise<Attachment | null>>();
 const receiptText = (value: string) => value.replace(/[\r\n]+/g, " ").replace(/[\\`*_{}\[\]<>]/g, "\\$&");
@@ -368,7 +387,62 @@ export class AttachmentService {
       await copyFile(source, destination);
       const analysis = await inspectAttachment(destination, name, extensionMime[path.extname(name).toLowerCase()] || "application/octet-stream");
       const artifactKey = `${bot.id}:${path.relative(workspace, source)}`, previous = this.db.latestArtifact(message.threadId, artifactKey);
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: analysis.detectedMime, size: info.size, storagePath: destination, analysis, source: "artifact", artifactKey, revision: (previous?.revision || 0) + 1, replacesAttachmentId: previous?.id || null }));
+      const prior = previous ? this.db.getAttachment(previous.id) : null;
+      if (prior && prior.messageId === message.id) continue;
+      if (prior) {
+        const priorFile = this.db.attachmentFile(prior.id);
+        const [newHash, oldHash] = await Promise.all([fileSha256(source), priorFile ? fileSha256(priorFile.storagePath) : Promise.resolve(null)]);
+        if (newHash && oldHash && newHash === oldHash) {
+          if (message.runId) this.db.addActivity({ runId: message.runId, botId: bot.id, kind: "file", label: "Referenced the same result", detail: `${prior.name} · v${prior.revision} · sha256 ${newHash.slice(0, 12)} unchanged` });
+          captured.push(prior);
+          continue;
+        }
+      }
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: analysis.detectedMime, size: info.size, storagePath: destination, analysis: withClassification(analysis, "deliverable"), source: "artifact", artifactKey, revision: (previous?.revision || 0) + 1, replacesAttachmentId: previous?.id || null }));
+    }
+    return captured;
+  }
+
+  /** Register host-checked workspace files as PARTIAL result cards when a
+   * task stops before final delivery (budget/limit/error). These bytes are
+   * already on disk and were host-verified; exposing them is retrieval, not
+   * new model work. Outcome stays failed/blocked — this never reads as a
+   * successful delivery. S5-P01 / S4-P01. */
+  async captureStoppedResult(bot: Bot, message: Message, paths: string[], partial = true): Promise<Attachment[]> {
+    const workspace = await realpath(path.join(this.db.workspacesDir, bot.id));
+    const captured: Attachment[] = [];
+    for (const raw of paths.slice(0, MAX_ARTIFACTS)) {
+      if (captured.length >= MAX_ARTIFACTS) break;
+      const relative = raw.startsWith("/workspace/") ? raw.slice("/workspace/".length) : raw;
+      const proposed = path.isAbsolute(relative) ? relative : path.resolve(workspace, relative);
+      let source: string;
+      try { source = await realpath(proposed); } catch { continue; }
+      if (!(source === workspace || source.startsWith(`${workspace}${path.sep}`)) || source.includes(`${path.sep}inbox${path.sep}`)) continue;
+      const info = await stat(source);
+      if (!info.isFile() || info.size <= 0 || info.size > MAX_FILE_BYTES) continue;
+      const name = path.basename(source), id = randomBytes(16).toString("hex"), directory = path.join(this.db.attachmentsDir, id), destination = path.join(directory, name);
+      await mkdir(directory, { recursive: true });
+      await copyFile(source, destination);
+      const analysis = await inspectAttachment(destination, name, extensionMime[path.extname(name).toLowerCase()] || "application/octet-stream");
+      const artifactKey = `${bot.id}:${path.relative(workspace, source)}`, previous = this.db.latestArtifact(message.threadId, artifactKey);
+      const prior = previous ? this.db.getAttachment(previous.id) : null;
+      // Already captured for this same message (e.g. linked in the summary):
+      // do not add a duplicate revision for the same delivery event.
+      if (prior && prior.messageId === message.id) continue;
+      // Same bytes as the previous revision: no content revision bump, just a
+      // provenance reference. Content revisions change only on real edits.
+      if (prior) {
+        const priorFile = this.db.attachmentFile(prior.id);
+        const [newHash, oldHash] = await Promise.all([fileSha256(source), priorFile ? fileSha256(priorFile.storagePath) : Promise.resolve(null)]);
+        if (newHash && oldHash && newHash === oldHash) {
+          captured.push(prior);
+          continue;
+        }
+      }
+      const labelled: AttachmentAnalysis = partial
+        ? { ...analysis, summary: `Partial result — the task stopped before final delivery. Host check scope only.${analysis.summary ? ` ${analysis.summary}` : ""}` }
+        : analysis;
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: analysis.detectedMime, size: info.size, storagePath: destination, analysis: withClassification(labelled, "deliverable"), source: "artifact", artifactKey, revision: (previous?.revision || 0) + 1, replacesAttachmentId: previous?.id || null }));
     }
     return captured;
   }
@@ -390,7 +464,7 @@ export class AttachmentService {
       const destination = path.join(directory, name);
       await writeFile(destination, content, { flag: "wx", mode: 0o600 });
       const analysis = await inspectAttachment(destination, name, "text/markdown");
-      return this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey, revision: 1 });
+      return this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey, revision: 1 });
     })();
     codeDeliveryCaptures.set(lockKey, capture);
     try { return await capture; }
@@ -407,7 +481,7 @@ export class AttachmentService {
       const destination = path.join(directory, name);
       await writeFile(destination, content, { flag: "wx", mode: 0o600 });
       const analysis = await inspectAttachment(destination, name, "text/markdown");
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `usage:${message.runId}`, revision: 1 }));
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey: `usage:${message.runId}`, revision: 1 }));
     }
     for (const snapshot of this.db.listWorkSnapshots(message.runId)) {
       const report = this.db.getWorkReport(snapshot.id);
@@ -418,7 +492,7 @@ export class AttachmentService {
       const destination = path.join(directory, name);
       await writeFile(destination, report.markdown, { flag: "wx", mode: 0o600 });
       const analysis = await inspectAttachment(destination, name, "text/markdown");
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(report.markdown), storagePath: destination, analysis, source: "artifact", artifactKey: `work-report:${snapshot.id}`, revision: 1 }));
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(report.markdown), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey: `work-report:${snapshot.id}`, revision: 1 }));
     }
     const delivery = this.db.extensionRecord<CodeDeliveryReceipt>("code-delivery", message.runId);
     if (delivery && delivery.botId === message.senderId && delivery.runId === message.runId) {
@@ -435,7 +509,7 @@ export class AttachmentService {
       const destination = path.join(directory, name);
       await writeFile(destination, content, { flag: "wx", mode: 0o600 });
       const analysis = await inspectAttachment(destination, name, "text/markdown");
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `code-benchmark:${message.runId}`, revision: 1 }));
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey: `code-benchmark:${message.runId}`, revision: 1 }));
     }
     if (checks.length) {
       const name = "code-checks.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
@@ -444,7 +518,7 @@ export class AttachmentService {
       const destination = path.join(directory, name);
       await writeFile(destination, content, { flag: "wx", mode: 0o600 });
       const analysis = await inspectAttachment(destination, name, "text/markdown");
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis, source: "artifact", artifactKey: `code-checks:${message.runId}`, revision: 1 }));
+      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey: `code-checks:${message.runId}`, revision: 1 }));
     }
     return captured;
   }

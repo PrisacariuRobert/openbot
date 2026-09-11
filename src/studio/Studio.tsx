@@ -61,6 +61,7 @@ import { useConversationDraft } from "./useConversationDraft";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
 import { DeliveryReceipt, DeliveredFile } from "./DeliveryReceipt";
+import { WorkReceipt } from "../CapabilityPanels";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { AppearanceEditor } from "./AppearanceEditor";
@@ -1884,6 +1885,7 @@ export function Studio() {
                 </div>
               )}
               <DeliveryReceipt run={detail.run} />
+              <WorkReceipt runId={detail.run.id} />
               <button
                 className="primary full-width"
                 onClick={() => openThread(detail.run.threadId)}
