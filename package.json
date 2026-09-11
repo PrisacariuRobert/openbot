@@ -47,6 +47,7 @@
     "benchmark:expenses": "tsx scripts/benchmark-expenses.ts",
     "benchmark:extensions": "tsx scripts/benchmark-extensions.ts",
     "benchmark:page-watch": "tsx scripts/benchmark-page-watch.ts",
+    "benchmark:repeat-loop": "tsx scripts/benchmark-repeat-loop.ts",
     "check": "tsc --noEmit",
     "check:acceptance": "tsc --noEmit -p tsconfig.acceptance.json",
     "check:ios": "node scripts/check-ios.mjs",
