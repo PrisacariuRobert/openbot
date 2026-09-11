@@ -97,7 +97,8 @@ test("host mediation denies sibling/ambient access and allows own mediated file 
 });
 
 const ESCAPE_RUNTIME = `#!${process.execPath}
-const fs = require('node:fs'), path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
 const endpoint = process.env.OPENBOT_INTERNAL_URL, runId = process.env.OPENBOT_RUN_ID;
 const alphaCanary = process.env.OPENBOT_TEST_CANARY;
 const record = path.join(process.cwd(), '.gate1a-escape-' + runId + '.json');
@@ -120,7 +121,12 @@ main().catch((error) => { console.error(error.message); process.exitCode = 1; })
  * shell while macOS (no Docker) refused it — the test now pins the stronger
  * property on every host with a container runtime. */
 test("computer-on shell cannot leak a sibling workspace through absolute paths", { timeout: 300_000 }, async () => {
-  const root = mkdtempSync(path.join(tmpdir(), "openbot-computer-escape-"));
+  // Docker bind-mounts resolve inside the container host: the fixture must
+  // live under a Colima-shared path (the repo), never macOS /var/folders
+  // tmpdir, or container creation fails before the probe even runs.
+  const fixtureBase = path.resolve(import.meta.dirname, "../.openbot/runtime-tests");
+  mkdirSync(fixtureBase, { recursive: true });
+  const root = mkdtempSync(path.join(fixtureBase, "computer-escape-"));
   const db = new OpenBotDatabase(root);
   if (!(await new ComputerManager(db).available())) {
     console.log("SKIP: Docker is not running on this host; the container-escape check needs a real container.");
@@ -163,8 +169,12 @@ test("computer-on shell cannot leak a sibling workspace through absolute paths",
     const recordFile = path.join(db.workspacesDir, beta.id, `.gate1a-escape-${runId}.json`);
     let obs: Record<string, { status: number; body: string }> | null = null;
     for (let n = 0; n < 600 && !obs; n++) { if (existsSync(recordFile)) obs = JSON.parse(readFileSync(recordFile, "utf8")); else await delay(100); }
+    if (!obs) {
+      const runs = db.listRuns(beta.threadId).map((r) => ({ id: r.id.slice(0, 8), status: r.status, error: (r.error || "").slice(0, 200) }));
+      console.error("ESCAPE-DEBUG", JSON.stringify({ runs, log: log.slice(-800) }));
+    }
     assert.ok(obs, log || "runtime did not record observations");
-    assert.equal(obs!.proofOfExecution!.status, 200, "the shell must actually execute for this test to mean anything");
+    assert.equal(obs!.proofOfExecution!.status, 200, `the shell must actually execute for this test to mean anything: ${obs!.proofOfExecution!.body.slice(0, 500)}`);
     assert.ok(obs!.proofOfExecution!.body.includes("CONTAINED_OK"), "shell output must come back");
     assert.equal(obs!.siblingAbsoluteCat!.body.includes(canary), false, "sibling canary bytes must never return through the shell");
     assert.equal(readFileSync(canaryPath, "utf8").includes(canary), true, "origin canary unchanged");

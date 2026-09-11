@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle, Plus } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
+import { isFreeTierModel } from "../shared/provider-config";
 import { Character } from "./Character";
 import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
@@ -282,10 +283,14 @@ export function CreateTeammate({
             choices={(connection.models || []).map((item) => ({
               value: item,
               label: item,
+              detail: isFreeTierModel(item) ? "Free tier" : undefined,
             }))}
             onChange={setModel}
           />
         </div>
+      )}
+      {connection && isFreeTierModel(model) && (
+        <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
       )}
       <a
         className="text-action"

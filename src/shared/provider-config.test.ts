@@ -4,6 +4,7 @@ import {
   apiConnectionSchema,
   apiRuntimeEnvironment,
   configuredModels,
+  isFreeTierModel,
   modelBelongsToConnection,
   providerInput,
 } from "./provider-config.js";
@@ -152,4 +153,15 @@ test("passes endpoint and model configuration to the real runtime without puttin
     ),
     {},
   );
+});
+
+test("free-tier suffix detection names the tier without judging other models", () => {
+  assert.equal(isFreeTierModel("opencode/muse-spark-1.3-contributor-free"), true);
+  assert.equal(isFreeTierModel("opencode-go/mimo-v2.5-free"), true);
+  assert.equal(isFreeTierModel("custom/free"), true);
+  assert.equal(isFreeTierModel("opencode-go/deepseek-v4.1-flash"), false);
+  assert.equal(isFreeTierModel("opencode-go/glm-5.3-flash"), false);
+  assert.equal(isFreeTierModel("opencode-go/muse-spark-1.3-contributor"), false);
+  assert.equal(isFreeTierModel("local/freezer-model"), false);
+  assert.equal(isFreeTierModel(""), false);
 });

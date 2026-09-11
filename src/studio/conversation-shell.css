@@ -138,6 +138,92 @@
   text-align: left;
   border-radius: 11px;
 }
+/* Pin cell: the toggle overlays reserved space so rows never shift. */
+.conversation-cell { position: relative; }
+.conversation-cell > .conversation-row { padding-right: 32px; }
+.conversation-pin {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.conversation-cell:hover .conversation-pin,
+.conversation-cell:focus-within .conversation-pin,
+.conversation-pin[aria-pressed="true"] { opacity: 1; }
+.conversation-pin:hover { background: var(--hover); color: var(--ink); }
+.conversation-pin[aria-pressed="true"] { color: var(--ink); }
+.conversation-pin[aria-pressed="true"] svg { fill: currentColor; }
+/* Pinned teammates: an avatar zone above the list, not list chrome. Large
+ * living mascots, one tap to open, one tap on × to unpin. Pinned threads
+ * leave the scrolling list so the zone never duplicates it. */
+.pinned-zone { padding: 2px 12px 10px; }
+.pinned-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 2px 8px;
+}
+.pinned-avatars { display: flex; flex-wrap: wrap; gap: 14px 12px; }
+.pinned-avatar { position: relative; width: 60px; }
+.pinned-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.pinned-name {
+  font-size: 10px;
+  font-weight: 550;
+  color: var(--ink);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pinned-dot {
+  position: absolute;
+  top: 40px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent, #e0574f);
+  border: 2px solid var(--surface);
+}
+.pinned-unpin {
+  position: absolute;
+  top: -5px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.pinned-unpin:hover { color: var(--ink); border-color: var(--line-strong); }
 .sidebar-conversations > .conversation-row {
   padding: 14px 10px;
 }

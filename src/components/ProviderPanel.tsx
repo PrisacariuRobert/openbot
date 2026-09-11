@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ProviderIcon } from "../ProviderIcon";
 import {
+  isFreeTierModel,
   isLocalModelUrl,
   providerInput,
   type ProviderInput,
@@ -248,10 +249,13 @@ export function ProviderPanel({
             <label>Model
               <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
                 <option value="">Choose a model</option>
-                {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}
+                {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}{isFreeTierModel(model) ? " · Free tier" : ""}</option>)}
               </select>
             </label>
           </div>
+          {isFreeTierModel(initialModel) && (
+            <p className="ai-help">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+          )}
           <p className="ai-help">Uses your account’s limits or API billing. OpenBot will not silently switch providers. The first task checks actual model access.</p>
           <button className="button-primary" disabled={busy !== null || !initial?.connected || !initial?.models?.includes(initialModel)} onClick={() => void act("initial", () => onChooseInitial(initialConnection, initialModel))}>
             Use this AI for unconfigured teammates
@@ -577,12 +581,15 @@ export function ProviderPanel({
                       <option key={model} value={model}>
                         {modelLabel(model)}
                         {connection?.models?.includes(model)
-                          ? ""
+                          ? isFreeTierModel(model) ? " · Free tier" : ""
                           : " · unavailable"}
                       </option>
                     ))}
                   </select>
                 </label>
+                {isFreeTierModel(bot.model) && (
+                  <p className="ai-help">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+                )}
               </div>
             </div>
           );
