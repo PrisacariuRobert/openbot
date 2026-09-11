@@ -1619,9 +1619,6 @@ export function Studio() {
                             )}
                             <div className="prose">
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
-                              {message.senderType === "bot" && message.runId
-                                ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} />
-                                : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>
@@ -1629,6 +1626,9 @@ export function Studio() {
                                 </details>
                               )}
                             </div>
+                            {message.senderType === "bot" && message.runId
+                              ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} />
+                              : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                           </article>
                         );
                       })

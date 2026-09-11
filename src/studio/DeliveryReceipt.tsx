@@ -16,11 +16,13 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
   const reviewed = kids.filter((r) => r.status === "completed");
   const reviewing = kids.filter((r) => !["completed", "failed", "cancelled"].includes(r.status));
   const faceOf = (botId: string) => (teammates || []).find((b) => b.id === botId);
+  const author = (teammates || []).find((b) => b.id === run.botId);
   const hosts = run.task.verificationChecks.filter((c) => c.source === "host");
   const checksLabel = run.task.verificationStatus === "passed"
     ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
   return (
     <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}>
+      {author && <i className="delivery-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, transparent, ${author.color} 30%, ${author.color} 70%, transparent)` }} />}
       <p className="delivery-strip">
         {reviewed.length > 0
           ? <><span className="delivery-faces">{reviewed.map((r) => {
