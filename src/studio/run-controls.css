@@ -99,11 +99,11 @@
 .decision-facts > div { display: grid; grid-template-columns: minmax(88px, 128px) 1fr; gap: 10px; align-items: baseline; }
 .decision-facts dt { font-size: 12px; color: var(--muted, var(--secondary)); margin: 0; }
 .decision-facts dd { margin: 0; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; }
-.decision-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; }
-.decision-confirm { min-height: 48px; padding: 12px 18px; font-size: 16px; flex: 1; }
+.decision-actions { display: grid; gap: 4px; margin-top: 4px; }
+.decision-confirm { min-height: 52px; padding: 13px 18px; font-size: 16.5px; width: 100%; }
 .decision-decline {
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 8px 14px;
   border: 0;
   background: transparent;
   color: var(--muted, var(--secondary));
@@ -111,8 +111,22 @@
   font-size: 14px;
   cursor: pointer;
   border-radius: 9px;
+  justify-self: center;
 }
 .decision-decline:hover:not(:disabled) { color: var(--ink); }
+/* Task management is not part of the decision: quiet, separated, small. */
+.decision-stop { margin-top: 14px; }
+button.decision-stop-btn {
+  min-height: 0;
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted, var(--secondary));
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+button.decision-stop-btn:hover:not(:disabled) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .run-control-actions button,
 .run-stop {
   min-height: 38px;

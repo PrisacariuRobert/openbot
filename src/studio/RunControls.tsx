@@ -294,14 +294,16 @@ export function RunControls({
         </div>
       )}
       {canStop && (
-        <button
-          type="button"
-          className="run-stop"
-          disabled={busy || needsRefresh || Boolean(notice)}
-          onClick={() => void act("cancel")}
-        >
-          Stop this task
-        </button>
+        <div className="decision-stop">
+          <button
+            type="button"
+            className="decision-stop-btn"
+            disabled={busy || needsRefresh || Boolean(notice)}
+            onClick={() => void act("cancel")}
+          >
+            Stop this task
+          </button>
+        </div>
       )}
       {busy && <p role="status">Updating…</p>}
       {notice && <p role="status">{notice}</p>}
