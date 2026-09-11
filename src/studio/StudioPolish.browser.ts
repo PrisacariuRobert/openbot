@@ -82,6 +82,11 @@ const browser = await chromium.launch({
     process.env.OPENBOT_CHROME_PATH ||
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   headless: true,
+  // Same platform-neutral text rendering as test-new-studio (OB-01): LCD
+  // (subpixel) antialiasing paints colored fringes on every glyph edge that
+  // the mascot-chroma check would mistake for design color. Grayscale
+  // fringes stay invisible to the check; real violations still fail.
+  args: ["--disable-lcd-text"],
 });
 const output = "/tmp/openbot-studio-polish-qa";
 mkdirSync(output, { recursive: true });
