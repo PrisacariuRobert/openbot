@@ -89,11 +89,16 @@ import { verifyTaskChecks } from "./verification-evidence.js";
 import { approvalPreview } from "../shared/approval-preview.js";
 import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
+import { readFrontendIdentity, resolveSourceIdentity } from "./source-identity.js";
+import { opencodeCompatibility } from "./runtime-compatibility.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appVersion = String(JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version);
+// Gate 1a provenance: the serving process reports which source checkout it
+// runs from (launch-injected commit first, own git checkout as fallback).
+const sourceIdentity = resolveSourceIdentity(rootDir);
 if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const deployment = readDeploymentConfig(process.env, { port, production: process.env.NODE_ENV === "production" });
@@ -205,8 +210,17 @@ app.use("/api", (request, response, next) => {
 
 app.get("/api/healthz", (_request, response) => {
   const health = runnerPayload(db.getRunnerHealth());
+  const compatibility = opencodeCompatibility();
   response.setHeader("Cache-Control", "no-store");
-  response.status(health.status === "online" ? 200 : 503).json({ ok: health.status === "online", runner: health.status, deployment: health.deployment?.mode, version: appVersion });
+  response.status(health.status === "online" ? 200 : 503).json({
+    ok: health.status === "online",
+    runner: health.status,
+    deployment: health.deployment?.mode,
+    version: appVersion,
+    source: sourceIdentity,
+    frontend: frontendIdentity,
+    runtime: { name: "opencode", version: compatibility.detectedVersion, compatibility: compatibility.compatibility },
+  });
 });
 
 function loopback(request: express.Request) {
@@ -3688,6 +3702,8 @@ const pageWatchTimer = setInterval(() => { void pageWatches.poll().then((changed
 pageWatchTimer.unref();
 
 const distDir = process.env.OPENBOT_DIST_DIR ? path.resolve(process.env.OPENBOT_DIST_DIR) : path.join(rootDir, "dist");
+// Served-build identity, derived from the actual distDir contents at startup.
+const frontendIdentity = readFrontendIdentity(distDir);
 // An older host must not disguise an unavailable API as a successful HTML page.
 app.use((error: unknown, _request: express.Request, response: express.Response, next: express.NextFunction) => {
   if (error instanceof WorkflowCheckError) return response.status(409).json({ error: error.message, code: "workflow_check_required" });
