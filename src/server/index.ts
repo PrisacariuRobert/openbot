@@ -61,6 +61,7 @@ import { collectOwnerSessionCookies, openInOwnersChrome } from "./own-browser-br
 import { reviewSignInRequest } from "./sign-in-review.js";
 import { applyProfileImport, previewProfileImport } from "./profile-import.js";
 import { proposeSkillFromRun } from "./skill-proposals.js";
+import { requestRunReview } from "./run-review.js";
 import { parseAuthoredSkill } from "./skill-authoring.js";
 import { learningCommandDirection, skillStartingUrlSchema } from "../shared/skill-authoring.js";
 import { TEAM_TEMPLATES, teamTemplate } from "./team-templates.js";
@@ -1781,6 +1782,18 @@ app.post("/api/runs/:id/skill-draft", async (request, response) => {
     return response.json(await proposeSkillFromRun(db, browser, request.params.id));
   } catch (error) {
     return response.status(409).json({ error: error instanceof Error ? error.message : "The skill draft could not be saved." });
+  }
+});
+
+// Owner-tapped independent review from a finished result card. The host
+// spawns the reviewer child run; the author's prose can never start one.
+app.post("/api/runs/:id/review", async (request, response) => {
+  try {
+    const parsed = z.object({ reviewerBotId: z.string().trim().min(1).max(200) }).strict().safeParse(request.body);
+    if (!parsed.success) return response.status(400).json({ error: "Choose a teammate to review this result." });
+    return response.json(await requestRunReview(db, request.params.id, parsed.data.reviewerBotId));
+  } catch (error) {
+    return response.status(409).json({ error: error instanceof Error ? error.message : "The review could not start." });
   }
 });
 

@@ -1544,7 +1544,7 @@ export function Studio() {
                             <div className="prose">
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
                               {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}
-                              {message.senderType === "bot" && <DeliveryReceipt run={state.runs.find((run) => run.id === message.runId)} />}
+                              {message.senderType === "bot" && <DeliveryReceipt run={state.runs.find((run) => run.id === message.runId)} teammates={state.bots} />}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>
@@ -1884,7 +1884,7 @@ export function Studio() {
                   <ReactMarkdown>{detail.run.summary}</ReactMarkdown>
                 </div>
               )}
-              <DeliveryReceipt run={detail.run} />
+              <DeliveryReceipt run={detail.run} teammates={state?.bots} />
               <WorkReceipt runId={detail.run.id} />
               <button
                 className="primary full-width"

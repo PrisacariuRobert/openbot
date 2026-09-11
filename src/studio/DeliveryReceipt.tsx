@@ -1,19 +1,62 @@
+import { useEffect, useState } from "react";
 import { Check, ShieldCheck, FileText, Download } from "lucide-react";
-import type { Attachment, Run } from "../shared/types";
+import type { Attachment, Bot, Run } from "../shared/types";
 import "./delivery-receipt.css";
 
-export function DeliveryReceipt({ run }: { run?: Run }) {
+export function DeliveryReceipt({ run, teammates }: { run?: Run; teammates?: Bot[] }) {
+  const [picking, setPicking] = useState(false);
+  const [choice, setChoice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { setPicking(false); setChoice(""); setNotice(""); setError(""); }, [run?.id]);
   if (!run || run.status !== "completed" || !run.task.tracked) return null;
   const task = run.task, checks = task.verificationChecks;
   const hosts = checks.filter((check) => check.source === "host");
   const passed = task.verificationStatus === "passed";
   const label = passed ? hosts.length === checks.length && checks.length > 0 ? "Recorded checks passed" : hosts.length ? "Some checks passed" : "Checks reported by teammate" : task.verificationStatus === "partial" ? "Finished with a note" : "Result delivered";
-  return <details className="delivery-receipt"><summary><ShieldCheck size={15} /><span>{label}</span></summary>
+  const candidates = (teammates || []).filter((bot) => bot.id !== run.botId && !bot.retiredAt);
+  async function askReviewer() {
+    if (!choice || busy) return;
+    setBusy(true); setNotice(""); setError("");
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(run!.id)}/review`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewerBotId: choice }),
+      });
+      const result = await response.json() as { reviewerName?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || "The review could not start.");
+      setPicking(false);
+      setNotice(`${result.reviewerName || "A teammate"} is reviewing this result — follow it in Activity. The review joins this receipt.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The review could not start.");
+    } finally { setBusy(false); }
+  }
+  return <>
+  <details className="delivery-receipt"><summary><ShieldCheck size={15} /><span>{label}</span></summary>
     {task.verificationSummary && <p>Teammate summary: {task.verificationSummary}</p>}
     {hosts.length > 0 && <p>OpenBot checked only the evidence described below. A file check does not verify every claim in the result.</p>}
     <ul>{checks.map((check, index) => <li key={index}><Check size={13} opacity={check.passed ? 1 : .35} /><div><strong>{check.label}</strong><small>{check.source === "host" ? "Host check" : "Teammate report"} · {check.passed ? "Passed" : "Not confirmed"}{check.detail ? ` · ${check.detail}` : ""}</small></div></li>)}</ul>
     {task.steps.length > 0 && <p className="delivery-progress">{task.steps.filter((step) => step.status === "completed").length} of {task.steps.length} steps completed.</p>}
-  </details>;
+  </details>
+  {candidates.length > 0 && !notice && (
+    picking ? <div className="delivery-review">
+      <label>Ask a teammate to check this result
+        <select aria-label="Teammate to review this result" value={choice} disabled={busy} onChange={(event) => setChoice(event.target.value)}>
+          <option value="">Choose a reviewer</option>
+          {candidates.map((bot) => <option key={bot.id} value={bot.id}>{bot.name} — {bot.role}</option>)}
+        </select>
+      </label>
+      <div className="delivery-review-actions">
+        <button type="button" className="primary" disabled={!choice || busy} onClick={() => void askReviewer()}>{busy ? "Asking…" : "Ask for a review"}</button>
+        <button type="button" className="text-action" disabled={busy} onClick={() => { setPicking(false); setChoice(""); setError(""); }}>Not now</button>
+      </div>
+      {error && <p role="alert">{error}</p>}
+    </div>
+    : <button type="button" className="text-action delivery-review-cta" onClick={() => { setPicking(true); setError(""); }}><ShieldCheck size={14} /> Have another teammate check this</button>
+  )}
+  {notice && <p role="status" className="delivery-review-note">{notice}</p>}
+  </>;
 }
 
 export function DeliveredFile({ file }: { file: Attachment }) {
