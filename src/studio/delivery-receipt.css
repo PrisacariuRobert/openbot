@@ -9,7 +9,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
-.delivery-accent { display: block; height: 3px; margin: 0 -16px; opacity: 0.9; }
+.delivery-accent { display: block; height: 4px; margin: 0 -16px; }
 .delivery-card .delivered-file { margin-top: 0; border: 0; border-radius: 12px; background: var(--surface-muted, var(--hover)); }
 .delivery-strip {
   display: flex;
@@ -23,7 +23,9 @@
 .delivery-strip span[aria-hidden="true"] { color: var(--muted); font-weight: 400; }
 .delivery-strip > span:last-child { color: var(--muted); font-weight: 500; }
 .delivery-faces { display: inline-flex; align-items: center; }
-.delivery-faces > * + * { margin-left: -7px; }
+.delivery-faces > * + * { margin-left: -9px; }
+.delivery-faces > * { box-shadow: 0 0 0 2px var(--surface); border-radius: 50%; }
+.delivery-strip-text { font-size: 14px; }
 .delivery-pulse {
   width: 7px;
   height: 7px;
@@ -83,3 +85,11 @@
 .delivered-file details { padding: 12px 14px; border-top: 1px solid var(--line); }
 .delivered-file summary { font-size: 12px; cursor: pointer; }
 .delivered-file pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+
+/* The download is the point of a delivery: a real button, not a ghost icon.
+ * Kept last with card-qualified selectors so it always beats the generic
+ * attachment rules above regardless of source order. */
+.delivery-card section.delivered-file a.message-file { background: var(--strong); border-radius: 14px; padding: 13px 16px; gap: 12px; }
+.delivery-card section.delivered-file a.message-file strong { color: var(--on-strong); }
+.delivery-card section.delivered-file a.message-file small { color: var(--on-strong); opacity: 0.72; }
+.delivery-card section.delivered-file a.message-file svg { color: var(--on-strong); flex: none; }

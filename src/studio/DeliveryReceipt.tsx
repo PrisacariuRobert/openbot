@@ -21,16 +21,20 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
   const checksLabel = run.task.verificationStatus === "passed"
     ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
   return (
-    <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}>
-      {author && <i className="delivery-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, transparent, ${author.color} 30%, ${author.color} 70%, transparent)` }} />}
+    <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}
+      style={author ? { background: `color-mix(in srgb, ${author.color} 6%, var(--surface))` } : undefined}>
+      {author && <i className="delivery-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${author.color}, ${author.color} 40%, transparent)` }} />}
       <p className="delivery-strip">
         {reviewed.length > 0
-          ? <><span className="delivery-faces">{reviewed.map((r) => {
-              const bot = faceOf(r.botId);
-              return bot
-                ? <Character key={r.id} name={bot.name} color={bot.color} variant={bot.mascot} size={22} />
-                : <Check key={r.id} size={13} />;
-            })}</span><span>Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
+          ? <><span className="delivery-faces">
+              {author && <Character name={author.name} color={author.color} variant={author.mascot} size={30} />}
+              {reviewed.map((r) => {
+                const bot = faceOf(r.botId);
+                return bot
+                  ? <Character key={r.id} name={bot.name} color={bot.color} variant={bot.mascot} size={24} />
+                  : <Check key={r.id} size={13} />;
+              })}
+            </span><span className="delivery-strip-text">Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
           : reviewing.length > 0
             ? <><i className="delivery-pulse" aria-hidden="true" /><span>{reviewing.map((r) => r.botName).join(", ")} {reviewing.length === 1 ? "is" : "are"} reviewing…</span></>
             : <span>Not yet reviewed</span>}
