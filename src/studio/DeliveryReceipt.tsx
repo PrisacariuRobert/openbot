@@ -121,26 +121,30 @@ export function DeliveredFile({ file, artifact = false }: { file: Attachment; ar
   }
   const lines = (file.previewText || "")
     .split(/\r?\n/)
-    .map((line) => line.replace(/[#*_`>|-]/g, " ").replace(/\s+/g, " ").trim())
+    .map((line) => line.replace(/[#*_`>]/g, " ").replace(/\s+/g, " ").trim())
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, 5);
+  const rows = lines.map((line) => {
+    const match = /^(.{1,34}?)\s*[:—·]\s+(.+)$/.exec(line);
+    return match ? { label: match[1], value: match[2].slice(0, 26) } : { label: line.slice(0, 40), value: "" };
+  });
   const image = file.kind === "image" && file.previewUrl;
   const glyph = file.kind === "spreadsheet" ? "XLSX" : file.kind === "presentation" ? "PPTX" : file.kind === "document" ? (file.mime.includes("pdf") ? "PDF" : "DOC") : file.kind === "archive" ? "ZIP" : "FILE";
+  const stamp = new Date(file.createdAt).toISOString().slice(0, 10);
   return <section className="delivered-file" aria-label={`File: ${file.name}`}>
-    <a className="artifact" href={file.url} target="_blank" rel="noreferrer">
-      <span className="artifact-sheet" aria-hidden="true">
+    <a className="ledger" href={file.url} target="_blank" rel="noreferrer">
+      <span className="ledger-head"><span>Result</span><span>{stamp}{file.revision > 1 ? ` · rev ${file.revision}` : ""}</span></span>
+      <span className="ledger-body">
         {image
-          ? <img src={file.previewUrl!} alt="" loading="lazy" />
-          : lines.length > 0
-            ? <span className="artifact-lines">{lines.map((line, index) => <span key={index} className={index === 0 ? "is-title" : ""}>{line.slice(0, 54)}</span>)}</span>
-            : <span className={`artifact-glyph is-${file.kind}`}>{glyph}</span>}
+          ? <span className="ledger-image"><img src={file.previewUrl!} alt="" loading="lazy" /></span>
+          : rows.length > 0
+            ? rows.map((row, index) => <span className={`ledger-line${index === 0 ? " is-lead" : ""}`} key={index}><span className="ledger-label">{row.label}</span>{row.value && <span className="ledger-value">{row.value}</span>}</span>)
+            : <span className="ledger-glyph">{glyph}</span>}
       </span>
-      <span className="artifact-caption">
-        <span className="artifact-text">
-          <strong>{file.name}</strong>
-          <small>{meta}</small>
-        </span>
-        <span className="artifact-open" aria-hidden="true"><Download size={15} /></span>
+      <span className="ledger-foot">
+        <span className="ledger-name">{file.name}</span>
+        <span className="ledger-meta">{meta}</span>
+        <span className="ledger-open" aria-hidden="true"><Download size={14} /></span>
       </span>
     </a>
     {file.summary && lines.length === 0 && <p>{file.summary}</p>}
