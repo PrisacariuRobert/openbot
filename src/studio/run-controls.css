@@ -52,7 +52,33 @@
 /* One decision card: consequence headline first, key facts visible, full
  * details one tap away, a single confirm gesture. Same engine underneath:
  * confirm stays disabled until the full review opens. */
-.decision-card { display: grid; gap: 10px; }
+.decision-card {
+  /* Docked, never covering: sticky keeps the card in flow (the page grows
+   * instead of sliding underneath), docking to the bottom of the chat scroll
+   * where a decision belongs. Where sticking is unsupported it degrades to
+   * an elevated inline card — still distinct, never overlapping. */
+  position: sticky;
+  bottom: 12px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 20px 20px 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+  animation: decision-rise 0.28s ease-out;
+}
+@keyframes decision-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .decision-card { animation: none; }
+}
+.decision-top { display: flex; align-items: center; gap: 13px; }
+.decision-title { display: grid; gap: 3px; min-width: 0; }
 .decision-eyebrow {
   margin: 0;
   font-size: 11px;
@@ -61,7 +87,7 @@
   text-transform: uppercase;
   color: var(--muted, var(--secondary));
 }
-.decision-headline { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.decision-headline { margin: 0; font-size: 21px; font-weight: 680; line-height: 1.3; overflow-wrap: anywhere; }
 .decision-facts {
   display: grid;
   gap: 8px;
@@ -74,7 +100,7 @@
 .decision-facts dt { font-size: 12px; color: var(--muted, var(--secondary)); margin: 0; }
 .decision-facts dd { margin: 0; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; }
 .decision-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; }
-.decision-confirm { min-height: 42px; padding: 10px 18px; font-size: 15px; }
+.decision-confirm { min-height: 48px; padding: 12px 18px; font-size: 16px; flex: 1; }
 .decision-decline {
   min-height: 42px;
   padding: 10px 14px;

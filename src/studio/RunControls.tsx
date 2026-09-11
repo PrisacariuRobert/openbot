@@ -3,6 +3,7 @@ import { LockKeyhole } from "lucide-react";
 import type { Approval, Run } from "../shared/types";
 import type { ApprovalPreview } from "../shared/approval-preview";
 import { TASK_TOKEN_OPTIONS } from "../shared/task-token-budget";
+import { Character } from "./Character";
 import { BrowserSignInPanel } from "../components/BrowserSignInPanel";
 import "./run-controls.css";
 
@@ -177,14 +178,26 @@ export function RunControls({
   }
 
   if (!pending && !canStop) return null;
+  // The acting teammate's face leads the card. Missing identity must never
+  // blank a decision: fall back to the approval author, then a neutral face.
+  const actor = {
+    name: run.botName || approval?.botName || "Teammate",
+    color: run.botColor || "#6757d9",
+    variant: run.botMascot || "nova",
+  };
   return (
     <section className="run-controls" aria-label="Task controls">
       {pending && (
         <div className="decision-card">
-          <p className="decision-eyebrow">
-            {approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}
-          </p>
-          {preview && <p className="decision-headline">{preview.actionLabel}</p>}
+          <div className="decision-top">
+            <Character name={actor.name} color={actor.color} variant={actor.variant} size={44} />
+            <div className="decision-title">
+              <p className="decision-eyebrow">
+                {approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}
+              </p>
+              {preview && <p className="decision-headline">{preview.actionLabel}</p>}
+            </div>
+          </div>
           {preview && !preview.browserSignIn && <p className="run-control-note">{preview.reason}</p>}
           {preview?.taskTokens && <label className="run-token-amount">Extra tokens for this task
             <select aria-label="Extra tokens for this task" value={preview.taskTokens.additionalTokens} disabled={busy || needsRefresh} onChange={event => void chooseTokenAmount(Number(event.target.value))}>
