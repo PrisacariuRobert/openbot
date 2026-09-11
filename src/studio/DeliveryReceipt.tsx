@@ -1,7 +1,38 @@
 import { useEffect, useState } from "react";
 import { Check, ShieldCheck, FileText, Download } from "lucide-react";
-import type { Attachment, Bot, Run } from "../shared/types";
+import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
+
+/** One delivery object: the result files, a one-line trust strip (who
+ * reviewed it, what was checked), the review action, and the proof
+ * disclosure. Data already in hand — no extra fetch per card. */
+export function DeliveryCard({ message, run, childRuns, teammates }: {
+  message: Message; run?: Run; childRuns?: Run[]; teammates?: Bot[];
+}) {
+  if (!run || run.status !== "completed" || !run.task.tracked)
+    return <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>;
+  const kids = childRuns || [];
+  const reviewed = kids.filter((r) => r.status === "completed");
+  const reviewing = kids.filter((r) => !["completed", "failed", "cancelled"].includes(r.status));
+  const hosts = run.task.verificationChecks.filter((c) => c.source === "host");
+  const checksLabel = run.task.verificationStatus === "passed"
+    ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
+  return (
+    <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}>
+      <p className="delivery-strip">
+        {reviewed.length > 0
+          ? <><Check size={13} /><span>Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
+          : reviewing.length > 0
+            ? <span>{reviewing.map((r) => r.botName).join(", ")} {reviewing.length === 1 ? "is" : "are"} reviewing…</span>
+            : <span>Not yet reviewed</span>}
+        <span aria-hidden="true">·</span>
+        <span>{checksLabel}</span>
+      </p>
+      {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}
+      <DeliveryReceipt run={run} teammates={teammates} />
+    </section>
+  );
+}
 
 export function DeliveryReceipt({ run, teammates }: { run?: Run; teammates?: Bot[] }) {
   const [picking, setPicking] = useState(false);

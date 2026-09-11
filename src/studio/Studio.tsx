@@ -62,7 +62,7 @@ import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
-import { DeliveryReceipt, DeliveredFile } from "./DeliveryReceipt";
+import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
 import { WorkReceipt } from "../CapabilityPanels";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
@@ -1619,8 +1619,9 @@ export function Studio() {
                             )}
                             <div className="prose">
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
-                              {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}
-                              {message.senderType === "bot" && <DeliveryReceipt run={state.runs.find((run) => run.id === message.runId)} teammates={state.bots} />}
+                              {message.senderType === "bot" && message.runId
+                                ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} />
+                                : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>
