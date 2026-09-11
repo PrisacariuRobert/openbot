@@ -56,7 +56,7 @@
     "test:packaging": "node --test scripts/test-staged-app-package.mjs scripts/test-release-version.mjs scripts/test-release-workflow.mjs",
     "test:desktop": "node --test desktop/*.test.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "verify": "npm run check:release && npm run check:ios && npm run check:macos && npm run test:packaging && npm run test:desktop && npm test && npm run check && npm run check:acceptance && npm run build"
+    "verify": "npm run check:release && npm run check:ios && npm run check:macos && npm run test:packaging && npm run test:desktop && npm run build && npm test && npm run check && npm run check:acceptance"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",

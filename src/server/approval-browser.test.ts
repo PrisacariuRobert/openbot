@@ -17,7 +17,6 @@ console.log(JSON.stringify({ type: 'text', text: 'Approved and completed.' }));
 `;
 
 test("real browser: approval is disabled until the review is visibly opened, then starts once", { timeout: 120_000 }, async (t) => {
-  const distDir = path.resolve(import.meta.dirname, "../..", "dist-browser-test");
   const root = mkdtempSync(path.join(tmpdir(), "openbot-approval-browser-"));
   const db = new OpenBotDatabase(root);
   const bin = path.join(root, "bin"); mkdirSync(bin);
@@ -31,7 +30,7 @@ test("real browser: approval is disabled until the review is visibly opened, the
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
     cwd: path.resolve(import.meta.dirname, "../.."), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.30", OPENBOT_DIST_DIR: distDir, OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_STAGING: "1" },
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.30", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_STAGING: "1" },
   });
   const exited = once(child, "exit"); let log = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (d) => { log = (log + d).slice(-3000); });
