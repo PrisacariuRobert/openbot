@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { Check, ShieldCheck, FileText, Download } from "lucide-react";
+import { Check, ShieldCheck, Download, FileText } from "lucide-react";
 import { Character } from "./Character";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
@@ -40,7 +40,7 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
         <span aria-hidden="true">·</span>
         <span>{checksLabel}</span>
       </p>
-      {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}
+      {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} artifact />)}
       <DeliveryReceipt run={run} teammates={teammates} />
     </section>
   );
@@ -102,12 +102,49 @@ export function DeliveryReceipt({ run, teammates }: { run?: Run; teammates?: Bot
   </>;
 }
 
-export function DeliveredFile({ file }: { file: Attachment }) {
+/** A delivered file shown as the work itself — a miniature of its actual
+ * content on a sheet of paper, not a generic icon row. Quick Look, not a
+ * file manager: you see the first lines before you decide to open it.
+ * Plain uploads keep the compact row (artifact={false}). */
+export function DeliveredFile({ file, artifact = false }: { file: Attachment; artifact?: boolean }) {
+  const size = `${Math.max(1, Math.ceil(file.size / 1000))} KB`;
+  const meta = [size, file.kind, file.source === "artifact" ? "Result" : null, file.revision > 1 ? `v${file.revision}` : null].filter(Boolean).join(" · ");
+  if (!artifact) {
+    return <section className="delivered-file" aria-label={`File: ${file.name}`}>
+      {file.kind === "image" && file.previewUrl && <a href={file.previewUrl} target="_blank" rel="noreferrer"><img src={file.previewUrl} alt={file.name} loading="lazy" /></a>}
+      <a className="message-file" href={file.url} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>{file.name}</strong><small>{meta}</small></span><Download size={15} /></a>
+      {file.summary && <p>{file.summary}</p>}
+      {file.previewText && <details><summary>Read preview</summary><pre>{file.previewText}</pre></details>}
+      {file.processingStatus === "partial" && <small>Partial preview. Download the original for the complete file.</small>}
+      {["failed", "unsupported"].includes(file.processingStatus) && <small>Preview unavailable. Your original file is still available.</small>}
+    </section>;
+  }
+  const lines = (file.previewText || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[#*_`>|-]/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  const image = file.kind === "image" && file.previewUrl;
+  const glyph = file.kind === "spreadsheet" ? "XLSX" : file.kind === "presentation" ? "PPTX" : file.kind === "document" ? (file.mime.includes("pdf") ? "PDF" : "DOC") : file.kind === "archive" ? "ZIP" : "FILE";
   return <section className="delivered-file" aria-label={`File: ${file.name}`}>
-    {file.kind === "image" && file.previewUrl && <a href={file.previewUrl} target="_blank" rel="noreferrer"><img src={file.previewUrl} alt={file.name} loading="lazy" /></a>}
-    <a className="message-file" href={file.url} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>{file.name}</strong><small>{Math.max(1, Math.ceil(file.size / 1000))} KB · {file.kind}{file.source === "artifact" ? " · Result" : ""}{file.revision > 1 ? ` · v${file.revision}` : ""}</small></span><Download size={15} /></a>
-    {file.summary && <p>{file.summary}</p>}
-    {file.previewText && <details><summary>Read preview</summary><pre>{file.previewText}</pre></details>}
+    <a className="artifact" href={file.url} target="_blank" rel="noreferrer">
+      <span className="artifact-sheet" aria-hidden="true">
+        {image
+          ? <img src={file.previewUrl!} alt="" loading="lazy" />
+          : lines.length > 0
+            ? <span className="artifact-lines">{lines.map((line, index) => <span key={index} className={index === 0 ? "is-title" : ""}>{line.slice(0, 54)}</span>)}</span>
+            : <span className={`artifact-glyph is-${file.kind}`}>{glyph}</span>}
+      </span>
+      <span className="artifact-caption">
+        <span className="artifact-text">
+          <strong>{file.name}</strong>
+          <small>{meta}</small>
+        </span>
+        <span className="artifact-open" aria-hidden="true"><Download size={15} /></span>
+      </span>
+    </a>
+    {file.summary && lines.length === 0 && <p>{file.summary}</p>}
+    {file.previewText && <details><summary>Read full text</summary><pre>{file.previewText}</pre></details>}
     {file.processingStatus === "partial" && <small>Partial preview. Download the original for the complete file.</small>}
     {["failed", "unsupported"].includes(file.processingStatus) && <small>Preview unavailable. Your original file is still available.</small>}
   </section>;

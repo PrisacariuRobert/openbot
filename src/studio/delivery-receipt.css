@@ -9,22 +9,71 @@
   background: var(--surface-muted);
   overflow: hidden;
 }
-/* The file is the delivery: an app-icon tile in the author's color with a
- * full-bleed tappable row. No ghost icons, no dark pills. */
+/* The file is the delivery: a real miniature of its contents on a sheet of
+ * paper, not a generic icon row. Quick Look, not a file manager. */
 .delivery-card .delivered-file { margin-top: 0; }
-.delivery-card .message-file { gap: 13px; padding: 4px 2px; }
-.delivery-card .message-file > svg {
-  width: 42px;
-  height: 42px;
-  padding: 10px;
-  box-sizing: border-box;
+.artifact {
+  display: block;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  text-decoration: none;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.artifact:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+.artifact:active { transform: none; }
+.artifact-sheet {
+  position: relative;
+  display: block;
+  height: 100px;
+  padding: 14px 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+/* A soft fade says "there is more in the file" without faking ruled rows. */
+.artifact-sheet::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 34px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+}
+.artifact-sheet > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+.artifact-lines { display: grid; gap: 3px; }
+.artifact-lines > span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.artifact-lines > span.is-title { color: var(--ink); font-weight: 650; font-size: 14px; letter-spacing: -0.005em; margin-bottom: 2px; }
+.artifact-glyph {
+  display: grid;
+  place-items: center;
+  height: 70px;
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--delivery-accent) 70%, var(--ink));
+}
+.artifact-caption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface));
+}
+.artifact-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.artifact-text strong { font-size: 14px; font-weight: 650; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.artifact-text small { font-size: 12px; color: var(--muted); }
+.artifact-open {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   flex: none;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--delivery-accent) 15%, var(--surface));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--delivery-accent) 14%, var(--surface));
   color: var(--delivery-accent);
 }
-.delivery-card .message-file strong { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
-.delivery-card .message-file small { font-size: 12.5px; }
 .delivery-strip {
   display: flex;
   align-items: center;
