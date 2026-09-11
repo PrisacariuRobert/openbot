@@ -180,9 +180,11 @@ export function RunControls({
   return (
     <section className="run-controls" aria-label="Task controls">
       {pending && (
-        <>
-          <strong>{approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}</strong>
-          {preview && <p>{preview.actionLabel}</p>}
+        <div className="decision-card">
+          <p className="decision-eyebrow">
+            {approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}
+          </p>
+          {preview && <p className="decision-headline">{preview.actionLabel}</p>}
           {preview && !preview.browserSignIn && <p className="run-control-note">{preview.reason}</p>}
           {preview?.taskTokens && <label className="run-token-amount">Extra tokens for this task
             <select aria-label="Extra tokens for this task" value={preview.taskTokens.additionalTokens} disabled={busy || needsRefresh} onChange={event => void chooseTokenAmount(Number(event.target.value))}>
@@ -195,6 +197,16 @@ export function RunControls({
                 <button type="button" className="primary" onClick={() => onSignInPane(approval!.id)}><LockKeyhole size={14} strokeWidth={2} />Open the private browser</button>
               </div>
             : <BrowserSignInPanel key={approval!.id} approvalId={approval!.id} handoff={preview.browserSignIn} disabled={busy || needsRefresh || Boolean(notice)} onBusyChange={setSignInBusy} onInteraction={() => setReviewed(false)} />)}
+          {preview && preview.fields.length > 3 && !preview.browserSignIn && (
+            <dl className="decision-facts">
+              {preview.fields.slice(0, 3).map((field) => (
+                <div key={field.label}>
+                  <dt>{field.label}</dt>
+                  <dd>{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {preview && preview.fields.length > 0 && (
             <details
               onToggle={(event) => {
@@ -203,7 +215,7 @@ export function RunControls({
             >
               <summary onClick={() => { if (!preview.browserSignIn) setReviewed(true); }}>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
               <dl>
-                {preview.fields.map((field) => (
+                {(preview.fields.length > 3 && !preview.browserSignIn ? preview.fields.slice(3) : preview.fields).map((field) => (
                   <div key={field.label}>
                     <dt>{field.label}</dt>
                     <dd>{field.value}</dd>
@@ -234,11 +246,11 @@ export function RunControls({
             <p className="run-control-note">This review is incomplete or out of date. Refresh before approving. You can still decline it.</p>
           )}
           {completeReview && preview?.browserSignIn && <label><input type="checkbox" checked={reviewed} disabled={busy || signInBusy || needsRefresh || Boolean(notice)} onChange={(event) => setReviewed(event.target.checked)} /> I’ve finished signing in to the account I want to use.</label>}
-          <div className="run-control-actions">
+          <div className="decision-actions">
             {completeReview && (
               <button
                 type="button"
-                className="primary"
+                className="primary decision-confirm"
                 disabled={busy || signInBusy || needsRefresh || !reviewed || Boolean(notice)}
                 onClick={() => void act("approved")}
               >
@@ -249,6 +261,7 @@ export function RunControls({
             )}
             <button
               type="button"
+              className="decision-decline"
               disabled={
                 busy ||
                 needsRefresh ||
@@ -265,7 +278,7 @@ export function RunControls({
               {preview?.browserSignIn ? "Finish signing in before continuing your task." : "Open the action details before approving."}
             </p>
           )}
-        </>
+        </div>
       )}
       {canStop && (
         <button
