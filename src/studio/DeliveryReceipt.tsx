@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Check, ShieldCheck, FileText, Download } from "lucide-react";
 import { Character } from "./Character";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
@@ -22,8 +22,7 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
     ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
   return (
     <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}
-      style={author ? { background: `color-mix(in srgb, ${author.color} 6%, var(--surface))` } : undefined}>
-      {author && <i className="delivery-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${author.color}, ${author.color} 40%, transparent)` }} />}
+      style={author ? ({ "--delivery-accent": author.color } as CSSProperties) : undefined}>
       <p className="delivery-strip">
         {reviewed.length > 0
           ? <><span className="delivery-faces">
