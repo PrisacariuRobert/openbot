@@ -27,7 +27,7 @@ test("generic website handoff saves only its origin and the original task, not l
     assert.equal(db.pendingNotifications().filter((notification) => notification.kind === "approval").length, 1);
     assert.match(db.pendingNotifications().find((notification) => notification.kind === "approval")!.title, /needs your sign-in/);
     const action = db.getApprovalAction(a.id);
-    assert.deepEqual(action, { type: "browser_sign_in", botId: "nova", args: { siteOrigin: "https://support.example.test" } });
+    assert.deepEqual(action, { type: "browser_sign_in", botId: "nova", args: { siteOrigin: "https://support.example.test", evidence: null } });
     const preview = approvalPreview(a, run, action);
     assert.equal(preview.canApprove, true);
     assert.equal(preview.browserSignIn?.siteOrigin, "https://support.example.test");
@@ -48,6 +48,24 @@ test("generic website handoff saves only its origin and the original task, not l
   } finally { close(); }
 });
 
+test("sign-in requests carry their evidence so the owner can judge false alarms", () => {
+  const { db, handoffs, run, close } = fixture();
+  try {
+    const host = handoffs.request("nova", run.id, "https://mail.example.test/mail", { source: "host", observedUrl: "https://mail.example.test", observedText: "login page /signin" });
+    assert.match(host.reason, /The host saw .*login page \/signin/);
+    const stored = db.getApprovalAction(host.id) as { args?: { evidence?: unknown } };
+    assert.deepEqual(stored.args?.evidence, { source: "host", observedUrl: "https://mail.example.test", observedText: "login page /signin" });
+    assert.doesNotMatch(JSON.stringify(stored), /PRIVATE/);
+  } finally { close(); }
+});
+
+test("uncited teammate sign-in requests say so on the card", () => {
+  const { handoffs, run, close } = fixture();
+  try {
+    const bare = handoffs.request("nova", run.id, "https://drive.example.test", { source: "teammate" });
+    assert.match(bare.reason, /cited no login wall/);
+  } finally { close(); }
+});
 test("pending sign-in is visible to a reopened database; decline releases the browser and cancels the task", () => {
   const { root, db, handoffs, run, close } = fixture();
   let reopened: OpenBotDatabase | undefined;

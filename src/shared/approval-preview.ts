@@ -126,10 +126,20 @@ export function approvalPreview(
   } else if (object.type === "browser_sign_in" && approval.kind === "browser") {
     try {
       const siteOrigin = signInOrigin(String(args.siteOrigin || ""));
-      if (siteOrigin !== args.siteOrigin || Object.keys(args).some((key) => key !== "siteOrigin")) incomplete = true;
+      const rawEvidence = (args as Record<string, unknown>).evidence as { source?: unknown; observedUrl?: unknown; observedText?: unknown } | null | undefined;
+      const evidenceOk = rawEvidence == null || (typeof rawEvidence === "object" &&
+        (rawEvidence.source === "host" || rawEvidence.source === "teammate") &&
+        (rawEvidence.observedUrl === undefined || typeof rawEvidence.observedUrl === "string") &&
+        (rawEvidence.observedText === undefined || typeof rawEvidence.observedText === "string"));
+      if (siteOrigin !== args.siteOrigin || Object.keys(args).some((key) => key !== "siteOrigin" && key !== "evidence") || !evidenceOk) incomplete = true;
       preview.browserSignIn = { botId: approval.botId, siteOrigin };
+      const seen = rawEvidence && typeof rawEvidence === "object"
+        ? [rawEvidence.observedUrl, rawEvidence.observedText].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(" · ")
+        : "";
+      const seenBy = rawEvidence && typeof rawEvidence === "object" && rawEvidence.source === "host" ? "Host check" : "Teammate";
       preview.fields.push({ label: "Website requesting your help", value: siteOrigin },
         { label: "Private browser", value: `${approval.botName}’s browser only. Other teammates do not receive this login.` },
+        { label: "What was seen", value: seen ? visible(`${seenBy}: ${seen}`.slice(0, 300)) : "No login wall was cited. Check the page yourself before signing in." },
         { label: "After you continue", value: "Resume your saved task and check the page and account. This does not approve sending, publishing, deleting or purchases." });
     } catch { incomplete = true; }
   } else if ((object.type === "browser_click" || object.type === "browser_type") && approval.kind === "browser") {

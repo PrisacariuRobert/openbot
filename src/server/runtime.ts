@@ -18,6 +18,21 @@ type CommandResult = { code: number; stdout: string; stderr: string; sourceChang
 type TeachStep = SkillStep & { at: string };
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
+/** One login-wall observation: a short evidence string (never credentials) or
+ * null when the page shows no gate. Pure page read, split out for unit tests
+ * with a stub page. */
+export async function detectLoginWall(page: { locator(s: string): { evaluate<T>(fn: (body: Element) => T): Promise<T> } }): Promise<string | null> {
+  return page.locator("body").evaluate((body) => {
+    // Keep callbacks inline: tsx's named-function helper is not present in the browser.
+    const visible = (node: Element) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
+    if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some(visible)) return "visible credential field";
+    const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter(visible).map((node) => node.textContent || "").join(" ").slice(0, 120);
+    if (/sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading) &&
+      [...body.querySelectorAll('input,button,[role="button"]')].some(visible)) return `login heading ${JSON.stringify(heading.slice(0, 80))}`;
+    return null;
+  });
+}
+
 export function protectedProjectPaths(projectPath: string): Array<{ relative: string; directory: boolean }> {
   const protectedPaths: Array<{ relative: string; directory: boolean }> = [];
   let visitedDirectories = 0;
@@ -545,23 +560,29 @@ export class BrowserManager {
   }
 
   /** Detect obvious gates without returning field values or the login URL. The
-   * model can explicitly request a handoff for gates this conservative check misses. */
-  async signInState(botId: string): Promise<{ siteOrigin: string; needsSignIn: boolean }> {
+   * model can explicitly request a handoff for gates this conservative check misses.
+   * Returns a short evidence string (never credentials) or null. A loading page
+   * is not a signed-out page: callers re-check a positive once after settling. */
+  async signInState(botId: string): Promise<{ siteOrigin: string; needsSignIn: boolean; evidence: string | null }> {
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
-    const address = new URL(page.url());
-    if (/\/(?:login|signin|sign-in|log-in|sso|oauth2?\/authorize)(?:\/|$)/i.test(address.pathname)) {
-      return { siteOrigin: address.origin, needsSignIn: true };
-    }
-    const needsSignIn = await page.locator("body").evaluate((body) => {
-      // Keep callbacks inline: tsx's named-function helper is not present in the browser.
-      if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return true;
-      const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden").map((node) => node.textContent || "").join(" ");
-      return /sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading) &&
-        [...body.querySelectorAll('input,button,[role="button"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden");
-    });
+    const settled = async (): Promise<{ siteOrigin: string; needsSignIn: boolean; evidence: string | null }> => {
+      const address = new URL(page.url());
+      if (/\/(?:login|signin|sign-in|log-in|sso|oauth2?\/authorize)(?:\/|$)/i.test(address.pathname)) {
+        return { siteOrigin: address.origin, needsSignIn: true, evidence: `login page ${address.pathname.slice(0, 80)}` };
+      }
+      const evidence = await detectLoginWall(page as unknown as { url(): string; locator(s: string): { evaluate<T>(fn: (body: Element) => T): Promise<T> } });
+      this.assertPageAccess(botId, page);
+      return { siteOrigin: new URL(page.url()).origin, needsSignIn: evidence !== null, evidence };
+    };
+    const first = await settled();
+    if (!first.needsSignIn) return first;
+    // A positive during navigation is usually a loading interstitial, not a
+    // signed-out session. Re-check once after settling; only a persistent
+    // login wall counts. This is the false-alarm fix: never cry wolf on load.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
     this.assertPageAccess(botId, page);
-    return { siteOrigin: new URL(page.url()).origin, needsSignIn };
+    return settled();
   }
 
   /** Sign-in handoffs need a real, visible Chrome: providers like Google

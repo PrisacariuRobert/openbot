@@ -3177,8 +3177,8 @@ app.post("/api/internal/tools", async (request, response) => {
     if (action.startsWith("browser_")) return await browserSignIns.withProfile(botId, async () => {
       browserSignIns.assertAgentAccess(botId);
       if (db.getRun(runId)?.status !== "running") return response.status(409).json({ error: "This task is no longer active." });
-      const requestSignIn = (siteOrigin: string) => {
-        const approval = browserSignIns.request(botId, runId, siteOrigin);
+      const requestSignIn = (siteOrigin: string, evidence?: { source: "host" | "teammate"; observedUrl?: string; observedText?: string }) => {
+        const approval = browserSignIns.request(botId, runId, siteOrigin, evidence);
         runner.pauseForApproval(runId);
         broadcast();
         setTimeout(() => {
@@ -3195,10 +3195,16 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_open") {
         const result = await browser.open(botId, String(args.url || ""));
         const gate = await browser.signInState(botId);
-        return gate.needsSignIn ? requestSignIn(gate.siteOrigin) : response.json(result);
+        return gate.needsSignIn ? requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined }) : response.json(result);
       }
       const gate = await browser.signInState(botId);
-      if (action === "browser_request_sign_in" || gate.needsSignIn) return requestSignIn(gate.siteOrigin);
+      if (action === "browser_request_sign_in") {
+        const observedUrl = String(args.observedUrl || "").slice(0, 300), observedText = String(args.observedText || "").slice(0, 300);
+        // The host gate already settled the page twice; a teammate citation is
+        // shown verbatim so the owner can judge a false alarm like a real one.
+        return requestSignIn(gate.siteOrigin, { source: "teammate", observedUrl: observedUrl || gate.siteOrigin, observedText });
+      }
+      if (gate.needsSignIn) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined });
       // While the owner is signing in on this browser, the page is theirs:
       // no model-visible snapshot or interaction until they continue.
       if (["browser_snapshot", "browser_click", "browser_type", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
@@ -3207,16 +3213,16 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_snapshot") return response.json(await browser.snapshot(botId));
       if (action === "browser_click") {
         const selector = String(args.selector || ""), target = await browser.describeTarget(botId, selector);
-        if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin);
+        if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("click", selector, target), browserApprovalReason("click", selector, target)).reason;
         if (reason) return holdForApproval("browser", reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review });
         const result = await browser.click(botId, selector, target.fingerprint);
         const next = await browser.signInState(botId);
-        return next.needsSignIn ? requestSignIn(next.siteOrigin) : response.json(result);
+        return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
       }
       if (action === "browser_type") {
         const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
-        if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin);
+        if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential field ${target.label || target.tag}`.slice(0, 160) });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("type", `${selector} ${value}`, target), browserApprovalReason("type", `${selector} ${value}`, target)).reason;
         if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review });
         return response.json(await browser.type(botId, selector, value, target.fingerprint));
