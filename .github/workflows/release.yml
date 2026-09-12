@@ -53,7 +53,7 @@ jobs:
             sleep 2
           done
           exit 1
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openbot-linux-x64
           path: |
@@ -94,7 +94,7 @@ jobs:
             }
             exit 1
           } finally { $job | Stop-Job -PassThru | Remove-Job -Force }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openbot-win-x64
           path: |
@@ -135,7 +135,7 @@ jobs:
           tar -czf "dist-release/openbot-${VERSION}-darwin-arm64.tar.gz" -C /tmp/openbotDerived/Build/Products/Debug OpenBot.app
           (cd dist-release && shasum -a 256 "openbot-${VERSION}-darwin-arm64.tar.gz" > "openbot-${VERSION}-darwin-arm64.tar.gz.sha256")
           cp /tmp/openbotDerived/Build/Products/Debug/OpenBot.app/Contents/Resources/OpenBotRuntime/runtime-manifest.json "dist-release/openbot-${VERSION}-darwin-arm64.manifest.json"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openbot-darwin-arm64
           path: |
@@ -238,7 +238,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openbot-darwin-arm64-final
           path: |
