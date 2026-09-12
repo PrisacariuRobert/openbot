@@ -615,6 +615,17 @@ export interface ProviderLoginAttempt {
   error: string | null;
 }
 
+/** A persisted live connection-test receipt. Absence means "Saved, not tested":
+ * saved credentials alone are never reported as ready. */
+export interface ProviderConnectionTest {
+  tested: true;
+  ok: boolean;
+  model: string;
+  latencyMs: number;
+  error: string | null;
+  testedAt: string;
+}
+
 export interface ProviderStatus {
   id: "opencode";
   name: string;

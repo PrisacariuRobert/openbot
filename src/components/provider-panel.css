@@ -153,6 +153,25 @@
   color: var(--secondary, #525252);
   white-space: nowrap;
 }
+.ai-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 220px;
+}
+.ai-test {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.ai-test-state {
+  color: var(--ai-muted);
+  font-size: 11px;
+  text-align: right;
+}
 .ai-action {
   min-height: 44px;
   padding: 8px 12px;

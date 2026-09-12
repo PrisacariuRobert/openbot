@@ -28,6 +28,7 @@ import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
+import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
 import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
@@ -83,7 +84,7 @@ import { inspectRunnerCare } from "./runner-care.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
-import type { AutomationEvent, Routine, RoutineTriggerConfig, RunnerHealth, Readiness, ReadinessStep } from "../shared/types.js";
+import type { AutomationEvent, ProviderConnectionTest, Routine, RoutineTriggerConfig, RunnerHealth, Readiness, ReadinessStep } from "../shared/types.js";
 import { listWorkspaceFiles, readWorkspaceFile, replaceWorkspaceFile, resolveWorkspacePath, writeWorkspaceFile } from "./workspace-files.js";
 import { isHandoffPath, mediateHandoffArtifacts } from "./handoff-files.js";
 import { verifyTaskChecks } from "./verification-evidence.js";
@@ -705,6 +706,34 @@ app.post("/api/provider/connect/:attemptId/callback", async (request, response) 
   if (!parsed.success) return response.status(400).json({ error: "Paste the sign-in code first." });
   try { response.json(await providerConnections.finish(request.params.attemptId, parsed.data.code)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+
+// Small real connection test: only a live model reply counts as tested.
+// Saved credentials alone are never reported as ready. Results persist per
+// connection so setup screens can show "Tested <time>" vs "Saved, not tested".
+app.get("/api/provider/:id/test", (request, response) => {
+  const receipt = db.extensionRecord<ProviderConnectionTest>("provider-test", request.params.id);
+  if (!receipt) return response.status(404).json({ tested: false });
+  response.json(receipt);
+});
+
+app.post("/api/provider/:id/test", async (request, response) => {
+  // Cheap guards first: existence and cooldown never touch the model runtime.
+  if (!db.getProvider(request.params.id)) return response.status(404).json({ error: "That connection no longer exists." });
+  const previous = db.extensionRecord<ProviderConnectionTest>("provider-test", request.params.id);
+  if (!probeAllowed(previous?.testedAt || null)) return response.status(429).json({ error: `A test just ran for this connection. Wait ${Math.ceil(PROBE_COOLDOWN_MS / 1_000)} seconds between tests to protect your usage.` });
+  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const connection = status.instances.find((entry) => entry.id === request.params.id);
+  if (!connection) return response.status(404).json({ error: "That connection no longer exists." });
+  if (!connection.connected) return response.status(409).json({ error: "Connect this provider first. Saved credentials alone are never shown as ready." });
+  const model = connection.defaultModel || (connection.models || [])[0];
+  if (!model) return response.status(409).json({ error: "This connection offers no usable models to test." });
+  try {
+    const result: ProviderConnectionTest = { tested: true, ...(await probeProviderModel(model, db.providerEnvironmentById(connection.id))) };
+    db.saveExtensionRecord("provider-test", connection.id, result);
+    broadcast();
+    response.json(result);
+  } catch (error) { response.status(503).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
 function readConnectorStatus(): ConnectorStatus {

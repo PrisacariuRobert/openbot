@@ -19,6 +19,7 @@ import type {
   ApiConnectionConfig,
   Bot,
   ProviderCatalogEntry,
+  ProviderConnectionTest,
   ProviderLoginAttempt,
   ProviderStatus,
 } from "../shared/types";
@@ -32,6 +33,8 @@ type Props = {
   onAdd: (input: ProviderInput) => Promise<void>;
   onConnect: (id: ProviderCatalogEntry["id"]) => Promise<ProviderLoginAttempt>;
   onFinish: (id: string, code: string) => Promise<void>;
+  connectionTests: Record<string, ProviderConnectionTest>;
+  onTestConnection: (id: string) => Promise<ProviderConnectionTest>;
   mascot: (bot: Bot) => ReactNode;
   modelLabel: (model: string) => string;
 };
@@ -80,6 +83,8 @@ export function ProviderPanel({
   onAdd,
   onConnect,
   onFinish,
+  connectionTests,
+  onTestConnection,
   mascot,
   modelLabel,
 }: Props) {
@@ -136,6 +141,45 @@ export function ProviderPanel({
     setSecret("");
     setModelIds("");
   };
+  const testTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return ""; }
+  };
+  // Only a live reply counts as tested. Saved sign-ins and keys stay "Saved,
+  // not tested" until the owner runs the tiny probe (uses a little allowance).
+  const connectionTest = (connectionId: string | null, actionKey: string) => {
+    if (!connectionId) return null;
+    const receipt = connectionTests[connectionId];
+    return (
+      <div className="ai-test">
+        <span className="ai-test-state" title={receipt?.error || undefined}>
+          {receipt
+            ? receipt.ok
+              ? `Tested · ${modelLabel(receipt.model)} · ${testTime(receipt.testedAt)}`
+              : `Last test failed · ${testTime(receipt.testedAt)}`
+            : "Saved, not tested"}
+        </span>
+        <button
+          type="button"
+          className="ai-action"
+          disabled={busy !== null}
+          onClick={() => void act(actionKey, async () => {
+            const receipt = await onTestConnection(connectionId);
+            if (!receipt.ok && receipt.error) setError(receipt.error);
+          })}
+        >
+          {busy === actionKey ? (
+            <LoaderCircle size={15} className="spinner" />
+          ) : receipt ? (
+            "Test again"
+          ) : (
+            "Test connection"
+          )}
+        </button>
+      </div>
+    );
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     void act("save", async () => {
@@ -188,9 +232,12 @@ export function ProviderPanel({
         </details>
       </div>
       {entry.connected ? (
-        <span className="ai-signed-in">
-          <Check size={13} /> Signed in
-        </span>
+        <div className="ai-side">
+          <span className="ai-signed-in">
+            <Check size={13} /> Signed in
+          </span>
+          {connectionTest(entry.connectionId, `test-${entry.id}`)}
+        </div>
       ) : entry.canConnect ? (
         <button
           type="button"
@@ -372,9 +419,12 @@ export function ProviderPanel({
                   <div className="ai-account-copy">
                     <h4>{entry.name}</h4>
                     <p>{entry.apiConfig?.baseUrl || "API-key connection"}</p>
-                    <p>{entry.note}</p>
+                    {!connectionTests[entry.id] && <p>{entry.note}</p>}
                   </div>
-                  <span className="ai-state">Saved</span>
+                  <div className="ai-side">
+                    <span className="ai-state">Saved</span>
+                    {connectionTest(entry.id, `test-${entry.id}`)}
+                  </div>
                 </article>
               ))}
             </div>

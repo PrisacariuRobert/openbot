@@ -16,6 +16,7 @@
     "mcp": "node --import tsx mcp/openbot.ts",
     "test": "tsx --test --test-concurrency=4 src/**/*.test.ts",
     "test:provider-runtime": "tsx scripts/test-provider-runtime.ts",
+    "test:provider-test-ui": "tsx scripts/test-provider-test-ui.ts",
     "test:onboarding": "tsx scripts/test-onboarding.ts",
     "test:calendar-routines": "tsx scripts/test-calendar-routines.ts",
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
