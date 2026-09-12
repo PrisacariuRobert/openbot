@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { safeHostEnvironment } from "./runtime.js";
 
 /** Gate 1a: pin the verified OpenCode runtime. The runtime version is part of
  * the security boundary, so an unverified version fails closed for model
@@ -26,7 +27,10 @@ export function opencodeCompatibility(options: { refresh?: boolean; probe?: () =
     return cached;
   }
   const readVersion = options.probe || (() => {
-    const result = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 10_000 });
+    // Never depend on the ambient PATH: GUI/daemon launches often sanitize it
+    // down to /usr/bin:/bin, which hides the user's runtime installs and would
+    // wedge every task on a healthy host.
+    const result = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 10_000, env: safeHostEnvironment() });
     return `${result.stdout || ""}`.trim().split(/\s+/).filter(Boolean).pop() || null;
   });
   let version: string | null = null;
