@@ -360,6 +360,41 @@ function pathCandidates(summary: string): string[] {
 export class AttachmentService {
   constructor(private readonly db: OpenBotDatabase) {}
 
+  /** Resolve follow-up links to an already captured workspace artifact.
+   * Reuse is deliberately narrower than a filename lookup: the live file must
+   * still be inside this bot's workspace and byte-identical to the latest
+   * artifact for this thread, bot and relative path. */
+  async resolveExistingArtifactLinks(bot: Bot, threadId: string, summary: string): Promise<string> {
+    let workspace: string;
+    try { workspace = await realpath(path.join(this.db.workspacesDir, bot.id)); }
+    catch { return summary; }
+    const matches = [...summary.matchAll(/\]\((<?)([^)\n\s>]+)(>?)(?=\s|\))/g)];
+    const replacements: Array<{ start: number; end: number; href: string }> = [];
+    for (const match of matches) {
+      const href = match[2]!;
+      if (/^[a-z]+:\/\//i.test(href) || href.startsWith("/api/")) continue;
+      let candidate = href.split(/[?#]/)[0]!;
+      try { candidate = decodeURIComponent(candidate); } catch { /* use literal path */ }
+      candidate = candidate.replace(/#L\d+(?:-L?\d+)?$/i, "").replace(/:\d+(?::\d+)?$/, "");
+      const relative = candidate.startsWith("/workspace/") ? candidate.slice("/workspace/".length) : candidate;
+      const proposed = path.isAbsolute(relative) ? relative : path.resolve(workspace, relative);
+      let source: string;
+      try { source = await realpath(proposed); } catch { continue; }
+      if (!(source.startsWith(`${workspace}${path.sep}`)) || source.includes(`${path.sep}inbox${path.sep}`)) continue;
+      const latest = this.db.latestArtifact(threadId, `${bot.id}:${path.relative(workspace, source)}`);
+      if (!latest) continue;
+      const stored = this.db.attachmentFile(latest.id);
+      if (!stored || stored.attachment.source !== "artifact") continue;
+      const [liveHash, storedHash] = await Promise.all([fileSha256(source), fileSha256(stored.storagePath)]);
+      if (!liveHash || liveHash !== storedHash) continue;
+      const hrefOffset = match.index! + match[0].indexOf(href);
+      replacements.push({ start: hrefOffset, end: hrefOffset + href.length, href: stored.attachment.url });
+    }
+    let resolved = summary;
+    for (const replacement of replacements.reverse()) resolved = `${resolved.slice(0, replacement.start)}${replacement.href}${resolved.slice(replacement.end)}`;
+    return resolved;
+  }
+
   async saveUpload(input: { id: string; threadId: string; name: string; mime: string; body: Buffer }): Promise<Attachment> {
     const directory = path.join(this.db.attachmentsDir, input.id), storagePath = path.join(directory, input.name);
     await mkdir(directory, { recursive: true });

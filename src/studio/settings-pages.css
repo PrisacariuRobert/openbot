@@ -63,14 +63,14 @@
 }
 .capabilities :is(.friendly-note, .security-footnote, .oauth-boundary) > svg { flex: none; margin-top: 2px; }
 .capabilities :is(.friendly-note, .security-footnote, .oauth-boundary) p { margin: 0; }
-.capabilities :is(.computer-disclosure, .bot-appearance) > summary {
+.capabilities :is(.computer-disclosure, .bot-appearance, .bot-advanced) > summary {
   display: flex; align-items: center; gap: 10px; list-style: none;
 }
-.capabilities :is(.computer-disclosure, .bot-appearance) > summary::-webkit-details-marker { display: none; }
+.capabilities :is(.computer-disclosure, .bot-appearance, .bot-advanced) > summary::-webkit-details-marker { display: none; }
 .capabilities .computer-disclosure > summary > span { flex: 1; }
-.capabilities .bot-appearance > summary small { margin-left: auto; font-weight: 400; }
-.capabilities .bot-appearance > summary::after { content: "+"; color: var(--secondary); font-size: 18px; }
-.capabilities .bot-appearance[open] > summary::after { content: "−"; }
+.capabilities :is(.bot-appearance, .bot-advanced) > summary small { margin-left: auto; font-weight: 400; }
+.capabilities :is(.bot-appearance, .bot-advanced) > summary::after { content: "+"; color: var(--secondary); font-size: 18px; }
+.capabilities :is(.bot-appearance, .bot-advanced)[open] > summary::after { content: "−"; }
 
 /* Teammate preferences: identity, instructions, access, then organization. */
 .capabilities .bot-editor { gap: 20px; }
@@ -80,6 +80,7 @@
 .capabilities .bot-hero > p { margin: 3px 0 0; align-self: start; font-size: 13px; }
 .capabilities .bot-hero .capability-pills { grid-column: 1 / -1; padding: 14px 0 0; }
 .capabilities .bot-editor > details { margin: 0; }
+.capabilities .bot-advanced-content { display: grid; gap: 16px; padding-top: 18px; }
 .capabilities .switch-list { display: grid; gap: 0; border-block: 1px solid var(--line); }
 .capabilities .switch-list > label { display: flex; align-items: center; gap: 16px; min-height: 72px; padding: 16px 0; }
 .capabilities .switch-list > label + label { border-top: 1px solid var(--line); }
@@ -91,6 +92,14 @@
 .capabilities .teach-callout > span { flex: 1; }
 .capabilities .teach-callout small { margin-top: 3px; }
 .capabilities .conversation-organizer p { margin: 0 0 8px; }
+.capabilities .bot-remove { display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--line); }
+.capabilities .bot-remove > div { display: grid; gap: 4px; }
+.capabilities .bot-remove > button { justify-self: start; }
+.capabilities .bot-remove > small { color: var(--secondary); }
+.capabilities .bot-remove .panel-error { margin: 0; }
+.capabilities .bot-remove-confirm { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.capabilities .bot-remove-confirm p { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.5; }
+.capabilities .bot-remove-confirm p strong { color: var(--ink); }
 
 /* Preference switches keep their native checkbox semantics and label targets.
    Approval checkboxes elsewhere deliberately retain their ordinary appearance. */

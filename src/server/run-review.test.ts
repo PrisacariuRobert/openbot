@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
 import { requestRunReview } from "./run-review.js";
+import { prepareConsultationFiles } from "./consultation-files.js";
 
 /** Owner-tapped independent review: the host spawns the reviewer child run,
  * never the author's prose. Completed parents only, never self-review, never
@@ -19,24 +20,26 @@ function fixture() {
   return { root, db, author, reviewer, run, close: () => { db.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
-function attachArtifact(f: ReturnType<typeof fixture>, name = "totals.xlsx") {
-  const file = path.join(f.root, name);
-  writeFileSync(file, "workbook-bytes");
+function attachArtifact(f: ReturnType<typeof fixture>, name = "totals.xlsx", body = "workbook-bytes", revision = 1) {
+  const directory = mkdtempSync(path.join(f.root, "artifact-"));
+  const file = path.join(directory, name);
+  writeFileSync(file, body);
   const message = f.db.addMessage({ threadId: f.author.threadId, senderType: "bot", senderId: f.author.id, body: "Done", runId: f.run.id });
-  f.db.createAttachment({ threadId: f.author.threadId, messageId: message.id, name, mime: "application/octet-stream", size: 14, storagePath: file, source: "artifact" });
+  return f.db.createAttachment({ threadId: f.author.threadId, messageId: message.id, name, mime: "application/octet-stream", size: Buffer.byteLength(body), storagePath: file, source: "artifact", revision });
 }
 
 test("owner tap spawns a queued reviewer child naming the delivered files", async () => {
   const f = fixture();
   try {
-    attachArtifact(f);
+    const artifact = attachArtifact(f);
     const result = await requestRunReview(f.db, f.run.id, f.reviewer.id);
     assert.equal(result.reviewerName, "Pixel");
     const child = f.db.getRun(result.childRunId)!;
     assert.equal(child.botId, f.reviewer.id);
     assert.equal(child.parentRunId, f.run.id);
     assert.equal(child.status, "queued");
-    assert.deepEqual(child.attachmentIds, f.run.attachmentIds);
+    assert.deepEqual(child.attachmentIds, [artifact.id]);
+    assert.equal(child.review?.artifacts[0]?.id, artifact.id);
     assert.ok(child.prompt.includes("totals.xlsx"), "reviewer re-opens the exact delivered file");
     assert.ok(child.prompt.includes("Do not address the user"), "reviewer stays internal");
     assert.match(child.prompt, /untrusted data/);
@@ -44,6 +47,74 @@ test("owner tap spawns a queued reviewer child naming the delivered files", asyn
     assert.ok(activity, "owner sees the review start on the parent run");
     const receipt = f.db.buildRunReceipt(f.run.id)!;
     assert.ok(receipt.team.some((entry) => entry.botName === "Pixel"), "reviewer joins the parent receipt");
+  } finally { f.close(); }
+});
+
+test("reviewer receives v2 bytes despite an older same-named downloaded copy", async () => {
+  const f = fixture();
+  try {
+    const old = attachArtifact(f, "choice.md", "Choose A. C costs 620.");
+    const revised = f.db.createRun({ threadId: f.author.threadId, botId: f.author.id, prompt: "C now costs 490. Choose the fastest eligible pilot.", status: "completed" });
+    f.run = revised;
+    const current = attachArtifact(f, "choice.md", "Choose C. C costs 490 and takes 2 days.", 2);
+    const workspace = path.join(f.db.workspacesDir, f.reviewer.id);
+    mkdirSync(path.join(workspace, "Downloads"), { recursive: true });
+    const stale = path.join(workspace, "Downloads", "choice.md");
+    writeFileSync(stale, "Choose A. C costs 620.");
+    const result = await requestRunReview(f.db, revised.id, f.reviewer.id);
+    const child = f.db.getRun(result.childRunId)!;
+    assert.deepEqual(child.attachmentIds, [current.id]);
+    assert.ok(!child.attachmentIds.includes(old.id));
+    const prompt = prepareConsultationFiles(f.db, child);
+    const copy = path.join(workspace, "inbox", current.messageId!, `${current.id.slice(0, 8)}-${current.name}`);
+    assert.equal(readFileSync(copy, "utf8"), "Choose C. C costs 490 and takes 2 days.");
+    assert.equal(readFileSync(stale, "utf8"), "Choose A. C costs 620.");
+    assert.match(prompt, /DELIVERED RESULT TO REVIEW/);
+    assert.match(prompt, /v2/);
+    assert.ok(child.prompt.includes(revised.prompt));
+    assert.equal(prepareConsultationFiles(f.db, child), prompt, "resumption retains the same version");
+    writeFileSync(f.db.attachmentFile(current.id)!.storagePath, "Replaced since the owner requested review.");
+    assert.throws(() => prepareConsultationFiles(f.db, child), /changed after the review/);
+  } finally { f.close(); }
+});
+
+test("missing delivered bytes do not silently fall back to conversation or old files", async () => {
+  const f = fixture();
+  try {
+    const artifact = attachArtifact(f);
+    rmSync(f.db.attachmentFile(artifact.id)!.storagePath);
+    await assert.rejects(() => requestRunReview(f.db, f.run.id, f.reviewer.id), /older copy cannot stand in/);
+    assert.equal(f.db.listChildRuns(f.run.id).length, 0);
+  } finally { f.close(); }
+});
+
+test("review still receives the delivered file beyond the chat history window", async () => {
+  const f = fixture();
+  try {
+    const artifact = attachArtifact(f);
+    for (let index = 0; index < 125; index++) f.db.addMessage({ threadId: f.author.threadId, senderType: "user", senderId: null, body: `Later message ${index}` });
+    assert.equal(f.db.listMessages(f.author.threadId).some((message) => message.runId === f.run.id), false);
+    const result = await requestRunReview(f.db, f.run.id, f.reviewer.id);
+    assert.deepEqual(f.db.getRun(result.childRunId)?.attachmentIds, [artifact.id]);
+  } finally { f.close(); }
+});
+
+test("review retains original inputs separately from delivered outputs", async () => {
+  const f = fixture();
+  try {
+    const source = attachArtifact(f, "source.csv", "id,total\nA,12");
+    const run = f.db.createRun({ threadId: f.author.threadId, botId: f.author.id, prompt: "Check totals", status: "completed", attachmentIds: [source.id] });
+    f.run = run;
+    const output = attachArtifact(f, "result.md", "Total 12");
+    const result = await requestRunReview(f.db, run.id, f.reviewer.id);
+    const child = f.db.getRun(result.childRunId)!;
+    assert.deepEqual(child.attachmentIds, [output.id, source.id]);
+    assert.deepEqual(child.review?.artifacts.map((a) => a.id), [output.id]);
+    mkdirSync(path.join(f.db.workspacesDir, f.reviewer.id), { recursive: true });
+    const prompt = prepareConsultationFiles(f.db, child);
+    assert.match(prompt, /ORIGINAL INPUT/);
+    assert.match(prompt, /DELIVERED RESULT TO REVIEW/);
+    assert.throws(() => prepareConsultationFiles(f.db, { ...child, attachmentIds: [source.id] }), /missing from this review/);
   } finally { f.close(); }
 });
 

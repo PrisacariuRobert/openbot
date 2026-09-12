@@ -1517,7 +1517,7 @@ private struct ThreadPickerView: View {
 
     private var conversations: [StudioThread] {
         store.state.threads.filter {
-            $0.hidden != true && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || ($0.lastMessage?.localizedCaseInsensitiveContains(query) ?? false))
+            $0.isVisibleConversation(in: store.state.bots) && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || ($0.lastMessage?.localizedCaseInsensitiveContains(query) ?? false))
         }
     }
 
@@ -1595,6 +1595,14 @@ struct ConnectionSettingsView: View {
                     Label("The private key stays in this iPhone’s Keychain.", systemImage: "iphone.gen3")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+                #if OPENBOT_PERSONAL_PREVIEW
+                Section("Personal preview") {
+                    Label("Push notification delivery is not available in this preview.", systemImage: "bell.slash")
+                    Label("Share-sheet delivery is not available in this preview.", systemImage: "square.and.arrow.up")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                #endif
                 Section("Notifications") {
                     Label(
                         session.nativePushReady ? "Native notifications are ready" : push.state == .denied ? "Notifications are off in iPhone Settings" : "Get results and approvals while OpenBot is closed",

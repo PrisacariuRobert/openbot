@@ -3,13 +3,32 @@ import SwiftUI
 @testable import OpenBot
 
 final class ConnectionAddressTests: XCTestCase {
+    func testConversationPreviewKeepsLatestMessageAndRetiredDirectShellIsHidden() throws {
+        let data = Data(#"{"id":"one","title":"Pixel","kind":"direct","botId":"pixel","updatedAt":"2026-09-06T12:00:00Z","lastMessage":"The report is ready.\nOpen it when you can."}"#.utf8)
+        let thread = try JSONDecoder().decode(StudioThread.self, from: data)
+
+        XCTAssertEqual(thread.conversationPreview, "The report is ready. Open it when you can.")
+        XCTAssertFalse(thread.isVisibleConversation(in: []))
+    }
+
+    func testRoomsAndActiveDirectConversationsRemainVisible() throws {
+        let direct = try JSONDecoder().decode(StudioThread.self, from: Data(#"{"id":"one","title":"Pixel","kind":"direct","botId":"pixel","updatedAt":"2026-09-06T12:00:00Z"}"#.utf8))
+        let room = try JSONDecoder().decode(StudioThread.self, from: Data(#"{"id":"room","title":"Launch","kind":"room","botId":null,"updatedAt":"2026-09-06T12:00:00Z"}"#.utf8))
+        let bot = try JSONDecoder().decode(StudioBot.self, from: Data(##"{"id":"pixel","name":"Pixel","mascot":"spark","color":"#000000","role":"Teammate","status":"idle","threadId":"one","lastActiveAt":null}"##.utf8))
+
+        XCTAssertTrue(direct.isVisibleConversation(in: [bot]))
+        XCTAssertTrue(room.isVisibleConversation(in: []))
+    }
+
     func testFailureNoticesStayAtTheirPositionInTheConversation() throws {
-        let data = Data(##"{"bots":[],"threads":[],"messages":[{"id":"failed-message","threadId":"t","senderType":"system","senderName":"Studio","body":"Stopped","createdAt":"2026-09-08T10:00:00Z","runId":"old","attachments":[]},{"id":"new-message","threadId":"t","senderType":"user","senderName":"You","body":"Hi","createdAt":"2026-09-09T10:00:00Z","attachments":[]}],"runs":[{"id":"old","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-08T09:00:00Z"},{"id":"orphan","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-07T09:00:00Z"}],"approvals":[],"workflows":[],"usage":{"totalTokens":0,"completedRuns":0,"activeRuns":0},"activeThreadId":"t"}"##.utf8)
+        let data = Data(##"{"bots":[],"threads":[{"id":"t","title":"Launch","kind":"room","botId":null,"updatedAt":"2026-09-09T10:00:00Z","lastMessage":"The newest conversation message"}],"messages":[{"id":"failed-message","threadId":"t","senderType":"system","senderName":"Studio","body":"Stopped","createdAt":"2026-09-08T10:00:00Z","runId":"old","attachments":[]},{"id":"new-message","threadId":"t","senderType":"user","senderName":"You","body":"Hi","createdAt":"2026-09-09T10:00:00Z","attachments":[]}],"runs":[{"id":"old","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-08T09:00:00Z"},{"id":"orphan","threadId":"t","botId":"b","botName":"Bot","botMascot":"blob","botColor":"#444444","attemptCount":1,"status":"failed","startedAt":"2026-09-07T09:00:00Z"}],"approvals":[],"workflows":[],"usage":{"totalTokens":0,"completedRuns":0,"activeRuns":0},"activeThreadId":"t"}"##.utf8)
         let state = try JSONDecoder().decode(StudioState.self, from: data)
         XCTAssertEqual(state.failure(for: state.messages[0])?.id, "old")
         XCTAssertNil(state.failure(for: state.messages[1]))
         XCTAssertTrue(state.unplacedFailures(in: "t").isEmpty)
         XCTAssertEqual(state.failedRuns(in: "t").count, 2) // History stays in Activity.
+        XCTAssertFalse(state.attentionItems.isEmpty)
+        XCTAssertEqual(state.threads[0].conversationPreview, "The newest conversation message")
     }
 
     func testCurrentLocalHostConversationContractReadOnly() async throws {

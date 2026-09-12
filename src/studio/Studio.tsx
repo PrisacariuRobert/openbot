@@ -1,4 +1,5 @@
 import {
+  Fragment,
   lazy,
   Suspense,
   useEffect,
@@ -23,7 +24,6 @@ import {
   LoaderCircle,
   MessageCircle,
   Monitor,
-  MoreHorizontal,
   Pin,
   Plus,
   Search,
@@ -56,14 +56,18 @@ import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
 import { ConversationContext } from "./ConversationContext";
+import { ConversationActions } from "./ConversationActions";
 import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
+import { ConversationProgress } from "./ConversationProgress";
 import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
 import { WorkReceipt } from "../CapabilityPanels";
+import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
+import { groupConsecutiveActionEvents } from "./action-event-groups";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { AppearanceEditor } from "./AppearanceEditor";
@@ -213,6 +217,12 @@ function Empty({ title, children }: { title: string; children?: ReactNode }) {
       {children && <p>{children}</p>}
     </div>
   );
+}
+function CancelledRunOutcome({ run, onReview, dated = false }: { run: Run; onReview: () => void; dated?: boolean }) {
+  return <div className="chat-event cancelled-run-outcome" role="status" data-event="run_stopped">
+    <span className="chat-event-mark" aria-hidden="true"><MessageCircle size={14} /></span>
+    <span><strong>{run.botName} · Stopped{dated && run.finishedAt ? ` · ${dateText(run.finishedAt)}` : ""}</strong><button type="button" className="text-action" onClick={onReview}>Review saved progress</button></span>
+  </div>;
 }
 function eventTitle(message: Message): string {
   const data = message.eventData || {};
@@ -572,6 +582,7 @@ export function Studio() {
     state?.studioRuns.filter(
       (run) => !run.parentRunId && activeStates.includes(run.status),
     ) || [];
+  const conversationFiles = useMemo(() => state?.messages.flatMap((message) => message.attachments) || [], [state?.messages]);
   const attention =
     state?.studioRuns.filter((run) =>
       ["failed", "awaiting_approval"].includes(run.status),
@@ -614,10 +625,14 @@ export function Studio() {
       .sort((a, b) => a.nextRunAt!.localeCompare(b.nextRunAt!)) || [];
   const threadTitle =
     state?.threads.find((item) => item.id === thread)?.title || "Conversation";
+  const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
+  const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
+  const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
   const conversationBot =
     page === "chat"
       ? state?.bots.find((bot) => bot.threadId === thread)
       : undefined;
+  const conversationThread = page === "chat" ? state?.threads.find((item) => item.id === thread) : undefined;
   const title =
     page === "chat"
       ? threadTitle
@@ -754,7 +769,7 @@ export function Studio() {
           onClick={() => void toggleMode()}
           disabled={modeBusy}
           aria-pressed={yoloMode}
-          title={yoloMode ? "YOLO mode is on: reviews are auto-approved. Click to go back to asking first." : "Ask first: new work waits for your approval. Click for YOLO mode."}
+          title={yoloMode ? "YOLO mode is on: reviews are auto-approved. Click to go back to asking first." : "Ask first: work can start, but actions requiring review wait for your approval. Click to change approval mode."}
         >
           <ShieldQuestion size={15} />
           {yoloMode ? "YOLO" : "Ask first"}
@@ -1057,7 +1072,7 @@ export function Studio() {
         <header className="topbar">
           <span>
             <button
-              className="conversation-back"
+              className="topbar-control conversation-back"
               aria-label="All conversations"
               onClick={() => navigate("home")}
             >
@@ -1065,7 +1080,7 @@ export function Studio() {
             </button>
             {conversationBot ? (
               <button
-                className="conversation-identity"
+                className="topbar-control conversation-identity"
                 aria-label={`About ${conversationBot.name}`}
                 onClick={() =>
                   setDetail({ kind: "teammate", bot: conversationBot })
@@ -1080,14 +1095,9 @@ export function Studio() {
             )}
           </span>
           <div>
-            <button
-              aria-label="Create teammate"
-              onClick={() => setDetail({ kind: "create" })}
-            >
-              <Plus size={18} strokeWidth={1.5} />
-            </button>
             {page === "chat" && state?.bots.length ? (
               <button
+                className="topbar-control"
                 aria-label="Conversation details"
                 onClick={() =>
                   narrow
@@ -1099,18 +1109,23 @@ export function Studio() {
               </button>
             ) : null}
             <button
-              className="mobile-search"
+              className="topbar-control mobile-search"
               aria-label="Search"
               onClick={() => setDetail({ kind: "search" })}
             >
               <Search size={18} />
             </button>
-            <button
-              aria-label="Workspace"
-              onClick={() => setDetail({ kind: "workspace" })}
-            >
-              <MoreHorizontal size={20} strokeWidth={1.5} />
-            </button>
+            {page === "chat" && conversationThread && <ConversationActions
+              key={thread}
+              thread={conversationThread}
+              bot={conversationBot}
+              onEditTeammate={conversationBot ? () => openCapability("bot", conversationBot.threadId) : undefined}
+              onEditGroup={thread.startsWith("group-") ? () => setDetail({ kind: "group", threadId: thread }) : undefined}
+              onDetails={() => narrow ? setDetail({ kind: "context" }) : setContextOpen(true)}
+              onWorkspace={() => setDetail({ kind: "workspace" })}
+              onNewTeammate={() => setDetail({ kind: "create" })}
+              onRemoved={() => { setRefresh((value) => value + 1); openThread("team-room"); }}
+            />}
           </div>
         </header>
         {error && (
@@ -1580,6 +1595,9 @@ export function Studio() {
                       </div>
                     ) : (
                       state.messages.map((message, index) => {
+                        if (actionGroupMemberIds.has(message.id)) return null;
+                        const actionGroup = actionGroupByFirstId.get(message.id);
+                        const cancelledOutcome = cancelledRunForTrigger(state.runs, state.messages, message.id);
                         const previous = index > 0 ? state.messages[index - 1] : undefined;
                         const startsGroup =
                           !previous ||
@@ -1588,7 +1606,9 @@ export function Studio() {
                           message.senderType === "system";
                         if (message.kind === "event") {
                           return (
-                            <div className="chat-event" key={message.id} data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
+                            <Fragment key={message.id}>{actionGroup ? <div className="chat-event action-completed-group" role="status" data-event="action_completed">
+                              <details><summary><Check size={14} aria-hidden="true" /><span>{actionGroup.length} reviewed steps</span><ChevronDown size={14} aria-hidden="true" /></summary><div className="action-completed-records">{actionGroup.map((item) => <p key={item.id}><strong>{eventTitle(item)}</strong>{eventDetail(item) && <small>{eventDetail(item)}</small>}</p>)}</div></details>
+                            </div> : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
                                 {message.eventType === "routine_created" ? <Clock size={14} /> : message.eventType === "handoff" ? <ArrowRightLeft size={14} /> : message.eventType === "routine_run" ? <Zap size={14} /> : <MessageCircle size={14} />}
                               </span>
@@ -1597,13 +1617,13 @@ export function Studio() {
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button>; })()}
                               </span>
-                            </div>
+                            </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                           );
                         }
                         return (
-                          <article
+                          <Fragment key={message.id}><article
                             className={`chat-message ${message.senderType === "user" ? "from-you" : "from-team"} ${startsGroup ? "" : "continues"}`}
-                            key={message.id}
+
                           >
                             {message.senderType !== "user" && startsGroup && (
                               <div className="message-author">
@@ -1627,12 +1647,16 @@ export function Studio() {
                               )}
                             </div>
                             {message.senderType === "bot" && message.runId
-                              ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} />
+                              ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
-                          </article>
+                          </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })
                     )}
+                    {state.activeThreadId === thread && (() => {
+                      const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);
+                      return fallback ? <CancelledRunOutcome run={fallback} dated onReview={() => setDetail({ kind: "run", run: fallback })} /> : null;
+                    })()}
                     {state.activeThreadId === thread &&
                       state.approvals.filter((approval) => approval.status === "pending").map((approval) => {
                         const run = state.runs.find((item) => item.id === approval.runId);
@@ -1646,26 +1670,7 @@ export function Studio() {
                             activeStates.includes(run.status),
                         )
                         .map((run) => (
-                          <div className="chat-progress" key={run.id}>
-                            <Character
-                              name={run.botName}
-                              color={run.botColor}
-                              variant={run.botMascot}
-                              status="working"
-                              size={31}
-                            />
-                            <span>
-                              {run.botName} · {labelFor(run.status)}
-                              {run.partialText && (
-                                <div className="prose">
-                                  <ReactMarkdown>
-                                    {run.partialText}
-                                  </ReactMarkdown>
-                                </div>
-                              )}
-                            </span>
-                            <RunControls run={run} onChange={() => setRefresh((value) => value + 1)} />
-                          </div>
+                          <ConversationProgress key={run.id} run={run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
                         ))}
                     <div ref={messagesEnd} />
                   </div>
@@ -1862,7 +1867,7 @@ export function Studio() {
                 <ArrowRight size={15} />
               </button>
               <AppearanceEditor key={detail.bot.id} bot={detail.bot} onSaved={(bot) => { setDetail({ kind: "teammate", bot }); setRefresh((n) => n + 1); }}/>
-              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`}>Instructions & permissions <ArrowRight size={14}/></a>
+              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
             </div>
           )}
           {detail.kind === "settings" && (
@@ -1961,6 +1966,7 @@ export function Studio() {
                   <ReactMarkdown>{detail.run.summary}</ReactMarkdown>
                 </div>
               )}
+              {!detail.run.summary && detail.run.partialText && <details className="message-work-updates"><summary>Latest work update</summary><div className="prose"><MarkdownMessage body={detail.run.partialText} /></div></details>}
               <DeliveryReceipt run={detail.run} teammates={state?.bots} />
               <WorkReceipt runId={detail.run.id} />
               <button

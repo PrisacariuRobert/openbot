@@ -37,6 +37,10 @@ test("current task prompts surface relevant methods, honor opt-outs and preserve
     const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", runtimeCheck: () => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const }), attachments: new AttachmentService(db) });
     const run = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Extract document obligations and action items from a policy", status: "queued" });
     const prompt = runner["buildPrompt"](run, db.getBot("nova")!, false);
+    assert.match(prompt, /Conversation style:/);
+    assert.match(prompt, /Never hide a failure/);
+    assert.match(prompt, /Keep checksums, byte counts, tool names/);
+    assert.match(runner["buildPrompt"](run, db.getBot("nova")!, true), /Conversation style:/);
     assert.match(prompt, /bundled-document-to-action-items/);
     const context = prompt.split("Reviewed methods already available")[1]!.split("Completion rules:")[0]!;
     assert.equal((context.match(/- bundled-/g) || []).length, 3);

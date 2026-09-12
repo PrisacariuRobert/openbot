@@ -912,7 +912,21 @@ export class BrowserManager {
         return (el.getAttribute('aria-label') || clone.textContent || '').replace(/\s+/g, ' ').trim();
       });
       const label = (node.getAttribute("aria-label") || labelTexts.slice(0, -1).join(" ") || labelTexts.at(-1) || node.getAttribute("name") || "").trim().slice(0, 240);
-      const scope = form || node.closest('[role="dialog"]') || document.body;
+      const controlledIds = (node.getAttribute("aria-controls") || "").trim().split(/\s+/).filter(Boolean);
+      const disclosure = node.matches('button,[role="button"]') && node.getAttribute("aria-expanded") === "false" && controlledIds.length > 0 && controlledIds.length <= 3 && controlledIds.every(id => id.length <= 200)
+        ? { expanded: false as const, controls: controlledIds }
+        : null;
+      const stateful = node.matches('input,textarea,select,[contenteditable="true"],[role="checkbox"],[role="switch"],[role="radio"],[role="option"],[role="slider"],[role="spinbutton"],[role="textbox"],[role="combobox"]')
+        || ['aria-pressed', 'aria-checked', 'aria-selected'].some(attribute => node.hasAttribute(attribute));
+      const dialog = node.closest('dialog,[role="dialog"]');
+      // Navigation controls in app sidebars must not become unreviewable just
+      // because an unrelated document editor exists elsewhere on the page.
+      // This changes review metadata only; clicks still require exact approval.
+      const navigation = !form && !dialog && node.matches('button,a,[role="button"],[role="link"]')
+        ? node.closest('nav,aside,[role="navigation"],[role="menu"]')
+        : null;
+      const scope = form || dialog || navigation || document.body;
+      const contextScope = form ? "form" as const : dialog ? "dialog" as const : navigation ? "navigation" as const : "page" as const;
       const controls = [...scope.querySelectorAll<HTMLElement>('input:not([type="hidden"]),textarea,select,[contenteditable="true"]')].filter(el => el.getClientRects().length > 0);
       let complete = controls.length <= 24;
       const fields = controls.slice(0, 24).map((el, index) => {
@@ -934,7 +948,8 @@ export class BrowserManager {
         autocomplete: node.getAttribute("autocomplete") || "", href: node instanceof HTMLAnchorElement ? node.href : "",
         formMethod: form?.method.toLowerCase() || "",
         searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
-        review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), fields, complete },
+        stateful,
+        review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), fields, contextScope, disclosure, complete },
       };
     }, undefined, { timeout: 12_000 });
     this.assertPageAccess(botId, page);

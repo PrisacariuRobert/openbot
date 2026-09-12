@@ -81,6 +81,12 @@ function asBoolean(value: string | number | null | undefined): boolean {
   return value === 1 || value === "1";
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
 function jsonArray<T>(value: string | number | null | undefined): T[] {
   if (typeof value !== "string" || !value) return [];
   try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed as T[] : []; }
@@ -122,6 +128,7 @@ export class OpenBotDatabase {
   readonly attachmentsDir: string;
   readonly vault: SecretVault;
   private readonly db: DatabaseSync;
+  private readonly runStatusListeners = new Set<(runId: string, status: RunStatus) => void>();
 
   constructor(rootDir: string, options: { dataDir?: string; seedStarterBots?: boolean } = {}) {
     this.rootDir = rootDir;
@@ -144,6 +151,11 @@ export class OpenBotDatabase {
 
   close() {
     this.db.close();
+  }
+
+  onRunStatusChange(listener: (runId: string, status: RunStatus) => void) {
+    this.runStatusListeners.add(listener);
+    return () => this.runStatusListeners.delete(listener);
   }
 
   extensionRecords<T>(kind: string): Array<{ id: string; value: T }> {
@@ -1221,10 +1233,10 @@ export class OpenBotDatabase {
   /** Retire a teammate: history is preserved, but they leave the roster and
    * cannot start new work. Restore brings them back subject to the cap. */
   retireBot(id: string): Bot | null {
-    const bot = this.getBot(id);
-    if (!bot || bot.retiredAt) return null;
-    this.db.prepare("UPDATE bots SET retired_at=? WHERE id=?").run(now(), id);
-    return this.getBot(id);
+    const result = this.db.prepare(
+      "UPDATE bots SET retired_at=? WHERE id=? AND retired_at IS NULL",
+    ).run(now(), id);
+    return result.changes === 1 ? this.getBot(id) : null;
   }
 
   restoreBot(id: string): Bot | null {
@@ -1506,6 +1518,13 @@ export class OpenBotDatabase {
     return rows.map((row) => this.messageFromRow(row));
   }
 
+  /** Delivered identity must not depend on how much chat history is loaded. */
+  listRunArtifacts(runId: string): Attachment[] {
+    return (this.db.prepare(`SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id JOIN runs r ON r.id=m.run_id
+      WHERE r.id=? AND a.thread_id=r.thread_id AND a.source='artifact' ORDER BY a.created_at,a.rowid`).all(runId) as Row[])
+      .map((row) => this.attachmentFromRow(row));
+  }
+
   toggleMessageReaction(messageId: string, emoji: string): Message | null {
     const message = this.getMessage(messageId);
     if (!message) return null;
@@ -1635,8 +1654,10 @@ export class OpenBotDatabase {
     const finished = now();
     this.db.exec("BEGIN");
     try {
+      const cancellingRunIds = (this.db.prepare("SELECT id FROM runs WHERE status NOT IN ('completed','failed','cancelled')").all() as Row[]).map(row => String(row.id));
       this.db.prepare("UPDATE runs SET status='cancelled', finished_at=? WHERE status NOT IN ('completed','failed','cancelled')").run(finished);
       counts.cancelledRuns = Number((this.db.prepare("SELECT changes() AS n").get() as Row).n);
+      for (const runId of cancellingRunIds) for (const listener of this.runStatusListeners) listener(runId, "cancelled");
       const wipe = (table: string, where = "") => {
         this.db.prepare(`DELETE FROM ${table}${where ? ` WHERE ${where}` : ""}`).run();
         counts[table] = Number((this.db.prepare("SELECT changes() AS n").get() as Row).n);
@@ -1840,6 +1861,7 @@ export class OpenBotDatabase {
     };
     return {
       id, threadId: String(row.thread_id), botId: String(row.bot_id), botName: String(row.bot_name), botEmoji: String(row.bot_emoji),
+      review: this.extensionRecord<NonNullable<Run["review"]>>("run-review", id),
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, triggerMessageId: row.trigger_message_id ? String(row.trigger_message_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
@@ -2090,6 +2112,7 @@ export class OpenBotDatabase {
       const routine = this.getRoutine(String(current.routine_id));
       this.createAutomationAlert({ routineId: String(current.routine_id), runId: id, eventId: current.automation_event_id ? String(current.automation_event_id) : null, kind: "approval", message: `${routine?.name || "An automation"} is waiting for your approval.` });
     }
+    if (statusChanged) for (const listener of this.runStatusListeners) listener(id, patch.status!);
   }
 
   setRunPrompt(id: string, prompt: string) {
@@ -3344,6 +3367,32 @@ export class OpenBotDatabase {
     return this.getRoutine(id)!;
   }
 
+  /** Idempotency is deliberately scoped to one model run and one exact,
+   * normalized payload. The receipt outlives deletion so a transport retry can
+   * never recreate something the owner intentionally removed. */
+  createRoutineForRun(runId: string, input: Parameters<OpenBotDatabase["createRoutine"]>[0]): { routine: Routine | null; replayed: boolean; deleted: boolean } {
+    const digest = createHash("sha256").update(stableJson(input)).digest("hex");
+    const receiptId = `${runId}:${digest}`;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const run = this.getRun(runId);
+      if (!run || run.botId !== input.botId || run.threadId !== input.threadId) throw new Error("The routine does not belong to this task.");
+      const existing = this.extensionRecord<{ routineId: string }>("routine-create", receiptId);
+      if (existing) {
+        const routine = this.getRoutine(existing.routineId);
+        this.db.exec("COMMIT");
+        return { routine, replayed: true, deleted: !routine };
+      }
+      const routine = this.createRoutine(input);
+      this.saveExtensionRecord("routine-create", receiptId, { routineId: routine.id });
+      this.db.exec("COMMIT");
+      return { routine, replayed: false, deleted: false };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   private routineFromRow(row: Row): Routine {
     const schedule = row.schedule_json ? routineScheduleInput.parse(JSON.parse(String(row.schedule_json))) : intervalSchedule;
     let watchStatus: Routine["watchStatus"];
@@ -3565,7 +3614,8 @@ export class OpenBotDatabase {
     return {
       id: String(row.id), routineId: String(row.routine_id), routineName: String(row.routine_name), runId: row.run_id ? String(row.run_id) : null,
       eventId: row.event_id ? String(row.event_id) : null, kind: String(row.kind) as AutomationAlert["kind"], message: String(row.message),
-      repairHint: automationRepairHint(error), createdAt: String(row.created_at), resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
+      repairHint: row.kind === "missed" && !event?.error && String(row.message).includes("caught up once")
+        ? null : automationRepairHint(error), createdAt: String(row.created_at), resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
     };
   }
 

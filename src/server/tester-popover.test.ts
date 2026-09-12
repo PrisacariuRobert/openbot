@@ -106,10 +106,10 @@ async function openTeammateMenu(f: Fixture): Promise<{ sessionId: string; option
     }
     throw new Error(`timed out waiting for ${label}:\n${await snap()}`);
   };
-  // Mirror the acceptance journey: thread -> About -> Instructions &
-  // permissions -> Teammate combobox.
+  // Mirror the current journey: thread -> About -> Edit & manage teammate
+  // -> Teammate combobox.
   await clickRef(refOf(await waitFor(/button: About Nova/, "About Nova"), /button: About Nova/));
-  await clickRef(refOf(await waitFor(/link: Instructions & permissions/, "Instructions & permissions"), /link: Instructions & permissions/));
+  await clickRef(refOf(await waitFor(/link: Edit & manage teammate/, "Edit & manage teammate"), /link: Edit & manage teammate/));
   const snap1 = await waitFor(/combobox: Teammate/, "Teammate combobox");
   const comboRef = refOf(snap1, /combobox: Teammate/);
   await clickRef(comboRef);

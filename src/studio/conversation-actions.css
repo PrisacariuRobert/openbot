@@ -1,0 +1,47 @@
+.conversation-actions { display: inline-flex; }
+.conversation-actions-popover {
+  position: fixed;
+  top: var(--conversation-actions-top, 56px);
+  right: auto;
+  bottom: auto;
+  left: var(--conversation-actions-left, calc(100vw - 292px));
+  width: min(280px, calc(100vw - 24px));
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .2);
+}
+.conversation-actions-popover::backdrop { background: transparent; }
+.conversation-actions-menu { display: grid; gap: 2px; }
+.conversation-actions-popover .conversation-actions-menu > button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.conversation-actions-popover .conversation-actions-menu > button:hover,
+.conversation-actions-popover .conversation-actions-menu > button:focus-visible { background: var(--surface-muted); }
+.conversation-actions-menu span { display: grid; gap: 2px; text-align: left; }
+.conversation-actions-menu .conversation-remove-item { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 9px 9px; color: var(--danger, #a53a3a); }
+.conversation-remove-confirm { display: grid; gap: 12px; padding: 8px; }
+.conversation-remove-confirm > p { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.5; }
+.conversation-remove-confirm > div { display: flex; justify-content: flex-end; gap: 8px; }
+.conversation-actions-popover .conversation-remove-confirm button { width: auto; height: auto; min-height: 44px; padding: 8px 12px; border-radius: 9px; }
+.conversation-remove-confirm-button { color: var(--danger, #a53a3a); }
+.conversation-remove-confirm .conversation-actions-error { color: var(--danger, #a53a3a); }
+@media (max-width: 600px) {
+  .conversation-actions-popover { top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; }
+}

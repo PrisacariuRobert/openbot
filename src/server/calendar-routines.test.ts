@@ -5,7 +5,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { OpenBotDatabase } from "./testing/database.js";
+import { internalRoutineEnabled } from "./routine-activation.js";
 import type { Routine } from "../shared/types.js";
+
+test("internal routine creation requires explicit activation", () => {
+  assert.equal(internalRoutineEnabled(undefined), false);
+  assert.equal(internalRoutineEnabled(false), false);
+  assert.equal(internalRoutineEnabled(true), true);
+});
 
 const input = { name: "Morning brief", botId: "nova", threadId: "bot-nova", prompt: "Prepare my brief", intervalMinutes: 1440 };
 const calendar = { kind: "calendar" as const, timeZone: "Europe/Brussels", time: "08:00", daysOfWeek: [1, 2, 3, 4, 5] };
@@ -77,6 +84,7 @@ test("a week of virtual downtime catches up once, then returns to calendar time"
     assert.equal(db.getRoutine(routine.id)!.nextRunAt, "2026-04-06T06:00:00.000Z");
     assert.equal(db.listAutomationAlerts().filter((a) => a.kind === "missed").length, 1);
     assert.match(db.listAutomationAlerts()[0]!.message, /caught up once/);
+    assert.equal(db.listAutomationAlerts()[0]!.repairHint, null, "successful catch-up must not suggest a failed run or duplicate retry");
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

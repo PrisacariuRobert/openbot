@@ -3,7 +3,7 @@ import { taskTokenRequestSchema, type TaskTokenReview } from "./task-token-budge
 import { codePublicationReviewSchema } from "./code-publication";
 import { authoredSkillSchema } from "./skill-authoring";
 import { gmailReplyReviewSchema } from "./gmail-reply";
-import { browserControlApprovalSchema } from "./browser-control-review";
+import { browserControlApprovalSchema, type BrowserNavigationAllowanceOffer } from "./browser-control-review";
 import { signInOrigin, type BrowserSignInHandoff } from "./browser-sign-in";
 
 export interface ApprovalPreview {
@@ -18,6 +18,7 @@ export interface ApprovalPreview {
   /** Opaque server-issued binding; missing on older hosts means no approval. */
   reviewFingerprint: string | null;
   browserSignIn?: BrowserSignInHandoff;
+  browserNavigationAllowance?: BrowserNavigationAllowanceOffer;
   taskTokens?: TaskTokenReview;
 }
 
@@ -144,14 +145,28 @@ export function approvalPreview(
     } catch { incomplete = true; }
   } else if ((object.type === "browser_click" || object.type === "browser_type") && approval.kind === "browser") {
     const parsed = browserControlApprovalSchema.safeParse(args);
-    if (!parsed.success || (object.type === "browser_type" && typeof args.value !== "string") || (object.type === "browser_click" && args.value !== undefined)) incomplete = true;
+    if (!parsed.success || (object.type === "browser_type" && (typeof args.value !== "string" || args.navigationAllowanceOffer !== undefined)) || (object.type === "browser_click" && args.value !== undefined)) incomplete = true;
     else {
       const target = parsed.data.targetReview;
+      if (object.type === "browser_click" && parsed.data.navigationAllowanceOffer) preview.browserNavigationAllowance = parsed.data.navigationAllowanceOffer;
       preview.actionLabel = visible(`${object.type === "browser_click" ? "Click" : "Enter text in"} “${target.label}” on ${new URL(target.url).hostname}`);
       preview.fields.push({ label: "Website", value: visible(target.url) }, { label: "Private browser", value: `${approval.botName}’s existing profile. The website—not an API connection—determines the signed-in account.` }, { label: "Control", value: visible(`${target.label} (${target.control})`) });
+      if (object.type === "browser_click" && target.disclosure) preview.fields.push({
+        label: "Page state",
+        value: "The website describes this as collapsed content. That description does not prove the click is read-only.",
+      });
+      if (object.type === "browser_click" && target.contextScope === "navigation") preview.fields.push({
+        label: "Review scope",
+        value: "Visible fields in this navigation area only. Unrelated page content is excluded; this click may still affect it.",
+      });
       if (object.type === "browser_type") field("value", "Exact text to enter", true);
       for (const item of target.fields) preview.fields.push({ label: visible(`On the page: ${item.label}`), value: visible(item.value) || "Empty" });
-      preview.fields.push({ label: "Effect", value: object.type === "browser_click" ? "Click this one control. It may submit these visible form values or change information. Review the page in Agent Computer when needed. The page, control and visible field values are checked again before the click; a change requires a fresh review. This does not approve later clicks." : "Replace this field with the exact text shown. Websites may autosave typed content. The page and visible field values are checked again before typing. This does not approve a later send or submit." });
+      preview.fields.push({ label: "Effect", value: object.type === "browser_click" ? target.contextScope === "navigation"
+        ? "Click this exact control once. It may run website code or affect content outside this navigation area. The URL, control and displayed navigation fields are checked again; excluded page content is not. This does not approve later clicks."
+        : target.disclosure
+        ? "Click this exact control once. It may still run website code, navigate, or change data. The page and control are checked again first; a change requires fresh review. Later clicks need separate review."
+        : "Click this one control. It may submit these visible form values or change information. Review the page in Agent Computer when needed. The page, control and visible field values are checked again before the click; a change requires a fresh review. This does not approve later clicks."
+        : "Replace this field with the exact text shown. Websites may autosave typed content. The page and visible field values are checked again before typing. This does not approve a later send or submit." });
     }
   } else if (object.type === "gmail_reply") {
     if (!gmailReplyReviewSchema.safeParse(args).success || args.account !== accountLabel?.toLowerCase()) incomplete = true;

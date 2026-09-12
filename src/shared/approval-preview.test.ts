@@ -35,6 +35,68 @@ test('browser review shows the exact control and visible fields without pretendi
   assert.equal(typed.canApprove, true); assert.ok(typed.fields.some(field => field.value === 'A complete replacement'));
 });
 
+test('browser disclosure review stays approval-gated but gives a truthful one-click preview without form fields', () => {
+  const input = {
+    selector: '#browse-channels',
+    targetFingerprint: 'b'.repeat(64),
+    targetReview: {
+      url: 'https://app.slack.com/client/workspace',
+      label: 'Browse channels',
+      control: 'button',
+      fields: [],
+      contextScope: 'navigation' as const,
+      disclosure: { expanded: false as const, controls: ['channel-browser'] },
+      complete: true as const,
+    },
+  };
+  const result = buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: input });
+  assert.equal(result.canApprove, true);
+  assert.equal(result.limitation, null);
+  assert.match(result.fields.find(field => field.label === 'Page state')?.value || '', /does not prove the click is read-only/);
+  assert.match(result.fields.find(field => field.label === 'Review scope')?.value || '', /Unrelated page content is excluded/);
+  assert.match(result.fields.find(field => field.label === 'Effect')?.value || '', /may run website code or affect content outside this navigation area/);
+  assert.match(result.fields.find(field => field.label === 'Effect')?.value || '', /excluded page content is not/);
+
+  const generic = buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: { ...input, targetReview: { ...input.targetReview, disclosure: null } } });
+  assert.equal(generic.canApprove, true, 'a precise non-form control review does not require visible fields');
+  assert.equal(generic.fields.some(field => field.label === 'Page state'), false);
+
+  const privateNavigation = buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: { ...input, targetReview: { ...input.targetReview, complete: false, fields: [{ label: 'Password', value: '[Private field hidden]' }] } } });
+  assert.equal(privateNavigation.canApprove, false, 'private navigation fields remain fail-closed');
+  const oversizedPage = buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: { ...input, targetReview: { ...input.targetReview, contextScope: 'page', disclosure: null, complete: false, fields: [{ label: 'Editor', value: 'x'.repeat(2000) }] } } });
+  assert.equal(oversizedPage.canApprove, false, 'an incomplete body fallback remains blocked');
+  const form = buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: { ...input, targetReview: { ...input.targetReview, contextScope: 'form', disclosure: null, fields: [{ label: 'Title', value: 'Project charter' }] } } });
+  assert.equal(form.canApprove, true);
+  assert.ok(form.fields.some(field => field.label === 'On the page: Title' && field.value === 'Project charter'), 'form fields retain full review priority');
+
+  for (const targetReview of [
+    { ...input.targetReview, disclosure: { expanded: true, controls: ['channel-browser'] } },
+    { ...input.targetReview, disclosure: { expanded: false, controls: [] } },
+    { ...input.targetReview, contextScope: 'unknown' },
+    { ...input.targetReview, label: '' },
+  ]) assert.equal(buildPreview({ ...approval, kind: 'browser' }, run, { type: 'browser_click', botId: 'bot', args: { ...input, targetReview } }).canApprove, false);
+});
+
+test('browser navigation allowance is a strict optional offer on an exact click review', () => {
+  const input = {
+    selector: '#search',
+    targetFingerprint: 'c'.repeat(64),
+    targetReview: { url: 'https://app.example.test/workspace', label: 'Search', control: 'button', fields: [], contextScope: 'navigation' as const, complete: true as const },
+    navigationAllowanceOffer: { version: 1 as const, origin: 'https://app.example.test', maxClicks: 12 as const, expiresInMinutes: 15 as const },
+  };
+  const browserApproval = { ...approval, kind: 'browser' as const };
+  const result = buildPreview(browserApproval, run, { type: 'browser_click', botId: 'bot', args: input });
+  assert.equal(result.canApprove, true);
+  assert.deepEqual(result.browserNavigationAllowance, input.navigationAllowanceOffer);
+  for (const navigationAllowanceOffer of [
+    { ...input.navigationAllowanceOffer, maxClicks: 99 },
+    { ...input.navigationAllowanceOffer, expiresInMinutes: 60 },
+    { ...input.navigationAllowanceOffer, origin: 'https://user:secret@app.example.test' },
+    { ...input.navigationAllowanceOffer, extra: true },
+  ]) assert.equal(buildPreview(browserApproval, run, { type: 'browser_click', botId: 'bot', args: { ...input, navigationAllowanceOffer } }).canApprove, false);
+  assert.equal(buildPreview(browserApproval, run, { type: 'browser_type', botId: 'bot', args: { ...input, value: 'query' } }).canApprove, false, 'typing can never carry a navigation offer');
+});
+
 function publicationFixture() {
   const snapshot: CodePublicationReview = {
     version: 1, projectId: "project", projectName: "Orders", ownerId: "owner", botId: "bot", runId: "run",

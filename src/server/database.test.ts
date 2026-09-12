@@ -133,6 +133,48 @@ test("stores and advances a five-minute enabled routine", () => {
   }
 });
 
+test("keeps internal routine creation idempotent only for an exact payload in one run", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-idempotency-test-"));
+  try {
+    let db = new OpenBotDatabase(root);
+    const makeRun = () => db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Create routines", status: "running" });
+    const firstRun = makeRun();
+    const input = { name: "Daily brief", botId: "nova", threadId: "bot-nova", prompt: "Write the brief.", intervalMinutes: 1440, enabled: false };
+    const first = db.createRoutineForRun(firstRun.id, input);
+    assert.equal(first.replayed, false);
+    const replay = db.createRoutineForRun(firstRun.id, input);
+    assert.equal(replay.replayed, true);
+    assert.equal(replay.routine?.id, first.routine?.id);
+    assert.equal(db.listRoutines().length, 1);
+    const secondConnection = new OpenBotDatabase(root);
+    assert.equal(secondConnection.createRoutineForRun(firstRun.id, input).routine?.id, first.routine?.id);
+    assert.equal(secondConnection.listRoutines().length, 1);
+    secondConnection.close();
+
+    const distinctPayload = db.createRoutineForRun(firstRun.id, { ...input, prompt: "Write a shorter brief." });
+    assert.equal(distinctPayload.replayed, false);
+    const secondRun = makeRun();
+    const distinctRun = db.createRoutineForRun(secondRun.id, input);
+    assert.equal(distinctRun.replayed, false);
+    assert.equal(db.listRoutines().length, 3);
+
+    db.close();
+    db = new OpenBotDatabase(root);
+    const afterRestart = db.createRoutineForRun(firstRun.id, input);
+    assert.equal(afterRestart.replayed, true);
+    assert.equal(afterRestart.routine?.id, first.routine?.id);
+    db.updateRoutine(first.routine!.id, { ...input, name: "Owner-edited brief" });
+    assert.equal(db.createRoutineForRun(firstRun.id, input).routine?.name, "Owner-edited brief");
+    assert.equal(db.deleteRoutine(first.routine!.id), true);
+    const afterDelete = db.createRoutineForRun(firstRun.id, input);
+    assert.deepEqual({ replayed: afterDelete.replayed, deleted: afterDelete.deleted, routine: afterDelete.routine }, { replayed: true, deleted: true, routine: null });
+    assert.equal(db.listRoutines().length, 2);
+    db.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("edits, pauses, retries, inspects, and deletes a routine without losing its results", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-ops-test-"));
   try {

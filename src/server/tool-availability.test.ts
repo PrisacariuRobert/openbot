@@ -19,6 +19,12 @@ test("standard reports expose only source collection and saved results", () => {
     assert.deepEqual(Object.keys(flags).filter((name) => flags[name]).sort(), ["work_collect", "work_report"]);
     assert.equal(flags.gmail_send, false);
     assert.equal(flags.task_plan, false);
+    assert.equal(flags.task_progress, false);
+    assert.equal(flags.task_verify, false);
+    assert.equal(flags.routine_create, false);
+    assert.equal(flags.remember, false);
+    assert.equal(flags.handoff, false);
+    assert.equal(flags.message_teammate, false);
     assert.equal(flags.read, false);
     assert.equal(flags.spreadsheet_export, false);
     assert.equal(flags.spreadsheet_inspect, false);
@@ -26,6 +32,7 @@ test("standard reports expose only source collection and saved results", () => {
     const workspace = prepareWorkspace(db, db.getBot("nova")!, true);
     const configuration = JSON.parse(readFileSync(path.join(workspace, "opencode.json"), "utf8"));
     assert.deepEqual(configuration.agent["openbot-report"].permission, { "*": "deny", work_collect: "allow", work_report: "allow" });
+    assert.equal(configuration.tools, undefined);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -49,8 +56,11 @@ test("keeps irrelevant app schemas out of a file-only task and updates after cap
       "mac_read",
     ])
       assert.equal(flags[name], false, name);
-    assert.equal(flags.task_plan, undefined);
-    assert.equal(flags.message_teammate, undefined);
+    assert.equal(flags.task_plan, true);
+    assert.equal(flags.task_progress, true);
+    assert.equal(flags.task_verify, true);
+    assert.equal(flags.handoff, true);
+    assert.equal(flags.message_teammate, true);
     assert.equal(flags.spreadsheet_export, true);
     assert.equal(flags.spreadsheet_inspect, true);
     assert.equal(flags.table_summary, true);
@@ -59,6 +69,15 @@ test("keeps irrelevant app schemas out of a file-only task and updates after cap
       readFileSync(path.join(workspace, "opencode.json"), "utf8"),
     );
     assert.equal(config.tools.gmail_search, false);
+    for (const name of ["task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate"]) {
+      assert.equal(config.tools[name], true, `${name} tool is exposed`);
+      assert.equal(config.permission[name], "allow", `${name} permission is allowed`);
+      assert.equal(config.agent.openbot.permission[name], "allow", `${name} agent permission is allowed`);
+    }
+    for (const name of ["read", "write", "edit", "bash", "webfetch", "apply_patch"]) {
+      assert.equal(config.tools[name], false, `${name} remains unavailable`);
+      assert.notEqual(config.permission[name], "allow", `${name} remains denied`);
+    }
     assert.match(readFileSync(path.join(workspace, ".opencode/tools/spreadsheet_export.ts"), "utf8"), /numberColumns/);
     db.updateStudioSettings({ macAccessEnabled: true });
     const updated = db.updateBot("nova", { browserEnabled: true })!;

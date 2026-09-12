@@ -297,7 +297,8 @@ p {
   display: flex;
   gap: 14px;
 }
-.topbar button {
+.topbar .topbar-control,
+.topbar .conversation-actions > button {
   color: var(--muted);
   display: grid;
   place-items: center;
@@ -305,7 +306,8 @@ p {
   height: 40px;
   border-radius: 7px;
 }
-.topbar button:hover {
+.topbar .topbar-control:hover,
+.topbar .conversation-actions > button:hover {
   background: var(--surface-muted);
 }
 .topbar .mobile-search {

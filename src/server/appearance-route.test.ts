@@ -110,8 +110,8 @@ test(
       );
       assert.equal(
         (await patch({ name: "Changed name" })).status,
-        400,
-        "The appearance exception cannot bypass other settings validation",
+        200,
+        "Basic profile edits remain available before model setup",
       );
       const snapshot = await (
         await fetch(`${base}/api/state?threadId=${bot.threadId}`)
@@ -124,6 +124,9 @@ test(
         "Changing appearance starts no model job",
       );
       assert.equal(snapshot.bots[0].color, "#687588");
+      assert.equal(snapshot.bots[0].name, "Changed name");
+      assert.equal(snapshot.bots[0].instructions, bot.instructions);
+      assert.equal(snapshot.bots[0].providerInstanceId, null);
       assert.equal(snapshot.bots[0].browserEnabled, false);
       assert.equal(snapshot.bots[0].model, "");
     } finally {

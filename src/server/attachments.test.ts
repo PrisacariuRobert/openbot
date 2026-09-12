@@ -137,3 +137,37 @@ test("turns workspace files mentioned by a teammate into reviewable result cards
     db.close();
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("resolves unchanged workspace-file follow-up links only to the same bot, thread, path, and revision", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-artifact-followup-"));
+  try {
+    const db = new OpenBotDatabase(root), service = new AttachmentService(db), pixel = db.getBot("pixel")!, nova = db.getBot("nova")!;
+    const pixelWorkspace = path.join(db.workspacesDir, pixel.id), novaWorkspace = path.join(db.workspacesDir, nova.id);
+    mkdirSync(pixelWorkspace, { recursive: true });
+    mkdirSync(novaWorkspace, { recursive: true });
+    writeFileSync(path.join(pixelWorkspace, "release-note-test.md"), "# Pixel release note\n");
+    writeFileSync(path.join(novaWorkspace, "release-note-test.md"), "# Nova private note\n");
+    const original = db.addMessage({ threadId: pixel.threadId, senderType: "bot", senderId: pixel.id, body: "[Release note](release-note-test.md)" });
+    const [artifact] = await service.captureArtifacts(pixel, original, original.body);
+
+    assert.equal(
+      await service.resolveExistingArtifactLinks(pixel, pixel.threadId, "Verified [the existing note](release-note-test.md)."),
+      `Verified [the existing note](${artifact!.url}).`,
+    );
+    assert.equal(
+      await service.resolveExistingArtifactLinks(nova, pixel.threadId, "[Wrong bot](release-note-test.md)"),
+      "[Wrong bot](release-note-test.md)",
+    );
+    assert.equal(
+      await service.resolveExistingArtifactLinks(pixel, "team-room", "[Wrong thread](release-note-test.md)"),
+      "[Wrong thread](release-note-test.md)",
+    );
+
+    writeFileSync(path.join(pixelWorkspace, "release-note-test.md"), "# Changed after capture\n");
+    assert.equal(
+      await service.resolveExistingArtifactLinks(pixel, pixel.threadId, "[Stale revision](release-note-test.md)"),
+      "[Stale revision](release-note-test.md)",
+    );
+    db.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

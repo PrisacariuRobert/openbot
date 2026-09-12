@@ -5,6 +5,7 @@ import { isFreeTierModel } from "../shared/provider-config";
 import { Character } from "./Character";
 import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
+import { createTeammatePayload } from "./create-teammate-payload";
 import "./create-teammate.css";
 
 interface ImportPlan {
@@ -108,18 +109,15 @@ export function CreateTeammate({
       const response = await fetch("/api/bots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(createTeammatePayload({
           name,
           role,
           instructions,
           color,
           mascot,
-          emoji: "●",
           providerInstanceId: providerId,
           model,
-          browserEnabled: false,
-          computerEnabled: false,
-        }),
+        })),
       });
       const result = await response.json();
       if (!response.ok)
@@ -233,28 +231,8 @@ export function CreateTeammate({
           onChange={(e) => setRole(e.target.value)}
           placeholder="For example, help plan my week"
         />
+        <small>Their job is used as instructions unless you add more.</small>
       </label>
-      <label>
-        How should they help?
-        <textarea
-          required
-          rows={3}
-          maxLength={2000}
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder="Tell them what a good result looks like, and what they should ask you before doing."
-        />
-      </label>
-      <details className="character-customize">
-        <summary>Make them yours</summary>
-        <AppearancePicker
-          name={name}
-          shape={mascot}
-          color={color}
-          onShape={setMascot}
-          onColor={setColor}
-        />
-      </details>
       <div className="creation-field">
         <span>AI connection</span>
         <ChoiceMenu
@@ -292,6 +270,25 @@ export function CreateTeammate({
       {connection && isFreeTierModel(model) && (
         <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
       )}
+      {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
+      <div className="teammate-section">
+        <label>
+          Additional instructions
+          <textarea
+            rows={3}
+            maxLength={2000}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Add what a good result looks like, and what they should ask you before doing."
+          />
+        </label>
+      </div>
+      <div className="teammate-section teammate-appearance">
+        <span className="section-label">Appearance</span>
+        <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
+      </div>
+      <details className="connection-management" open={providers && !providers.instances.some((item) => item.connected) ? true : undefined}>
+      <summary>Manage AI connections</summary>
       <a
         className="text-action"
         href="/?panel=provider"
@@ -311,6 +308,7 @@ export function CreateTeammate({
       >
         Refresh connections
       </button>
+      </details>
       <p className="boundary-note">
         No task starts yet. Existing Google-account permissions aren’t shared
         with this new teammate. Studio-wide Mac access, if enabled, still
@@ -417,7 +415,6 @@ export function CreateTeammate({
             busy ||
             !name.trim() ||
             !role.trim() ||
-            !instructions.trim() ||
             !validSelection
           }
         >

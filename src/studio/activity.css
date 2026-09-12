@@ -1,0 +1,128 @@
+/* Activity is a decision surface: compact status first, detail on demand. */
+.capabilities .live-studio-panel .live-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.capabilities .live-studio-panel .live-summary .live-summary-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.capabilities .live-studio-panel .live-summary .live-summary-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.capabilities .live-studio-panel .live-summary button {
+  flex: 0 1 auto;
+  justify-content: flex-start;
+}
+.capabilities .live-studio-panel .attention-more {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.capabilities .live-studio-panel .attention-more article {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.capabilities .live-studio-panel .attention-more > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: fit-content;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.capabilities .live-studio-panel .attention-more > summary::-webkit-details-marker { display: none; }
+.capabilities .live-studio-panel .attention-more[open] > summary > svg { transform: rotate(180deg); }
+.capabilities .live-studio-panel .activity-history-disclosure {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.capabilities .live-studio-panel .activity-history-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+.capabilities .live-studio-panel .activity-history-disclosure > summary::-webkit-details-marker { display: none; }
+.capabilities .live-studio-panel .activity-history-disclosure > summary > span {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.capabilities .live-studio-panel .activity-history-disclosure > summary small {
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.capabilities .live-studio-panel .activity-history-disclosure[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.capabilities .live-studio-panel .activity-history-disclosure .action-history-list article:last-child { border-bottom: 0; }
+.capabilities .live-studio-panel .live-attention header { margin-bottom: 2px; }
+.capabilities .live-studio-panel .live-attention article > span:nth-child(2) { overflow-wrap: anywhere; }
+.capabilities .live-studio-panel .live-attention { gap: 0; }
+.capabilities .live-studio-panel .live-attention > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.capabilities .live-studio-panel .live-attention > header > div { min-width: 0; }
+.capabilities .live-studio-panel .live-attention > article {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.capabilities .live-studio-panel .attention-reason {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--secondary);
+}
+.capabilities .live-studio-panel .attention-reason summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.capabilities .live-studio-panel .attention-reason small {
+  margin-top: 4px;
+  max-width: 58ch;
+}
+@media (max-width: 520px) {
+  .capabilities .live-studio-panel .live-summary .live-summary-pill { white-space: normal; }
+  .capabilities .live-studio-panel .live-attention article { grid-template-columns: auto minmax(0, 1fr); }
+  .capabilities .live-studio-panel .live-attention article > button { grid-column: 2; justify-self: start; }
+}
