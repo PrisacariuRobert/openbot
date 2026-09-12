@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { defaultConversation } from "../shared/default-conversation.js";
 import { TASK_TOKEN_TOP_UP, taskTokenAmountSchema, taskTokenRequestSchema, type TaskTokenPolicy, type TaskTokenReview } from "../shared/task-token-budget.js";
 import type { ExecutionLimits } from "./execution-policy.js";
 import { BUNDLED_ACCESS_KIND, bundledSkillsRevision } from "./bundled-skills.js";
@@ -420,6 +421,13 @@ export class OpenBotDatabase {
         attachment_id TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL,
         PRIMARY KEY(thread_id, attachment_id)
+      );
+      CREATE TABLE IF NOT EXISTS bot_saved_files (
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        attachment_id TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+        sha256 TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(bot_id, attachment_id)
       );
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
@@ -1607,6 +1615,22 @@ export class OpenBotDatabase {
     return { attachment: this.attachmentFromRow(row), storagePath: String(row.storage_path) };
   }
 
+  listBotSavedFileRecords(botId: string): Array<{ attachment: Attachment; storagePath: string; sha256: string; savedAt: string }> {
+    const rows = this.db.prepare(`SELECT a.*,s.sha256,s.created_at saved_at FROM bot_saved_files s
+      JOIN attachments a ON a.id=s.attachment_id WHERE s.bot_id=? ORDER BY s.created_at,s.rowid`).all(botId) as Row[];
+    return rows.map((row) => ({ attachment: this.attachmentFromRow(row), storagePath: String(row.storage_path), sha256: String(row.sha256), savedAt: String(row.saved_at) }));
+  }
+
+  addBotSavedFile(botId: string, attachmentId: string, sha256: string): boolean {
+    const result = this.db.prepare("INSERT OR IGNORE INTO bot_saved_files(bot_id,attachment_id,sha256,created_at) VALUES (?,?,?,?)").run(botId, attachmentId, sha256, now());
+    return Number(result.changes) === 1;
+  }
+
+  removeBotSavedFile(botId: string, attachmentId: string): boolean {
+    const result = this.db.prepare("DELETE FROM bot_saved_files WHERE bot_id=? AND attachment_id=?").run(botId, attachmentId);
+    return Number(result.changes) === 1;
+  }
+
   /** Agent courier: a machine-to-machine inbox so the local builder and the
    * tunnel-connected tester coordinate without the owner ferrying messages.
    * Bounded plain text, no secrets, owner-visible. */
@@ -2313,6 +2337,8 @@ export class OpenBotDatabase {
       extensions: ["mcp", "community-skill"].map((kind) => this.extensionRecords<Record<string, unknown>>(kind).map(({ id, value }) => ({ id, revision: value.revision || value.digest, access: kind === "mcp" ? (value.grants as Record<string, unknown>)?.[botId] : (value.botIds as string[])?.includes(botId) }))),
       memoryRevision: this.extensionRecord<string>("memory-revision", botId),
       activeMemory: this.memoryEntries(botId).filter((note) => !note.conflict).map((note) => note.revision).sort(),
+      savedFiles: this.listBotSavedFileRecords(botId).map((file) => ({ id: file.attachment.id, sha256: file.sha256 })).sort((a, b) => a.id.localeCompare(b.id)),
+      savedFileToolsRevision: 1,
     });
   }
 
@@ -3922,7 +3948,7 @@ export class OpenBotDatabase {
 
   getState(threadId?: string): AppState {
     const threads = this.listThreads();
-    const activeThreadId = threadId && threads.some((thread) => thread.id === threadId) ? threadId : threads[0]?.id || "team-room";
+    const activeThreadId = defaultConversation(threads, threadId);
     return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), approvedActions: this.listApprovedActions(),   agentMessages: this.listAgentMessages(activeThreadId), delegations: this.listDelegations(), retiredBots: this.listBots(true).filter((bot) => bot.retiredAt), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
 }

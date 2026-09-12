@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, CalendarDays } from "lucide-react";
+import { ArrowRight, CalendarDays, ShieldQuestion } from "lucide-react";
 import type { AppState, Bot, Run } from "../shared/types";
 import { Character } from "./Character";
 import { BrowserAccessCard } from "./BrowserAccessCard";
@@ -15,6 +15,9 @@ export function ConversationContext({
   onSchedule,
   onTakeover,
   onEditGroup,
+  yoloMode,
+  safetyBusy,
+  onToggleSafety,
 }: {
   state: AppState;
   bot?: Bot;
@@ -23,6 +26,9 @@ export function ConversationContext({
   onSchedule: () => void;
   onTakeover?: (bot: Bot) => void;
   onEditGroup?: () => void;
+  yoloMode?: boolean;
+  safetyBusy?: boolean;
+  onToggleSafety?: () => void;
 }) {
   const [chosen, setChosen] = useState(bot?.id || "");
   const selected = bot || state.bots.find((item) => item.id === chosen);
@@ -40,6 +46,26 @@ export function ConversationContext({
   );
   return (
     <div className="conversation-context-content">
+      {onToggleSafety && (
+        <section className="safety-card" aria-label="Safety">
+          <h3>Safety</h3>
+          <p>
+            {yoloMode
+              ? "Auto-approve is on: reviews pass by themselves. Sign-ins and access grants still pause."
+              : "Ask first: work can start, but sensitive actions wait for your approval."}
+          </p>
+          <button
+            type="button"
+            className="safety-toggle"
+            aria-pressed={yoloMode === true}
+            disabled={safetyBusy}
+            onClick={onToggleSafety}
+          >
+            <ShieldQuestion size={15} />
+            {yoloMode ? "Auto-approve on" : "Ask first on"}
+          </button>
+        </section>
+      )}
       {!bot && (
         <div className="context-picker"><span>Whose work?</span><ChoiceMenu label="Whose work?" value={chosen} onChange={setChosen}
           choices={[{value:"",label:"The whole conversation"},...state.bots.map((item) => ({value:item.id,label:item.name,detail:item.role}))]}/></div>

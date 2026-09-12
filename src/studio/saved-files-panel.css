@@ -1,0 +1,23 @@
+.saved-files-panel { margin-bottom: 28px; }
+.saved-files-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.saved-files-heading-row h2 { margin: 0; font-size: 16px; }
+.saved-files-heading-row p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.saved-files-add, .saved-file-confirm button, .saved-files-error button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); padding: 7px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.saved-files-add { background: var(--ink); color: var(--surface); border-color: var(--ink); white-space: nowrap; }
+.saved-files-add:disabled, .saved-file-remove:disabled, .saved-file-confirm button:disabled { opacity: .55; cursor: default; }
+.saved-files-list { border-top: 1px solid var(--line); }
+.saved-file-row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 58px; border-bottom: 1px solid var(--line); }
+.saved-file-meta { min-width: 0; flex: 1; }
+.saved-file-meta strong, .saved-file-meta small { display: block; overflow-wrap: anywhere; }
+.saved-file-meta strong { font-size: 13px; font-weight: 600; }
+.saved-file-meta small { color: var(--muted); margin-top: 3px; }
+.saved-file-row a, .saved-file-remove { color: var(--muted); font: inherit; font-size: 12px; }
+.saved-file-row a { text-decoration: none; }
+.saved-file-remove { border: 0; background: none; padding: 8px 0 8px 8px; cursor: pointer; }
+.saved-file-confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12px; }
+.saved-file-confirm span, .saved-file-confirm small { width: 100%; text-align: right; }
+.saved-file-confirm small { color: var(--muted); }
+.saved-file-confirm button:last-child { color: var(--danger, #b42318); }
+.saved-files-state { display: flex; align-items: center; gap: 8px; min-height: 58px; color: var(--muted); font-size: 13px; }
+.saved-files-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin: 8px 0; border: 1px solid color-mix(in srgb, var(--danger, #b42318) 30%, var(--line)); border-radius: 8px; color: var(--danger, #b42318); font-size: 13px; }
+.saved-files-error button { color: inherit; border-color: currentColor; background: transparent; }

@@ -1,26 +1,61 @@
-/* A finished result, presented flat like Mail: files as quiet tappable rows
- * with one line of real content each, then a single whisper of provenance.
- * No cards, no boxes, no bars — spacing does the work. */
-.delivery-result { display: grid; margin-top: 10px; }
-.delivery-row {
+/* A finished result: files as tappable file cards with a type tile, name,
+ * and size — like attachments in a real conversation app — then a single
+ * whisper of provenance. */
+.delivery-result { display: grid; gap: 8px; margin-top: 10px; }
+.file-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 4px;
-  border-radius: 10px;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: min(220px, 100%);
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--system-background);
+  color: var(--ink);
   text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
 }
-.delivery-row + .delivery-row { border-top: 1px solid var(--line); border-radius: 0; }
-.delivery-version + .delivery-version { border-top: 1px solid var(--line); }
-.delivery-newer { margin: 0 4px 8px; font-size: 12px; line-height: 1.5; color: var(--secondary); }
+a.file-card:hover {
+  border-color: var(--separator-strong);
+}
+a.file-card:active {
+  transform: scale(0.99);
+}
+.file-card-thumb {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-muted);
+}
+.file-card-meta { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.file-card-meta strong { font-size: 14px; font-weight: 600; letter-spacing: -0.005em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-card-meta small { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Quiet trailing affordances: a plain glyph, never a button-looking circle. */
+.file-card-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.file-card-open {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.delivery-version + .delivery-version { border-top: 0; }
+/* Inside the delivered-file card the file row drops its own chrome — the
+ * container is already the card. */
+.delivered-file .file-card { border: 0; border-radius: 0; background: transparent; padding: 10px 12px; width: auto; min-width: 0; }
+.delivered-file .file-card:hover { background: var(--secondary-system-background); }
+.delivery-newer { margin: 6px 4px 0; font-size: 12px; line-height: 1.5; color: var(--secondary); }
 .delivery-newer a { display: inline-flex; align-items: center; gap: 3px; min-height: 36px; color: var(--ink); font-weight: 550; text-underline-offset: 3px; }
 .delivery-newer a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
-.delivery-row:hover { background: color-mix(in srgb, var(--surface-muted) 60%, transparent); }
-.delivery-row-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.delivery-row-text strong { font-size: 14.5px; font-weight: 650; letter-spacing: -0.005em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delivery-row-excerpt { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delivery-row-text small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.delivery-row > svg { color: var(--muted); flex: none; }
 .delivery-prov { margin: 8px 4px 0; font-size: 11.5px; color: var(--muted); }
 .delivery-finding { min-width: 0; margin: 14px 4px 0; padding-inline-start: 12px; border-inline-start: 2px solid var(--line); color: var(--ink); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .delivery-finding > strong { font-size: 13px; font-weight: 600; }
@@ -46,7 +81,7 @@
 .delivery-receipt li svg { flex-shrink: 0; margin-top: 3px; }
 .delivery-receipt strong { font-weight: 500; color: var(--ink); }
 .delivery-receipt small { display: block; line-height: 1.5; overflow-wrap: anywhere; }
-.delivered-file { width: min(100%, 480px); margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.delivered-file { width: fit-content; max-width: min(100%, 480px); min-width: min(240px, 100%); margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
 /* Attachment cards own their foreground/background tokens independent of the
  * enclosing incoming/outgoing chat bubble, so names, row summaries and preview
  * controls stay readable in light and dark themes at desktop and 390px.

@@ -5,6 +5,7 @@ import { authoredSkillSchema } from "./skill-authoring";
 import { gmailReplyReviewSchema } from "./gmail-reply";
 import { browserControlApprovalSchema, type BrowserNavigationAllowanceOffer } from "./browser-control-review";
 import { signInOrigin, type BrowserSignInHandoff } from "./browser-sign-in";
+import { browserSavedFileUploadSchema } from "./browser-upload-review";
 
 export interface ApprovalPreview {
   approvalId: string;
@@ -143,6 +144,13 @@ export function approvalPreview(
         { label: "What was seen", value: seen ? visible(`${seenBy}: ${seen}`.slice(0, 300)) : "No login wall was cited. Check the page yourself before signing in." },
         { label: "After you continue", value: "Resume your saved task and check the page and account. This does not approve sending, publishing, deleting or purchases." });
     } catch { incomplete = true; }
+  } else if (object.type === "browser_upload_saved_file" && approval.kind === "browser") {
+    const parsed = browserSavedFileUploadSchema.safeParse(args);
+    if (!parsed.success || new URL(parsed.data.targetReview.url).origin !== parsed.data.origin || parsed.data.targetReview.control !== "input") incomplete = true;
+    else {
+      preview.actionLabel = visible(`Upload “${parsed.data.name}” to ${new URL(parsed.data.origin).hostname}`);
+      preview.fields.push({ label: "Website", value: visible(parsed.data.targetReview.url) }, { label: "File", value: visible(parsed.data.name) }, { label: "Size", value: `${parsed.data.size} bytes` }, { label: "SHA-256", value: parsed.data.sha256 }, { label: "File input", value: visible(parsed.data.targetReview.label || parsed.data.selector) }, { label: "Effect", value: "Send these exact saved-file bytes to this website's reviewed file input. This selects the file but does not approve submitting the surrounding form." });
+    }
   } else if ((object.type === "browser_click" || object.type === "browser_type") && approval.kind === "browser") {
     const parsed = browserControlApprovalSchema.safeParse(args);
     if (!parsed.success || (object.type === "browser_type" && (typeof args.value !== "string" || args.navigationAllowanceOffer !== undefined)) || (object.type === "browser_click" && args.value !== undefined)) incomplete = true;
@@ -331,7 +339,7 @@ export function approvalPreview(
         incomplete = true;
     }
   } else supported = false;
-  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "self_extend" && object.type !== "skill_propose") {
+  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
     if (!accountLabel?.trim()) incomplete = true;
     preview.fields.unshift({
       label: "Connected account",

@@ -26,7 +26,7 @@ struct NativeTeamView: View {
                             }.padding(.vertical, 20).contentShape(Rectangle())
                         }.buttonStyle(.plain).overlay(alignment: .bottom) { Rectangle().fill(StudioPalette.line).frame(height: 1) }
                     }
-                    Button("New group conversation", systemImage: "person.2") { showingGroup = true }
+                    Button("New project room", systemImage: "person.2") { showingGroup = true }
                         .padding(.top, 28).disabled(store.state.bots.isEmpty)
                     if let error = store.errorMessage { Text(error).font(.callout).padding(.top, 20) }
                 }.padding(24)
@@ -151,7 +151,7 @@ private struct NativeGroupEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    TextField("Group name", text: $name).padding(14).studioOutline()
+                    TextField("Room name", text: $name).padding(14).studioOutline()
                     Text("Bring up to six teammates together.").font(.subheadline).foregroundStyle(StudioPalette.muted)
                     ForEach(store.state.bots) { bot in
                         Button {
@@ -167,7 +167,7 @@ private struct NativeGroupEditor: View {
                     }
                     if let error = store.errorMessage { Text(error).font(.callout) }
                 }.padding(24)
-            }.background(StudioPalette.paper).navigationTitle("New group").navigationBarTitleDisplayMode(.inline)
+            }.background(StudioPalette.paper).navigationTitle("New project room").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
                     ToolbarItem(placement: .confirmationAction) {

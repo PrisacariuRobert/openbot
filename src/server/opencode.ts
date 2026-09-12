@@ -454,7 +454,10 @@ export class OpenCodeRunner {
     if (!useClaude) {
       const compatibility = (this.options.runtimeCheck || opencodeCompatibility)();
       if (compatibility.compatibility !== "verified") {
-        this.failBeforeStart(run, `${RUNTIME_INCOMPATIBLE_MESSAGE} Detected: ${compatibility.detectedVersion || "unknown"} (${compatibility.compatibility}).`, "Runtime not verified");
+        const reason = compatibility.compatibility === "unknown"
+          ? "OpenBot could not check the installed OpenCode version. The check may have timed out or the runtime may be unavailable. No model was started. Try again; if this repeats, check the runtime installation."
+          : `${RUNTIME_INCOMPATIBLE_MESSAGE} Detected: ${compatibility.detectedVersion} (${compatibility.compatibility}).`;
+        this.failBeforeStart(run, reason, "Runtime not verified");
         return;
       }
     }
