@@ -22,6 +22,13 @@ const server = createServer((req, res) => {
   if (route === "/send") { sends++; res.writeHead(403); res.end("This fixture must never send."); return; }
   res.setHeader("content-type", "text/html; charset=utf-8");
   if (!req.headers.cookie?.includes("fixture-session=owner")) { res.end('<!doctype html><title>Owner sign-in required</title><h1>Sign in to this sample account</h1><form method="post" action="/login"><label for="password">Password</label><input type="password" id="password" name="password"><button id="login">Sign in</button></form>'); return; }
+  if (route === "/inbox-list") {
+    // A signed-in inbox whose messages mention signing in (a phishing subject,
+    // a shared doc title): content must never read as a login wall.
+    const rows = ["Action required: Pay your past due invoice — Sign in to review", "Mira shared a doc: Sign in sheet v3", "Your receipt", "Weekly digest", "Todoist reminder", "Notion update", "Calendar invite"].map((subject) => `<tr><td><span role="heading">${subject}</span></td></tr>`).join("");
+    res.end(`<!doctype html><title>Sample inbox</title><h1>Inbox</h1><table>${rows}</table><input aria-label="Search mail"><button>Compose</button>`);
+    return;
+  }
   res.end(`<!doctype html><title>${route === "/social" ? "Sample activity" : "Sample support"}</title><main><h1>${route === "/social" ? "Selected account activity" : "Support triage"}</h1><label for="filter">Find a topic</label><input id="filter" aria-label="Find a topic"><button type="button" id="preview">${layout === 1 ? "Preview" : "Preview selected topic"}</button><p id="result">${route === "/social" ? "Mira asked about dark mode. Prepare a reply for review only." : "Ticket 17: invoice export fails. Ticket 22: account invite delayed."}</p><a href="/support/17">Ticket 17 source</a><form action="/send" method="post"><button id="send">Send reply</button></form></main><script>document.querySelector('#preview').onclick=()=>document.querySelector('#result').textContent='Read-only results for '+document.querySelector('#filter').value;</script>`);
 });
 await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -56,6 +63,11 @@ try {
   await browser.open("nova", `${base}/social`); assert.match(JSON.stringify(await browser.snapshot("nova")), /Mira asked about dark mode/);
   await browser.open("pixel", `${base}/social`); assert.match(JSON.stringify(await browser.snapshot("pixel")), /Sign in to this sample account/);
   assert.equal((await browser.signInState("pixel")).needsSignIn, true);
+  // A signed-in inbox whose message text mentions signing in is content, not
+  // a gate: the host must not cry wolf on the phishing subject below.
+  await browser.open("nova", `${base}/inbox-list`);
+  assert.match(JSON.stringify(await browser.snapshot("nova")), /Action required/);
+  assert.equal((await browser.signInState("nova")).needsSignIn, false);
   await browser.open("nova", `${base}/logout`); assert.match(JSON.stringify(await browser.snapshot("nova")), /Sign in to this sample account/);
   // A denied known-service URL is rejected before any navigation. Redirect-chain
   // classification has a separate deterministic unit test and is not a firewall.
@@ -63,5 +75,5 @@ try {
   db.setBotConnectorAccess("nova", { canRead: false, canSend: false });
   await assert.rejects(browser.open("nova", "https://mail.google.com/mail/u/0/"), /reading is turned off/);
   assert.equal(sends, 0);
-  console.log("PASS: teaching-to-task login persistence, restart, bot-profile isolation, different-input read-only support flow, social source read, logout, changed-control rejection, denied-service navigation blocked and no recorded field secrets or accidental sends. Local fixtures, no model or real account used.");
+  console.log("PASS: teaching-to-task login persistence, restart, bot-profile isolation, different-input read-only support flow, social source read, inbox message text never reads as a login wall, logout, changed-control rejection, denied-service navigation blocked and no recorded field secrets or accidental sends. Local fixtures, no model or real account used.");
 } finally { await browser.close(); await new Promise<void>((resolve) => server.close(() => resolve())); db.close(); rmSync(root, { recursive: true, force: true }); }

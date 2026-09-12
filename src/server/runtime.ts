@@ -24,11 +24,37 @@ const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 export async function detectLoginWall(page: { locator(s: string): { evaluate<T>(fn: (body: Element) => T): Promise<T> } }): Promise<string | null> {
   return page.locator("body").evaluate((body) => {
     // Keep every callback inline and unnamed: tsx injects a __name helper
-    // into declared functions, which does not exist inside the page.
-    if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return "visible credential field";
-    const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden").map((node) => node.textContent || "").join(" ").slice(0, 120);
-    if (/sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading) &&
-      [...body.querySelectorAll('input,button,[role="button"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return `login heading ${JSON.stringify(heading.slice(0, 80))}`;
+    // into declared functions, which does not exist inside the page. Only
+    // argument-position arrows and plain loops are used below — both are
+    // proven to survive the trip (a nested const-arrow broke this once).
+    // Login-like text inside a message list (a phishing subject, a shared doc
+    // title) is content, not a gate: matches buried in a long list never
+    // count, so an inbox can never cry wolf.
+    const skip = new Set<Element>();
+    const lists = [...body.querySelectorAll('table,[role="table"],[role="grid"],[role="list"],ul,ol,[role="feed"],[role="rowgroup"]')];
+    for (const list of lists) {
+      if (list.querySelectorAll('tr,[role="row"],li,[role="article"],article').length <= 5) continue;
+      const inner = list.querySelectorAll('h1,h2,[role="heading"],input[type="password"],input[autocomplete="one-time-code"]');
+      for (const node of inner) skip.add(node);
+    }
+    const fields = [...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')];
+    for (const node of fields) {
+      if (!skip.has(node) && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden") return "visible credential field";
+    }
+    let heading = "";
+    const heads = [...body.querySelectorAll('h1,h2,[role="heading"]')];
+    for (const node of heads) {
+      if (skip.has(node) || node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") continue;
+      heading += `${node.textContent || ""} `;
+      if (heading.length > 120) break;
+    }
+    heading = heading.slice(0, 120);
+    if (/sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading)) {
+      const controls = [...body.querySelectorAll('input,button,[role="button"]')];
+      for (const node of controls) {
+        if (node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden") return `login heading ${JSON.stringify(heading.slice(0, 80))}`;
+      }
+    }
     return null;
   });
 }
