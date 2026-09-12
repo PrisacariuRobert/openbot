@@ -28,7 +28,7 @@ await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 try {
   await browser.startTeaching("nova", "Selected support review", `${base}/support?code=private-callback#private-state`);
-  assert.deepEqual(await browser.signInState("nova"), { siteOrigin: base, needsSignIn: true });
+  assert.deepEqual(await browser.signInState("nova"), { siteOrigin: base, needsSignIn: true, evidence: "visible credential field" });
   await browser.type("nova", "#password", "fixture-password-must-not-be-recorded");
   await browser.click("nova", "#login");
   for (let n = 0; n < 20; n++) { if (JSON.stringify(await browser.snapshot("nova")).includes("Support triage")) break; await delay(50); }

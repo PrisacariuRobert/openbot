@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Globe2, Monitor, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Globe2, Monitor, Plus, RotateCw, ShieldCheck, X } from "lucide-react";
 import type { Bot } from "../shared/types";
 import { DirectScreen, type DirectOp } from "./DirectScreen";
 
@@ -37,9 +37,11 @@ export function useLiveComputer(botId: string | undefined) {
   const [frame, setFrame] = useState<string | null>(null);
   const [browserState, setBrowserState] = useState<LiveComputerState>("connecting");
   const [title, setTitle] = useState<string | null>(null);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   useEffect(() => {
     setFrame(null);
     setTitle(null);
+    setCurrentUrl(null);
     setBrowserState("connecting");
     if (!botId) return;
     let source: EventSource | null = null;
@@ -65,6 +67,7 @@ export function useLiveComputer(botId: string | undefined) {
           clearTimeout(startupTimer);
           setBrowserState(event.browser);
           setTitle(event.title ?? null);
+          if (typeof event.currentUrl === "string") setCurrentUrl(event.currentUrl);
           if (event.browser !== "ready") setFrame(null);
         }
       };
@@ -91,7 +94,7 @@ export function useLiveComputer(botId: string | undefined) {
       disconnect();
     };
   }, [botId]);
-  return { frame, browserState, title };
+  return { frame, browserState, title, currentUrl };
 }
 
 export function LiveComputer({ bot, threadId, onTakeover }: { bot: Bot; threadId: string; onTakeover?: (bot: Bot) => void }) {
@@ -148,11 +151,14 @@ export function LiveComputer({ bot, threadId, onTakeover }: { bot: Bot; threadId
  * somewhere else is the design this replaces. Nothing typed is stored, logged
  * or sent to the model. */
 export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => void }) {
-  const { frame, browserState, title } = useLiveComputer(bot.id);
+  const { frame, browserState, title, currentUrl } = useLiveComputer(bot.id);
   const [armed, setArmed] = useState(false);
-  const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [tabs, setTabs] = useState<Array<{ id: string; url: string; title: string; active: boolean }>>([]);
+  const [urlField, setUrlField] = useState("");
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlOverride, setUrlOverride] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current!;
@@ -163,6 +169,36 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       prior?.focus();
     };
   }, []);
+  type TabView = { tabs: Array<{ id: string; url: string; title: string; active: boolean }>; url: string; title: string };
+  const readTabs = async () => {
+    try {
+      const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/tabs`, { cache: "no-store" });
+      if (response.ok) {
+        const view = (await response.json()) as TabView;
+        setTabs(view.tabs);
+      }
+    } catch { /* The strip stays empty until the browser answers. */ }
+  };
+  useEffect(() => {
+    setTabs([]);
+    setUrlOverride(null);
+    setEditingUrl(false);
+    void readTabs();
+  }, [bot.id]);
+  // A dead browser has no tabs: clear the strip instead of showing ghosts.
+  useEffect(() => {
+    if (browserState === "stopped" || browserState === "unavailable") setTabs([]);
+  }, [browserState]);
+  // The live stream wins once it reports a different address.
+  useEffect(() => {
+    if (currentUrl && currentUrl !== urlOverride) setUrlOverride(null);
+  }, [currentUrl]);
+  const applyTabView = (view: TabView) => {
+    setTabs(view.tabs);
+    if (view.url) setUrlOverride(view.url);
+  };
+  const fail = (error: unknown, fallback: string) =>
+    setNotice(error instanceof Error ? error.message : fallback);
   const send = (op: DirectOp) => {
     if (!armed) return;
     const path =
@@ -180,9 +216,9 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       (error: unknown) => setNotice(error instanceof Error ? error.message : "That control needs another try."),
     );
   };
-  const openAddress = () => {
-    if (!armed || busy || !address.trim()) return;
-    const url = address;
+  const openAddress = (raw: string) => {
+    if (!armed || busy || !raw.trim()) return;
+    const url = raw.trim();
     setBusy(true);
     setNotice("");
     fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/open`, {
@@ -190,15 +226,31 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     }).then(async (response) => {
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(typeof data?.error === "string" ? data.error : "That page could not be opened.");
-      }
-      setAddress("");
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That page could not be opened.");
+      setEditingUrl(false);
+      void readTabs();
     }).catch((error: unknown) => {
-      setNotice(error instanceof Error ? error.message : "That page could not be opened.");
+      fail(error, "That page could not be opened.");
     }).finally(() => setBusy(false));
   };
+  const tabOp = (method: string, url: string, body?: Record<string, unknown>) => {
+    if (!armed || busy) return;
+    setBusy(true);
+    setNotice("");
+    fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }).then(async (response) => {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "The browser did not respond.");
+      applyTabView(data as TabView);
+    }).catch((error: unknown) => {
+      fail(error, "The browser did not respond.");
+    }).finally(() => setBusy(false));
+  };
+  const shownUrl = editingUrl ? urlField : (urlOverride || currentUrl || "");
   const ready = browserState === "ready";
   return (
     <dialog
@@ -249,24 +301,84 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
         >
           <ShieldCheck size={15} /> {armed ? "In control — click to act" : "Take control"}
         </button>
-        <form
-          className="takeover-address"
-          onSubmit={(event) => {
-            event.preventDefault();
-            openAddress();
-          }}
-        >
-          <Globe2 size={14} />
-          <input
-            disabled={!armed || busy}
-            value={address}
-            onChange={(event) => setAddress(event.target.value)}
-            placeholder="Open a page in this browser"
-            aria-label="Browser address"
-          />
-          <button disabled={!armed || busy || !address.trim()}>Open</button>
-        </form>
       </div>
+      <div className="browser-tabs" role="tablist" aria-label="Browser tabs">
+        {tabs.map((tab) => (
+          <div key={tab.id} role="tab" aria-selected={tab.active} className={tab.active ? "browser-tab active" : "browser-tab"}>
+            <button
+              className="browser-tab-name"
+              disabled={!armed || busy}
+              title={tab.url || "Blank tab"}
+              onClick={() => tabOp("POST", `/api/bots/${encodeURIComponent(bot.id)}/browser/tabs/${encodeURIComponent(tab.id)}/select`)}
+            >
+              {tab.title || "New tab"}
+            </button>
+            <button
+              className="browser-tab-close"
+              disabled={!armed || busy || tabs.length <= 1}
+              aria-label={`Close ${tab.title || "blank tab"}`}
+              onClick={() => tabOp("DELETE", `/api/bots/${encodeURIComponent(bot.id)}/browser/tabs/${encodeURIComponent(tab.id)}`)}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        <button
+          className="browser-tab-new"
+          disabled={!armed || busy}
+          aria-label="Open a new tab"
+          onClick={() => tabOp("POST", `/api/bots/${encodeURIComponent(bot.id)}/browser/tabs`, {})}
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+      <form
+        className="browser-bar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          openAddress(urlField);
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Go back"
+          disabled={!armed || busy || !ready}
+          onClick={() => tabOp("POST", `/api/bots/${encodeURIComponent(bot.id)}/browser/nav`, { to: "back" })}
+        >
+          <ArrowLeft size={14} />
+        </button>
+        <button
+          type="button"
+          aria-label="Go forward"
+          disabled={!armed || busy || !ready}
+          onClick={() => tabOp("POST", `/api/bots/${encodeURIComponent(bot.id)}/browser/nav`, { to: "forward" })}
+        >
+          <ArrowRight size={14} />
+        </button>
+        <button
+          type="button"
+          aria-label="Reload this page"
+          disabled={!armed || busy || !ready}
+          onClick={() => tabOp("POST", `/api/bots/${encodeURIComponent(bot.id)}/browser/nav`, { to: "reload" })}
+        >
+          <RotateCw size={13} />
+        </button>
+        <Globe2 size={14} />
+        <input
+          value={shownUrl}
+          onChange={(event) => setUrlField(event.target.value)}
+          onFocus={(event) => {
+            setEditingUrl(true);
+            setUrlField(urlOverride || currentUrl || "");
+            event.currentTarget.select();
+          }}
+          onBlur={() => setEditingUrl(false)}
+          placeholder={ready ? "Search or enter an address" : "Browser address"}
+          aria-label="Browser address. Type an address and press Enter to open it."
+          spellCheck={false}
+          disabled={!armed || busy}
+        />
+      </form>
       <div className="takeover-screen-frame">
         {frame ? (
           <DirectScreen

@@ -2802,6 +2802,34 @@ app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
   try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
+// Real-browser tabs, shared by owner and agent: one explicit active tab.
+// Agent tools always act on the active tab; background tabs are never
+// inspected unless selected. Sessions persist in the profile; the tab strip
+// itself is per browser session and is not reopened after a restart.
+app.get("/api/bots/:id/browser/tabs", async (request, response) => {
+  try { response.json(await browser.listTabs(request.params.id)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/tabs", async (request, response) => {
+  const parsed = z.object({ url: z.string().url().max(2_048).optional() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Give this tab a valid address, or none for a blank tab." });
+  try { response.json(await browser.openTab(request.params.id, parsed.data.url)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.delete("/api/bots/:id/browser/tabs/:tabId", async (request, response) => {
+  try { response.json(await browser.closeTab(request.params.id, request.params.tabId)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/tabs/:tabId/select", async (request, response) => {
+  try { response.json(await browser.selectTab(request.params.id, request.params.tabId)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/nav", async (request, response) => {
+  const parsed = z.object({ to: z.enum(["back", "forward", "reload"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Go back, forward, or reload." });
+  try { response.json(await browser.navigateTab(request.params.id, parsed.data.to)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
 app.get("/api/skill-templates", (_request, response) => response.json(SKILL_TEMPLATES.map(({ steps, ...template }) => ({ ...template, stepCount: steps.length }))));

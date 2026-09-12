@@ -771,6 +771,124 @@
   outline: 2px solid var(--focus, #0a84ff);
   outline-offset: 2px;
 }
+/* Real-browser chrome for the takeover dialog: tab strip plus navigation
+ * bar with a live address field. One shared browser, owner and agent agree
+ * on the visible active tab. */
+.browser-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 18px 0;
+  overflow-x: auto;
+}
+.browser-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 190px;
+  padding: 5px 4px 5px 10px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+}
+.browser-tab.active {
+  background: var(--surface);
+  color: var(--ink);
+}
+.browser-tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 2px;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.browser-tab-name:disabled {
+  cursor: default;
+}
+.browser-tab-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.browser-tab-close:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.browser-tab-new {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.browser-tab-new:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 18px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.browser-bar > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.browser-bar > button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.browser-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--ink);
+  padding: 6px 4px;
+}
+.browser-bar input:disabled {
+  color: var(--muted);
+}
+.browser-bar input:focus {
+  outline: none;
+}
 /* Shared direct-manipulation browser screen: one interaction in the takeover
  * dialog, the guiding view, and the in-app browser. Click a field, then type
  * — keys go straight to the page, like a real browser window. */

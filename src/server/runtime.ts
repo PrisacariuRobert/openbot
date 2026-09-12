@@ -23,12 +23,12 @@ const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
  * with a stub page. */
 export async function detectLoginWall(page: { locator(s: string): { evaluate<T>(fn: (body: Element) => T): Promise<T> } }): Promise<string | null> {
   return page.locator("body").evaluate((body) => {
-    // Keep callbacks inline: tsx's named-function helper is not present in the browser.
-    const visible = (node: Element) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
-    if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some(visible)) return "visible credential field";
-    const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter(visible).map((node) => node.textContent || "").join(" ").slice(0, 120);
+    // Keep every callback inline and unnamed: tsx injects a __name helper
+    // into declared functions, which does not exist inside the page.
+    if ([...body.querySelectorAll('input[type="password"], input[autocomplete="one-time-code"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return "visible credential field";
+    const heading = [...body.querySelectorAll('h1,h2,[role="heading"]')].filter((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden").map((node) => node.textContent || "").join(" ").slice(0, 120);
     if (/sign[ -]?in|log[ -]?in|verify (?:your |it.?s you)|enter.*(?:code|password)|choose an account/i.test(heading) &&
-      [...body.querySelectorAll('input,button,[role="button"]')].some(visible)) return `login heading ${JSON.stringify(heading.slice(0, 80))}`;
+      [...body.querySelectorAll('input,button,[role="button"]')].some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden")) return `login heading ${JSON.stringify(heading.slice(0, 80))}`;
     return null;
   });
 }
@@ -451,7 +451,111 @@ export class BrowserManager {
 
   private async page(botId: string): Promise<Page> {
     const context = await this.context(botId);
-    return context.pages()[0] || context.newPage();
+    const active = this.activePage(botId);
+    if (active) return active;
+    const fresh = await context.newPage();
+    this.activePages.set(botId, fresh);
+    return fresh;
+  }
+
+  /** Tabs: the owner and the agent share one explicit active tab, like a real
+   * browser. Agent tools always act on the active tab; background tabs are
+   * never inspected unless selected. At most MAX_TABS per teammate. */
+  private readonly activePages = new Map<string, Page>();
+  private readonly tabIds = new WeakMap<Page, string>();
+  private readonly tabSeq = new Map<string, number>();
+  static readonly maxTabs = 8;
+
+  private activePage(botId: string): Page | null {
+    const context = this.contexts.get(botId);
+    if (!context) return null;
+    const open = context.pages().filter((page) => !page.isClosed());
+    const active = this.activePages.get(botId);
+    if (active && open.includes(active)) return active;
+    const first = open[0] || null;
+    if (first) this.activePages.set(botId, first);
+    else this.activePages.delete(botId);
+    return first;
+  }
+
+  private tabId(botId: string, page: Page): string {
+    let id = this.tabIds.get(page);
+    if (!id) {
+      const next = (this.tabSeq.get(botId) || 0) + 1;
+      this.tabSeq.set(botId, next);
+      id = `${next}`;
+      this.tabIds.set(page, id);
+    }
+    return id;
+  }
+
+  private async tabView(botId: string): Promise<{ tabs: Array<{ id: string; url: string; title: string; active: boolean }>; url: string; title: string }> {
+    const context = this.contexts.get(botId);
+    const active = this.activePage(botId);
+    const tabs: Array<{ id: string; url: string; title: string; active: boolean }> = [];
+    for (const page of context?.pages() || []) {
+      if (page.isClosed()) continue;
+      tabs.push({ id: this.tabId(botId, page), url: page.url(), title: (await page.title().catch(() => "")) || "New tab", active: page === active });
+    }
+    const current = active && !active.isClosed() ? active : null;
+    return { tabs, url: current?.url() || "", title: current ? await current.title().catch(() => "") : "" };
+  }
+
+  private findTab(botId: string, tabId: string): Page | null {
+    const context = this.contexts.get(botId);
+    for (const page of context?.pages() || []) {
+      if (!page.isClosed() && this.tabId(botId, page) === tabId) return page;
+    }
+    return null;
+  }
+
+  async listTabs(botId: string) {
+    return this.tabView(botId);
+  }
+
+  async openTab(botId: string, rawUrl?: string) {
+    const url = rawUrl ? safeUrl(rawUrl) : null;
+    if (url) this.assertWebsiteAccess(botId, url.toString());
+    const context = await this.context(botId);
+    const open = context.pages().filter((page) => !page.isClosed());
+    if (open.length >= BrowserManager.maxTabs) throw new Error(`This browser already has ${BrowserManager.maxTabs} tabs open. Close one first.`);
+    const page = await context.newPage();
+    this.activePages.set(botId, page);
+    if (url) {
+      await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+      this.assertPageAccess(botId, page);
+    }
+    try { await page.bringToFront(); } catch { /* Focus is a courtesy. */ }
+    return this.tabView(botId);
+  }
+
+  async selectTab(botId: string, tabId: string) {
+    const page = this.findTab(botId, tabId);
+    if (!page) throw new Error("That tab is no longer open. Pick another one.");
+    this.activePages.set(botId, page);
+    try { await page.bringToFront(); } catch { /* Focus is a courtesy. */ }
+    return this.tabView(botId);
+  }
+
+  async closeTab(botId: string, tabId: string) {
+    const context = this.contexts.get(botId);
+    const open = context?.pages().filter((page) => !page.isClosed()) || [];
+    if (open.length <= 1) throw new Error("A browser keeps at least one tab. Open a new one first.");
+    const page = this.findTab(botId, tabId);
+    if (!page) throw new Error("That tab is no longer open.");
+    await page.close().catch(() => {});
+    return this.tabView(botId);
+  }
+
+  async navigateTab(botId: string, to: "back" | "forward" | "reload") {
+    const page = this.activePage(botId);
+    if (!page) throw new Error("The private browser is not running. It starts with the next browser task.");
+    const done = to === "back" ? await page.goBack({ waitUntil: "domcontentloaded", timeout: 20_000 }).catch(() => null)
+      : to === "forward" ? await page.goForward({ waitUntil: "domcontentloaded", timeout: 20_000 }).catch(() => null)
+      : await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 }).catch(() => null);
+    if (!done && to !== "reload") throw new Error(to === "back" ? "No earlier page in this tab." : "No later page in this tab.");
+    this.assertPageAccess(botId, page);
+    return this.tabView(botId);
   }
 
   async open(botId: string, rawUrl: string): Promise<{ url: string; title: string }> {
@@ -875,7 +979,7 @@ export class BrowserManager {
 
   async status(botId: string, computer: ComputerManager): Promise<ComputerStatus> {
     const context = this.contexts.get(botId);
-    const page = context?.pages()[0];
+    const page = this.activePage(botId);
     return {
       botId, container: await computer.status(botId), browser: !this.isAvailable() ? "unavailable" : context ? "ready" : "stopped",
       currentUrl: page?.url() || null, title: page ? await page.title().catch(() => "") : null,
@@ -940,9 +1044,17 @@ export class BrowserManager {
         detach(); emitStatus();
         return;
       }
-      if (session && tracked && !tracked.isClosed()) { emitStatus(); return; }
-      const page = context.pages()[0];
-      if (!page || page.isClosed()) { detach(); emitStatus(); return; }
+      if (session && tracked && !tracked.isClosed()) {
+        // Follow tab switches: reattach when the active tab moved on.
+        const candidates = context.pages().filter((candidate) => !candidate.isClosed());
+        const active = this.activePages.get(botId);
+        const current = active && candidates.includes(active) ? active : candidates[0];
+        if (tracked === current) { emitStatus(); return; }
+      }
+      const open = context.pages().filter((candidate) => !candidate.isClosed());
+      const active = this.activePages.get(botId);
+      const page = (active && open.includes(active) ? active : open[0]) || null;
+      if (!page) { detach(); emitStatus(); return; }
       if (session && tracked === page) return;
       attaching = true;
       detach();
