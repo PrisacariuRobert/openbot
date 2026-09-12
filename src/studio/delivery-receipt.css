@@ -1,100 +1,23 @@
-.delivery-card {
-  --delivery-accent: var(--ink);
-  display: grid;
+/* A finished result, presented flat like Mail: files as quiet tappable rows
+ * with one line of real content each, then a single whisper of provenance.
+ * No cards, no boxes, no bars — spacing does the work. */
+.delivery-result { display: grid; margin-top: 10px; }
+.delivery-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  margin: 12px 0 4px;
-  padding: 16px 16px 14px;
-  border: 0;
-  border-radius: 18px;
-  background: var(--surface-muted);
-  overflow: hidden;
-}
-/* The delivered result is presented as a ledger: monospace figures, dotted
- * leaders, an exact footer. Formatting is part of the proof. */
-.delivery-card .delivered-file { margin-top: 0; }
-.ledger {
-  display: block;
-  padding: 13px 15px 11px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--surface);
+  padding: 10px 4px;
+  border-radius: 10px;
   text-decoration: none;
-  color: var(--ink);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
-.ledger:hover { border-color: var(--line-strong); box-shadow: 0 3px 14px rgba(0, 0, 0, 0.07); }
-.ledger-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1.5px solid var(--ink);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.ledger-body { display: grid; padding: 6px 0; }
-.ledger-line {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 5px 0;
-  border-bottom: 1px dotted color-mix(in srgb, var(--line) 90%, transparent);
-  font-size: 12px;
-  color: var(--secondary);
-}
-.ledger-line:last-child { border-bottom: 0; }
-.ledger-line.is-lead .ledger-label { color: var(--ink); font-weight: 650; }
-.ledger-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ledger-value { color: var(--ink); font-variant-numeric: tabular-nums; }
-.ledger-image img { display: block; width: 100%; max-height: 150px; object-fit: cover; border-radius: 7px; }
-.ledger-glyph {
-  display: grid;
-  place-items: center;
-  height: 58px;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: color-mix(in srgb, var(--delivery-accent) 65%, var(--ink));
-}
-.ledger-foot {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.ledger-name { font-size: 12.5px; font-weight: 650; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ledger-meta { flex: 1; font-size: 10px; letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
-.ledger-open { display: inline-flex; color: var(--delivery-accent); flex: none; }
-.delivery-strip {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.delivery-strip span[aria-hidden="true"] { color: var(--muted); font-weight: 400; }
-.delivery-strip > span:last-child { color: var(--muted); font-weight: 500; }
-.delivery-faces { display: inline-flex; align-items: center; }
-.delivery-faces > * + * { margin-left: -9px; }
-.delivery-faces > * { box-shadow: 0 0 0 2px var(--surface); border-radius: 50%; }
-.delivery-strip-text { font-size: 14px; }
-.delivery-pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ink);
-  animation: delivery-pulse 1.6s ease-in-out infinite;
-}
-@keyframes delivery-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-@media (prefers-reduced-motion: reduce) {
-  .delivery-pulse { animation: none; }
-}
+.delivery-row + .delivery-row { border-top: 1px solid var(--line); border-radius: 0; }
+.delivery-row:hover { background: color-mix(in srgb, var(--surface-muted) 60%, transparent); }
+.delivery-row-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.delivery-row-text strong { font-size: 14.5px; font-weight: 650; letter-spacing: -0.005em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-row-excerpt { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-row-text small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.delivery-row > svg { color: var(--muted); flex: none; }
+.delivery-prov { margin: 8px 4px 0; font-size: 11.5px; color: var(--muted); }
 .delivery-receipt { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--secondary); }
 /* Owner-tapped review: one quiet action under the result, same tokens. */
 .delivery-review-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; }

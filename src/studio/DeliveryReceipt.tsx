@@ -1,12 +1,11 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { Check, ShieldCheck, Download, FileText } from "lucide-react";
-import { Character } from "./Character";
+import { useEffect, useState } from "react";
+import { Check, ShieldCheck, Download, FileText, ChevronRight } from "lucide-react";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
 
-/** One delivery object: the result files, a one-line trust strip (who
- * reviewed it, what was checked), the review action, and the proof
- * disclosure. Data already in hand — no extra fetch per card. */
+/** A finished result, presented flat: the files as quiet tappable rows with
+ * one line of real content each, then a single whisper of provenance.
+ * No cards, no boxes, no bars — spacing does the work, like Mail. */
 export function DeliveryCard({ message, run, childRuns, teammates }: {
   message: Message; run?: Run; childRuns?: Run[]; teammates?: Bot[];
 }) {
@@ -15,34 +14,35 @@ export function DeliveryCard({ message, run, childRuns, teammates }: {
   const kids = childRuns || [];
   const reviewed = kids.filter((r) => r.status === "completed");
   const reviewing = kids.filter((r) => !["completed", "failed", "cancelled"].includes(r.status));
-  const faceOf = (botId: string) => (teammates || []).find((b) => b.id === botId);
-  const author = (teammates || []).find((b) => b.id === run.botId);
   const hosts = run.task.verificationChecks.filter((c) => c.source === "host");
-  const checksLabel = run.task.verificationStatus === "passed"
-    ? hosts.length ? "Host-checked" : "Teammate-checked" : "Unchecked";
+  const checked = run.task.verificationStatus === "passed"
+    ? hosts.length ? "Host-checked" : "Teammate-checked" : null;
+  const provenance = [
+    run.botName,
+    reviewed.length > 0 ? `Reviewed by ${reviewed.map((r) => r.botName).join(", ")}`
+      : reviewing.length > 0 ? `${reviewing.map((r) => r.botName).join(", ")} reviewing…`
+      : "Not yet reviewed",
+    checked,
+  ].filter(Boolean).join(" · ");
   return (
-    <section className="delivery-card" aria-label={`Delivered result${reviewed.length ? `, reviewed by ${reviewed.map((r) => r.botName).join(", ")}` : ""}`}
-      style={author ? ({ "--delivery-accent": author.color } as CSSProperties) : undefined}>
-      <p className="delivery-strip">
-        {reviewed.length > 0
-          ? <><span className="delivery-faces">
-              {author && <Character name={author.name} color={author.color} variant={author.mascot} size={30} />}
-              {reviewed.map((r) => {
-                const bot = faceOf(r.botId);
-                return bot
-                  ? <Character key={r.id} name={bot.name} color={bot.color} variant={bot.mascot} size={24} />
-                  : <Check key={r.id} size={13} />;
-              })}
-            </span><span className="delivery-strip-text">Reviewed by {reviewed.map((r) => r.botName).join(", ")}</span></>
-          : reviewing.length > 0
-            ? <><i className="delivery-pulse" aria-hidden="true" /><span>{reviewing.map((r) => r.botName).join(", ")} {reviewing.length === 1 ? "is" : "are"} reviewing…</span></>
-            : <span>Not yet reviewed</span>}
-        <span aria-hidden="true">·</span>
-        <span>{checksLabel}</span>
-      </p>
-      {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} artifact />)}
+    <div className="delivery-result" aria-label={`Delivered result. ${provenance}`}>
+      {message.attachments.map((file) => {
+        const excerpt = (file.previewText || "").split(/\r?\n/).map((line) => line.replace(/[#*_`>]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean)[0];
+        const meta = `${Math.max(1, Math.ceil(file.size / 1000))} KB · ${file.kind}${file.revision > 1 ? ` · v${file.revision}` : ""}`;
+        return (
+          <a className="delivery-row" key={file.id} href={file.url} target="_blank" rel="noreferrer">
+            <span className="delivery-row-text">
+              <strong>{file.name}</strong>
+              {excerpt && <span className="delivery-row-excerpt">{excerpt.slice(0, 90)}</span>}
+              <small>{meta}</small>
+            </span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </a>
+        );
+      })}
+      <p className="delivery-prov">{provenance}</p>
       <DeliveryReceipt run={run} teammates={teammates} />
-    </section>
+    </div>
   );
 }
 
