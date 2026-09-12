@@ -85,7 +85,7 @@ try {
   await page.getByRole("button", { name: "Create your first teammate" }).click();
   const creation = page.getByRole("dialog");
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
-  await creation.getByLabel("Their job", { exact: true }).fill("Help plan my week");
+  await creation.getByLabel("Their job").fill("Help plan my week");
   const instructions = "Find a realistic plan. Ask before changing my calendar.";
   await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
@@ -125,8 +125,8 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   assert.ok((await refreshed).ok(), "Returning reloads actual provider discovery");
   assert.equal(await creation.getByLabel("Name", { exact: true }).inputValue(), "Remy");
-  assert.equal(await creation.getByLabel("Their job", { exact: true }).inputValue(), "Help plan my week");
-  assert.equal(await creation.getByRole("textbox", { name: /^How should they help\?/ }).inputValue(), instructions);
+  assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
+  assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
   assert.equal(await service.innerText(), "Choose your AI service", "Saving a connection does not silently select it");
   await service.click();

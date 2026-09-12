@@ -183,7 +183,11 @@ try {
   });
   await page.getByText("Updating…", { exact: true }).waitFor();
   assert.equal(posts.length, 1);
-  assert.deepEqual(posts[0]!.body, { decision: "approved", reviewFingerprint: "a".repeat(64) });
+  assert.deepEqual(posts[0]!.body, {
+    decision: "approved",
+    reviewFingerprint: "a".repeat(64),
+    navigationAllowance: false,
+  });
   assert.match(posts[0]!.url, /\/approvals\/approval-fixture\/decide$/);
   while (!release) await new Promise((resolve) => setTimeout(resolve, 10));
   (release as () => void)();
