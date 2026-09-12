@@ -269,6 +269,9 @@ export interface RunReceiptArtifact {
   mime: string;
   revision: number;
   url: string | null;
+  /** deliverable = user-facing result; evidence = host receipts/usage;
+   * internal = scratch. Only deliverables may satisfy a required deliverable. */
+  classification: "deliverable" | "evidence" | "internal";
 }
 
 export interface RunReceiptExternalAction {
@@ -286,6 +289,8 @@ export interface RunReceipt {
   goal: string | null;
   deliverable: string | null;
   status: RunStatus;
+  /** Task outcome, separate from process status (see Run.outcome). */
+  outcome: "delivered" | "blocked" | null;
   error: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -293,6 +298,8 @@ export interface RunReceipt {
   team: RunReceiptEntry[];
   checks: RunReceiptCheck[];
   workLog: RunReceiptWorkLog[];
+  /** Input files retained for this task (never deleted on stop). */
+  inputs: RunReceiptArtifact[];
   artifacts: RunReceiptArtifact[];
   externalActions: RunReceiptExternalAction[];
   uncertainty: string[];
@@ -311,6 +318,11 @@ export interface Run {
   botColor: string;
   parentRunId: string | null;
   steeredFromRunId: string | null;
+  /** Task outcome, separate from process status: a run whose process ended
+   * is "completed", but only "delivered" means the requested work exists.
+   * "blocked" means it stopped without delivering (e.g. inputs never became
+   * usable output); null means no deliverable was checked. */
+  outcome?: "delivered" | "blocked" | null;
   /** Group-discipline linkage: the teammate reply that @mentioned this run
    * into the conversation. Lets the follow-up quote its trigger and keeps the
    * reply chain (and its round cap) computable from host records. */
@@ -601,6 +613,17 @@ export interface ProviderLoginAttempt {
   callbackMode: "auto" | "code" | null;
   instructions: string;
   error: string | null;
+}
+
+/** A persisted live connection-test receipt. Absence means "Saved, not tested":
+ * saved credentials alone are never reported as ready. */
+export interface ProviderConnectionTest {
+  tested: true;
+  ok: boolean;
+  model: string;
+  latencyMs: number;
+  error: string | null;
+  testedAt: string;
 }
 
 export interface ProviderStatus {

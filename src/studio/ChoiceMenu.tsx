@@ -48,14 +48,32 @@ export function ChoiceMenu({
         'button[role="option"]:not(:disabled)',
       ) || [],
     );
+  function isShowing(): boolean {
+    try {
+      return popover.current?.matches(":popover-open") ?? open;
+    } catch {
+      return open;
+    }
+  }
   function close(restore = false) {
     search.current = { text: "", time: 0 };
-    popover.current?.hidePopover();
+    try {
+      if (popover.current?.matches(":popover-open")) popover.current?.hidePopover();
+    } catch {
+      popover.current?.hidePopover();
+    }
     setOpen(false);
     if (restore) trigger.current?.focus();
   }
   function show(edge?: "first" | "last") {
     if (disabled || !trigger.current || !popover.current) return;
+    if (isShowing()) {
+      // Already open (e.g. a second activation while showing): converge on
+      // the open menu instead of throwing from showPopover().
+      setOpen(true);
+      items().find((item) => item.getAttribute("aria-selected") === "true")?.focus();
+      return;
+    }
     search.current = { text: "", time: 0 };
     const rect = trigger.current.getBoundingClientRect();
     const width = Math.min(
@@ -109,7 +127,7 @@ export function ChoiceMenu({
         aria-expanded={open}
         aria-controls={id}
         disabled={disabled}
-        onClick={() => (open ? close(true) : show())}
+        onClick={() => (isShowing() ? close(true) : show())}
         onKeyDown={(event) => {
           if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
             event.preventDefault();

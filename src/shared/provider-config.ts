@@ -2,6 +2,14 @@ import { z } from "zod";
 import type { ApiConnectionConfig, ProviderInstance } from "./types.js";
 
 export const MODEL_KEY_ENV = "OPENBOT_MODEL_API_KEY";
+/** Free-tier models repeatedly stall on multi-step agent work in our pilot
+ * runs (trivial file tasks left unfinished, review steps skipped), while the
+ * same prompts pass on full models. The helper only names the tier so the
+ * UI can warn; nothing is blocked and no model is judged beyond the suffix. */
+export function isFreeTierModel(model: string): boolean {
+  const tail = model.split("/").at(-1) ?? model;
+  return tail === "free" || tail.toLowerCase().endsWith("-free");
+}
 export const isLocalModelUrl = (raw: string): boolean => {
   try {
     return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(raw).hostname);

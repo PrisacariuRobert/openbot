@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { LockKeyhole } from "lucide-react";
+import { CalendarDays, Coins, Globe, LockKeyhole, Mail } from "lucide-react";
 import type { Approval, Run } from "../shared/types";
 import type { ApprovalPreview } from "../shared/approval-preview";
 import { TASK_TOKEN_OPTIONS } from "../shared/task-token-budget";
+import { Character } from "./Character";
 import { BrowserSignInPanel } from "../components/BrowserSignInPanel";
 import "./run-controls.css";
 
@@ -177,12 +178,33 @@ export function RunControls({
   }
 
   if (!pending && !canStop) return null;
+  // The acting teammate's face leads the card. Missing identity must never
+  // blank a decision: fall back to the approval author, then a neutral face.
+  const actor = {
+    name: run.botName || approval?.botName || "Teammate",
+    color: run.botColor || "#6757d9",
+    variant: run.botMascot || "nova",
+  };
+  const decisionIcon =
+    approval?.kind === "budget" ? <Coins size={13} strokeWidth={2} />
+    : approval?.kind === "browser" ? <Globe size={13} strokeWidth={2} />
+    : /mail|email|send|draft/i.test(preview?.actionLabel || "") ? <Mail size={13} strokeWidth={2} />
+    : /calendar|event|meeting|invite/i.test(preview?.actionLabel || "") ? <CalendarDays size={13} strokeWidth={2} />
+    : <LockKeyhole size={13} strokeWidth={2} />;
   return (
     <section className="run-controls" aria-label="Task controls">
       {pending && (
-        <>
-          <strong>{approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}</strong>
-          {preview && <p>{preview.actionLabel}</p>}
+        <div className="decision-card">
+          <i className="decision-accent" aria-hidden="true" style={{ background: `linear-gradient(90deg, transparent, ${actor.color} 30%, ${actor.color} 70%, transparent)` }} />
+          <div className="decision-top">
+            <Character name={actor.name} color={actor.color} variant={actor.variant} size={44} />
+            <div className="decision-title">
+              <p className="decision-eyebrow">{decisionIcon}
+                {approval?.kind === "budget" ? "Continue this task?" : preview?.browserSignIn ? "Needs your sign-in" : "Needs your review"}
+              </p>
+              {preview && <p className="decision-headline">{preview.actionLabel}</p>}
+            </div>
+          </div>
           {preview && !preview.browserSignIn && <p className="run-control-note">{preview.reason}</p>}
           {preview?.taskTokens && <label className="run-token-amount">Extra tokens for this task
             <select aria-label="Extra tokens for this task" value={preview.taskTokens.additionalTokens} disabled={busy || needsRefresh} onChange={event => void chooseTokenAmount(Number(event.target.value))}>
@@ -195,15 +217,25 @@ export function RunControls({
                 <button type="button" className="primary" onClick={() => onSignInPane(approval!.id)}><LockKeyhole size={14} strokeWidth={2} />Open the private browser</button>
               </div>
             : <BrowserSignInPanel key={approval!.id} approvalId={approval!.id} handoff={preview.browserSignIn} disabled={busy || needsRefresh || Boolean(notice)} onBusyChange={setSignInBusy} onInteraction={() => setReviewed(false)} />)}
+          {preview && preview.fields.length > 3 && !preview.browserSignIn && (
+            <dl className="decision-facts">
+              {preview.fields.slice(0, 3).map((field) => (
+                <div key={field.label}>
+                  <dt>{field.label}</dt>
+                  <dd>{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {preview && preview.fields.length > 0 && (
             <details
               onToggle={(event) => {
                 if (event.currentTarget.open && !preview.browserSignIn) setReviewed(true);
               }}
             >
-              <summary>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
+              <summary onClick={() => { if (!preview.browserSignIn) setReviewed(true); }}>{approval?.kind === "budget" ? "Review the token allowance" : "Review the full action"}</summary>
               <dl>
-                {preview.fields.map((field) => (
+                {(preview.fields.length > 3 && !preview.browserSignIn ? preview.fields.slice(3) : preview.fields).map((field) => (
                   <div key={field.label}>
                     <dt>{field.label}</dt>
                     <dd>{field.value}</dd>
@@ -234,11 +266,11 @@ export function RunControls({
             <p className="run-control-note">This review is incomplete or out of date. Refresh before approving. You can still decline it.</p>
           )}
           {completeReview && preview?.browserSignIn && <label><input type="checkbox" checked={reviewed} disabled={busy || signInBusy || needsRefresh || Boolean(notice)} onChange={(event) => setReviewed(event.target.checked)} /> I’ve finished signing in to the account I want to use.</label>}
-          <div className="run-control-actions">
+          <div className="decision-actions">
             {completeReview && (
               <button
                 type="button"
-                className="primary"
+                className="primary decision-confirm"
                 disabled={busy || signInBusy || needsRefresh || !reviewed || Boolean(notice)}
                 onClick={() => void act("approved")}
               >
@@ -249,6 +281,7 @@ export function RunControls({
             )}
             <button
               type="button"
+              className="decision-decline"
               disabled={
                 busy ||
                 needsRefresh ||
@@ -265,17 +298,19 @@ export function RunControls({
               {preview?.browserSignIn ? "Finish signing in before continuing your task." : "Open the action details before approving."}
             </p>
           )}
-        </>
+        </div>
       )}
       {canStop && (
-        <button
-          type="button"
-          className="run-stop"
-          disabled={busy || needsRefresh || Boolean(notice)}
-          onClick={() => void act("cancel")}
-        >
-          Stop this task
-        </button>
+        <div className="decision-stop">
+          <button
+            type="button"
+            className="decision-stop-btn"
+            disabled={busy || needsRefresh || Boolean(notice)}
+            onClick={() => void act("cancel")}
+          >
+            Stop this task
+          </button>
+        </div>
       )}
       {busy && <p role="status">Updating…</p>}
       {notice && <p role="status">{notice}</p>}

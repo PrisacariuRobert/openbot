@@ -4,7 +4,7 @@ import type { ExecutionLimits } from "./execution-policy.js";
 import { BUNDLED_ACCESS_KIND, bundledSkillsRevision } from "./bundled-skills.js";
 import { rankMemories, nearDuplicateNote, rankTexts } from "./memory-retrieval.js";
 import type { AutoReviewRule } from "./auto-review.js";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { workSourcesInput, type WorkSourcesSettings } from "../shared/work-sources.js";
@@ -66,6 +66,7 @@ import { replyEscalatesToOwner } from "../shared/routing.js";
 import { intervalSchedule, nextRoutineOccurrence, routineScheduleInput, scheduleLabel, type RoutineSchedule } from "../shared/calendar-schedule.js";
 import { skillSlug } from "../shared/skills.js";
 import type { AttachmentAnalysis } from "./attachments.js";
+import { attachmentClassification } from "./attachments.js";
 import type { WorkSnapshot, WorkReport } from "../shared/work-reports.js";
 import type { CodeCheckReceipt } from "../shared/code-checks.js";
 import { automationRepairHint, normalizedTriggerConfig } from "./automations.js";
@@ -454,6 +455,17 @@ export class OpenBotDatabase {
         detail TEXT,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS courier_messages (
+        id TEXT PRIMARY KEY,
+        sender TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        refs_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        read_at TEXT
+      );
       CREATE TABLE IF NOT EXISTS approvals (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -810,6 +822,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "cost REAL NOT NULL DEFAULT 0");
     this.addColumn("runs", "parent_run_id TEXT");
     this.addColumn("runs", "trigger_message_id TEXT");
+    this.addColumn("runs", "outcome TEXT");
     this.addColumn("runs", "steered_from_run_id TEXT");
     this.addColumn("runs", "routine_id TEXT");
     this.addColumn("runs", "consultation_pending INTEGER NOT NULL DEFAULT 0");
@@ -1012,6 +1025,28 @@ export class OpenBotDatabase {
   getBot(id: string): Bot | null {
     const row = this.db.prepare(this.botSelect("WHERE b.id = ?")).get(id) as Row | undefined;
     return row ? this.botFromRow(row) : null;
+  }
+
+  /** Deterministic teammate resolution for handoffs and consultations.
+   * Accepts an exact bot id or an unambiguous teammate name
+   * (case-insensitive); anything else fails with the available roster so the
+   * caller can retry with a real identity instead of guessing. Retired
+   * teammates get their own actionable error. */
+  resolveTeammate(reference: string): Bot {
+    const trimmed = reference.trim();
+    if (!trimmed) throw new Error("Choose a teammate first — no name or id was given.");
+    const direct = this.getBot(trimmed);
+    if (direct && !direct.retiredAt) return direct;
+    const lowered = trimmed.toLowerCase();
+    const all = this.listBots(true);
+    const retired = all.find((bot) => Boolean(bot.retiredAt) && (bot.id === trimmed || bot.name.toLowerCase() === lowered || bot.id.toLowerCase() === lowered))
+      || (direct?.retiredAt ? direct : undefined);
+    if (retired) throw new Error(`${retired.name} is retired. Restore them before handing off work.`);
+    const matches = all.filter((bot) => !bot.retiredAt && (bot.name.toLowerCase() === lowered || bot.id.toLowerCase() === lowered));
+    if (matches.length === 1) return matches[0]!;
+    throw new Error(matches.length
+      ? `“${trimmed}” matches several teammates. Use one of these ids: ${matches.map((bot) => `${bot.id} (${bot.name}, ${bot.role})`).join("; ")}.`
+      : `No teammate matches “${trimmed}”. Available: ${all.filter((bot) => !bot.retiredAt).map((bot) => `${bot.id} (${bot.name}, ${bot.role})`).join("; ") || "none"}.`);
   }
 
   getStudioSettings(): StudioSettings {
@@ -1458,8 +1493,16 @@ export class OpenBotDatabase {
     return row ? this.messageFromRow(row) : null;
   }
 
-  listMessages(threadId: string, limit = 120): Message[] {
-    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit) as Row[];
+  /** The system event message a run emitted for a given event type (e.g.
+   * run_stopped). Used to attach partial-result files to the stop notice so
+   * the receipt and evidence export can find them. */
+  messageForRunEvent(runId: string, eventType: string): Message | null {
+    const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.run_id=? AND m.event_type=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 1`).get(runId, eventType) as Row | undefined;
+    return row ? this.messageFromRow(row) : null;
+  }
+
+  listMessages(threadId: string, limit = 120, offset = 0): Message[] {
+    const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ? OFFSET ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit, Math.max(0, offset)) as Row[];
     return rows.map((row) => this.messageFromRow(row));
   }
 
@@ -1543,6 +1586,116 @@ export class OpenBotDatabase {
     const row = this.db.prepare("SELECT * FROM attachments WHERE id=?").get(id) as Row | undefined;
     if (!row) return null;
     return { attachment: this.attachmentFromRow(row), storagePath: String(row.storage_path) };
+  }
+
+  /** Agent courier: a machine-to-machine inbox so the local builder and the
+   * tunnel-connected tester coordinate without the owner ferrying messages.
+   * Bounded plain text, no secrets, owner-visible. */
+  sendCourierMessage(input: { sender: string; recipient: string; kind: string; subject: string; body: string; refs?: string[] }): { id: string; createdAt: string } {
+    const sender = input.sender.trim().slice(0, 40) || "unknown";
+    const recipient = input.recipient.trim().slice(0, 40) || "unknown";
+    const kind = input.kind.trim().slice(0, 24) || "note";
+    const subject = input.subject.trim().slice(0, 160);
+    const body = input.body.trim().slice(0, 12_000);
+    if (!subject || !body) throw new Error("Give the courier message a subject and a body.");
+    const refs = [...new Set((input.refs || []).filter((ref) => typeof ref === "string").map((ref) => ref.slice(0, 200)))].slice(0, 20);
+    const id = randomUUID(), createdAt = now();
+    this.db.prepare("INSERT INTO courier_messages (id,sender,recipient,kind,subject,body,refs_json,created_at,read_at) VALUES (?,?,?,?,?,?,?,?,NULL)").run(
+      id, sender, recipient, kind, subject, body, JSON.stringify(refs), createdAt,
+    );
+    // Bounded history per recipient: the courier is a channel, not storage.
+    this.db.prepare(`DELETE FROM courier_messages WHERE recipient=? AND id NOT IN (SELECT id FROM courier_messages WHERE recipient=? ORDER BY created_at DESC,rowid DESC LIMIT 200)`).run(recipient, recipient);
+    return { id, createdAt };
+  }
+
+  courierInbox(recipient: string, unreadOnly = false): Array<{ id: string; sender: string; kind: string; subject: string; body: string; refs: string[]; createdAt: string; readAt: string | null }> {
+    const rows = this.db.prepare(
+      `SELECT * FROM courier_messages WHERE recipient=? ${unreadOnly ? "AND read_at IS NULL" : ""} ORDER BY created_at ASC,rowid ASC LIMIT 100`,
+    ).all(recipient.trim().slice(0, 40)) as Row[];
+    return rows.map((row) => ({
+      id: String(row.id), sender: String(row.sender), kind: String(row.kind),
+      subject: String(row.subject), body: String(row.body),
+      refs: jsonArray<string>(row.refs_json).filter((ref) => typeof ref === "string"),
+      createdAt: String(row.created_at), readAt: row.read_at ? String(row.read_at) : null,
+    }));
+  }
+
+  ackCourierMessage(id: string, recipient: string): boolean {
+    const result = this.db.prepare("UPDATE courier_messages SET read_at=? WHERE id=? AND recipient=? AND read_at IS NULL").run(now(), id, recipient.trim().slice(0, 40));
+    return result.changes > 0;
+  }
+
+  /** Staging-only reset: return the studio to a known state by removing
+   * test activity while keeping identity and configuration (bots, providers,
+   * connectors, settings, memories, skills). Runs are cancelled first so
+   * nothing keeps writing mid-wipe. Everything here is test-owned by
+   * construction — this method must only ever run on a staging database. */
+  resetTestEnvironment(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    const finished = now();
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("UPDATE runs SET status='cancelled', finished_at=? WHERE status NOT IN ('completed','failed','cancelled')").run(finished);
+      counts.cancelledRuns = Number((this.db.prepare("SELECT changes() AS n").get() as Row).n);
+      const wipe = (table: string, where = "") => {
+        this.db.prepare(`DELETE FROM ${table}${where ? ` WHERE ${where}` : ""}`).run();
+        counts[table] = Number((this.db.prepare("SELECT changes() AS n").get() as Row).n);
+      };
+      wipe("message_reactions");
+      wipe("attachments");
+      wipe("draft_attachments");
+      wipe("messages");
+      wipe("activities");
+      wipe("agent_messages");
+      wipe("approvals");
+      wipe("approved_actions");
+      wipe("runs");
+      wipe("work_snapshots");
+      wipe("code_task_reviews");
+      wipe("code_check_receipts");
+      wipe("thread_drafts");
+      wipe("thread_bots", "thread_id NOT IN (SELECT id FROM threads WHERE id='team-room' OR id LIKE 'bot-%')");
+      wipe("threads", "id != 'team-room' AND id NOT LIKE 'bot-%'");
+      wipe("routines");
+      wipe("automation_events");
+      wipe("automation_alerts");
+      wipe("automation_cursors");
+      wipe("courier_messages");
+      wipe("notification_outbox");
+      wipe("notification_deliveries");
+      wipe("auto_review_rules");
+      wipe("dedupe_keys");
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    for (const dir of ["attachments", "tester", "computers"]) {
+      try {
+        const target = path.join(this.dataDir, dir);
+        mkdirSync(target, { recursive: true });
+        for (const entry of readdirSync(target)) rmSync(path.join(target, entry), { recursive: true, force: true });
+      } catch { /* Best effort; the database is already clean. */ }
+    }
+    return counts;
+  }
+
+  /** Tester fixture cleanup: delete an attachment only while it is still
+   * unclaimed (no message references it). Claimed files are conversation
+   * evidence and are never removed through this path. Returns the deleted
+   * attachment's name, or null when there is nothing safe to delete. */
+  deleteUnclaimedAttachment(id: string): string | null {
+    const found = this.db.prepare("SELECT id,message_id FROM attachments WHERE id=?").get(id) as Row | undefined;
+    if (!found || found.message_id) return null;
+    const file = this.attachmentFile(id);
+    this.db.prepare("DELETE FROM attachments WHERE id=?").run(id);
+    if (file) {
+      const directory = path.dirname(file.storagePath);
+      try {
+        if (directory.startsWith(this.attachmentsDir)) rmSync(directory, { recursive: true, force: true });
+      } catch { /* The record is gone; a leftover file is harmless. */ }
+    }
+    return file?.attachment.name ?? id;
   }
 
   attachmentText(id: string): string | null {
@@ -1690,6 +1843,7 @@ export class OpenBotDatabase {
       botMascot: String(row.bot_mascot || "orbit") as MascotKind, botColor: String(row.bot_color), parentRunId: row.parent_run_id ? String(row.parent_run_id) : null,
       steeredFromRunId: row.steered_from_run_id ? String(row.steered_from_run_id) : null, triggerMessageId: row.trigger_message_id ? String(row.trigger_message_id) : null, routineId: row.routine_id ? String(row.routine_id) : null,
       automationEventId: row.automation_event_id ? String(row.automation_event_id) : null,
+      outcome: row.outcome === "delivered" || row.outcome === "blocked" ? row.outcome : null,
       attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
       expectedWorkKind: ["morning", "inbox", "meeting", "weekly"].includes(String(row.expected_work_kind)) ? row.expected_work_kind as Run["expectedWorkKind"] : null,
@@ -1884,16 +2038,16 @@ export class OpenBotDatabase {
     status: RunStatus; approvalReason: string | null; approvalId: string | null; startedAt: string | null; finishedAt: string | null;
     progressAt: string | null; partialText: string | null; summary: string | null; error: string | null; sessionId: string | null; modelOverride: string | null;
     inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number; taskStage: TaskStage;
-    activeDurationMs: number; modelSteps: number;
+    activeDurationMs: number; modelSteps: number; outcome: "delivered" | "blocked" | null;
   }>) {
     const current = this.db.prepare("SELECT * FROM runs WHERE id=?").get(id) as Row | undefined;
     if (!current) return;
     const value = <K extends keyof typeof patch>(key: K, column: string) => patch[key] === undefined ? current[column] : patch[key];
-    this.db.prepare(`UPDATE runs SET status=?,approval_reason=?,approval_id=?,started_at=?,finished_at=?,progress_at=?,partial_text=?,summary=?,error=?,session_id=?,model_override=?,input_tokens=?,output_tokens=?,reasoning_tokens=?,cache_read_tokens=?,cost=?,task_stage=? WHERE id=?`).run(
+    this.db.prepare(`UPDATE runs SET status=?,approval_reason=?,approval_id=?,started_at=?,finished_at=?,progress_at=?,partial_text=?,summary=?,error=?,session_id=?,model_override=?,input_tokens=?,output_tokens=?,reasoning_tokens=?,cache_read_tokens=?,cost=?,task_stage=?,outcome=? WHERE id=?`).run(
       value("status", "status"), value("approvalReason", "approval_reason"), value("approvalId", "approval_id"), value("startedAt", "started_at"),
       value("finishedAt", "finished_at"), value("progressAt", "progress_at"), value("partialText", "partial_text"), value("summary", "summary"),
       value("error", "error"), value("sessionId", "session_id"), value("modelOverride", "model_override") ?? null, value("inputTokens", "input_tokens"), value("outputTokens", "output_tokens"),
-      value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), id,
+      value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), value("outcome", "outcome"), id,
     );
     if (patch.activeDurationMs !== undefined || patch.modelSteps !== undefined) this.db.prepare("UPDATE runs SET active_duration_ms=?,model_steps=? WHERE id=?").run(
       patch.activeDurationMs ?? current.active_duration_ms, patch.modelSteps ?? current.model_steps, id,
@@ -2287,7 +2441,13 @@ export class OpenBotDatabase {
       : [];
     const artifacts = artifactRows.map((row) => {
       const attachment = this.attachmentFromRow(row);
-      return { name: attachment.name, mime: attachment.mime, revision: attachment.revision, url: attachment.url };
+      return { name: attachment.name, mime: attachment.mime, revision: attachment.revision, url: attachment.url, classification: attachmentClassification(attachment) };
+    });
+    // S4-U01: retained inputs are shown separately from delivered/partial
+    // outputs so a stopped task can say exactly what is still available.
+    const inputs = run.attachmentIds.flatMap((id) => {
+      const attachment = this.getAttachment(id);
+      return attachment ? [{ name: attachment.name, mime: attachment.mime, revision: attachment.revision, url: attachment.url, classification: "internal" as const }] : [];
     });
     // Query this job directly. Filtering the global activity feed lost old
     // actions once other jobs filled its limit, hiding uncertain deliveries.
@@ -2316,13 +2476,16 @@ export class OpenBotDatabase {
     const cost = this.db.prepare(`SELECT COALESCE(SUM(cost),0) AS cost FROM runs WHERE id IN (${placeholders || "''"})`).get(...jobRunIds) as Row;
     const finished = run.finishedAt ? Date.parse(run.finishedAt) : null;
     const started = run.startedAt ? Date.parse(run.startedAt) : null;
+    if (run.status === "completed" && run.outcome === "blocked") {
+      uncertainty.unshift("This task ended without delivering a result. It must not be read as successful — continue it from here instead of starting over.");
+    }
     return {
       runId: run.id, threadId: run.threadId, botName: run.botName,
       goal: run.task.tracked ? run.task.goal.split(" Automation context")[0]?.trim() || null : null,
       deliverable: run.task.tracked ? run.task.deliverable : null,
-      status: run.status, error: run.error, startedAt: run.startedAt, finishedAt: run.finishedAt,
+      status: run.status, outcome: run.outcome ?? null, error: run.error, startedAt: run.startedAt, finishedAt: run.finishedAt,
       durationMs: started !== null && finished !== null && finished > started ? finished - started : null,
-      team, checks, workLog, artifacts, externalActions, uncertainty,
+      team, checks, workLog, inputs, artifacts, externalActions, uncertainty,
       usage: { tokens: job.totalTokens, cost: Number(cost.cost || 0), runs: jobRunIds.length },
     };
   }
@@ -3638,10 +3801,15 @@ export class OpenBotDatabase {
     return { inputTokens, outputTokens, reasoningTokens, cacheReadTokens, totalTokens: inputTokens + outputTokens + reasoningTokens, cost: Number(row.cost || 0), completedRuns: Number(row.completed_runs || 0), activeRuns: Number(row.active_runs || 0) };
   }
 
-  budgetAvailable(botId: string): { allowed: boolean; used: number; budget: number } {
+  budgetAvailable(botId: string, reserveTokens = 0): { allowed: boolean; used: number; budget: number; remaining: number } {
     const bot = this.getBot(botId);
-    if (!bot) return { allowed: false, used: 0, budget: 0 };
-    return { allowed: bot.weeklyTokenBudget <= 0 || bot.tokensUsedThisWeek < bot.weeklyTokenBudget, used: bot.tokensUsedThisWeek, budget: bot.weeklyTokenBudget };
+    if (!bot) return { allowed: false, used: 0, budget: 0, remaining: 0 };
+    const remaining = bot.weeklyTokenBudget - bot.tokensUsedThisWeek;
+    // S3-P03: dispatch gates pass a step reserve so new model work only
+    // starts when roughly one bounded step still fits. The default keeps
+    // the historical strict used<budget gate (a one-token floor).
+    const headroom = Math.max(1, reserveTokens);
+    return { allowed: bot.weeklyTokenBudget <= 0 || bot.tokensUsedThisWeek + headroom <= bot.weeklyTokenBudget, used: bot.tokensUsedThisWeek, budget: bot.weeklyTokenBudget, remaining };
   }
 
   acquireRunnerLease(instanceId: string, mode: RunnerHealth["mode"], leaseMs = 30_000): boolean {

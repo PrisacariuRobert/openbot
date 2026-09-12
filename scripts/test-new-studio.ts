@@ -121,6 +121,9 @@ const child = spawn(
   },
 );
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+// OB-01: visual-design failures are collected here so one bad screenshot
+// cannot hide the functional results that follow.
+const visualFailures: string[] = [];
 try {
   let ready = false;
   for (let n = 0; n < 100; n++) {
@@ -138,6 +141,11 @@ try {
       process.env.OPENBOT_CHROME_PATH ||
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     headless: true,
+    // OB-01: color analysis must not depend on the platform's text renderer.
+    // LCD (subpixel) antialiasing paints colored fringes on every glyph edge;
+    // disabling it leaves grayscale fringes (invisible to the chroma check)
+    // while real design violations — colored icons, emoji, accents — still fail.
+    args: ["--disable-lcd-text"],
   });
   const page = await browser.newPage({
     timezoneId: "Europe/Brussels",
@@ -293,9 +301,15 @@ try {
           else outsideColor++;
         }
       }
-    assert.equal(outsideColor, 0, `${name}: only mascots should be colorful`);
-    if (name.endsWith("home"))
-      assert.ok(insideColor > 15, "Home characters remain colorful");
+    // OB-01: a visual-design failure must not hide every later functional
+    // result. Record it and keep going; the suite still fails at the end.
+    try {
+      assert.equal(outsideColor, 0, `${name}: only mascots should be colorful`);
+      if (name.endsWith("home"))
+        assert.ok(insideColor > 15, "Home characters remain colorful");
+    } catch (error) {
+      visualFailures.push(error instanceof Error ? error.message : String(error));
+    }
   }
   const nav = (_width: number) => ({
     getByRole: (_role: "button", options: { name: string | RegExp; exact?: boolean }) => ({
@@ -668,6 +682,7 @@ try {
   );
   assert.ok(reducedDurations.every((duration) => Number.isFinite(duration) && duration <= 1), "Both visible float and blink styles respect reduced motion");
   assert.deepEqual(errors, []);
+  assert.deepEqual(visualFailures, [], "One or more screenshots violated the monochrome-except-mascots design contract");
   console.log(
     `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
   );

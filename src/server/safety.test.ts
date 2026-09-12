@@ -57,3 +57,40 @@ test("destructive and external actions wait for the user", () => {
     "This may spend money or start a subscription.",
   );
 });
+
+test("local payment analysis gets a truthful reason while real payments stay spend-gated", () => {
+  assert.equal(
+    approvalReason("Process the attached refunds CSV and reconcile paid orders (17 data rows) into one local JSON report. Read-only analysis; no external accounts, no transactions, do not issue anything."),
+    "This analyzes attached payment data and writes a local report; it proposes no transaction.",
+  );
+  assert.equal(
+    approvalReason("Process refunds from the attached file and summarize paid orders locally into one JSON report. Historical data only; execute nothing."),
+    "This analyzes attached payment data and writes a local report; it proposes no transaction.",
+  );
+  assert.equal(
+    approvalReason("Issue refunds to the three customers on the list."),
+    "This may spend money or start a subscription.",
+  );
+  assert.equal(
+    approvalReason("Analyze last quarter first, then execute a refund of 25 euros to the customer now."),
+    "This may spend money or start a subscription.",
+  );
+});
+
+test("spending warnings follow actions, not money words or grammar", () => {
+  assert.equal(approvalReason("Reconcile August orders and refunds in order to produce the monthly report."), null);
+  assert.equal(approvalReason("Calculate total orders and draft a refund explanation for the customer."), null);
+  assert.equal(approvalReason("Do not execute a refund, just calculate the totals."), null);
+  assert.equal(
+    approvalReason("Execute a refund of 25 euros to the customer now."),
+    "This may spend money or start a subscription.",
+  );
+  assert.equal(
+    approvalReason("Order 50 new laptops for the studio."),
+    "This may spend money or start a subscription.",
+  );
+  assert.equal(
+    approvalReason("Buy the premium plan"),
+    "This may spend money or start a subscription.",
+  );
+});

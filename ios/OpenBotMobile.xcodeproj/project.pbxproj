@@ -41,6 +41,7 @@
 		DCF418EABBC7749AD4B18165 /* PushRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1527FBA67B9886961BE457E /* PushRegistration.swift */; };
 		E408A829F7CCE69DD061340B /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68867F381BFD41C3E1B3B47 /* KeychainStore.swift */; };
 		E92D069A280B1C4624F4E600 /* NativeSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4177A0137C84375AA3506D2 /* NativeSettingsViews.swift */; };
+		71DD57DD706C3BFA3F3EF20A /* NativeCapabilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB2D94E7CB9852FDD53A7B2 /* NativeCapabilityViews.swift */; };
 		F056E0D90CEE83BDD7C34CC9 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E6A177987867773EF6B192 /* ConnectionView.swift */; };
 		F49977E1D51F842185872472 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41C2E7C00C18C882B39EDC0 /* RootView.swift */; };
 		FCDF62B844D782AA36A11A00 /* OpenExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220648D6FC0F0EDF223E61A9 /* OpenExtensionsView.swift */; };
@@ -108,6 +109,7 @@
 		95833809056894928443FB90 /* StudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioStore.swift; sourceTree = "<group>"; };
 		9B85BC55A9A07FE438642109 /* NativeTeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTeamView.swift; sourceTree = "<group>"; };
 		A4177A0137C84375AA3506D2 /* NativeSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSettingsViews.swift; sourceTree = "<group>"; };
+		DDB2D94E7CB9852FDD53A7B2 /* NativeCapabilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCapabilityViews.swift; sourceTree = "<group>"; };
 		A753525342AE1E8BBB30A024 /* BrandAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = BrandAssets.xcassets; sourceTree = "<group>"; };
 		A8F2D3DBED4658F155358B13 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		AF0EB8BA814A479EA537096F /* StudioApprovalReviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioApprovalReviewModel.swift; sourceTree = "<group>"; };
@@ -240,6 +242,7 @@
 				FF9B6F5DFC2A57732D2F8B26 /* ComputerView.swift */,
 				37E6A177987867773EF6B192 /* ConnectionView.swift */,
 				A4177A0137C84375AA3506D2 /* NativeSettingsViews.swift */,
+				DDB2D94E7CB9852FDD53A7B2 /* NativeCapabilityViews.swift */,
 				9B85BC55A9A07FE438642109 /* NativeTeamView.swift */,
 				220648D6FC0F0EDF223E61A9 /* OpenExtensionsView.swift */,
 				8C8A0F0B1F6BC5DD9EDF5229 /* PairingScannerView.swift */,
@@ -430,6 +433,7 @@
 				F056E0D90CEE83BDD7C34CC9 /* ConnectionView.swift in Sources */,
 				E408A829F7CCE69DD061340B /* KeychainStore.swift in Sources */,
 				E92D069A280B1C4624F4E600 /* NativeSettingsViews.swift in Sources */,
+				71DD57DD706C3BFA3F3EF20A /* NativeCapabilityViews.swift in Sources */,
 				B182DC04BD2A132DA3A22576 /* NativeTeamView.swift in Sources */,
 				33065AD9AAEF6DFDCD84D7C6 /* NetworkMonitor.swift in Sources */,
 				75E248CC681D81278BD52C64 /* OpenBotMobileApp.swift in Sources */,

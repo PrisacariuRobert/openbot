@@ -1,6 +1,8 @@
 node_modules/
 dist/
+dist-staging/
 .openbot/
+.openbot-staging/
 .DS_Store
 *.log
 .env
@@ -29,3 +31,10 @@ desktop/node_modules/
 # Per-machine CLI state and generated Electron executable locator.
 .local/
 desktop/path.txt
+
+# Local-only dev automation (personal paths, staging tokens) — never ship.
+scripts/tmp-*.mjs
+scripts/courier-watch.mjs
+scripts/wake-builder.mjs
+scripts/wake-supervisor.mjs
+scripts/com.openbot.*.plist

@@ -65,7 +65,7 @@ function agentModels(models: string[]): string[] {
 }
 
 function preferredModel(provider: ProviderInstance["provider"], models: string[]): string | undefined {
-  if (provider === "opencode") return models.find((model) => model === "opencode-go/deepseek-v4-flash") || models.find((model) => model.endsWith("-free")) || models[0];
+  if (provider === "opencode") return models.find((model) => model === "opencode-go/deepseek-v4.1-flash") || models.find((model) => model === "opencode-go/muse-spark-1.3-contributor") || models.find((model) => model === "opencode-go/deepseek-v4-flash") || models.find((model) => model.endsWith("-free")) || models[0];
   if (provider === "claude") return models.find((model) => model.endsWith("/sonnet")) || models[0];
   if (provider === "openai") {
     const baseModels = models.filter((model) => /^openai\/gpt-\d+(?:\.\d+)*$/.test(model));

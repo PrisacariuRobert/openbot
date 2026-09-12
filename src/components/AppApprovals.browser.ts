@@ -66,6 +66,22 @@ try {
     return route.fulfill({ status: 503, json: { error: "Not available in this isolated review fixture" } });
   });
   let checks = 0;
+  // The Refresh button unmounts the moment its fetch resolves: on a slow
+  // host the tap can land mid-rerender (covered at hit-test, then detached
+  // before dispatch is confirmed). Retry with a fresh handle; a missing
+  // button means the tap already landed and state moved on.
+  const clickRefresh = async (controls: ReturnType<typeof page.getByRole>) => {
+    const refresh = () => controls.getByRole("button", { name: "Refresh status", exact: true });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await refresh().click({ timeout: 7000 });
+        return;
+      } catch {
+        if ((await refresh().count()) === 0) return;
+      }
+    }
+    await refresh().click({ timeout: 7000 });
+  };
   for (const entry of ["/", "/studio.html", "/?panel=live"]) {
     const open = async (next: string) => {
       mode = next; hold = false; posts = []; recorded = false; allowRecovery = false; release = undefined;
@@ -121,10 +137,10 @@ try {
       assert.ok(await controls.getByRole("button",{name:"Decline",exact:true}).isDisabled());
       if (interrupted === "uncertain") {
         allowRecovery = true;
-        await controls.getByRole("button",{name:"Refresh status",exact:true}).click();
-        await controls.getByRole("button",{name:"Approve action",exact:true}).waitFor({state:"hidden"});
+        await clickRefresh(controls);
+        await controls.getByRole("button", {name:"Approve action",exact:true}).waitFor({state:"hidden"});
       } else {
-        await controls.getByRole("button",{name:"Refresh status",exact:true}).click();
+        await clickRefresh(controls);
         await controls.getByText("Send an email", {exact:true}).waitFor();
         // A fresh preview must not preserve an acknowledgement from the old action.
         assert.ok(await controls.getByRole("button",{name:"Approve action",exact:true}).isDisabled());

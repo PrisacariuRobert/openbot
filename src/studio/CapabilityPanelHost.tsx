@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AppState, Bot, ConnectorStatus, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
+import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
 import { ProviderPanel } from "../components/ProviderPanel";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
 import { Character } from "./Character";
@@ -24,17 +24,39 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
   onOpen: (panel: CapabilityPanel) => void; onThread: (id: string) => void; onChange: () => void;
 }) {
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
+  const [connectionTests, setConnectionTests] = useState<Record<string, ProviderConnectionTest>>({});
   const [connections, setConnections] = useState<ConnectorStatus | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [chosenBot, setChosenBot] = useState(state.bots.find((bot) => bot.threadId === threadId)?.id || state.bots[0]?.id || "");
   const [reviewRunId, setReviewRunId] = useState<string | null>(null);
   const bot = state.bots.find((item) => item.id === chosenBot) || state.bots[0];
-  const loadProvider = useCallback(async () => setProvider(await request<ProviderStatus>("/api/provider")), []);
+  const loadProvider = useCallback(async () => {
+    const status = await request<ProviderStatus>("/api/provider");
+    setProvider(status);
+    return status;
+  }, []);
+  // Test receipts are loaded on open and after each test — not on the 5s
+  // refresh — so merely viewing setup never spends provider allowance.
+  const loadConnectionTests = useCallback(async (status: ProviderStatus) => {
+    const ids = [...new Set([...status.instances.map((entry) => entry.id), ...status.catalog.map((entry) => entry.connectionId).filter((id): id is string => Boolean(id))])];
+    const entries = await Promise.all(ids.map(async (id) => {
+      try {
+        const response = await fetch(`/api/provider/${encodeURIComponent(id)}/test`);
+        if (!response.ok) return null;
+        return [id, await response.json() as ProviderConnectionTest] as const;
+      } catch { return null; }
+    }));
+    const next: Record<string, ProviderConnectionTest> = {};
+    for (const entry of entries) if (entry) next[entry[0]] = entry[1];
+    setConnectionTests(next);
+  }, []);
   const loadConnections = useCallback(async () => setConnections(await request<ConnectorStatus>("/api/connectors")), []);
   useEffect(() => {
     setError(""); setNotice("");
-    if (["provider", "bot"].includes(panel)) void loadProvider().catch((e: Error) => setError(e.message));
+    if (["provider", "bot"].includes(panel)) void loadProvider().then((status) => {
+      if (panel === "provider") void loadConnectionTests(status).catch(() => {});
+    }).catch((e: Error) => setError(e.message));
     if (["connectors", "bot"].includes(panel)) void loadConnections().catch((e: Error) => setError(e.message));
     if (panel !== "provider") return;
     const timer = setInterval(() => void loadProvider().catch(() => {}), 5000);
@@ -64,6 +86,12 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role }))} onChange={setChosenBot} /></div>}
     {["bot", "files", "computer", "teach"].includes(panel) && !bot && <p>Create a teammate first to use this feature.</p>}
     {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={(model) => model.split("/").at(-1) || model} onUpdateBot={saveBot}
+      connectionTests={connectionTests}
+      onTestConnection={async (id) => {
+        const receipt = await change<ProviderConnectionTest>(`/api/provider/${encodeURIComponent(id)}/test`, "POST", {});
+        setConnectionTests((previous) => ({ ...previous, [id]: receipt }));
+        return receipt;
+      }}
       onChooseInitial={async (providerInstanceId, model) => { await change("/api/provider/choose", "POST", { providerInstanceId, model }, "Your AI choice is saved."); await loadProvider(); }}
       onAdd={async (input) => { await change("/api/providers", "POST", input); await loadProvider(); }}
       onConnect={(providerId) => request<ProviderLoginAttempt>("/api/provider/connect", "POST", { providerId })}

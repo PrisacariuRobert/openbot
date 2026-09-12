@@ -46,15 +46,52 @@ export function codeProjectToolchain(projectPath: string, command: string): "nod
   return pythonProject && !existsSync(path.join(projectPath, "package.json")) ? "python" : "node";
 }
 
-function run(command: string, args: string[], timeoutMs = 30_000, extraEnvironment: Record<string, string> = {}): Promise<CommandResult> {
+/** OB-03: subprocess output is bounded per stream (endless output cannot
+ * grow memory without limit), and an expired timeout escalates SIGTERM to
+ * SIGKILL so the work actually stops — not just the wait. Truncation is
+ * reported on stderr so stdout payloads (JSON tool results) stay intact. */
+const SUBPROCESS_STREAM_LIMIT = 4 * 1024 * 1024;
+const SUBPROCESS_KILL_GRACE_MS = 5_000;
+
+export { SUBPROCESS_STREAM_LIMIT };
+
+export function run(command: string, args: string[], timeoutMs = 30_000, extraEnvironment: Record<string, string> = {}): Promise<CommandResult> {
   return new Promise((resolve) => {
     const child = spawn(command, args, { env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "", stderr = "", settled = false;
-    child.stdout.on("data", (chunk) => (stdout += String(chunk)));
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)));
-    const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
-    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }); } });
-    child.on("close", (code) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: code ?? 1, stdout, stderr }); } });
+    let stdout = "", stderr = "", settled = false, droppedOut = 0, droppedErr = 0;
+    const killTimer: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+    const settle = (code: number, extraError = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (killTimer.current) clearTimeout(killTimer.current);
+      if (droppedOut > 0) stderr += `\n[OpenBot truncated stdout at 4 MiB; ${droppedOut} further bytes were dropped, not executed.]`;
+      if (droppedErr > 0) stderr += `\n[OpenBot truncated stderr at 4 MiB; ${droppedErr} further bytes were dropped.]`;
+      resolve({ code, stdout, stderr: `${stderr}${extraError}` });
+    };
+    const append = (text: string, stream: "out" | "err") => {
+      if (stream === "out") {
+        if (stdout.length + text.length > SUBPROCESS_STREAM_LIMIT) {
+          const room = Math.max(0, SUBPROCESS_STREAM_LIMIT - stdout.length);
+          stdout += text.slice(0, room);
+          droppedOut += text.length - room;
+        } else stdout += text;
+      } else if (stderr.length + text.length > SUBPROCESS_STREAM_LIMIT) {
+        const room = Math.max(0, SUBPROCESS_STREAM_LIMIT - stderr.length);
+        stderr += text.slice(0, room);
+        droppedErr += text.length - room;
+      } else stderr += text;
+    };
+    child.stdout.on("data", (chunk) => append(String(chunk), "out"));
+    child.stderr.on("data", (chunk) => append(String(chunk), "err"));
+    const timer = setTimeout(() => {
+      try { child.kill("SIGTERM"); } catch { /* already gone */ }
+      killTimer.current = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* already gone */ }
+      }, SUBPROCESS_KILL_GRACE_MS);
+    }, timeoutMs);
+    child.on("error", (error) => settle(1, error.message));
+    child.on("close", (code) => settle(code ?? 1));
   });
 }
 
@@ -181,7 +218,7 @@ export class ComputerManager {
   }
 }
 
-function chromePath(): string | undefined {
+export function chromePath(): string | undefined {
   const candidates = [
     process.env.OPENBOT_CHROME_PATH,
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -192,13 +229,37 @@ function chromePath(): string | undefined {
   return candidates.find(existsSync);
 }
 
-/** Group cookies by their registrable site (approximate eTLD+1: the last two
- * labels, which covers nearly every real cookie domain). */
-function siteForCookieDomain(domain: string): string | null {
+/** Multi-label public suffixes where the last two labels are NOT the
+ * registrable site (example.co.uk is a site; co.uk is not). Curated subset
+ * covering the suffixes browsers actually encounter; extended with a test
+ * whenever a new one matters. Full PSL parity is deliberately avoided to
+ * keep this dependency-free — a wrong grouping here merges two sites'
+ * sessions, so every entry is covered by a fixture. */
+const MULTI_LABEL_SUFFIXES = new Set([
+  "co.uk", "org.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "ac.uk", "gov.uk", "nhs.uk", "sch.uk",
+  "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp", "ed.jp",
+  "com.au", "net.au", "org.au", "edu.au", "gov.au", "asn.au", "id.au",
+  "co.nz", "org.nz", "net.nz", "govt.nz", "school.nz",
+  "com.br", "net.br", "org.br", "gov.br",
+  "com.mx", "com.ar", "com.co", "com.tr", "com.sg", "com.hk", "com.tw",
+  "co.in", "co.kr", "or.kr", "go.kr",
+  "co.za", "com.za", "org.za", "web.za",
+  "co.il", "org.il", "net.il", "gov.il",
+  "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
+]);
+
+/** Group cookies by their registrable site: the label below the public
+ * suffix. Never merges example.co.uk with evil.co.uk. */
+export function siteForCookieDomain(domain: string): string | null {
   const clean = domain.replace(/^\./, "").toLowerCase().trim();
-  if (!clean.includes(".")) return null;
   const labels = clean.split(".");
-  return labels.slice(-2).join(".");
+  if (labels.length < 2 || labels.some((label) => !label || !/^[a-z0-9-]+$/.test(label))) return null;
+  const lastTwo = labels.slice(-2).join(".");
+  if (MULTI_LABEL_SUFFIXES.has(lastTwo)) {
+    if (labels.length < 3) return null;
+    return labels.slice(-3).join(".");
+  }
+  return lastTwo;
 }
 
 function cookieDomainMatches(cookieDomain: string, site: string): boolean {

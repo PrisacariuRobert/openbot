@@ -124,28 +124,33 @@ try {
   }
   assert.ok(ready, `Test server did not start: ${serverLog}`);
   key = readFileSync(path.join(root, "access.token"), "utf8").trim();
-  for (const id of ["nova", "pixel", "scout"])
-    await api(
-      `/api/bots/${id}`,
+  // OB-02: the benchmark starts from a controlled empty studio. Fixture
+  // teammates are created through the supported API (never assumed seeded),
+  // and every later step uses the returned ids — never hardcoded ones.
+  async function fixtureBot(name: string, role: string, instructions: string, color: string, mascot: string) {
+    const created = await api<{ id: string; threadId: string }>(
+      "/api/bots",
       {
-        model,
+        name, emoji: "●", color, mascot, role, instructions, model,
         providerInstanceId: process.env.OPENBOT_BENCHMARK_PROVIDER || "local-opencode",
-        computerEnabled: false,
-        browserEnabled: false,
-        weeklyTokenBudget: 100_000,
+        computerEnabled: false, browserEnabled: false, weeklyTokenBudget: 100_000,
       },
-      "PATCH",
     );
+    return created;
+  }
+  const nova = await fixtureBot("Nova", "Researcher", "Fixture researcher for benchmark acceptance. Answer plainly.", "#6757d9", "nova");
+  const pixel = await fixtureBot("Pixel", "Maker", "Fixture maker for benchmark acceptance. Follow instructions exactly.", "#ef6a8a", "blob");
+  const scout = await fixtureBot("Scout", "Operator", "Fixture operator for benchmark acceptance. Be brief.", "#27a67a", "sprout");
   if (!codeOnly) {
-  const workspace = path.join(root, "workspaces", "nova");
+  const workspace = path.join(root, "workspaces", nova.id);
   mkdirSync(workspace, { recursive: true });
   writeFileSync(
     path.join(workspace, "numbers.csv"),
     "id,amount,status\nA,12,paid\nB,25,paid\nC,5,paid\nD,30,pending\n",
   );
   const report = await run(
-    "bot-nova",
-    "nova",
+    nova.threadId,
+    nova.id,
     "Read numbers.csv in your workspace. Create totals.json with exactly the keys paidTotal, pendingTotal, paidCount, pendingIds. Calculate from the file, not guesses. Save a short report.md citing each source row ID and link both files in your final reply. Check the saved files. This is a synthetic local-file exercise; use only workspace and task tools.",
   );
   assert.deepEqual(
@@ -179,7 +184,7 @@ try {
 
   const team = await run(
     "team-room",
-    "pixel",
+    pixel.id,
     "Ask Nova privately to check this arithmetic independently: 17 + 25 = 42. Wait for Nova's reply, then give me one short final answer with the checked total. Use message_teammate with expectsReply true; this tests real private consultation, not a simulated conversation. No files, browser, terminal, or external apps are needed.",
   );
   const children = team.state.runs.filter(
@@ -187,7 +192,7 @@ try {
   );
   assert.ok(
     children.some(
-      (entry) => entry.botId === "nova" && entry.status === "completed",
+      (entry) => entry.botId === nova.id && entry.status === "completed",
     ),
     "No completed private consultation",
   );
@@ -202,7 +207,7 @@ try {
     1,
     "Consultants must not send duplicate user-facing answers",
   );
-  assert.equal(answers[0]?.senderId, "pixel");
+  assert.equal(answers[0]?.senderId, pixel.id);
   assert.match(answers[0]!.body, /42/);
   console.log(
     JSON.stringify({
@@ -228,9 +233,9 @@ try {
     git(source, "init", "-b", "main"); git(source, "add", ".");
     git(source, "-c", "user.name=Acceptance Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "Independent failing quantity fixture");
     const originalCommit = git(source, "rev-parse", "HEAD");
-    const project = await api<{ id: string }>("/api/code-projects", { name: "Quantity fixture", rootPath: source, access: [{ botId: "pixel", canRead: true, canWrite: true, canRun: true }] });
-    await api("/api/bots/pixel", { computerEnabled: true }, "PATCH");
-    const result = await run("bot-pixel", "pixel", "Fix the quantity calculation bug in the shared Quantity fixture project. First reproduce it with node total.test.cjs. Do not modify the existing tests. Work on your isolated task branch, make the smallest implementation fix, commit only total.cjs, rerun the original tests against that commit, and explain the evidence. Do not install packages, access the network, push, publish, or change my original checkout.");
+    const project = await api<{ id: string }>("/api/code-projects", { name: "Quantity fixture", rootPath: source, access: [{ botId: pixel.id, canRead: true, canWrite: true, canRun: true }] });
+    await api(`/api/bots/${pixel.id}`, { computerEnabled: true }, "PATCH");
+    const result = await run(pixel.threadId, pixel.id, "Fix the quantity calculation bug in the shared Quantity fixture project. First reproduce it with node total.test.cjs. Do not modify the existing tests. Work on your isolated task branch, make the smallest implementation fix, commit only total.cjs, rerun the original tests against that commit, and explain the evidence. Do not install packages, access the network, push, publish, or change my original checkout.");
     const previousDataDir = process.env.OPENBOT_DATA_DIR;
     process.env.OPENBOT_DATA_DIR = root;
     const db = new OpenBotDatabase(root);

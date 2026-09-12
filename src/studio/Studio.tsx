@@ -24,6 +24,7 @@ import {
   MessageCircle,
   Monitor,
   MoreHorizontal,
+  Pin,
   Plus,
   Search,
   Settings2,
@@ -48,6 +49,7 @@ import type {
   Message,
   Run,
   Routine,
+  Thread,
 } from "../shared/types";
 import type { CommunitySkill } from "../shared/extensions";
 import { ConnectorIcon } from "../ConnectorIcon";
@@ -60,7 +62,8 @@ import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
-import { DeliveryReceipt, DeliveredFile } from "./DeliveryReceipt";
+import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
+import { WorkReceipt } from "../CapabilityPanels";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { AppearanceEditor } from "./AppearanceEditor";
@@ -149,6 +152,56 @@ function FaceGroup({ bots, size = 50 }: { bots: Bot[]; size?: number }) {
       {bots.slice(0, 3).map((bot) => (
         <Face key={bot.id} bot={bot} size={size} />
       ))}
+    </div>
+  );
+}
+// Pinned teammates live above the list as large avatars —glanceable like a
+// pinned chat, unpinned with one tap. The scrolling list never duplicates them.
+function PinnedZone({ items, bots, onOpen, onUnpin }: {
+  items: Thread[];
+  bots: Bot[];
+  onOpen: (threadId: string) => void;
+  onUnpin: (item: Thread) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className="pinned-zone">
+      <span className="pinned-label">Pinned</span>
+      <div className="pinned-avatars">
+        {items.map((item) => {
+          const bot = bots.find((b) => b.threadId === item.id);
+          return (
+            <div key={item.id} className="pinned-avatar">
+              <button
+                type="button"
+                className="pinned-open"
+                aria-label={`Open ${item.title}`}
+                title={item.title}
+                onClick={() => onOpen(item.id)}
+              >
+                {bot ? (
+                  <Face bot={bot} size={52} />
+                ) : (
+                  <span className="room-mark">
+                    <MessageCircle size={26} strokeWidth={1.3} />
+                  </span>
+                )}
+                <span className="pinned-name">{item.title}</span>
+                {item.needsYou && <i className="pinned-dot" aria-label="Needs you" />}
+              </button>
+              <button
+                type="button"
+                className="pinned-unpin"
+                aria-label={`Unpin ${item.title}`}
+                title="Unpin"
+                onClick={() => onUnpin(item)}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -860,10 +913,20 @@ export function Studio() {
     </button>
   );
   const activeNow = activeNowBots(state?.bots || []);
+  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
+    void (async () => {
+      await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned }),
+      }).catch(() => {});
+      setRefresh((n) => n + 1);
+    })();
+  const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
   const conversationRows = state?.threads
     .filter(
       (item) =>
         !item.hidden &&
+        !item.pinned &&
         `${item.title} ${item.lastMessage || ""}`
           .toLowerCase()
           .includes(conversationQuery.toLowerCase()),
@@ -871,8 +934,8 @@ export function Studio() {
     .map((item) => {
       const bot = state.bots.find((bot) => bot.threadId === item.id);
       return (
+        <div key={item.id} className="conversation-cell">
         <button
-          key={item.id}
           aria-label={item.title}
           className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}`}
           onClick={() => openThread(item.id)}
@@ -911,6 +974,16 @@ export function Studio() {
             </small>
           </span>
         </button>
+        <button
+          type="button"
+          className="conversation-pin"
+          aria-label={`Pin ${item.title} to the top`}
+          title="Pin to the top"
+          onClick={() => setPin(item, true)}
+        >
+          <Pin size={13} />
+        </button>
+        </div>
       );
     });
   return (
@@ -956,6 +1029,7 @@ export function Studio() {
               ))}
             </div>
           )}
+          <PinnedZone items={pinnedThreads} bots={state?.bots || []} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
@@ -1089,7 +1163,10 @@ export function Studio() {
                     </button>
                   ))}
                 </div>
-                <div className="inbox-conversations">{conversationRows}</div>
+                <div className="inbox-conversations">
+                  <PinnedZone items={pinnedThreads} bots={state?.bots || []} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
+                  {conversationRows}
+                </div>
                 {!state.bots.length && (
                   <Empty title="Your first conversation starts here">
                     Create a teammate with a job that matters to you.
@@ -1542,8 +1619,6 @@ export function Studio() {
                             )}
                             <div className="prose">
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
-                              {message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}
-                              {message.senderType === "bot" && <DeliveryReceipt run={state.runs.find((run) => run.id === message.runId)} />}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>
@@ -1551,6 +1626,9 @@ export function Studio() {
                                 </details>
                               )}
                             </div>
+                            {message.senderType === "bot" && message.runId
+                              ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} />
+                              : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                           </article>
                         );
                       })
@@ -1883,7 +1961,8 @@ export function Studio() {
                   <ReactMarkdown>{detail.run.summary}</ReactMarkdown>
                 </div>
               )}
-              <DeliveryReceipt run={detail.run} />
+              <DeliveryReceipt run={detail.run} teammates={state?.bots} />
+              <WorkReceipt runId={detail.run.id} />
               <button
                 className="primary full-width"
                 onClick={() => openThread(detail.run.threadId)}

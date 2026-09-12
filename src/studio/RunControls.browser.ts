@@ -145,6 +145,16 @@ try {
       });
       return;
     }
+    // The sign-in panel opens a live-browser EventSource; this fixture covers
+    // approval controls, not live view, so hold the stream open with no events.
+    if (request.method() === "GET" && /\/api\/bots\/[^/]+\/computer\/live/.test(request.url())) {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: ": run-controls fixture has no live browser\n\n",
+      });
+      return;
+    }
     throw new Error(`Unexpected request: ${request.method()} ${request.url()}`);
   });
   const open = async () => {
@@ -302,24 +312,40 @@ try {
   await open();
   const resume = page.getByRole("button", { name: "Continue task", exact: true });
   assert.equal(await resume.isDisabled(), true);
+  await page.getByText("Needs your sign-in", { exact: true }).waitFor();
+  // The private pane shows the exact origin with a live screen, never a transcript.
+  const pane = page.getByRole("region", { name: "Private website sign-in", exact: true });
+  await pane.getByText("https://accounts.example.test", { exact: true }).waitFor();
   await page.getByText("Review the full action", { exact: true }).click();
   assert.equal(await resume.isDisabled(), true, "Opening details does not confirm sign-in");
-  await page.getByRole("button", { name: "Open sign-in", exact: true }).click();
-  await page.getByText("https://accounts.example.test", { exact: true }).waitFor();
-  const field = page.getByLabel("Text for the selected field", { exact: true });
-  assert.equal(await field.getAttribute("type"), "password");
-  await field.fill("private-fixture-input");
-  await page.getByRole("button", { name: "Enter text", exact: true }).click();
-  await page.getByText("Updating your private browser…").waitFor({ state: "hidden" });
-  assert.equal(await field.inputValue(), "");
-  assert.equal((await page.locator("body").innerText()).includes("private-fixture-input"), false);
-  assert.equal(posts.filter((post) => post.url.endsWith("/decide")).length, 0);
+  // Type a secret straight into the page: it must travel as site input ops and
+  // never appear in the page DOM, the chat transcript, or a premature decision.
+  const secret = `fixture-secret-${Date.now().toString(36)}`;
+  const screen = page.getByRole("application", { name: /Live website screen/ });
+  await screen.click();
+  await page.keyboard.type(secret, { delay: 10 });
+  const pressDeadline = Date.now() + 15_000;
+  for (;;) {
+    const presses = posts.filter(
+      (post) => post.url.endsWith("/sign-in") && (post.body as { operation?: string })?.operation === "press",
+    ).length;
+    if (presses >= secret.length) break;
+    if (Date.now() > pressDeadline) throw new Error(`Only ${presses}/${secret.length} press ops reached the site op`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal((await page.locator("body").innerText()).includes(secret), false, "typed secret never lands in the DOM");
+  assert.equal(posts.filter((post) => post.url.endsWith("/decide")).length, 0, "typing never decides");
   const confirmation = page.getByRole("checkbox");
   await confirmation.check();
   assert.equal(await resume.isEnabled(), true);
-  await page.getByText("Keyboard controls", { exact: true }).click();
-  await page.getByRole("button", { name: "Tab", exact: true }).click();
-  await page.getByText("Updating your private browser…").waitFor({ state: "hidden" });
+  // Further private-browser interaction resets the confirmation.
+  await screen.click();
+  await page.keyboard.press("Tab");
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll("button")].some(
+      (button) => button.textContent === "Continue task" && button.disabled,
+    ),
+  );
   assert.equal(await resume.isDisabled(), true, "Further browser interaction resets confirmation");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByRole("region", { name: "Task controls", exact: true }).screenshot({ path: "/tmp/openbot-sign-in-ui.png" });

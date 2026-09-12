@@ -49,6 +49,108 @@
   align-items: center;
   gap: 10px;
 }
+/* One decision card: consequence headline first, key facts visible, full
+ * details one tap away, a single confirm gesture. Same engine underneath:
+ * confirm stays disabled until the full review opens. */
+.decision-card {
+  /* Docked, never covering: sticky keeps the card in flow (the page grows
+   * instead of sliding underneath), docking to the bottom of the chat scroll
+   * where a decision belongs. Where sticking is unsupported it degrades to
+   * an elevated inline card — still distinct, never overlapping. */
+  position: sticky;
+  bottom: 12px;
+  z-index: 40;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 0 20px 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 12px 32px rgba(0, 0, 0, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  animation: decision-rise 0.34s cubic-bezier(0.2, 0.9, 0.25, 1.04);
+  overflow: hidden;
+}
+@keyframes decision-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .decision-card { animation: none; }
+  .decision-confirm { transition: none; }
+}
+.decision-accent { display: block; height: 3px; margin: 0 -20px; opacity: 0.9; }
+.decision-top { display: flex; align-items: center; gap: 13px; }
+.decision-title { display: grid; gap: 4px; min-width: 0; }
+.decision-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted, var(--secondary));
+}
+.decision-headline { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.28; overflow-wrap: anywhere; }
+.decision-facts {
+  display: grid;
+  margin: 0;
+  padding: 2px 2px 0;
+}
+.decision-facts > div {
+  display: grid;
+  grid-template-columns: minmax(88px, 128px) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 0;
+}
+.decision-facts > div + div { border-top: 1px solid var(--line); }
+.decision-facts dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted, var(--secondary));
+  margin: 0;
+}
+.decision-facts dd { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.decision-actions { display: grid; gap: 4px; margin-top: 4px; }
+.decision-confirm { min-height: 52px; padding: 13px 18px; font-size: 16.5px; width: 100%; transition: transform 0.12s ease, filter 0.12s ease; }
+.decision-confirm:hover:not(:disabled) { filter: brightness(1.07); }
+.decision-confirm:active:not(:disabled) { transform: scale(0.985); }
+.decision-decline {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--muted, var(--secondary));
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 9px;
+  justify-self: center;
+}
+.decision-decline:hover:not(:disabled) { color: var(--ink); }
+/* Task management is not part of the decision: quiet, separated, small. */
+.decision-stop { margin-top: 14px; }
+button.decision-stop-btn {
+  min-height: 0;
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted, var(--secondary));
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+button.decision-stop-btn:hover:not(:disabled) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .run-control-actions button,
 .run-stop {
   min-height: 38px;

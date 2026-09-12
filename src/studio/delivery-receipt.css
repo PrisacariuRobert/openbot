@@ -1,4 +1,31 @@
+/* A finished result, presented flat like Mail: files as quiet tappable rows
+ * with one line of real content each, then a single whisper of provenance.
+ * No cards, no boxes, no bars — spacing does the work. */
+.delivery-result { display: grid; margin-top: 10px; }
+.delivery-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+.delivery-row + .delivery-row { border-top: 1px solid var(--line); border-radius: 0; }
+.delivery-row:hover { background: color-mix(in srgb, var(--surface-muted) 60%, transparent); }
+.delivery-row-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.delivery-row-text strong { font-size: 14.5px; font-weight: 650; letter-spacing: -0.005em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-row-excerpt { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-row-text small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.delivery-row > svg { color: var(--muted); flex: none; }
+.delivery-prov { margin: 8px 4px 0; font-size: 11.5px; color: var(--muted); }
 .delivery-receipt { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--secondary); }
+/* Owner-tapped review: one quiet action under the result, same tokens. */
+.delivery-review-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; }
+.delivery-review { display: grid; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--secondary); }
+.delivery-review label { display: grid; gap: 6px; }
+.delivery-review select { max-width: 100%; }
+.delivery-review-actions { display: flex; gap: 10px; align-items: center; }
+.delivery-review-note { margin-top: 10px; font-size: 12px; }
 .delivery-receipt summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .delivery-receipt summary::after { content: "+"; margin-left: auto; }
 .delivery-receipt[open] summary::after { content: "−"; }
@@ -8,6 +35,28 @@
 .delivery-receipt strong { font-weight: 500; color: var(--ink); }
 .delivery-receipt small { display: block; line-height: 1.5; overflow-wrap: anywhere; }
 .delivered-file { width: min(100%, 480px); margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+/* Attachment cards own their foreground/background tokens independent of the
+ * enclosing incoming/outgoing chat bubble, so names, row summaries and preview
+ * controls stay readable in light and dark themes at desktop and 390px.
+ * S3-P02 / S4-U02 / S5-UX01. */
+.delivered-file,
+.delivered-file .message-file,
+.delivered-file .message-file strong,
+.delivered-file strong,
+.delivered-file > p,
+.delivered-file summary { color: var(--ink); }
+.delivered-file small,
+.delivered-file .message-file small { color: var(--secondary); }
+/* The owner bubble sets --on-strong on .prose and strong; beat it explicitly
+ * so the card's own ink/surface pairing always wins. */
+.from-you .prose .delivered-file,
+.from-you .prose .delivered-file strong,
+.from-you .prose .delivered-file .message-file,
+.from-you .prose .delivered-file .message-file strong,
+.from-you .prose .delivered-file > p,
+.from-you .prose .delivered-file summary { color: var(--ink); }
+.from-you .prose .delivered-file small,
+.from-you .prose .delivered-file .message-file small { color: var(--secondary); }
 .delivered-file > a > img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
 .delivered-file .message-file { display: flex; width: 100%; gap: 12px; border: 0; margin: 0; padding: 14px; border-radius: 0; }
 .delivered-file .message-file span { flex: 1; min-width: 0; }

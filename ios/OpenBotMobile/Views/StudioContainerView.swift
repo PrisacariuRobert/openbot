@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
 import QuickLook
 import UIKit
 
@@ -933,6 +934,8 @@ private struct NativeComposer: View {
     @State private var targetBotID: String?
     @State private var pendingFiles: [URL] = []
     @State private var showingFiles = false
+    @State private var showingPhotos = false
+    @State private var photoSelection: PhotosPickerItem?
     @State private var draftSaveTask: Task<Void, Never>?
     @State private var appliedDraftRevision: String?
     @State private var appliedDraftBody: String?
@@ -1028,7 +1031,7 @@ private struct NativeComposer: View {
                     HStack(spacing: 7) {
                         ForEach(pendingFiles, id: \.self) { file in
                             HStack(spacing: 5) {
-                                Image(systemName: "doc.fill")
+                                Image(systemName: ["jpg", "jpeg", "png", "heic", "gif", "webp"].contains(file.pathExtension.lowercased()) ? "photo.fill" : "doc.fill")
                                 Text(file.lastPathComponent).lineLimit(1)
                                 Button { pendingFiles.removeAll(where: { $0 == file }) } label: { Image(systemName: "xmark.circle.fill") }
                             }
@@ -1039,8 +1042,29 @@ private struct NativeComposer: View {
                     }
                 }
             }
+            if !mentionChoices.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(mentionChoices, id: \.id) { choice in
+                            Button { applyMention(insert: choice.insert) } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: choice.id == "@everyone" ? "person.2.fill" : "at")
+                                    Text(choice.label).lineLimit(1)
+                                }
+                                .font(.system(size: 12, weight: .semibold, design: .default))
+                                .padding(.horizontal, 10).padding(.vertical, 7)
+                                .background(OpenBotTheme.purple.opacity(0.09), in: Capsule())
+                                .foregroundStyle(OpenBotTheme.purple)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+                .accessibilityLabel("Mention suggestions")
+            }
             HStack(alignment: .center, spacing: 4) {
                 Menu {
+                    Button("Attach a photo", systemImage: "photo") { showingPhotos = true }
                     Button("Attach files", systemImage: "paperclip") { showingFiles = true }
                     Menu("Choose a teammate", systemImage: "person.crop.circle") {
                         Button("Auto-pick") { targetBotID = nil }
@@ -1160,11 +1184,80 @@ private struct NativeComposer: View {
                 pendingFiles = Array(pendingFiles.prefix(6))
             }
         }
+        .photosPicker(isPresented: $showingPhotos, selection: $photoSelection, matching: .images)
+        .onChange(of: photoSelection) { _, item in
+            guard let item else { return }
+            photoSelection = nil
+            Task { await attachPhoto(item) }
+        }
         .sheet(isPresented: $showingAI) { NativeAIChoiceView(store: store) }
     }
 
-    private func send() {
-        guard !store.isSending, !preparingSend else { return }
+    // @-mention autocomplete, mirroring the web composer: in group chats a
+    // trailing @token offers matching teammates plus @everyone. The slug
+    // matches the server's mention parser so multi-word names still route.
+    private var mentionQuery: String? {
+        guard store.activeThread?.kind == "room" else { return nil }
+        guard let match = draft.range(of: #"(?:^|\s)@([A-Za-z0-9_-]*)$"#, options: .regularExpression) else { return nil }
+        var token = String(draft[match]).trimmingCharacters(in: .whitespacesAndNewlines)
+        token.removeFirst()
+        return token
+    }
+
+    private var mentionChoices: [(id: String, label: String, insert: String)] {
+        guard let query = mentionQuery else { return [] }
+        let needle = query.lowercased()
+        var choices = store.state.bots
+            .filter { needle.isEmpty || $0.name.lowercased().contains(needle) || $0.id.lowercased().contains(needle) }
+            .map { bot -> (id: String, label: String, insert: String) in
+                let slug = mentionSlug(bot.name)
+                return (id: bot.id, label: bot.name, insert: slug.isEmpty ? bot.id : slug)
+            }
+        if "everyone".hasPrefix(needle) { choices.append((id: "@everyone", label: "everyone", insert: "everyone")) }
+        return choices
+    }
+
+    private func mentionSlug(_ name: String) -> String {
+        let folded = name.lowercased().folding(options: .diacriticInsensitive, locale: .current)
+        var slug = ""
+        var dashed = false
+        for scalar in folded.unicodeScalars {
+            let value = scalar.value
+            if (value >= 97 && value <= 122) || (value >= 48 && value <= 57) {
+                slug.append(Character(scalar))
+                dashed = false
+            } else if !dashed, !slug.isEmpty {
+                slug.append("-")
+                dashed = true
+            }
+        }
+        while slug.hasSuffix("-") { slug.removeLast() }
+        return slug
+    }
+
+    private func applyMention(insert: String) {
+        guard let range = draft.range(of: #"(?:^|\s)@([A-Za-z0-9_-]*)$"#, options: .regularExpression) else { return }
+        let matched = String(draft[range])
+        let prefix = matched.first.map { $0.isWhitespace ? String($0) : "" } ?? ""
+        draft = draft.replacingCharacters(in: range, with: "\(prefix)@\(insert) ")
+    }
+
+    private func attachPhoto(_ item: PhotosPickerItem) async {        guard pendingFiles.count < 6 else { return }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            // Normalize to JPEG so the host, the web client and every other
+            // surface can preview the photo without codec surprises.
+            let jpeg: Data? = UIImage(data: data)?.jpegData(compressionQuality: 0.85)
+            let payload = jpeg ?? data
+            guard payload.count <= 25_000_000 else { return }
+            let name = "photo-\(Int(Date().timeIntervalSince1970)).jpg"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+            try payload.write(to: url, options: .atomic)
+            await MainActor.run { pendingFiles.append(url) }
+        } catch { return }
+    }
+
+    private func send() {        guard !store.isSending, !preparingSend else { return }
         // No AI yet: sending would only fail on the host. Open the chooser now.
         if store.needsProviderChoice { showingAI = true; return }
         let destination = composerThreadID ?? store.selectedThreadID
