@@ -1752,6 +1752,16 @@
     justify-content: space-around;
   }
 }
+@media (max-width: 360px) {
+  .conversations-page .page-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .conversations-page .page-heading .text-action {
+    margin-left: auto;
+  }
+}
 .composer-mode {
   display: inline-flex;
   align-items: center;

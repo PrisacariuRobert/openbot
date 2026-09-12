@@ -1,6 +1,6 @@
 .project-rooms { margin-top: 18px; }
 .project-rooms > summary { padding: 8px 12px; color: var(--muted); font-size: 12px; cursor: pointer; }
-.project-rooms > .compose-secondary { display: flex; align-items: center; gap: 7px; margin: 8px 12px; padding: 8px; color: var(--muted); font-size: 12px; }
+.project-rooms > .compose-secondary { display: flex; align-items: center; width: auto; min-width: 0; max-width: calc(100% - 24px); gap: 7px; margin: 8px 12px; padding: 8px; color: var(--muted); font-size: 12px; }
 .project-rooms > summary:focus-visible, .collaboration-detail > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 5px; }
 .collaboration-detail > summary { color: var(--muted); font-size: 12px; cursor: pointer; padding: 3px 0; }
 .collaboration-detail[open] > small { display: block; max-width: 60ch; margin-top: 5px; overflow-wrap: anywhere; }
