@@ -5,6 +5,9 @@ import { signInOrigin } from "../shared/browser-sign-in";
 /** A durable owner handoff, not permission to submit a form or proof of login. */
 export class BrowserSignIns {
   private locks = new Map<string, Promise<unknown>>();
+  /** Completed handoffs per teammate+site (best-effort, memory-only): a repeat
+   * ask shortly after one says so on the card instead of nagging fresh. */
+  private completedAt = new Map<string, number>();
   constructor(private db: OpenBotDatabase) {}
 
   async withProfile<T>(botId: string, operation: () => Promise<T>): Promise<T> {
@@ -56,8 +59,13 @@ export class BrowserSignIns {
       : seen.length
         ? `${bot.name} saw ${seen.join(" · ")}.`
         : `${bot.name} cited no login wall. Check the page yourself before signing in.`;
+    const key = `${botId} ${siteOrigin}`;
+    const lastDone = this.completedAt.get(key) || 0;
+    const repeatLine = lastDone && Date.now() - lastDone < 30 * 60_000
+      ? ` You signed in here ${Math.max(1, Math.round((Date.now() - lastDone) / 60_000))} min ago and the page still shows a wall — if this repeats, the site may be dropping the session.`
+      : "";
     const approval = this.db.createApproval({ botId, runId, kind: "browser",
-      reason: `${bot.name} needs you to sign in at ${site}. ${evidenceLine} Your task is saved and will wait. A visible Chrome window opens for this sign-in on the Mac running OpenBot — finish it there or on the private screen below; both drive the same browser.`,
+      reason: `${bot.name} needs you to sign in at ${site}. ${evidenceLine}${repeatLine} Your task is saved and will wait. A visible Chrome window opens for this sign-in on the Mac running OpenBot — finish it there or on the private screen below; both drive the same browser.`,
       actionLabel: `Sign in to ${site}`,
       action: { type: "browser_sign_in", botId, args: { siteOrigin, evidence: evidence ? { source: evidence.source, observedUrl: (evidence.observedUrl || "").slice(0, 300), observedText: (evidence.observedText || "").slice(0, 300) } : null } },
     });
@@ -73,6 +81,7 @@ export class BrowserSignIns {
     const { run, siteOrigin } = this.details(approvalId);
     // Save before enqueueing: recovery must never resume with the old refusal alone.
     this.db.setRunPrompt(run.id, `${run.prompt}\n\n[Owner sign-in handoff completed for ${siteOrigin}. This is NOT proof of authentication. Inspect your current browser page, verify the intended account and relevant service, then continue the original request. If still gated, call browser_request_sign_in again. Never request passwords in chat. Do not repeat completed actions or bypass separate approvals for sending, publishing, deleting or purchasing.]`);
+    this.completedAt.set(`${run.botId} ${siteOrigin}`, Date.now());
     return this.db.decideApproval(approvalId, "approved");
   }
 }

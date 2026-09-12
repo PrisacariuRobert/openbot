@@ -29,6 +29,12 @@ const server = createServer((req, res) => {
     res.end(`<!doctype html><title>Sample inbox</title><h1>Inbox</h1><table>${rows}</table><input aria-label="Search mail"><button>Compose</button>`);
     return;
   }
+  if (route === "/hop") {
+    // A login-looking interstitial that forwards to signed-in content after a
+    // beat (the LinkedIn shape): judging mid-redirect must never raise a wall.
+    res.end('<!doctype html><title>Signing you in</title><meta http-equiv="refresh" content="1.2;url=/support"><h1>Sign in</h1><p>Checking your session…</p><button>Continue</button>');
+    return;
+  }
   res.end(`<!doctype html><title>${route === "/social" ? "Sample activity" : "Sample support"}</title><main><h1>${route === "/social" ? "Selected account activity" : "Support triage"}</h1><label for="filter">Find a topic</label><input id="filter" aria-label="Find a topic"><button type="button" id="preview">${layout === 1 ? "Preview" : "Preview selected topic"}</button><p id="result">${route === "/social" ? "Mira asked about dark mode. Prepare a reply for review only." : "Ticket 17: invoice export fails. Ticket 22: account invite delayed."}</p><a href="/support/17">Ticket 17 source</a><form action="/send" method="post"><button id="send">Send reply</button></form></main><script>document.querySelector('#preview').onclick=()=>document.querySelector('#result').textContent='Read-only results for '+document.querySelector('#filter').value;</script>`);
 });
 await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -67,6 +73,10 @@ try {
   // a gate: the host must not cry wolf on the phishing subject below.
   await browser.open("nova", `${base}/inbox-list`);
   assert.match(JSON.stringify(await browser.snapshot("nova")), /Action required/);
+  assert.equal((await browser.signInState("nova")).needsSignIn, false);
+  // A login-looking hop that forwards into the signed-in app: the gate must
+  // settle through the redirect instead of crying wolf mid-flight.
+  await browser.open("nova", `${base}/hop`);
   assert.equal((await browser.signInState("nova")).needsSignIn, false);
   await browser.open("nova", `${base}/logout`); assert.match(JSON.stringify(await browser.snapshot("nova")), /Sign in to this sample account/);
   // A denied known-service URL is rejected before any navigation. Redirect-chain

@@ -66,6 +66,18 @@ test("uncited teammate sign-in requests say so on the card", () => {
     assert.match(bare.reason, /cited no login wall/);
   } finally { close(); }
 });
+
+test("repeat asks after a completed handoff say when the last one finished", () => {
+  const { db, handoffs, run, close } = fixture();
+  try {
+    const first = handoffs.request("nova", run.id, "https://mail.example.test/mail", { source: "host", observedText: "login page /signin" });
+    assert.doesNotMatch(first.reason, /signed in here/);
+    handoffs.continue(first.id);
+    const again = db.createRun({ botId: "nova", threadId: run.threadId, prompt: "Recheck the inbox.", status: "running" });
+    const second = handoffs.request("nova", again.id, "https://mail.example.test/mail", { source: "host", observedText: "login page /signin" });
+    assert.match(second.reason, /signed in here 1 min ago/);
+  } finally { close(); }
+});
 test("pending sign-in is visible to a reopened database; decline releases the browser and cancels the task", () => {
   const { root, db, handoffs, run, close } = fixture();
   let reopened: OpenBotDatabase | undefined;
