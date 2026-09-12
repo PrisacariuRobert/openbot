@@ -1126,6 +1126,15 @@ export function Studio() {
               onNewTeammate={() => setDetail({ kind: "create" })}
               onRemoved={() => { setRefresh((value) => value + 1); openThread("team-room"); }}
             />}
+            {page !== "chat" && (
+              <button
+                className="topbar-control mobile-workspace"
+                aria-label="Workspace"
+                onClick={() => setDetail({ kind: "workspace" })}
+              >
+                <Layers3 size={19} strokeWidth={1.5} />
+              </button>
+            )}
           </div>
         </header>
         {error && (

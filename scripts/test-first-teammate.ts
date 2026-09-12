@@ -101,7 +101,7 @@ try {
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
     await sheet.getByLabel("Their job").fill("Help plan my week");
     await sheet
-      .getByLabel("How should they help?")
+      .getByLabel("Additional instructions", { exact: true })
       .fill("Find a realistic plan. Ask before changing my calendar.");
     await sheet.getByText("Make them yours", { exact: true }).click();
     await sheet.getByRole("button", { name: "Sprout shape" }).click();

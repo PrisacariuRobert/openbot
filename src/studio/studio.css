@@ -1482,6 +1482,9 @@ h2 {
 .mobile-nav {
   display: none;
 }
+.mobile-workspace {
+  display: none;
+}
 @media (min-width: 1600px) {
   .page-content {
     padding-top: 72px;
@@ -1541,6 +1544,9 @@ h2 {
     padding: 0 23px;
   }
   .topbar .mobile-search {
+    display: grid;
+  }
+  .topbar .mobile-workspace {
     display: grid;
   }
   .topbar > span {

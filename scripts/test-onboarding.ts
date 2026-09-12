@@ -87,7 +87,7 @@ try {
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job", { exact: true }).fill("Help plan my week");
   const instructions = "Find a realistic plan. Ask before changing my calendar.";
-  await creation.getByLabel("How should they help?", { exact: true }).fill(instructions);
+  await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
   const popup = page.waitForEvent("popup");
   await creation.getByRole("link", { name: /^(Set up an AI connection|Connect another AI service)$/ }).click();
