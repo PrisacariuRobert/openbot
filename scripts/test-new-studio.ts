@@ -263,7 +263,9 @@ try {
           `${name}: ${selector} overflows`,
         );
     }
-    const boxes = await page.locator(".character").evaluateAll((elements) =>
+    // Color has meaning in the new UI: mascots, live/attention state and file
+    // types. Keep the rest of the canvas restrained, not an unrestricted mask.
+    const boxes = await page.locator(".character, .live-pill, .needs-you-pill, .pinned-dot, .file-sigla").evaluateAll((elements) =>
       elements.map((el) => {
         const r = el.getBoundingClientRect();
         return {
@@ -304,7 +306,7 @@ try {
     // OB-01: a visual-design failure must not hide every later functional
     // result. Record it and keep going; the suite still fails at the end.
     try {
-      assert.equal(outsideColor, 0, `${name}: only mascots should be colorful`);
+      assert.equal(outsideColor, 0, `${name}: color stays within mascots and semantic status/file indicators`);
       if (name.endsWith("home"))
         assert.ok(insideColor > 15, "Home characters remain colorful");
     } catch (error) {
@@ -353,7 +355,9 @@ try {
     ["small-phone", 320, 740],
   ] as const) {
     await page.setViewportSize({ width, height });
-    await page.goto(base + "/studio.html");
+    // This progress fixture belongs to the shared room; the app now defaults
+    // to a direct conversation when no explicit thread is requested.
+    await page.goto(base + "/studio.html?thread=team-room");
     await page
       .getByRole("textbox", { name: "Message your team", exact: true })
       .waitFor();
@@ -534,7 +538,10 @@ try {
   await page.waitForFunction(async () => (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft.body === "My test draft");
   await page.reload();
   await page.getByRole("button", { name: "Remove brief.txt" }).waitFor();
-  await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value === "My test draft");
+  await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value === "My test draft").catch(async (error) => {
+    console.error("Synthetic draft recovery diagnostics", await page.evaluate(async () => ({ url: location.href, value: document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value, draft: (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft })));
+    throw error;
+  });
   await page.getByRole("button", { name: "Send message" }).click();
   await page.getByText(/Your draft has been kept/).waitFor();
   assert.equal(
@@ -605,11 +612,22 @@ try {
     .getByRole("complementary", { name: "Conversation details" })
     .waitFor();
   await page.waitForFunction(() => document.querySelector(".computer-placeholder p")?.textContent !== "Checking…");
-  const fileContrast = await page.locator(".from-you .message-file").evaluate((element) => {
+  const fileContrast = await page.locator(".from-you .delivered-file").first().evaluate((element) => {
     const style = getComputedStyle(element);
-    return { color: style.color, background: style.backgroundColor };
+    const label = element.querySelector(".file-card strong")!;
+    return { color: getComputedStyle(label).color, background: style.backgroundColor };
   });
-  assert.equal(fileContrast.color, "rgb(32, 32, 32)", "Outgoing attachment labels remain readable on their white card");
+  const luminance = (color: string) => {
+      const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((value) => {
+        const channel = value / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+  const foreground = luminance(fileContrast.color);
+  const background = luminance(fileContrast.background);
+  const contrastRatio = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+  assert.ok(contrastRatio >= 4.5, "Outgoing attachment labels retain accessible contrast on their card");
   assert.equal(fileContrast.background, "rgb(255, 255, 255)");
   await capture("desktop-conversation-context");
   await page
@@ -644,7 +662,7 @@ try {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto(base + "/studio.html?thread=team-room");
     await page.locator(".from-team .prose").first().waitFor();
-    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(23, 23, 23)", "System dark appearance applies");
+    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(0, 0, 0)", "System dark appearance applies the dark canvas token");
     for (const selector of [".from-team > .prose", ".from-you > .prose"]) {
       const colors = await page.locator(selector).first().evaluate((element) => {
         let background = getComputedStyle(element).backgroundColor, parent = element.parentElement;

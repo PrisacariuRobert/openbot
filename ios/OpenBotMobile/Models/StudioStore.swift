@@ -34,7 +34,8 @@ final class StudioStore: ObservableObject {
     @Published private(set) var isCheckingRunner = false
     @Published var errorMessage: String?
     @Published var shareNotice: String?
-    @Published var selectedThreadID = "team-room"
+    // Let the host choose an available direct chat on first connection.
+    @Published var selectedThreadID = ""
 
     private let client: StudioAPIClient
 

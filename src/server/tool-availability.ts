@@ -37,7 +37,7 @@ export function toolAvailability(
     for (const name of names) flags[name] = available;
   };
   set(
-    ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_request_sign_in"],
+    ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "browser_request_sign_in"],
     bot.browserEnabled,
   );
   set(

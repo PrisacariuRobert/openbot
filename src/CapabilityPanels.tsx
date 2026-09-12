@@ -150,6 +150,7 @@ import { routineScheduleLabel, routineStartsInLabel } from "./shared/routines";
 import { ProviderIcon } from "./ProviderIcon";
 import { useModalFocus } from "./components/useModalFocus";
 import { ConnectorIcon } from "./ConnectorIcon";
+import { SavedFilesPanel } from "./studio/SavedFilesPanel";
 
 import { Character } from "./studio/Character";
 import { AppearancePicker } from "./studio/AppearancePicker";
@@ -4988,6 +4989,8 @@ export function FilesPanel({ bot }: { bot: Bot }) {
     );
   return (
     <div className="files-view">
+      <SavedFilesPanel key={bot.id} bot={bot} />
+      <h2 className="workspace-files-heading">Workspace files</h2>
       <div className="friendly-note">
         <FolderOpen size={18} />
         <p>

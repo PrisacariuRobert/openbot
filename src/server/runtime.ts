@@ -16,6 +16,7 @@ import { signInOrigin } from "../shared/browser-sign-in.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
+export class BrowserUploadUncertainError extends Error {}
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
 /** One login-wall observation: a short evidence string (never credentials) or
@@ -957,6 +958,14 @@ export class BrowserManager {
     return { ...target, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
   }
 
+  async describeFileInput(botId: string, selector: string) {
+    const page = await this.page(botId), matches = page.locator(selector);
+    if (await matches.count() !== 1) throw new Error("Choose a selector that identifies exactly one file input.");
+    const valid = await matches.first().evaluate((node) => node instanceof HTMLInputElement && node.type === "file" && !node.disabled && !node.hasAttribute("webkitdirectory") && !node.hasAttribute("directory"));
+    if (!valid) throw new Error("Choose one enabled file input; folder inputs are not supported.");
+    return this.describeTarget(botId, selector);
+  }
+
   private async assertTarget(botId: string, selector: string, fingerprint?: string) {
     this.assertPageAccess(botId, await this.page(botId));
     if (fingerprint && (await this.describeTarget(botId, selector)).fingerprint !== fingerprint) {
@@ -988,6 +997,30 @@ export class BrowserManager {
     const locator = page.locator(selector).first();
     await locator.fill(value, { timeout: 12_000 });
     return { url: page.url(), title: await page.title() };
+  }
+
+  async uploadFile(botId: string, selector: string, file: { name: string; mimeType: string; buffer: Buffer }, fingerprint: string, origin: string) {
+    const page = await this.page(botId);
+    await this.assertTarget(botId, selector, fingerprint);
+    if (new URL(page.url()).origin !== origin) throw new Error("The upload page changed after review. Inspect it again and request a new approval.");
+    const matches = page.locator(selector);
+    if (await matches.count() !== 1) throw new Error("The reviewed file input is no longer unique.");
+    const input = await matches.elementHandle();
+    if (!input) throw new Error("The reviewed file input is no longer available.");
+    try {
+      const valid = await input.evaluate((node) => node instanceof HTMLInputElement && node.type === "file" && node.isConnected && !node.disabled && !node.hasAttribute("webkitdirectory") && !node.hasAttribute("directory"));
+      if (!valid) throw new Error("The reviewed control is no longer an enabled file input.");
+      await this.assertTarget(botId, selector, fingerprint);
+      if (new URL(page.url()).origin !== origin) throw new Error("The upload page changed after review.");
+      try {
+        // Bind selection to this inspected DOM node, never a newly matched input.
+        await input.setInputFiles(file, { timeout: 12_000 });
+        this.assertPageAccess(botId, page);
+        return { url: page.url(), title: await page.title() };
+      } catch {
+        throw new BrowserUploadUncertainError("The website may have received the file selection, but OpenBot could not confirm the final page state. Check the website before trying again.");
+      }
+    } finally { await input.dispose().catch(() => undefined); }
   }
 
   async takeoverClick(botId: string, x: number, y: number) {

@@ -32,7 +32,7 @@ import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
 import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
-import { BrowserManager, ComputerManager } from "./runtime.js";
+import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
 import { TesterBrowser } from "./tester-browser.js";
 import { LiveViewHub, type LiveViewEvent } from "./live-view.js";
 import { buildRawEmail, connectorCatalog, GoogleWorkspaceConnector } from "./google-workspace.js";
@@ -57,6 +57,7 @@ import { pageWatchConfig } from "./page-watch-source.js";
 import { invokedWorkflow } from "../shared/skills.js";
 import { iosConnectURL, isTailscaleURL } from "../shared/mobile.js";
 import { AttachmentService, attachmentPromptBlock } from "./attachments.js";
+import { SavedFileLibrary } from "./saved-files.js";
 import { browserAccessStatus, browserWebsiteBlock } from "./browser-access.js";
 import { BrowserSignIns } from "./browser-sign-in.js";
 import { collectOwnerSessionCookies, openInOwnersChrome } from "./own-browser-bridge.js";
@@ -92,6 +93,7 @@ import { verifyTaskChecks } from "./verification-evidence.js";
 import { approvalPreview } from "../shared/approval-preview.js";
 import { BrowserNavigationGrants, browserNavigationAllowanceOffer, reviewedBrowserNavigationGrant } from "./browser-navigation-grants.js";
 import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
+import { browserSavedFileUploadSchema } from "../shared/browser-upload-review.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
@@ -104,6 +106,7 @@ const deployment = readDeploymentConfig(process.env, { port, production: process
 // Production hosts start empty: onboarding creates the first teammate.
 // Test hosts opt into the classic starter roster explicitly.
 const db = new OpenBotDatabase(rootDir, { seedStarterBots: process.env.OPENBOT_SEED_STARTER_BOTS === "1" });
+const savedFiles = new SavedFileLibrary(db);
 const studioLock = acquireStudioLock(db.dataDir, port);
 if (!studioLock.acquired) {
   const holderPort = studioLock.holder?.port ? ` (serving port ${studioLock.holder.port})` : "";
@@ -1480,6 +1483,14 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     const result = await browser.type(parsed.data.botId, String(args.selector || ""), String(args.value || ""), args.targetFingerprint);
     return `The approved field entry completed on ${result.title} (${result.url}).`;
   }
+  if (parsed.data.type === "browser_upload_saved_file") {
+    if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
+    const frozen = browserSavedFileUploadSchema.parse(args);
+    const file = savedFiles.verified(parsed.data.botId, frozen.savedFileId);
+    if (file.name !== frozen.name || file.size !== frozen.size || file.detectedMime !== frozen.mime || file.sha256 !== frozen.sha256) throw new Error("The saved file changed after review. Request a new approval.");
+    const result = await browser.uploadFile(parsed.data.botId, frozen.selector, { name: file.name, mimeType: file.detectedMime, buffer: file.buffer }, frozen.targetFingerprint, frozen.origin);
+    return `Selected ${file.name} (${file.size} bytes, sha256 ${file.sha256}) on ${result.url}. This confirms file selection, not form submission.`;
+  }
   if (parsed.data.type === "gmail_reply") {
     const access = db.getBotConnectorAccess(parsed.data.botId), connection = db.getConnector("google-workspace");
     const capability = connectorCatalog(Boolean(connection?.connected), connection?.scopes || []).find(entry => entry.id === "gmail");
@@ -1651,7 +1662,7 @@ async function executeApprovedAction(approvalId: string, reviewedFingerprint: st
     );
   } catch (error) {
     const message = actionCompleted ? "The action completed, but OpenBot could not finish recording its continuation. Check the saved result and destination before continuing; do not repeat this action." : error instanceof Error ? error.message : String(error);
-    if (actionCompleted || error instanceof McpUncertainError || error instanceof GitHubWriteUncertainError || error instanceof MacOrganizationIncompleteError || error instanceof ApprovedConnectorOutcomeUncertainError || (error instanceof ApprovalReviewChangedError && error.mutationAttempted)) {
+    if (actionCompleted || error instanceof McpUncertainError || error instanceof BrowserUploadUncertainError || error instanceof GitHubWriteUncertainError || error instanceof MacOrganizationIncompleteError || error instanceof ApprovedConnectorOutcomeUncertainError || (error instanceof ApprovalReviewChangedError && error.mutationAttempted)) {
       db.markApprovedActionUncertain(approvalId, message);
       db.updateRun(receipt.runId, { status: "failed", error: message, finishedAt: new Date().toISOString(), taskStage: "blocked" });
       db.finishRunTask(receipt.runId, "failed", message);
@@ -1699,7 +1710,7 @@ function currentApprovalReview(approvalId: string) {
   }
   const taskTokens = type === "task_tokens" ? runner.taskTokenReview(approval.id) : null;
   const preview = approvalPreview(approval, run, action, githubContext?.accountLogin || connector?.accountEmail, taskTokens);
-  if (type === "browser_click" || type === "browser_type") {
+  if (type === "browser_click" || type === "browser_type" || type === "browser_upload_saved_file") {
     const target = args.targetReview as { url?: unknown } | undefined;
     const denied = typeof target?.url === "string" ? browserWebsiteBlock(db, approval.botId, target.url) : null;
     if (!db.getBot(approval.botId)?.browserEnabled || denied) {
@@ -1736,7 +1747,7 @@ function currentApprovalReview(approvalId: string) {
     connector: connectorId ? { id: connectorId, account: connector?.accountEmail, connected: connector?.connected, version: db.connectorAuthorizationVersion(connectorId), canRead: grant?.canRead, canSend: grant?.canSend } : null,
     macAccess: type === "mac_organize" ? { enabled: db.getStudioSettings().macAccessEnabled, root: macFiles.root } : null,
     github: githubContext, publicationValid,
-    browserAccess: type === "browser_click" || type === "browser_type" ? db.botSessionFingerprint(approval.botId) : null,
+    browserAccess: type === "browser_click" || type === "browser_type" || type === "browser_upload_saved_file" ? db.botSessionFingerprint(approval.botId) : null,
     taskTokens,
   });
   preview.reviewFingerprint = preview.canApprove ? fingerprint : null;
@@ -1754,6 +1765,7 @@ function autoApproveIfYolo(approvalId: string) {
   if (!db.getStudioSettings().yoloMode) return;
   // Persistent instructions can affect later tasks. They always need human review.
   if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "skill_propose") return;
+  if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "browser_upload_saved_file") return;
   void (async () => {
     try {
       const reviewed = currentApprovalReview(approvalId);
@@ -2370,6 +2382,32 @@ app.post("/api/bots", (request, response) => {
   }
 });
 
+app.get("/api/bots/:id/saved-files", (request, response) => {
+  if (!db.getBot(request.params.id)) return response.status(404).json({ error: "Teammate not found." });
+  response.json(savedFiles.list(request.params.id));
+});
+
+app.post("/api/bots/:id/saved-files", (request, response) => {
+  const parsed = z.object({ attachmentId: z.string().min(1).max(128) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose one uploaded file to save." });
+  try {
+    const existed = savedFiles.list(request.params.id).some((file) => file.id === parsed.data.attachmentId);
+    response.status(existed ? 200 : 201).json(savedFiles.add(request.params.id, parsed.data.attachmentId));
+    broadcast();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "That file could not be saved.";
+    response.status(/Teammate not found|File not found/.test(message) ? 404 : 409).json({ error: message });
+  }
+});
+
+app.delete("/api/bots/:id/saved-files/:attachmentId", (request, response) => {
+  if (!db.getBot(request.params.id)) return response.status(404).json({ error: "Teammate not found." });
+  const removed = savedFiles.remove(request.params.id, request.params.attachmentId);
+  if (!removed) return response.status(404).json({ error: "Saved file not found." });
+  broadcast();
+  response.json({ removed: true });
+});
+
 app.post("/api/bots/:id/duplicate", (request, response) => {
   try {
     const bot = db.duplicateBot(request.params.id);
@@ -2967,7 +3005,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -2984,7 +3022,7 @@ app.post("/api/internal/tools", async (request, response) => {
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not
     // let its eventual shutdown cancel the approved action or replacement.
-    const yolo = action !== "skill_propose" && db.getStudioSettings().yoloMode;
+    const yolo = action !== "skill_propose" && action !== "browser_upload_saved_file" && db.getStudioSettings().yoloMode;
     if (yolo) autoApproveIfYolo(approval.id);
     broadcast();
     return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by YOLO mode. OpenBot is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
@@ -3271,10 +3309,16 @@ app.post("/api/internal/tools", async (request, response) => {
       if (gate.needsSignIn) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined });
       // While the owner is signing in on this browser, the page is theirs:
       // no model-visible snapshot or interaction until they continue.
-      if (["browser_snapshot", "browser_click", "browser_type", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
+      if (["browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
         return response.status(409).json({ error: "The owner is signing in on this browser right now. The page is private until they hand it back." });
       }
       if (action === "browser_snapshot") return response.json(await browser.snapshot(botId));
+      if (action === "browser_upload_saved_file") {
+        const savedFileId = z.string().min(1).max(128).parse(args.savedFileId), selector = z.string().min(1).max(500).parse(args.selector);
+        const file = savedFiles.verified(botId, savedFileId), target = await browser.describeFileInput(botId, selector);
+        const origin = new URL(target.url).origin;
+        return holdForApproval("browser", `Uploading sends the exact saved file bytes to ${new URL(origin).hostname}. Review the file and destination before continuing.`, `Upload “${file.name}” to ${new URL(origin).hostname}`, { savedFileId, selector, name: file.name, size: file.size, mime: file.detectedMime, sha256: file.sha256, origin, targetFingerprint: target.fingerprint, targetReview: target.review });
+      }
       if (action === "browser_click") {
         const selector = String(args.selector || ""), target = await browser.describeTarget(botId, selector);
         if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });

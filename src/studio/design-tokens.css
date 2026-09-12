@@ -1,68 +1,246 @@
-/* One semantic palette. Character colors are deliberately outside this system. */
+/* HIG-first semantic tokens (design/messaging-first-hig-redesign).
+ * Apple HIG foundations applied to the web studio:
+ * - Color: semantic roles (not appearances), light/dark + increased-contrast
+ *   variants, one accent reserved for primary/interactive meaning.
+ *   Refs: HIG Color (system colors adapt to appearance/vibrancy), HIG
+ *   Accessibility (4.5:1 body contrast, never color-alone).
+ * - Typography: SF system stack + HIG text-style scale. iOS Body = 17pt,
+ *   macOS = 13pt; we ship 16px desktop body / 17px touch, footnote 13px,
+ *   caption 12/11px min. Dynamic Type: layouts must not clip at 200%.
+ * - Layout: 44pt minimum touch targets (HIG Accessibility), 8pt grid,
+ *   bubble radius 18px / card 12px / control 10px.
+ * Legacy --canvas/--surface/--ink aliases are kept so existing sheets keep
+ * working; new code should use the --label/--system/--accent roles. */
 :root,
 :root[data-appearance="light"] {
   color-scheme: light;
-  --canvas: #fff;
-  --surface: #fff;
-  --sidebar: #f6f6f6;
-  --surface-muted: #f1f1f1;
-  --hover: #f3f3f3;
-  --selection: #e9e9e9;
-  --ink: #202020;
-  --secondary: #525252;
-  --muted: #6b6b6b;
-  --line: #e5e5e5;
-  --line-strong: #a7a7a7;
-  --focus: #525252;
-  --strong: #202020;
-  --on-strong: #fff;
-  --code-strong: #393939;
+
+  /* System backgrounds (HIG: hierarchy lives in background layers). */
+  --system-background: #ffffff;
+  --secondary-system-background: #f5f5f7;
+  --tertiary-system-background: #ececf0;
+  --grouped-background: #f2f2f7;
+  --sidebar-material: rgba(246, 246, 248, 0.88);
+
+  /* Labels. */
+  --label-primary: #1d1d1f;
+  --label-secondary: #515154;
+  --label-tertiary: #6e6e73;
+  --separator: rgba(60, 60, 67, 0.18);
+  --separator-strong: rgba(60, 60, 67, 0.36);
+
+  /* The one interactive color. Reserved for send, links, selection,
+   * focus, and "needs you". Never reused for decoration. */
+  --accent: #0071e3;
+  --accent-tap: #0068d1;
+  --accent-soft: rgba(0, 113, 227, 0.12);
+  --link: #0066cc;
+
+  /* Status: always paired with an icon/label, never color-alone. */
+  --success: #1d8127;
+  --warning: #9a6700;
+  --danger: #d70015;
+
+  /* File-family tints (Seti-inspired, quiet pastels — distinct, never loud). */
+  --ft-text-bg: #e3eeff;
+  --ft-text-fg: #0b5fd0;
+  --ft-code-bg: #e9e5ff;
+  --ft-code-fg: #5b4bc4;
+  --ft-data-bg: #fff1cf;
+  --ft-data-fg: #8f6100;
+  --ft-sheet-bg: #ddf5e2;
+  --ft-sheet-fg: #147a45;
+  --ft-slide-bg: #ffe8d3;
+  --ft-slide-fg: #a84e00;
+  --ft-pdf-bg: #ffe0dc;
+  --ft-pdf-fg: #c0271b;
+  --ft-image-bg: #f1e2ff;
+  --ft-image-fg: #7d3ac1;
+  --ft-media-bg: #dcf5f2;
+  --ft-media-fg: #0b746e;
+  --ft-archive-bg: #ece7dd;
+  --ft-archive-fg: #77694f;
+  --ft-file-bg: var(--tertiary-system-background);
+  --ft-file-fg: var(--label-secondary);
+
+  /* Bubbles: openbot's own voice — monochrome ink for you, quiet gray for
+   * the team. Accent blue stays reserved for actions, links, and status. */
+  --bubble-outgoing: #2b2b30;
+  --bubble-outgoing-label: #ffffff;
+  --bubble-incoming: #e9e9eb;
+  --bubble-incoming-label: var(--label-primary);
+
+  /* Type scale (HIG text styles, web-adapted). */
+  --text-large-title: 34px;
+  --text-title: 22px;
+  --text-headline: 17px;
+  --text-body: 16px;
+  --text-body-touch: 17px;
+  --text-callout: 15px;
+  --text-subhead: 14px;
+  --text-footnote: 13px;
+  --text-caption: 12px;
+  --text-caption-2: 11px;
+
+  --font-system:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+
+  --radius-bubble: 18px;
+  --radius-card: 12px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+  --target-min: 44px;
+
+  /* Legacy aliases (do not extend; migrate to roles above). */
+  --canvas: var(--grouped-background);
+  --surface: var(--system-background);
+  --sidebar: var(--sidebar-material);
+  --surface-muted: var(--tertiary-system-background);
+  --hover: var(--tertiary-system-background);
+  --selection: #e5e5ea;
+  --ink: var(--label-primary);
+  --secondary: var(--label-secondary);
+  --muted: var(--label-tertiary);
+  --line: var(--separator);
+  --line-strong: var(--separator-strong);
+  --focus: var(--accent);
+  --strong: var(--bubble-outgoing);
+  --on-strong: var(--bubble-outgoing-label);
+  --code-strong: rgba(255, 255, 255, 0.24);
   --brand-filter: grayscale(1);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-appearance="light"]) {
     color-scheme: dark;
-    --canvas: #171717;
-    --surface: #1e1e1e;
-    --sidebar: #151515;
-    --surface-muted: #282828;
-    --hover: #2c2c2c;
-    --selection: #353535;
-    --ink: #efefef;
-    --secondary: #cecece;
-    --muted: #ababab;
-    --line: #373737;
-    --line-strong: #727272;
-    --focus: #dadada;
-    --strong: #ededed;
-    --on-strong: #202020;
-    --code-strong: #d4d4d4;
+    --system-background: #1c1c1e;
+    --secondary-system-background: #161617;
+    --tertiary-system-background: #2c2c2e;
+    --grouped-background: #000000;
+    --sidebar-material: rgba(22, 22, 23, 0.86);
+    --label-primary: #f5f5f7;
+    --label-secondary: #d7d7dc;
+    --label-tertiary: #aeaeb2;
+    --separator: rgba(84, 84, 88, 0.55);
+    --separator-strong: rgba(142, 142, 147, 0.7);
+    --accent: #0a84ff;
+    --accent-tap: #409cff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --link: #2997ff;
+    --success: #30d158;
+    --warning: #ffd60a;
+    --danger: #ff453a;
+    --ft-text-bg: rgba(64, 156, 255, 0.2);
+    --ft-text-fg: #6bb3ff;
+    --ft-code-bg: rgba(172, 142, 255, 0.2);
+    --ft-code-fg: #b79cff;
+    --ft-data-bg: rgba(255, 214, 10, 0.16);
+    --ft-data-fg: #ffd60a;
+    --ft-sheet-bg: rgba(48, 209, 88, 0.16);
+    --ft-sheet-fg: #30d158;
+    --ft-slide-bg: rgba(255, 159, 10, 0.18);
+    --ft-slide-fg: #ff9f0a;
+    --ft-pdf-bg: rgba(255, 69, 58, 0.18);
+    --ft-pdf-fg: #ff6961;
+    --ft-image-bg: rgba(191, 90, 242, 0.18);
+    --ft-image-fg: #ce93ff;
+    --ft-media-bg: rgba(102, 212, 207, 0.16);
+    --ft-media-fg: #66d4cf;
+    --ft-archive-bg: rgba(152, 152, 157, 0.22);
+    --ft-archive-fg: #c7c7cc;
+    --ft-file-bg: var(--tertiary-system-background);
+    --ft-file-fg: var(--label-secondary);
+    --bubble-outgoing: #ececf0;
+    --bubble-outgoing-label: #1d1d1f;
+    --bubble-incoming: #2c2c2e;
+    --bubble-incoming-label: var(--label-primary);
+    --selection: #3a3a3c;
+    --hover: #2c2c2e;
+    --surface-muted: #2c2c2e;
+    --canvas: var(--grouped-background);
+    --surface: var(--system-background);
+    --sidebar: var(--sidebar-material);
+    --ink: var(--label-primary);
+    --secondary: var(--label-secondary);
+    --muted: var(--label-tertiary);
+    --line: var(--separator);
+    --line-strong: var(--separator-strong);
+    --focus: var(--accent);
+    --strong: var(--bubble-outgoing);
+    --on-strong: var(--bubble-outgoing-label);
+    --code-strong: rgba(0, 0, 0, 0.14);
     --brand-filter: grayscale(1) invert(1);
   }
 }
 :root[data-appearance="dark"] {
   color-scheme: dark;
-  --canvas: #171717;
-  --surface: #1e1e1e;
-  --sidebar: #151515;
-  --surface-muted: #282828;
-  --hover: #2c2c2c;
-  --selection: #353535;
-  --ink: #efefef;
-  --secondary: #cecece;
-  --muted: #ababab;
-  --line: #373737;
-  --line-strong: #727272;
-  --focus: #dadada;
-  --strong: #ededed;
-  --on-strong: #202020;
-  --code-strong: #d4d4d4;
+  --system-background: #1c1c1e;
+  --secondary-system-background: #161617;
+  --tertiary-system-background: #2c2c2e;
+  --grouped-background: #000000;
+  --sidebar-material: rgba(22, 22, 23, 0.86);
+  --label-primary: #f5f5f7;
+  --label-secondary: #d7d7dc;
+  --label-tertiary: #aeaeb2;
+  --separator: rgba(84, 84, 88, 0.55);
+  --separator-strong: rgba(142, 142, 147, 0.7);
+  --accent: #0a84ff;
+  --accent-tap: #409cff;
+  --accent-soft: rgba(10, 132, 255, 0.22);
+  --link: #2997ff;
+  --success: #30d158;
+  --warning: #ffd60a;
+  --danger: #ff453a;
+  --ft-text-bg: rgba(64, 156, 255, 0.2);
+  --ft-text-fg: #6bb3ff;
+  --ft-code-bg: rgba(172, 142, 255, 0.2);
+  --ft-code-fg: #b79cff;
+  --ft-data-bg: rgba(255, 214, 10, 0.16);
+  --ft-data-fg: #ffd60a;
+  --ft-sheet-bg: rgba(48, 209, 88, 0.16);
+  --ft-sheet-fg: #30d158;
+  --ft-slide-bg: rgba(255, 159, 10, 0.18);
+  --ft-slide-fg: #ff9f0a;
+  --ft-pdf-bg: rgba(255, 69, 58, 0.18);
+  --ft-pdf-fg: #ff6961;
+  --ft-image-bg: rgba(191, 90, 242, 0.18);
+  --ft-image-fg: #ce93ff;
+  --ft-media-bg: rgba(102, 212, 207, 0.16);
+  --ft-media-fg: #66d4cf;
+  --ft-archive-bg: rgba(152, 152, 157, 0.22);
+  --ft-archive-fg: #c7c7cc;
+  --ft-file-bg: var(--tertiary-system-background);
+  --ft-file-fg: var(--label-secondary);
+  --bubble-outgoing: #ececf0;
+  --bubble-outgoing-label: #1d1d1f;
+  --bubble-incoming: #2c2c2e;
+  --bubble-incoming-label: var(--label-primary);
+  --selection: #3a3a3c;
+  --hover: #2c2c2e;
+  --surface-muted: #2c2c2e;
+  --canvas: var(--grouped-background);
+  --surface: var(--system-background);
+  --sidebar: var(--sidebar-material);
+  --ink: var(--label-primary);
+  --secondary: var(--label-secondary);
+  --muted: var(--label-tertiary);
+  --line: var(--separator);
+  --line-strong: var(--separator-strong);
+  --focus: var(--accent);
+  --strong: var(--bubble-outgoing);
+  --on-strong: var(--bubble-outgoing-label);
+  --code-strong: rgba(255, 255, 255, 0.24);
   --brand-filter: grayscale(1) invert(1);
 }
 html,
 body {
   background: var(--canvas);
   color: var(--ink);
+  font-family: var(--font-system);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 .workspace {
   background: var(--canvas);
@@ -70,6 +248,8 @@ body {
 .sidebar,
 .conversation-context {
   background: var(--sidebar);
+  backdrop-filter: saturate(1.6) blur(20px);
+  -webkit-backdrop-filter: saturate(1.6) blur(20px);
 }
 .from-you .message-file {
   color: var(--ink);
@@ -78,10 +258,18 @@ body {
 .from-you .prose a:not(.message-file) {
   text-underline-offset: 3px;
 }
+/* HIG: visible focus everywhere, 2px accent, never removed. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 .topbar .topbar-control,
 .topbar .conversation-actions > button {
   border-radius: 8px;
   transition: background 120ms ease;
+  min-width: var(--target-min);
+  min-height: var(--target-min);
 }
 .topbar .topbar-control:hover,
 .topbar .conversation-actions > button:hover {
@@ -99,8 +287,8 @@ body {
     box-shadow 120ms ease;
 }
 .composer:focus-within {
-  border-color: var(--line-strong);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 4%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .chat-scroll {
   scrollbar-gutter: stable;
@@ -111,6 +299,19 @@ body {
 }
 .conversation-row[aria-current="page"] {
   background: var(--selection);
+}
+/* Primary send: openbot ink, not system blue. Blue stays reserved for links,
+ * status, and focus — the chat keeps its own voice. */
+.send {
+  background: var(--label-primary);
+  color: var(--grouped-background);
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease,
+    background 120ms ease;
+}
+.send:hover:not(:disabled) {
+  opacity: 0.82;
 }
 .send:disabled {
   opacity: 1;
@@ -191,6 +392,17 @@ button[aria-label]:not(:disabled) {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 }
+/* Touch pointers get the full 17pt HIG body; Dynamic Type growth must wrap,
+ * never clip (HIG Typography + Layout). */
+@media (pointer: coarse) {
+  body {
+    font-size: var(--text-body-touch);
+  }
+  .prose,
+  .from-team > .prose {
+    font-size: var(--text-body-touch);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .topbar .topbar-control,
   .topbar .conversation-actions > button,
@@ -202,6 +414,12 @@ button[aria-label]:not(:disabled) {
 @media (prefers-contrast: more) {
   :root {
     --line: var(--line-strong);
+    --accent: #0058b0;
+    --link: #004da3;
+  }
+  :root[data-appearance="dark"] {
+    --accent: #409cff;
+    --link: #53a8ff;
   }
   .composer,
   .message-file,

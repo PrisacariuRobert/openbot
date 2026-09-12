@@ -617,7 +617,9 @@ test("an unknown runtime version also fails closed before spawning", async () =>
   try {
     f.runner["executeRun"](f.db.getRun(f.run.id)!);
     assert.equal(f.child(), undefined);
-    assert.match(f.db.getRun(f.run.id)?.error || "", /runtime not verified/i);
+    assert.equal(f.db.getRun(f.run.id)?.status, "failed");
+    assert.match(f.db.getRun(f.run.id)?.error || "", /could not check the installed OpenCode version/i);
+    assert.match(f.db.getRun(f.run.id)?.error || "", /No model was started/i);
   } finally { await f.close(); }
 });
 

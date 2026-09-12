@@ -151,6 +151,11 @@ export interface Attachment {
   createdAt: string;
 }
 
+export interface SavedFile extends Pick<Attachment, "id" | "name" | "mime" | "detectedMime" | "kind" | "size" | "url" | "previewUrl" | "createdAt"> {
+  sha256: string;
+  savedAt: string;
+}
+
 export interface ArtifactSummary {
   id: string;
   threadId: string;

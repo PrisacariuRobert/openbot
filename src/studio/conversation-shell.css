@@ -6,19 +6,176 @@
 .compose-files {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
 }
-.compose-files > span {
+/* Attachment chip: glyph tile + name + meta, own card language. */
+.compose-file {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--system-background);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+/* File thumbnail tile: quiet gray with the real extension — restraint, not
+ * a black slab. Shared by composer chips and transcript file cards. */
+.file-thumb {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--ft-file-bg);
+  color: var(--ft-file-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.file-thumb.ft-text { background: var(--ft-text-bg); color: var(--ft-text-fg); }
+.file-thumb.ft-code { background: var(--ft-code-bg); color: var(--ft-code-fg); }
+.file-thumb.ft-data { background: var(--ft-data-bg); color: var(--ft-data-fg); }
+.file-thumb.ft-sheet { background: var(--ft-sheet-bg); color: var(--ft-sheet-fg); }
+.file-thumb.ft-slide { background: var(--ft-slide-bg); color: var(--ft-slide-fg); }
+.file-thumb.ft-pdf { background: var(--ft-pdf-bg); color: var(--ft-pdf-fg); }
+.file-thumb.ft-image { background: var(--ft-image-bg); color: var(--ft-image-fg); }
+.file-thumb.ft-media { background: var(--ft-media-bg); color: var(--ft-media-fg); }
+.file-thumb.ft-archive { background: var(--ft-archive-bg); color: var(--ft-archive-fg); }
+/* Inline sigla (VS Code explorer style): extension in the family color, no
+ * box. Used by the compact file cards in transcript and composer. */
+.file-sigla {
+  flex-shrink: 0;
+  min-width: 30px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ft-file-fg);
+}
+.file-sigla.ft-text { color: var(--ft-text-fg); }
+.file-sigla.ft-code { color: var(--ft-code-fg); }
+.file-sigla.ft-data { color: var(--ft-data-fg); }
+.file-sigla.ft-sheet { color: var(--ft-sheet-fg); }
+.file-sigla.ft-slide { color: var(--ft-slide-fg); }
+.file-sigla.ft-pdf { color: var(--ft-pdf-fg); }
+.file-sigla.ft-image { color: var(--ft-image-fg); }
+.file-sigla.ft-media { color: var(--ft-media-fg); }
+.file-sigla.ft-archive { color: var(--ft-archive-fg); }
+/* Live pill: Discord-style presence in the row. Mini mascot + what they're
+ * doing + bouncing dots while live; back to the quiet line when done. */
+.live-pill {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  min-height: 24px;
+  padding: 2px 9px 2px 3px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.live-pill .character {
+  flex-shrink: 0;
+}
+.live-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  flex-shrink: 0;
+}
+.live-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+/* Speaking ring on the row avatar while live. */
+.conversation-row.is-live > .character,
+.conversation-row.is-live .group-stack > .character {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) .live-pill {
+    color: var(--link);
+  }
+}
+:root[data-appearance="dark"] .live-pill {
+  color: var(--link);
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes live-dot {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+    30% { transform: translateY(-3px); opacity: 1; }
+  }
+  .live-dots i {
+    animation: live-dot 1.2s ease-in-out infinite;
+  }
+  .live-dots i:nth-child(2) { animation-delay: 0.18s; }
+  .live-dots i:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes live-ring {
+    0%, 100% { box-shadow: 0 0 0 2px var(--accent); }
+    50% { box-shadow: 0 0 0 4px var(--accent-soft); }
+  }
+  .conversation-row.is-live > .character,
+  .conversation-row.is-live .group-stack > .character {
+    animation: live-ring 2s ease-in-out infinite;
+  }
+}
+.compose-thumb {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-muted);
+}
+.compose-file-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.compose-file-meta strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.compose-file-meta small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.compose-file-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.compose-file-remove:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 .composer-bar .add-file {
   width: 28px;
@@ -135,7 +292,48 @@
   flex: 1;
 }
 .sidebar-conversations header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 6px 12px 12px;
+}
+/* HIG Familiarity: one obvious compose entry, 44pt target, accent meaning. */
+.sidebar-conversations header > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.compose-primary {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--label-primary);
+  color: var(--grouped-background);
+  cursor: pointer;
+}
+.compose-primary:hover {
+  opacity: 0.82;
+}
+.compose-secondary {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.compose-secondary:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 .conversation-row {
   display: flex;
@@ -143,21 +341,23 @@
   width: 100%;
   gap: 11px;
   min-width: 0;
-  padding: 14px 10px;
+  min-height: 64px;
+  padding: 12px 10px;
   text-align: left;
   border-radius: 11px;
 }
 /* Pin cell: the toggle overlays reserved space so rows never shift. */
 .conversation-cell { position: relative; }
-.conversation-cell > .conversation-row { padding-right: 32px; }
+.conversation-cell > .conversation-row { padding-right: 30px; }
 .conversation-pin {
   position: absolute;
-  top: 8px;
-  right: 6px;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -168,6 +368,11 @@
 .conversation-cell:hover .conversation-pin,
 .conversation-cell:focus-within .conversation-pin,
 .conversation-pin[aria-pressed="true"] { opacity: 1; }
+/* HIG Flexibility: hover-only chrome is undiscoverable on touch — always
+ * show the pin where there is no hover. */
+@media (hover: none) {
+  .conversation-pin { opacity: 1; }
+}
 .conversation-pin:hover { background: var(--hover); color: var(--ink); }
 .conversation-pin[aria-pressed="true"] { color: var(--ink); }
 .conversation-pin[aria-pressed="true"] svg { fill: currentColor; }
@@ -233,6 +438,43 @@
   padding: 0;
 }
 .pinned-unpin:hover { color: var(--ink); border-color: var(--line-strong); }
+/* Section headers: quiet HIG footnote style, own sentence case. */
+.sidebar-section {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 14px 12px 4px;
+}
+.sidebar-section:first-child {
+  padding-top: 2px;
+}
+/* Group avatar: two overlapping teammate faces, strictly in normal flow so
+ * the cluster can never paint outside its slot. Centered so the optical
+ * gap to the title matches single-avatar rows. */
+.group-stack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 43px;
+  width: 43px;
+  height: 43px;
+  min-width: 43px;
+  overflow: visible;
+}
+.group-stack .character {
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  box-shadow: 0 0 0 2px var(--sidebar);
+  /* Mascot art bleeds past its viewBox (antennae, arms, orbit rings) and the
+   * base .character sets overflow: visible — clip back to the disc here so
+   * overlapped faces read as two clean avatars, not one glitch. */
+  overflow: hidden;
+}
+.group-stack .character + .character {
+  margin-left: -15px;
+}
 .sidebar-conversations > .conversation-row {
   padding: 14px 10px;
 }
@@ -314,14 +556,18 @@
 }
 .needs-you-pill {
   flex-shrink: 0;
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: .02em;
-  color: var(--on-strong, #fff);
-  background: var(--strong, #202020);
+  letter-spacing: .01em;
+  color: #fff;
+  background: var(--accent);
   border-radius: 999px;
-  padding: 2px 7px;
+  padding: 3px 9px;
   line-height: 1.4;
+  min-height: 22px;
 }
 .conversation-heading time {
   margin-left: auto;
@@ -406,6 +652,7 @@
 }
 .chat-messages {
   max-width: 720px;
+  margin-inline: auto;
 }
 .chat-message {
   margin: 13px 0;
@@ -415,20 +662,28 @@
 .chat-message.continues {
   margin-top: 4px;
 }
-/* Structured transcript events (Grok Bot-style cards): quiet, aligned, one line of detail. */
+/* Structured transcript events: quiet centered outline pills — no fill,
+ * icon or mascot leading, one line of detail. Expandable step groups stay
+ * left-aligned since they carry real content. */
 .chat-event {
   display: flex;
   align-items: baseline;
   gap: 9px;
-  margin: 10px 0;
-  padding: 7px 11px;
+  margin: 10px auto;
+  padding: 7px 14px;
   max-width: 88%;
   width: fit-content;
-  background: var(--surface-muted);
-  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
-  border-radius: 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   font-size: 13px;
   color: var(--ink);
+}
+.chat-event.action-completed-group {
+  margin-inline: 0;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  border-color: color-mix(in srgb, var(--line) 55%, transparent);
 }
 .chat-event strong {
   font-weight: 600;
@@ -441,7 +696,28 @@
 .chat-event-mark {
   align-self: center;
   display: inline-flex;
+  flex-shrink: 0;
   color: var(--muted);
+}
+.chat-event-mark .character {
+  display: block;
+  border-radius: 50%;
+}
+/* Centered system line for membership noise — quiet, no bubble, no author. */
+.chat-event.is-centered {
+  margin: 12px auto;
+  padding: 5px 14px;
+  max-width: 88%;
+  width: fit-content;
+  background: transparent;
+  border-color: transparent;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+.chat-event.is-centered svg {
+  flex-shrink: 0;
 }
 .action-completed-group { padding: 0; }
 .action-completed-group details { width: 100%; }
@@ -458,23 +734,26 @@
   width: fit-content;
 }
 .from-team > .prose {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--bubble-incoming);
+  border: 1px solid transparent;
   box-shadow: none;
-  padding: 12px 16px;
-  border-radius: 14px 14px 14px 6px;
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--ink);
+  padding: 10px 14px;
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) 6px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--bubble-incoming-label);
 }
 .from-team.continues > .prose {
   border-radius: 6px 14px 14px 6px;
 }
 .from-you {
-  background: var(--strong);
-  border-radius: 14px 14px 6px 14px;
-  padding: 11px 16px;
+  background: var(--bubble-outgoing);
+  border-radius: var(--radius-bubble) var(--radius-bubble) 6px var(--radius-bubble);
+  padding: 10px 14px;
   box-shadow: none;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--bubble-outgoing-label);
 }
 .from-you.continues {
   border-radius: 14px 6px 6px 14px;
@@ -489,10 +768,11 @@
   background: var(--code-strong);
 }
 .prose {
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--ink);
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: -0.002em;
+  overflow-wrap: anywhere;
 }
 .message-author {
   margin: 0 0 5px 2px;
@@ -535,15 +815,43 @@
   display: none;
 }
 .composer-chat {
-  padding: 12px 14px 9px;
-  border-radius: 20px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 22px;
+  background: var(--system-background);
 }
 .composer-chat textarea {
   min-height: 24px;
   max-height: 160px;
+  font-size: 16px;
+  line-height: 1.45;
 }
 .composer-bar {
-  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* HIG Simplicity: the message field + Send carry the hierarchy. Safety is a
+ * quiet secondary control — one tap, full meaning in Details. */
+.composer-bar .add-file {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.composer-bar .send {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.composer-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-inline: auto 4px;
 }
 .chat-empty {
   padding-top: 65px;
@@ -1444,11 +1752,21 @@
     justify-content: space-around;
   }
 }
+@media (max-width: 360px) {
+  .conversations-page .page-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .conversations-page .page-heading .text-action {
+    margin-left: auto;
+  }
+}
 .composer-mode {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 32px;
+  gap: 6px;
+  min-height: 36px;
   padding: 5px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1459,7 +1777,140 @@
   font-weight: 550;
   cursor: pointer;
   white-space: nowrap;
+  order: 3;
 }
 .composer-mode:hover { background: var(--hover); color: var(--ink); }
-.composer-mode.yolo { background: var(--strong); color: var(--on-strong); border-color: var(--strong); }
+/* Safety on: still quiet chrome, meaning carried by label + icon, never
+ * color-alone (HIG Accessibility). */
+.composer-mode.yolo { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .composer-mode:disabled { opacity: .6; cursor: default; }
+/* iMessage topbar: translucent material, 17pt semibold identity, footnote
+ * presence below the name. */
+.topbar {
+  background: color-mix(in srgb, var(--system-background) 78%, transparent);
+  backdrop-filter: saturate(1.6) blur(20px);
+  -webkit-backdrop-filter: saturate(1.6) blur(20px);
+  border-bottom: 1px solid var(--line);
+}
+.conversation-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.conversation-identity-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+  min-width: 0;
+}
+.conversation-name {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 38vw;
+}
+.conversation-status {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.conversation-status .presence-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+/* Details pane, iMessage order: who, safety, work, routines. */
+.safety-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  margin-bottom: 24px;
+  background: var(--system-background);
+}
+.safety-card h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.safety-card p {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.safety-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--target-min);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.safety-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+.safety-toggle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* File cards in the transcript: quiet until hover, then a clear affordance. */
+.message-file {
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+a.message-file:hover {
+  border-color: var(--separator-strong);
+}
+.delivered-file img {
+  border-radius: 10px;
+}
+/* Motion: small, physical, always optional. New messages rise once;
+ * chips pop in; pressable things compress under the finger. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes chip-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .chat-messages > .chat-message:last-child {
+    animation: msg-in 220ms ease-out both;
+  }
+  .compose-file {
+    animation: chip-in 180ms ease-out both;
+  }
+  .send:active:not(:disabled),
+  .compose-primary:active,
+  .compose-secondary:active {
+    transform: scale(0.9);
+  }
+  .conversation-row:active {
+    transform: scale(0.99);
+  }
+  .pinned-open {
+    transition: transform 140ms ease;
+  }
+  .pinned-open:hover {
+    transform: translateY(-1px);
+  }
+}

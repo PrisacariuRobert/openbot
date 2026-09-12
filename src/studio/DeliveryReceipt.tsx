@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { Check, ShieldCheck, Download, FileText, ChevronRight, MessageSquare, CircleAlert } from "lucide-react";
+import { Check, ShieldCheck, Download, ChevronRight, MessageSquare, CircleAlert } from "lucide-react";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
 import { deliveryReview, deliveryReviewSummary } from "./delivery-review";
 import ReactMarkdown from "react-markdown";
 import { newerDeliveredVersion } from "./artifact-versions";
 import { isUnverifiedTextFallback } from "./delivery-fallback";
+import { fileLabel, fileSiglaClass } from "./file-glyph";
 
-/** A finished result, presented flat: the files as quiet tappable rows with
- * one line of real content each, then a single whisper of provenance.
- * No cards, no boxes, no bars — spacing does the work, like Mail. */
+/** A finished result: files as tappable file cards with a type tile, name,
+ * and size — the way attachments look in a real conversation app — then a
+ * single whisper of provenance. */
 export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles = [] }: {
   message: Message; run?: Run; childRuns?: Run[]; teammates?: Bot[]; visibleFiles?: Attachment[];
 }) {
@@ -34,13 +35,21 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
         const newer = newerDeliveredVersion(file, visibleFiles);
         const meta = `${Math.max(1, Math.ceil(file.size / 1000))} KB · ${file.kind}${file.revision > 1 ? ` · v${file.revision}` : ""}`;
         return (
-          <div className="delivery-version" key={file.id}><a className="delivery-row" href={file.url} target="_blank" rel="noreferrer">
-            <span className="delivery-row-text">
-              <strong>{file.name}</strong>
-              <small>{meta}</small>
-            </span>
-            <ChevronRight size={16} aria-hidden="true" />
-          </a>{newer && <p className="delivery-newer">A newer version is ready. <a href={newer.url} target="_blank" rel="noreferrer">Open v{newer.revision}<ChevronRight size={13} aria-hidden="true" /></a></p>}</div>
+          <div className="delivery-version" key={file.id}>
+            <a className="file-card" href={file.url} target="_blank" rel="noreferrer" aria-label={`${file.name}, ${meta}`}>
+              {file.kind === "image" && file.previewUrl ? (
+                <img src={file.previewUrl} alt="" className="file-card-thumb" loading="lazy" />
+              ) : (
+                <span className={fileSiglaClass(file)} aria-hidden="true">{fileLabel(file)}</span>
+              )}
+              <span className="file-card-meta">
+                <strong>{file.name}</strong>
+                <small>{meta}</small>
+              </span>
+              <ChevronRight size={14} className="file-card-chevron" aria-hidden="true" />
+            </a>
+            {newer && <p className="delivery-newer">A newer version is ready. <a href={newer.url} target="_blank" rel="noreferrer">Open v{newer.revision}<ChevronRight size={13} aria-hidden="true" /></a></p>}
+          </div>
         );
       })}
       <div className="delivery-summary">
@@ -142,7 +151,11 @@ export function DeliveredFile({ file, artifact = false }: { file: Attachment; ar
   if (!artifact) {
     return <section className="delivered-file" aria-label={`File: ${file.name}`}>
       {file.kind === "image" && file.previewUrl && <a href={file.previewUrl} target="_blank" rel="noreferrer"><img src={file.previewUrl} alt={file.name} loading="lazy" /></a>}
-      <a className="message-file" href={file.url} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>{file.name}</strong><small>{meta}</small></span><Download size={15} /></a>
+      <a className="file-card" href={file.url} target="_blank" rel="noreferrer" aria-label={`${file.name}, ${meta}`}>
+        <span className={fileSiglaClass(file)} aria-hidden="true">{fileLabel(file)}</span>
+        <span className="file-card-meta"><strong>{file.name}</strong><small>{meta}</small></span>
+        <span className="file-card-open" aria-hidden="true"><Download size={15} /></span>
+      </a>
       {file.summary && <p>{file.summary}</p>}
       {file.previewText && <details><summary>Read preview</summary><pre>{file.previewText}</pre></details>}
       {file.processingStatus === "partial" && <small>Partial preview. Download the original for the complete file.</small>}
@@ -159,7 +172,6 @@ export function DeliveredFile({ file, artifact = false }: { file: Attachment; ar
     return match ? { label: match[1], value: match[2].slice(0, 26) } : { label: line.slice(0, 40), value: "" };
   });
   const image = file.kind === "image" && file.previewUrl;
-  const glyph = file.kind === "spreadsheet" ? "XLSX" : file.kind === "presentation" ? "PPTX" : file.kind === "document" ? (file.mime.includes("pdf") ? "PDF" : "DOC") : file.kind === "archive" ? "ZIP" : "FILE";
   const stamp = new Date(file.createdAt).toISOString().slice(0, 10);
   return <section className="delivered-file" aria-label={`File: ${file.name}`}>
     <a className="ledger" href={file.url} target="_blank" rel="noreferrer">
@@ -169,7 +181,7 @@ export function DeliveredFile({ file, artifact = false }: { file: Attachment; ar
           ? <span className="ledger-image"><img src={file.previewUrl!} alt="" loading="lazy" /></span>
           : rows.length > 0
             ? rows.map((row, index) => <span className={`ledger-line${index === 0 ? " is-lead" : ""}`} key={index}><span className="ledger-label">{row.label}</span>{row.value && <span className="ledger-value">{row.value}</span>}</span>)
-            : <span className="ledger-glyph">{glyph}</span>}
+            : <span className={fileSiglaClass(file)}>{fileLabel(file)}</span>}
       </span>
       <span className="ledger-foot">
         <span className="ledger-name">{file.name}</span>

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import type { AppState } from "../shared/types";
 
-/** Create or edit a named group chat: the owner picks the teammates; the room
- * keeps them. Mentions and the usual approvals still decide what happens. */
+/** Create or edit an optional project room: the owner picks the teammates; the
+ * room keeps them. Mentions and the usual approvals still decide what happens. */
 export function GroupEditor({
   state,
   threadId,
@@ -45,12 +45,12 @@ export function GroupEditor({
   };
   return (
     <div className="group-editor">
-      <p className="overline">{editing ? "GROUP" : "NEW GROUP"}</p>
-      <h2 className="detail-title">{editing ? editing.title : "A room for specific teammates"}</h2>
+      <p className="overline">{editing ? "PROJECT ROOM" : "NEW PROJECT ROOM"}</p>
+      <h2 className="detail-title">{editing ? editing.title : "Project room"}</h2>
       <p className="drawer-intro">
         {editing
-          ? "Rename the group or change who is in it. Members change affects future tasks; running work keeps going."
-          : "Name it, add the teammates who belong, and @ mention anyone inside. Everyone else stays out."}
+          ? "Rename the project room or change its teammates. Members change affects future tasks; running work keeps going."
+          : "Project rooms are optional shared conversations for project decisions and files. No room is needed for bots to ask each other for help."}
       </p>
       <label className="group-name">
         <UsersRound size={15} />
@@ -58,12 +58,12 @@ export function GroupEditor({
           value={title}
           maxLength={48}
           required
-          placeholder="e.g. Launch week"
-          aria-label="Group name"
+          placeholder="Room name"
+          aria-label="Room name"
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
-      <div className="group-members" role="group" aria-label="Group members">
+      <div className="group-members" role="group" aria-label="Room teammates">
         {state.bots.map((bot) => (
           <button
             type="button"
@@ -84,7 +84,7 @@ export function GroupEditor({
         disabled={busy || !title.trim() || !members.length}
         onClick={() => void save()}
       >
-        {editing ? "Save changes" : "Create group"} <ArrowRight size={15} />
+        {editing ? "Save changes" : "Create room"} <ArrowRight size={15} />
       </button>
     </div>
   );

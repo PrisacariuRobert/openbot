@@ -72,7 +72,9 @@ import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { AppearanceEditor } from "./AppearanceEditor";
 import { useAppearance, type Appearance } from "./useAppearance";
+import { fileLabel, fileSiglaClass } from "./file-glyph";
 import "./character-context.css";
+import "./project-rooms.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
@@ -235,16 +237,34 @@ function eventTitle(message: Message): string {
     case "routine_run":
       return `${data.name ?? "Routine"} started`;
     case "handoff":
-      return `${data.fromName ?? "Teammate"} handed off to ${data.toName ?? "a teammate"}`;
+      return `${data.fromName ?? "Teammate"} asked ${data.toName ?? "a teammate"}`;
     case "teammate_message":
       return `${data.fromName ?? "Teammate"} ${data.expectsReply === "true" ? "asked" : "messaged"} ${data.toName ?? "a teammate"}`;
     default:
       return "Studio event";
   }
 }
+/** Group membership events read as noise in bubbles and lists — they render
+ * as centered system pills and member names instead. */
+function isMembershipText(text: string): boolean {
+  const clean = text.replace(/[*#_`]/g, "");
+  return (
+    clean.startsWith('The group "') ||
+    /joined|left the group|now has .* in it\.?$/.test(clean)
+  );
+}
 function eventDetail(message: Message): string {
   const data = message.eventData || {};
   switch (message.eventType) {
+    case "run_stopped": {
+      // The pill carries title + action on one line. The server paragraph
+      // only shows when the title itself says nothing ("Task update").
+      const rawTitle = String(message.eventData?.title || "");
+      if (rawTitle && !/^(Task update|Studio event)$/.test(rawTitle)) return "";
+      const sentence = message.body.split(". ")[0]!.trim();
+      const line = sentence.endsWith(".") ? sentence : `${sentence}.`;
+      return line.length > 140 ? `${line.slice(0, 137)}…` : line;
+    }
     case "routine_created":
       return `${data.schedule ?? ""}${data.enabled === "false" ? " · Paused" : ""}`;
     case "routine_run":
@@ -261,7 +281,7 @@ function eventDetail(message: Message): string {
 export function Studio() {
   const { appearance, setAppearance } = useAppearance();
   const [page, setPage] = useState<Page>("chat"),
-    [thread, setThread] = useState(() => new URLSearchParams(window.location.search).get("thread")?.slice(0, 128) || "team-room");
+    [thread, setThread] = useState(() => new URLSearchParams(window.location.search).get("thread")?.slice(0, 128) || "");
   const [state, setState] = useState<AppState | null>(null),
     [connections, setConnections] = useState<ConnectorStatus | null>(null),
     [skills, setSkills] = useState<CommunitySkill[]>([]);
@@ -386,6 +406,7 @@ export function Studio() {
   const nearBottom = useRef(true),
     requestNumber = useRef(0);
   useEffect(() => {
+    if (!thread) return;
     const url = new URL(window.location.href); url.searchParams.set("thread", thread);
     window.history.replaceState(null, "", url);
   }, [thread]);
@@ -667,19 +688,30 @@ export function Studio() {
       />
       {attached.files.length > 0 && (
         <div className="compose-files">
-          {attached.files.map((file) => (
-            <span key={file.id}>
-              <FileText size={14} />
-              {file.name}
-              <button
-                type="button"
-                aria-label={`Remove ${file.name}`}
-                onClick={() => attached.remove(file.id)}
-              >
-                <X size={13} />
-              </button>
-            </span>
-          ))}
+          {attached.files.map((file) => {
+            const size = `${Math.max(1, Math.ceil(file.size / 1000))} KB`;
+            return (
+              <span key={file.id} className="compose-file">
+                {file.kind === "image" && file.previewUrl ? (
+                  <img src={file.previewUrl} alt="" className="compose-thumb" />
+                ) : (
+                  <span className={fileSiglaClass(file)} aria-hidden="true">{fileLabel(file)}</span>
+                )}
+                <span className="compose-file-meta">
+                  <strong>{file.name}</strong>
+                  <small>{size} · {file.kind}</small>
+                </span>
+                <button
+                  type="button"
+                  className="compose-file-remove"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() => attached.remove(file.id)}
+                >
+                  <X size={13} />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
       <label className="sr-only" htmlFor="studio-message">
@@ -769,10 +801,11 @@ export function Studio() {
           onClick={() => void toggleMode()}
           disabled={modeBusy}
           aria-pressed={yoloMode}
-          title={yoloMode ? "YOLO mode is on: reviews are auto-approved. Click to go back to asking first." : "Ask first: work can start, but actions requiring review wait for your approval. Click to change approval mode."}
+          title={yoloMode ? "Safety: auto-approves reviews. Switch back to asking first." : "Safety: work can start, but sensitive actions wait for your approval. Change in Details anytime."}
+          aria-label={yoloMode ? "Safety is set to auto-approve. Switch to ask first." : "Safety is set to ask first. Switch to auto-approve."}
         >
           <ShieldQuestion size={15} />
-          {yoloMode ? "YOLO" : "Ask first"}
+          {yoloMode ? "Auto-approve" : "Ask first"}
         </button>
         <button
           type="button"
@@ -928,7 +961,9 @@ export function Studio() {
     </button>
   );
   const activeNow = activeNowBots(state?.bots || []);
-  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
+  // Display lookups span active + retired teammates: a retired mascot is
+  // still the right face for old groups and event pills.
+  const allBots = state ? [...state.bots, ...(state.retiredBots || [])] : [];  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
     void (async () => {
       await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -937,29 +972,67 @@ export function Studio() {
       setRefresh((n) => n + 1);
     })();
   const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
-  const conversationRows = state?.threads
-    .filter(
-      (item) =>
-        !item.hidden &&
-        !item.pinned &&
-        `${item.title} ${item.lastMessage || ""}`
-          .toLowerCase()
-          .includes(conversationQuery.toLowerCase()),
-    )
-    .map((item) => {
-      const bot = state.bots.find((bot) => bot.threadId === item.id);
+  const isGroupThread = (item: Thread) =>
+    (item.botIds?.length ?? 0) > 1 ||
+    item.id.startsWith("group-") ||
+    item.id === "team-room";
+  const visibleThreads = (state?.threads || []).filter(
+    (item) =>
+      !item.hidden &&
+      !item.pinned &&
+      `${item.title} ${item.lastMessage || ""}`
+        .toLowerCase()
+        .includes(conversationQuery.toLowerCase()),
+  );
+  const groupThreads = visibleThreads.filter(isGroupThread);
+  const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
+  const threadRow = (item: Thread) => {
+      const bot = allBots.find((bot) => bot.threadId === item.id);
+      const members = (item.botIds || [])
+        .map((id) => allBots.find((bot) => bot.id === id))
+        .filter((member): member is Bot => Boolean(member));
+      const memberNames = members.map((member) => member.name).join(", ");
+      // Group membership events ("The group X now has…", "A joined · B left")
+      // read as noise in a list — real messaging apps show the members.
+      const cleanLast = item.lastMessage?.replace(/[*#_`]/g, "") || "";
+      const listSubtitle =
+        !cleanLast || isMembershipText(cleanLast)
+          ? memberNames || bot?.role || "A conversation with your team"
+          : cleanLast;
+      // Discord-style live presence: when this teammate — or a member of this
+      // group — is working right now, the subtitle becomes a small animated
+      // pill with their mascot. Done = back to the quiet last-message line.
+      const liveBot =
+        bot && (bot.status === "working" || bot.status === "celebrating")
+          ? bot
+          : members.find(
+              (member) => member.status === "working" || member.status === "celebrating",
+            );
+      const liveAction = liveBot
+        ? liveBot.currentAction || (liveBot.status === "celebrating" ? "Celebrating" : "")
+        : "";
       return (
         <div key={item.id} className="conversation-cell">
         <button
           aria-label={item.title}
-          className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}`}
+          title={item.title}
+          className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}${liveAction ? " is-live" : ""}`}
           onClick={() => openThread(item.id)}
         >
-          {bot ? (
+          {members.length > 1 ? (
+            <span className="group-stack" aria-hidden="true">
+              <Face bot={members[0]!} size={30} />
+              <Face bot={members[1]!} size={30} />
+            </span>
+          ) : bot ? (
             <Face bot={bot} size={43} />
           ) : (
             <span className="room-mark">
-              <MessageCircle size={24} strokeWidth={1.3} />
+              {isGroupThread(item) ? (
+                <UsersRound size={24} strokeWidth={1.3} />
+              ) : (
+                <MessageCircle size={24} strokeWidth={1.3} />
+              )}
             </span>
           )}
           <span className="conversation-copy">
@@ -974,19 +1047,29 @@ export function Studio() {
                 </time>
               )}
             </span>
+            {liveBot && liveAction ? (
+              <span
+                className="live-pill"
+                title={liveAction}
+                aria-label={`${liveBot.name} is live: ${liveAction}`}
+              >
+                <Face bot={liveBot} size={18} />
+                <span className="live-text">{liveAction}</span>
+                <span className="live-dots" aria-hidden="true"><i /><i /><i /></span>
+              </span>
+            ) : (
             <small
               title={
                 bot && ["working", "waiting"].includes(bot.status) && bot.currentAction
                   ? bot.currentAction
-                  : undefined
+                  : memberNames || undefined
               }
             >
               {bot && ["working", "waiting"].includes(bot.status) && bot.currentAction
                 ? bot.currentAction
-                : item.lastMessage?.replace(/[*#_`]/g, "") ||
-                  bot?.role ||
-                  "A conversation with your team"}
+                : listSubtitle}
             </small>
+            )}
           </span>
         </button>
         <button
@@ -1000,7 +1083,17 @@ export function Studio() {
         </button>
         </div>
       );
-    });
+    };
+  const conversationRows = (
+    <>
+      {dmThreads.map(threadRow)}
+      <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
+        <summary>Project rooms</summary>
+        {groupThreads.map(threadRow)}
+        <button className="compose-secondary" onClick={() => setDetail({ kind: "group" })}><Plus size={15} /> New project room</button>
+      </details>
+    </>
+  );
   return (
     <div
       className={`studio-shell ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
@@ -1023,13 +1116,15 @@ export function Studio() {
         </label>
         <div className="sidebar-conversations">
           <header>
-            <span>Conversations</span>
+            <span>Chats</span>
             <span className="conversation-new">
-              <button aria-label="New group" onClick={() => setDetail({ kind: "group" })}>
-                <UsersRound size={15} />
-              </button>
-              <button aria-label="New teammate" onClick={() => setDetail({ kind: "create" })}>
-                <Plus size={15} />
+              <button
+                className="compose-primary"
+                aria-label="New message"
+                title="New message"
+                onClick={() => setDetail({ kind: "create" })}
+              >
+                <Plus size={20} />
               </button>
             </span>
           </header>
@@ -1087,7 +1182,19 @@ export function Studio() {
                 }
               >
                 <Face bot={conversationBot} size={33} />
-                <span className="conversation-name">{title}</span>
+                <span className="conversation-identity-text">
+                  <span className="conversation-name">{title}</span>
+                  <span className="conversation-status">
+                    {activeNow.some((bot) => bot.id === conversationBot.id) ? (
+                      <>
+                        <i className="presence-dot" aria-hidden="true" />
+                        Active now
+                      </>
+                    ) : (
+                      conversationBot.role || "Teammate"
+                    )}
+                  </span>
+                </span>
                 <ChevronDown size={12} />
               </button>
             ) : (
@@ -1188,7 +1295,7 @@ export function Studio() {
                   ))}
                 </div>
                 <div className="inbox-conversations">
-                  <PinnedZone items={pinnedThreads} bots={state?.bots || []} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
+          <PinnedZone items={pinnedThreads} bots={allBots} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
                   {conversationRows}
                 </div>
                 {!state.bots.length && (
@@ -1607,6 +1714,21 @@ export function Studio() {
                         if (actionGroupMemberIds.has(message.id)) return null;
                         const actionGroup = actionGroupByFirstId.get(message.id);
                         const cancelledOutcome = cancelledRunForTrigger(state.runs, state.messages, message.id);
+                        // Event pills carry the teammate's mascot when the
+                        // event names them — never a generic icon.
+                        const eventFace = (() => {
+                          if (message.kind !== "event") return undefined;
+                          const data = message.eventData || {};
+                          if (data.botId) {
+                            const byId = allBots.find((bot) => bot.id === data.botId);
+                            if (byId) return byId;
+                          }
+                          const name = data.fromName || data.toName;
+                          if (typeof name === "string" && name) {
+                            return allBots.find((bot) => bot.name === name);
+                          }
+                          return undefined;
+                        })();
                         const previous = index > 0 ? state.messages[index - 1] : undefined;
                         const startsGroup =
                           !previous ||
@@ -1614,19 +1736,32 @@ export function Studio() {
                           previous.senderType === "system" ||
                           message.senderType === "system";
                         if (message.kind === "event") {
-                          return (
-                            <Fragment key={message.id}>{actionGroup ? <div className="chat-event action-completed-group" role="status" data-event="action_completed">
+                          return (                            <Fragment key={message.id}>{actionGroup ? <div className="chat-event action-completed-group" role="status" data-event="action_completed">
                               <details><summary><Check size={14} aria-hidden="true" /><span>{actionGroup.length} reviewed steps</span><ChevronDown size={14} aria-hidden="true" /></summary><div className="action-completed-records">{actionGroup.map((item) => <p key={item.id}><strong>{eventTitle(item)}</strong>{eventDetail(item) && <small>{eventDetail(item)}</small>}</p>)}</div></details>
                             </div> : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
-                                {message.eventType === "routine_created" ? <Clock size={14} /> : message.eventType === "handoff" ? <ArrowRightLeft size={14} /> : message.eventType === "routine_run" ? <Zap size={14} /> : <MessageCircle size={14} />}
+                                {eventFace ? (
+                                  <Face bot={eventFace} size={20} />
+                                ) : message.eventType === "routine_created" ? <Clock size={14} /> : message.eventType === "handoff" ? <ArrowRightLeft size={14} /> : message.eventType === "routine_run" ? <Zap size={14} /> : <MessageCircle size={14} />}
                               </span>
                               <span>
                                 <strong>{eventTitle(message)}</strong>
-                                {eventDetail(message) && <small>{eventDetail(message)}</small>}
-                                {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button>; })()}
+                                {eventDetail(message) && (['handoff', 'teammate_message'].includes(message.eventType || '')
+                                  ? <details className="collaboration-detail"><summary>Details</summary><small>{eventDetail(message)}</small></details>
+                                  : <small>{eventDetail(message)}</small>)}
+                                {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
+                          );
+                        }
+                        // Membership noise never earns a full bubble — quiet
+                        // centered system line, like every real chat app.
+                        if (message.senderType !== "user" && isMembershipText(message.body)) {
+                          return (
+                            <div key={message.id} className="chat-event is-centered" aria-label={message.body}>
+                              <UsersRound size={13} aria-hidden="true" />
+                              <span>{message.body}</span>
+                            </div>
                           );
                         }
                         return (
@@ -1716,7 +1851,7 @@ export function Studio() {
           aria-label="Conversation details"
         >
           <header>
-            <h2>Alongside this conversation</h2>
+            <h2>Details</h2>
             <button
               aria-label="Close conversation details"
               onClick={() => setContextOpen(false)}
@@ -1732,6 +1867,9 @@ export function Studio() {
             onSchedule={() => navigate("schedule")}
             onTakeover={setTakeoverBot}
             onEditGroup={thread.startsWith("group-") ? () => setDetail({ kind: "group", threadId: thread }) : undefined}
+            yoloMode={yoloMode}
+            safetyBusy={modeBusy}
+            onToggleSafety={() => void toggleMode()}
           />
         </aside>
       )}
@@ -1746,7 +1884,7 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? detail.threadId ? "Group members" : "New group"
+                ? detail.threadId ? "Room teammates" : "New project room"
               : detail.kind === "workspace"
                 ? "Your workspace"
                 : detail.kind === "create"
@@ -1773,6 +1911,9 @@ export function Studio() {
               onSchedule={() => navigate("schedule")}
               onTakeover={setTakeoverBot}
               onEditGroup={thread.startsWith("group-") ? () => setDetail({ kind: "group", threadId: thread }) : undefined}
+              yoloMode={yoloMode}
+              safetyBusy={modeBusy}
+              onToggleSafety={() => void toggleMode()}
             />
           )}
           {detail.kind === "workspace" && (
