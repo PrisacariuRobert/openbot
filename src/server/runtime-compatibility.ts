@@ -16,7 +16,7 @@ export const RUNTIME_INCOMPATIBLE_MESSAGE =
 
 let cached: RuntimeCompatibility | null = null;
 
-export function opencodeCompatibility(options: { refresh?: boolean } = {}): RuntimeCompatibility {
+export function opencodeCompatibility(options: { refresh?: boolean; probe?: () => string | null } = {}): RuntimeCompatibility {
   if (cached && !options.refresh) return cached;
   // A declared version (set by controlled fixtures) is still validated against
   // the verified version — this is not a bypass.
@@ -25,15 +25,22 @@ export function opencodeCompatibility(options: { refresh?: boolean } = {}): Runt
     cached = { runtime: "opencode", detectedVersion: declared, compatibility: declared === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" };
     return cached;
   }
-  try {
+  const readVersion = options.probe || (() => {
     const result = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 10_000 });
-    const text = `${result.stdout || ""}`.trim();
-    const version = text.split(/\s+/).filter(Boolean).pop() || null;
-    cached = version
-      ? { runtime: "opencode", detectedVersion: version, compatibility: version === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" }
-      : { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+    return `${result.stdout || ""}`.trim().split(/\s+/).filter(Boolean).pop() || null;
+  });
+  let version: string | null = null;
+  try {
+    version = readVersion();
   } catch {
-    cached = { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+    version = null;
   }
-  return cached;
+  const next: RuntimeCompatibility = version
+    ? { runtime: "opencode", detectedVersion: version, compatibility: version === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" }
+    : { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+  // A transient probe failure must not wedge the host: only definitive
+  // verdicts are cached, so the next task re-probes instead of failing
+  // forever on one bad reading.
+  cached = next.compatibility === "unknown" ? null : next;
+  return next;
 }
