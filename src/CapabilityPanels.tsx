@@ -5,6 +5,9 @@ import { WorkFollowupsPanel } from "./components/WorkFollowupsPanel";
 import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
+import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
+import { groupActivityAttentionRuns } from "./studio/activity-attention";
+import { createTeammateRestoreCoordinator, type TeammateRestoreState } from "./studio/teammate-restore";
 import {
   lazy,
   Suspense,
@@ -317,6 +320,8 @@ export function ControlPanel({
   onSetYoloMode: (enabled: boolean) => Promise<void>;
   onImportTeammate: (bundle: unknown) => Promise<{ name: string; skills: number; routines: number }>;
 }) {
+  const restoreCoordinator = useRef(createTeammateRestoreCoordinator());
+  const [restoreState, setRestoreState] = useState<TeammateRestoreState>({ botId: null, error: "" });
   const active = state.bots.filter((bot) =>
     ["working", "waiting"].includes(bot.status),
   );
@@ -647,14 +652,19 @@ export function ControlPanel({
                 </div>
                 <p>{bot.role}</p>
                 <div className="delegation-actions">
-                  <button onClick={() => { void onRestoreTeammate(bot.id); }}>
-                    Restore
+                  <button
+                    type="button"
+                    disabled={restoreState.botId !== null}
+                    onClick={() => { void restoreCoordinator.current.restore(bot, onRestoreTeammate, setRestoreState); }}
+                  >
+                    {restoreState.botId === bot.id ? "Restoring…" : "Restore"}
                   </button>
                 </div>
               </article>
             ))}
           </div>
         )}
+        {restoreState.error && <p className="panel-error" role="alert">{restoreState.error}</p>}
       </section>
       <section>
         <div className="panel-section-heading">
@@ -1039,8 +1049,8 @@ function LiveBrowser({
   const [address, setAddress] = useState(
       status?.currentUrl || "https://www.google.com/",
     ),
-    [entry, setEntry] = useState(""),
     [busy, setBusy] = useState(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
   const merge = (result: TakeoverResult) =>
     onStatus({
       botId: bot.id,
@@ -1051,24 +1061,26 @@ function LiveBrowser({
       screenshot: result.screenshot,
       updatedAt: new Date().toISOString(),
     });
-  const perform = async (path: string, body: Record<string, unknown>) => {
-    setBusy(true);
-    try {
-      merge(
-        await api<TakeoverResult>(`/api/bots/${bot.id}/browser/${path}`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        }),
-      );
-    } catch (error) {
-      onNotice(
-        error instanceof Error
-          ? error.message
-          : "The browser needs another try.",
-      );
-    } finally {
-      setBusy(false);
-    }
+  // Keystrokes queue in order and never block the screen; clicks and typing
+  // go straight to the page like a real browser. Nothing typed is stored,
+  // logged, or sent to the model.
+  const send = (op: DirectOp) => {
+    const path =
+      op.kind === "click" ? "takeover/click" : op.kind === "press" ? "takeover/press" : op.kind === "text" ? "takeover/type" : "takeover/scroll";
+    const body =
+      op.kind === "click"
+        ? { x: op.x, y: op.y }
+        : op.kind === "press"
+          ? { key: op.key }
+          : op.kind === "text"
+            ? { value: op.value, replace: false }
+            : { x: op.x, y: op.y, deltaY: op.deltaY };
+    queue.current = queue.current
+      .then(() => api<TakeoverResult>(`/api/bots/${bot.id}/browser/${path}`, { method: "POST", body: JSON.stringify(body) }))
+      .then(merge, (error: unknown) =>
+        onNotice(error instanceof Error ? error.message : "The browser needs another try."),
+      )
+      .catch(() => {});
   };
   const openAddress = async () => {
     setBusy(true);
@@ -1088,14 +1100,6 @@ function LiveBrowser({
       setBusy(false);
     }
   };
-  const clickPreview = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!status?.screenshot || busy) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    void perform("takeover/click", {
-      x: ((event.clientX - rect.left) / rect.width) * 1280,
-      y: ((event.clientY - rect.top) / rect.height) * 820,
-    });
-  };
   return (
     <div className="live-browser">
       <div className="live-browser-heading">
@@ -1107,7 +1111,7 @@ function LiveBrowser({
           <span>
             <strong>You’re guiding {bot.name}</strong>
             <small>
-              Click the screen, type privately, then hand control back.
+              Click a field, then type — keys go straight to the page.
             </small>
           </span>
         </span>
@@ -1138,99 +1142,35 @@ function LiveBrowser({
         </button>
       </form>
       <div className="live-screen-frame">
-        {status?.screenshot ? (
-          <button
-            className="live-screen"
-            onClick={clickPreview}
-            disabled={busy}
-            aria-label="Interactive browser screen"
-          >
-            <img
-              src={status.screenshot}
-              alt={`${bot.name}'s current browser`}
-            />
-            {busy && (
+        <DirectScreen
+          image={status?.screenshot || null}
+          alt={`${bot.name}'s current browser`}
+          interactive={status?.browser === "ready"}
+          badge="Click a field, then type"
+          label="Live browser screen. Click a field, then type — keys go straight to the page."
+          send={send}
+          empty={
+            <div className="live-screen-empty">
+              <Mascot bot={{ ...bot, status: "waiting" }} size="large" />
+              <strong>{bot.name}’s browser is resting</strong>
               <span>
-                <LoaderCircle className="spinner" /> Updating screen…
+                Open a page when you want to sign in or guide the next step.
               </span>
-            )}
-            <i>
-              <MousePointer2 size={13} /> Click anywhere to take control
-            </i>
-          </button>
-        ) : (
-          <div className="live-screen-empty">
-            <Mascot bot={{ ...bot, status: "waiting" }} size="large" />
-            <strong>{bot.name}’s browser is resting</strong>
-            <span>
-              Open a page when you want to sign in or guide the next step.
-            </span>
-            <button
-              className="button-primary"
-              onClick={() => void openAddress()}
-              disabled={busy}
-            >
-              <Globe2 size={15} /> Start browser
-            </button>
-          </div>
-        )}
+              <button
+                className="button-primary"
+                onClick={() => void openAddress()}
+                disabled={busy}
+              >
+                <Globe2 size={15} /> Start browser
+              </button>
+            </div>
+          }
+        />
       </div>
-      <div className="takeover-controls">
-        <div className="takeover-copy">
-          <ShieldCheck size={16} />
-          <span>
-            <strong>Private keyboard</strong>
-            <small>
-              Text goes directly to the focused field. It is never saved in chat
-              or added to the bot’s activity.
-            </small>
-          </span>
-        </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (entry)
-              void perform("takeover/type", {
-                value: entry,
-                replace: false,
-              });
-            setEntry("");
-          }}
-        >
-          <Keyboard size={15} />
-          <input
-            type="password"
-            value={entry}
-            onChange={(event) => setEntry(event.target.value)}
-            placeholder="Type into the selected field"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            disabled={!entry || busy}
-            onClick={() => {
-              void perform("takeover/type", { value: entry, replace: true });
-              setEntry("");
-            }}
-          >
-            Replace
-          </button>
-          <button className="primary" disabled={!entry || busy}>
-            Type
-          </button>
-        </form>
-        <div className="takeover-keys">
-          {(["Tab", "Enter", "Escape", "Backspace"] as const).map((key) => (
-            <button
-              key={key}
-              disabled={busy || status?.browser !== "ready"}
-              onClick={() => void perform("takeover/key", { key })}
-            >
-              {key}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="takeover-hint">
+        Click a field, then type — like a real browser. Nothing typed is stored
+        or sent to the model.
+      </p>
     </div>
   );
 }
@@ -1307,18 +1247,7 @@ export function LiveStudioPanel({
   const attentionRuns = state.studioRuns.filter((run) =>
     ["awaiting_approval", "failed"].includes(run.status),
   );
-  // Repeated identical failures collapse into one card with a count, so four
-  // crashed runs do not read as four emergencies. The first run of each group
-  // (the newest) carries the message.
-  const groupedAttentionRuns = Array.from(
-    attentionRuns.reduce((groups, run) => {
-      const key = `${run.botId}:${run.status}`;
-      const group = groups.get(key);
-      if (group) group.count += 1;
-      else groups.set(key, { run, count: 1 });
-      return groups;
-    }, new Map<string, { run: (typeof attentionRuns)[number]; count: number }>()),
-  ).map(([, group]) => group);
+  const groupedAttentionRuns = groupActivityAttentionRuns(state.studioRuns);
   const approvedActions = state.approvedActions || [];
   const uncertainActions = approvedActions.filter(
     (action) => action.status === "uncertain",
@@ -1338,10 +1267,46 @@ export function LiveStudioPanel({
     (bot) => state.threads.find((thread) => thread.id === bot.threadId)?.hidden,
   );
   const activeWork = state.studioRuns.filter((run) => ["queued", "running", "waiting_for_teammate"].includes(run.status));
+  const needsDecision = state.approvals.length > 0 || uncertainActions.length > 0;
+  const hasAttention = needsDecision || attentionRuns.length > 0 || state.automationAlerts.length > 0;
   const finishedWork = state.studioRuns
     .filter((run) => !run.parentRunId && ["completed", "failed"].includes(run.status))
     .sort((a, b) => (b.finishedAt || "").localeCompare(a.finishedAt || ""))
     .slice(0, 5);
+  const attentionReason = (run: (typeof attentionRuns)[number]) => {
+    const reason = run.error || run.approvalReason || run.task.goal || "This task needs review.";
+    return reason.length > 150 ? `${reason.slice(0, 147)}…` : reason;
+  };
+  const attentionReasonFull = (run: (typeof attentionRuns)[number]) =>
+    run.error || run.approvalReason || run.task.goal || "This task needs review.";
+  const renderAttentionRun = ({ run, count }: (typeof groupedAttentionRuns)[number]) => (
+    <article key={run.id}>
+      <Mascot
+        bot={{
+          name: run.botName,
+          color: run.botColor,
+          mascot: run.botMascot,
+          status: run.status === "failed" ? "failed" : "waiting",
+        }}
+        size="small"
+      />
+      <span>
+        <strong>{run.status === "failed" ? `${run.botName} needs a hand` : `${run.botName} needs your okay`}</strong>
+        <small>{count > 1 ? `${count} tasks like this. Latest: ` : ""}{attentionReason(run)}</small>
+        {attentionReasonFull(run).length > 150 && (
+          <details className="attention-reason">
+            <summary>{run.status === "awaiting_approval" ? "Request details" : "Why it stopped"}</summary>
+            <small>{attentionReasonFull(run)}</small>
+          </details>
+        )}
+      </span>
+      <button onClick={() => onOpenThread(run.threadId)}>Open</button>
+      {run.status === "awaiting_approval" && (
+        <button className="allow" onClick={() => onReview(run.id)}><ShieldCheck size={13} /> Review request</button>
+      )}
+    </article>
+  );
+  const orderedAttentionRuns = groupedAttentionRuns;
   return (
     <div className="live-studio-panel">
       <div className="live-hero">
@@ -1349,25 +1314,25 @@ export function LiveStudioPanel({
           <span>
             <i /> {state.runner.deployment?.mode === "private_runner" ? "Private home online" : state.runner.backgroundService === "installed" ? "Background protection active" : "Live from this Mac"}
           </span>
-          <h3>{activeWork.length ? "In progress" : "All quiet for now"}</h3>
-          <p>{activeWork.length ? "Your team's current work, with the next step in view." : "New tasks and requests for your approval will appear here."}</p>
+          <h3>{needsDecision ? "Needs your decision" : activeWork.length ? "In progress" : hasAttention ? "Needs attention" : "All quiet for now"}</h3>
+          <p>{needsDecision ? "Open the item below to decide what happens next." : activeWork.length ? "Your team's current work, with the next step in view." : hasAttention ? "Updates and failures are ready for review." : "New tasks and requests for your approval will appear here."}</p>
         </div>
         <RoomCluster bots={state.bots} hero />
       </div>
       <div className="live-summary live-summary-compact">
-        <div>
+        <div className="live-summary-pill">
           <MonitorPlay size={17} />
           <strong>
             {activeWork.length}
           </strong>
           <span>in progress</span>
         </div>
-        <div>
+        <div className="live-summary-pill">
           <ShieldCheck size={17} />
-          <strong>{Math.max(state.approvals.length, attentionRuns.filter((run) => run.status === "awaiting_approval").length) + uncertainActions.length}</strong>
+          <strong>{state.approvals.length + uncertainActions.length}</strong>
           <span>need your decision</span>
         </div>
-        <div>
+        <div className="live-summary-pill">
           <Check size={17} />
           <strong>{state.usage.completedRuns}</strong>
           <span>finished this week</span>
@@ -1376,7 +1341,7 @@ export function LiveStudioPanel({
           <Settings2 size={16} /> Studio access
         </button>
       </div>
-      {(attentionRuns.length > 0 || state.automationAlerts.length > 0 || uncertainActions.length > 0) && (
+      {hasAttention && (
         <section className="live-attention">
           <header>
             <span>
@@ -1405,39 +1370,13 @@ export function LiveStudioPanel({
               <button onClick={() => void onResolveAction(action.id, "not_completed")}>It didn’t happen</button>
             </article>
           ))}
-          {groupedAttentionRuns.slice(0, 5).map(({ run, count }) => (
-            <article key={run.id}>
-              <Mascot
-                bot={{
-                  name: run.botName,
-                  color: run.botColor,
-                  mascot: run.botMascot,
-                  status: run.status === "failed" ? "failed" : "waiting",
-                }}
-                size="small"
-              />
-              <span>
-                <strong>
-                  {run.status === "failed"
-                    ? `${run.botName} needs a hand`
-                    : `${run.botName} needs your okay`}
-                </strong>
-                <small>
-                  {count > 1 ? `${count} tasks like this. Latest: ` : ""}
-                  {run.error || run.approvalReason || run.task.goal}
-                </small>
-              </span>
-              <button onClick={() => onOpenThread(run.threadId)}>Open</button>
-              {run.status === "awaiting_approval" && (
-                <button
-                  className="allow"
-                  onClick={() => onReview(run.id)}
-                >
-                  <ShieldCheck size={13} /> Review request
-                </button>
-              )}
-            </article>
-          ))}
+          {orderedAttentionRuns.slice(0, 5).map(renderAttentionRun)}
+          {orderedAttentionRuns.length > 5 && (
+            <details className="attention-more">
+              <summary>More items ({orderedAttentionRuns.length - 5})<ChevronDown size={14} /></summary>
+              {orderedAttentionRuns.slice(5).map(renderAttentionRun)}
+            </details>
+          )}
           {state.automationAlerts.slice(0, 3).map((alert) => (
             <article key={alert.id}>
               <span className="live-alert-mark">
@@ -1468,7 +1407,6 @@ export function LiveStudioPanel({
               <h3>Finished work</h3>
               <p>Open the receipt: what happened, what was checked and what it cost.</p>
             </div>
-            <span className="bounded-badge">Signed</span>
           </div>
           <div className="receipt-list-rows">
             {finishedWork.map((run) => (
@@ -1487,14 +1425,8 @@ export function LiveStudioPanel({
         </section>
       )}
       {approvedActions.length > 0 && (
-        <section className="action-history">
-          <div className="panel-section-heading">
-            <div>
-              <h3>Action history</h3>
-              <p>A durable receipt for every approved command, post, email and update</p>
-            </div>
-            <span className="bounded-badge">Recorded</span>
-          </div>
+        <details className="action-history activity-history-disclosure">
+          <summary><CheckCircle2 size={16} /><span>Approved action history<small>Completed and recorded actions</small></span><ChevronDown size={16} /></summary>
           <div className="action-history-list">
             {approvedActions.slice(0, 8).map((action) => {
               const completed = ["completed", "confirmed_completed"].includes(action.status);
@@ -1523,7 +1455,7 @@ export function LiveStudioPanel({
               );
             })}
           </div>
-        </section>
+        </details>
       )}
       <details className="computer-disclosure">
         <summary><MonitorPlay size={17} /><span>Teammate computers<small>Open a browser or step into a task</small></span><ChevronDown size={16} /></summary>
@@ -4368,11 +4300,10 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
   const [meta, setMeta] = useState<{ url: string; title: string } | null>(null);
   const [frame, setFrame] = useState<string | null>(null);
   const [address, setAddress] = useState("");
-  const [typeValue, setTypeValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const screen = useRef<HTMLDivElement>(null);
   const stopped = useRef(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     stopped.current = false;
     const watch = async () => {
@@ -4411,10 +4342,31 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
       setBusy(false);
     }
   };
-  const take = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!screen.current || busy) return;
-    const rect = screen.current.getBoundingClientRect();
-    void act("takeover/click", { x: ((event.clientX - rect.left) / rect.width) * 1280, y: ((event.clientY - rect.top) / rect.height) * 820 });
+  // Clicks and keystrokes queue in order without blocking the screen, like a
+  // real browser. Nothing typed is stored or sent to the model.
+  const send = (op: DirectOp) => {
+    const route =
+      op.kind === "click" ? "takeover/click" : op.kind === "press" ? "takeover/press" : op.kind === "text" ? "takeover/type" : "takeover/scroll";
+    const body =
+      op.kind === "click"
+        ? { x: op.x, y: op.y }
+        : op.kind === "press"
+          ? { key: op.key }
+          : op.kind === "text"
+            ? { value: op.value, replace: false }
+            : { x: op.x, y: op.y, deltaY: op.deltaY };
+    queue.current = queue.current
+      .then(async () => {
+        const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(result.error || "The browser did not respond.");
+        setError("");
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+        onNotice(e instanceof Error ? e.message : "The browser did not respond.");
+      })
+      .catch(() => {});
   };
   return (
     <div className="in-app-browser">
@@ -4434,44 +4386,15 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
         />
         <button disabled={busy}>Go</button>
       </form>
-      <div
-        ref={screen}
-        className={`in-app-browser-screen ${busy ? "busy" : ""}`}
-        onClick={take}
-        role="button"
-        aria-label="Live browser view. Click to take control."
-      >
-        {frame ? (
-          <img src={frame} alt="Live browser" />
-        ) : (
-          <p className="panel-note">{busy ? "Connecting…" : "Waiting for the first frame…"}</p>
-        )}
-        <i><MousePointer2 size={12} /> Click the screen to act for {botId && "this teammate"}</i>
-      </div>
-      <div className="in-app-browser-keys">
-        {(["Enter", "Tab", "Backspace", "Escape"] as const).map((key) => (
-          <button key={key} disabled={busy} onClick={() => void act("takeover/key", { key })}>{key}</button>
-        ))}
-      </div>
-      <form
-        className="inline-field"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (typeValue.trim()) {
-            void act("takeover/type", { value: typeValue });
-            setTypeValue("");
-          }
-        }}
-      >
-        <input
-          value={typeValue}
-          onChange={(event) => setTypeValue(event.target.value)}
-          placeholder="Type into the page"
-          aria-label="Text to enter in the page"
-          maxLength={4_000}
-        />
-        <button disabled={busy || !typeValue.trim()}>Type</button>
-      </form>
+      <DirectScreen
+        image={frame}
+        alt="Live browser"
+        interactive
+        badge="Click a field, then type"
+        label="Live browser screen. Click a field, then type — keys go straight to the page."
+        send={send}
+        empty={<p className="panel-note">{busy ? "Connecting…" : "Waiting for the first frame…"}</p>}
+      />
       {error && <p className="panel-error">{error}</p>}
       {meta && <small className="in-app-browser-url">{meta.title || "(untitled)"} · {meta.url}</small>}
     </div>
@@ -4610,6 +4533,7 @@ export function BotPanel({
   onRetire: () => Promise<void>;
 }) {
   const [form, setForm] = useState({
+    name: bot.name,
     role: bot.role,
     instructions: bot.instructions,
     model: bot.model,
@@ -4621,8 +4545,13 @@ export function BotPanel({
   });
   const [section, setSection] = useState(thread.section || ""),
     [saved, setSaved] = useState(false),
+    [saving, setSaving] = useState(false),
+    [saveError, setSaveError] = useState(""),
     [duplicating, setDuplicating] = useState(false),
-    [liveView, setLiveView] = useState(false);
+    [liveView, setLiveView] = useState(false),
+    [retiring, setRetiring] = useState(false),
+    [confirmRetire, setConfirmRetire] = useState(false),
+    [retireError, setRetireError] = useState("");
   const assignedModels = provider?.instances.find(
     (instance) => instance.id === bot.providerInstanceId,
   )?.models || [form.model];
@@ -4656,14 +4585,50 @@ export function BotPanel({
     );
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await Promise.all([
-      onSave(bot.id, form),
-      onUpdateThread({ section: section.trim() || null }),
-    ]);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    if (saving) return;
+    const name = form.name.trim(), role = form.role.trim();
+    if (!name || !role) {
+      setSaveError("Name and job are required.");
+      return;
+    }
+    setSaving(true);
+    setSaveError("");
+    try {
+      const patch: Partial<Bot> = {};
+      if (name !== bot.name) patch.name = name;
+      if (role !== bot.role) patch.role = role;
+      if (form.instructions !== bot.instructions) patch.instructions = form.instructions;
+      if (form.model !== bot.model) patch.model = form.model;
+      if (form.weeklyTokenBudget !== bot.weeklyTokenBudget) patch.weeklyTokenBudget = form.weeklyTokenBudget;
+      if (form.computerEnabled !== bot.computerEnabled) patch.computerEnabled = form.computerEnabled;
+      if (form.browserEnabled !== bot.browserEnabled) patch.browserEnabled = form.browserEnabled;
+      if (form.mascot !== bot.mascot) patch.mascot = form.mascot;
+      if (form.color !== bot.color) patch.color = form.color;
+      const nextSection = section.trim() || null;
+      await Promise.all([
+        ...(Object.keys(patch).length ? [onSave(bot.id, patch)] : []),
+        ...(nextSection !== thread.section ? [onUpdateThread({ section: nextSection })] : []),
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "These teammate settings could not be saved. Try again.");
+    } finally {
+      setSaving(false);
+    }
   };
-  const preview = { ...bot, mascot: form.mascot, color: form.color };
+  const retire = async () => {
+    if (retiring) return;
+    setRetiring(true);
+    setRetireError("");
+    try {
+      await onRetire();
+    } catch (cause) {
+      setRetireError(cause instanceof Error ? cause.message : `Could not remove ${bot.name}. Nothing was hidden; try again.`);
+      setRetiring(false);
+    }
+  };
+  const preview = { ...bot, name: form.name, mascot: form.mascot, color: form.color };
   // S5-UX02: readiness must reflect the budget state, not claim "ready" for
   // a teammate that cannot start another model step.
   const budgetExhausted = bot.weeklyTokenBudget > 0 && bot.tokensUsedThisWeek >= bot.weeklyTokenBudget;
@@ -4674,7 +4639,7 @@ export function BotPanel({
         style={{ "--bot-color": form.color } as React.CSSProperties}
       >
         <Mascot bot={preview} size="large" />
-        <h3>{bot.name}</h3>
+        <h3>{form.name}</h3>
         <p>
           {bot.status === "working"
             ? "Busy making progress"
@@ -4742,22 +4707,38 @@ export function BotPanel({
           )}
         </div>
       </div>
-      <details className="bot-appearance">
-        <summary>Customize character <small>Shape and color</small></summary>
-        <AppearancePicker name={bot.name} shape={form.mascot} color={form.color} onShape={(mascot) => setForm({ ...form, mascot })} onColor={(color) => setForm({ ...form, color })} />
-      </details>
       <label className="field">
-        <span>What {bot.name} is great at</span>
+        <span>Name</span>
         <input
-          value={form.role}
-          onChange={(e) => setForm({ ...form, role: e.target.value })}
+          value={form.name}
+          maxLength={30}
+          required
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
       </label>
+      <label className="field">
+        <span>Job</span>
+        <input
+          value={form.role}
+          maxLength={60}
+          required
+          onChange={(e) => setForm({ ...form, role: e.target.value })}
+        />
+        <small>What this teammate is responsible for.</small>
+      </label>
+      <details className="bot-appearance">
+        <summary>Customize character <small>Shape and color</small></summary>
+        <AppearancePicker name={form.name || bot.name} shape={form.mascot} color={form.color} onShape={(mascot) => setForm({ ...form, mascot })} onColor={(color) => setForm({ ...form, color })} />
+      </details>
+      <details className="bot-advanced">
+        <summary>Advanced settings <small>Instructions, model, limits & access</small></summary>
+        <div className="bot-advanced-content">
       <label className="field">
         <span>Personality and working style</span>
         <textarea
           rows={5}
           value={form.instructions}
+          maxLength={2000}
           onChange={(e) => setForm({ ...form, instructions: e.target.value })}
         />
       </label>
@@ -4779,6 +4760,7 @@ export function BotPanel({
         <input
           type="number"
           min="0"
+          max="100000000"
           step="10000"
           value={form.weeklyTokenBudget}
           onChange={(e) =>
@@ -4852,6 +4834,8 @@ export function BotPanel({
         )}
       </div>
       <SkillToggles botId={bot.id} />
+        </div>
+      </details>
       <details className="bot-conversation">
         <summary>Organize this conversation</summary>
       <fieldset className="conversation-organizer">
@@ -4919,26 +4903,10 @@ export function BotPanel({
             <EyeOff size={15} />
             Hide from sidebar
           </button>
-          <button
-            type="button"
-            className="quiet-danger"
-            onClick={() => {
-              if (
-                window.confirm(
-                  `Retire ${bot.name}? Their history stays, but they leave the team and stop all work. You can restore them later.`,
-                )
-              )
-                void onRetire();
-            }}
-          >
-            <Archive size={15} />
-            Retire teammate
-          </button>
         </div>
         <small>
           Duplicating copies this teammate’s setup and access, but never their
-          private history or memory. Retiring keeps every conversation and
-          result, stops active work, and frees their seat.
+          private history or memory.
         </small>
       </fieldset>
       </details>
@@ -4950,15 +4918,36 @@ export function BotPanel({
         </span>
         <ChevronDown size={16} />
       </button>
-      <button className="button-primary button-wide" type="submit">
+      {saveError && <p className="panel-error" role="alert">{saveError}</p>}
+      <button className="button-primary button-wide" type="submit" disabled={saving || retiring}>
         {saved ? (
           <>
             <Check size={17} /> Saved
           </>
-        ) : (
-          "Save changes"
-        )}
+        ) : saving ? "Saving…" : "Save changes"}
       </button>
+      <section className="bot-remove">
+        <div>
+          <strong>Remove from your team</strong>
+          <small>This stops active work and frees the seat. Conversations, results, files, and private browser data stay recoverable.</small>
+        </div>
+        {!confirmRetire ? (
+          <button type="button" className="quiet-danger" disabled={retiring || saving} onClick={() => { setRetireError(""); setConfirmRetire(true); }}>
+            <Archive size={15} /> Remove teammate…
+          </button>
+        ) : (
+          <div className="bot-remove-confirm" role="group" aria-label={`Confirm removing ${bot.name}`}>
+            <p><strong>Remove {bot.name} from your team?</strong> Active work will stop and the seat is freed. Conversations, results, files, and private browser data stay recoverable.</p>
+            <div className="delegation-actions">
+              <button type="button" disabled={retiring} onClick={() => { setConfirmRetire(false); setRetireError(""); }}>Cancel</button>
+              <button type="button" className="quiet-danger" disabled={retiring} onClick={() => void retire()}><Archive size={15} /> {retiring ? "Removing…" : "Remove from team"}</button>
+            </div>
+          </div>
+        )}
+        <small>Restore later in Settings → Permissions & usage → Teammates.</small>
+        <a className="text-action" href="/?panel=control">Open teammate recovery settings <ChevronRight size={14} /></a>
+        {retireError && <p className="panel-error" role="alert">{retireError}</p>}
+      </section>
     </form>
   );
 }
@@ -5545,7 +5534,7 @@ export function RoutinesPanel({
               <Bell size={15} />
             </span>
             <div>
-              <strong>Needs your attention</strong>
+              <strong>Routine updates</strong>
               <small>
                 {alerts.length} automation{" "}
                 {alerts.length === 1 ? "item" : "items"} to review
@@ -5568,11 +5557,11 @@ export function RoutinesPanel({
                     <CircleAlert size={14} />
                   )}
                 </span>
-                <div>
-                  <strong>{alert.routineName}</strong>
+                <details className="routine-alert-detail">
+                  <summary><strong>{alert.routineName}</strong><span>{alert.kind === "approval" ? "Needs approval" : alert.kind === "missed" && alert.message.includes("caught up once") ? "Caught up" : "Needs attention"}</span><ChevronDown size={14} /></summary>
                   <p>{alert.message}</p>
-                  {alert.repairHint && <small>{alert.repairHint}</small>}
-                </div>
+                  {alert.repairHint && !(alert.kind === "missed" && alert.message.includes("caught up once")) && <small>{alert.repairHint}</small>}
+                </details>
                 <div>
                   {routine &&
                     sourceEvent &&
@@ -5672,6 +5661,11 @@ export function RoutinesPanel({
                       ? `${routine.watchStatus.detail} Checked ${relativeTime(routine.watchStatus.checkedAt)} · ${routine.watchStatus.unchangedChecks} unchanged checks skipped`
                       : "Waiting for the first check. No model is used until content changes."}</small>}
                   </div>
+                </div>
+                <details className="routine-manage">
+                  <summary><Settings2 size={14} /> Manage <ChevronDown size={13} /></summary>
+                  <div className="routine-manage-body">
+                  <div className="routine-quick-actions">
                   <button
                     className="routine-test"
                     disabled={routine.triggerType === "webpage" && !routine.enabled}
@@ -5688,11 +5682,11 @@ export function RoutinesPanel({
                     <Play size={12} /> {routine.triggerType === "webpage" ? "Check now" : "Test"}
                   </button>
                   <button
-                    className={`toggle ${routine.enabled ? "on" : ""}`}
+                    className="routine-pause"
                     onClick={() => void onToggle(routine)}
                     aria-label={`${routine.enabled ? "Pause" : "Start"} ${routine.name}`}
                   >
-                    <span />
+                    <Power size={13} /> {routine.enabled ? "Pause" : "Resume"}
                   </button>
                 </div>
                 <div className="routine-health">
@@ -5839,6 +5833,8 @@ export function RoutinesPanel({
                     )}
                   </div>
                 )}
+                  </div>
+                </details>
               </article>
             );
           })}

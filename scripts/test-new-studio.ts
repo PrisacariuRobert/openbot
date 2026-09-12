@@ -314,9 +314,32 @@ try {
   const nav = (_width: number) => ({
     getByRole: (_role: "button", options: { name: string | RegExp; exact?: boolean }) => ({
       click: async () => {
-        await page
-          .getByRole("button", { name: "Workspace", exact: true })
-          .click();
+        await page.waitForFunction(() =>
+          !document.querySelector(".loading") &&
+          [...document.querySelectorAll<HTMLButtonElement>("button")].some((button) =>
+            ["Conversation actions", "Workspace", "Open workspace"].includes(
+              button.getAttribute("aria-label") || "",
+            ),
+          ),
+        );
+        const conversationActions = page.getByRole("button", {
+          name: "Conversation actions",
+          exact: true,
+        });
+        if (await conversationActions.isVisible()) {
+          await conversationActions.click();
+          await page
+            .getByRole("menuitem", { name: "Workspace", exact: true })
+            .click();
+        } else if (_width <= 760) {
+          await page
+            .getByRole("button", { name: "Workspace", exact: true })
+            .click();
+        } else {
+          await page
+            .getByRole("button", { name: "Open workspace", exact: true })
+            .click();
+        }
         await page
           .getByRole("navigation", { name: "Workspace navigation" })
           .getByRole("button", options)

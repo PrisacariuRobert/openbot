@@ -101,9 +101,8 @@ try {
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
     await sheet.getByLabel("Their job").fill("Help plan my week");
     await sheet
-      .getByLabel("How should they help?")
+      .getByLabel("Additional instructions", { exact: true })
       .fill("Find a realistic plan. Ask before changing my calendar.");
-    await sheet.getByText("Make them yours", { exact: true }).click();
     await sheet.getByRole("button", { name: "Sprout shape" }).click();
     await sheet.getByRole("button", { name: "Leaf character" }).click();
     assert.equal(
@@ -127,6 +126,7 @@ try {
       .getByRole("combobox", { name: /^Model/ })
       .click();
     await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
+    await sheet.getByText("Manage AI connections", { exact: true }).click();
     available = false;
     await sheet.getByRole("button", { name: "Refresh connections" }).click();
     await sheet.getByText("This connection or model is no longer available.", { exact: false }).waitFor();

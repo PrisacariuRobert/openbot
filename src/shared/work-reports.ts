@@ -3,7 +3,10 @@ export type WorkKind = "morning" | "inbox" | "meeting" | "weekly";
 export type WorkService = "gmail" | "google-calendar" | "google-drive" | "apple-mail" | "apple-calendar" | "slack" | "notion" | "todoist";
 export interface WorkCoverage {
   service: WorkService;
-  state: "complete" | "limited" | "unavailable";
+  // complete/limited: the host fetched and bounded the data itself. browser:
+  // no app connection — the teammate can read it in its own browser, and
+  // anything cited from there stays teammate-reported, never host-verified.
+  state: "complete" | "limited" | "unavailable" | "browser";
   count: number;
   detail: string;
   account?: string;
@@ -38,9 +41,13 @@ export interface WorkSnapshot {
   coverage: WorkCoverage[];
   sources: WorkSource[];
 }
+export interface BrowserPageCitation {
+  url: string;
+  note: string;
+}
 export interface WorkReportInput {
   snapshotId: string;
-  items: { priority: "now" | "soon" | "fyi"; text: string; sourceRefs: string[] }[];
+  items: { priority: "now" | "soon" | "fyi"; text: string; sourceRefs: string[]; browserPages?: BrowserPageCitation[] }[];
   drafts: { sourceRef: string; body: string }[];
 }
 export interface WorkReport {

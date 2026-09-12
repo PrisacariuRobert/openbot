@@ -25,6 +25,7 @@ export function RunControls({
   const [busy, setBusy] = useState(false);
   const [signInBusy, setSignInBusy] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [allowNavigation, setAllowNavigation] = useState(false);
   const [reload, setReload] = useState(0);
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const lock = useRef(false);
@@ -55,6 +56,7 @@ export function RunControls({
     setPreview(null);
     setLoadError("");
     setReviewed(false);
+    setAllowNavigation(false);
     lock.current = false;
     setBusy(false);
     if (pending && approval) {
@@ -129,7 +131,7 @@ export function RunControls({
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: action === "cancel" ? "{}" : JSON.stringify({ decision: action, ...(action === "approved" ? { reviewFingerprint: preview!.reviewFingerprint } : {}) }),
+        body: action === "cancel" ? "{}" : JSON.stringify({ decision: action, ...(action === "approved" ? { reviewFingerprint: preview!.reviewFingerprint, navigationAllowance: allowNavigation } : {}) }),
       });
       if (current !== generation.current) return;
       if (response.status === 409) {
@@ -266,6 +268,7 @@ export function RunControls({
             <p className="run-control-note">This review is incomplete or out of date. Refresh before approving. You can still decline it.</p>
           )}
           {completeReview && preview?.browserSignIn && <label><input type="checkbox" checked={reviewed} disabled={busy || signInBusy || needsRefresh || Boolean(notice)} onChange={(event) => setReviewed(event.target.checked)} /> I’ve finished signing in to the account I want to use.</label>}
+          {completeReview && preview?.browserNavigationAllowance && !preview.browserSignIn && <label className="navigation-allowance"><input type="checkbox" checked={allowNavigation} disabled={busy || needsRefresh || Boolean(notice)} onChange={(event) => setAllowNavigation(event.target.checked)} /> For this task, allow up to {preview.browserNavigationAllowance.maxClicks} more eligible navigation clicks on {new URL(preview.browserNavigationAllowance.origin).hostname} for {preview.browserNavigationAllowance.expiresInMinutes} minutes. Website handlers may still change state; risky, sensitive, unknown, or changed controls still pause.</label>}
           <div className="decision-actions">
             {completeReview && (
               <button

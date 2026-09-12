@@ -12,6 +12,8 @@ test("browser approvals inspect real controls, not just selectors chosen by the 
   assert.equal(browserApprovalReason("click", "#docs", { ...target, tag: "a", label: "Documentation", inputType: "", href: "https://example.com/docs" }), null);
   assert.equal(browserApprovalReason("click", "#search", { ...target, label: "Search", inputType: "button", formMethod: "get", searchForm: true }), null);
   assert.ok(browserApprovalReason("click", "#search", { ...target, label: "Search", inputType: "button", formMethod: "post", searchForm: true }));
+  assert.ok(browserApprovalReason("click", "#looks-safe", { ...target, tag: "a", label: "Read-only preview", inputType: "", href: "javascript:submit()" }));
+  assert.ok(browserApprovalReason("click", "#browse", { ...target, label: "Browse channels", review: { url: target.url, label: "Browse channels", control: "button", fields: [], disclosure: { expanded: false, controls: ["channel-browser"] }, complete: true } }));
 });
 
 test("ordinary local work does not require an extra approval", () => {
@@ -34,10 +36,30 @@ test("coordinated prohibitions do not turn safe work into a publishing request",
   assert.equal(approvalReason("Fix the bug. Do not install packages, access the network, push, publish, or change my original checkout."), null);
   assert.equal(approvalReason("Prepare the drafts. Don't send emails or post to the team."), null);
   assert.equal(approvalReason("Never delete, overwrite, or publish the originals."), null);
+  assert.equal(approvalReason("Read-only: do not create, complete, edit, send, post, invite or buy anything."), null);
+  assert.equal(approvalReason("Do not create another task, complete/delete anything, share it or contact anyone."), null);
+  assert.equal(approvalReason("Create one private Todoist task. Do not complete or delete it, touch unrelated tasks, change settings, or create a report file."), null);
   assert.ok(approvalReason("Do not delete files or publish the preview, then deploy the approved release."));
   assert.ok(approvalReason("Do not delete files, and publish the preview."));
   assert.ok(approvalReason("Do not ask for approval or publish later, deploy now."));
   assert.ok(approvalReason("Do not delete or publish drafts. Publish the website."));
+  assert.ok(approvalReason("Do not create another task, complete/delete anything, share it, but delete the draft."));
+  assert.equal(
+    approvalReason("Do not create, complete, edit, send, post, invite or buy anything. Buy the premium plan afterwards."),
+    "This may spend money or start a subscription.",
+  );
+  assert.equal(
+    approvalReason("Do not create, complete, edit, send, post, invite or buy anything. Publish the approved release."),
+    "This may publish work outside your computer.",
+  );
+  assert.equal(
+    approvalReason("Do not complete or delete it, touch unrelated tasks, change settings, or create a report file, but delete the old item."),
+    "This may delete files or data.",
+  );
+  assert.equal(
+    approvalReason("Do not complete or delete it, touch unrelated tasks, change settings, or create a report file, then delete the old item."),
+    "This may delete files or data.",
+  );
   assert.ok(commandApprovalReason("git push origin main"));
   assert.ok(commandApprovalReason("rm -rf drafts"));
 });

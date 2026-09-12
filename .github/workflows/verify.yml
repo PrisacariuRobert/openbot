@@ -107,6 +107,8 @@ jobs:
         run: npm run test:studio-polish
       - name: Test isolated saved-browser sessions
         run: npm run test:browser-sessions
+      - name: Test browser tabs and active-tab routing
+        run: npm run test:browser-tabs
       - name: Retain synthetic browser evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

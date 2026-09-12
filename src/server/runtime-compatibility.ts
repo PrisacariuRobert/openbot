@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { safeHostEnvironment } from "./runtime.js";
 
 /** Gate 1a: pin the verified OpenCode runtime. The runtime version is part of
  * the security boundary, so an unverified version fails closed for model
@@ -16,7 +17,7 @@ export const RUNTIME_INCOMPATIBLE_MESSAGE =
 
 let cached: RuntimeCompatibility | null = null;
 
-export function opencodeCompatibility(options: { refresh?: boolean } = {}): RuntimeCompatibility {
+export function opencodeCompatibility(options: { refresh?: boolean; probe?: () => string | null } = {}): RuntimeCompatibility {
   if (cached && !options.refresh) return cached;
   // A declared version (set by controlled fixtures) is still validated against
   // the verified version — this is not a bypass.
@@ -25,15 +26,25 @@ export function opencodeCompatibility(options: { refresh?: boolean } = {}): Runt
     cached = { runtime: "opencode", detectedVersion: declared, compatibility: declared === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" };
     return cached;
   }
+  const readVersion = options.probe || (() => {
+    // Never depend on the ambient PATH: GUI/daemon launches often sanitize it
+    // down to /usr/bin:/bin, which hides the user's runtime installs and would
+    // wedge every task on a healthy host.
+    const result = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 10_000, env: safeHostEnvironment() });
+    return `${result.stdout || ""}`.trim().split(/\s+/).filter(Boolean).pop() || null;
+  });
+  let version: string | null = null;
   try {
-    const result = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 10_000 });
-    const text = `${result.stdout || ""}`.trim();
-    const version = text.split(/\s+/).filter(Boolean).pop() || null;
-    cached = version
-      ? { runtime: "opencode", detectedVersion: version, compatibility: version === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" }
-      : { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+    version = readVersion();
   } catch {
-    cached = { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+    version = null;
   }
-  return cached;
+  const next: RuntimeCompatibility = version
+    ? { runtime: "opencode", detectedVersion: version, compatibility: version === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" }
+    : { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
+  // A transient probe failure must not wedge the host: only definitive
+  // verdicts are cached, so the next task re-probes instead of failing
+  // forever on one bad reading.
+  cached = next.compatibility === "unknown" ? null : next;
+  return next;
 }

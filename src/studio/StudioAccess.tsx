@@ -1,25 +1,29 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, LockKeyhole, LoaderCircle } from "lucide-react";
+import { watchStudioConnection, type AccessPhase } from "./studio-connection";
 
 /** One first-load/recovery surface for both routes, including paired browsers. */
 export function StudioAccess({ children }: { children: ReactNode }) {
-  const [phase, setPhase] = useState<"checking" | "ready" | "locked" | "offline">("checking");
+  const [phase, setPhase] = useState<AccessPhase>("checking");
   const [retry, setRetry] = useState(0), [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   useEffect(() => {
-    const abort = new AbortController();
-    void fetch("/api/state", { signal: abort.signal, cache: "no-store" }).then((response) => {
-      if (!abort.signal.aborted) setPhase(response.ok ? "ready" : response.status === 401 ? "locked" : "offline");
-    }).catch(() => { if (!abort.signal.aborted) setPhase("offline"); });
-    const locked = () => setPhase("locked");
-    window.addEventListener("openbot:locked", locked);
-    return () => { abort.abort(); window.removeEventListener("openbot:locked", locked); };
+    const connection = watchStudioConnection({
+      fetchState: (signal) => fetch("/api/state", { signal, cache: "no-store" }),
+      onPhase: setPhase,
+      schedule: (work, milliseconds) => window.setTimeout(work, milliseconds),
+      cancel: (timer) => window.clearTimeout(timer as number),
+    });
+    window.addEventListener("openbot:locked", connection.lock);
+    window.addEventListener("online", connection.wake);
+    window.addEventListener("focus", connection.wake);
+    return () => { connection.stop(); window.removeEventListener("openbot:locked", connection.lock); window.removeEventListener("online", connection.wake); window.removeEventListener("focus", connection.wake); };
   }, [retry]);
   if (phase === "ready") return children;
   return <main className="studio-access"><section>
     <span className="access-mark"><LockKeyhole size={24} strokeWidth={1.5} /></span>
     <p className="overline">OPENBOT</p>
     <h1>{phase === "locked" ? "Your studio is private." : phase === "offline" ? "Let’s reconnect." : "Opening your studio."}</h1>
-    <p>{phase === "locked" ? "Use your studio’s access key to continue on this device." : phase === "offline" ? "Keep the Mac running OpenBot awake and connected, then try again." : "Your conversations and teammates will be here in a moment."}</p>
+    <p>{phase === "locked" ? "Use your studio’s access key to continue on this device." : phase === "offline" ? "Keep the Mac running OpenBot awake and connected. We’ll reconnect automatically when it’s available." : "Your conversations and teammates will be here in a moment."}</p>
     {phase === "checking" && <LoaderCircle className="spinner" size={21} aria-label="Loading" />}
     {phase === "offline" && <button className="primary" onClick={() => { setPhase("checking"); setRetry((n) => n + 1); }}>Try again <ArrowRight size={16} /></button>}
     {phase === "locked" && <form onSubmit={async (event) => {

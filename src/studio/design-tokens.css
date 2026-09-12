@@ -78,11 +78,13 @@ body {
 .from-you .prose a:not(.message-file) {
   text-underline-offset: 3px;
 }
-.topbar button {
+.topbar .topbar-control,
+.topbar .conversation-actions > button {
   border-radius: 8px;
   transition: background 120ms ease;
 }
-.topbar button:hover {
+.topbar .topbar-control:hover,
+.topbar .conversation-actions > button:hover {
   background: var(--hover);
 }
 .topbar .conversation-identity:focus-visible {
@@ -173,7 +175,8 @@ button[aria-label]:not(:disabled) {
   .composer textarea {
     font-size: 16px;
   }
-  .topbar button {
+  .topbar .topbar-control,
+  .topbar .conversation-actions > button {
     min-width: 40px;
     min-height: 40px;
   }
@@ -189,7 +192,8 @@ button[aria-label]:not(:disabled) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .topbar button,
+  .topbar .topbar-control,
+  .topbar .conversation-actions > button,
   .conversation-row,
   .composer {
     transition: none;

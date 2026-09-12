@@ -334,6 +334,20 @@ struct StudioBot: Decodable, Identifiable, Hashable {
 }
 
 extension StudioThread {
+    /// Retiring a teammate removes it from the active roster before older hosts
+    /// necessarily hide its direct thread. Do not render that shell as a group.
+    func isVisibleConversation(in bots: [StudioBot]) -> Bool {
+        guard hidden != true else { return false }
+        guard kind == "direct", let botId else { return true }
+        return bots.contains { $0.id == botId }
+    }
+
+    var conversationPreview: String {
+        let message = lastMessage?.replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return message?.isEmpty == false ? message! : "Start a conversation"
+    }
+
     /// A custom room must never display teammates that are not its members.
     func members(in bots: [StudioBot]) -> [StudioBot] {
         if let botId { return bots.filter { $0.id == botId } }

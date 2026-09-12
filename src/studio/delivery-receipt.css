@@ -11,6 +11,10 @@
   text-decoration: none;
 }
 .delivery-row + .delivery-row { border-top: 1px solid var(--line); border-radius: 0; }
+.delivery-version + .delivery-version { border-top: 1px solid var(--line); }
+.delivery-newer { margin: 0 4px 8px; font-size: 12px; line-height: 1.5; color: var(--secondary); }
+.delivery-newer a { display: inline-flex; align-items: center; gap: 3px; min-height: 36px; color: var(--ink); font-weight: 550; text-underline-offset: 3px; }
+.delivery-newer a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
 .delivery-row:hover { background: color-mix(in srgb, var(--surface-muted) 60%, transparent); }
 .delivery-row-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .delivery-row-text strong { font-size: 14.5px; font-weight: 650; letter-spacing: -0.005em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -18,6 +22,14 @@
 .delivery-row-text small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .delivery-row > svg { color: var(--muted); flex: none; }
 .delivery-prov { margin: 8px 4px 0; font-size: 11.5px; color: var(--muted); }
+.delivery-finding { min-width: 0; margin: 14px 4px 0; padding-inline-start: 12px; border-inline-start: 2px solid var(--line); color: var(--ink); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.delivery-finding > strong { font-size: 13px; font-weight: 600; }
+.delivery-finding p { margin: 4px 0 0; }
+.delivery-finding summary { width: fit-content; padding-block: 6px; cursor: pointer; color: var(--secondary); }
+.delivery-finding details p { color: var(--secondary); }
+.delivery-finding-full { overflow-wrap: anywhere; }
+.delivery-finding-full > * + * { margin-top: 8px; }
+.delivery-finding-full code { white-space: pre-wrap; }
 .delivery-receipt { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--secondary); }
 /* Owner-tapped review: one quiet action under the result, same tokens. */
 .delivery-review-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; }
@@ -66,3 +78,17 @@
 .delivered-file details { padding: 12px 14px; border-top: 1px solid var(--line); }
 .delivered-file summary { font-size: 12px; cursor: pointer; }
 .delivered-file pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+
+/* Result first. Supporting evidence is one labelled disclosure, not another answer. */
+.delivery-summary { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; margin-top: 8px; }
+.delivery-summary > details { margin: 0; padding: 0; border: 0; font-size: 12px; color: var(--secondary); max-width: 100%; }
+.delivery-summary > details > summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 36px; padding: 6px 10px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 20px; cursor: pointer; list-style: none; }
+.delivery-summary summary::-webkit-details-marker { display: none; }
+.delivery-summary > details > summary::after { content: none; }
+.delivery-summary > details[open] { flex-basis: 100%; }
+.delivery-summary > details[open] > summary { color: var(--ink); }
+.delivery-summary > details > summary:focus-visible, .delivery-review-cta:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.delivery-summary .delivery-review-cta { min-height: 36px; padding: 6px 8px; margin: 0; font-size: 12px; }
+.delivery-summary .delivery-finding { margin: 12px 0; }
+.delivery-summary .delivery-review { flex-basis: 100%; }
+@media (pointer: coarse) { .delivery-summary > details > summary, .delivery-summary .delivery-review-cta { min-height: 44px; } }

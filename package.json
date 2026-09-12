@@ -22,6 +22,7 @@
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
     "test:recipes-memory-ui": "tsx scripts/test-recipes-memory-ui.ts",
     "test:browser-sessions": "tsx scripts/test-browser-session-workflows.ts",
+    "test:browser-tabs": "tsx scripts/test-browser-tabs.ts",
     "test:browser-sign-in": "tsx scripts/test-browser-sign-in.ts",
     "test:workflow-checks-ui": "tsx scripts/test-workflow-checks-ui.ts",
     "test:skill-authoring-ui": "tsx scripts/test-skill-authoring-ui.ts",

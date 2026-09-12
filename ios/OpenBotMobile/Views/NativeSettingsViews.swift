@@ -13,7 +13,7 @@ struct NativeConversationList: View {
 
     private var threads: [StudioThread] {
         store.state.threads.filter {
-            $0.hidden != true && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || ($0.lastMessage?.localizedCaseInsensitiveContains(query) ?? false))
+            $0.isVisibleConversation(in: store.state.bots) && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || ($0.lastMessage?.localizedCaseInsensitiveContains(query) ?? false))
         }.sorted { ($0.lastMessageAt ?? $0.updatedAt) > ($1.lastMessageAt ?? $1.updatedAt) }
     }
 
@@ -36,16 +36,27 @@ struct NativeConversationList: View {
                             HStack(spacing: 12) {
                                 NativeThreadIdentity(store: store, thread: thread, size: 42).frame(width: 46)
                                 VStack(alignment: .leading, spacing: 6) {
+                                    let run = store.activeRuns.first { $0.threadId == thread.id }
+                                    let needsAttention = store.state.attentionItems.contains { $0.threadID == thread.id }
                                     HStack {
                                         Text(thread.title).font(.system(size: 16, weight: .semibold)).lineLimit(1)
                                         Spacer(minLength: 8)
+                                        if needsAttention {
+                                            Label("Needs you", systemImage: "exclamationmark.circle.fill")
+                                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(OpenBotTheme.purple)
+                                                .lineLimit(1).fixedSize().accessibilityLabel("Needs your attention")
+                                        } else if let run {
+                                            Label(run.status == "awaiting_approval" ? "Approval" : "Working", systemImage: run.status == "awaiting_approval" ? "checkmark.circle" : "ellipsis.circle")
+                                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(StudioPalette.muted)
+                                                .lineLimit(1).fixedSize()
+                                                .accessibilityLabel(run.status == "awaiting_approval" ? "Needs your approval" : "Working")
+                                        }
                                         Text((thread.lastMessageAt ?? thread.updatedAt).openBotRelativeTime)
                                             .font(.system(size: 11)).foregroundStyle(StudioPalette.muted)
                                     }
-                                    let run = store.activeRuns.first { $0.threadId == thread.id }
-                                    let needsAttention = store.state.attentionItems.contains { $0.threadID == thread.id }
-                                    Text(needsAttention ? "Needs your attention" : run.map { $0.status == "awaiting_approval" ? "Needs your approval" : "Working…" } ?? thread.lastMessage?.replacingOccurrences(of: "\n", with: " ") ?? "Start a conversation")
+                                    Text(thread.conversationPreview)
                                         .font(.system(size: 14)).foregroundStyle(StudioPalette.muted).lineLimit(2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }.padding(.vertical, 19).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityIdentifier("native-thread-\(thread.id)")

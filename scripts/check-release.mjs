@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { includesStringLiteral, includesText } from "./lib/source-contract.mjs";
 
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
@@ -98,7 +99,7 @@ if (!app.includes("skill-owner-switcher") || !app.includes("Import reviewed skil
 if (!database.includes("CREATE TABLE IF NOT EXISTS runner_state") || !database.includes("claimNextQueuedRun") || !database.includes("recoverExpiredRuns")) {
   failures.push("The durable runner lease, exclusive claim, or restart recovery store is incomplete.");
 }
-if (!database.includes("CREATE TABLE IF NOT EXISTS approved_actions") || !database.includes("claimApprovedAction") || !database.includes("recoverInterruptedApprovedActions") || !server.includes('/api/approved-actions/:id/resolve') || !app.includes("Action history")) {
+if (!database.includes("CREATE TABLE IF NOT EXISTS approved_actions") || !database.includes("claimApprovedAction") || !database.includes("recoverInterruptedApprovedActions") || !includesStringLiteral(server, "/api/approved-actions/:id/resolve") || !includesText(app, "Action history")) {
   failures.push("Approved actions must keep a durable single-claim ledger, uncertain-restart recovery, and visible reconciliation.");
 }
 if (!runner.includes("maintainLeadership") || !runner.includes("renewRunLeases") || !runner.includes("requeueWorkerRuns")) {

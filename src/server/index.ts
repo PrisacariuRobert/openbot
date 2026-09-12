@@ -51,6 +51,7 @@ import { CONNECTOR_MANIFESTS, friendlyConnectorError, manifestCatalogEntry } fro
 import type { Bot, CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance } from "../shared/types.js";
 import { resolveMessageTargets } from "../shared/routing.js";
 import { parseRoutineIntent } from "../shared/routine-intent.js";
+import { internalRoutineEnabled } from "./routine-activation.js";
 import { PageWatchMonitor } from "./page-watch.js";
 import { pageWatchConfig } from "./page-watch-source.js";
 import { invokedWorkflow } from "../shared/skills.js";
@@ -89,6 +90,7 @@ import { listWorkspaceFiles, readWorkspaceFile, replaceWorkspaceFile, resolveWor
 import { isHandoffPath, mediateHandoffArtifacts } from "./handoff-files.js";
 import { verifyTaskChecks } from "./verification-evidence.js";
 import { approvalPreview } from "../shared/approval-preview.js";
+import { BrowserNavigationGrants, browserNavigationAllowanceOffer, reviewedBrowserNavigationGrant } from "./browser-navigation-grants.js";
 import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
 
@@ -119,6 +121,8 @@ const internalToken = randomBytes(32).toString("base64url");
 const approvedConnectorDispatch = new ApprovedConnectorDispatch();
 const computer = new ComputerManager(db);
 const browser = new BrowserManager(db);
+const browserNavigationGrants = new BrowserNavigationGrants();
+db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus(runId, status));
 // The tester browser always starts at the studio itself (loopback), never at
 // a relay or LAN address — its scope is loopback-only by construction.
 const tester = new TesterBrowser(db.dataDir, `http://127.0.0.1:${port}/`);
@@ -1764,13 +1768,16 @@ function autoApproveIfYolo(approvalId: string) {
   })();
 }
 
-async function decideApproval(approvalId: string, decision: "approved" | "denied", reviewedFingerprint?: string) {  const approval = db.getApproval(approvalId);
+async function decideApproval(approvalId: string, decision: "approved" | "denied", reviewedFingerprint?: string, navigationAllowance = false) {  const approval = db.getApproval(approvalId);
   if (!approval || approval.status !== "pending") return null;
   if (decision === "approved") {
     const reviewed = currentApprovalReview(approvalId);
     if (!reviewed?.preview.canApprove || !sameReviewFingerprint(reviewedFingerprint, reviewed.fingerprint)) return null;
   }
-  const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string } | null;
+  const action = db.getApprovalAction(approval.id) as { type?: string; botId?: string; args?: unknown } | null;
+  if (navigationAllowance && decision !== "approved") return null;
+  const browserGrantInput = reviewedBrowserNavigationGrant(action, navigationAllowance && decision === "approved", db.listAutoReviewRules());
+  if (navigationAllowance && !browserGrantInput.valid) return null;
   if (action?.type === "task_tokens") return runner.decideTaskTokens(approval.id, decision);
   if (action?.type === "browser_sign_in") {
     return browserSignIns.withProfile(approval.botId, async () => {
@@ -1791,7 +1798,13 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
     broadcast({ type: "connector", at: Date.now() });
   }
   if (decision === "approved" && action?.type && action.type !== "run") {
-    await executeApprovedAction(approval.id, reviewedFingerprint!);
+    const receipt = await executeApprovedAction(approval.id, reviewedFingerprint!);
+    const freshGrantInput = reviewedBrowserNavigationGrant(action, Boolean(browserGrantInput.offer), db.listAutoReviewRules());
+    const currentRun = db.getRun(approval.runId);
+    if (freshGrantInput.valid && freshGrantInput.offer && receipt?.status === "completed" && currentRun && ["queued", "running"].includes(currentRun.status)) {
+      browserNavigationGrants.issue(approval.runId, approval.botId, freshGrantInput.offer);
+      db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Navigation allowance enabled", detail: `Up to 12 eligible clicks on ${freshGrantInput.offer.origin} for 15 minutes or until this task ends.` });
+    }
   }
   return decided;
 }
@@ -2251,9 +2264,9 @@ app.post("/api/courier/messages/:id/ack", (request, response) => {
   response.json({ acknowledged: db.ackCourierMessage(request.params.id, parsed.data.for) });
 });
 app.post("/api/approvals/:id/decide", async (request, response) => {
-  const parsed = z.object({ decision: z.enum(["approved", "denied"]), reviewFingerprint: z.string().max(128).optional() }).safeParse(request.body);
+  const parsed = z.object({ decision: z.enum(["approved", "denied"]), reviewFingerprint: z.string().max(128).optional(), navigationAllowance: z.boolean().optional().default(false) }).strict().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose approve or deny." });
-  const decided = await decideApproval(request.params.id, parsed.data.decision, parsed.data.reviewFingerprint);
+  const decided = await decideApproval(request.params.id, parsed.data.decision, parsed.data.reviewFingerprint, parsed.data.navigationAllowance);
   if (!decided) return response.status(409).json({ error: "This action or connected account changed, or its complete review is missing. Refresh and review its details before deciding." });
   broadcast();
   response.json(decided);
@@ -2372,11 +2385,14 @@ app.post("/api/bots/:id/retire", (request, response) => {
   const bot = db.getBot(request.params.id);
   if (!bot) return response.status(404).json({ error: "Teammate not found." });
   if (bot.retiredAt) return response.status(409).json({ error: "This teammate is already retired." });
+  // Claim retirement atomically before stopping work. A concurrent request
+  // must not cancel tasks and then report a second, unconfirmed success.
+  const retired = db.retireBot(bot.id);
+  if (!retired) return response.status(409).json({ error: "This teammate is already retired." });
   let stopped = 0;
   for (const run of db.activeRunsForBot(bot.id)) {
     if (stopRun(run.id, "Retired by you")) stopped += 1;
   }
-  const retired = db.retireBot(bot.id);
   broadcast();
   response.json({ ok: true, stopped, bot: retired });
 });
@@ -2419,8 +2435,11 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Teammate not found." });
   // Appearance does not execute a model or change access. It remains editable
   // when an old teammate has no provider or its chosen model is unavailable.
-  const appearanceOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => key === "mascot" || key === "color");
-  if (appearanceOnly) {
+  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color"].includes(key));
+  // Name, job and appearance are local profile metadata. Keep them editable
+  // when an older teammate's provider is unavailable; access/model changes
+  // still use the full connection validation below.
+  if (profileOnly) {
     const bot = db.updateBot(request.params.id, parsed.data);
     broadcast();
     return response.json(bot);
@@ -2783,6 +2802,51 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+// Direct keystroke for the takeover screen: a single printable character or a
+// named key, forwarded one by one as the owner types. Combos with held
+// modifiers are never accepted; paste uses takeover/type instead.
+app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
+  const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
+  try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+// Wheel scrolling under the pointer, so the takeover screen scrolls like a
+// real browser window instead of needing scroll controls.
+app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
+  const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
+  try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+// Real-browser tabs, shared by owner and agent: one explicit active tab.
+// Agent tools always act on the active tab; background tabs are never
+// inspected unless selected. Sessions persist in the profile; the tab strip
+// itself is per browser session and is not reopened after a restart.
+app.get("/api/bots/:id/browser/tabs", async (request, response) => {
+  try { response.json(await browser.listTabs(request.params.id)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/tabs", async (request, response) => {
+  const parsed = z.object({ url: z.string().url().max(2_048).optional() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Give this tab a valid address, or none for a blank tab." });
+  try { response.json(await browser.openTab(request.params.id, parsed.data.url)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.delete("/api/bots/:id/browser/tabs/:tabId", async (request, response) => {
+  try { response.json(await browser.closeTab(request.params.id, request.params.tabId)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/tabs/:tabId/select", async (request, response) => {
+  try { response.json(await browser.selectTab(request.params.id, request.params.tabId)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+app.post("/api/bots/:id/browser/nav", async (request, response) => {
+  const parsed = z.object({ to: z.enum(["back", "forward", "reload"]) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Go back, forward, or reload." });
+  try { response.json(await browser.navigateTab(request.params.id, parsed.data.to)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
@@ -3177,8 +3241,8 @@ app.post("/api/internal/tools", async (request, response) => {
     if (action.startsWith("browser_")) return await browserSignIns.withProfile(botId, async () => {
       browserSignIns.assertAgentAccess(botId);
       if (db.getRun(runId)?.status !== "running") return response.status(409).json({ error: "This task is no longer active." });
-      const requestSignIn = (siteOrigin: string) => {
-        const approval = browserSignIns.request(botId, runId, siteOrigin);
+      const requestSignIn = (siteOrigin: string, evidence?: { source: "host" | "teammate"; observedUrl?: string; observedText?: string }) => {
+        const approval = browserSignIns.request(botId, runId, siteOrigin, evidence);
         runner.pauseForApproval(runId);
         broadcast();
         setTimeout(() => {
@@ -3195,10 +3259,16 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_open") {
         const result = await browser.open(botId, String(args.url || ""));
         const gate = await browser.signInState(botId);
-        return gate.needsSignIn ? requestSignIn(gate.siteOrigin) : response.json(result);
+        return gate.needsSignIn ? requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined }) : response.json(result);
       }
       const gate = await browser.signInState(botId);
-      if (action === "browser_request_sign_in" || gate.needsSignIn) return requestSignIn(gate.siteOrigin);
+      if (action === "browser_request_sign_in") {
+        const observedUrl = String(args.observedUrl || "").slice(0, 300), observedText = String(args.observedText || "").slice(0, 300);
+        // The host gate already settled the page twice; a teammate citation is
+        // shown verbatim so the owner can judge a false alarm like a real one.
+        return requestSignIn(gate.siteOrigin, { source: "teammate", observedUrl: observedUrl || gate.siteOrigin, observedText });
+      }
+      if (gate.needsSignIn) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined });
       // While the owner is signing in on this browser, the page is theirs:
       // no model-visible snapshot or interaction until they continue.
       if (["browser_snapshot", "browser_click", "browser_type", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
@@ -3207,16 +3277,26 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_snapshot") return response.json(await browser.snapshot(botId));
       if (action === "browser_click") {
         const selector = String(args.selector || ""), target = await browser.describeTarget(botId, selector);
-        if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin);
-        const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("click", selector, target), browserApprovalReason("click", selector, target)).reason;
-        if (reason) return holdForApproval("browser", reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review });
+        if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
+        const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("click", selector, target), browserApprovalReason("click", selector, target));
+        const requiredByRule = decision.matched?.effect === "require_approval";
+        if (decision.reason) {
+          if (browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule)) {
+            const result = await browser.click(botId, selector, target.fingerprint);
+            db.addActivity({ runId, botId, kind: "status", label: "Used navigation allowance", detail: `Clicked “${target.label}” on ${new URL(target.url).hostname}; the exact target was checked again first.` });
+            const next = await browser.signInState(botId);
+            return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
+          }
+          const offer = browserNavigationAllowanceOffer(target, requiredByRule);
+          return holdForApproval("browser", decision.reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined });
+        }
         const result = await browser.click(botId, selector, target.fingerprint);
         const next = await browser.signInState(botId);
-        return next.needsSignIn ? requestSignIn(next.siteOrigin) : response.json(result);
+        return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
       }
       if (action === "browser_type") {
         const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
-        if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin);
+        if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential field ${target.label || target.tag}`.slice(0, 160) });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("type", `${selector} ${value}`, target), browserApprovalReason("type", `${selector} ${value}`, target)).reason;
         if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review });
         return response.json(await browser.type(botId, selector, value, target.fingerprint));
@@ -3471,7 +3551,7 @@ app.post("/api/internal/tools", async (request, response) => {
       const requestedTrigger = typeof args.triggerType === "string" ? args.triggerType : "schedule";
       const routine = routineInput.safeParse({
         name: args.name, botId, threadId: sourceRun.threadId, prompt: args.prompt,
-        intervalMinutes: requestedTrigger === "webpage" ? args.intervalMinutes ?? 60 : requestedTrigger === "schedule" ? args.intervalMinutes ?? 1440 : 1440, schedule: args.schedule, enabled: args.enabled !== false,
+        intervalMinutes: requestedTrigger === "webpage" ? args.intervalMinutes ?? 60 : requestedTrigger === "schedule" ? args.intervalMinutes ?? 1440 : 1440, schedule: args.schedule, enabled: internalRoutineEnabled(args.enabled),
         triggerType: requestedTrigger, triggerConfig: args.triggerConfig,
       });
       if (!routine.success) return response.status(400).json({ error: "Choose a name, what should happen, and a repeat time of at least 5 minutes." });
@@ -3481,7 +3561,10 @@ app.post("/api/internal/tools", async (request, response) => {
       if (scheduleError) return response.status(400).json({ error: scheduleError });
       if (routine.data.enabled !== false && routine.data.triggerType === "calendar" && !calendarAutomationReady(botId)) return response.status(409).json({ error: "Calendar is not ready for this teammate. Connect it or create the automation as a paused draft." });
       if (routine.data.enabled !== false && routine.data.triggerType && ["todoist", "dropbox", "slack", "notion"].includes(routine.data.triggerType) && !connectorAutomationReady(routine.data.triggerType as "todoist" | "dropbox" | "slack" | "notion", botId)) return response.status(409).json({ error: "That app or its live events are not ready for this teammate. Finish setup in Apps & Tools or create the automation as a paused draft." });
-      const created = db.createRoutine(routine.data);
+      const creation = db.createRoutineForRun(runId, routine.data);
+      if (creation.deleted || !creation.routine) return response.status(409).json({ error: "This exact routine was already created by this task and was later deleted. Start a new task to create it again." });
+      const created = creation.routine;
+      if (creation.replayed) return response.json({ ok: true, routineId: created.id, name: created.name, trigger: created.triggerType === "schedule" ? created.scheduleLabel : created.triggerType, nextRunAt: created.nextRunAt, enabled: created.enabled, replayed: true });
       db.addActivity({ runId, botId, kind: "tool", label: `Set up ${created.name}`, detail: null });
       db.addMessage({
         threadId: sourceRun.threadId, senderType: "system", senderId: null, body: `${created.name} · ${created.triggerType === "schedule" ? created.scheduleLabel || "On a schedule" : created.triggerType}`,
@@ -3489,7 +3572,7 @@ app.post("/api/internal/tools", async (request, response) => {
         eventData: { name: created.name, schedule: created.triggerType === "schedule" ? created.scheduleLabel ?? "On a schedule" : created.triggerType, enabled: created.enabled ? "true" : "false", botName: sourceRun.botName },
       });
       broadcast();
-      return response.status(201).json({ ok: true, name: created.name, trigger: created.triggerType === "schedule" ? created.scheduleLabel : created.triggerType, nextRunAt: created.nextRunAt, enabled: created.enabled });
+      return response.status(201).json({ ok: true, routineId: created.id, name: created.name, trigger: created.triggerType === "schedule" ? created.scheduleLabel : created.triggerType, nextRunAt: created.nextRunAt, enabled: created.enabled, replayed: false });
     }
     if (action === "remember") {
       const input = z.object({ key: z.string().min(1).max(80), content: z.string().min(1).max(1200), expectedRevision: z.string().max(80).optional(), expiresAt: z.string().datetime({ offset: true }).optional() }).strict().parse(args);

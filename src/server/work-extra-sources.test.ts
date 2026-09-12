@@ -19,6 +19,7 @@ const selection = [ { service: "slack", id: "C123", label: "#launch" }, { servic
 
 function fixture(options: { fail?: string; delayed?: () => Promise<void>; notionDeep?: boolean } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-work-sources-")), db = new OpenBotDatabase(root);
+  db.updateBot("nova", { browserEnabled: false }); // Connector opt-in semantics in isolation; browser coverage has its own tests.
   for (const service of ["slack", "notion", "todoist"] as const) {
     db.configureOAuthConnector({ id: service, kind: `${service}_oauth`, name: service, clientId: "fixture", clientSecret: "fixture" });
     db.completeOAuthConnector(service, { accessToken: "fixture", user: { accessToken: "fixture" }, bot: { accessToken: "fixture" }, teamId: "T123" }, "Fixture account", ["read"]);

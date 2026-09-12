@@ -23,8 +23,8 @@ export function approvalReason(prompt: string): string | null {
   const withoutExcludedLists = prompt.replace(/\b(?:do\s+not|don't|never)\s+[^.;!?\n]+/gi, (clause) => {
     const actions = clause.replace(/^(?:do\s+not|don't|never)\s+/i, "");
     if (!/\s+or\s+/i.test(actions) || /\b(?:but|then|instead|however|also|actually|afterwards|except)\b/i.test(actions)) return clause;
-    const parts = actions.split(/,\s*(?:or\s+)?|\s+or\s+/i);
-    const excludedVerb = /^(?:delete|remove|erase|wipe|drop|truncate|git\s+push|push|publish|deploy|release|merge|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|install|access|change|modify|overwrite)\b/i;
+    const parts = actions.split(/,\s*(?:or\s+)?|\s+or\s+|\s*\/\s*(?=[a-z])/i);
+    const excludedVerb = /^(?:create|complete|edit|invite|touch|delete|remove|erase|wipe|drop|truncate|git\s+push|push|publish|deploy|release|merge|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|install|access|change|modify|overwrite|share|contact)\b/i;
     return parts.length >= 2 && parts.every((part) => excludedVerb.test(part.trim())) ? "[actions explicitly excluded]" : clause;
   });
   const actionable = withoutExcludedLists.replace(/\b(?:do\s+not|don't|never)\s+(?:try\s+to\s+|attempt\s+to\s+)?(?:delete|remove|erase|wipe|drop|truncate|git\s+push|publish|deploy|release|merge\s+(?:the\s+)?pr|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|use\s+(?:an?\s+)?(?:password|passcode|api[ _-]?key|secret|credit\s+card|bank\s+account))\b[^,.;]*?(?=\s+\b(?:but|then)\b|[,.;]|$)/gi, "[action explicitly excluded]");
@@ -76,7 +76,18 @@ export interface BrowserTarget {
   href: string;
   formMethod: string;
   searchForm: boolean;
-  review?: { url: string; label: string; control: string; fields: Array<{ label: string; value: string }>; complete: boolean };
+  /** Host-observed control state. Navigation grants fail closed for controls
+   * that edit or select state even when their page-authored label sounds safe. */
+  stateful?: boolean;
+  review?: {
+    url: string;
+    label: string;
+    control: string;
+    fields: Array<{ label: string; value: string }>;
+    contextScope?: "form" | "dialog" | "navigation" | "page";
+    disclosure?: { expanded: false; controls: string[] } | null;
+    complete: boolean;
+  };
 }
 
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {

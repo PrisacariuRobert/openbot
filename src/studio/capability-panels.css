@@ -1,3 +1,5 @@
+@import "./routines.css";
+@import "./activity.css";
 /* Settings are part of Studio, not a second application or legacy theme. */
 .capabilities {
   --bg: var(--canvas); --paper: var(--surface); --card: var(--surface); --text: var(--ink);

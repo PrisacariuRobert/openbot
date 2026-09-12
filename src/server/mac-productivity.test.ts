@@ -18,6 +18,7 @@ function fixture(options: { connected?: boolean; failCloud?: boolean; failLocal?
   const root = mkdtempSync(path.join(tmpdir(), "openbot-mac-fallback-"));
   const db = new OpenBotDatabase(root);
   db.updateStudioSettings({ macAccessEnabled: true });
+  db.updateBot("nova", { browserEnabled: false }); // Mac-fallback semantics in isolation; browser coverage has its own tests.
   if (options.connected) {
     db.configureGoogleConnector({ clientId: "fixture.apps.googleusercontent.com" });
     db.completeGoogleConnector({ accessToken: "fixture", expiresAt: new Date(AT + 100_000).toISOString(), scopes: GOOGLE_SCOPES, accountEmail: "fixture@example.test" });

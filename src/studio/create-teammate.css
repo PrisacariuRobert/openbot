@@ -2,9 +2,28 @@
   display: grid;
   gap: 19px;
 }
+.sheet-mode button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.teammate-section {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.section-label {
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 550;
+}
+.teammate-appearance { gap: 0; }
+.connection-management { display: grid; gap: 10px; }
+.connection-management > summary { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; color: var(--secondary); font-size: 12px; }
+.connection-management > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .topbar > span { min-width: 0; overflow: hidden; }
 .topbar > div { flex-shrink: 0; }
-.topbar button.conversation-identity { display: flex; width: 100%; gap: 8px; padding-inline: 4px; font-size: 13px; }
+.topbar .topbar-control.conversation-identity { display: flex; width: 100%; gap: 8px; padding-inline: 4px; font-size: 13px; }
 .conversation-identity > .character, .conversation-identity > svg { flex-shrink: 0; }
 .conversation-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .new-character {
@@ -182,8 +201,8 @@
     font-size: 29px;
   }
 }
-.sheet-mode { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-muted, #f4f4f4); }
-.sheet-mode button { flex: 1; min-width: 0; min-height: 34px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--secondary); font: inherit; font-size: 12.5px; font-weight: 550; line-height: 1.3; cursor: pointer; }
+.sheet-mode { display: flex; gap: 8px; justify-content: flex-start; padding: 0; border: 0; background: transparent; }
+.sheet-mode button { flex: 0 1 auto; min-width: 0; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--secondary); font: inherit; font-size: 12.5px; font-weight: 550; line-height: 1.3; cursor: pointer; }
 .sheet-mode button.current { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
 .profile-import-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .profile-import-panel > .panel-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }

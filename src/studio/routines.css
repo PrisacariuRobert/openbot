@@ -1,0 +1,41 @@
+/* Quiet routine list. These scoped rules also cover the shared legacy panel markup. */
+.capabilities .routines-view { display: grid; gap: 24px; }
+.capabilities .routines-view .automation-health { margin: 0; border: 0; padding: 0; }
+.capabilities .routines-view .automation-health > summary { display: flex; width: fit-content; gap: 8px; padding: 8px 12px; min-height: 36px; border: 1px solid var(--line); border-radius: 24px; font-size: 12px; }
+.capabilities .routines-view .automation-health > summary small { display: none; }
+.capabilities .routine-list { display: grid; gap: 0; }
+.capabilities .routine-list .routine-card { padding: 20px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.capabilities .routine-row { display: flex; align-items: flex-start; gap: 12px; }
+.capabilities .routine-row > div:last-child { flex: 1; display: grid; gap: 4px; }
+.capabilities .routine-row strong { font-size: 14px; line-height: 1.4; }
+.capabilities .routine-row > div > span { font-size: 12px; color: var(--secondary); }
+.capabilities .routine-row small { font-size: 12px; }
+.capabilities .routine-row .mascot { flex: none; }
+.capabilities .routine-manage { margin: 10px 0 0 44px; padding: 0; border: 0; }
+.capabilities .routine-manage > summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 36px; padding: 6px 12px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 20px; font-size: 12px; cursor: pointer; list-style: none; }
+.capabilities .routine-manage > summary::-webkit-details-marker, .capabilities .routine-alert-detail > summary::-webkit-details-marker { display: none; }
+.capabilities .routine-manage-body { padding-top: 14px; display: grid; gap: 12px; }
+.capabilities .routines-view .routine-quick-actions, .capabilities .routines-view .routine-actions, .capabilities .routines-view .routine-health { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; }
+.capabilities .routine-health { color: var(--secondary); font-size: 12px; }
+.capabilities .routine-health > span + span::before { content: "·"; margin-right: 8px; }
+.capabilities .routine-manage button, .capabilities .automation-inbox button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; padding: 7px 12px; min-height: 36px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); }
+.capabilities .routine-history { border-top: 1px solid var(--line); }
+.capabilities .routine-history-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.capabilities .routine-history-row > span:nth-child(2) { flex: 1; min-width: 140px; }
+.capabilities .automation-inbox { border: 0; padding: 0; }
+.capabilities .automation-inbox > header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.capabilities .automation-inbox > header strong { font-size: 13px; }
+.capabilities .automation-inbox > header small { display: none; }
+.capabilities .automation-inbox > article { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.capabilities .automation-alert-icon { padding-top: 7px; }
+.capabilities .routine-alert-detail { padding: 0; border: 0; margin: 0; }
+.capabilities .routine-alert-detail > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; list-style: none; }
+.capabilities .routine-alert-detail > summary strong { font-size: 13px; }
+.capabilities .routine-alert-detail > summary > span { font-size: 11px; border: 1px solid var(--line); border-radius: 16px; padding: 2px 8px; color: var(--secondary); }
+.capabilities .routine-alert-detail p { margin: 8px 0; font-size: 13px; }
+.capabilities .automation-inbox > article > div:last-child { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; }
+.capabilities .routines-view summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .capabilities .routine-manage { margin-left: 0; }
+  .capabilities .routine-manage > summary, .capabilities .routine-manage button, .capabilities .automation-inbox button, .capabilities .routine-alert-detail > summary { min-height: 44px; }
+}

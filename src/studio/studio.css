@@ -297,7 +297,8 @@ p {
   display: flex;
   gap: 14px;
 }
-.topbar button {
+.topbar .topbar-control,
+.topbar .conversation-actions > button {
   color: var(--muted);
   display: grid;
   place-items: center;
@@ -305,7 +306,8 @@ p {
   height: 40px;
   border-radius: 7px;
 }
-.topbar button:hover {
+.topbar .topbar-control:hover,
+.topbar .conversation-actions > button:hover {
   background: var(--surface-muted);
 }
 .topbar .mobile-search {
@@ -1480,6 +1482,9 @@ h2 {
 .mobile-nav {
   display: none;
 }
+.mobile-workspace {
+  display: none;
+}
 @media (min-width: 1600px) {
   .page-content {
     padding-top: 72px;
@@ -1539,6 +1544,9 @@ h2 {
     padding: 0 23px;
   }
   .topbar .mobile-search {
+    display: grid;
+  }
+  .topbar .mobile-workspace {
     display: grid;
   }
   .topbar > span {

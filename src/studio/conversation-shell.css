@@ -443,6 +443,16 @@
   display: inline-flex;
   color: var(--muted);
 }
+.action-completed-group { padding: 0; }
+.action-completed-group details { width: 100%; }
+.action-completed-group details summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 11px; cursor: pointer; color: var(--ink); font-size: 12px; list-style: none; }
+.action-completed-group details summary::-webkit-details-marker { display: none; }
+.action-completed-group details summary span { flex: 1; }
+.action-completed-group details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.action-completed-group details[open] summary > svg:last-child { transform: rotate(180deg); }
+.action-completed-group details p { margin: 5px 11px 0; }
+.action-completed-group .action-completed-records { padding-bottom: 9px; }
+.action-completed-group details p small { display: block; }
 .from-team {
   max-width: 88%;
   width: fit-content;
@@ -450,24 +460,24 @@
 .from-team > .prose {
   background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  padding: 14px 18px;
-  border-radius: 18px 18px 18px 6px;
+  box-shadow: none;
+  padding: 12px 16px;
+  border-radius: 14px 14px 14px 6px;
   font-size: 15px;
   line-height: 1.65;
   color: var(--ink);
 }
 .from-team.continues > .prose {
-  border-radius: 6px 18px 18px 6px;
+  border-radius: 6px 14px 14px 6px;
 }
 .from-you {
   background: var(--strong);
-  border-radius: 18px 18px 6px 18px;
-  padding: 12px 17px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 14px 14px 6px 14px;
+  padding: 11px 16px;
+  box-shadow: none;
 }
 .from-you.continues {
-  border-radius: 18px 6px 6px 18px;
+  border-radius: 14px 6px 6px 14px;
 }
 .from-you .prose,
 .from-you .prose strong {
@@ -485,8 +495,8 @@
   letter-spacing: -0.002em;
 }
 .message-author {
-  margin: 0 0 7px 2px;
-  gap: 7px;
+  margin: 0 0 5px 2px;
+  gap: 6px;
 }
 .message-author .character {
   width: 22px;
@@ -501,6 +511,7 @@
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  margin-left: 2px;
 }
 .message-file {
   padding: 12px;
@@ -514,7 +525,11 @@
   flex-shrink: 0;
 }
 .chat-compose {
-  padding: 12px 28px 22px;
+  padding: 10px 30px 18px;
+}
+.chat-compose > form {
+  width: min(720px, 100%);
+  margin-inline: auto;
 }
 .chat-compose > p {
   display: none;
@@ -566,6 +581,25 @@
   overflow-y: auto;
   background: var(--sidebar);
 }
+
+/* Reveal only contextual surfaces; chat history should remain still as it updates. */
+@keyframes conversation-shell-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.conversation-context,
+.detail-drawer[open] {
+  animation: conversation-shell-reveal 180ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-context,
+  .detail-drawer[open] {
+    animation: none;
+  }
+}
+
 .conversation-context > header {
   height: 64px;
   display: flex;
@@ -767,6 +801,168 @@
 .takeover-screen.armed {
   cursor: crosshair;
 }
+.takeover-screen.armed:focus-visible {
+  outline: 2px solid var(--focus, #0a84ff);
+  outline-offset: 2px;
+}
+/* Real-browser chrome for the takeover dialog: tab strip plus navigation
+ * bar with a live address field. One shared browser, owner and agent agree
+ * on the visible active tab. */
+.browser-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 18px 0;
+  overflow-x: auto;
+}
+.browser-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 190px;
+  padding: 5px 4px 5px 10px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+}
+.browser-tab.active {
+  background: var(--surface);
+  color: var(--ink);
+}
+.browser-tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 2px;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.browser-tab-name:disabled {
+  cursor: default;
+}
+.browser-tab-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.browser-tab-close:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.browser-tab-new {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.browser-tab-new:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 18px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.browser-bar > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.browser-bar > button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.browser-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--ink);
+  padding: 6px 4px;
+}
+.browser-bar input:disabled {
+  color: var(--muted);
+}
+.browser-bar input:focus {
+  outline: none;
+}
+/* Shared direct-manipulation browser screen: one interaction in the takeover
+ * dialog, the guiding view, and the in-app browser. Click a field, then type
+ * — keys go straight to the page, like a real browser window. */
+.direct-screen {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: default;
+  background: var(--surface-muted);
+}
+.direct-screen.armed {
+  cursor: crosshair;
+}
+.direct-screen.armed:focus-visible {
+  outline: 2px solid var(--focus, #0a84ff);
+  outline-offset: 2px;
+}
+.direct-screen img {
+  display: block;
+  width: 100%;
+}
+.direct-screen-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--strong);
+  color: var(--on-strong);
+  pointer-events: none;
+}
 .takeover-screen img {
   display: block;
   width: 100%;
@@ -802,6 +998,39 @@
   padding: 9px 18px 0;
   font-size: 11px;
   color: var(--muted);
+}
+.takeover-hint-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--strong);
+  color: var(--on-strong);
+  pointer-events: none;
+}
+.takeover-hint {
+  padding: 9px 18px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* Touch-keyboard summoner: invisible but focusable, so tapping the screen on
+ * a phone opens the OS keyboard and typing still lands straight in the page.
+ * Never display:none — mobile browsers refuse the keyboard for hidden inputs. */
+.takeover-hidden-keys {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  opacity: 0.01;
+  border: 0;
+  padding: 0;
+  pointer-events: none;
 }
 .computer-takeover .takeover-controls {
   margin: 12px 18px 0;
@@ -1054,13 +1283,25 @@
 }
 .context-group {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 11px 12px;
+  padding: 9px 12px;
+  margin-bottom: 24px;
   font-size: 12px;
   color: var(--secondary);
+}
+.context-group > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.context-group .text-action {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 6px 0 6px 8px;
+  white-space: nowrap;
 }
 .context-computer > p,
 .context-computer small {
@@ -1097,6 +1338,14 @@
   font-size: 12px;
   font-weight: 500;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.context-work:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
 }
 .context-work small {
   grid-column: 1;
@@ -1107,6 +1356,21 @@
   grid-column: 2;
   grid-row: 1 / 3;
   align-self: center;
+}
+.context-work-history {
+  margin-top: 10px;
+}
+.context-work-history > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.context-work-history > .context-work {
+  margin-left: 8px;
+  width: calc(100% - 8px);
 }
 .draft-conflict {
   font-size: 12px;
@@ -1146,7 +1410,8 @@
   .topbar > div {
     gap: 0;
   }
-  .topbar > div button {
+  .topbar > div > .topbar-control,
+  .topbar > div > .conversation-actions > button {
     width: 34px;
   }
   .topbar .conversation-identity > .character {

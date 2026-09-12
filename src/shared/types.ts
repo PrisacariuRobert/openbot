@@ -307,6 +307,10 @@ export interface RunReceipt {
 }
 
 export interface Run {
+  /** Host-bound owner-requested review. Identity is a delivered revision, not a filename. */
+  review?: {
+    artifacts: Array<{ id: string; name: string; revision: number; sha256: string }>;
+  } | null;
   expectedWorkKind?: "morning" | "inbox" | "meeting" | "weekly" | null;
   completionRepairCount?: number;
   id: string;

@@ -13,6 +13,13 @@ export function toolAvailability(
   reportOnly = false,
 ): Record<string, boolean> {
   const flags: Record<string, boolean> = {
+    task_plan: true,
+    task_progress: true,
+    task_verify: true,
+    routine_create: true,
+    remember: true,
+    handoff: true,
+    message_teammate: true,
     spreadsheet_export: true,
     spreadsheet_inspect: true,
     table_summary: true,

@@ -52,6 +52,7 @@ function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expected
   const start = async (runId = run.id) => {
     runner["executeRun"](db.getRun(runId)!);
     await once(child!, "close");
+    await runner["finalizing"].get(runId);
     return db.getRun(runId)!;
   };
   const close = async () => {
@@ -93,6 +94,43 @@ test("publishes the final turn only and persists earlier updates behind that res
     assert.equal(f.db.listThreads().find(thread => thread.id === run.threadId)?.lastMessage, run.summary);
     const other = f.db.addMessage({ threadId: "bot-pixel", senderId: "pixel", senderType: "bot", runId: run.id, body: "Unrelated thread" });
     assert.deepEqual(other.progressUpdates, [], "Never expose another thread's progress through a mismatched run ID");
+  } finally { await f.close(); }
+});
+
+test("a closed process remains owned until asynchronous answer finalization completes", async () => {
+  const f = fixture('console.log(JSON.stringify({type:"text",text:"Final answer"}))');
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  f.runner["options"].attachments.resolveExistingArtifactLinks = async (_bot, _threadId, summary) => {
+    await blocked;
+    return summary;
+  };
+  try {
+    f.runner["executeRun"](f.db.getRun(f.run.id)!);
+    await once(f.child(), "close");
+    assert.equal(f.db.getRun(f.run.id)?.status, "running");
+    assert.equal(f.runner["running"].has(f.run.id), true, "the runner must retain ownership during finalization");
+    release();
+    await f.runner["finalizing"].get(f.run.id);
+    assert.equal(f.db.getRun(f.run.id)?.status, "completed");
+    assert.equal(f.runner["running"].has(f.run.id), false);
+  } finally { release(); await f.close(); }
+});
+
+test("a rejected answer resolver fails recoverably, releases ownership, and does not block shutdown", async () => {
+  const f = fixture('console.log(JSON.stringify({type:"text",text:"Recoverable final text"}))');
+  f.runner["options"].attachments.resolveExistingArtifactLinks = async () => {
+    throw new Error("fixture resolver failed");
+  };
+  try {
+    const result = await f.start();
+    assert.equal(result.status, "failed");
+    assert.match(result.error || "", /Could not finalize.*fixture resolver failed/);
+    assert.equal(result.partialText, "Recoverable final text");
+    assert.equal(f.runner["running"].has(result.id), false);
+    assert.equal(f.runner["processControls"].has(result.id), false);
+    assert.equal(f.runner["finalizing"].has(result.id), false);
+    await f.runner.stop();
   } finally { await f.close(); }
 });
 

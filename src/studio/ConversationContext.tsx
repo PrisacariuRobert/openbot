@@ -5,6 +5,7 @@ import { Character } from "./Character";
 import { BrowserAccessCard } from "./BrowserAccessCard";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { LiveComputer } from "./LiveComputer";
+import { orderContextRuns } from "./context-runs";
 
 export function ConversationContext({
   state,
@@ -26,11 +27,14 @@ export function ConversationContext({
   const [chosen, setChosen] = useState(bot?.id || "");
   const selected = bot || state.bots.find((item) => item.id === chosen);
   const group = !selected ? state.threads.find((thread) => thread.id === threadId && thread.botIds?.length) : undefined;
-  const runs = state.studioRuns.filter(
-    (run) =>
-      !run.parentRunId &&
-      (selected ? run.botId === selected.id : run.threadId === threadId),
-  );
+  const runs = orderContextRuns(Array.from(new Map(
+    [...state.studioRuns, ...state.runs]
+      .filter((run) => !run.parentRunId && (selected ? run.botId === selected.id : run.threadId === threadId))
+      .map((run) => [run.id, run] as const),
+  ).values()));
+  const activeRuns = runs.filter((run) => ["queued", "running", "awaiting_approval", "waiting_for_teammate"].includes(run.status));
+  const currentRuns = activeRuns.length ? activeRuns : runs.slice(0, 1);
+  const olderRuns = runs.filter((run) => !currentRuns.some((current) => current.id === run.id));
   const routines = state.routines.filter((routine) =>
     selected ? routine.botId === selected.id : routine.threadId === threadId,
   );
@@ -71,11 +75,14 @@ export function ConversationContext({
         <div className="section-heading">
           <h3>Work</h3>
         </div>
-        {runs.length ? (
-          runs.slice(0, 8).map((run) => (
+        {currentRuns.length ? (
+          <>
+          {currentRuns.map((run) => (
             <button
               className="context-work"
               key={run.id}
+              title={run.task?.goal || run.prompt}
+              aria-label={`Work: ${run.task?.goal || run.prompt}`}
               onClick={() => onRun(run)}
             >
               <strong>{run.task?.goal || run.prompt}</strong>
@@ -90,7 +97,20 @@ export function ConversationContext({
               </small>
               <ArrowRight size={13} />
             </button>
-          ))
+          ))}
+          {olderRuns.length > 0 && (
+            <details className="context-work-history">
+              <summary>Earlier work ({olderRuns.length})</summary>
+              {olderRuns.map((run) => (
+                <button className="context-work" key={run.id} title={run.task?.goal || run.prompt} aria-label={`Work: ${run.task?.goal || run.prompt}`} onClick={() => onRun(run)}>
+                  <strong>{run.task?.goal || run.prompt}</strong>
+                  <small>{run.status === "failed" ? "Failed" : run.status === "completed" ? "Finished" : run.status}</small>
+                  <ArrowRight size={13} />
+                </button>
+              ))}
+            </details>
+          )}
+          </>
         ) : (
           <p className="quiet-copy">Tasks and results will collect here.</p>
         )}
