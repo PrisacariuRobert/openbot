@@ -691,10 +691,23 @@ export class BrowserManager {
 
   /** Detect obvious gates without returning field values or the login URL. The
    * model can explicitly request a handoff for gates this conservative check misses.
-   * Returns a short evidence string (never credentials) or null. A loading page
-   * is not a signed-out page: callers re-check a positive once after settling. */
+   * Returns a short evidence string (never credentials) or null. Redirect hops
+   * and loading screens are not verdicts: the URL must settle before anything
+   * is judged, and a positive is re-checked after settling. */
   async signInState(botId: string): Promise<{ siteOrigin: string; needsSignIn: boolean; evidence: string | null }> {
     const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    // Wait for the address to stop hopping (login redirects, session-check
+    // bounces, client-side forwards). Judging mid-redirect cried wolf on
+    // valid sessions more than once.
+    let lastUrl = "";
+    for (let n = 0; n < 10; n++) {
+      let current = "";
+      try { current = page.url(); } catch { break; }
+      if (current && current === lastUrl) break;
+      lastUrl = current;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
     this.assertPageAccess(botId, page);
     const settled = async (): Promise<{ siteOrigin: string; needsSignIn: boolean; evidence: string | null }> => {
       const address = new URL(page.url());
@@ -708,9 +721,16 @@ export class BrowserManager {
     const first = await settled();
     if (!first.needsSignIn) return first;
     // A positive during navigation is usually a loading interstitial, not a
-    // signed-out session. Re-check once after settling; only a persistent
+    // signed-out session. Settle again and re-check once; only a persistent
     // login wall counts. This is the false-alarm fix: never cry wolf on load.
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    lastUrl = "";
+    for (let n = 0; n < 6; n++) {
+      let current = "";
+      try { current = page.url(); } catch { break; }
+      if (current && current === lastUrl) break;
+      lastUrl = current;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
     this.assertPageAccess(botId, page);
     return settled();
   }
