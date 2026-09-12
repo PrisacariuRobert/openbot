@@ -353,7 +353,9 @@ try {
     ["small-phone", 320, 740],
   ] as const) {
     await page.setViewportSize({ width, height });
-    await page.goto(base + "/studio.html");
+    // This progress fixture belongs to the shared room; the app now defaults
+    // to a direct conversation when no explicit thread is requested.
+    await page.goto(base + "/studio.html?thread=team-room");
     await page
       .getByRole("textbox", { name: "Message your team", exact: true })
       .waitFor();
