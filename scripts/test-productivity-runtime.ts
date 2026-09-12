@@ -20,8 +20,11 @@ import { z } from "zod";
 import { DEFAULT_EXECUTION_LIMITS } from "../src/server/execution-policy.js";
 
 // Opt-in only. Never silently substitute a paid model.
+// Owner-authorized live paths (2026-09-12): OpenCode provider with
+// DeepSeek 4.1 Flash or Muse Spark 1.3 Contributor (paid), plus the
+// existing free fixtures for CI. Browser-first for accounts; owner signs in on demand.
 const liveModel = process.env.OPENBOT_PRODUCTIVITY_LIVE_MODEL;
-assert.ok(!liveModel || ["opencode/muse-spark-1.2-contributor-free", "opencode/muse-spark-1.3-contributor-free"].includes(liveModel), "Only an explicitly selected Muse Spark free model is accepted by this small live check; no fallback is selected.");
+assert.ok(!liveModel || ["opencode/muse-spark-1.2-contributor-free", "opencode/muse-spark-1.3-contributor-free", "opencode-go/deepseek-v4.1-flash", "opencode-go/muse-spark-1.3-contributor"].includes(liveModel), "Only an explicitly selected owner-authorized model is accepted by this small live check; no fallback is selected.");
 
 const root = mkdtempSync(path.join(tmpdir(), "openbot-productivity-runtime-"));
 const db = new OpenBotDatabase(root);
@@ -132,7 +135,7 @@ try {
     spawnProcess: (command, args, options) => {
       const env = { ...options.env };
       const config = JSON.parse(String(env.OPENCODE_CONFIG_CONTENT || "{}"));
-      if (liveModel) config.enabled_providers = ["opencode"];
+      if (liveModel) config.enabled_providers = liveModel.startsWith("opencode-go/") ? ["opencode", "opencode-go"] : ["opencode"];
       config.model = db.getBot("nova")!.model;
       config.small_model = config.model;
       config.share = "disabled"; config.autoupdate = false;
@@ -239,7 +242,7 @@ try {
       console.log(JSON.stringify({ result: "PASS", workflow: "cross-app-source-digest", realMacAppRead: false, savedSources: 2, allCited: true }));
     }
   }
-  console.log(liveModel ? "Used only the explicitly selected free model and synthetic app data. Four small successes do not establish model-class or competitor parity." : "No model subscription, real inbox, or external write was used. These scripted model replies verify integration, not reasoning quality.");
+  console.log(liveModel ? "Used only the explicitly selected owner-authorized model and synthetic app data. Four small successes do not establish model-class or competitor parity." : "No model subscription, real inbox, or external write was used. These scripted model replies verify integration, not reasoning quality.");
 } finally {
   await runner?.stop();
   server.closeAllConnections();
