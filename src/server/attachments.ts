@@ -10,7 +10,6 @@ import sharp from "sharp";
 import type { Attachment, Bot, Message } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { renderCodeBenchmark, type CodeBenchmark } from "../shared/code-benchmark.js";
-import { usageLedger, usageLedgerMarkdown } from "./usage-ledger.js";
 import type { CodeDeliveryReceipt } from "./code-delivery.js";
 
 /** Content identity for revision semantics: identical bytes must not create a
@@ -474,15 +473,8 @@ export class AttachmentService {
   async captureWorkReports(message: Message): Promise<Attachment[]> {
     if (!message.runId) return [];
     const captured: Attachment[] = [];
-    if (usageLedger(this.db, message.runId).attempts.length) {
-      const name = "provider-usage.md", directory = path.join(this.db.attachmentsDir, randomBytes(16).toString("hex"));
-      const content = usageLedgerMarkdown(this.db, message.runId);
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      const destination = path.join(directory, name);
-      await writeFile(destination, content, { flag: "wx", mode: 0o600 });
-      const analysis = await inspectAttachment(destination, name, "text/markdown");
-      captured.push(this.db.createAttachment({ threadId: message.threadId, messageId: message.id, name, mime: "text/markdown", size: Buffer.byteLength(content), storagePath: destination, analysis: withClassification(analysis, "evidence"), source: "artifact", artifactKey: `usage:${message.runId}`, revision: 1 }));
-    }
+    // Usage stays queryable on the run receipt (per-job ledger); it is not
+    // attached to every answer — chat keeps deliverables, not metadata.
     for (const snapshot of this.db.listWorkSnapshots(message.runId)) {
       const report = this.db.getWorkReport(snapshot.id);
       if (!report) continue;

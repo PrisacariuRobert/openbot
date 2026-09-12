@@ -163,11 +163,12 @@ try {
     }
     if (!liveModel) assert.deepEqual(observedTools.sort(), ["work_collect", "work_report"], "Report starters must expose only their two tools to the real runtime.");
     assert.equal(db.getRun(run.id)!.status, "completed", JSON.stringify(db.getRun(run.id)));
-    // Completion is persisted just before async attachment preparation.
-    for (let attempt = 0; attempt < 30 && (db.listMessages(threadId).find((message) => message.runId === run.id)?.attachments.length || 0) < 2; attempt++) await delay(100);
+    // Completion is persisted just before async attachment preparation. Chat
+    // keeps the deliverable; usage stays queryable on the run receipt.
+    for (let attempt = 0; attempt < 30 && (db.listMessages(threadId).find((message) => message.runId === run.id)?.attachments.length || 0) < 1; attempt++) await delay(100);
     const message = db.listMessages(threadId).find((message) => message.runId === run.id)!;
-    assert.equal(message.attachments.length, 2, `The server must attach the work report and usage receipt. Tools: ${observedTools.join(", ")}; snapshot: ${Boolean(snapshots.get(run.id))}; answer: ${message.body}`);
-    assert.equal(message.attachments.filter((attachment) => attachment.name === "provider-usage.md").length, 1);
+    assert.equal(message.attachments.length, 1, `The server must attach the work report file. Tools: ${observedTools.join(", ")}; snapshot: ${Boolean(snapshots.get(run.id))}; answer: ${message.body}`);
+    assert.equal(message.attachments.filter((attachment) => attachment.name === "provider-usage.md").length, 0, "Usage lives on the run receipt, not in chat.");
     assert.match(message.body, /Sources:/);
     const snapshot = snapshots.get(run.id)!;
     const report = db.getWorkReport(snapshot.id)!;

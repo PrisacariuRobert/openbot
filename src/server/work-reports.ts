@@ -17,8 +17,12 @@ export const workReportInput = z.object({
   snapshotId: z.string().uuid(),
   items: z.array(z.object({
     priority: z.enum(["now", "soon", "fyi"]), text: z.string().trim().min(1).max(600),
-    sourceRefs: z.array(z.string().max(20)).min(1).max(5),
-  }).strict()).max(8),
+    sourceRefs: z.array(z.string().max(20)).max(5),
+    browserPages: z.array(z.object({
+      url: z.string().trim().max(2_048).refine((value) => { try { return new URL(value).protocol === "https:"; } catch { return false; } }, "Cite the https page actually opened in the teammate browser."),
+      note: z.string().trim().min(1).max(200),
+    })).max(3).optional(),
+  })).max(8),
   drafts: z.array(z.object({ sourceRef: z.string().max(20), body: z.string().trim().min(1).max(2000) }).strict()).max(5).default([]),
 }).strict();
 
@@ -45,7 +49,7 @@ export function renderWorkReport(snapshot: WorkSnapshot, report: Pick<WorkReport
     `# ${snapshot.kind === "morning" ? "Your next 24 hours" : snapshot.kind === "meeting" ? "Your next meeting" : snapshot.kind === "weekly" ? "Your weekly review" : "Inbox follow-ups"}`,
     `Prepared from a snapshot taken ${dateLabel(snapshot.fetchedAt, snapshot.timeZone)} (${md(snapshot.timeZone)}). Nothing was sent or changed in your connected apps.`,
     "## What was checked",
-    ...snapshot.coverage.map((item) => `- **${SERVICE_NAMES[item.service]} — ${item.state === "complete" ? "checked within this scope" : item.state === "limited" ? "partial coverage" : "not checked"}:** ${md(item.detail)}${item.account ? ` Account: ${md(item.account)}.` : ""}`),
+    ...snapshot.coverage.map((item) => `- **${SERVICE_NAMES[item.service]} — ${item.state === "complete" ? "checked within this scope" : item.state === "limited" ? "partial coverage" : item.state === "browser" ? "read in the teammate browser, not host-checked" : "not checked"}:** ${md(item.detail)}${item.account ? ` Account: ${md(item.account)}.` : ""}`),
     `Mail scope: ${md(snapshot.window.mailQuery)}. Calendar window: ${dateLabel(snapshot.window.from, snapshot.timeZone)} to ${dateLabel(snapshot.window.until, snapshot.timeZone)}.`,
   ];
   const events = snapshot.sources.filter((source) => source.service === "google-calendar" || source.service === "apple-calendar");
@@ -54,10 +58,12 @@ export function renderWorkReport(snapshot: WorkSnapshot, report: Pick<WorkReport
     if (!events.length) lines.push(snapshot.coverage.some((entry) => entry.service === "google-calendar" && entry.state === "complete") ? "No events returned in this window on your primary calendar." : "There is no complete calendar check to report.");
     for (const event of events) lines.push(`- **${event.allDay ? `All day · ${md(event.start || "date unavailable")} (ends ${md(event.end || "date unavailable")}, exclusive)` : `${dateLabel(event.start || "", snapshot.timeZone)} – ${dateLabel(event.end || "", snapshot.timeZone)}`}** · ${sourceLink(event)}`);
   }
-  lines.push("## Suggested priorities", "These are your teammate’s interpretations. Open the sources before acting; source matching does not independently verify the advice.");
+  lines.push("## Suggested priorities", "These are your teammate’s interpretations. Open the sources before acting; source matching does not independently verify the advice. Pages under “seen in the browser” were reported by the teammate from its own browser and were not fetched or checked by the host.");
   for (const priority of ["now", "soon", "fyi"] as const) {
     for (const item of report.items.filter((entry) => entry.priority === priority)) {
-      lines.push(`- **${priority === "now" ? "First" : priority === "soon" ? "Next" : "For context"}:** ${md(item.text)}\n  ${item.sourceRefs.map((ref) => sourceLink(sources.get(ref)!)).join(" · ")}`);
+      const refs = item.sourceRefs.map((ref) => sourceLink(sources.get(ref)!));
+      for (const page of item.browserPages || []) refs.push(`[seen in the browser: ${md(page.note)}](<${page.url}>) (not host-verified)`);
+      lines.push(`- **${priority === "now" ? "First" : priority === "soon" ? "Next" : "For context"}:** ${md(item.text)}\n  ${refs.join(" · ") || "No source cited."}`);
     }
   }
   if (!report.items.length) lines.push("No priorities were proposed. This is not a claim that your entire inbox needs no attention.");
@@ -65,7 +71,7 @@ export function renderWorkReport(snapshot: WorkSnapshot, report: Pick<WorkReport
     lines.push("## Reply drafts — not sent", "Review names, dates and promises before sending. These are saved only in OpenBot, not in Gmail Drafts.");
     for (const draft of report.drafts) lines.push(`### ${md(draft.subject)}\nTo: ${md(draft.to)}\n\n${md(draft.body)}\n\nSource: ${sourceLink(sources.get(draft.sourceRef)!)}`);
   }
-  lines.push("## Source receipt", "The app matched every reference and draft recipient to this saved snapshot. It did not independently fact-check the model’s interpretation.");
+  lines.push("## Source receipt", "The app matched every reference and draft recipient to this saved snapshot. Browser pages were cited by the teammate, not fetched by the host. It did not independently fact-check the model’s interpretation.");
   for (const source of snapshot.sources) lines.push(`- ${sourceLink(source)}${source.sourceId ? ` · Source ID: ${md(source.sourceId)}` : ""}${source.scope ? ` · ${md(source.scope)}` : ""}${source.from ? ` · ${md(source.from)}` : ""}${source.date ? ` · ${md(source.date)}` : ""}${source.replyState === "sent_last" ? " · Latest message is already sent by you; no reply draft was prepared" : source.replyState === "unknown" ? " · Reply status could not be established" : ""}${source.truncated ? " · Shortened context" : ""}`);
   return lines.join("\n\n") + "\n";
 }
@@ -80,6 +86,13 @@ export class WorkReportService {
 
   private canFallback(botId: string, service: WorkService) {
     return macFallbackAllowed(this.db, botId, service, this.local.available);
+  }
+
+  /** Browser readability: no app connection, but the teammate's own browser
+   * can still read these services. Anything cited that way stays
+   * teammate-reported, never host-verified. */
+  private canBrowse(botId: string, service: WorkService) {
+    return (service === "gmail" || service === "google-calendar") && Boolean(this.db.getBot(botId)?.browserEnabled);
   }
 
   private assertRun(botId: string, runId: string) {
@@ -99,8 +112,8 @@ export class WorkReportService {
   }
 
   canStart(botId: string, kind: WorkSnapshot["kind"]) {
-    const mail = this.canRead(botId, "gmail") || this.canFallback(botId, "gmail");
-    const calendar = this.canRead(botId, "google-calendar") || this.canFallback(botId, "google-calendar");
+    const mail = this.canRead(botId, "gmail") || this.canFallback(botId, "gmail") || this.canBrowse(botId, "gmail");
+    const calendar = this.canRead(botId, "google-calendar") || this.canFallback(botId, "google-calendar") || this.canBrowse(botId, "google-calendar");
     return kind === "inbox" ? mail : kind === "meeting" ? calendar : mail || calendar || this.db.getWorkSources(botId).selections.some((selection) => this.canRead(botId, selection.service));
   }
 
@@ -129,7 +142,7 @@ export class WorkReportService {
     const allowed = new Map(services.map((service) => [service, this.canRead(botId, service)]));
     const usable = new Map(services.map((service) => [service, allowed.get(service) || this.canFallback(botId, service)]));
     const accountEmail = this.db.getConnector("google-workspace")?.accountEmail || "";
-    if (![...usable.values()].some(Boolean) && !selections.some((selection) => this.canRead(botId, selection.service))) throw new Error("Choose sources for this teammate in Apps & Tools and give them read access, or connect Gmail/Calendar or enable Mac access. macOS Automation permission is also required for local apps.");
+    if (![...usable.values()].some(Boolean) && !selections.some((selection) => this.canRead(botId, selection.service)) && !services.some((service) => this.canBrowse(botId, service))) throw new Error("Choose sources for this teammate in Apps & Tools and give them read access, connect Gmail/Calendar, enable Mac access, or use this teammate’s own browser. macOS Automation permission is also required for local apps.");
     const cached = prior.find((snapshot) => snapshot.contextRevision === contextRevision && snapshot.accountEmail === accountEmail && snapshot.kind === input.kind && snapshot.timeZone === input.timeZone && this.now() - Date.parse(snapshot.fetchedAt) <= MAX_AGE && snapshot.coverage.every((entry) => entry.state !== "unavailable" && this.canRead(botId, entry.service)));
     if (cached && !input.refresh) return cached;
     if (prior.length >= 3) throw new Error("This task has already gathered three source snapshots. Start a new request for another refresh.");
@@ -196,6 +209,9 @@ export class WorkReportService {
         batch.sources = batch.sources.map((source) => ({ ...source, service: actual, url: null }));
       }
       if ((actual || allowed.get(original)) && !this.canRead(botId, actual || original)) throw new Error("App access changed while gathering sources. No result was saved; check this teammate’s permissions.");
+      if (batch.coverage.state === "unavailable" && this.canBrowse(botId, batch.coverage.service)) {
+        batch.coverage = { ...batch.coverage, state: "browser", detail: `${SERVICE_NAMES[batch.coverage.service]} is not connected as an app. Read it in this teammate’s own browser and cite the pages below; the host did not fetch them, so they stay teammate-reported, never host-verified. Nothing was read.` };
+      }
       snapshot.coverage.push(batch.coverage);
       snapshot.sources.push(...batch.sources);
     }
@@ -209,7 +225,10 @@ export class WorkReportService {
     const snapshot = this.db.listWorkSnapshots(runId).find((entry) => entry.id === input.snapshotId);
     if (!snapshot || snapshot.botId !== botId) throw new Error("Use a source snapshot gathered by this teammate in this task.");
     if ((this.db.getConnector("google-workspace")?.accountEmail || "") !== snapshot.accountEmail) throw new Error("The connected Google account changed. Gather fresh sources from the new account.");
-    for (const entry of snapshot.coverage) if (entry.state !== "unavailable" && !this.canRead(botId, entry.service)) throw new Error("Source access was removed. Check app permissions before preparing this result.");
+    for (const entry of snapshot.coverage) {
+      if (entry.state === "browser" && !this.canBrowse(botId, entry.service)) throw new Error("Browser access was turned off. Check this teammate’s permissions before preparing this result.");
+      if (entry.state !== "unavailable" && entry.state !== "browser" && !this.canRead(botId, entry.service)) throw new Error("Source access was removed. Check app permissions before preparing this result.");
+    }
     if (snapshot.contextRevision && snapshot.contextRevision !== this.contextRevision(botId)) throw new Error("Source selection or connected account changed. Gather a fresh snapshot before preparing this result.");
     const existing = this.db.getWorkReport(snapshot.id);
     if (existing) {
@@ -219,7 +238,13 @@ export class WorkReportService {
     if (this.now() - Date.parse(snapshot.fetchedAt) > MAX_AGE) throw new Error("These sources are over 15 minutes old. Gather a fresh snapshot before preparing the result.");
     if (snapshot.coverage.every((entry) => entry.state === "unavailable")) throw new Error("No connected app could be checked. Fix the connection and try again; there is no verified empty inbox to report.");
     const sources = new Map(snapshot.sources.map((source) => [source.ref, source]));
-    for (const item of input.items) if (new Set(item.sourceRefs).size !== item.sourceRefs.length || item.sourceRefs.some((ref) => !sources.has(ref))) throw new Error("Every priority must reference sources actually read in this snapshot, without duplicate references.");
+    const browsable = new Set(snapshot.coverage.filter((entry) => entry.state === "browser").map((entry) => entry.service));
+    for (const item of input.items) {
+      if (new Set(item.sourceRefs).size !== item.sourceRefs.length || item.sourceRefs.some((ref) => !sources.has(ref))) throw new Error("Every priority must reference sources actually read in this snapshot, without duplicate references.");
+      const pages = item.browserPages || [];
+      if (!item.sourceRefs.length && !pages.length) throw new Error("Every priority needs snapshot references or cited browser pages.");
+      if (pages.length && ![...browsable].length) throw new Error("Browser pages need browser-readable coverage in this snapshot.");
+    }
     if (new Set(input.drafts.map((draft) => draft.sourceRef)).size !== input.drafts.length) throw new Error("Prepare at most one reply per conversation.");
     const drafts = input.drafts.map((draft) => {
       const source = sources.get(draft.sourceRef);

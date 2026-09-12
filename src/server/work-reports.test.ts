@@ -82,6 +82,7 @@ test("meeting preparation selects a timed event and saves bounded, clearly label
 
 test("a calendar failure cannot produce a meeting report or trigger unrelated mailbox searches", async () => {
   const f = fixture({ calendarFails: true });
+  f.db.updateBot("nova", { browserEnabled: false }); // Connector-only semantics; browser coverage has its own tests.
   try {
     const snapshot = await f.collect("meeting");
     assert.equal(snapshot.sources.length, 0);
@@ -172,6 +173,7 @@ test("rejects forged sources, duplicate drafts and already answered conversation
 
 test("failed app reads are unavailable, not an empty or successful inbox", async () => {
   const f = fixture({ calendarFails: true, mailFails: true });
+  f.db.updateBot("nova", { browserEnabled: false }); // Connector-only semantics; browser coverage has its own tests.
   try {
     const snapshot = await f.collect();
     assert.ok(snapshot.coverage.every((entry) => entry.state === "unavailable"));
@@ -182,6 +184,7 @@ test("failed app reads are unavailable, not an empty or successful inbox", async
 
 test("partial reads and pagination remain visible in the saved report", async () => {
   const f = fixture({ calendarFails: true, unreadable: true, more: true });
+  f.db.updateBot("nova", { browserEnabled: false }); // Connector-only semantics; browser coverage has its own tests.
   try {
     const snapshot = await f.collect();
     assert.deepEqual(snapshot.coverage.map((entry) => entry.state), ["limited", "unavailable"]);
@@ -212,6 +215,7 @@ test("snapshot reuse and concurrent calls avoid repeated connector reads; refres
 
 test("revoking permissions prevents cached source reuse and report creation", async () => {
   const f = fixture();
+  f.db.updateBot("nova", { browserEnabled: false }); // Connector-only semantics; browser coverage has its own tests.
   try {
     const snapshot = await f.collect("inbox");
     f.db.setBotConnectorAccess("nova", { canRead: false, canSend: false });
@@ -274,5 +278,49 @@ test("OpenCode receives the new tools only with app access and the same source c
     const bridge = readFileSync(new URL("./claude-mcp.mjs", import.meta.url), "utf8");
     assert.match(bridge, /name: "work_collect"/);
     assert.match(bridge, /name: "work_report"/);
+    assert.match(bridge, /browserPages/);
+  } finally { f.close(); }
+});
+
+function browserOnlyFixture() {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-work-report-browser-"));
+  const db = new OpenBotDatabase(root);
+  db.updateBot("nova", { browserEnabled: true });
+  const run = db.createRun({ botId: "nova", threadId: "bot-nova", status: "running", prompt: "Prepare my inbox follow-ups" });
+  const google = { workInbox: async () => { throw new Error("no connector"); }, workThread: async () => { throw new Error("no connector"); }, workCalendar: async () => { throw new Error("no connector"); } };
+  const service = new WorkReportService(db, google as never);
+  return { root, db, run, service, collect: (kind = "inbox") => service.collect("nova", run.id, { kind, timeZone: "Europe/Brussels" }), close: () => { db.close(); rmSync(root, { recursive: true, force: true }); } };
+}
+
+test("without an app connection, Gmail coverage is browser-readable instead of a dead end", async () => {
+  const f = browserOnlyFixture();
+  try {
+    const snapshot = await f.collect("inbox");
+    assert.deepEqual(snapshot.coverage.map((entry) => [entry.service, entry.state]), [["gmail", "browser"]]);
+    assert.equal(snapshot.sources.length, 0);
+    assert.match(snapshot.coverage[0]!.detail, /own browser/);
+  } finally { f.close(); }
+});
+
+test("a browser-sourced priority saves with separated, never-verified citations", async () => {
+  const f = browserOnlyFixture();
+  try {
+    const snapshot = await f.collect("inbox");
+    const report = f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [{ priority: "now", text: "Reply to Mira about Tuesday.", sourceRefs: [], browserPages: [{ url: "https://mail.google.com/mail/u/0/#inbox", note: "Mira thread asking for Tuesday" }] }] });
+    assert.match(report.markdown, /seen in the browser/);
+    assert.match(report.markdown, /not host-verified/);
+    assert.match(report.markdown, /read in the teammate browser, not host-checked/);
+    assert.doesNotMatch(report.markdown, /checked within this scope/);
+  } finally { f.close(); }
+});
+
+test("browser citations are bounded and cannot stand in for an empty claim", async () => {
+  const f = browserOnlyFixture();
+  try {
+    const snapshot = await f.collect("inbox");
+    assert.throws(() => f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [{ priority: "now", text: "Nothing.", sourceRefs: [], browserPages: [] }] }), /snapshot references or cited browser pages/);
+    assert.throws(() => f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [{ priority: "now", text: "X.", sourceRefs: [], browserPages: [{ url: "http://insecure.test/", note: "nope" }] }] }), /https/);
+    f.db.updateBot("nova", { browserEnabled: false });
+    assert.throws(() => f.service.save("nova", f.run.id, { snapshotId: snapshot.id, items: [{ priority: "now", text: "X.", sourceRefs: [], browserPages: [{ url: "https://mail.google.com/mail/u/0/#inbox", note: "Y" }] }] }), /Browser access was turned off/);
   } finally { f.close(); }
 });
