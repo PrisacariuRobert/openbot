@@ -767,6 +767,50 @@
 .takeover-screen.armed {
   cursor: crosshair;
 }
+.takeover-screen.armed:focus-visible {
+  outline: 2px solid var(--focus, #0a84ff);
+  outline-offset: 2px;
+}
+/* Shared direct-manipulation browser screen: one interaction in the takeover
+ * dialog, the guiding view, and the in-app browser. Click a field, then type
+ * — keys go straight to the page, like a real browser window. */
+.direct-screen {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: default;
+  background: var(--surface-muted);
+}
+.direct-screen.armed {
+  cursor: crosshair;
+}
+.direct-screen.armed:focus-visible {
+  outline: 2px solid var(--focus, #0a84ff);
+  outline-offset: 2px;
+}
+.direct-screen img {
+  display: block;
+  width: 100%;
+}
+.direct-screen-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--strong);
+  color: var(--on-strong);
+  pointer-events: none;
+}
 .takeover-screen img {
   display: block;
   width: 100%;
@@ -802,6 +846,39 @@
   padding: 9px 18px 0;
   font-size: 11px;
   color: var(--muted);
+}
+.takeover-hint-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--strong);
+  color: var(--on-strong);
+  pointer-events: none;
+}
+.takeover-hint {
+  padding: 9px 18px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* Touch-keyboard summoner: invisible but focusable, so tapping the screen on
+ * a phone opens the OS keyboard and typing still lands straight in the page.
+ * Never display:none — mobile browsers refuse the keyboard for hidden inputs. */
+.takeover-hidden-keys {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  opacity: 0.01;
+  border: 0;
+  padding: 0;
+  pointer-events: none;
 }
 .computer-takeover .takeover-controls {
   margin: 12px 18px 0;

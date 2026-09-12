@@ -5,6 +5,7 @@ import { WorkFollowupsPanel } from "./components/WorkFollowupsPanel";
 import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
+import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
 import {
   lazy,
   Suspense,
@@ -1039,8 +1040,8 @@ function LiveBrowser({
   const [address, setAddress] = useState(
       status?.currentUrl || "https://www.google.com/",
     ),
-    [entry, setEntry] = useState(""),
     [busy, setBusy] = useState(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
   const merge = (result: TakeoverResult) =>
     onStatus({
       botId: bot.id,
@@ -1051,24 +1052,26 @@ function LiveBrowser({
       screenshot: result.screenshot,
       updatedAt: new Date().toISOString(),
     });
-  const perform = async (path: string, body: Record<string, unknown>) => {
-    setBusy(true);
-    try {
-      merge(
-        await api<TakeoverResult>(`/api/bots/${bot.id}/browser/${path}`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        }),
-      );
-    } catch (error) {
-      onNotice(
-        error instanceof Error
-          ? error.message
-          : "The browser needs another try.",
-      );
-    } finally {
-      setBusy(false);
-    }
+  // Keystrokes queue in order and never block the screen; clicks and typing
+  // go straight to the page like a real browser. Nothing typed is stored,
+  // logged, or sent to the model.
+  const send = (op: DirectOp) => {
+    const path =
+      op.kind === "click" ? "takeover/click" : op.kind === "press" ? "takeover/press" : op.kind === "text" ? "takeover/type" : "takeover/scroll";
+    const body =
+      op.kind === "click"
+        ? { x: op.x, y: op.y }
+        : op.kind === "press"
+          ? { key: op.key }
+          : op.kind === "text"
+            ? { value: op.value, replace: false }
+            : { x: op.x, y: op.y, deltaY: op.deltaY };
+    queue.current = queue.current
+      .then(() => api<TakeoverResult>(`/api/bots/${bot.id}/browser/${path}`, { method: "POST", body: JSON.stringify(body) }))
+      .then(merge, (error: unknown) =>
+        onNotice(error instanceof Error ? error.message : "The browser needs another try."),
+      )
+      .catch(() => {});
   };
   const openAddress = async () => {
     setBusy(true);
@@ -1088,14 +1091,6 @@ function LiveBrowser({
       setBusy(false);
     }
   };
-  const clickPreview = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!status?.screenshot || busy) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    void perform("takeover/click", {
-      x: ((event.clientX - rect.left) / rect.width) * 1280,
-      y: ((event.clientY - rect.top) / rect.height) * 820,
-    });
-  };
   return (
     <div className="live-browser">
       <div className="live-browser-heading">
@@ -1107,7 +1102,7 @@ function LiveBrowser({
           <span>
             <strong>You’re guiding {bot.name}</strong>
             <small>
-              Click the screen, type privately, then hand control back.
+              Click a field, then type — keys go straight to the page.
             </small>
           </span>
         </span>
@@ -1138,99 +1133,35 @@ function LiveBrowser({
         </button>
       </form>
       <div className="live-screen-frame">
-        {status?.screenshot ? (
-          <button
-            className="live-screen"
-            onClick={clickPreview}
-            disabled={busy}
-            aria-label="Interactive browser screen"
-          >
-            <img
-              src={status.screenshot}
-              alt={`${bot.name}'s current browser`}
-            />
-            {busy && (
+        <DirectScreen
+          image={status?.screenshot || null}
+          alt={`${bot.name}'s current browser`}
+          interactive={status?.browser === "ready"}
+          badge="Click a field, then type"
+          label="Live browser screen. Click a field, then type — keys go straight to the page."
+          send={send}
+          empty={
+            <div className="live-screen-empty">
+              <Mascot bot={{ ...bot, status: "waiting" }} size="large" />
+              <strong>{bot.name}’s browser is resting</strong>
               <span>
-                <LoaderCircle className="spinner" /> Updating screen…
+                Open a page when you want to sign in or guide the next step.
               </span>
-            )}
-            <i>
-              <MousePointer2 size={13} /> Click anywhere to take control
-            </i>
-          </button>
-        ) : (
-          <div className="live-screen-empty">
-            <Mascot bot={{ ...bot, status: "waiting" }} size="large" />
-            <strong>{bot.name}’s browser is resting</strong>
-            <span>
-              Open a page when you want to sign in or guide the next step.
-            </span>
-            <button
-              className="button-primary"
-              onClick={() => void openAddress()}
-              disabled={busy}
-            >
-              <Globe2 size={15} /> Start browser
-            </button>
-          </div>
-        )}
+              <button
+                className="button-primary"
+                onClick={() => void openAddress()}
+                disabled={busy}
+              >
+                <Globe2 size={15} /> Start browser
+              </button>
+            </div>
+          }
+        />
       </div>
-      <div className="takeover-controls">
-        <div className="takeover-copy">
-          <ShieldCheck size={16} />
-          <span>
-            <strong>Private keyboard</strong>
-            <small>
-              Text goes directly to the focused field. It is never saved in chat
-              or added to the bot’s activity.
-            </small>
-          </span>
-        </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (entry)
-              void perform("takeover/type", {
-                value: entry,
-                replace: false,
-              });
-            setEntry("");
-          }}
-        >
-          <Keyboard size={15} />
-          <input
-            type="password"
-            value={entry}
-            onChange={(event) => setEntry(event.target.value)}
-            placeholder="Type into the selected field"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            disabled={!entry || busy}
-            onClick={() => {
-              void perform("takeover/type", { value: entry, replace: true });
-              setEntry("");
-            }}
-          >
-            Replace
-          </button>
-          <button className="primary" disabled={!entry || busy}>
-            Type
-          </button>
-        </form>
-        <div className="takeover-keys">
-          {(["Tab", "Enter", "Escape", "Backspace"] as const).map((key) => (
-            <button
-              key={key}
-              disabled={busy || status?.browser !== "ready"}
-              onClick={() => void perform("takeover/key", { key })}
-            >
-              {key}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="takeover-hint">
+        Click a field, then type — like a real browser. Nothing typed is stored
+        or sent to the model.
+      </p>
     </div>
   );
 }
@@ -4368,11 +4299,10 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
   const [meta, setMeta] = useState<{ url: string; title: string } | null>(null);
   const [frame, setFrame] = useState<string | null>(null);
   const [address, setAddress] = useState("");
-  const [typeValue, setTypeValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const screen = useRef<HTMLDivElement>(null);
   const stopped = useRef(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     stopped.current = false;
     const watch = async () => {
@@ -4411,10 +4341,31 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
       setBusy(false);
     }
   };
-  const take = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!screen.current || busy) return;
-    const rect = screen.current.getBoundingClientRect();
-    void act("takeover/click", { x: ((event.clientX - rect.left) / rect.width) * 1280, y: ((event.clientY - rect.top) / rect.height) * 820 });
+  // Clicks and keystrokes queue in order without blocking the screen, like a
+  // real browser. Nothing typed is stored or sent to the model.
+  const send = (op: DirectOp) => {
+    const route =
+      op.kind === "click" ? "takeover/click" : op.kind === "press" ? "takeover/press" : op.kind === "text" ? "takeover/type" : "takeover/scroll";
+    const body =
+      op.kind === "click"
+        ? { x: op.x, y: op.y }
+        : op.kind === "press"
+          ? { key: op.key }
+          : op.kind === "text"
+            ? { value: op.value, replace: false }
+            : { x: op.x, y: op.y, deltaY: op.deltaY };
+    queue.current = queue.current
+      .then(async () => {
+        const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(result.error || "The browser did not respond.");
+        setError("");
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+        onNotice(e instanceof Error ? e.message : "The browser did not respond.");
+      })
+      .catch(() => {});
   };
   return (
     <div className="in-app-browser">
@@ -4434,44 +4385,15 @@ function InAppBrowserView({ botId, onNotice }: { botId: string; onNotice: (messa
         />
         <button disabled={busy}>Go</button>
       </form>
-      <div
-        ref={screen}
-        className={`in-app-browser-screen ${busy ? "busy" : ""}`}
-        onClick={take}
-        role="button"
-        aria-label="Live browser view. Click to take control."
-      >
-        {frame ? (
-          <img src={frame} alt="Live browser" />
-        ) : (
-          <p className="panel-note">{busy ? "Connecting…" : "Waiting for the first frame…"}</p>
-        )}
-        <i><MousePointer2 size={12} /> Click the screen to act for {botId && "this teammate"}</i>
-      </div>
-      <div className="in-app-browser-keys">
-        {(["Enter", "Tab", "Backspace", "Escape"] as const).map((key) => (
-          <button key={key} disabled={busy} onClick={() => void act("takeover/key", { key })}>{key}</button>
-        ))}
-      </div>
-      <form
-        className="inline-field"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (typeValue.trim()) {
-            void act("takeover/type", { value: typeValue });
-            setTypeValue("");
-          }
-        }}
-      >
-        <input
-          value={typeValue}
-          onChange={(event) => setTypeValue(event.target.value)}
-          placeholder="Type into the page"
-          aria-label="Text to enter in the page"
-          maxLength={4_000}
-        />
-        <button disabled={busy || !typeValue.trim()}>Type</button>
-      </form>
+      <DirectScreen
+        image={frame}
+        alt="Live browser"
+        interactive
+        badge="Click a field, then type"
+        label="Live browser screen. Click a field, then type — keys go straight to the page."
+        send={send}
+        empty={<p className="panel-note">{busy ? "Connecting…" : "Waiting for the first frame…"}</p>}
+      />
       {error && <p className="panel-error">{error}</p>}
       {meta && <small className="in-app-browser-url">{meta.title || "(untitled)"} · {meta.url}</small>}
     </div>

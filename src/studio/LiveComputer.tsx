@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Globe2, Keyboard, Monitor, MousePointer2, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Globe2, Monitor, ShieldCheck, X } from "lucide-react";
 import type { Bot } from "../shared/types";
+import { DirectScreen, type DirectOp } from "./DirectScreen";
 
 export type LiveComputerState = "connecting" | "ready" | "stopped" | "unavailable";
 
@@ -12,7 +13,10 @@ type LiveViewEvent =
 type TakeoverResult = { url: string; title: string; screenshot: string | null };
 
 const VIEWPORT = { width: 1280, height: 820 };
-const TAKEOVER_KEYS = ["Tab", "Enter", "Escape", "Backspace"] as const;
+// Single keystrokes the takeover screen forwards, mirroring the server's
+// takeover/press validation. Combos with held modifiers are never accepted.
+const DIRECT_KEY = /^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/;
+const IGNORED_KEY = ["Meta", "Shift", "Control", "Alt", "CapsLock", "Dead", "Process"];
 
 async function takeoverAction(botId: string, path: string, body: Record<string, unknown>): Promise<TakeoverResult> {
   const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/browser/takeover/${path}`, {
@@ -136,11 +140,16 @@ export function LiveComputer({ bot, threadId, onTakeover }: { bot: Bot; threadId
 
 /** The teammate's own screen, Grok Bot "Agent Computer" style: watch the work
  * live, then take control only for the step that needs a human — a password,
- * a code, a check. Control is explicit and never granted by watching. */
+ * a code, a check. Control is explicit and never granted by watching.
+ *
+ * Direct manipulation: once armed, the screen itself is the control. Click a
+ * field and type — keystrokes go straight to the page, one by one, exactly
+ * like a real browser. There is deliberately no separate typing box: typing
+ * somewhere else is the design this replaces. Nothing typed is stored, logged
+ * or sent to the model. */
 export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => void }) {
   const { frame, browserState, title } = useLiveComputer(bot.id);
   const [armed, setArmed] = useState(false);
-  const [entry, setEntry] = useState("");
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -154,50 +163,41 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       prior?.focus();
     };
   }, []);
-  const run = async (action: () => Promise<unknown>) => {
-    if (!armed || busy) return;
-    setBusy(true);
-    setNotice("");
-    try {
-      await action();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "That control needs another try.");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const clickScreen = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!armed) {
-      setNotice("Turn on Take control to click inside this screen.");
-      return;
-    }
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.round(((event.clientX - rect.left) / rect.width) * VIEWPORT.width);
-    const y = Math.round(((event.clientY - rect.top) / rect.height) * VIEWPORT.height);
-    void run(() => takeoverAction(bot.id, "click", { x, y }));
-  };
-  const sendKey = (key: (typeof TAKEOVER_KEYS)[number]) => {
-    void run(() => takeoverAction(bot.id, "key", { key }));
-  };
-  const typeEntry = (replace: boolean) => {
-    if (!entry) return;
-    const value = entry;
-    setEntry("");
-    void run(() => takeoverAction(bot.id, "type", { value, replace }));
+  const send = (op: DirectOp) => {
+    if (!armed) return;
+    const path =
+      op.kind === "click" ? "click" : op.kind === "press" ? "press" : op.kind === "text" ? "type" : "scroll";
+    const body =
+      op.kind === "click"
+        ? { x: op.x, y: op.y }
+        : op.kind === "press"
+          ? { key: op.key }
+          : op.kind === "text"
+            ? { value: op.value, replace: false }
+            : { x: op.x, y: op.y, deltaY: op.deltaY };
+    void takeoverAction(bot.id, path, body).then(
+      () => setNotice(""),
+      (error: unknown) => setNotice(error instanceof Error ? error.message : "That control needs another try."),
+    );
   };
   const openAddress = () => {
-    void run(async () => {
-      const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/open`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: address }),
-      });
+    if (!armed || busy || !address.trim()) return;
+    const url = address;
+    setBusy(true);
+    setNotice("");
+    fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then(async (response) => {
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(typeof data?.error === "string" ? data.error : "That page could not be opened.");
       }
       setAddress("");
-    });
+    }).catch((error: unknown) => {
+      setNotice(error instanceof Error ? error.message : "That page could not be opened.");
+    }).finally(() => setBusy(false));
   };
   const ready = browserState === "ready";
   return (
@@ -207,7 +207,7 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       aria-label={`${bot.name}’s Agent Computer`}
       onCancel={onClose}
       onKeyDown={(event) => {
-        if (event.key !== "Tab") return;
+        if (event.defaultPrevented || event.key !== "Tab") return;
         const items = Array.from(
           event.currentTarget.querySelectorAll<HTMLElement>(
             'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]',
@@ -243,7 +243,6 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
           className={armed ? "takeover-switch armed" : "takeover-switch"}
           onClick={() => {
             setArmed((value) => !value);
-            setEntry("");
             setNotice("");
           }}
           aria-pressed={armed}
@@ -254,7 +253,7 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
           className="takeover-address"
           onSubmit={(event) => {
             event.preventDefault();
-            if (address) openAddress();
+            openAddress();
           }}
         >
           <Globe2 size={14} />
@@ -270,24 +269,20 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       </div>
       <div className="takeover-screen-frame">
         {frame ? (
-          <button
-            className={armed ? "takeover-screen armed" : "takeover-screen"}
-            onClick={clickScreen}
-            disabled={busy || !ready}
-            aria-label={
+          <DirectScreen
+            image={frame}
+            alt={`${bot.name}'s browser, updating live`}
+            interactive={armed}
+            badge="Click a field, then type"
+            label={
               armed
-                ? "Interactive screen. Click to control this teammate's browser."
-                : "Live screen. Turn on Take control to interact."
+                ? "Live browser screen. Click a field, then type — keys go straight to the page."
+                : "Live browser screen. Turn on Take control to interact."
             }
-          >
-            <img alt={`${bot.name}'s browser, updating live`} src={frame} draggable={false} />
-            {busy && <span className="takeover-busy">Working…</span>}
-            {armed && !busy && (
-              <i>
-                <MousePointer2 size={13} /> Click anywhere to act
-              </i>
-            )}
-          </button>
+            send={send}
+            onInactiveClick={() => setNotice("Turn on Take control to click inside this screen.")}
+            empty={null}
+          />
         ) : (
           <div className="computer-placeholder">
             <Monitor size={30} strokeWidth={1} />
@@ -306,48 +301,11 @@ export function ComputerTakeover({ bot, onClose }: { bot: Bot; onClose: () => vo
       <p className="takeover-caption" aria-live="polite">
         {notice || (title ? `${title} · live` : ready ? "Live view of this teammate's browser" : "Waiting for activity")}
       </p>
-      <section className="takeover-controls">
-        <div className="takeover-copy">
-          <Keyboard size={15} />
-          <span>
-            <strong>Private keyboard</strong>
-            <small>
-              Text goes directly to the focused field. It is never saved in chat
-              or added to the bot’s activity.
-            </small>
-          </span>
-        </div>
-        <form
-          className="takeover-type"
-          onSubmit={(event) => {
-            event.preventDefault();
-            typeEntry(false);
-          }}
-        >
-          <input
-            disabled={!armed || busy || !ready}
-            type="password"
-            value={entry}
-            onChange={(event) => setEntry(event.target.value)}
-            placeholder="Type into the selected field"
-            autoComplete="off"
-            aria-label="Private text to type into the focused field"
-          />
-          <button type="button" disabled={!armed || busy || !entry || !ready} onClick={() => typeEntry(true)}>
-            Replace
-          </button>
-          <button className="primary" disabled={!armed || busy || !entry || !ready}>
-            Type
-          </button>
-        </form>
-        <div className="takeover-keys">
-          {TAKEOVER_KEYS.map((key) => (
-            <button key={key} disabled={!armed || busy || !ready} onClick={() => sendKey(key)}>
-              {key}
-            </button>
-          ))}
-        </div>
-      </section>
+      <p className="takeover-hint">
+        {armed
+          ? "Click a field, then type — keys go straight to the page, like a real browser. Nothing typed is stored or sent to the model."
+          : "Turn on Take control, then click and type directly in the screen."}
+      </p>
       <small className="takeover-boundary">
         Control reaches only this teammate’s already-running browser. Approvals
         and access limits still apply; watching does not grant anything.

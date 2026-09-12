@@ -2785,6 +2785,23 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
+// Direct keystroke for the takeover screen: a single printable character or a
+// named key, forwarded one by one as the owner types. Combos with held
+// modifiers are never accepted; paste uses takeover/type instead.
+app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
+  const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
+  try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
+// Wheel scrolling under the pointer, so the takeover screen scrolls like a
+// real browser window instead of needing scroll controls.
+app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
+  const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
+  try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+});
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
 app.get("/api/skill-templates", (_request, response) => response.json(SKILL_TEMPLATES.map(({ steps, ...template }) => ({ ...template, stepCount: steps.length }))));

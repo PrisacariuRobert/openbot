@@ -48,18 +48,29 @@ try {
   const dialog = page.getByRole("dialog", { name: "Fixture’s Agent Computer" });
   await dialog.getByAltText("Fixture's browser, updating live").waitFor();
   assert.equal(starts, 1, "The larger panel reuses one source and gets an idle screen immediately");
-  for (const name of ["Tab", "Enter", "Escape", "Backspace"]) assert.equal(await dialog.getByRole("button", { name, exact: true }).isDisabled(), true);
+  const screen = dialog.getByRole("application", { name: /Live browser screen/ });
   assert.equal(await dialog.getByLabel("Browser address", { exact: true }).isDisabled(), true);
-  assert.equal(await dialog.getByLabel("Private text to type into the focused field").isDisabled(), true);
   assert.equal(posts.length, 0, "Watching sends no control actions");
+  assert.equal(await page.locator(".takeover-hidden-keys").count(), 1, "Touch-keyboard summoner is present but invisible");
   await page.screenshot({ path: path.join(output, "watch-desktop.png") });
   await dialog.getByRole("button", { name: "Take control", exact: true }).click();
-  await dialog.getByRole("button", { name: "Tab", exact: true }).click();
-  assert.equal(posts.length, 1); assert.match(posts[0]!.url, /takeover\/key$/);
-  await dialog.getByLabel("Private text to type into the focused field").fill("fixture-only text");
-  await dialog.getByRole("button", { name: "Type", exact: true }).click();
-  assert.equal(posts.length, 2); assert.equal(JSON.parse(posts[1]!.body).value, "fixture-only text");
-  assert.equal(await dialog.getByLabel("Private text to type into the focused field").inputValue(), "");
+  // Direct manipulation: click the screen, then type — no side box.
+  // Keystroke POSTs are queued async; poll instead of asserting instantly.
+  const waitPosts = async (count: number) => {
+    for (let n = 0; n < 100 && posts.length < count; n++) await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(posts.length, count);
+  };
+  await screen.click({ position: { x: 640, y: 400 } });
+  await waitPosts(1); assert.match(posts[0]!.url, /takeover\/click$/);
+  await screen.press("Tab");
+  await waitPosts(2); assert.match(posts[1]!.url, /takeover\/press$/);
+  assert.equal(JSON.parse(posts[1]!.body).key, "Tab");
+  await screen.press("a");
+  await waitPosts(3); assert.equal(JSON.parse(posts[2]!.body).key, "a");
+  // Owner shortcuts stay local: Cmd+T must not reach the page.
+  await page.keyboard.press("Meta+t");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(posts.length, 3, "Command combos never leave the app");
   await dialog.getByRole("button", { name: "In control — click to act", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -67,7 +78,7 @@ try {
   emit({ type: "status", browser: "stopped" });
   await dialog.getByText("No browser open right now. Open a page above to begin.").waitFor();
   assert.equal(await dialog.locator("img").count(), 0, "Stopped streams clear old private screen images");
-  assert.equal(posts.length, 2);
+  assert.equal(posts.length, 3);
   assert.deepEqual(errors, []);
-  console.log(`PASS: idle second viewer, one source, explicit control, private input clearing, stopped-frame clearing, desktop and 390px. ${output}`);
+  console.log(`PASS: idle second viewer, one source, explicit control, direct click-and-type, shortcut isolation, stopped-frame clearing, desktop and 390px. ${output}`);
 } finally { await browser.close(); await server.close(); }
