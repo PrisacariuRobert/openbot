@@ -130,14 +130,12 @@ try {
   assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
   assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
-  assert.equal(await service.innerText(), "Choose your AI service", "Saving a connection does not silently select it");
-  await service.click();
-  await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
-  const model = creation.getByRole("combobox", { name: "Model", exact: true });
-  assert.equal(await model.innerText(), "Choose a model", "Model is still an explicit choice");
-  await model.click();
+  assert.equal(await service.innerText(), "Local beta test", "A sole saved connection preselects itself");
   const modelId = "openbot-" + saved.id + "/chosen-model";
-  await creation.getByRole("option", { name: modelId, exact: true }).click();
+  assert.ok(
+    await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
+    "A sole provider and model preselect, so the form is ready to submit",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));
   await page.screenshot({ path: path.join(output, "ready-to-create-mobile.png"), fullPage: true });
@@ -165,7 +163,7 @@ try {
   assert.equal(final.messages.filter((message) => message.senderType === "bot").length, 0, "Setup never fabricates a reply");
   assert.deepEqual(unexpected, []);
   assert.deepEqual(errors, []);
-  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → explicit provider/model → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
+  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → sole provider/model preselection → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");
