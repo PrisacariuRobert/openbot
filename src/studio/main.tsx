@@ -8,6 +8,7 @@ import "./studio.css";
 import "./conversation-shell.css";
 import "./design-tokens.css";
 import "./settings-shell.css";
+import "./apple-polish.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
