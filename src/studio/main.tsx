@@ -13,6 +13,7 @@ import "./apple-pages.css";
 import "./apple-capabilities.css";
 import "./apple-brand.css";
 import "./apple-contract-fixes.css";
+import "./apple-review-fixes.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
