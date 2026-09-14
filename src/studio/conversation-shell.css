@@ -381,8 +381,8 @@
 .sidebar-conversations .conversation-cell:has(> .conversation-row.current) + .conversation-cell::before {
   border-top-color: transparent;
 }
-/* Row actions: round candy buttons (mute-blue, edit-purple, trash-red) that
- * pop in with a stagger while the row springs aside. Solid fills only. */
+/* Row actions: round monochrome buttons (red only for delete) that pop in
+ * with a stagger while the row springs aside on swipe. Solid fills only. */
 .conversation-cell { position: relative; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .row-actions {
   position: absolute;

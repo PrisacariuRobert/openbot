@@ -87,6 +87,8 @@ try {
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");
   const instructions = "Find a realistic plan. Ask before changing my calendar.";
+  // Instructions live behind the Advanced disclosure in the new form.
+  await creation.locator("summary", { hasText: "Advanced" }).click();
   await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
   const popup = page.waitForEvent("popup");
@@ -96,7 +98,7 @@ try {
   // The provider setup renders as a full panel in the separate tab now.
   const providerSheet = settings.locator(".provider-settings");
   await providerSheet.waitFor();
-  await providerSheet.getByRole("button", { name: "API & local models", exact: true }).click();
+  await providerSheet.getByRole("radio", { name: "API Keys & Local Models", exact: true }).click();
   await providerSheet.getByRole("button", { name: "Add API or local model", exact: true }).click();
   await providerSheet.getByRole("combobox", { name: "Provider", exact: true }).selectOption("custom");
   await providerSheet.getByLabel("Connection name", { exact: true }).fill("Local beta test");

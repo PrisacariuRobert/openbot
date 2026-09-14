@@ -1427,7 +1427,11 @@ export function Studio() {
   const [hideArmed, setHideArmed] = useState<string | null>(null);
   const dragStartX = useRef<number | null>(null);
   const dragStartY = useRef<number | null>(null);
-  const dragMoved = useRef(false);
+  // When the last drag released, as a timestamp. A trailing click right
+  // after a drag belongs to the gesture and is ignored; a sticky boolean
+  // would stay set forever when pointer capture retargets that click away
+  // from the row button, silently eating a later, deliberate tap.
+  const dragEndAt = useRef(0);
   const dragEngaged = useRef(false);
   const dragBase = useRef(0);
   const dragX = useRef(0);
@@ -1571,7 +1575,7 @@ export function Studio() {
             : x < -shiftPx / 2
               ? -shiftPx
               : 0;
-        dragMoved.current = true;
+        dragEndAt.current = performance.now();
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           cell.classList.remove("dragging");
           setSwipedRow(target < 0 ? item.id : null);
@@ -1638,6 +1642,14 @@ export function Studio() {
             gestureHist.current = [{ x: event.clientX, t: performance.now() }];
           }}
           onPointerMove={(event) => {
+            // Hovering without a pressed button is never a drag — reset so a
+            // later click can't inherit a stale gesture and get swallowed.
+            if (event.buttons === 0) {
+              dragStartX.current = null;
+              dragStartY.current = null;
+              dragEngaged.current = false;
+              return;
+            }
             const startX = dragStartX.current;
             const startY = dragStartY.current;
             if (startX == null || startY == null) return;
@@ -1652,7 +1664,6 @@ export function Studio() {
                 return;
               }
               dragEngaged.current = true;
-              dragMoved.current = true;
               try {
                 event.currentTarget.setPointerCapture(event.pointerId);
               } catch {
@@ -1687,7 +1698,9 @@ export function Studio() {
           title={item.title}
           className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}${liveAction ? " is-live" : ""}`}
           onClick={() => {
-            if (dragMoved.current) { dragMoved.current = false; return; }
+            // A click landing right after a drag release belongs to the
+            // gesture, not to a tap — ignore it, then forget it happened.
+            if (performance.now() - dragEndAt.current < 350) return;
             if (swipedRow === item.id) { setSwipedRow(null); return; }
             openThread(item.id);
           }}
