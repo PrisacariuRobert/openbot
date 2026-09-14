@@ -10,6 +10,7 @@ import "./design-tokens.css";
 import "./settings-shell.css";
 import "./apple-polish.css";
 import "./apple-pages.css";
+import "./apple-capabilities.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
