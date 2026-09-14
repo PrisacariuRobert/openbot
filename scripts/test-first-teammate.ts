@@ -100,6 +100,8 @@ try {
     const sheet = page.getByRole("dialog");
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
     await sheet.getByLabel("Their job").fill("Help plan my week");
+    // Instructions live behind the Advanced disclosure in the new form.
+    await sheet.locator("summary", { hasText: "Advanced" }).click();
     await sheet
       .getByLabel("Additional instructions", { exact: true })
       .fill("Find a realistic plan. Ask before changing my calendar.");
@@ -107,20 +109,21 @@ try {
     await sheet.getByRole("button", { name: "Leaf character" }).click();
     assert.equal(
       await sheet.getByRole("combobox", { name: "AI connection" }).innerText(),
-      "Choose your AI service",
-      "No default provider",
+      provider.name,
+      "A sole connected provider preselects itself",
     );
     assert.ok(
       await sheet
         .getByRole("button", { name: "Create teammate", exact: true })
-        .isDisabled(),
+        .isEnabled(),
+      "A sole provider and model preselect, so the form is submittable",
     );
     await sheet.getByRole("combobox", { name: "AI connection" }).click();
     await sheet.getByRole("option", { name: provider.name, exact: true }).click();
     assert.equal(
       await sheet.getByRole("combobox", { name: /^Model/ }).innerText(),
       "Choose a model",
-      "No default model",
+      "Re-picking the provider resets the model",
     );
     await sheet
       .getByRole("combobox", { name: /^Model/ })

@@ -664,10 +664,17 @@ try {
   assert.match(page.url(), /thread=bot-nova/, "Delayed send must not pull navigation back");
   assert.equal(await page.getByRole("textbox", { name: "Message your team" }).inputValue(), "A separate conversation draft.");
   assert.equal(posts.length, postsBeforeDelayedSend + 1);
-  await page.locator(".sidebar-conversations").getByRole("button", { name: "Pixel", exact: true }).click();
+  // Reach Pixel's thread by URL, like the Nova hop above: a poll landing
+  // mid-click can detach the row under the cursor and swallow the navigation.
+  await page.goto(`${base}/studio.html?thread=bot-pixel`);
+  await page.getByRole("textbox", { name: "Message your team" }).waitFor();
   await page.getByRole("textbox", { name: "Message your team" }).fill("");
+  // Wait for the cleared draft to reach the server: a slow poll returning
+  // the previous draft could otherwise resurrect it between clear and send.
   await page.waitForFunction(
-    () => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value === "",
+    async () =>
+      (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft
+        .body === "",
   );
   await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('button[aria-label="Add files"]')?.disabled);
   await page.getByLabel("Choose files", { exact: true }).setInputFiles({
