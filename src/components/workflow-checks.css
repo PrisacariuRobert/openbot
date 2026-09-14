@@ -1,16 +1,25 @@
-.workflow-checks { display: grid; gap: 16px; padding: 20px; margin-block: 16px; min-width: 0; border: 1px solid #e3e3e3; border-radius: 20px; background: #ffffff; overflow-wrap: anywhere; }
+.workflow-checks { display: grid; gap: 16px; padding: 20px; margin-block: 16px; min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow-wrap: anywhere; }
 .workflow-checks header, .workflow-checks-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .workflow-checks header { justify-content: space-between; }
 .workflow-checks h3, .workflow-checks p { margin: 0; }
-.workflow-checks form, .workflow-checks label, .workflow-checks article { display: grid; gap: 10px; min-width: 0; }
+.workflow-checks form, .workflow-checks label, .workflow-checks article { display: grid; gap: 12px; min-width: 0; }
 .workflow-checks form { gap: 16px; }
-.workflow-checks textarea { width: 100%; min-width: 0; min-height: 88px; padding: 12px; font: inherit; border: 1px solid #dadada; border-radius: 12px; resize: vertical; box-sizing: border-box; }
-.workflow-checks label.workflow-checks-consent { display: flex; align-items: start; gap: 10px; font-size: 13px; }
-.workflow-checks-consent input { flex: 0 0 auto; margin-top: 3px; }
-.workflow-checks button { border: 1px solid #e3e3e3; border-radius: 12px; padding: 10px 14px; min-height: 44px; font: inherit; cursor: pointer; }
+.workflow-checks textarea { width: 100%; min-width: 0; min-height: 88px; padding: 12px; font: inherit; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--ink); resize: vertical; box-sizing: border-box; }
+.workflow-checks textarea:hover:not(:disabled) { border-color: var(--secondary); }
+.workflow-checks textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.workflow-checks textarea:disabled { opacity: .6; cursor: default; }
+.workflow-checks label.workflow-checks-consent { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 13px; overflow-wrap: anywhere; }
+.workflow-checks-consent input { flex: 0 0 auto; align-self: center; width: 18px; height: 18px; accent-color: var(--strong); }
+.workflow-checks button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; min-height: 44px; font: inherit; line-height: 1.4; white-space: nowrap; background: var(--surface); color: var(--ink); cursor: pointer; }
+.workflow-checks button:hover:not(:disabled) { background: var(--surface-muted); }
+.workflow-checks button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.workflow-checks button:active:not(:disabled) { background: var(--surface-muted); }
 .workflow-checks button:disabled { opacity: .5; cursor: default; }
-.workflow-checks article { border-top: 1px solid #e3e3e3; padding-top: 16px; }
-.workflow-checks small, .workflow-checks-note { font-size: 13px; color: #6d6d6d; }
-.workflow-checks-result { white-space: pre-wrap; max-height: 320px; overflow: auto; padding-block: 12px; }
-.workflow-checks [role=alert] { color: #4f4f4f; }
-@media (max-width: 480px) { .workflow-checks { padding: 14px; } .workflow-checks-actions button { flex: 1 1 150px; } }
+.workflow-checks article { border-top: 1px solid var(--line); padding-top: 16px; }
+.workflow-checks small, .workflow-checks-note { font-size: 13px; color: var(--secondary); }
+.workflow-checks-result { white-space: pre-wrap; max-height: 320px; overflow: auto; padding: 12px 16px; background: var(--surface-muted); border-radius: 12px; }
+.workflow-checks [role=alert] { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--secondary); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .workflow-checks { padding: 16px; } .workflow-checks-actions button { flex: 1 1 160px; } }
+@media (prefers-reduced-motion: reduce) {
+  .workflow-checks *, .workflow-checks *::before, .workflow-checks *::after { transition: none !important; animation: none !important; }
+}

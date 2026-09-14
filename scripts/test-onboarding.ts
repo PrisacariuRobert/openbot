@@ -87,6 +87,8 @@ try {
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");
   const instructions = "Find a realistic plan. Ask before changing my calendar.";
+  // Instructions live behind the Advanced disclosure in the new form.
+  await creation.locator("summary", { hasText: "Advanced" }).click();
   await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
   const popup = page.waitForEvent("popup");
@@ -96,13 +98,13 @@ try {
   // The provider setup renders as a full panel in the separate tab now.
   const providerSheet = settings.locator(".provider-settings");
   await providerSheet.waitFor();
-  await providerSheet.getByRole("button", { name: "API & local models", exact: true }).click();
+  await providerSheet.getByRole("radio", { name: "API Keys & Local Models", exact: true }).click();
   await providerSheet.getByRole("button", { name: "Add API or local model", exact: true }).click();
   await providerSheet.getByRole("combobox", { name: "Provider", exact: true }).selectOption("custom");
   await providerSheet.getByLabel("Connection name", { exact: true }).fill("Local beta test");
   await providerSheet.getByLabel("API address", { exact: true }).fill("http://127.0.0.1:1/v1");
   await providerSheet.getByLabel("Model IDs", { exact: true }).fill("chosen-model");
-  assert.equal(await providerSheet.getByLabel("API key (optional)", { exact: true }).inputValue(), "");
+  assert.equal(await providerSheet.getByLabel("API key", { exact: true }).inputValue(), "");
   await settings.screenshot({ path: path.join(output, "provider-setup-desktop.png"), fullPage: true });
   await settings.setViewportSize({ width: 390, height: 844 });
   assert.ok(await providerSheet.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Provider setup fits a phone");
@@ -128,14 +130,12 @@ try {
   assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
   assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
-  assert.equal(await service.innerText(), "Choose your AI service", "Saving a connection does not silently select it");
-  await service.click();
-  await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
-  const model = creation.getByRole("combobox", { name: "Model", exact: true });
-  assert.equal(await model.innerText(), "Choose a model", "Model is still an explicit choice");
-  await model.click();
+  assert.equal(await service.innerText(), "Local beta test", "A sole saved connection preselects itself");
   const modelId = "openbot-" + saved.id + "/chosen-model";
-  await creation.getByRole("option", { name: modelId, exact: true }).click();
+  assert.ok(
+    await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
+    "A sole provider and model preselect, so the form is ready to submit",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));
   await page.screenshot({ path: path.join(output, "ready-to-create-mobile.png"), fullPage: true });
@@ -163,7 +163,7 @@ try {
   assert.equal(final.messages.filter((message) => message.senderType === "bot").length, 0, "Setup never fabricates a reply");
   assert.deepEqual(unexpected, []);
   assert.deepEqual(errors, []);
-  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → explicit provider/model → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
+  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → sole provider/model preselection → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

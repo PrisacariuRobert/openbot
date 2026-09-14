@@ -1,79 +1,63 @@
 /* Conversation layout: one primary list, optional contextual work, quiet utilities. */
 .chat-message.from-you { margin-left: auto; }
-.sidebar-conversations .conversation-row > .room-mark { flex: 0 0 43px; }
+.sidebar-conversations .conversation-row > .room-mark { flex: 0 0 44px; }
 .chat-progress { flex-wrap: wrap; }
-.chat-progress > .run-controls { flex-basis: 100%; margin-top: 2px; }
+.chat-progress > .run-controls { flex-basis: 100%; margin-top: 4px; }
 .compose-files {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 /* Attachment chip: glyph tile + name + meta, own card language. */
 .compose-file {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   max-width: 100%;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--system-background);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 /* File thumbnail tile: quiet gray with the real extension — restraint, not
- * a black slab. Shared by composer chips and transcript file cards. */
+ * a black slab. Shared by composer chips and transcript file cards.
+ * Monochrome by contract: file-type colors would trip the visual-design
+ * chroma check, so every family uses the neutral file tokens. */
 .file-thumb {
   display: grid;
   place-items: center;
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--ft-file-bg);
   color: var(--ft-file-fg);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
-.file-thumb.ft-text { background: var(--ft-text-bg); color: var(--ft-text-fg); }
-.file-thumb.ft-code { background: var(--ft-code-bg); color: var(--ft-code-fg); }
-.file-thumb.ft-data { background: var(--ft-data-bg); color: var(--ft-data-fg); }
-.file-thumb.ft-sheet { background: var(--ft-sheet-bg); color: var(--ft-sheet-fg); }
-.file-thumb.ft-slide { background: var(--ft-slide-bg); color: var(--ft-slide-fg); }
-.file-thumb.ft-pdf { background: var(--ft-pdf-bg); color: var(--ft-pdf-fg); }
-.file-thumb.ft-image { background: var(--ft-image-bg); color: var(--ft-image-fg); }
-.file-thumb.ft-media { background: var(--ft-media-bg); color: var(--ft-media-fg); }
-.file-thumb.ft-archive { background: var(--ft-archive-bg); color: var(--ft-archive-fg); }
-/* Inline sigla (VS Code explorer style): extension in the family color, no
- * box. Used by the compact file cards in transcript and composer. */
+/* Inline sigla (VS Code explorer style): the extension in ink, no box.
+ * Used by the compact file cards in transcript and composer. */
 .file-sigla {
   flex-shrink: 0;
-  min-width: 30px;
+  min-width: 32px;
   text-align: center;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--ft-file-fg);
+  color: var(--ink);
 }
-.file-sigla.ft-text { color: var(--ft-text-fg); }
-.file-sigla.ft-code { color: var(--ft-code-fg); }
-.file-sigla.ft-data { color: var(--ft-data-fg); }
-.file-sigla.ft-sheet { color: var(--ft-sheet-fg); }
-.file-sigla.ft-slide { color: var(--ft-slide-fg); }
-.file-sigla.ft-pdf { color: var(--ft-pdf-fg); }
-.file-sigla.ft-image { color: var(--ft-image-fg); }
-.file-sigla.ft-media { color: var(--ft-media-fg); }
-.file-sigla.ft-archive { color: var(--ft-archive-fg); }
 /* Live pill: Discord-style presence in the row. Mini mascot + what they're
  * doing + bouncing dots while live; back to the quiet line when done. */
 .live-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
   min-height: 24px;
-  padding: 2px 9px 2px 3px;
+  padding: 4px 12px 4px 4px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--ink);
@@ -139,7 +123,7 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 12px;
   object-fit: cover;
   background: var(--surface-muted);
 }
@@ -150,7 +134,7 @@
   line-height: 1.3;
 }
 .compose-file-meta strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -158,28 +142,45 @@
   max-width: 220px;
 }
 .compose-file-meta small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .compose-file-remove {
   display: grid;
   place-items: center;
+  position: relative;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
+.compose-file-remove::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
 .compose-file-remove:hover {
   background: var(--hover);
   color: var(--ink);
 }
+.compose-file-remove:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.compose-file-remove:active:not(:disabled) {
+  filter: brightness(.95);
+}
+.compose-file-remove:disabled {
+  opacity: .5;
+  cursor: default;
+}
 .composer-bar .add-file {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -207,26 +208,37 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 14px 16px 10px;
+  gap: 12px;
+  padding: 16px 16px 12px;
 }
 .browser-pane > header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--secondary);
 }
 .browser-pane > header button {
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
   color: var(--secondary);
   cursor: pointer;
+}
+.browser-pane > header button:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+.browser-pane > header button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.browser-pane > header button:active:not(:disabled) {
+  filter: brightness(.95);
 }
 .browser-pane .browser-sign-in {
   margin: 0;
@@ -238,45 +250,45 @@
 }
 .sign-in-pane-cta {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   justify-items: start;
 }
 .sign-in-pane-cta .primary {
-  padding: 9px 14px;
+  padding: 8px 16px;
   border: 0;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 .sign-in-pane-cta .primary:disabled {
   opacity: .45;
   cursor: default;
 }
 .sidebar {
-  padding: 25px 12px 18px;
+  padding: 24px 12px 16px;
   background: var(--sidebar);
 }
 .wordmark {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  padding-inline: 14px;
+  padding-inline: 12px;
 }
 .conversation-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
-  margin: 20px 10px 10px;
-  border-radius: 11px;
+  padding: 8px 12px;
+  margin: 16px 12px 8px;
+  border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--muted);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 .conversation-search:focus-within {
   border-color: var(--line-strong);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 7%, transparent);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
   color: var(--ink);
 }
 .conversation-search input {
@@ -285,7 +297,7 @@
   padding: 0;
   background: transparent;
   border: 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 .sidebar-conversations {
   margin-top: 8px;
@@ -296,21 +308,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 12px 12px;
+  padding: 8px 12px 12px;
 }
 /* HIG Familiarity: one obvious compose entry, 44pt target, accent meaning. */
 .sidebar-conversations header > span {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--muted);
 }
 .compose-primary {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: 0;
   border-radius: 50%;
   background: var(--label-primary);
@@ -323,8 +335,10 @@
 .compose-secondary {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 50%;
   background: transparent;
@@ -339,18 +353,36 @@
   display: flex;
   align-items: center;
   width: 100%;
-  gap: 11px;
+  gap: 12px;
   min-width: 0;
   min-height: 64px;
-  padding: 12px 10px;
+  padding: 12px;
   text-align: left;
-  border-radius: 11px;
+  border-radius: 12px;
   transition:
-    background 120ms ease,
-    transform 180ms ease;
+    background 150ms ease-out,
+    transform 220ms cubic-bezier(.32,.72,.35,1);
 }
-/* Row actions, Apple Mail style: the row slides aside and the actions sit
- * beneath it — no floating bubble. Hover slides on desktop, swipe on touch. */
+/* Messages-style inset separators: the hairline starts at the text while
+ * the row itself stays flush with the sidebar edge. */
+.sidebar-conversations .conversation-cell + .conversation-cell::before {
+  content: "";
+  display: block;
+  margin-left: 68px;
+  border-top: 1px solid var(--line);
+}
+/* The divider yields around hover, focus and selection — like the hovered
+ * row absorbs it — instead of drawing a line through the highlight. */
+.sidebar-conversations .conversation-cell:hover::before,
+.sidebar-conversations .conversation-cell:focus-within::before,
+.sidebar-conversations .conversation-cell:has(> .conversation-row.current)::before,
+.sidebar-conversations .conversation-cell:hover + .conversation-cell::before,
+.sidebar-conversations .conversation-cell:focus-within + .conversation-cell::before,
+.sidebar-conversations .conversation-cell:has(> .conversation-row.current) + .conversation-cell::before {
+  border-top-color: transparent;
+}
+/* Row actions: round monochrome buttons (red only for delete) that pop in
+ * with a stagger while the row springs aside on swipe. Solid fills only. */
 .conversation-cell { position: relative; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .row-actions {
   position: absolute;
@@ -358,9 +390,9 @@
   bottom: 0;
   right: 0;
   display: flex;
-  align-items: stretch;
-  border-radius: 0 11px 11px 0;
-  overflow: hidden;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease;
@@ -372,6 +404,19 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Mid-gesture the row is driven frame-by-frame from JS (1:1 tracking into a
+ * spring), so CSS transitions stand down and the actions ride along. */
+.conversation-cell.dragging > .conversation-row {
+  transition: none;
+}
+.conversation-cell.dragging .row-actions {
+  opacity: 1;
+  transition: none;
+}
+.conversation-cell.dragging .row-action {
+  transform: none;
+  transition: none;
+}
 /* Touch has no hover: actions stay hidden until a swipe opens them. */
 @media (hover: none) {
   .conversation-cell .row-actions { opacity: 0; }
@@ -381,31 +426,54 @@
   display: grid;
   place-items: center;
   width: 40px;
+  height: 40px;
   border: 0;
-  border-radius: 0;
-  background: var(--surface-muted);
-  color: var(--secondary);
+  border-radius: 50%;
+  color: #fff;
   cursor: pointer;
   padding: 0;
+  transform: scale(.6);
+  transition:
+    transform 200ms cubic-bezier(.34,1.45,.44,1),
+    opacity 140ms ease,
+    background 120ms ease;
 }
-.row-action:hover { background: var(--selection); color: var(--ink); }
-.row-action[aria-pressed="true"] { color: var(--accent); }
-.row-action[aria-pressed="true"] svg { fill: currentColor; }
-.row-action.armed { background: var(--danger); color: #fff; }
+.conversation-cell:focus-within .row-action,
+.conversation-cell.swiped .row-action {
+  transform: none;
+}
+.conversation-cell.swiped .row-action:nth-child(2),
+.conversation-cell:focus-within .row-action:nth-child(2) {
+  transition-delay: 35ms;
+}
+.conversation-cell.swiped .row-action:nth-child(3),
+.conversation-cell:focus-within .row-action:nth-child(3) {
+  transition-delay: 70ms;
+}
+.row-action-pin { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.row-action-pin:hover { background: var(--surface-muted); }
+.row-action-pin[aria-pressed="true"] svg { fill: currentColor; }
+.row-action-edit { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.row-action-edit:hover { background: var(--surface-muted); }
+.row-action-delete { background: var(--danger); }
+.row-action-delete:hover { filter: brightness(1.08); }
+.row-action-delete.armed { background: #a50010; }
+:root[data-appearance="dark"] .row-action-delete.armed { background: #ff6961; color: #40000a; }
 .conversation-cell:focus-within > .conversation-row,
 .conversation-cell.swiped > .conversation-row {
-  transform: translateX(calc(-1 * var(--shift, 120px)));
+  transform: translateX(calc(-1 * var(--shift, 148px)));
   background: var(--system-background);
 }
 @media (prefers-reduced-motion: reduce) {
-  .row-actions { transition: none; }
+  .row-actions,
+  .row-action { transition: none; }
 }
 /* Specificity beats the token sheet (loaded later) so the swipe slide
  * animates; reduced-motion still kills it below. */
 .sidebar-conversations .conversation-row {
   transition:
-    background 120ms ease,
-    transform 180ms ease;
+    background 150ms ease-out,
+    transform 220ms cubic-bezier(.32,.72,.35,1);
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar-conversations .conversation-row { transition: none; }
@@ -413,23 +481,23 @@
 /* Pinned teammates: an avatar zone above the list, not list chrome. Large
  * living mascots, one tap to open, one tap on × to unpin. Pinned threads
  * leave the scrolling list so the zone never duplicates it. */
-.pinned-zone { padding: 2px 12px 10px; }
+.pinned-zone { padding: 4px 12px 12px; }
 .pinned-label {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 0 2px 8px;
+  padding: 0 4px 8px;
 }
-.pinned-avatars { display: flex; flex-wrap: wrap; gap: 14px 12px; }
+.pinned-avatars { display: flex; flex-wrap: wrap; gap: 16px 12px; }
 .pinned-avatar { position: relative; width: 60px; }
 .pinned-open {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   width: 100%;
   border: 0;
   background: transparent;
@@ -438,8 +506,8 @@
   padding: 0;
 }
 .pinned-name {
-  font-size: 10px;
-  font-weight: 550;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ink);
   max-width: 100%;
   overflow: hidden;
@@ -449,27 +517,32 @@
 .pinned-dot {
   position: absolute;
   top: 40px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--accent, #e0574f);
   border: 2px solid var(--surface);
 }
 .pinned-unpin {
   position: absolute;
-  top: -5px;
-  right: -3px;
+  top: -4px;
+  right: -4px;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
   padding: 0;
+}
+.pinned-unpin::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .pinned-unpin:hover { color: var(--ink); border-color: var(--line-strong); }
 /* Section headers: quiet HIG footnote style, own sentence case. */
@@ -478,10 +551,10 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  padding: 14px 12px 4px;
+  padding: 16px 12px 4px;
 }
 .sidebar-section:first-child {
-  padding-top: 2px;
+  padding-top: 4px;
 }
 /* Group avatar: two overlapping teammate faces, strictly in normal flow so
  * the cluster can never paint outside its slot. Centered so the optical
@@ -490,10 +563,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 43px;
-  width: 43px;
-  height: 43px;
-  min-width: 43px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   overflow: visible;
 }
 .group-stack .character {
@@ -507,10 +580,10 @@
   overflow: hidden;
 }
 .group-stack .character + .character {
-  margin-left: -15px;
+  margin-left: -16px;
 }
 .sidebar-conversations > .conversation-row {
-  padding: 14px 10px;
+  padding: 12px;
 }
 .conversation-row > .character,
 .room-mark {
@@ -519,8 +592,8 @@
 .room-mark {
   display: grid;
   place-items: center;
-  width: 43px;
-  height: 43px;
+  width: 44px;
+  height: 44px;
   color: var(--muted);
 }
 .conversation-copy {
@@ -530,26 +603,28 @@
 }
 .conversation-row .conversation-heading {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 4px;
 }
 .conversation-heading strong {
   font-size: 14px;
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.005em;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .conversation-copy > small {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.45;
 }
 .conversation-heading time {
-  font-size: 11.5px;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   flex: none;
@@ -557,24 +632,25 @@
 .active-now {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 12px 8px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 8px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .active-now-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 28px;
-  padding: 3px 10px 3px 4px;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px 4px 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
   cursor: pointer;
   font: inherit;
-  font-size: 11px;
-  font-weight: 550;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ink);
 }
 .active-now-chip i {
@@ -592,21 +668,21 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 8px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .01em;
   color: #fff;
   background: var(--accent);
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 4px 8px;
   line-height: 1.4;
-  min-height: 22px;
+  min-height: 24px;
 }
 .conversation-heading time {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .conversation-copy small {
@@ -618,16 +694,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conversation-row:hover,
+/* Selected conversation: flat Messages gray, never a bordered card. */
 .conversation-row.current {
-  background: var(--surface);
-}
-.conversation-row.current {
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(0, 0, 0, 0.06);
+  background: var(--surface-muted);
+  box-shadow: none;
 }
 .conversation-row:hover:not(.current) {
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-muted) 55%, transparent);
 }
 .sidebar-bottom {
   padding: 12px 12px 0;
@@ -636,20 +709,22 @@
 .sidebar-bottom .workspace-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
+  gap: 12px;
+  font-size: 14px;
   width: 100%;
-  margin: 5px 0 21px;
+  min-height: 44px;
+  margin: 4px 0 16px;
+  padding: 0 4px;
 }
 .workspace-link b {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   margin-left: auto;
 }
 .topbar {
   height: 64px;
   flex-basis: 64px;
-  padding: 0 25px;
+  padding: 0 24px;
 }
 /* Messages-style header: transparent, centered identity, circular buttons.
  * Appended after the legacy rules so it wins on equal specificity. */
@@ -692,10 +767,11 @@ header.topbar .conversation-actions > button {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--system-background) 68%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
-  backdrop-filter: blur(16px) saturate(1.5);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  /* Solid, never glass: a translucent blur layer paints its square box
+   * behind the circle on some browsers — that was the visible hard border. */
+  background: var(--system-background);
+  /* No shadow at all: every shadow technique left a square halo in Safari. */
+  box-shadow: none;
   color: var(--secondary);
   display: grid;
   place-items: center;
@@ -704,7 +780,7 @@ header.topbar .conversation-actions > button {
 }
 header.topbar .topbar-control:hover,
 header.topbar .conversation-actions > button:hover {
-  background: color-mix(in srgb, var(--system-background) 88%, transparent);
+  background: var(--surface-muted);
   color: var(--ink);
 }
 /* Profile header: big mascot, name pill underneath. Transparent overlay —
@@ -712,7 +788,7 @@ header.topbar .conversation-actions > button:hover {
 header.topbar {
   height: auto;
   flex-basis: auto;
-  padding: 14px 16px 12px;
+  padding: 16px 16px 12px;
 }
 .workspace-chat {
   position: relative;
@@ -732,19 +808,31 @@ header.topbar {
 }
 @media (max-width: 760px) {
   .workspace-chat > .chat-scroll {
-    padding-top: 128px;
+    padding-top: 132px;
   }
   .workspace-chat > .error-banner {
-    margin-top: 110px;
+    margin-top: 112px;
   }
 }
 .topbar-center {
   flex-direction: column;
-  gap: 9px;
+}
+/* Beats `.topbar > span` on specificity so the mascot/pill stack has no gap. */
+header.topbar .topbar-center {
+  gap: 0;
 }
 .identity-mascot {
   display: block;
   line-height: 0;
+  /* Sits a bit on top of the pill: slight overlap via positioning, the
+   * pill itself stays a normal snug pill around the text. */
+  position: relative;
+  z-index: 1;
+  margin-bottom: -12px;
+}
+/* The whole identity (mascot + pill) opens the teammate panel. */
+.identity-tap {
+  cursor: pointer;
 }
 .identity-mascot .character {
   border-radius: 50%;
@@ -754,9 +842,10 @@ header.topbar {
   align-items: center;
   justify-content: center;
   color: var(--muted);
+  margin-bottom: -12px;
 }
 .identity-stack .character + .character {
-  margin-left: -14px;
+  margin-left: -16px;
 }
 .identity-stack .character {
   border-radius: 50%;
@@ -766,20 +855,22 @@ header.topbar {
 .identity-pill {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--system-background) 68%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
-  backdrop-filter: blur(16px) saturate(1.5);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  /* Solid, never glass: a translucent blur layer paints its square box
+   * behind the pill on some browsers — that was the visible hard border. */
+  background: var(--system-background);
+  /* No shadow at all: every shadow technique left a square halo in Safari. */
+  box-shadow: none;
   color: var(--ink);
   font: inherit;
   font-size: 16px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  padding: 7px 15px;
+  /* Normal pill snug around the text; the mascot overlaps from above. */
+  padding: 8px 16px;
   cursor: pointer;
 }
 .identity-pill:hover {
@@ -791,23 +882,26 @@ header.topbar {
 }
 @media (max-width: 760px) {
   header.topbar {
-    padding: 10px 12px 9px;
+    padding: 12px 12px 8px;
   }
-  .topbar-center {
-    gap: 7px;
+  header.topbar .topbar-center {
+    gap: 0;
+  }
+  .identity-mascot {
+    margin-bottom: -12px;
   }
   .identity-pill {
-    font-size: 15px;
-    padding: 6px 13px;
+    font-size: 16px;
+    padding: 8px 12px;
   }
 }
 .topbar > span {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 .topbar > div {
-  gap: 3px;
+  gap: 4px;
 }
 .topbar .conversation-back {
   display: none;
@@ -818,8 +912,9 @@ header.topbar {
 .workspace-menu button {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 21px 2px;
+  gap: 12px;
+  min-height: 44px;
+  padding: 20px 4px;
   border-bottom: 1px solid var(--line);
   font-size: 14px;
   text-align: left;
@@ -827,19 +922,32 @@ header.topbar {
 .workspace-menu button span {
   flex: 1;
 }
+.workspace-menu button:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+.workspace-menu button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.workspace-menu button:active:not(:disabled) {
+  filter: brightness(.96);
+}
 .workspace-menu b {
   font-weight: 500;
-  font-size: 11px;
+  font-size: 12px;
 }
 .chat-scroll {
-  padding: 24px 30px 12px;
+  padding: 24px 32px 12px;
 }
 .chat-messages {
   max-width: 720px;
   margin-inline: auto;
 }
+.chat-messages > :first-child {
+  margin-top: 0;
+}
 .chat-message {
-  margin: 13px 0;
+  margin: 20px 0 0;
 }
 /* iMessage rhythm: consecutive messages from the same speaker sit close
  * together; a group boundary breathes. */
@@ -851,18 +959,19 @@ header.topbar {
  * left-aligned since they carry real content. */
 .chat-event {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  margin: 8px auto;
-  padding: 5px 13px;
+  margin: 12px auto;
+  padding: 8px 12px;
   max-width: 78%;
   width: fit-content;
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.45;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 .chat-event.action-completed-group {
   margin-inline: 0;
@@ -875,8 +984,8 @@ header.topbar {
 }
 .chat-event small {
   color: var(--muted);
-  margin-left: 6px;
-  font-size: 12.5px;
+  margin-left: 8px;
+  font-size: 12px;
 }
 .chat-event-mark {
   align-self: center;
@@ -889,13 +998,19 @@ header.topbar {
   border-radius: 50%;
 }
 .chat-event-mark .character + .character {
-  margin-left: -7px;
+  margin-left: -8px;
 }
 /* Talking pills expand inline: the chevron sits next to the title, detail
  * lines unfold beneath. No second "Details" row. */
-.talk-pill > details {
+.talk-pill {
+  background: transparent;
+}.talk-pill > details {
   display: grid;
   min-width: 0;
+}
+/* Opened, the pill relaxes into a card — a tall 999px capsule looks broken. */
+.talk-pill:has(details[open]) {
+  border-radius: 16px;
 }
 .talk-pill summary {
   display: flex;
@@ -922,8 +1037,8 @@ header.topbar {
 }
 .talk-lines {
   display: grid;
-  gap: 3px;
-  padding-top: 5px;
+  gap: 4px;
+  padding-top: 4px;
   padding-left: 28px;
 }
 .talk-lines small {
@@ -939,28 +1054,29 @@ header.topbar {
 /* Centered system line for membership noise — quiet, no bubble, no author. */
 .chat-event.is-centered {
   margin: 12px auto;
-  padding: 5px 14px;
+  padding: 4px 12px;
   max-width: 88%;
   width: fit-content;
   background: transparent;
   border-color: transparent;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 .chat-event.is-centered svg {
   flex-shrink: 0;
 }
 .action-completed-group { padding: 0; }
 .action-completed-group details { width: 100%; }
-.action-completed-group details summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 11px; cursor: pointer; color: var(--ink); font-size: 12px; list-style: none; }
+.action-completed-group details summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; cursor: pointer; color: var(--ink); font-size: 12px; list-style: none; }
 .action-completed-group details summary::-webkit-details-marker { display: none; }
 .action-completed-group details summary span { flex: 1; }
 .action-completed-group details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .action-completed-group details[open] summary > svg:last-child { transform: rotate(180deg); }
-.action-completed-group details p { margin: 5px 11px 0; }
-.action-completed-group .action-completed-records { padding-bottom: 9px; }
+.action-completed-group details p { margin: 8px 12px 0; }
+.action-completed-group .action-completed-records { padding-bottom: 8px; }
 .action-completed-group details p small { display: block; }
 .from-team {
   max-width: 88%;
@@ -970,26 +1086,26 @@ header.topbar {
   background: var(--bubble-incoming);
   border: 1px solid transparent;
   box-shadow: none;
-  padding: 10px 14px;
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) 6px;
+  padding: 12px 16px;
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) 4px;
   font-size: 16px;
   line-height: 1.55;
   color: var(--bubble-incoming-label);
 }
 .from-team.continues > .prose {
-  border-radius: 6px 14px 14px 6px;
+  border-radius: 4px 16px 16px 4px;
 }
 .from-you {
   background: var(--bubble-outgoing);
-  border-radius: var(--radius-bubble) var(--radius-bubble) 6px var(--radius-bubble);
-  padding: 10px 14px;
+  border-radius: var(--radius-bubble) var(--radius-bubble) 4px var(--radius-bubble);
+  padding: 12px 16px;
   box-shadow: none;
   font-size: 16px;
   line-height: 1.55;
   color: var(--bubble-outgoing-label);
 }
 .from-you.continues {
-  border-radius: 14px 6px 6px 14px;
+  border-radius: 16px 4px 4px 16px;
 }
 .from-you .prose,
 .from-you .prose strong {
@@ -1008,37 +1124,41 @@ header.topbar {
   overflow-wrap: anywhere;
 }
 .message-author {
-  margin: 0 0 5px 2px;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  margin: 0 0 8px 0;
+  gap: 8px;
 }
 .message-author .character {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 .message-author strong {
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: -0.005em;
+  line-height: 1.4;
 }
 .message-author time {
   font-size: 12px;
+  line-height: 1.4;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  margin-left: 2px;
+  margin-left: 0;
 }
 .message-file {
   padding: 12px;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow-wrap: anywhere;
 }
 .message-file svg {
   flex-shrink: 0;
 }
 .chat-compose {
-  padding: 10px 30px 18px;
+  padding: 12px 32px 16px;
 }
 .chat-compose > form {
   width: min(720px, 100%);
@@ -1048,8 +1168,8 @@ header.topbar {
   display: none;
 }
 .composer-chat {
-  padding: 10px 10px 10px 14px;
-  border-radius: 22px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 16px;
   background: var(--system-background);
 }
 .composer-chat textarea {
@@ -1067,13 +1187,13 @@ header.topbar {
 /* HIG Simplicity: the message field + Send carry the hierarchy. Safety is a
  * quiet secondary control — one tap, full meaning in Details. */
 .composer-bar .add-file {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
 }
 .composer-bar .send {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 0;
   border-radius: 50%;
   display: grid;
@@ -1082,39 +1202,39 @@ header.topbar {
   flex-shrink: 0;
 }
 .composer-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-inline: auto 4px;
 }
 .chat-empty {
-  padding-top: 65px;
+  padding-top: 64px;
 }
 .chat-empty h1 {
-  font-size: 25px;
-  letter-spacing: -0.8px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
 }
 .conversations-page {
   max-width: 760px;
 }
 .favorite-teammates {
   display: flex;
-  gap: 22px;
+  gap: 24px;
   margin: 28px 0;
 }
 .favorite-teammates button {
   display: grid;
   justify-items: center;
-  gap: 7px;
+  gap: 8px;
   font-size: 12px;
 }
 .inbox-conversations .conversation-row {
-  padding: 18px 6px;
+  padding: 16px 8px;
 }
 .inbox-conversations .conversation-heading strong {
-  font-size: 15px;
+  font-size: 16px;
 }
 .inbox-conversations .conversation-copy small {
-  font-size: 13px;
+  font-size: 14px;
 }
 .conversation-context {
   border-left: 1px solid var(--line);
@@ -1153,72 +1273,96 @@ header.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 20px;
   border-bottom: 1px solid var(--line);
+}
+.conversation-context > header button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.conversation-context > header button:hover {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+.conversation-context > header button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .conversation-context h2 {
   font-size: 12px;
   font-weight: 500;
 }
 .conversation-context-content {
-  padding: 23px 20px;
+  padding: 24px 20px;
 }
 .drawer-body > .conversation-context-content {
   padding: 0;
 }
 .context-picker {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 24px;
 }
 .context-picker select {
   width: 100%;
-  padding: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
 }
 .context-person {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-bottom: 26px;
+  gap: 8px;
+  margin-bottom: 24px;
 }
 .context-person strong {
   font-size: 14px;
+  line-height: 1.4;
 }
 .context-person p {
-  margin-top: 5px;
+  margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 .conversation-context-content section {
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 .conversation-context-content h3 {
   display: flex;
-  gap: 7px;
+  gap: 8px;
   align-items: center;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 600;
 }
 .conversation-context-content .section-heading {
-  margin-bottom: 13px;
+  margin-bottom: 12px;
 }
 .context-computer img {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .live-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
-  font-weight: 550;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1286,7 +1430,7 @@ header.topbar {
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   padding: 7px 13px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
@@ -1375,7 +1519,7 @@ header.topbar {
   border-radius: 9px 9px 0 0;
   background: var(--surface-muted);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .browser-tab.active {
   background: var(--surface);
@@ -1390,7 +1534,7 @@ header.topbar {
   background: none;
   border: 0;
   padding: 2px;
-  font-size: 11px;
+  font-size: 12px;
   color: inherit;
   cursor: pointer;
   text-align: left;
@@ -1504,7 +1648,7 @@ header.topbar {
   align-items: center;
   gap: 5px;
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   padding: 4px 9px;
   border-radius: 999px;
   background: var(--strong);
@@ -1536,7 +1680,7 @@ header.topbar {
   align-items: center;
   gap: 5px;
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   padding: 4px 9px;
   border-radius: 999px;
   background: var(--strong);
@@ -1544,7 +1688,7 @@ header.topbar {
 }
 .takeover-caption {
   padding: 9px 18px 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .takeover-hint-badge {
@@ -1555,7 +1699,7 @@ header.topbar {
   align-items: center;
   gap: 5px;
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   padding: 4px 9px;
   border-radius: 999px;
   background: var(--strong);
@@ -1564,7 +1708,7 @@ header.topbar {
 }
 .takeover-hint {
   padding: 9px 18px 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -1590,8 +1734,8 @@ header.topbar {
 }
 .takeover-copy {
   display: flex;
-  gap: 9px;
-  align-items: flex-start;
+  gap: 8px;
+  align-items: center;
   color: var(--secondary);
 }
 .takeover-copy strong {
@@ -1600,7 +1744,7 @@ header.topbar {
   color: var(--ink);
 }
 .takeover-copy small {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -1627,11 +1771,28 @@ header.topbar {
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .takeover-type button.primary {
   background: var(--strong);
   color: var(--on-strong);
   border-color: var(--strong);
+}
+.takeover-type button:hover:not(:disabled),
+.takeover-keys button:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+.takeover-type button:focus-visible,
+.takeover-keys button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.takeover-type button:active:not(:disabled),
+.takeover-keys button:active:not(:disabled) {
+  filter: brightness(.96);
 }
 .takeover-type button:disabled,
 .takeover-keys button:disabled {
@@ -1646,7 +1807,7 @@ header.topbar {
 .takeover-boundary {
   display: block;
   padding: 10px 18px 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
 }
@@ -1658,18 +1819,19 @@ header.topbar {
 }
 .auto-review-details summary {
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--secondary);
   cursor: pointer;
 }
 .auto-review-rules {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding-top: 11px;
 }
 .auto-review-intro {
   display: flex;
-  gap: 9px;
+  align-items: center;
+  gap: 8px;
   color: var(--secondary);
 }
 .auto-review-intro strong {
@@ -1677,14 +1839,15 @@ header.topbar {
   color: var(--ink);
 }
 .auto-review-intro small {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
 }
 .auto-review-form {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  align-items: center;
+  gap: 8px;
 }
 .auto-review-form select,
 .auto-review-form input {
@@ -1702,7 +1865,7 @@ header.topbar {
 .auto-review-form button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   border: 1px solid var(--strong);
   border-radius: 8px;
   padding: 7px 12px;
@@ -1715,14 +1878,24 @@ header.topbar {
   opacity: 0.5;
   cursor: default;
 }
+.auto-review-form button:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.auto-review-form button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.auto-review-form button:active:not(:disabled) {
+  filter: brightness(.95);
+}
 .auto-review-notice {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .auto-review-list {
   list-style: none;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
   padding: 0;
 }
@@ -1734,7 +1907,7 @@ header.topbar {
 }
 .auto-review-effect {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1749,12 +1922,12 @@ header.topbar {
   border-color: var(--strong);
 }
 .auto-review-list code {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink);
 }
 .auto-review-list small {
   flex: 1;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1766,22 +1939,34 @@ header.topbar {
   color: var(--muted);
   cursor: pointer;
   padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .auto-review-list button:hover {
   color: var(--ink);
 }
+.auto-review-list button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.auto-review-list button:active:not(:disabled) {
+  filter: brightness(.95);
+}
 .conversation-new {
   display: inline-flex;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 .group-editor {
   display: grid;
-  gap: 13px;
+  gap: 12px;
 }
 .group-name {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1793,7 +1978,7 @@ header.topbar {
   border: none;
   background: transparent;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
 }
 .group-members {
@@ -1805,7 +1990,7 @@ header.topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px 7px;
+  gap: 4px 8px;
   text-align: left;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1816,7 +2001,7 @@ header.topbar {
 }
 .group-member small {
   width: 100%;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 .group-member.chosen {
@@ -1829,6 +2014,16 @@ header.topbar {
 .group-member:not(.chosen) svg {
   opacity: 0;
 }
+.group-member:hover:not(.chosen) {
+  background: var(--surface-muted);
+}
+.group-member:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.group-member:active:not(:disabled) {
+  filter: brightness(.96);
+}
 .context-group {
   display: flex;
   align-items: center;
@@ -1836,7 +2031,7 @@ header.topbar {
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 9px 12px;
+  padding: 12px;
   margin-bottom: 24px;
   font-size: 12px;
   color: var(--secondary);
@@ -1854,7 +2049,7 @@ header.topbar {
 .context-computer > p,
 .context-computer small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
   margin-top: 10px;
@@ -1876,9 +2071,10 @@ header.topbar {
 .context-work {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 6px;
+  gap: 4px 12px;
   width: 100%;
-  padding: 13px 0;
+  min-height: 44px;
+  padding: 12px 0;
   text-align: left;
   border-bottom: 1px solid var(--line);
 }
@@ -1897,7 +2093,7 @@ header.topbar {
 }
 .context-work small {
   grid-column: 1;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .context-work svg {
@@ -1925,16 +2121,20 @@ header.topbar {
   line-height: 1.5;
   border-top: 1px solid var(--line);
   padding-top: 12px;
+  overflow-wrap: anywhere;
 }
 .draft-conflict blockquote {
   max-height: 100px;
   overflow: auto;
   margin: 8px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
 }
 .draft-conflict button {
+  min-height: 40px;
   padding: 8px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   margin: 4px;
 }
 @media (max-width: 760px) {
@@ -1949,21 +2149,23 @@ header.topbar {
   }
   .topbar .conversation-back {
     display: grid;
-    width: 25px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
   }
   .topbar .mobile-search {
     display: none;
   }
   .topbar > div {
-    gap: 0;
+    gap: 4px;
   }
   .topbar > div > .topbar-control,
   .topbar > div > .conversation-actions > button {
     width: 40px;
+    height: 40px;
   }
   .chat-scroll {
-    padding: 17px 17px 8px;
+    padding: 16px 16px 8px;
   }
   .from-team,
   .from-you {
@@ -1982,7 +2184,7 @@ header.topbar {
     display: none;
   }
   .conversations-page h1 {
-    font-size: 27px;
+    font-size: 24px;
   }
   .favorite-teammates {
     justify-content: space-around;
@@ -2001,16 +2203,16 @@ header.topbar {
 .composer-mode {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 5px 12px;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--secondary);
   font: inherit;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   order: 3;
@@ -2023,19 +2225,20 @@ header.topbar {
 /* Details pane, iMessage order: who, safety, work, routines. */
 .safety-card {
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  padding: 14px;
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 24px;
   background: var(--system-background);
 }
 .safety-card h3 {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.4;
 }
 .safety-card p {
   margin: 0 0 12px;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--muted);
 }
@@ -2050,7 +2253,7 @@ header.topbar {
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2094,16 +2297,52 @@ a.message-file:hover {
   }
   .send:active:not(:disabled),
   .compose-primary:active,
-  .compose-secondary:active {
+  .compose-secondary:active,
+  .composer-bar .add-file:active:not(:disabled),
+  .composer-mode:active:not(:disabled) {
     transform: scale(0.9);
   }
+  .composer-bar .add-file,
+  .composer-mode,
+  .compose-primary,
+  .compose-secondary {
+    transition: transform 160ms ease-out;
+  }
+  /* Press compresses; rows dim instead of scaling so a pressed swiped row
+   * never snaps out of its slid-aside position. */
   .conversation-row:active {
-    transform: scale(0.99);
+    transform: none;
+    filter: brightness(0.96);
+  }
+  .identity-pill {
+    transition: transform 160ms ease-out, border-color 120ms ease;
+  }
+  .identity-pill:active {
+    transform: scale(0.96);
+  }
+  header.topbar .topbar-control,
+  header.topbar .conversation-actions > button {
+    transition: transform 160ms ease-out, background 120ms ease, color 120ms ease;
+  }
+  header.topbar .topbar-control:active,
+  header.topbar .conversation-actions > button:active {
+    transform: scale(0.9);
+  }
+  .conversation-cell.swiped .row-action:active,
+  .conversation-cell:focus-within .row-action:active {
+    transform: scale(0.85);
+  }
+  .pinned-open:active {
+    transform: scale(0.94);
+  }
+  .composer-mention button:active,
+  .talk-pill summary:active {
+    filter: brightness(0.96);
   }
   .pinned-open {
     transition: transform 140ms ease;
   }
   .pinned-open:hover {
-    transform: translateY(-1px);
+    /* transform: translateY(-1px); removed for HIG */
   }
 }

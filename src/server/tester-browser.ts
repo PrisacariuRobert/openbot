@@ -112,7 +112,7 @@ export function compactAxTree(tree: unknown, opts?: { ref?: number; maxDepth?: n
   const nodes = (tree as { nodes?: AxNode[] } | null)?.nodes;
   if (!Array.isArray(nodes)) return [];
   const byId = new Map(nodes.filter((node) => typeof node.nodeId === "string").map((node) => [node.nodeId as string, node]));
-  const maxDepth = Math.max(1, Math.min(12, opts?.maxDepth || 12));
+  const maxDepth = Math.max(1, Math.min(24, opts?.maxDepth || 20));
   const interactiveOnly = opts?.interactiveOnly !== false;
   const keep = new Set(["button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox", "listbox", "option", "menuitem", "DisclosureTriangle", "tab", "switch", "slider", "spinbutton", "heading", "img", "StaticText"]);
   const lines: string[] = [];
@@ -405,7 +405,7 @@ export class TesterBrowser {
     try {
       const cdp = await session.context.newCDPSession(page);
       try {
-        tree = await cdp.send("Accessibility.getFullAXTree", { depth: 14 });
+        tree = await cdp.send("Accessibility.getFullAXTree", { depth: 20 });
       } finally {
         await cdp.detach().catch(() => {});
       }

@@ -153,6 +153,13 @@ import { ConnectorIcon } from "./ConnectorIcon";
 import { SavedFilesPanel } from "./studio/SavedFilesPanel";
 
 import { Character } from "./studio/Character";
+import { Advanced } from "./studio/Advanced";
+import {
+  SettingsCard,
+  SettingsGroup,
+  SettingsRow,
+  SwitchRow,
+} from "./studio/Settings";
 import { AppearancePicker } from "./studio/AppearancePicker";
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -416,39 +423,13 @@ export function ControlPanel({
           </div>
         </section>
       )}
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Studio access</h3>
-            <p>One clear permission shared by every teammate</p>
-          </div>
-          <span
-            className={`studio-access-state ${state.settings.macAccessEnabled ? "on" : ""}`}
-          >
-            <i />
-            {state.settings.macAccessEnabled
-              ? "Available to everyone"
-              : "Off for everyone"}
-          </span>
-        </div>
-        <label className="studio-access-card">
-          <span className="studio-access-icon">
-            <HardDrive size={20} />
-          </span>
-          <span>
-            <strong>Files & apps on this Mac</strong>
-            <small>
-              Every current and future teammate can inspect visible files and
-              accessible app controls, plus read Calendar and Mail with macOS Automation consent. File moves, clicks and typing still wait
-              for your okay.
-            </small>
-          </span>
-          <input
-            aria-label="Mac access for every teammate"
-            type="checkbox"
+      <SettingsGroup title="Safety & Permissions">
+        <SettingsCard>
+          <SwitchRow
+            title="Files & apps on this Mac"
+            description="Teammates can inspect visible files and accessible app controls, plus read Calendar and Mail with macOS Automation consent. Consequential actions (moving files, clicks, terminal commands) still wait for your okay."
             checked={state.settings.macAccessEnabled}
-            onChange={(event) => {
-              const enabled = event.target.checked;
+            onChange={(enabled) => {
               if (
                 !enabled ||
                 window.confirm(
@@ -458,258 +439,208 @@ export function ControlPanel({
                 void onSetMacAccess(enabled);
             }}
           />
-        </label>
-      </section>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Self-extending studio</h3>
-            <p>When a teammate hits a capability it does not have</p>
-          </div>
-          <span
-            className={`studio-access-state ${state.settings.selfExtendEnabled ? "on" : ""}`}
+        </SettingsCard>
+      </SettingsGroup>
+
+      <SettingsGroup title="Teammates">
+        <SettingsCard>
+          <SettingsRow
+            title="Import teammate bundle"
+            description="Add a pre-configured teammate, their skills and routines from a .json file"
+            control={
+              <button type="button" onClick={() => teammateImportInput.current?.click()}>
+                <Download size={15} /> Import teammate
+              </button>
+            }
           >
-            <i />
-            {state.settings.selfExtendEnabled ? "On" : "Off"}
-          </span>
-        </div>
-        <label className="studio-access-card">
-          <span className="studio-access-icon">
-            <Wrench size={20} />
-          </span>
-          <span>
-            <strong>Let teammates write their own tools</strong>
-            <small>
-              When something is missing, the teammate asks first and shows its
-              exact plan. Approving restarts the same task with your coding
-              model. New tools stay in the teammate's private workspace and you
-              can delete them in Files.
-            </small>
-          </span>
-          <input
-            aria-label="Let teammates write their own tools"
-            type="checkbox"
-            checked={state.settings.selfExtendEnabled}
-            onChange={(event) => {
-              void onSetSelfExtend(event.target.checked);
-            }}
-          />
-        </label>
-        {state.settings.selfExtendEnabled && (
-          <label className="field">
-            <span>Coding model for self-built tools</span>
-            <select
-              value={state.settings.codingModel || ""}
-              onChange={(event) => {
-                void onSetCodingModel(event.target.value || null);
-              }}
-            >
-              <option value="">Same model as the teammate</option>
-              {codingChoices.map((value) => (
-                <option key={value} value={value}>
-                  {shortModel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </section>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Memory with meaning</h3>
-            <p>Let teammates recall notes by meaning, not just shared words</p>
-          </div>
-          <span
-            className={`studio-access-state ${embeddingsActive ? "on" : ""}`}
-          >
-            <i />
-            {embeddingsActive ? "On" : "Keyword only"}
-          </span>
-        </div>
-        <label className="studio-access-card">
-          <span className="studio-access-icon">
-            <Brain size={20} />
-          </span>
-          <span>
-            <strong>Understand saved notes by meaning</strong>
-            <small>
-              Pick a key-based or local model connection and an embedding
-              model. Teammates then match memories by meaning first, wording
-              second. Anything the connection cannot reach falls back to
-              keyword search automatically.
-            </small>
-          </span>
-          <input
-            aria-label="Understand saved notes by meaning"
-            type="checkbox"
-            checked={embeddingsActive}
-            disabled={!embeddingsActive && embeddingConnections.length === 0}
-            onChange={(event) => {
-              if (!event.target.checked)
-                void onSetEmbeddings(null, null);
-              else if (embeddingConnections[0])
-                void onSetEmbeddings(
-                  embeddingConnections[0].id,
-                  embeddingsModelDraft || null,
-                );
-            }}
-          />
-        </label>
-        <label className="field">
-          <span>Embeddings connection</span>
-          <select
-            value={state.settings.embeddingsProviderInstanceId || ""}
-            onChange={(event) => {
-              void onSetEmbeddings(event.target.value || null, null);
-            }}
-          >
-            <option value="">Keyword search only</option>
-            {embeddingConnections.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {state.settings.embeddingsProviderInstanceId && (
-          <label className="field">
-            <span>Embedding model</span>
             <input
-              key={state.settings.embeddingsModel || ""}
-              defaultValue={embeddingsModelDraft}
-              placeholder="text-embedding-3-small"
-              maxLength={200}
-              onChange={(event) => setEmbeddingsModelDraft(event.target.value)}
-              onBlur={(event) => {
-                const model = event.target.value.trim();
-                if (model && model !== state.settings.embeddingsModel)
+              ref={teammateImportInput}
+              type="file"
+              className="visually-hidden"
+              accept=".json,application/json"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (teammateImportInput.current) teammateImportInput.current.value = "";
+                if (!file) return;
+                void (async () => {
+                  if (file.size > 256_000) throw new Error("That teammate file is too large. Choose one under 256 KB.");
+                  const bundle = JSON.parse(await file.text()) as unknown;
+                  const imported = await onImportTeammate(bundle);
+                  window.alert(`Imported ${imported.name} as a new teammate${imported.routines ? ` with ${imported.routines} paused routine${imported.routines === 1 ? "" : "s"}` : ""}. Choose an AI connection for them before starting work.`);
+                })().catch((error: Error) => window.alert(error instanceof SyntaxError ? "That file is not an OpenBot teammate file." : error.message || "This teammate could not be imported."));
+              }}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsGroup>
+
+      <Advanced title="Advanced Safety & System Controls" summary="YOLO mode, self-built tools, semantic embeddings, and seat limits">
+        <SettingsGroup title="Unrestricted Execution">
+          <SettingsCard>
+            <SwitchRow
+              title="Let teammates act without asking (YOLO Mode)"
+              description="Sends, publishes, file moves, browser clicks and code runs go through immediately without confirmation prompts. Every auto-decision is still recorded in your activity receipts."
+              checked={state.settings.yoloMode}
+              onChange={(enabled) => {
+                if (
+                  !enabled ||
+                  window.confirm(
+                    "Turn on YOLO mode? Teammates will send, publish, move files and run commands without asking first — including actions your Auto Review rules would normally stop. Every auto-decision is still recorded, and access grants do not change.",
+                  )
+                )
+                  void onSetYoloMode(enabled);
+              }}
+            />
+          </SettingsCard>
+        </SettingsGroup>
+
+        <SettingsGroup title="Self-Built Tools & Coding">
+          <SettingsCard>
+            <SwitchRow
+              title="Let teammates write their own tools"
+              description="When something is missing, the teammate asks first and shows its plan. Approving restarts the task with your designated coding model."
+              checked={state.settings.selfExtendEnabled}
+              onChange={(enabled) => {
+                void onSetSelfExtend(enabled);
+              }}
+            />
+            {state.settings.selfExtendEnabled && (
+              <SettingsRow
+                title="Coding model for self-built tools"
+                control={
+                  <select
+                    aria-label="Coding model for self-built tools"
+                    value={state.settings.codingModel || ""}
+                    onChange={(event) => {
+                      void onSetCodingModel(event.target.value || null);
+                    }}
+                  >
+                    <option value="">Same model as the teammate</option>
+                    {codingChoices.map((value) => (
+                      <option key={value} value={value}>
+                        {shortModel(value)}
+                      </option>
+                    ))}
+                  </select>
+                }
+              />
+            )}
+          </SettingsCard>
+        </SettingsGroup>
+
+        <SettingsGroup title="Semantic Memory & Embeddings">
+          <SettingsCard>
+            <SwitchRow
+              title="Understand saved notes by meaning"
+              description="Teammates match memories by semantic meaning first, wording second, with automatic keyword fallback."
+              checked={embeddingsActive}
+              disabled={!embeddingsActive && embeddingConnections.length === 0}
+              onChange={(checked) => {
+                if (!checked) void onSetEmbeddings(null, null);
+                else if (embeddingConnections[0])
                   void onSetEmbeddings(
-                    state.settings.embeddingsProviderInstanceId,
-                    model,
+                    embeddingConnections[0].id,
+                    embeddingsModelDraft || null,
                   );
               }}
             />
-          </label>
-        )}
-      </section>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Teammates</h3>
-            <p>
-              {state.bots.length} of {state.settings.maxTeammates} seat
-              {state.settings.maxTeammates === 1 ? "" : "s"} in use
-            </p>
-          </div>
-        </div>
-        <label className="field">
-          <span>Teammate limit</span>
-          <input
-            key={state.settings.maxTeammates}
-            type="number"
-            min={1}
-            max={100}
-            defaultValue={state.settings.maxTeammates}
-            onBlur={(event) => {
-              const max = Math.max(1, Math.min(100, Math.floor(Number(event.target.value)) || state.settings.maxTeammates));
-              if (max !== state.settings.maxTeammates) void onSetMaxTeammates(max);
-            }}
-          />
-        </label>
-        <div className="delegation-actions">
-          <input
-            ref={teammateImportInput}
-            type="file"
-            className="visually-hidden"
-            accept=".json,application/json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (teammateImportInput.current) teammateImportInput.current.value = "";
-              if (!file) return;
-              void (async () => {
-                if (file.size > 256_000) throw new Error("That teammate file is too large. Choose one under 256 KB.");
-                const bundle = JSON.parse(await file.text()) as unknown;
-                const imported = await onImportTeammate(bundle);
-                window.alert(`Imported ${imported.name} as a new teammate${imported.routines ? ` with ${imported.routines} paused routine${imported.routines === 1 ? "" : "s"}` : ""}. Choose an AI connection for them before starting work.`);
-              })().catch((error: Error) => window.alert(error instanceof SyntaxError ? "That file is not an OpenBot teammate file." : error.message || "This teammate could not be imported."));
-            }}
-          />
-          <button type="button" onClick={() => teammateImportInput.current?.click()}>
-            <Download size={15} /> Import teammate
-          </button>
-        </div>
-        {state.retiredBots.length > 0 && (
-          <div className="signal-list">
-            {state.retiredBots.map((bot) => (
-              <article key={bot.id}>
-                <div className="signal-route">
-                  <Mascot
-                    bot={{ name: bot.name, mascot: bot.mascot, color: bot.color }}
-                    size="tiny"
+            <SettingsRow
+              title="Embeddings connection"
+              control={
+                <select
+                  aria-label="Embeddings connection"
+                  value={state.settings.embeddingsProviderInstanceId || ""}
+                  onChange={(event) => {
+                    void onSetEmbeddings(event.target.value || null, null);
+                  }}
+                >
+                  <option value="">Keyword search only</option>
+                  {embeddingConnections.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+              }
+            />
+            {state.settings.embeddingsProviderInstanceId && (
+              <SettingsRow
+                title="Embedding model"
+                control={
+                  <input
+                    key={state.settings.embeddingsModel || ""}
+                    defaultValue={embeddingsModelDraft}
+                    placeholder="text-embedding-3-small"
+                    maxLength={200}
+                    aria-label="Embedding model"
+                    onChange={(event) => setEmbeddingsModelDraft(event.target.value)}
+                    onBlur={(event) => {
+                      const model = event.target.value.trim();
+                      if (model && model !== state.settings.embeddingsModel)
+                        void onSetEmbeddings(
+                          state.settings.embeddingsProviderInstanceId,
+                          model,
+                        );
+                    }}
                   />
-                  <span>{bot.name}</span>
-                  <b>retired</b>
+                }
+              />
+            )}
+          </SettingsCard>
+        </SettingsGroup>
+
+        <SettingsGroup title="Limits & Recovery">
+          <SettingsCard>
+            <SettingsRow
+              title="Teammate seat limit"
+              description={`${state.bots.length} of ${state.settings.maxTeammates} seat${state.settings.maxTeammates === 1 ? "" : "s"} in use`}
+              control={
+                <input
+                  key={state.settings.maxTeammates}
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue={state.settings.maxTeammates}
+                  aria-label="Teammate limit"
+                  onBlur={(event) => {
+                    const max = Math.max(1, Math.min(100, Math.floor(Number(event.target.value)) || state.settings.maxTeammates));
+                    if (max !== state.settings.maxTeammates) void onSetMaxTeammates(max);
+                  }}
+                />
+              }
+            />
+            {state.retiredBots.length > 0 && (
+              <SettingsRow title="Retired teammates" description="Bring one back without losing its history">
+                <div className="signal-list">
+                  {state.retiredBots.map((bot) => (
+                    <article key={bot.id}>
+                      <div className="signal-route">
+                        <Mascot
+                          bot={{ name: bot.name, mascot: bot.mascot, color: bot.color }}
+                          size="tiny"
+                        />
+                        <span>{bot.name}</span>
+                        <b>retired</b>
+                      </div>
+                      <p>{bot.role}</p>
+                      <div className="delegation-actions">
+                        <button
+                          type="button"
+                          disabled={restoreState.botId !== null}
+                          onClick={() => { void restoreCoordinator.current.restore(bot, onRestoreTeammate, setRestoreState); }}
+                        >
+                          {restoreState.botId === bot.id ? "Restoring…" : "Restore"}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-                <p>{bot.role}</p>
-                <div className="delegation-actions">
-                  <button
-                    type="button"
-                    disabled={restoreState.botId !== null}
-                    onClick={() => { void restoreCoordinator.current.restore(bot, onRestoreTeammate, setRestoreState); }}
-                  >
-                    {restoreState.botId === bot.id ? "Restoring…" : "Restore"}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-        {restoreState.error && <p className="panel-error" role="alert">{restoreState.error}</p>}
-      </section>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>YOLO mode</h3>
-            <p>Skip every approval. Nothing pauses.</p>
-          </div>
-          <span
-            className={`studio-access-state ${state.settings.yoloMode ? "on" : ""}`}
-          >
-            <i />
-            {state.settings.yoloMode ? "On — nothing pauses" : "Off"}
-          </span>
-        </div>
-        <label className="studio-access-card">
-          <span className="studio-access-icon">
-            <Flame size={20} />
-          </span>
-          <span>
-            <strong>Let teammates act without asking</strong>
-            <small>
-              Sends, publishes, file moves, browser clicks and code runs go
-              through immediately — including anything your Auto Review rules
-              would stop. Every auto-decision is still recorded. Access grants
-              stay exactly as they are.
-            </small>
-          </span>
-          <input
-            aria-label="Let teammates act without asking"
-            type="checkbox"
-            checked={state.settings.yoloMode}
-            onChange={(event) => {
-              const enabled = event.target.checked;
-              if (
-                !enabled ||
-                window.confirm(
-                  "Turn on YOLO mode? Teammates will send, publish, move files and run commands without asking first — including actions your Auto Review rules would normally stop. Every auto-decision is still recorded, and access grants do not change.",
-                )
-              )
-                void onSetYoloMode(enabled);
-            }}
-          />
-        </label>
-      </section>
+              </SettingsRow>
+            )}
+          </SettingsCard>
+          {restoreState.error && <p className="panel-error" role="alert">{restoreState.error}</p>}
+        </SettingsGroup>
+      </Advanced>
       <section>
         <div className="panel-section-heading">
           <div>
@@ -1353,7 +1284,8 @@ export function LiveStudioPanel({
               <small>Nothing disappears until you decide</small>
             </div>
           </header>
-          {uncertainActions.map((action) => (
+          <SettingsCard>
+            {uncertainActions.map((action) => (
             <article key={action.id} className="uncertain-action">
               <span className="live-alert-mark">
                 <CircleAlert size={15} />
@@ -1389,17 +1321,20 @@ export function LiveStudioPanel({
               </span>
             </article>
           ))}
+          </SettingsCard>
         </section>
       )}
       {activeWork.length > 0 && <section className="work-timeline" aria-label="Work in progress">
-        {activeWork.map((run) => <article key={run.id}>
-          <Mascot bot={{ name: run.botName, color: run.botColor, mascot: run.botMascot, status: run.status === "running" ? "working" : "waiting" }} size="small" />
-          <div><span className="work-timeline-state">{run.botName} · {run.status === "queued" ? "Up next" : run.status === "waiting_for_teammate" ? "Consulting a teammate" : "Working"}</span>
-            <h4>{run.task.goal}</h4><p>{run.activities.at(-1)?.label || "Preparing the next step"}</p>
-            <button onClick={() => onOpenThread(run.threadId)}>Open conversation <ChevronRight size={13} /></button>
-          </div>
-          <button className="icon-button" aria-label={`Stop ${run.botName}'s task`} onClick={() => void onCancel(run.id)}><Square size={13} /></button>
-        </article>)}
+        <SettingsCard>
+          {activeWork.map((run) => <article key={run.id}>
+            <Mascot bot={{ name: run.botName, color: run.botColor, mascot: run.botMascot, status: run.status === "running" ? "working" : "waiting" }} size="small" />
+            <div><span className="work-timeline-state">{run.botName} · {run.status === "queued" ? "Up next" : run.status === "waiting_for_teammate" ? "Consulting a teammate" : "Working"}</span>
+              <h4>{run.task.goal}</h4><p>{run.activities.at(-1)?.label || "Preparing the next step"}</p>
+              <button onClick={() => onOpenThread(run.threadId)}>Open conversation <ChevronRight size={13} /></button>
+            </div>
+            <button className="icon-button" aria-label={`Stop ${run.botName}'s task`} onClick={() => void onCancel(run.id)}><Square size={13} /></button>
+          </article>)}
+        </SettingsCard>
       </section>}
       {finishedWork.length > 0 && (
         <section className="receipt-list" aria-label="Finished work">
@@ -1410,18 +1345,23 @@ export function LiveStudioPanel({
             </div>
           </div>
           <div className="receipt-list-rows">
-            {finishedWork.map((run) => (
-              <article key={run.id}>
-                <span className={`action-history-icon ${run.status === "completed" ? "done" : "attention"}`}>
-                  {run.status === "completed" ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
-                </span>
-                <span>
-                  <strong>{run.task.goal || run.prompt}</strong>
-                  <small>{run.botName} · {relativeTime(run.finishedAt)}{run.status === "failed" ? " · needs a hand" : ""}</small>
-                </span>
-                <button onClick={() => onReview(run.id)}>Receipt</button>
-              </article>
-            ))}
+            <SettingsCard>
+              {finishedWork.map((run) => (
+                <SettingsRow
+                  key={run.id}
+                  title={run.task.goal || run.prompt}
+                  description={`${run.botName} · ${relativeTime(run.finishedAt)}${run.status === "failed" ? " · needs a hand" : ""}`}
+                  control={
+                    <>
+                      <span className={`action-history-icon ${run.status === "completed" ? "done" : "attention"}`}>
+                        {run.status === "completed" ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
+                      </span>
+                      <button onClick={() => onReview(run.id)}>Receipt</button>
+                    </>
+                  }
+                />
+              ))}
+            </SettingsCard>
           </div>
         </section>
       )}
@@ -1468,7 +1408,8 @@ export function LiveStudioPanel({
           </div>
           <span className="bounded-badge">Live</span>
         </div>
-        <div className="live-desk-grid">
+        <SettingsCard>
+          <div className="live-desk-grid">
           {state.bots.map((bot) => {
             const run = currentRun(bot),
               status = statuses[bot.id],
@@ -1568,7 +1509,8 @@ export function LiveStudioPanel({
               </article>
             );
           })}
-        </div>
+          </div>
+        </SettingsCard>
       </section>
       </details>
       {hiddenBots.length > 0 && (
@@ -2032,6 +1974,16 @@ export function CodeProjectsPanel({
             Paste a GitHub link or choose a folder already on this Mac. Then ask
             a teammate to build, fix and test it.
           </p>
+          {!adding && !cloning && (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+              <button type="button" className="button-primary" onClick={() => setCloning(true)}>
+                <span><ConnectorIcon id="github" /></span> Get from GitHub
+              </button>
+              <button type="button" className="secondary" onClick={() => setAdding(true)}>
+                <FolderOpen size={16} /> Connect a folder
+              </button>
+            </div>
+          )}
         </div>
       )}
       {!adding && data?.suggestions.length ? (
@@ -2282,14 +2234,10 @@ export function CodeProjectsPanel({
           </div>
         </section>
       ) : null}
-      <div className="friendly-note">
+      <div className="settings-callout">
         <ShieldCheck size={17} />
         <p>
-          <strong>Fast work, calm review.</strong>
-          <br />
-          Every task gets its own isolated branch, so agents can work at the
-          same time without changing your main folder. Publishing to GitHub
-          always waits for your approval.
+          <strong>Fast work, calm review.</strong> Every task gets its own isolated branch so agents work without changing your main folder. Publishing always waits for approval.
         </p>
       </div>
       {error && <p className="panel-error">{error}</p>}
@@ -2374,208 +2322,203 @@ function GitHubConnectorPanel({
     });
   if (!status)
     return (
-      <section className="github-connector">
-        <div className="github-connect-head">
-          <span className="github-mark">
-            <ConnectorIcon id="github" />
-          </span>
-          <div>
-            <small>GITHUB PRODUCTIVITY</small>
-            <h3>Checking GitHub on this Mac…</h3>
-            <p>Looking for an official GitHub sign-in you already trust.</p>
-          </div>
-          <LoaderCircle className="spinner" size={17} />
-        </div>
-      </section>
+      <SettingsGroup title="GitHub">
+        <SettingsCard>
+          <SettingsRow
+            title="Checking GitHub on this Mac…"
+            description="Looking for an official GitHub sign-in you already trust."
+            control={<LoaderCircle className="spinner" size={17} />}
+          />
+        </SettingsCard>
+      </SettingsGroup>
     );
   return (
-    <section
-      className={`github-connector ${github?.connected ? "connected" : ""}`}
-    >
-      <div className="github-connect-head">
-        <span className="github-mark">
-          <ConnectorIcon id="github" />
-        </span>
-        <div>
-          <small>GITHUB PRODUCTIVITY</small>
-          <h3>
-            {github?.connected
+    <SettingsGroup title="GitHub">
+      <SettingsCard>
+        <SettingsRow
+          title={
+            github?.connected
               ? `Ready as @${github.accountLogin}`
               : github?.installed
                 ? "Bring GitHub into the studio"
-                : "GitHub CLI is needed"}
-          </h3>
-          <p>
-            {github?.connected
+                : "GitHub CLI is needed"
+          }
+          description={
+            github?.connected
               ? "Follow work across repositories, with a separate permission for creating issues."
-              : "Use the official GitHub sign-in already trusted on this Mac—no token copying."}
-          </p>
-        </div>
-        {github?.connected ? (
-          <span className="connector-ready">
-            <i /> Connected
-          </span>
-        ) : github?.installed ? (
-          <button
-            className="button-primary"
-            onClick={() => void connect()}
-            disabled={busy === "connect-github"}
-          >
-            {busy === "connect-github" || github?.connecting ? (
-              <LoaderCircle className="spinner" size={14} />
-            ) : (
-              <ExternalLink size={14} />
-            )}{" "}
-            Connect GitHub
-          </button>
-        ) : (
-          <a
-            className="button-secondary"
-            href="https://cli.github.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Get GitHub CLI <ExternalLink size={12} />
-          </a>
-        )}
-      </div>
-      {github?.connected && (
-        <>
-          <div className="github-checks">
-            <button
-              onClick={() => void checkNotifications()}
-              disabled={busy === "github-notifications"}
-            >
-              {busy === "github-notifications" ? (
-                <LoaderCircle className="spinner" size={13} />
-              ) : (
-                <Bell size={13} />
-              )}{" "}
-              Check updates
-            </button>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void searchIssues();
-              }}
-            >
-              <Search size={13} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search issues…"
-              />
-              <button disabled={busy === "github-issues"}>
-                {busy === "github-issues" ? (
-                  <LoaderCircle className="spinner" size={13} />
+              : "Use the official GitHub sign-in already trusted on this Mac—no token copying."
+          }
+          control={
+            github?.connected ? (
+              <span className="connector-ready">
+                <i /> Connected
+              </span>
+            ) : github?.installed ? (
+              <button
+                className="button-primary"
+                onClick={() => void connect()}
+                disabled={busy === "connect-github"}
+              >
+                {busy === "connect-github" || github?.connecting ? (
+                  <LoaderCircle className="spinner" size={14} />
                 ) : (
-                  "Search"
-                )}
+                  <ExternalLink size={14} />
+                )}{" "}
+                Connect GitHub
               </button>
-            </form>
-          </div>
-          {preview === "notifications" && notifications.length > 0 && (
-            <div className="github-preview">
-              {notifications.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.url || `https://github.com/${item.repository}`}
-                  target="_blank"
-                  rel="noreferrer"
+            ) : (
+              <a
+                className="button-secondary"
+                href="https://cli.github.com/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Get GitHub CLI <ExternalLink size={12} />
+              </a>
+            )
+          }
+        />
+        {github?.connected && (
+          <>
+            <SettingsRow
+              title="Check connection"
+              description="Check GitHub updates"
+              control={
+                <button
+                  onClick={() => void checkNotifications()}
+                  disabled={busy === "github-notifications"}
                 >
-                  <span className={item.unread ? "github-unread" : ""}>
-                    <Bell size={12} />
-                  </span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <small>
-                      {item.repository} · {item.reason.replace(/_/g, " ")}
-                    </small>
-                  </div>
-                  <time>{relativeTime(item.updatedAt)}</time>
-                  <ExternalLink size={11} />
-                </a>
-              ))}
-            </div>
-          )}
-          {preview === "issues" && issues.length > 0 && (
-            <div className="github-preview">
-              {issues.map((issue) => (
-                <a
-                  key={issue.id}
-                  href={issue.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span className={`issue-${issue.state}`}>
-                    #{issue.number}
-                  </span>
-                  <div>
-                    <strong>{issue.title}</strong>
-                    <small>
-                      {issue.repository}
-                      {issue.author ? ` · ${issue.author}` : ""}
-                    </small>
-                  </div>
-                  <time>{relativeTime(issue.updatedAt)}</time>
-                  <ExternalLink size={11} />
-                </a>
-              ))}
-            </div>
-          )}
-          <div className="github-access">
-            <div className="panel-section-heading">
-              <div>
-                <h3>Who can use GitHub</h3>
-                <p>Reading activity and preparing new issues stay separate</p>
-              </div>
-            </div>
-            {bots.map((bot) => {
-              const access = status?.access.find(
-                (item) =>
-                  item.connectorId === "github-cli" && item.botId === bot.id,
-              );
-              return (
-                <div key={bot.id}>
-                  <Mascot bot={bot} size="small" />
-                  <span>
-                    <strong>{bot.name}</strong>
-                    <small>{bot.role}</small>
-                  </span>
-                  <button
-                    className={access?.canRead ? "on" : ""}
-                    onClick={() =>
-                      void setAccess(
-                        bot.id,
-                        !access?.canRead,
-                        Boolean(access?.canSend),
-                      )
-                    }
-                    disabled={busy === `github-access-${bot.id}`}
-                  >
-                    <Eye size={12} /> Read
-                  </button>
-                  <button
-                    className={access?.canSend ? "on create" : "create"}
-                    onClick={() =>
-                      void setAccess(
-                        bot.id,
-                        Boolean(access?.canRead),
-                        !access?.canSend,
-                      )
-                    }
-                    disabled={busy === `github-access-${bot.id}`}
-                  >
-                    <Plus size={12} /> Create issues
-                  </button>
+                  {busy === "github-notifications" ? (
+                    <LoaderCircle className="spinner" size={13} />
+                  ) : (
+                    <Bell size={13} />
+                  )}{" "}
+                  Check updates
+                </button>
+              }
+            />
+            <SettingsRow title="Search preview" description="Search issues…">
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void searchIssues();
+                }}
+              >
+                <Search size={13} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search issues…"
+                />
+                <button disabled={busy === "github-issues"}>
+                  {busy === "github-issues" ? (
+                    <LoaderCircle className="spinner" size={13} />
+                  ) : (
+                    "Search"
+                  )}
+                </button>
+              </form>
+              {preview === "notifications" && notifications.length > 0 && (
+                <div className="github-preview">
+                  {notifications.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url || `https://github.com/${item.repository}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className={item.unread ? "github-unread" : ""}>
+                        <Bell size={12} />
+                      </span>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <small>
+                          {item.repository} · {item.reason.replace(/_/g, " ")}
+                        </small>
+                      </div>
+                      <time>{relativeTime(item.updatedAt)}</time>
+                      <ExternalLink size={11} />
+                    </a>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+              )}
+              {preview === "issues" && issues.length > 0 && (
+                <div className="github-preview">
+                  {issues.map((issue) => (
+                    <a
+                      key={issue.id}
+                      href={issue.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className={`issue-${issue.state}`}>
+                        #{issue.number}
+                      </span>
+                      <div>
+                        <strong>{issue.title}</strong>
+                        <small>
+                          {issue.repository}
+                          {issue.author ? ` · ${issue.author}` : ""}
+                        </small>
+                      </div>
+                      <time>{relativeTime(issue.updatedAt)}</time>
+                      <ExternalLink size={11} />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </SettingsRow>
+            <SettingsRow
+              title="Who can use GitHub"
+              description="Reading activity and preparing new issues stay separate"
+            >
+              {bots.map((bot) => {
+                const access = status?.access.find(
+                  (item) =>
+                    item.connectorId === "github-cli" && item.botId === bot.id,
+                );
+                return (
+                  <div key={bot.id}>
+                    <Mascot bot={bot} size="small" />
+                    <span>
+                      <strong>{bot.name}</strong>
+                      <small>{bot.role}</small>
+                    </span>
+                    <button
+                      className={access?.canRead ? "on" : ""}
+                      onClick={() =>
+                        void setAccess(
+                          bot.id,
+                          !access?.canRead,
+                          Boolean(access?.canSend),
+                        )
+                      }
+                      disabled={busy === `github-access-${bot.id}`}
+                    >
+                      <Eye size={12} /> Read
+                    </button>
+                    <button
+                      className={access?.canSend ? "on create" : "create"}
+                      onClick={() =>
+                        void setAccess(
+                          bot.id,
+                          Boolean(access?.canRead),
+                          !access?.canSend,
+                        )
+                      }
+                      disabled={busy === `github-access-${bot.id}`}
+                    >
+                      <Plus size={12} /> Create issues
+                    </button>
+                  </div>
+                );
+              })}
+            </SettingsRow>
+          </>
+        )}
+      </SettingsCard>
       {error && <p className="panel-error">{error}</p>}
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -2782,355 +2725,368 @@ function OAuthConnectorPanel({
     });
   if (!status || !connector) return null;
   return (
-    <section
-      className={`oauth-connector oauth-${kind} ${connector.connected ? "connected" : ""}`}
-    >
-      <div className="oauth-connector-head">
-        <span className="oauth-product-mark">
-          <ConnectorIcon id={kind} />
-        </span>
-        <div>
-          <small>{details.kicker}</small>
-          <h3>
-            {connector.connected
+    <SettingsGroup title={details.name}>
+      <SettingsCard>
+        <SettingsRow
+          title={
+            connector.connected
               ? `${details.name} is ready${connector.accountName ? ` · ${connector.accountName}` : ""}`
-              : details.connectTitle}
-          </h3>
-          <p>
-            {connector.connected
+              : details.connectTitle
+          }
+          description={
+            connector.connected
               ? details.connectedCopy
               : connector.configured
                 ? `Your private ${details.name} connection is ready for sign-in.`
-                : details.setupCopy}
-          </p>
-        </div>
-        {connector.connected ? (
-          <span className="connector-ready">
-            <i /> Connected
-          </span>
-        ) : connector.configured || details.oneClick ? (
-          <button
-            className="button-primary"
-            onClick={() => void connect()}
-            disabled={busy === "connect"}
-          >
-            {busy === "connect" || connector.oauthInProgress ? (
-              <LoaderCircle className="spinner" size={14} />
-            ) : (
-              <ExternalLink size={14} />
-            )}{" "}
-            {connector.oauthInProgress ? "Waiting…" : `Connect ${details.name}`}
-          </button>
-        ) : null}
-      </div>
-      {!connector.configured && !connector.managedClient && !details.oneClick && (
-        <details className="oauth-setup-disclosure">
-          <summary>
-            <span>
-              <ShieldCheck size={15} />
-              <span>
-                <strong>Set up {details.name} on this Mac</strong>
-                <small>For self-hosted and developer installs</small>
+                : details.setupCopy
+          }
+          control={
+            connector.connected ? (
+              <span className="connector-ready">
+                <i /> Connected
               </span>
-            </span>
-            <ChevronDown size={16} />
-          </summary>
-          <form className="oauth-setup-form" onSubmit={configure}>
-          <div className="oauth-setup-intro">
-            <span>
-              <ShieldCheck size={15} />
-            </span>
-            <div>
-              <strong>Self-hosted setup</strong>
-              <small>
-                {kind === "dropbox"
-                  ? "Use the public app key with PKCE, or add the secret for a private server deployment."
-                  : "The public release can bundle this once so everyone else gets one-click sign-in."}
-              </small>
-            </div>
-            <a href={details.docs} target="_blank" rel="noreferrer">
-              Create app <ExternalLink size={11} />
-            </a>
-          </div>
-          <div className="oauth-fields">
-            <label className="field">
-              <span>{kind === "dropbox" ? "App key" : "Client ID"}</span>
-              <input
-                value={clientId}
-                onChange={(event) => setClientId(event.target.value)}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Client secret {kind === "dropbox" && <small>optional with PKCE</small>}</span>
-              <input
-                type="password"
-                value={clientSecret}
-                onChange={(event) => setClientSecret(event.target.value)}
-                autoComplete="new-password"
-                required={kind !== "dropbox"}
-              />
-            </label>
-          </div>
-          <div className="callback-row">
-            <span>
-              <strong>Return address</strong>
-              <code>{connector.callbackUrl}</code>
-            </span>
-            <button type="button" onClick={() => void copyCallback()}>
-              <Copy size={14} /> Copy
-            </button>
-          </div>
-          <button className="button-primary" disabled={busy === "configure"}>
-            {busy === "configure" ? (
-              <LoaderCircle className="spinner" size={14} />
-            ) : (
-              <ShieldCheck size={14} />
-            )}{" "}
-            Save privately
-          </button>
-          </form>
-        </details>
-      )}
-      {connector.connected && (
-        <>
-          <div className="oauth-connector-tools">
-            <button onClick={() => void check()} disabled={busy === "check"}>
-              {busy === "check" ? (
-                <LoaderCircle className="spinner" size={13} />
-              ) : (
-                <RefreshCw size={13} />
-              )}{" "}
-              Check connection
-            </button>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void preview();
-              }}
-            >
-              <Search size={13} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={details.searchPlaceholder}
-              />
-              <button disabled={busy === "preview"}>
-                {busy === "preview" ? (
-                  <LoaderCircle className="spinner" size={13} />
+            ) : connector.configured || details.oneClick ? (
+              <button
+                className="button-primary"
+                onClick={() => void connect()}
+                disabled={busy === "connect"}
+              >
+                {busy === "connect" || connector.oauthInProgress ? (
+                  <LoaderCircle className="spinner" size={14} />
                 ) : (
-                  "Search"
-                )}
+                  <ExternalLink size={14} />
+                )}{" "}
+                {connector.oauthInProgress ? "Waiting…" : `Connect ${details.name}`}
               </button>
-            </form>
-          </div>
-          {kind === "slack" && slackResults.length > 0 && (
-            <div className="oauth-preview-list">
-              {slackResults.map((item) =>
-                item.permalink ? (
-                  <a
-                    key={`${item.channelId}:${item.timestamp}`}
-                    href={item.permalink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <span className="mini-service-icon">
-                      <ConnectorIcon id="slack" />
-                    </span>
-                    <span>
-                      <strong>
-                        #{item.channelName} · {item.author}
-                      </strong>
-                      <small>{item.text}</small>
-                    </span>
-                    <ExternalLink size={11} />
-                  </a>
-                ) : (
-                  <div key={`${item.channelId}:${item.timestamp}`}>
-                    <span className="mini-service-icon">
-                      <ConnectorIcon id="slack" />
-                    </span>
-                    <span>
-                      <strong>
-                        #{item.channelName} · {item.author}
-                      </strong>
-                      <small>{item.text}</small>
-                    </span>
-                  </div>
-                ),
-              )}
-            </div>
-          )}
-          {kind === "notion" && notionResults.length > 0 && (
-            <div className="oauth-preview-list">
-              {notionResults.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span className="mini-service-icon">
-                    <ConnectorIcon id="notion" />
-                  </span>
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>Edited {relativeTime(item.lastEditedAt)}</small>
-                  </span>
-                  <ExternalLink size={11} />
-                </a>
-              ))}
-            </div>
-          )}
-          {kind === "todoist" && todoistResults.length > 0 && (
-            <div className="oauth-preview-list">
-              {todoistResults.map((item) => (
-                <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
-                  <span className="mini-service-icon"><ConnectorIcon id="todoist" /></span>
-                  <span>
-                    <strong>{item.content}</strong>
-                    <small>{item.due ? `Due ${item.due}` : item.description || "Active task"}</small>
-                  </span>
-                  <ExternalLink size={11} />
-                </a>
-              ))}
-            </div>
-          )}
-          {kind === "dropbox" && dropboxResults.length > 0 && (
-            <div className="oauth-preview-list">
-              {dropboxResults.map((item) => (
-                <div key={item.id}>
-                  <span className="mini-service-icon"><ConnectorIcon id="dropbox" /></span>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.path}</small>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="oauth-boundary">
-            <ShieldCheck size={14} />
-            <span>{details.boundary}</span>
-          </div>
-          {(kind === "slack" || kind === "notion") && connector.events && (
-            <section className={`connector-event-setup ${connector.events.verified ? "ready" : ""}`}>
-              <div className="connector-event-heading">
-                <span><Webhook size={15} /></span>
-                <div>
-                  <strong>{connector.events.verified ? "Live activity is ready" : kind === "notion" && connector.events.verificationTokenReady ? "Finish in Notion" : `Let ${details.name} wake a teammate`}</strong>
-                  <small>{kind === "slack" ? "Mentions and subscribed conversation activity can start an automation." : "Page, database and comment changes can start an automation."}</small>
-                </div>
-                {connector.events.verified && <i><Check size={11} /> Ready</i>}
-                {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && <i className="pending">Verify in Notion</i>}
-              </div>
-              <div className="callback-row event-address-row">
+            ) : null
+          }
+        />
+        {!connector.configured && !connector.managedClient && !details.oneClick && (
+          <SettingsRow
+            title={`Set up ${details.name} on this Mac`}
+            description="For self-hosted and developer installs"
+          >
+            <details className="oauth-setup-disclosure">
+              <summary>
                 <span>
-                  <strong>Event address</strong>
-                  <code>{connector.events.url}</code>
-                </span>
-                <button type="button" onClick={() => void copyEventUrl()}><Copy size={14} /> Copy</button>
-              </div>
-              {kind === "slack" && !connector.events.secretConfigured && (
-                <form className="connector-event-secret" onSubmit={configureSlackEvents}>
-                  <label className="field">
-                    <span>Slack signing secret</span>
-                    <input type="password" value={signingSecret} onChange={(event) => setSigningSecret(event.target.value)} minLength={16} autoComplete="new-password" required />
-                  </label>
-                  <button className="button-primary" disabled={busy === "events"}><ShieldCheck size={14} /> Save privately</button>
-                </form>
-              )}
-              {kind === "slack" && connector.events.secretConfigured && !connector.events.verified && (
-                <p className="event-setup-note">Add the event address under <strong>Event Subscriptions</strong> in Slack. OpenBot will answer Slack’s signed verification check automatically.</p>
-              )}
-              {kind === "notion" && !connector.events.verificationTokenReady && (
-                <p className="event-setup-note">Create a webhook subscription in Notion using this event address. Return here after Notion sends its verification token.</p>
-              )}
-              {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && (
-                <div className="event-token-ready">
-                  <span><Check size={13} /> Token received. Copy it into Notion, then choose <strong>Verify subscription</strong>.</span>
-                  <button type="button" onClick={() => void copyNotionToken()} disabled={busy === "notion-token"}><Copy size={13} /> Copy token</button>
-                </div>
-              )}
-              {kind === "notion" && connector.events.verified && (
-                <p className="event-setup-note event-setup-verified"><Check size={13} /> A signed Notion event reached OpenBot successfully.</p>
-              )}
-              <div className="event-setup-footer">
-                <small>The private address and signing material never enter teammate prompts.</small>
-                <button type="button" onClick={() => {
-                  if (window.confirm(`Replace the ${details.name} event address? The previous address will stop working immediately.`)) void rotateEventAddress();
-                }} disabled={busy === "event-rotate"}><RotateCcw size={12} /> New address</button>
-              </div>
-            </section>
-          )}
-          <div className="github-access oauth-access">
-            <div className="panel-section-heading">
-              <div>
-                <h3>Who can use {details.name}</h3>
-                <p>Reading and preparing changes stay separate</p>
-              </div>
-            </div>
-            {bots.map((bot) => {
-              const access = status.access.find(
-                (item) => item.connectorId === kind && item.botId === bot.id,
-              );
-              return (
-                <div key={bot.id}>
-                  <Mascot bot={bot} size="small" />
+                  <ShieldCheck size={15} />
                   <span>
-                    <strong>{bot.name}</strong>
-                    <small>{bot.role}</small>
+                    <strong>Set up {details.name} on this Mac</strong>
+                    <small>For self-hosted and developer installs</small>
                   </span>
-                  <button
-                    className={access?.canRead ? "on" : ""}
-                    onClick={() => {
-                      const canRead = !access?.canRead;
-                      void setAccess(
-                        bot.id,
-                        canRead,
-                        canRead && Boolean(access?.canSend),
-                      );
-                    }}
-                    disabled={busy === `access-${bot.id}`}
-                  >
-                    <Eye size={12} /> {details.readLabel}
+                </span>
+                <ChevronDown size={16} />
+              </summary>
+              <form className="oauth-setup-form" onSubmit={configure}>
+                <div className="oauth-setup-intro">
+                  <span>
+                    <ShieldCheck size={15} />
+                  </span>
+                  <div>
+                    <strong>Self-hosted setup</strong>
+                    <small>
+                      {kind === "dropbox"
+                        ? "Use the public app key with PKCE, or add the secret for a private server deployment."
+                        : "The public release can bundle this once so everyone else gets one-click sign-in."}
+                    </small>
+                  </div>
+                  <a href={details.docs} target="_blank" rel="noreferrer">
+                    Create app <ExternalLink size={11} />
+                  </a>
+                </div>
+                <div className="oauth-fields">
+                  <label className="field">
+                    <span>{kind === "dropbox" ? "App key" : "Client ID"}</span>
+                    <input
+                      value={clientId}
+                      onChange={(event) => setClientId(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Client secret {kind === "dropbox" && <small>optional with PKCE</small>}</span>
+                    <input
+                      type="password"
+                      value={clientSecret}
+                      onChange={(event) => setClientSecret(event.target.value)}
+                      autoComplete="new-password"
+                      required={kind !== "dropbox"}
+                    />
+                  </label>
+                </div>
+                <div className="callback-row">
+                  <span>
+                    <strong>Return address</strong>
+                    <code>{connector.callbackUrl}</code>
+                  </span>
+                  <button type="button" onClick={() => void copyCallback()}>
+                    <Copy size={14} /> Copy
                   </button>
-                  {details.canWrite && (
-                    <button
-                      className={access?.canSend ? "on create" : "create"}
-                      onClick={() => void setAccess(bot.id, true, !access?.canSend)}
-                      disabled={busy === `access-${bot.id}`}
-                    >
-                      <Plus size={12} /> {details.writeLabel}
-                    </button>
+                </div>
+                <button className="button-primary" disabled={busy === "configure"}>
+                  {busy === "configure" ? (
+                    <LoaderCircle className="spinner" size={14} />
+                  ) : (
+                    <ShieldCheck size={14} />
+                  )}{" "}
+                  Save privately
+                </button>
+              </form>
+            </details>
+          </SettingsRow>
+        )}
+        {connector.connected && (
+          <>
+            <SettingsRow
+              title="Check connection"
+              control={
+                <button onClick={() => void check()} disabled={busy === "check"}>
+                  {busy === "check" ? (
+                    <LoaderCircle className="spinner" size={13} />
+                  ) : (
+                    <RefreshCw size={13} />
+                  )}{" "}
+                  Check connection
+                </button>
+              }
+            />
+            <SettingsRow title="Search preview" description={details.searchPlaceholder}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void preview();
+                }}
+              >
+                <Search size={13} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={details.searchPlaceholder}
+                />
+                <button disabled={busy === "preview"}>
+                  {busy === "preview" ? (
+                    <LoaderCircle className="spinner" size={13} />
+                  ) : (
+                    "Search"
+                  )}
+                </button>
+              </form>
+              {kind === "slack" && slackResults.length > 0 && (
+                <div className="oauth-preview-list">
+                  {slackResults.map((item) =>
+                    item.permalink ? (
+                      <a
+                        key={`${item.channelId}:${item.timestamp}`}
+                        href={item.permalink}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <span className="mini-service-icon">
+                          <ConnectorIcon id="slack" />
+                        </span>
+                        <span>
+                          <strong>
+                            #{item.channelName} · {item.author}
+                          </strong>
+                          <small>{item.text}</small>
+                        </span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <div key={`${item.channelId}:${item.timestamp}`}>
+                        <span className="mini-service-icon">
+                          <ConnectorIcon id="slack" />
+                        </span>
+                        <span>
+                          <strong>
+                            #{item.channelName} · {item.author}
+                          </strong>
+                          <small>{item.text}</small>
+                        </span>
+                      </div>
+                    ),
                   )}
                 </div>
-              );
-            })}
-          </div>
-          <button
-            className="disconnect-button"
-            onClick={() => {
-              if (
-                window.confirm(
-                  `Disconnect ${details.name} from OpenBot? The app details stay saved so you can reconnect later.`,
-                )
-              )
-                void disconnect();
-            }}
-            disabled={busy === "disconnect"}
-          >
-            Disconnect {details.name}
-          </button>
-        </>
-      )}
+              )}
+              {kind === "notion" && notionResults.length > 0 && (
+                <div className="oauth-preview-list">
+                  {notionResults.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className="mini-service-icon">
+                        <ConnectorIcon id="notion" />
+                      </span>
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>Edited {relativeTime(item.lastEditedAt)}</small>
+                      </span>
+                      <ExternalLink size={11} />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {kind === "todoist" && todoistResults.length > 0 && (
+                <div className="oauth-preview-list">
+                  {todoistResults.map((item) => (
+                    <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
+                      <span className="mini-service-icon"><ConnectorIcon id="todoist" /></span>
+                      <span>
+                        <strong>{item.content}</strong>
+                        <small>{item.due ? `Due ${item.due}` : item.description || "Active task"}</small>
+                      </span>
+                      <ExternalLink size={11} />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {kind === "dropbox" && dropboxResults.length > 0 && (
+                <div className="oauth-preview-list">
+                  {dropboxResults.map((item) => (
+                    <div key={item.id}>
+                      <span className="mini-service-icon"><ConnectorIcon id="dropbox" /></span>
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{item.path}</small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SettingsRow>
+            <SettingsRow title="Usage boundary">
+              <div className="oauth-boundary">
+                <ShieldCheck size={14} />
+                <span>{details.boundary}</span>
+              </div>
+            </SettingsRow>
+            {(kind === "slack" || kind === "notion") && connector.events && (
+              <SettingsRow title="Live activity">
+                <section className={`connector-event-setup ${connector.events.verified ? "ready" : ""}`}>
+                  <div className="connector-event-heading">
+                    <span><Webhook size={15} /></span>
+                    <div>
+                      <strong>{connector.events.verified ? "Live activity is ready" : kind === "notion" && connector.events.verificationTokenReady ? "Finish in Notion" : `Let ${details.name} wake a teammate`}</strong>
+                      <small>{kind === "slack" ? "Mentions and subscribed conversation activity can start an automation." : "Page, database and comment changes can start an automation."}</small>
+                    </div>
+                    {connector.events.verified && <i><Check size={11} /> Ready</i>}
+                    {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && <i className="pending">Verify in Notion</i>}
+                  </div>
+                  <div className="callback-row event-address-row">
+                    <span>
+                      <strong>Event address</strong>
+                      <code>{connector.events.url}</code>
+                    </span>
+                    <button type="button" onClick={() => void copyEventUrl()}><Copy size={14} /> Copy</button>
+                  </div>
+                  {kind === "slack" && !connector.events.secretConfigured && (
+                    <form className="connector-event-secret" onSubmit={configureSlackEvents}>
+                      <label className="field">
+                        <span>Slack signing secret</span>
+                        <input type="password" value={signingSecret} onChange={(event) => setSigningSecret(event.target.value)} minLength={16} autoComplete="new-password" required />
+                      </label>
+                      <button className="button-primary" disabled={busy === "events"}><ShieldCheck size={14} /> Save privately</button>
+                    </form>
+                  )}
+                  {kind === "slack" && connector.events.secretConfigured && !connector.events.verified && (
+                    <p className="event-setup-note">Add the event address under <strong>Event Subscriptions</strong> in Slack. OpenBot will answer Slack’s signed verification check automatically.</p>
+                  )}
+                  {kind === "notion" && !connector.events.verificationTokenReady && (
+                    <p className="event-setup-note">Create a webhook subscription in Notion using this event address. Return here after Notion sends its verification token.</p>
+                  )}
+                  {kind === "notion" && connector.events.verificationTokenReady && !connector.events.verified && (
+                    <div className="event-token-ready">
+                      <span><Check size={13} /> Token received. Copy it into Notion, then choose <strong>Verify subscription</strong>.</span>
+                      <button type="button" onClick={() => void copyNotionToken()} disabled={busy === "notion-token"}><Copy size={13} /> Copy token</button>
+                    </div>
+                  )}
+                  {kind === "notion" && connector.events.verified && (
+                    <p className="event-setup-note event-setup-verified"><Check size={13} /> A signed Notion event reached OpenBot successfully.</p>
+                  )}
+                  <div className="event-setup-footer">
+                    <small>The private address and signing material never enter teammate prompts.</small>
+                    <button type="button" onClick={() => {
+                      if (window.confirm(`Replace the ${details.name} event address? The previous address will stop working immediately.`)) void rotateEventAddress();
+                    }} disabled={busy === "event-rotate"}><RotateCcw size={12} /> New address</button>
+                  </div>
+                </section>
+              </SettingsRow>
+            )}
+            <SettingsRow
+              title={`Who can use ${details.name}`}
+              description="Reading and preparing changes stay separate"
+            >
+              {bots.map((bot) => {
+                const access = status.access.find(
+                  (item) => item.connectorId === kind && item.botId === bot.id,
+                );
+                return (
+                  <div key={bot.id}>
+                    <Mascot bot={bot} size="small" />
+                    <span>
+                      <strong>{bot.name}</strong>
+                      <small>{bot.role}</small>
+                    </span>
+                    <button
+                      className={access?.canRead ? "on" : ""}
+                      onClick={() => {
+                        const canRead = !access?.canRead;
+                        void setAccess(
+                          bot.id,
+                          canRead,
+                          canRead && Boolean(access?.canSend),
+                        );
+                      }}
+                      disabled={busy === `access-${bot.id}`}
+                    >
+                      <Eye size={12} /> {details.readLabel}
+                    </button>
+                    {details.canWrite && (
+                      <button
+                        className={access?.canSend ? "on create" : "create"}
+                        onClick={() => void setAccess(bot.id, true, !access?.canSend)}
+                        disabled={busy === `access-${bot.id}`}
+                      >
+                        <Plus size={12} /> {details.writeLabel}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </SettingsRow>
+            <SettingsRow
+              title={`Disconnect ${details.name}`}
+              description="The app details stay saved so you can reconnect later."
+              control={
+                <button
+                  className="disconnect-button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Disconnect ${details.name} from OpenBot? The app details stay saved so you can reconnect later.`,
+                      )
+                    )
+                      void disconnect();
+                  }}
+                  disabled={busy === "disconnect"}
+                >
+                  Disconnect {details.name}
+                </button>
+              }
+            />
+          </>
+        )}
+      </SettingsCard>
       {connection?.lastError && !connector.connected && (
         <p className="oauth-attention">
           <CircleAlert size={14} /> {connection.lastError}
         </p>
       )}
       {error && <p className="panel-error">{error}</p>}
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -3151,7 +3107,13 @@ export function ConnectorPanel({
   const openApp = (id: string) => {
     const group = ["gmail", "google-drive", "google-calendar"].includes(id) ? "google" : id;
     const section = document.getElementById(`connector-settings-${group}`) as HTMLDetailsElement | null;
-    if (section) { section.open = true; section.scrollIntoView({ block: "start", behavior: "auto" }); section.querySelector("summary")?.focus(); }
+    if (section) {
+      section.open = true;
+      section.scrollIntoView({ block: "start", behavior: "smooth" });
+      section.classList.add("connector-target-highlight");
+      setTimeout(() => section.classList.remove("connector-target-highlight"), 1800);
+      section.querySelector("summary")?.focus();
+    }
   };
   const [clientId, setClientId] = useState(""),
     [clientSecret, setClientSecret] = useState(""),
@@ -3405,29 +3367,62 @@ export function ConnectorPanel({
         <div className="connector-catalog">
           {status?.catalog
             .filter((entry) => `${entry.name} ${entry.description}`.toLowerCase().includes(appSearch.toLowerCase()))
-            .map((entry) => (
-              <article
-                key={entry.id}
-                className={`connector-card ${entry.connected ? "connected" : ""} ${entry.availability === "next" ? "coming" : ""}`}
-              >
-                <span className={`connector-logo connector-logo-${entry.id}`}>
-                  <ConnectorIcon id={entry.id} />
-                </span>
-                <div className="connector-card-main">
-                  <div className="connector-card-title">
-                    <h4>{entry.name}</h4>
-                    <b>{entry.connected ? "Connected" : entry.badge}</b>
+            .map((entry) => {
+              const category = ["gmail", "google-drive", "google-calendar"].includes(entry.id)
+                ? "Google Workspace"
+                : entry.id === "github"
+                  ? "Developer & Code"
+                  : entry.id === "slack"
+                    ? "Team Messaging"
+                    : entry.id === "notion"
+                      ? "Knowledge Base"
+                      : entry.id === "todoist"
+                        ? "Task Management"
+                        : entry.id === "dropbox"
+                          ? "Cloud Storage"
+                          : "Integration";
+              return (
+                <article
+                  key={entry.id}
+                  className={`connector-card ${entry.connected ? "connected" : ""} ${entry.availability === "next" ? "coming" : ""}`}
+                >
+                  <div className="connector-card-head">
+                    <span className={`connector-logo connector-logo-${entry.id}`}>
+                      <ConnectorIcon id={entry.id} />
+                    </span>
+                    <div className="connector-card-identity">
+                      <h4>{entry.name}</h4>
+                      <span className="connector-card-category">{category}</span>
+                    </div>
+                    <span className={`connector-status-badge ${entry.connected ? "connected" : ""}`}>
+                      {entry.connected && <span className="connector-status-dot" aria-hidden="true" />}
+                      {entry.connected ? "Connected" : entry.badge || "Available"}
+                    </span>
                   </div>
-                  <p>{entry.description}</p>
+                  <p className="connector-card-body">{entry.description}</p>
                   <div className="connector-capabilities">
                     {entry.capabilities.map((capability) => (
-                      <span key={capability}>{capability}</span>
+                      <span key={capability} className="connector-capability-tag">{capability}</span>
                     ))}
                   </div>
-                  {entry.availability !== "next" && <button className="connector-manage" onClick={() => openApp(entry.id)} aria-label={`${entry.connected ? "Manage" : "Set up"} ${entry.name}`}>{entry.connected ? "Manage connection" : "Set up connection"}<ChevronRight size={13} /></button>}
-                </div>
-              </article>
-            )) || (
+                  <div className="connector-card-action">
+                    {entry.availability !== "next" ? (
+                      <button
+                        type="button"
+                        className={`connector-manage ${entry.connected ? "is-connected" : ""}`}
+                        onClick={() => openApp(entry.id)}
+                        aria-label={`${entry.connected ? "Configure" : "Set up"} ${entry.name}`}
+                      >
+                        <span>{entry.connected ? "Configure connection" : "Set up connection"}</span>
+                        <ChevronRight size={14} />
+                      </button>
+                    ) : (
+                      <span className="connector-coming-pill">Coming soon</span>
+                    )}
+                  </div>
+                </article>
+              );
+            }) || (
             <div className="connector-loading">
               <LoaderCircle className="spinner" /> Checking your apps…
             </div>
@@ -3524,579 +3519,557 @@ export function ConnectorPanel({
         <summary><ConnectorIcon id="gmail" /><span>Google Workspace<small>Mail, files and calendar access</small></span><ChevronDown size={16} /></summary>
         <div className="purpose-disclosure-body">
       {!status ? null : !connection?.configured ? (
-        <section className="google-setup">
-          <input
-            ref={credentialsFile}
-            className="visually-hidden"
-            type="file"
-            accept=".json,application/json"
-            onChange={(event) =>
-              void importCredentials(event.target.files?.[0])
-            }
-          />
-          <div className="setting-section-title">
-            <h3>Connect Google Workspace</h3>
-            <p>
-              The release build supports one-click Google sign-in. Self-hosters
-              can get the same flow by choosing one Desktop OAuth credentials
-              file.
-            </p>
-          </div>
-          <button
-            className="credential-import"
-            onClick={() => credentialsFile.current?.click()}
-            disabled={busy === "import"}
-          >
-            <span className="credential-icons">
-              <i>
-                <ConnectorIcon id="gmail" />
-              </i>
-              <i>
-                <ConnectorIcon id="google-drive" />
-              </i>
-              <i>
-                <ConnectorIcon id="google-calendar" />
-              </i>
-            </span>
-            <span>
-              <strong>
-                {busy === "import"
-                  ? "Reading your Google file…"
-                  : "Choose Google credentials file"}
-              </strong>
-              <small>
-                Then Google sign-in opens automatically—no copying IDs or
-                callback addresses
-              </small>
-            </span>
-            {busy === "import" ? (
-              <LoaderCircle className="spinner" size={17} />
-            ) : (
-              <ArrowUp size={17} />
-            )}
-          </button>
-          <div className="google-api-setup">
-            <div>
-              <strong>Turn on the three Google apps first</strong>
-              <small>
-                Each button opens the correct switch in Google Cloud.
-              </small>
-            </div>
-            <div>
-              {GOOGLE_API_SETUP.map((item) => (
-                <a
-                  key={item.id}
-                  href={`https://console.cloud.google.com/apis/library/${item.api}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span>
-                    <ConnectorIcon id={item.id} />
-                  </span>
-                  {item.name}
-                  <ExternalLink size={11} />
-                </a>
-              ))}
-            </div>
-          </div>
-          <div className="setup-steps setup-steps-simple">
-            <div>
-              <b>1</b>
-              <span>
-                <strong>Create a Desktop OAuth client</strong>
-                <small>
-                  Add yourself as a test user, create a Desktop app, then
-                  download its JSON file.
-                </small>
-                <a
-                  href="https://console.cloud.google.com/apis/credentials"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open credentials <ExternalLink size={12} />
-                </a>
-              </span>
-            </div>
-            <div>
-              <b>2</b>
-              <span>
-                <strong>Choose the file above</strong>
-                <small>
-                  OpenBot saves it privately and opens Google’s official sign-in
-                  screen.
-                </small>
-              </span>
-            </div>
-          </div>
-          <details className="connector-advanced">
-            <summary>Advanced: enter details manually</summary>
-            <form className="connector-form" onSubmit={save}>
-              <label className="field">
-                <span>Google client ID</span>
-                <input
-                  value={clientId}
-                  onChange={(event) => setClientId(event.target.value)}
-                  placeholder="…apps.googleusercontent.com"
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>
-                  Client secret <small>if Google gave you one</small>
-                </span>
-                <input
-                  type="password"
-                  value={clientSecret}
-                  onChange={(event) => setClientSecret(event.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              <div className="callback-row">
-                <span>
-                  <strong>Callback address</strong>
-                  <code>{status.callbackUrl}</code>
-                </span>
-                <button type="button" onClick={() => void copy()}>
-                  <Copy size={14} /> Copy
-                </button>
-              </div>
-              <button
-                className="button-primary button-wide"
-                disabled={busy === "save"}
-              >
-                {busy === "save" ? (
-                  <LoaderCircle className="spinner" size={16} />
-                ) : (
-                  <ShieldCheck size={16} />
-                )}{" "}
-                Save privately
-              </button>
-            </form>
-          </details>
-          <div className="connector-note">
-            <ShieldCheck size={16} />
-            <p>
-              <strong>Your files and tokens stay on this Mac.</strong> For
-              public distribution, the release maintainer adds a verified Google
-              client so everyone sees a single Connect Google button.
-            </p>
-          </div>
-        </section>
-      ) : !connected ? (
-        <section
-          className={`connect-account-card ${recovery || apiCheckProject ? "needs-api" : ""}`}
-        >
-          <span className="google-app-stack">
-            <i>
-              <ConnectorIcon id="gmail" />
-            </i>
-            <i>
-              <ConnectorIcon id="google-drive" />
-            </i>
-            <i>
-              <ConnectorIcon id="google-calendar" />
-            </i>
-          </span>
-          <div>
-            <h3>
-              {recovery
-                ? `Turn on ${recovery.serviceName} to finish`
-                : apiCheckProject
-                  ? "Finish your Google setup"
-                  : connection.status === "needs_attention"
-                    ? "Google needs a quick reconnect"
-                    : status.managedGoogleClient
-                      ? "Connect Google in one click"
-                      : "Your Google connection is ready"}
-            </h3>
-            <p>
-              {apiCheckProject
-                ? "Before signing in again, make sure Gmail, Drive and Calendar are turned on for this project."
-                : connection.lastError ||
-                  "One Google sign-in adds Gmail, Drive and Calendar."}
-            </p>
-            {recovery ? (
-              <div className="google-recovery-steps">
-                <span>
-                  <b>1</b> Open the switch
-                </span>
-                <span>
-                  <b>2</b> Press Enable
-                </span>
-                <span>
-                  <b>3</b> Connect again
-                </span>
-              </div>
-            ) : apiCheckProject ? (
-              <div className="google-api-checks">
-                {GOOGLE_API_SETUP.map((item) => (
-                  <a
-                    key={item.id}
-                    href={`https://console.cloud.google.com/apis/library/${item.api}?project=${apiCheckProject}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ConnectorIcon id={item.id} /> Turn on {item.name}
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <small>Google shows every permission before you agree.</small>
-            )}
-          </div>
-          <div className="connect-account-actions">
-            {recovery && (
-              <a
-                className="button-primary"
-                href={recovery.enableUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={15} /> Turn on {recovery.serviceName}
-              </a>
-            )}
-            <button
-              className={recovery ? "button-secondary" : "button-primary"}
-              onClick={() => void connect()}
-              disabled={busy === "connect"}
+        <SettingsGroup title="Google Workspace">
+          <SettingsCard>
+            <SettingsRow
+              title="Connect Google Workspace"
+              description="The release build supports one-click Google sign-in. Self-hosters can get the same flow by choosing one Desktop OAuth credentials file."
             >
-              {busy === "connect" || status.oauthInProgress ? (
-                <LoaderCircle className="spinner" size={16} />
-              ) : recovery || apiCheckProject ? (
-                <RefreshCw size={15} />
-              ) : (
-                <ExternalLink size={16} />
-              )}{" "}
-              {status.oauthInProgress
-                ? "Waiting for Google"
-                : recovery || apiCheckProject
-                  ? "Connect again"
-                  : "Connect Google"}
-            </button>
-          </div>
-        </section>
-      ) : (
-        <>
-          <section className="connected-account">
-            <div className="connected-account-top">
-              <span className="google-app-stack">
-                <i>
-                  <ConnectorIcon id="gmail" />
-                </i>
-                <i>
-                  <ConnectorIcon id="google-drive" />
-                </i>
-                <i>
-                  <ConnectorIcon id="google-calendar" />
-                </i>
-              </span>
-              <span>
-                <strong>{connection.accountEmail}</strong>
-                <small>
-                  <i /> Google Workspace is ready for your team
-                </small>
-              </span>
-              <div className="workspace-checks">
-                <button
-                  onClick={() => void testInbox()}
-                  disabled={!gmailReady || busy === "preview-gmail"}
-                >
-                  {busy === "preview-gmail" ? (
-                    <LoaderCircle className="spinner" size={14} />
-                  ) : (
-                    <Inbox size={14} />
-                  )}{" "}
-                  Inbox
-                </button>
-                <button
-                  onClick={() => void testDrive()}
-                  disabled={!driveReady || busy === "preview-drive"}
-                >
-                  <FolderOpen size={14} /> Drive
-                </button>
-                <button
-                  onClick={() => void testCalendar()}
-                  disabled={!calendarReady || busy === "preview-calendar"}
-                >
-                  <Clock3 size={14} /> Calendar
-                </button>
-              </div>
-            </div>
-            {previewKind === "gmail" && preview.length > 0 && (
-              <div className="inbox-preview">
-                {preview.map((message) => (
-                  <div key={message.id}>
-                    <i className={message.unread ? "unread" : ""} />
-                    <span>
-                      <strong>{message.subject}</strong>
-                      <small>
-                        {message.from.replace(/\s*<.*?>\s*$/, "")} ·{" "}
-                        {message.snippet}
-                      </small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {previewKind === "drive" && drivePreview.length > 0 && (
-              <div className="inbox-preview">
-                {drivePreview.map((file) => (
-                  <div key={file.id}>
-                    <span className="mini-service-icon">
-                      <ConnectorIcon id="google-drive" />
-                    </span>
-                    <span>
-                      <strong>{file.name}</strong>
-                      <small>
-                        {file.mimeType
-                          .replace("application/vnd.google-apps.", "Google ")
-                          .replace("application/", "")}{" "}
-                        · {relativeTime(file.modifiedTime)}
-                      </small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {previewKind === "calendar" && calendarPreview.length > 0 && (
-              <div className="inbox-preview">
-                {calendarPreview.map((event) => (
-                  <div key={event.id}>
-                    <span className="mini-service-icon">
-                      <ConnectorIcon id="google-calendar" />
-                    </span>
-                    <span>
-                      <strong>{event.title}</strong>
-                      <small>
-                        {event.allDay
-                          ? event.start
-                          : new Date(event.start).toLocaleString([], {
-                              weekday: "short",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                        {event.location ? ` · ${event.location}` : ""}
-                      </small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-          {serviceRecoveries.length > 0 && (
-            <section className="google-service-recovery">
-              <div className="google-service-recovery-copy">
-                <span>
-                  <ShieldCheck size={17} />
+              <input
+                ref={credentialsFile}
+                className="visually-hidden"
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) =>
+                  void importCredentials(event.target.files?.[0])
+                }
+              />
+              <button
+                className="credential-import"
+                onClick={() => credentialsFile.current?.click()}
+                disabled={busy === "import"}
+              >
+                <span className="credential-icons">
+                  <i>
+                    <ConnectorIcon id="gmail" />
+                  </i>
+                  <i>
+                    <ConnectorIcon id="google-drive" />
+                  </i>
+                  <i>
+                    <ConnectorIcon id="google-calendar" />
+                  </i>
                 </span>
-                <div>
+                <span>
                   <strong>
-                    {serviceRecoveries.length === 1
-                      ? `${serviceRecoveries[0]!.serviceName} needs one more step`
-                      : `${serviceRecoveries.length} Google apps need one more step`}
+                    {busy === "import"
+                      ? "Reading your Google file…"
+                      : "Choose Google credentials file"}
                   </strong>
                   <small>
-                    Your working Google apps stay connected. Turn on only the
-                    missing ones, then try them again.
+                    Then Google sign-in opens automatically—no copying IDs or
+                    callback addresses
                   </small>
+                </span>
+                {busy === "import" ? (
+                  <LoaderCircle className="spinner" size={17} />
+                ) : (
+                  <ArrowUp size={17} />
+                )}
+              </button>
+            </SettingsRow>
+            <SettingsRow
+              title="Turn on the three Google apps first"
+              description="Each button opens the correct switch in Google Cloud."
+            >
+              <div className="google-api-setup">
+                <div>
+                  {GOOGLE_API_SETUP.map((item) => (
+                    <a
+                      key={item.id}
+                      href={`https://console.cloud.google.com/apis/library/${item.api}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>
+                        <ConnectorIcon id={item.id} />
+                      </span>
+                      {item.name}
+                      <ExternalLink size={11} />
+                    </a>
+                  ))}
                 </div>
               </div>
-              <div className="google-service-recovery-list">
-                {serviceRecoveries.map((item) => {
-                  const loading =
-                    busy ===
-                    (item.service === "gmail"
-                      ? "preview-gmail"
-                      : item.service === "google-drive"
-                        ? "preview-drive"
-                        : "preview-calendar");
-                  return (
-                    <div key={item.service}>
-                      <span className="mini-service-icon">
-                        <ConnectorIcon id={item.service} />
+            </SettingsRow>
+            <SettingsRow title="Setup steps">
+              <div className="setup-steps setup-steps-simple">
+                <div>
+                  <b>1</b>
+                  <span>
+                    <strong>Create a Desktop OAuth client</strong>
+                    <small>
+                      Add yourself as a test user, create a Desktop app, then
+                      download its JSON file.
+                    </small>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open credentials <ExternalLink size={12} />
+                    </a>
+                  </span>
+                </div>
+                <div>
+                  <b>2</b>
+                  <span>
+                    <strong>Choose the file above</strong>
+                    <small>
+                      OpenBot saves it privately and opens Google’s official sign-in
+                      screen.
+                    </small>
+                  </span>
+                </div>
+              </div>
+            </SettingsRow>
+            <Advanced title="Manual client credentials" summary="Enter client ID and secret directly instead of uploading credentials JSON">
+              <form className="connector-form" onSubmit={save} style={{ padding: "8px 0" }}>
+                <label className="field">
+                  <span>Google client ID</span>
+                  <input
+                    value={clientId}
+                    onChange={(event) => setClientId(event.target.value)}
+                    placeholder="…apps.googleusercontent.com"
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>
+                    Client secret <small>if Google gave you one</small>
+                  </span>
+                  <input
+                    type="password"
+                    value={clientSecret}
+                    onChange={(event) => setClientSecret(event.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <div className="callback-row">
+                  <span>
+                    <strong>Callback address</strong>
+                    <code>{status.callbackUrl}</code>
+                  </span>
+                  <button type="button" onClick={() => void copy()}>
+                    <Copy size={14} /> Copy
+                  </button>
+                </div>
+                <button
+                  className="button-primary button-wide"
+                  disabled={busy === "save"}
+                >
+                  {busy === "save" ? (
+                    <LoaderCircle className="spinner" size={16} />
+                  ) : (
+                    <ShieldCheck size={16} />
+                  )}{" "}
+                  Save privately
+                </button>
+              </form>
+            </Advanced>
+            <SettingsRow title="Your files and tokens stay on this Mac.">
+              <div className="connector-note">
+                <ShieldCheck size={16} />
+                <p>
+                  <strong>Your files and tokens stay on this Mac.</strong> For
+                  public distribution, the release maintainer adds a verified Google
+                  client so everyone sees a single Connect Google button.
+                </p>
+              </div>
+            </SettingsRow>
+          </SettingsCard>
+        </SettingsGroup>
+      ) : !connected ? (
+        <SettingsGroup title="Google Workspace">
+          <SettingsCard>
+            <SettingsRow
+              title={
+                recovery
+                  ? `Turn on ${recovery.serviceName} to finish`
+                  : apiCheckProject
+                    ? "Finish your Google setup"
+                    : connection.status === "needs_attention"
+                      ? "Google needs a quick reconnect"
+                      : status.managedGoogleClient
+                        ? "Connect Google in one click"
+                        : "Your Google connection is ready"
+              }
+              description={
+                apiCheckProject
+                  ? "Before signing in again, make sure Gmail, Drive and Calendar are turned on for this project."
+                  : connection.lastError ||
+                    "One Google sign-in adds Gmail, Drive and Calendar."
+              }
+              control={
+                <>
+                  {recovery && (
+                    <a
+                      className="button-primary"
+                      href={recovery.enableUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink size={15} /> Turn on {recovery.serviceName}
+                    </a>
+                  )}
+                  <button
+                    className={recovery ? "button-secondary" : "button-primary"}
+                    onClick={() => void connect()}
+                    disabled={busy === "connect"}
+                  >
+                    {busy === "connect" || status.oauthInProgress ? (
+                      <LoaderCircle className="spinner" size={16} />
+                    ) : recovery || apiCheckProject ? (
+                      <RefreshCw size={15} />
+                    ) : (
+                      <ExternalLink size={16} />
+                    )}{" "}
+                    {status.oauthInProgress
+                      ? "Waiting for Google"
+                      : recovery || apiCheckProject
+                        ? "Connect again"
+                        : "Connect Google"}
+                  </button>
+                </>
+              }
+            >
+              {recovery ? (
+                <div className="google-recovery-steps">
+                  <span>
+                    <b>1</b> Open the switch
+                  </span>
+                  <span>
+                    <b>2</b> Press Enable
+                  </span>
+                  <span>
+                    <b>3</b> Connect again
+                  </span>
+                </div>
+              ) : apiCheckProject ? (
+                <div className="google-api-checks">
+                  {GOOGLE_API_SETUP.map((item) => (
+                    <a
+                      key={item.id}
+                      href={`https://console.cloud.google.com/apis/library/${item.api}?project=${apiCheckProject}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ConnectorIcon id={item.id} /> Turn on {item.name}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <small>Google shows every permission before you agree.</small>
+              )}
+            </SettingsRow>
+          </SettingsCard>
+        </SettingsGroup>
+      ) : (
+        <SettingsGroup title="Google Workspace">
+          <SettingsCard>
+            <SettingsRow
+              title={connection.accountEmail ?? "Google Workspace"}
+              description="Google Workspace is ready for your team"
+            />
+            <SettingsRow
+              title="Check connection"
+              control={
+                <div className="workspace-checks">
+                  <button
+                    onClick={() => void testInbox()}
+                    disabled={!gmailReady || busy === "preview-gmail"}
+                  >
+                    {busy === "preview-gmail" ? (
+                      <LoaderCircle className="spinner" size={14} />
+                    ) : (
+                      <Inbox size={14} />
+                    )}{" "}
+                    Inbox
+                  </button>
+                  <button
+                    onClick={() => void testDrive()}
+                    disabled={!driveReady || busy === "preview-drive"}
+                  >
+                    <FolderOpen size={14} /> Drive
+                  </button>
+                  <button
+                    onClick={() => void testCalendar()}
+                    disabled={!calendarReady || busy === "preview-calendar"}
+                  >
+                    <Clock3 size={14} /> Calendar
+                  </button>
+                </div>
+              }
+            />
+            <SettingsRow title="Search preview">
+              {previewKind === "gmail" && preview.length > 0 && (
+                <div className="inbox-preview">
+                  {preview.map((message) => (
+                    <div key={message.id}>
+                      <i className={message.unread ? "unread" : ""} />
+                      <span>
+                        <strong>{message.subject}</strong>
+                        <small>
+                          {message.from.replace(/\s*<.*?>\s*$/, "")} ·{" "}
+                          {message.snippet}
+                        </small>
                       </span>
-                      <strong>{item.serviceName}</strong>
-                      <a href={item.enableUrl} target="_blank" rel="noreferrer">
-                        Turn on <ExternalLink size={11} />
-                      </a>
-                      <button
-                        disabled={loading}
-                        onClick={() =>
-                          void (item.service === "gmail"
-                            ? testInbox()
-                            : item.service === "google-drive"
-                              ? testDrive()
-                              : testCalendar())
-                        }
-                      >
-                        {loading ? (
-                          <LoaderCircle className="spinner" size={12} />
-                        ) : (
-                          <RefreshCw size={12} />
-                        )}{" "}
-                        Try again
-                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {previewKind === "drive" && drivePreview.length > 0 && (
+                <div className="inbox-preview">
+                  {drivePreview.map((file) => (
+                    <div key={file.id}>
+                      <span className="mini-service-icon">
+                        <ConnectorIcon id="google-drive" />
+                      </span>
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>
+                          {file.mimeType
+                            .replace("application/vnd.google-apps.", "Google ")
+                            .replace("application/", "")}{" "}
+                          · {relativeTime(file.modifiedTime)}
+                        </small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {previewKind === "calendar" && calendarPreview.length > 0 && (
+                <div className="inbox-preview">
+                  {calendarPreview.map((event) => (
+                    <div key={event.id}>
+                      <span className="mini-service-icon">
+                        <ConnectorIcon id="google-calendar" />
+                      </span>
+                      <span>
+                        <strong>{event.title}</strong>
+                        <small>
+                          {event.allDay
+                            ? event.start
+                            : new Date(event.start).toLocaleString([], {
+                                weekday: "short",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                          {event.location ? ` · ${event.location}` : ""}
+                        </small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SettingsRow>
+            {serviceRecoveries.length > 0 && (
+              <SettingsRow
+                title={
+                  serviceRecoveries.length === 1
+                    ? `${serviceRecoveries[0]!.serviceName} needs one more step`
+                    : `${serviceRecoveries.length} Google apps need one more step`
+                }
+                description="Your working Google apps stay connected. Turn on only the missing ones, then try them again."
+              >
+                <div className="google-service-recovery-list">
+                  {serviceRecoveries.map((item) => {
+                    const loading =
+                      busy ===
+                      (item.service === "gmail"
+                        ? "preview-gmail"
+                        : item.service === "google-drive"
+                          ? "preview-drive"
+                          : "preview-calendar");
+                    return (
+                      <div key={item.service}>
+                        <span className="mini-service-icon">
+                          <ConnectorIcon id={item.service} />
+                        </span>
+                        <strong>{item.serviceName}</strong>
+                        <a href={item.enableUrl} target="_blank" rel="noreferrer">
+                          Turn on <ExternalLink size={11} />
+                        </a>
+                        <button
+                          disabled={loading}
+                          onClick={() =>
+                            void (item.service === "gmail"
+                              ? testInbox()
+                              : item.service === "google-drive"
+                                ? testDrive()
+                                : testCalendar())
+                          }
+                        >
+                          {loading ? (
+                            <LoaderCircle className="spinner" size={12} />
+                          ) : (
+                            <RefreshCw size={12} />
+                          )}{" "}
+                          Try again
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SettingsRow>
+            )}
+            {serviceRecoveries.length === 0 &&
+              (!gmailReady || !driveReady || !calendarReady || !gmailWriteReady || !driveWriteReady || !calendarWriteReady) && (
+                <SettingsRow title="Upgrade Google access">
+                  <button className="upgrade-google" onClick={() => void connect()}>
+                    <RefreshCw size={15} /> Reconnect once to add approval-safe
+                    Drive and Calendar creation
+                  </button>
+                </SettingsRow>
+              )}
+            <SettingsRow
+              title="Who can use each app"
+              description="Choose what each teammate can read or prepare. Sending and creating still wait for your approval."
+            >
+              <div className="connector-access-list">
+                {bots.map((bot) => {
+                  const gmail = status.access.find(
+                      (item) => item.botId === bot.id && item.service === "gmail",
+                    ),
+                    drive = status.access.find(
+                      (item) =>
+                        item.botId === bot.id && item.service === "google-drive",
+                    ),
+                    calendar = status.access.find(
+                      (item) =>
+                        item.botId === bot.id &&
+                        item.service === "google-calendar",
+                    );
+                  return (
+                    <div key={bot.id}>
+                      <Mascot bot={bot} size="small" />
+                      <span>
+                        <strong>{bot.name}</strong>
+                        <small>{bot.role}</small>
+                      </span>
+                      <div className="service-access-buttons">
+                        <button
+                          className={gmail?.canRead ? "on" : ""}
+                          aria-pressed={Boolean(gmail?.canRead)}
+                          disabled={
+                            !gmailWriteReady || busy === `access-gmail-${bot.id}`
+                          }
+                          onClick={() =>
+                            void setAccess(
+                              bot.id,
+                              "gmail",
+                              !gmail?.canRead,
+                              Boolean(gmail?.canSend),
+                            )
+                          }
+                        >
+                          <Search size={13} /> Inbox
+                        </button>
+                        <button
+                          className={gmail?.canSend ? "on connector-send" : "connector-send"}
+                          aria-pressed={Boolean(gmail?.canSend)}
+                          disabled={
+                            !gmailReady || busy === `access-gmail-${bot.id}`
+                          }
+                          onClick={() =>
+                            void setAccess(
+                              bot.id,
+                              "gmail",
+                              Boolean(gmail?.canRead),
+                              !gmail?.canSend,
+                            )
+                          }
+                        >
+                          <Mail size={13} /> Send
+                        </button>
+                        <button
+                          className={drive?.canRead ? "on drive" : "drive"}
+                          aria-pressed={Boolean(drive?.canRead)}
+                          disabled={
+                            !driveReady ||
+                            busy === `access-google-drive-${bot.id}`
+                          }
+                          onClick={() =>
+                            void setAccess(
+                              bot.id,
+                              "google-drive",
+                              !drive?.canRead,
+                            )
+                          }
+                        >
+                          <FolderOpen size={13} /> Drive
+                        </button>
+                        <button
+                          className={drive?.canSend ? "on create" : "create"}
+                          aria-pressed={Boolean(drive?.canSend)}
+                          disabled={!driveWriteReady || busy === `access-google-drive-${bot.id}`}
+                          onClick={() => void setAccess(bot.id, "google-drive", Boolean(drive?.canRead), !drive?.canSend)}
+                        >
+                          <Plus size={13} /> Create file
+                        </button>
+                        <button
+                          className={
+                            calendar?.canRead ? "on calendar" : "calendar"
+                          }
+                          aria-pressed={Boolean(calendar?.canRead)}
+                          disabled={
+                            !calendarReady ||
+                            busy === `access-google-calendar-${bot.id}`
+                          }
+                          onClick={() =>
+                            void setAccess(
+                              bot.id,
+                              "google-calendar",
+                              !calendar?.canRead,
+                            )
+                          }
+                        >
+                          <Clock3 size={13} /> Calendar
+                        </button>
+                        <button
+                          className={calendar?.canSend ? "on create" : "create"}
+                          aria-pressed={Boolean(calendar?.canSend)}
+                          disabled={!calendarWriteReady || busy === `access-google-calendar-${bot.id}`}
+                          onClick={() => void setAccess(bot.id, "google-calendar", Boolean(calendar?.canRead), !calendar?.canSend)}
+                        >
+                          <Plus size={13} /> Add event
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            </section>
-          )}
-          {serviceRecoveries.length === 0 &&
-            (!gmailReady || !driveReady || !calendarReady || !gmailWriteReady || !driveWriteReady || !calendarWriteReady) && (
-              <button className="upgrade-google" onClick={() => void connect()}>
-                <RefreshCw size={15} /> Reconnect once to add approval-safe
-                Drive and Calendar creation
-              </button>
-            )}
-          <section>
-            <div className="panel-section-heading">
-              <div>
-                <h3>Who can use each app</h3>
-                <p>
-                  Choose what each teammate can read or prepare. Sending and
-                  creating still wait for your approval.
-                </p>
-              </div>
-            </div>
-            <div className="connector-access-list">
-              {bots.map((bot) => {
-                const gmail = status.access.find(
-                    (item) => item.botId === bot.id && item.service === "gmail",
-                  ),
-                  drive = status.access.find(
-                    (item) =>
-                      item.botId === bot.id && item.service === "google-drive",
-                  ),
-                  calendar = status.access.find(
-                    (item) =>
-                      item.botId === bot.id &&
-                      item.service === "google-calendar",
-                  );
-                return (
-                  <div key={bot.id}>
-                    <Mascot bot={bot} size="small" />
-                    <span>
-                      <strong>{bot.name}</strong>
-                      <small>{bot.role}</small>
-                    </span>
-                    <div className="service-access-buttons">
-                      <button
-                        className={gmail?.canRead ? "on" : ""}
-                        aria-pressed={Boolean(gmail?.canRead)}
-                        disabled={
-                          !gmailWriteReady || busy === `access-gmail-${bot.id}`
-                        }
-                        onClick={() =>
-                          void setAccess(
-                            bot.id,
-                            "gmail",
-                            !gmail?.canRead,
-                            Boolean(gmail?.canSend),
-                          )
-                        }
-                      >
-                        <Search size={13} /> Inbox
-                      </button>
-                      <button
-                        className={gmail?.canSend ? "on connector-send" : "connector-send"}
-                        aria-pressed={Boolean(gmail?.canSend)}
-                        disabled={
-                          !gmailReady || busy === `access-gmail-${bot.id}`
-                        }
-                        onClick={() =>
-                          void setAccess(
-                            bot.id,
-                            "gmail",
-                            Boolean(gmail?.canRead),
-                            !gmail?.canSend,
-                          )
-                        }
-                      >
-                        <Mail size={13} /> Send
-                      </button>
-                      <button
-                        className={drive?.canRead ? "on drive" : "drive"}
-                        aria-pressed={Boolean(drive?.canRead)}
-                        disabled={
-                          !driveReady ||
-                          busy === `access-google-drive-${bot.id}`
-                        }
-                        onClick={() =>
-                          void setAccess(
-                            bot.id,
-                            "google-drive",
-                            !drive?.canRead,
-                          )
-                        }
-                      >
-                        <FolderOpen size={13} /> Drive
-                      </button>
-                      <button
-                        className={drive?.canSend ? "on create" : "create"}
-                        aria-pressed={Boolean(drive?.canSend)}
-                        disabled={!driveWriteReady || busy === `access-google-drive-${bot.id}`}
-                        onClick={() => void setAccess(bot.id, "google-drive", Boolean(drive?.canRead), !drive?.canSend)}
-                      >
-                        <Plus size={13} /> Create file
-                      </button>
-                      <button
-                        className={
-                          calendar?.canRead ? "on calendar" : "calendar"
-                        }
-                        aria-pressed={Boolean(calendar?.canRead)}
-                        disabled={
-                          !calendarReady ||
-                          busy === `access-google-calendar-${bot.id}`
-                        }
-                        onClick={() =>
-                          void setAccess(
-                            bot.id,
-                            "google-calendar",
-                            !calendar?.canRead,
-                          )
-                        }
-                      >
-                        <Clock3 size={13} /> Calendar
-                      </button>
-                      <button
-                        className={calendar?.canSend ? "on create" : "create"}
-                        aria-pressed={Boolean(calendar?.canSend)}
-                        disabled={!calendarWriteReady || busy === `access-google-calendar-${bot.id}`}
-                        onClick={() => void setAccess(bot.id, "google-calendar", Boolean(calendar?.canRead), !calendar?.canSend)}
-                      >
-                        <Plus size={13} /> Add event
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-          <button
-            className="disconnect-button"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Disconnect Google Workspace from OpenBot? Your client details will stay saved so you can reconnect later.",
-                )
-              )
-                void run("disconnect", async () => {
-                  await api("/api/connectors/google/disconnect", {
-                    method: "POST",
-                  });
-                  setPreview([]);
-                  setDrivePreview([]);
-                  setCalendarPreview([]);
-                  await onRefresh();
-                  onNotice("Google Workspace disconnected");
-                });
-            }}
-            disabled={busy === "disconnect"}
-          >
-            Disconnect Google Workspace
-          </button>
-        </>
+            </SettingsRow>
+            <SettingsRow
+              title="Disconnect Google Workspace"
+              description="Your client details will stay saved so you can reconnect later."
+              control={
+                <button
+                  className="disconnect-button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Disconnect Google Workspace from OpenBot? Your client details will stay saved so you can reconnect later.",
+                      )
+                    )
+                      void run("disconnect", async () => {
+                        await api("/api/connectors/google/disconnect", {
+                          method: "POST",
+                        });
+                        setPreview([]);
+                        setDrivePreview([]);
+                        setCalendarPreview([]);
+                        await onRefresh();
+                        onNotice("Google Workspace disconnected");
+                      });
+                  }}
+                  disabled={busy === "disconnect"}
+                >
+                  Disconnect Google Workspace
+                </button>
+              }
+            />
+          </SettingsCard>
+        </SettingsGroup>
       )}
         </div>
       </details>
@@ -4277,19 +4250,72 @@ export function RemotePanel({ bots, runner, installPrompt, onInstalled, onNotice
       <p>Send a task, see what changed, and approve work from your iPhone. Just OpenBot—no extra networking apps.</p>
     </div>
     {local ? <AwayAccessPanel /> : <div className="remote-status good"><Check size={18} /><span><strong>Connected to your studio</strong><small>Manage paired phones from OpenBot on your host.</small></span></div>}
-    {local && <details className="remote-advanced"><summary>Advanced connection settings</summary>
-      <p>For self-hosters and local-network troubleshooting. QR pairing does not require copying these values.</p>
-      {access && <div className="remote-setup">
-        {access.urls.map((url) => <div className="remote-status" key={url}><small>{url} · private network only</small></div>)}
-        <div className="access-key-row"><span><strong>Owner access key</strong><code>{showKey ? access.token : "••••••••••••••••"}</code></span>
-          <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Show"}</button>
-          <button onClick={() => void navigator.clipboard.writeText(access.token).then(() => onNotice("Owner key copied")).catch(() => onNotice("Clipboard access was blocked"))}>Copy</button>
-        </div>
-        <p>Keep this owner key private. Paired phones use their own revocable keys instead.</p>
-      </div>}
-      {access?.nativePush && <p>{access.nativePush.configured ? "Native push is configured on this host." : "Native push delivery still needs Apple push configuration on the host."}</p>}
-      {installPrompt && <button onClick={() => void installPrompt.prompt().then(() => installPrompt.userChoice).then((choice) => { if (choice.outcome === "accepted") onInstalled(); })}>Install browser companion</button>}
-    </details>}
+    {local && (
+      <Advanced title="Advanced connection settings" summary="Owner access key, direct network URLs, and host notifications">
+        <SettingsGroup title="Direct Network Addresses">
+          <SettingsCard>
+            {access && access.urls.map((url) => (
+              <SettingsRow
+                key={url}
+                title={url}
+                description="Direct private network endpoint"
+              />
+            ))}
+            {access && (
+              <SettingsRow
+                title="Owner access key"
+                description="Keep this owner key private. Paired phones use their own revocable session keys."
+                control={
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <code style={{ fontSize: 13, background: "var(--surface-muted)", padding: "4px 8px", borderRadius: 6 }}>
+                      {showKey ? access.token : "••••••••••••••••"}
+                    </code>
+                    <button type="button" onClick={() => setShowKey(!showKey)}>
+                      {showKey ? "Hide" : "Show"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(access.token)
+                          .then(() => onNotice("Owner key copied"))
+                          .catch(() => onNotice("Clipboard access was blocked"))
+                      }
+                    >
+                      Copy
+                    </button>
+                  </div>
+                }
+              />
+            )}
+          </SettingsCard>
+        </SettingsGroup>
+        {access?.nativePush && (
+          <p style={{ margin: "12px 0 0", color: "var(--secondary)", fontSize: 13 }}>
+            {access.nativePush.configured
+              ? "Native push is configured on this host."
+              : "Native push delivery still needs Apple push configuration on the host."}
+          </p>
+        )}
+        {installPrompt && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() =>
+                void installPrompt
+                  .prompt()
+                  .then(() => installPrompt.userChoice)
+                  .then((choice) => {
+                    if (choice.outcome === "accepted") onInstalled();
+                  })
+              }
+            >
+              Install browser companion
+            </button>
+          </div>
+        )}
+      </Advanced>
+    )}
     <div className="security-footnote"><ShieldCheck size={16} /><p>{runner.deployment?.mode === "private_runner" ? "This studio runs on your private host." : "Your studio runs on this Mac. Keep it awake and online for away access."} Dictation does not save microphone audio in OpenBot.</p></div>
   </div>;
 }
@@ -4708,209 +4734,40 @@ export function BotPanel({
           )}
         </div>
       </div>
-      <label className="field">
-        <span>Name</span>
-        <input
-          value={form.name}
-          maxLength={30}
-          required
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-      </label>
-      <label className="field">
-        <span>Job</span>
-        <input
-          value={form.role}
-          maxLength={60}
-          required
-          onChange={(e) => setForm({ ...form, role: e.target.value })}
-        />
-        <small>What this teammate is responsible for.</small>
-      </label>
+      <SettingsGroup title="Teammate Profile">
+        <SettingsCard>
+          <SettingsRow
+            title="Name"
+            control={
+              <input
+                value={form.name}
+                maxLength={30}
+                required
+                aria-label="Teammate name"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            }
+          />
+          <SettingsRow
+            title="Job & Responsibility"
+            description="What this teammate is focused on."
+            control={
+              <input
+                value={form.role}
+                maxLength={60}
+                required
+                aria-label="Teammate job"
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+              />
+            }
+          />
+        </SettingsCard>
+      </SettingsGroup>
       <details className="bot-appearance">
         <summary>Customize character <small>Shape and color</small></summary>
         <AppearancePicker name={form.name || bot.name} shape={form.mascot} color={form.color} onShape={(mascot) => setForm({ ...form, mascot })} onColor={(color) => setForm({ ...form, color })} />
       </details>
-      <details className="bot-advanced">
-        <summary>Advanced settings <small>Instructions, model, limits & access</small></summary>
-        <div className="bot-advanced-content">
-      <label className="field">
-        <span>Personality and working style</span>
-        <textarea
-          rows={5}
-          value={form.instructions}
-          maxLength={2000}
-          onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-        />
-      </label>
-      <label className="field">
-        <span>Model</span>
-        <select
-          value={form.model}
-          onChange={(e) => setForm({ ...form, model: e.target.value })}
-        >
-          {modelChoices.map((value) => (
-            <option key={value} value={value}>
-              {shortModel(value)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        <span>Weekly token limit</span>
-        <input
-          type="number"
-          min="0"
-          max="100000000"
-          step="10000"
-          value={form.weeklyTokenBudget}
-          onChange={(e) =>
-            setForm({ ...form, weeklyTokenBudget: Number(e.target.value) })
-          }
-        />
-        <small>
-          {compactNumber(bot.tokensUsedThisWeek)} used · 0 means unlimited
-        </small>
-      </label>
-      <div className="switch-list">
-        <label>
-          <span>
-            <Cpu size={17} />
-            <b>Private computer</b>
-            <small>Terminal work stays in a limited container</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={form.computerEnabled}
-            onChange={(e) =>
-              setForm({ ...form, computerEnabled: e.target.checked })
-            }
-          />
-        </label>
-        <label>
-          <span>
-            <Globe2 size={17} />
-            <b>Private browser</b>
-            <small>Separate history and sign-ins for this bot</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={form.browserEnabled}
-            onChange={(e) =>
-              setForm({ ...form, browserEnabled: e.target.checked })
-            }
-          />
-        </label>
-        {form.browserEnabled && (
-          <div>
-            <div className="delegation-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  void (async () => {
-                    const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/window`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-                    const result = (await response.json()) as { error?: string; hint?: string };
-                    if (!response.ok) throw new Error(result.error || "The browser window could not be opened.");
-                    window.alert(result.hint || "The browser window is open.");
-                  })().catch((error: Error) => window.alert(error.message));
-                }}
-              >
-                <ExternalLink size={15} />
-                Open browser window
-              </button>
-              <button type="button" className={liveView ? "is-on" : ""} onClick={() => setLiveView(!liveView)}>
-                {liveView ? <ChevronDown size={15} /> : <MonitorPlay size={15} />}
-                {liveView ? "Hide live view" : "View in app"}
-              </button>
-            </div>
-            <small>
-              Drive it yourself in the window, or watch {bot.name} work right
-              here. The browser belongs to this teammate either way.
-            </small>
-            {liveView && (
-              <InAppBrowserView botId={bot.id} onNotice={(message) => window.alert(message)} />
-            )}
-            <BrowserSiteData botId={bot.id} />
-          </div>
-        )}
-      </div>
-      <SkillToggles botId={bot.id} />
-        </div>
-      </details>
-      <details className="bot-conversation">
-        <summary>Organize this conversation</summary>
-      <fieldset className="conversation-organizer">
-        <legend>Conversation</legend>
-        <p>Keep a growing team tidy without losing any work.</p>
-        <label className="field">
-          <span>Sidebar section</span>
-          <input
-            value={section}
-            onChange={(event) => setSection(event.target.value)}
-            placeholder="Teammates"
-            maxLength={40}
-          />
-        </label>
-        <div>
-          <button
-            type="button"
-            className={thread.pinned ? "is-on" : ""}
-            onClick={() => void onUpdateThread({ pinned: !thread.pinned })}
-          >
-            <Pin size={15} />
-            {thread.pinned ? "Pinned" : "Pin to top"}
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              setDuplicating(true);
-              try {
-                await onDuplicate();
-              } finally {
-                setDuplicating(false);
-              }
-            }}
-            disabled={duplicating}
-          >
-            <Copy size={15} />
-            {duplicating ? "Copying…" : "Duplicate setup"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void (async () => {
-                const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/share`);
-                if (!response.ok) throw new Error("This teammate could not be shared.");
-                const bundle = await response.json();
-                const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `teammate-${bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "teammate"}.openbot.json`;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 1_000);
-              })().catch(() => window.alert("This teammate could not be shared."));
-            }}
-          >
-            <Download size={15} />
-            Share setup
-          </button>
-          <button
-            type="button"
-            className="quiet-danger"
-            onClick={() => void onUpdateThread({ hidden: true })}
-          >
-            <EyeOff size={15} />
-            Hide from sidebar
-          </button>
-        </div>
-        <small>
-          Duplicating copies this teammate’s setup and access, but never their
-          private history or memory.
-        </small>
-      </fieldset>
-      </details>
+      <SavedFilesPanel bot={bot} />
       <button type="button" className="teach-callout" onClick={onOpenTeach}>
         <WandSparkles size={19} />
         <span>
@@ -4919,14 +4776,180 @@ export function BotPanel({
         </span>
         <ChevronDown size={16} />
       </button>
-      {saveError && <p className="panel-error" role="alert">{saveError}</p>}
-      <button className="button-primary button-wide" type="submit" disabled={saving || retiring}>
-        {saved ? (
-          <>
-            <Check size={17} /> Saved
-          </>
-        ) : saving ? "Saving…" : "Save changes"}
-      </button>
+      <Advanced title="Advanced Teammate Options" summary="Instructions, model engine, limits, and organizing">
+        <SettingsGroup title="Instructions & Personality">
+          <SettingsCard>
+            <div style={{ padding: "14px 16px" }}>
+              <label style={{ display: "block", marginBottom: 8, fontWeight: 550, fontSize: 13 }}>
+                Personality and working style
+              </label>
+              <textarea
+                rows={5}
+                style={{ width: "100%", boxSizing: "border-box" }}
+                value={form.instructions}
+                maxLength={2000}
+                onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+              />
+            </div>
+          </SettingsCard>
+        </SettingsGroup>
+
+        <SettingsGroup title="Model & Resources">
+          <SettingsCard>
+            <SettingsRow
+              title="Model engine"
+              control={
+                <select
+                  value={form.model}
+                  onChange={(e) => setForm({ ...form, model: e.target.value })}
+                >
+                  {modelChoices.map((value) => (
+                    <option key={value} value={value}>
+                      {shortModel(value)}
+                    </option>
+                  ))}
+                </select>
+              }
+            />
+            <SettingsRow
+              title="Weekly token limit"
+              description={`${compactNumber(bot.tokensUsedThisWeek)} used · 0 means unlimited`}
+              control={
+                <input
+                  type="number"
+                  min="0"
+                  max="100000000"
+                  step="10000"
+                  value={form.weeklyTokenBudget}
+                  onChange={(e) =>
+                    setForm({ ...form, weeklyTokenBudget: Number(e.target.value) })
+                  }
+                />
+              }
+            />
+            <SwitchRow
+              title="Private computer"
+              description="Terminal work stays isolated in a limited container"
+              checked={form.computerEnabled}
+              onChange={(checked) =>
+                setForm({ ...form, computerEnabled: checked })
+              }
+            />
+            <SwitchRow
+              title="Private browser"
+              description="Separate browser history and sign-ins for this teammate"
+              checked={form.browserEnabled}
+              onChange={(checked) =>
+                setForm({ ...form, browserEnabled: checked })
+              }
+            />
+          </SettingsCard>
+          {form.browserEnabled && (
+            <div style={{ marginTop: 8 }}>
+              <div className="delegation-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (async () => {
+                      const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/browser/window`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                      const result = (await response.json()) as { error?: string; hint?: string };
+                      if (!response.ok) throw new Error(result.error || "The browser window could not be opened.");
+                      window.alert(result.hint || "The browser window is open.");
+                    })().catch((error: Error) => window.alert(error.message));
+                  }}
+                >
+                  <ExternalLink size={15} />
+                  Open browser window
+                </button>
+                <button type="button" className={liveView ? "is-on" : ""} onClick={() => setLiveView(!liveView)}>
+                  {liveView ? <ChevronDown size={15} /> : <MonitorPlay size={15} />}
+                  {liveView ? "Hide live view" : "View in app"}
+                </button>
+              </div>
+              <small style={{ display: "block", margin: "6px 0" }}>
+                Drive it yourself in the window, or watch {bot.name} work right
+                here. The browser belongs to this teammate either way.
+              </small>
+              {liveView && (
+                <InAppBrowserView botId={bot.id} onNotice={(message) => window.alert(message)} />
+              )}
+              <BrowserSiteData botId={bot.id} />
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <SkillToggles botId={bot.id} />
+          </div>
+        </SettingsGroup>
+
+        <SettingsGroup title="Organize & Export">
+          <SettingsCard>
+            <SettingsRow
+              title="Sidebar section"
+              control={
+                <input
+                  value={section}
+                  onChange={(event) => setSection(event.target.value)}
+                  placeholder="Teammates"
+                  maxLength={40}
+                />
+              }
+            />
+          </SettingsCard>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            <button
+              type="button"
+              className={thread.pinned ? "is-on" : ""}
+              onClick={() => void onUpdateThread({ pinned: !thread.pinned })}
+            >
+              <Pin size={15} />
+              {thread.pinned ? "Pinned" : "Pin to top"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setDuplicating(true);
+                try {
+                  await onDuplicate();
+                } finally {
+                  setDuplicating(false);
+                }
+              }}
+              disabled={duplicating}
+            >
+              <Copy size={15} />
+              {duplicating ? "Copying…" : "Duplicate setup"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  const response = await fetch(`/api/bots/${encodeURIComponent(bot.id)}/share`);
+                  if (!response.ok) throw new Error("This teammate could not be shared.");
+                  const bundle = await response.json();
+                  const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `teammate-${bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "teammate"}.openbot.json`;
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+                })().catch(() => window.alert("This teammate could not be shared."));
+              }}
+            >
+              <Download size={15} />
+              Share setup
+            </button>
+            <button
+              type="button"
+              className="quiet-danger"
+              onClick={() => void onUpdateThread({ hidden: true })}
+            >
+              <EyeOff size={15} />
+              Hide from sidebar
+            </button>
+          </div>
+        </SettingsGroup>
       <section className="bot-remove">
         <div>
           <strong>Remove from your team</strong>
@@ -4949,6 +4972,15 @@ export function BotPanel({
         <a className="text-action" href="/?panel=control">Open teammate recovery settings <ChevronRight size={14} /></a>
         {retireError && <p className="panel-error" role="alert">{retireError}</p>}
       </section>
+      </Advanced>
+      {saveError && <p className="panel-error" role="alert">{saveError}</p>}
+      <button className="button-primary button-wide" type="submit" disabled={saving || retiring}>
+        {saved ? (
+          <>
+            <Check size={17} /> Saved
+          </>
+        ) : saving ? "Saving…" : "Save changes"}
+      </button>
     </form>
   );
 }
@@ -4990,14 +5022,10 @@ export function FilesPanel({ bot }: { bot: Bot }) {
   return (
     <div className="files-view">
       <SavedFilesPanel key={bot.id} bot={bot} />
-      <h2 className="workspace-files-heading">Workspace files</h2>
-      <div className="friendly-note">
-        <FolderOpen size={18} />
+      <div className="settings-callout">
+        <FolderOpen size={17} />
         <p>
-          <strong>{bot.name} has a private workspace.</strong>
-          <br />
-          Files persist across sessions while terminal commands run inside the
-          bot's constrained computer.
+          <strong>{bot.name} has a private workspace.</strong> Files persist across sessions while terminal commands run inside the bot's constrained computer.
         </p>
       </div>
       {loading ? (
@@ -5005,28 +5033,35 @@ export function FilesPanel({ bot }: { bot: Bot }) {
           <LoaderCircle className="spinner" />
         </div>
       ) : files.length ? (
-        <div className="file-list">
-          {files.map((file) => (
-            <button key={file.path} onClick={() => void open(file)}>
-              {file.kind === "directory" ? (
-                <Folder size={18} />
-              ) : (
-                <File size={18} />
-              )}
-              <span>{file.path}</span>
-              {file.kind === "file" && (
-                <small>{Math.max(1, Math.round(file.size / 1024))} KB</small>
-              )}
-            </button>
-          ))}
-        </div>
+        <SettingsGroup title="Workspace files">
+          <SettingsCard>
+            {files.map((file) => (
+              <SettingsRow
+                key={file.path}
+                title={file.path}
+                description={file.kind === "file" ? `${Math.max(1, Math.round(file.size / 1024))} KB` : "Folder"}
+                control={
+                  <button type="button" onClick={() => void open(file)} aria-label={`Open ${file.path}`}>
+                    {file.kind === "directory" ? (
+                      <Folder size={18} />
+                    ) : (
+                      <File size={18} />
+                    )}
+                    <span>Open</span>
+                  </button>
+                }
+              />
+            ))}
+          </SettingsCard>
+        </SettingsGroup>
       ) : (
         <div className="empty-panel">
-          <div className="empty-illustration">
-            <FolderOpen size={30} />
-          </div>
+          <Mascot bot={bot} size="tiny" />
           <h3>Nothing here yet</h3>
           <p>Ask {bot.name} to create a note, plan or small project.</p>
+          <a className="button-primary" href={`/?thread=${encodeURIComponent(bot.threadId)}`}>
+            <MessageCircleReply size={15} /> Ask {bot.name}
+          </a>
         </div>
       )}
     </div>
@@ -5859,64 +5894,71 @@ export function RoutinesPanel({
               </small>
             </div>
           </header>
-          <label className="field">
-            <span>Name</span>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My morning plan"
-              required
-            />
-          </label>
-          <fieldset className="routine-fieldset">
-            <legend>What starts it?</legend>
-            <select className="trigger-menu" aria-label="What starts it?" value={triggerType} onChange={(event) => { const kind = event.target.value as AutomationTriggerType; setTriggerType(kind); if (kind === "webpage" && schedule === "5") setSchedule("60"); }}>
-              {[
-                { value: "webpage" as const, label: "Page changes", icon: <Globe2 size={14} /> },
-                {
-                  value: "schedule" as const,
-                  label: "Schedule",
-                  icon: <Clock3 size={14} />,
-                },
-                {
-                  value: "calendar" as const,
-                  label: "Before a calendar event",
-                  icon: <CalendarDays size={14} />,
-                },
-                {
-                  value: "github" as const,
-                  label: "GitHub",
-                  icon: <GitBranch size={14} />,
-                },
-                {
-                  value: "todoist" as const,
-                  label: "Todoist",
-                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="todoist" /></span>,
-                },
-                {
-                  value: "dropbox" as const,
-                  label: "Dropbox",
-                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>,
-                },
-                {
-                  value: "slack" as const,
-                  label: "Slack",
-                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="slack" /></span>,
-                },
-                {
-                  value: "notion" as const,
-                  label: "Notion",
-                  icon: <span className="trigger-connector-icon"><ConnectorIcon id="notion" /></span>,
-                },
-                {
-                  value: "webhook" as const,
-                  label: "Webhook",
-                  icon: <Webhook size={14} />,
-                },
-              ].map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-          </fieldset>
+          <SettingsCard>
+          <SettingsRow
+            title="Name"
+            control={
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My morning plan"
+                required
+                aria-label="Automation name"
+              />
+            }
+          />
+          <SettingsRow
+            title="What starts it?"
+            control={
+              <select className="trigger-menu" aria-label="What starts it?" value={triggerType} onChange={(event) => { const kind = event.target.value as AutomationTriggerType; setTriggerType(kind); if (kind === "webpage" && schedule === "5") setSchedule("60"); }}>
+                {[
+                  { value: "webpage" as const, label: "Page changes", icon: <Globe2 size={14} /> },
+                  {
+                    value: "schedule" as const,
+                    label: "Schedule",
+                    icon: <Clock3 size={14} />,
+                  },
+                  {
+                    value: "calendar" as const,
+                    label: "Before a calendar event",
+                    icon: <CalendarDays size={14} />,
+                  },
+                  {
+                    value: "github" as const,
+                    label: "GitHub",
+                    icon: <GitBranch size={14} />,
+                  },
+                  {
+                    value: "todoist" as const,
+                    label: "Todoist",
+                    icon: <span className="trigger-connector-icon"><ConnectorIcon id="todoist" /></span>,
+                  },
+                  {
+                    value: "dropbox" as const,
+                    label: "Dropbox",
+                    icon: <span className="trigger-connector-icon"><ConnectorIcon id="dropbox" /></span>,
+                  },
+                  {
+                    value: "slack" as const,
+                    label: "Slack",
+                    icon: <span className="trigger-connector-icon"><ConnectorIcon id="slack" /></span>,
+                  },
+                  {
+                    value: "notion" as const,
+                    label: "Notion",
+                    icon: <span className="trigger-connector-icon"><ConnectorIcon id="notion" /></span>,
+                  },
+                  {
+                    value: "webhook" as const,
+                    label: "Webhook",
+                    icon: <Webhook size={14} />,
+                  },
+                ].map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            }
+          />
+          <Advanced title="Trigger details" summary="Schedule, pages, apps & webhooks">
           {triggerType === "webpage" && (
             <fieldset className="routine-fieldset page-watch-fields">
               <legend>Which page should we watch?</legend>
@@ -6141,8 +6183,9 @@ export function RoutinesPanel({
               <small className="routine-help">The webhook is only a signal. Your teammate still needs explicit Notion read access to fetch current content.</small>
             </fieldset>
           )}
-          <fieldset className="routine-fieldset">
-            <legend>Who should do it?</legend>
+          </Advanced>
+          {bots.length > 1 && (
+          <SettingsRow title="Who should do it?">
             <div className="routine-teammates">
               {bots.map((bot) => (
                 <button
@@ -6161,37 +6204,31 @@ export function RoutinesPanel({
                 </button>
               ))}
             </div>
-          </fieldset>
-          <label className="field">
-            <span>What should happen?</span>
+          </SettingsRow>
+          )}
+          <SettingsRow title="What should happen?">
             <textarea
               rows={5}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Read the event, check the related context and post a concise next action…"
               required
+              aria-label="What should happen?"
             />
-          </label>
-          <label className="routine-start">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-            />
-            <span>
-              <b>Turn it on</b>
-              <small>
-                {enabled
-                  ? triggerType === "schedule"
-                    ? "See the checked run times above"
-                    : triggerType === "webpage" ? "First check saves a baseline; later changes start the job" : "It will wait safely for a matching event"
-                  : "Keep it as a paused draft"}
-              </small>
-            </span>
-            <i>
-              <Check size={12} />
-            </i>
-          </label>
+          </SettingsRow>
+          <SwitchRow
+            title="Turn it on"
+            description={
+              enabled
+                ? triggerType === "schedule"
+                  ? "See the checked run times above"
+                  : triggerType === "webpage" ? "First check saves a baseline; later changes start the job" : "It will wait safely for a matching event"
+                : "Keep it as a paused draft"
+            }
+            checked={enabled}
+            onChange={setEnabled}
+          />
+          </SettingsCard>
           <div className="routine-preview">
             {triggerType === "schedule" ? (
               <Clock3 size={15} />
@@ -6255,6 +6292,15 @@ export function RoutinesPanel({
             </button>
           </div>
         </form>
+      ) : routines.length === 0 ? (
+        <div className="empty-panel">
+          {bots[0] && <Mascot bot={bots[0]} size="tiny" />}
+          <h3>No automations yet</h3>
+          <p>Let a teammate handle the repeats — morning briefs, reminders, and gentle nudges.</p>
+          <button type="button" className="button-primary" onClick={startCreate}>
+            <Plus size={15} /> Add an automation
+          </button>
+        </div>
       ) : (
         <button className="add-routine" onClick={startCreate}>
           <Plus size={17} /> Add an automation
@@ -6312,71 +6358,80 @@ export function ComputerPanel({ bot, onTeach }: { bot: Bot; onTeach: () => void 
   };
   return (
     <div className="computer-panel">
-      <div className="computer-status-row">
-        <div>
-          <span
-            className={`status-light ${status?.container === "ready" ? "on" : ""}`}
+      <SettingsGroup title="Computer">
+        <SettingsCard>
+          <SettingsRow
+            title="Private computer"
+            description={status?.container || "checking"}
+            control={<span className={`status-light ${status?.container === "ready" ? "on" : ""}`} />}
           />
-          <strong>Private computer</strong>
-          <small>{status?.container || "checking"}</small>
-        </div>
-        <div>
-          <span
-            className={`status-light ${status?.browser === "ready" ? "on" : ""}`}
+          <SettingsRow
+            title="Private browser"
+            description={status?.browser || "checking"}
+            control={<span className={`status-light ${status?.browser === "ready" ? "on" : ""}`} />}
           />
-          <strong>Private browser</strong>
-          <small>{status?.browser || "checking"}</small>
-        </div>
-      </div>
-      <div className="computer-screen">
-        {status?.screenshot ? (
-          <img src={status.screenshot} alt={`${bot.name}'s current browser`} />
-        ) : (
-          <div className="screen-empty">
-            <Mascot bot={bot} size="large" />
-            <h3>{bot.name}'s own little computer</h3>
-            <p>Browser history, sign-ins and files stay with this teammate.</p>
-          </div>
-        )}
-        <div className="screen-bar">
-          <span>
-            <i />
-            {status?.title || "No page open"}
-          </span>
-          <button onClick={() => void refresh()} aria-label="Refresh preview">
-            <RefreshCw size={14} />
-          </button>
-        </div>
-      </div>
-      <form className="browser-address" onSubmit={open}>
-        <Globe2 size={16} />
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…"
-          aria-label="Web address"
-        />
-        <button disabled={busy} aria-label="Open web page">
-          {busy ? (
-            <LoaderCircle className="spinner" size={16} />
-          ) : (
-            <ArrowUp size={16} />
-          )}
-        </button>
-      </form>
-      {error && <p className="panel-error">{error}</p>}
-      <div className="computer-actions">
-        <button
-          className="button-secondary"
-          onClick={() => void start()}
-          disabled={busy}
-        >
-          <Power size={15} /> Start computer
-        </button>
-        <button className="button-primary" onClick={onTeach}>
-          <WandSparkles size={15} /> Teach a workflow
-        </button>
-      </div>
+          <SettingsRow title={status?.title || "No page open"}>
+            <div className="computer-screen">
+              {status?.screenshot ? (
+                <img src={status.screenshot} alt={`${bot.name}'s current browser`} />
+              ) : (
+                <div className="screen-empty">
+                  <h3>A fresh desk for {bot.name}</h3>
+                  <p>Start the computer, open a page, and this teammate will keep sign-ins and files safe.</p>
+                </div>
+              )}
+              <div className="screen-bar">
+                <span>
+                  <i />
+                  {status?.title || "No page open"}
+                </span>
+                <button onClick={() => void refresh()} aria-label="Refresh preview">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
+          </SettingsRow>
+          <SettingsRow title="Web address">
+            <form className="browser-address" onSubmit={open}>
+              <Globe2 size={16} />
+              <input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://…"
+                aria-label="Web address"
+              />
+              <button disabled={busy} aria-label="Open web page">
+                {busy ? (
+                  <LoaderCircle className="spinner" size={16} />
+                ) : (
+                  <ArrowUp size={16} />
+                )}
+              </button>
+            </form>
+          </SettingsRow>
+          {error && <p className="panel-error">{error}</p>}
+          <SettingsRow
+            title="Start computer"
+            control={
+              <button
+                className="button-secondary"
+                onClick={() => void start()}
+                disabled={busy}
+              >
+                <Power size={15} /> Start computer
+              </button>
+            }
+          />
+          <SettingsRow
+            title="Teach a workflow"
+            control={
+              <button className="button-primary" onClick={onTeach}>
+                <WandSparkles size={15} /> Teach a workflow
+              </button>
+            }
+          />
+        </SettingsCard>
+      </SettingsGroup>
       <div className="security-footnote">
         <ShieldCheck size={16} />
         <p>
@@ -6705,31 +6760,46 @@ export function TeachPanel({
         </button>
       ) : (
         <form className="teach-form" onSubmit={start}>
-          <label className="field">
-            <span>What should this be called?</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Update the weekly tracker"
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Starting web page</span>
-            <input
-              value={startUrl}
-              onChange={(e) => setStartUrl(e.target.value)}
-              required
-            />
-          </label>
-          <button className="button-primary button-wide" disabled={busy}>
-            {busy ? (
-              <LoaderCircle className="spinner" size={16} />
-            ) : (
-              <Eye size={16} />
-            )}{" "}
-            Open teaching browser
-          </button>
+          <SettingsGroup title="Teach a workflow">
+            <SettingsCard>
+              <SettingsRow
+                title="What should this be called?"
+                control={
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Update the weekly tracker"
+                    required
+                    aria-label="What should this be called?"
+                  />
+                }
+              />
+              <SettingsRow
+                title="Starting web page"
+                control={
+                  <input
+                    value={startUrl}
+                    onChange={(e) => setStartUrl(e.target.value)}
+                    required
+                    aria-label="Starting web page"
+                  />
+                }
+              />
+              <SettingsRow
+                title="Open teaching browser"
+                control={
+                  <button className="button-primary button-wide" disabled={busy}>
+                    {busy ? (
+                      <LoaderCircle className="spinner" size={16} />
+                    ) : (
+                      <Eye size={16} />
+                    )}{" "}
+                    Open teaching browser
+                  </button>
+                }
+              />
+            </SettingsCard>
+          </SettingsGroup>
         </form>
       )}
       {error && <p className="panel-error">{error}</p>}
@@ -6757,47 +6827,33 @@ export function TeachPanel({
         <KeyRound size={16} />
         <p>Passwords are replaced with placeholders. Imported files are rejected if they contain credentials, private keys, or changed integrity data.</p>
       </div>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Useful starters</h3>
-            <p>Small, editable foundations—not opaque automations</p>
+      <SettingsGroup title="Useful starters">
+        <SettingsCard>
+          <div className="skill-template-grid">
+            {templates.map((template) => (
+              <article key={template.id}>
+                <span className="skill-template-icon"><WandSparkles size={17} /></span>
+                <span className="skill-category">{template.category}</span>
+                <h4>{template.name}</h4>
+                <p>{template.description}</p>
+                <button disabled={busy} onClick={() => void installTemplate(template)}>
+                  <Plus size={13} /> Add to {bot.name}
+                </button>
+              </article>
+            ))}
           </div>
-        </div>
-        <div className="skill-template-grid">
-          {templates.map((template) => (
-            <article key={template.id}>
-              <span className="skill-template-icon"><WandSparkles size={17} /></span>
-              <span className="skill-category">{template.category}</span>
-              <h4>{template.name}</h4>
-              <p>{template.description}</p>
-              <button disabled={busy} onClick={() => void installTemplate(template)}>
-                <Plus size={13} /> Add to {bot.name}
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section>
-        <div className="panel-section-heading">
-          <div>
-            <h3>Learned skills</h3>
-            <p>Type / in chat, edit safely, or return to an earlier version</p>
-          </div>
-        </div>
+        </SettingsCard>
+      </SettingsGroup>
+      <SettingsGroup title="Learned skills">
         {workflows.length ? (
-          <div className="workflow-list">
+          <SettingsCard>
             {workflows.map((workflow) => (
-              <div key={workflow.id}>
-                <WandSparkles size={18} />
-                <span>
-                  <strong>/{workflow.skillSlug}</strong>
-                  <small>
-                    {workflow.name} · v{workflow.version} · {workflow.stepCount ? `${workflow.stepCount} recorded steps` : "Reusable instructions"} ·{" "}
-                    {workflow.startUrl ? new URL(workflow.startUrl).hostname : "No starting website needed"}
-                  </small>
-                  <em>{workflow.description}</em>
-                </span>
+              <SettingsRow
+                key={workflow.id}
+                title={`/${workflow.skillSlug}`}
+                description={`${workflow.name} · v${workflow.version} · ${workflow.stepCount ? `${workflow.stepCount} recorded steps` : "Reusable instructions"} · ${workflow.startUrl ? new URL(workflow.startUrl).hostname : "No starting website needed"}`}
+              >
+                <em>{workflow.description}</em>
                 <div className="workflow-actions">
                   <button onClick={() => void onUse(workflow)}>
                     <Play size={12} /> Use
@@ -6822,91 +6878,97 @@ export function TeachPanel({
                     <Trash2 size={12} />
                   </button>
                 </div>
-              </div>
+              </SettingsRow>
             ))}
-          </div>
+          </SettingsCard>
         ) : (
-          <div className="empty-panel compact">
-            <PanelTop size={28} />
+          <div className="empty-panel">
             <h3>Nothing taught yet</h3>
-            <p>Your first demonstrated workflow will appear here.</p>
+            <p>Start from a starter — {bot.name} will make it yours.</p>
+            {templates[0] ? (
+              <button type="button" className="button-primary" disabled={busy} onClick={() => void installTemplate(templates[0])}>
+                <Plus size={15} /> Add {templates[0].name}
+              </button>
+            ) : null}
           </div>
         )}
-      </section>
-      {checkingWorkflow?.botId === bot.id && <WorkflowChecksPanel key={checkingWorkflow.id} workflow={workflows.find((w) => w.id === checkingWorkflow.id) || checkingWorkflow} />}
+      </SettingsGroup>
+      {checkingWorkflow?.botId === bot.id && (
+        <Advanced title="Skill checks" summary="Try two different examples before scheduling">
+          <WorkflowChecksPanel key={checkingWorkflow.id} workflow={workflows.find((w) => w.id === checkingWorkflow.id) || checkingWorkflow} />
+        </Advanced>
+      )}
       {studioSkills.length > 0 && (
-        <section>
-          <div className="panel-section-heading">
-            <div>
-              <h3>From your studio</h3>
-              <p>Copy a teammate's setup without copying their private history</p>
-            </div>
-          </div>
-          <div className="studio-skill-list">
+        <SettingsGroup title="From your studio">
+          <SettingsCard>
             {studioSkills.map((workflow) => (
-              <article key={workflow.id}>
-                <span className="skill-share-mark"><Copy size={15} /></span>
-                <span>
-                  <strong>{workflow.name}</strong>
-                  <small>/{workflow.skillSlug} · {workflow.botName} · v{workflow.version}</small>
-                  <p>{workflow.description}</p>
-                </span>
-                <button disabled={busy} onClick={() => void assign(workflow)}>
-                  Add to {bot.name}
-                </button>
-              </article>
+              <SettingsRow
+                key={workflow.id}
+                title={workflow.name}
+                description={`/${workflow.skillSlug} · ${workflow.botName} · v${workflow.version} · ${workflow.description}`}
+                control={
+                  <button disabled={busy} onClick={() => void assign(workflow)}>
+                    Add to {bot.name}
+                  </button>
+                }
+              />
             ))}
-          </div>
-        </section>
+          </SettingsCard>
+        </SettingsGroup>
       )}
       {editingWorkflow && (
         <form className="workflow-edit-form" onSubmit={saveEdit}>
-          <header>
-            <span>
-              <Settings2 size={15} />
-            </span>
-            <div>
-              <strong>Edit /{editingWorkflow.skillSlug}</strong>
-              <small>Changing the name also updates its slash command.</small>
-            </div>
-          </header>
-          <label className="field">
-            <span>Skill name</span>
-            <input
-              value={editName}
-              onChange={(event) => setEditName(event.target.value)}
-              required
-              autoFocus
-            />
-          </label>
-          <label className="field">
-            <span>What it is for</span>
-            <input
-              value={editDescription}
-              onChange={(event) => setEditDescription(event.target.value)}
-              maxLength={300}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>How it should work</span>
-            <textarea
-              value={editInstructions}
-              onChange={(event) => setEditInstructions(event.target.value)}
-              maxLength={5000}
-              rows={5}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Starting web page (optional)</span>
-            <input
-              value={editUrl}
-              onChange={(event) => setEditUrl(event.target.value)}
-              type="url"
-              placeholder="Leave empty for file or project work"
-            />
-          </label>
+          <SettingsGroup title={`Edit /${editingWorkflow.skillSlug}`}>
+            <SettingsCard>
+              <SettingsRow
+                title="Skill name"
+                description="Changing the name also updates its slash command."
+                control={
+                  <input
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    required
+                    autoFocus
+                    aria-label="Skill name"
+                  />
+                }
+              />
+              <SettingsRow
+                title="What it is for"
+                control={
+                  <input
+                    value={editDescription}
+                    onChange={(event) => setEditDescription(event.target.value)}
+                    maxLength={300}
+                    required
+                    aria-label="What it is for"
+                  />
+                }
+              />
+              <SettingsRow title="How it should work">
+                <textarea
+                  value={editInstructions}
+                  onChange={(event) => setEditInstructions(event.target.value)}
+                  maxLength={5000}
+                  rows={5}
+                  required
+                  aria-label="How it should work"
+                />
+              </SettingsRow>
+              <SettingsRow
+                title="Starting web page (optional)"
+                control={
+                  <input
+                    value={editUrl}
+                    onChange={(event) => setEditUrl(event.target.value)}
+                    type="url"
+                    placeholder="Leave empty for file or project work"
+                    aria-label="Starting web page (optional)"
+                  />
+                }
+              />
+            </SettingsCard>
+          </SettingsGroup>
           <div className="form-actions">
             <button
               type="button"
@@ -6927,33 +6989,34 @@ export function TeachPanel({
         </form>
       )}
       {historyWorkflow && (
-        <section className="skill-history-panel">
-          <header>
-            <span><RotateCcw size={16} /></span>
-            <div>
-              <strong>{historyWorkflow.name} history</strong>
-              <small>Restoring creates a new version, so nothing is lost.</small>
-            </div>
-            <button className="icon-button" onClick={() => setHistoryWorkflow(null)} aria-label="Close skill history"><X size={15} /></button>
-          </header>
-          <div className="skill-version-list">
-            {versions.map((version) => (
-              <article key={version.id}>
-                <b>v{version.version}</b>
-                <span>
-                  <strong>{version.name}</strong>
-                  <small>{version.stepCount} steps · {relativeTime(version.createdAt)}</small>
-                  <p>{version.description}</p>
-                </span>
-                {version.version === historyWorkflow.version ? (
-                  <em>Current</em>
-                ) : (
-                  <button disabled={busy} onClick={() => void rollback(historyWorkflow, version.version)}>Restore</button>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
+        <Advanced title={`${historyWorkflow.name} history`} summary="Restoring creates a new version, so nothing is lost.">
+          <section className="skill-history-panel">
+            <header>
+              <span><RotateCcw size={16} /></span>
+              <div>
+                <strong>{historyWorkflow.name} history</strong>
+                <small>Restoring creates a new version, so nothing is lost.</small>
+              </div>
+              <button className="icon-button" onClick={() => setHistoryWorkflow(null)} aria-label="Close skill history"><X size={15} /></button>
+            </header>
+            <SettingsCard>
+              {versions.map((version) => (
+                <SettingsRow
+                  key={version.id}
+                  title={`v${version.version} · ${version.name}`}
+                  description={`${version.stepCount} steps · ${relativeTime(version.createdAt)} · ${version.description}`}
+                  control={
+                    version.version === historyWorkflow.version ? (
+                      <em>Current</em>
+                    ) : (
+                      <button disabled={busy} onClick={() => void rollback(historyWorkflow, version.version)}>Restore</button>
+                    )
+                  }
+                />
+              ))}
+            </SettingsCard>
+          </section>
+        </Advanced>
       )}
     </div>
   );
@@ -6991,25 +7054,27 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
           {selected.botName ? ` by ${selected.botName}` : ""} in {selected.threadTitle}.
         </p>
         <div className="file-list">
-          {revisions.map((revision) => (
-            <article className="artifact-revision" key={revision.id}>
-              <File size={18} />
-              <span>
-                <strong>{revision.revision > 1 ? `Revision ${revision.revision}` : "First delivery"}</strong>
-                <small>{relativeTime(revision.createdAt)} · {Math.max(1, Math.round(revision.size / 1024))} KB</small>
-              </span>
-              <span className="artifact-revision-actions">
-                {revision.previewUrl && (
-                  <a href={revision.previewUrl} target="_blank" rel="noreferrer">
-                    <Eye size={14} /> Preview
-                  </a>
-                )}
-                <a href={revision.url} target="_blank" rel="noreferrer">
-                  <Download size={14} /> Open
-                </a>
-              </span>
-            </article>
-          ))}
+          <SettingsCard>
+            {revisions.map((revision) => (
+              <SettingsRow
+                key={revision.id}
+                title={revision.revision > 1 ? `Revision ${revision.revision}` : "First delivery"}
+                description={`${relativeTime(revision.createdAt)} · ${Math.max(1, Math.round(revision.size / 1024))} KB`}
+                control={
+                  <span className="artifact-revision-actions">
+                    {revision.previewUrl && (
+                      <a href={revision.previewUrl} target="_blank" rel="noreferrer">
+                        <Eye size={14} /> Preview
+                      </a>
+                    )}
+                    <a href={revision.url} target="_blank" rel="noreferrer">
+                      <Download size={14} /> Open
+                    </a>
+                  </span>
+                }
+              />
+            ))}
+          </SettingsCard>
         </div>
         <button className="text-action" onClick={() => { onOpenThread(selected.threadId); setSelected(null); }}>
           Open {selected.threadTitle} <ArrowRight size={14} />
@@ -7018,13 +7083,10 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
     );
   return (
     <div className="files-view">
-      <div className="friendly-note">
-        <FolderOpen size={18} />
+      <div className="settings-callout">
+        <FolderOpen size={17} />
         <p>
-          <strong>Work your teammates finished.</strong>
-          <br />
-          Reports, briefs, notes and delivered code — newest first, with every
-          revision kept.
+          <strong>Work your teammates finished.</strong> Reports, briefs, notes and delivered code — newest first, with every revision kept.
         </p>
       </div>
       {loading ? (
@@ -7032,36 +7094,44 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
           <LoaderCircle className="spinner" />
         </div>
       ) : artifacts.length ? (
-        <div className="file-list">
-          {artifacts.map((artifact) => (
-            <button key={artifact.id} onClick={() => void open(artifact)}>
-              {artifact.kind === "image" ? (
-                <FileImage size={18} />
-              ) : artifact.kind === "spreadsheet" ? (
-                <FileSpreadsheet size={18} />
-              ) : artifact.kind === "archive" ? (
-                <FileArchive size={18} />
-              ) : (
-                <FileText size={18} />
-              )}
-              <span>
-                <strong>{artifact.name}</strong>
-                <small>
-                  {artifact.botName ? `${artifact.botName} · ` : ""}
-                  {artifact.threadTitle} · {relativeTime(artifact.createdAt)}
-                </small>
-              </span>
-              {artifact.revisions > 1 && <small>v{artifact.revision}</small>}
-            </button>
-          ))}
-        </div>
+        <SettingsGroup title="Artifacts">
+          <SettingsCard>
+            {artifacts.map((artifact) => (
+              <SettingsRow
+                key={artifact.id}
+                title={artifact.name}
+                description={`${
+                  artifact.botName && artifact.threadTitle && artifact.botName !== artifact.threadTitle
+                    ? `${artifact.botName} in ${artifact.threadTitle} · `
+                    : artifact.botName || artifact.threadTitle
+                      ? `${artifact.botName || artifact.threadTitle} · `
+                      : ""
+                }${relativeTime(artifact.createdAt)}${artifact.revisions > 1 ? ` · v${artifact.revision}` : ""}`}
+                control={
+                  <button type="button" onClick={() => void open(artifact)} aria-label={`Open ${artifact.name}`}>
+                    {artifact.kind === "image" ? (
+                      <FileImage size={18} />
+                    ) : artifact.kind === "spreadsheet" ? (
+                      <FileSpreadsheet size={18} />
+                    ) : artifact.kind === "archive" ? (
+                      <FileArchive size={18} />
+                    ) : (
+                      <FileText size={18} />
+                    )}
+                    <span>Open</span>
+                  </button>
+                }
+              />
+            ))}
+          </SettingsCard>
+        </SettingsGroup>
       ) : (
         <div className="empty-panel">
-          <div className="empty-illustration">
-            <FolderOpen size={30} />
-          </div>
           <h3>Nothing here yet</h3>
           <p>Ask your team for a brief, report or plan — finished work lands here.</p>
+          <button type="button" className="button-primary" onClick={() => onOpenThread("team-room")}>
+            <MessageCircleReply size={15} /> Ask the team
+          </button>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Globe2, LoaderCircle, QrCode, Smartphone } from "lucide-react";
+import { SettingsCard, SettingsGroup, SettingsRow, SwitchRow } from "../studio/Settings";
 import "./away-access-panel.css";
 
 type Device = { id: string; name: string; revokedAt: number | null; lastUsedAt: number };
@@ -46,25 +47,43 @@ export function AwayAccessPanel() {
     catch (error) { setError(error instanceof Error ? error.message : "Could not disconnect this phone."); }
   }
   const seconds = invitation ? Math.max(0, Math.ceil((invitation.expiresAt - now) / 1000)) : 0;
+  void SwitchRow;
   return <section className="away-pairing" aria-label="Away access">
     <div className="away-pairing-heading"><span className="away-pairing-icon"><Globe2 size={23} /></span><div>
       <h3>{status?.ready ? "Away access is ready" : "Your studio, wherever you are"}</h3>
       <p>Your team on your iPhone. No VPN app needed.</p>
     </div></div>
-    <div className={`away-pairing-state ${status?.ready ? "ready" : ""}`}>
-      {busy ? <LoaderCircle className="spinner" size={19} /> : status?.ready ? <CheckCircle2 size={19} /> : <Globe2 size={19} />}
-      <div><strong>{status?.ready ? "Secure connection checked" : status?.url ? "Waiting for the secure address" : status ? "Set up an internet connection" : "Checking your connection…"}</strong>
-      <p>{status?.detail || "Checking the studio address and access protection."}</p></div>
-    </div>
-    {status?.ready && <>
-      {invitation && seconds > 0 ? <div className="away-qr">
-        <img src={invitation.qr} width="240" height="240" alt="Scan this code with OpenBot on your iPhone to pair it with this studio" />
-        <div><h4>Scan. Connect. You’re in.</h4><p>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</p><small>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</small>
-        <button onClick={() => { setInvitation(null); void request("/pairing", "DELETE").catch(() => {}); }}>Hide and cancel code</button></div>
-      </div> : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my iPhone"}</button>}
-    </>}
+    <SettingsGroup title="Your phone">
+      <SettingsCard>
+        <SettingsRow
+          title={status?.ready ? "Secure connection checked" : status?.url ? "Waiting for the secure address" : status ? "Set up an internet connection" : "Checking your connection…"}
+          description={status?.detail || "Checking the studio address and access protection."}
+          control={busy ? <LoaderCircle className="spinner" size={19} /> : status?.ready ? <CheckCircle2 size={19} /> : <Globe2 size={19} />}
+        />
+        {status?.ready && <SettingsRow
+          title={invitation && seconds > 0 ? "Scan. Connect. You’re in." : "Connect my iPhone"}
+          description={invitation && seconds > 0
+            ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.<span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
+            : <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</>}
+          control={invitation && seconds > 0
+            ? <button onClick={() => { setInvitation(null); void request("/pairing", "DELETE").catch(() => {}); }}>Hide and cancel code</button>
+            : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my iPhone"}</button>}
+        >
+          {invitation && seconds > 0 && <img src={invitation.qr} width="240" height="240" alt="Scan this code with OpenBot on your iPhone to pair it with this studio" />}
+        </SettingsRow>}
+        <SettingsRow
+          title="Check again"
+          description="Your Mac must stay awake and online. A private always-on host can work while it is off."
+          control={<button onClick={() => void refresh()} disabled={busy}>Check again</button>}
+        />
+        {status?.devices.filter((device) => !device.revokedAt).map((device) => <SettingsRow
+          key={device.id}
+          title={device.name}
+          description={`Last connected ${new Date(device.lastUsedAt).toLocaleString()}`}
+          control={<><Smartphone size={20} /><button onClick={() => void revoke(device)}>Disconnect</button></>}
+        />)}
+      </SettingsCard>
+    </SettingsGroup>
     {error && <p className="away-pairing-error" role="alert">{error}</p>}
-    <div className="away-pairing-footer"><small>Your Mac must stay awake and online. A private always-on host can work while it is off.</small><button onClick={() => void refresh()} disabled={busy}>Check again</button></div>
-    {!!status?.devices.filter((device) => !device.revokedAt).length && <div className="away-devices"><h4>Connected phones</h4>{status.devices.filter((device) => !device.revokedAt).map((device) => <div key={device.id}><Smartphone size={20} /><span><strong>{device.name}</strong><small>Last connected {new Date(device.lastUsedAt).toLocaleString()}</small></span><button onClick={() => void revoke(device)}>Disconnect</button></div>)}</div>}
   </section>;
 }

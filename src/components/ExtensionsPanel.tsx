@@ -1,8 +1,32 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Cable, Check, Download, LoaderCircle, Plus, Search, Trash2, Upload } from "lucide-react";
+import {
+  BookOpen,
+  Bug,
+  Cable,
+  CalendarCheck,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Compass,
+  Download,
+  Eye,
+  FileCheck,
+  FileCode,
+  ListTodo,
+  LoaderCircle,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Table,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import type { Bot } from "../shared/types";
 import type { CommunitySkill, McpConnection } from "../shared/extensions";
 import type { PrivateMemory } from "../shared/private-memory";
+import { SettingsCard, SettingsGroup, SettingsRow, Switch, SwitchRow, SegmentedControl } from "../studio/Settings";
 import "./extensions-panel.css";
 
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
@@ -13,12 +37,83 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
 }
 type Preview = Omit<CommunitySkill, "id" | "botIds" | "installedAt">;
 
+
+function getSkillMeta(id: string, name: string) {
+  const key = `${id} ${name}`.toLowerCase();
+  if (key.includes("weekly") || key.includes("review-planning")) {
+    return {
+      category: "Planning",
+      gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+      icon: CalendarCheck,
+      triggers: ["Plan week", "Review schedule", "Prioritize"],
+    };
+  }
+  if (key.includes("meeting") || key.includes("action-item")) {
+    return {
+      category: "Collaboration",
+      gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+      icon: ListTodo,
+      triggers: ["Meeting notes", "Action items", "Key decisions"],
+    };
+  }
+  if (key.includes("document") || key.includes("doc")) {
+    return {
+      category: "Productivity",
+      gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+      icon: FileCheck,
+      triggers: ["Extract tasks", "Process brief", "Next steps"],
+    };
+  }
+  if (key.includes("research") || key.includes("grounded")) {
+    return {
+      category: "Research",
+      gradient: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
+      icon: Compass,
+      triggers: ["Verify facts", "Check sources", "Synthesize"],
+    };
+  }
+  if (key.includes("debug") || key.includes("systematic")) {
+    return {
+      category: "Engineering",
+      gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+      icon: Bug,
+      triggers: ["Debug error", "Trace cause", "Propose fix"],
+    };
+  }
+  if (key.includes("spreadsheet") || key.includes("csv") || key.includes("table")) {
+    return {
+      category: "Data & Numbers",
+      gradient: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+      icon: Table,
+      triggers: ["Analyze CSV", "Reconcile totals", "Data sanity"],
+    };
+  }
+  if (key.includes("private") || key.includes("team-review")) {
+    return {
+      category: "Teamwork",
+      gradient: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+      icon: ShieldCheck,
+      triggers: ["Cross-check", "Consult teammates", "Align decisions"],
+    };
+  }
+  return {
+    category: "Extension",
+    gradient: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+    icon: Sparkles,
+    triggers: ["Auto-invoked by relevance"],
+  };
+}
+
 export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { bots: Bot[]; skillsOnly?: boolean; selectedBotId?: string }) {
   const [tab, setTab] = useState<"connections" | "skills" | "memory">(skillsOnly ? "skills" : "connections");
   const [state, setState] = useState<{ connections: McpConnection[]; skills: CommunitySkill[]; oauth?: { hostOnly: boolean } }>({ connections: [], skills: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [localBotId, setBotId] = useState(bots[0]?.id || "");
   const botId = selectedBotId ?? localBotId;
+  const currentBot = bots.find((bot) => bot.id === botId);
+  const [skillCategory, setSkillCategory] = useState<string>("all");
+  const [inspectingSkillId, setInspectingSkillId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [skillSearch, setSkillSearch] = useState("");
   const [name, setName] = useState(""), [url, setUrl] = useState(""), [token, setToken] = useState(""), [loopback, setLoopback] = useState(false);
   const [mode, setMode] = useState<"http" | "stdio">("http"); const [command, setCommand] = useState(""); const [argsText, setArgsText] = useState(""); const [envText, setEnvText] = useState("");
@@ -47,33 +142,60 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
     catch (error) { setError(error instanceof Error ? error.message : "Could not finish that request."); }
     finally { setBusy(false); }
   };
+  void SwitchRow;
   return <section className={`extensions-panel ${skillsOnly ? "included-library" : ""}`} aria-label="Open extensions">
     <header><div><span className="extension-eyebrow">Made to work your way</span><h3>{skillsOnly ? "Ready-to-use skills" : "Tools, skills & memory"}</h3><p>{skillsOnly ? "Useful methods, already here. Your teammates choose the right one for your task." : "Use an included skill, add an open connection, or correct what a teammate remembers."}</p></div><Cable size={24} aria-hidden="true" /></header>
-    {!skillsOnly && <nav aria-label="Extension sections">{([['connections', 'Connections'], ['skills', 'Skills'], ['memory', 'Memory']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setError(""); setNotice(""); }}>{label}</button>)}</nav>}
+    {!skillsOnly && (
+      <div style={{ margin: "20px 0" }}>
+        <SegmentedControl
+          ariaLabel="Extension sections"
+          value={tab}
+          onChange={(val) => {
+            setTab(val as "connections" | "skills" | "memory");
+            setError("");
+            setNotice("");
+          }}
+          options={[
+            { value: "connections", label: "Connections" },
+            { value: "skills", label: "Skills Library" },
+            { value: "memory", label: "Teammate Memory" },
+          ]}
+        />
+      </div>
+    )}
     {selectedBotId === undefined && <label className="extension-teammate">Teammate<select value={botId} onChange={(event) => { setBotId(event.target.value); }}>{bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>}
     {error && <p role="alert" className="extension-error">{error}</p>}{notice && <p role="status" className="extension-notice"><Check size={16} />{notice}</p>}
     <fieldset disabled={busy || !botId}>
     {tab === "connections" && <>
       <p>Use a service’s own sign-in or access token, or run a community MCP server as a local command on the host. Browser sign-in works with MCP services that offer public-client registration. Other services may require their own integration. A local command server starts when this connection is used and can read the files it is given; choose those commands carefully.</p>
       {state.oauth?.hostOnly && <p>For this local studio, finish browser sign-in on the Mac running OpenBot. The phone can use the connection once you share its tools.</p>}
-      {state.connections.map((connection) => <article className="extension-card" key={connection.id}>
-        <div className="extension-card-heading"><div><h4>{connection.name}</h4><p>{connection.transport === "stdio" ? `stdio · ${connection.command} ${(connection.args || []).join(" ")}` : connection.url}</p><small>{connection.lastUsedAt ? "Used successfully · " : ""}{connection.checkedAt ? `${connection.tools.length} tools discovered · account access is checked when used` : "Saved · not checked yet"}{connection.transport === "stdio" ? " · local command" : ""}</small></div>
-          <button type="button" aria-label={`Remove ${connection.name}`} onClick={() => { if (window.confirm(`Remove ${connection.name} and revoke every teammate's access?`)) void run(() => request(`/mcp/${connection.id}`, "DELETE"), "Connection removed. Access revoked."); }}><Trash2 size={16} /></button></div>
-        <button type="button" onClick={() => void run(() => request(`/mcp/${connection.id}/check`, "POST"), "Tools checked. Review access below; changed tools lose their old permissions.")}><Search size={15} />Check connection</button>
-        <button type="button" disabled={state.oauth?.hostOnly && !["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname)} onClick={() => {
-          if ((connection.hasToken || connection.checkedAt) && !window.confirm("Sign in again? Existing credentials and teammate tool permissions will be cleared first.")) return;
-          void run(async () => { const result = await request<{ url: string }>(`/mcp/${connection.id}/oauth`, "POST"); window.location.assign(result.url); }, "Opening the service’s sign-in…");
-        }}>{connection.authMode === "oauth" ? "Sign in again" : "Sign in with this service"}</button>
-        {connection.authMode === "oauth" && <button type="button" onClick={() => { if (window.confirm("Disconnect this sign-in and revoke all teammate tool access?")) void run(() => request(`/mcp/${connection.id}/oauth`, "DELETE"), "Disconnected. Tool access revoked."); }}>Disconnect sign-in</button>}
-        {connection.tools.length > 0 && <details><summary>Choose tools for {bots.find((bot) => bot.id === botId)?.name}</summary><p>Start with “Ask each time.” Use “Read without asking” only for tools you have verified cannot change anything. Server labels are not a security guarantee.</p>
-          {connection.tools.map((tool) => <div className="extension-tool" key={tool.name}><div><strong>{tool.name}</strong><p>{tool.description}</p><details><summary>Tool inputs</summary><pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre></details></div>
-            <select aria-label={`${tool.name} access`} value={connection.grants[botId]?.[tool.name] || "off"} onChange={(event) => {
-              const grants = { ...connection.grants[botId] };
-              if (event.target.value === "off") delete grants[tool.name]; else grants[tool.name] = event.target.value as "ask" | "read";
-              void run(() => request(`/mcp/${connection.id}/access`, "PATCH", { botId, grants }), "Access updated. Waiting calls will be rechecked.");
-            }}><option value="off">Off</option><option value="ask">Ask each time</option><option value="read">Read without asking</option></select></div>)}
-        </details>}
-      </article>)}
+      {state.connections.length > 0 && <SettingsGroup title="Connections">
+        <SettingsCard>
+          {state.connections.map((connection) => <SettingsRow
+            key={connection.id}
+            title={connection.name}
+            description={<><span>{connection.transport === "stdio" ? `stdio · ${connection.command} ${(connection.args || []).join(" ")}` : connection.url}</span><span>{connection.lastUsedAt ? "Used successfully · " : ""}{connection.checkedAt ? `${connection.tools.length} tools discovered · account access is checked when used` : "Saved · not checked yet"}{connection.transport === "stdio" ? " · local command" : ""}</span></>}
+            control={<>
+              <button type="button" onClick={() => void run(() => request(`/mcp/${connection.id}/check`, "POST"), "Tools checked. Review access below; changed tools lose their old permissions.")}><Search size={15} />Check connection</button>
+              <button type="button" disabled={state.oauth?.hostOnly && !["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname)} onClick={() => {
+                if ((connection.hasToken || connection.checkedAt) && !window.confirm("Sign in again? Existing credentials and teammate tool permissions will be cleared first.")) return;
+                void run(async () => { const result = await request<{ url: string }>(`/mcp/${connection.id}/oauth`, "POST"); window.location.assign(result.url); }, "Opening the service’s sign-in…");
+              }}>{connection.authMode === "oauth" ? "Sign in again" : "Sign in with this service"}</button>
+              {connection.authMode === "oauth" && <button type="button" onClick={() => { if (window.confirm("Disconnect this sign-in and revoke all teammate tool access?")) void run(() => request(`/mcp/${connection.id}/oauth`, "DELETE"), "Disconnected. Tool access revoked."); }}>Disconnect sign-in</button>}
+              <button type="button" aria-label={`Remove ${connection.name}`} onClick={() => { if (window.confirm(`Remove ${connection.name} and revoke every teammate's access?`)) void run(() => request(`/mcp/${connection.id}`, "DELETE"), "Connection removed. Access revoked."); }}><Trash2 size={16} /></button>
+            </>}
+          >
+            {connection.tools.length > 0 && <details><summary>Choose tools for {bots.find((bot) => bot.id === botId)?.name}</summary><p>Start with “Ask each time.” Use “Read without asking” only for tools you have verified cannot change anything. Server labels are not a security guarantee.</p>
+              {connection.tools.map((tool) => <div className="extension-tool" key={tool.name}><div><strong>{tool.name}</strong><p>{tool.description}</p><details><summary>Tool inputs</summary><pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre></details></div>
+                <select aria-label={`${tool.name} access`} value={connection.grants[botId]?.[tool.name] || "off"} onChange={(event) => {
+                  const grants = { ...connection.grants[botId] };
+                  if (event.target.value === "off") delete grants[tool.name]; else grants[tool.name] = event.target.value as "ask" | "read";
+                  void run(() => request(`/mcp/${connection.id}/access`, "PATCH", { botId, grants }), "Access updated. Waiting calls will be rechecked.");
+                }}><option value="off">Off</option><option value="ask">Ask each time</option><option value="read">Read without asking</option></select></div>)}
+            </details>}
+          </SettingsRow>)}
+        </SettingsCard>
+      </SettingsGroup>}
       <details className="extension-add"><summary><Plus size={16} />Add a custom connection</summary>
         {mode === "stdio" && <div className="extension-starters">
           <small>Community starters from the open MCP catalog (modelcontextprotocol/servers, MIT · <a href="https://github.com/NousResearch/hermes-agent/tree/main/optional-mcps" target="_blank" rel="noreferrer">Hermes optional MCPs</a> list many services) — each pre-fills the form; review the command before saving:</small>
@@ -110,50 +232,479 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
         </form>
       </details>
     </>}
-    {tab === "skills" && <>
-      <label className="app-search"><Search size={16} /><input type="search" aria-label="Find a skill" placeholder="Find a skill" value={skillSearch} onChange={(event) => setSkillSearch(event.target.value)} /></label>
-      <p>Included skills are ready for every teammate, including new ones. Turn any off below. They add useful methods—not account access or new software. You can also review and add your own.</p>
-      {state.skills.filter((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(skillSearch.toLowerCase())).map((skill) => <article className="extension-card" key={skill.id}><div className="extension-card-heading"><div><h4><BookOpen size={16} />{skill.name.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</h4><p>{skill.description}</p><small>{skill.bundled ? "Included · " : "Imported · "}{skill.license} · pinned {skill.digest.slice(0, 10)}</small></div><div className="extension-actions"><button type="button" aria-label={`Share ${skill.name}`} onClick={() => void run(async () => {
-          const shared = await request<{ kind: string; version: number; name: string; bundle: { files: Record<string, string>; source: string } }>(`/skills/${skill.id}/share`);
-          const url = URL.createObjectURL(new Blob([`${JSON.stringify(shared, null, 2)}\n`], { type: "application/json" }));
-          const link = document.createElement("a");
-          link.href = url; link.download = `${shared.name}.openbot-skill.json`;
-          document.body.appendChild(link); link.click(); link.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1_000);
-        }, "Skill file downloaded. The importer reviews the exact bundle before installing.")}><Download size={16} /></button><button type="button" aria-label={`${skill.bundled ? "Disable" : "Remove"} ${skill.name}`} onClick={() => { if (window.confirm(skill.bundled ? `Disable ${skill.name} for current and future teammates? You can re-enable it for a teammate below.` : `Remove ${skill.name} from this studio?`)) void run(() => request(`/skills/${skill.id}`, "DELETE"), skill.bundled ? "Skill disabled. You can re-enable it for any teammate." : "Skill removed."); }}><Trash2 size={16} /></button></div></div>
-        <label className="extension-check"><input type="checkbox" checked={skill.botIds.includes(botId)} onChange={(event) => void run(() => request(`/skills/${skill.id}/access`, "PATCH", { botIds: event.target.checked ? [...skill.botIds, botId] : skill.botIds.filter((id) => id !== botId) }), "Skill access updated.")} />Available to {bots.find((bot) => bot.id === botId)?.name}</label>
-        <details><summary>Reviewed source & instructions</summary><p>{skill.source}</p><pre>{skill.instructions}</pre></details>
-      </article>)}
-      {skillSearch && !state.skills.some((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(skillSearch.toLowerCase())) && <p>No matching skills. Try another name.</p>}
-      <details className="extension-add"><summary><Plus size={16} />Review a community skill</summary>
-        <form onSubmit={(event) => { event.preventDefault(); void run(async () => setPreview(await request<Preview>("/skills/fetch", "POST", { url: source })), "Downloaded for review. Not installed yet."); }}><label>Raw SKILL.md address<input type="url" required value={source} placeholder="https://raw.githubusercontent.com/…/SKILL.md" onChange={(event) => { setSource(event.target.value); setPreview(null); }} /></label><button type="submit">Load from URL</button></form>
-        <div className="extension-divider">or open a shared skill file</div>
-        <input ref={skillFile} type="file" className="visually-hidden" accept=".json,application/json" onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (skillFile.current) skillFile.current.value = "";
-          if (!file) return;
-          void run(async () => {
-            if (file.size > 256_000) throw new Error("That skill file is too large. Choose one under 256 KB.");
-            const shared = JSON.parse(await file.text()) as { kind?: unknown; bundle?: unknown };
-            if (shared.kind !== "openbot-skill" || !shared.bundle) throw new Error("That file is not an OpenBot skill file.");
-            setPreview(await request<Preview>("/skills/inspect", "POST", shared.bundle));
-          }, "Shared skill loaded for review. Not installed yet.");
-        }} />
-        <button type="button" onClick={() => skillFile.current?.click()}><Upload size={15} />Open shared file</button>
-        <div className="extension-divider">or paste a self-contained SKILL.md</div>
-        <label>Skill contents<textarea rows={7} value={markdown} placeholder={'---\nname: meeting-review\ndescription: Review meeting notes\n---\nYour instructions…'} onChange={(event) => { setMarkdown(event.target.value); setPreview(null); }} /></label>
-        <button type="button" disabled={!markdown.trim()} onClick={() => void run(async () => setPreview(await request<Preview>("/skills/inspect", "POST", { files: { "SKILL.md": markdown }, source: "Manually provided by the studio owner" })), "Ready to review. Not installed yet.")}>Review pasted skill</button>
-        {preview && <div className="extension-review"><h4>{preview.name}</h4><p>{preview.description}</p><small>{preview.license} · {Object.keys(preview.files).length} files</small><ul>{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}{preview.blockers.map((blocker) => <li className="extension-error" key={blocker}>{blocker}</li>)}</ul><details><summary>Read the exact bundle</summary>{Object.entries(preview.files).map(([file, content]) => <div key={file}><h4>{file}</h4><pre>{content}</pre></div>)}</details><button type="button" className="extension-primary" disabled={preview.blockers.length > 0} onClick={() => void run(async () => { await request("/skills", "POST", { bundle: { files: preview.files, source: preview.source }, digest: preview.digest, botIds: [botId] }); setPreview(null); setMarkdown(""); }, "Reviewed skill installed for this teammate.")}>Approve & add skill</button></div>}
-      </details>
-    </>}
+    {tab === "skills" && (
+      <div className="skills-showcase">
+        <div className="skills-status-hero">
+          <div className="skills-status-info">
+            <h4>Ready-to-Use Skills Library</h4>
+            <p>
+              Curated methods that guide your teammates through structured, deterministic tasks.
+              Every recipe is sandboxed and inspectable.
+            </p>
+          </div>
+          <div className="skills-hero-stat">
+            <span className="skills-stat-count">
+              {state.skills.filter((s) => s.botIds.includes(botId)).length}
+              <small>/{state.skills.length}</small>
+            </span>
+            <span className="skills-stat-label">Active for {currentBot?.name || "teammate"}</span>
+          </div>
+        </div>
+
+        <div className="skills-toolbar">
+          <div className="skills-search-box">
+            <Search size={15} />
+            <input
+              type="search"
+              aria-label="Find a skill"
+              placeholder="Filter by name, instructions or triggers…"
+              value={skillSearch}
+              onChange={(event) => setSkillSearch(event.target.value)}
+            />
+            {skillSearch && (
+              <button
+                type="button"
+                className="skills-search-clear"
+                onClick={() => setSkillSearch("")}
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="skills-category-pills" role="tablist" aria-label="Skill categories">
+            {[
+              { id: "all", label: "All Skills" },
+              { id: "Planning", label: "Planning" },
+              { id: "Collaboration", label: "Collaboration" },
+              { id: "Productivity", label: "Productivity" },
+              { id: "Research", label: "Research" },
+              { id: "Engineering", label: "Engineering" },
+              { id: "Data & Numbers", label: "Data" },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={skillCategory === cat.id}
+                className={`skill-category-pill ${skillCategory === cat.id ? "active" : ""}`}
+                onClick={() => setSkillCategory(cat.id)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="skills-cards-grid">
+          {state.skills
+            .filter((skill) => {
+              const meta = getSkillMeta(skill.id, skill.name);
+              const matchesSearch = `${skill.name} ${skill.description} ${meta.triggers.join(" ")}`
+                .toLowerCase()
+                .includes(skillSearch.toLowerCase());
+              const matchesCat = skillCategory === "all" || meta.category === skillCategory;
+              return matchesSearch && matchesCat;
+            })
+            .map((skill) => {
+              const meta = getSkillMeta(skill.id, skill.name);
+              const IconComp = meta.icon;
+              const isAssigned = skill.botIds.includes(botId);
+              const isInspecting = inspectingSkillId === skill.id;
+
+              return (
+                <article
+                  key={skill.id}
+                  className={`skill-card ${isAssigned ? "is-active" : ""}`}
+                >
+                  <div className="skill-card-top">
+                    <div
+                      className="skill-icon-squircle"
+                      style={{ background: meta.gradient }}
+                    >
+                      <IconComp size={22} color="#ffffff" strokeWidth={2} />
+                    </div>
+                    <div className="skill-card-heading">
+                      <div className="skill-card-title-row">
+                        <h5>
+                          {skill.name
+                            .replaceAll("-", " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </h5>
+                        <span className="skill-category-badge" data-category={meta.category}>{meta.category}</span>
+                      </div>
+                      <span className="skill-digest-pill">
+                        {skill.bundled ? "Included" : "Imported"} · {skill.license} · pinned {skill.digest.slice(0, 8)}
+                      </span>
+                    </div>
+                    <div className="skill-card-switch">
+                      <Switch
+                        label={`Toggle ${skill.name} for ${currentBot?.name}`}
+                        checked={isAssigned}
+                        onChange={(checked) =>
+                          void run(
+                            () =>
+                              request(`/skills/${skill.id}/access`, "PATCH", {
+                                botIds: checked
+                                  ? [...skill.botIds, botId]
+                                  : skill.botIds.filter((id) => id !== botId),
+                              }),
+                            "Skill access updated."
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <p className="skill-card-description">{skill.description}</p>
+
+                  <div className="skill-card-triggers">
+                    <span className="skill-trigger-label">Triggers:</span>
+                    {meta.triggers.map((trigger) => (
+                      <span key={trigger} className="skill-trigger-tag">
+                        {trigger}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="skill-card-footer">
+                    <span className={`skill-status-tag ${isAssigned ? "assigned" : ""}`}>
+                      {isAssigned ? (
+                        <>
+                          <span className="skill-status-dot" aria-hidden="true" />
+                          Ready for {currentBot?.name || "teammate"}
+                        </>
+                      ) : (
+                        "Disabled for this teammate"
+                      )}
+                    </span>
+
+                    <div className="skill-card-actions">
+                      <button
+                        type="button"
+                        className={`skill-action-btn ${isInspecting ? "active" : ""}`}
+                        onClick={() =>
+                          setInspectingSkillId(isInspecting ? null : skill.id)
+                        }
+                        aria-expanded={isInspecting}
+                        title="Inspect recipe instructions"
+                      >
+                        <Eye size={13} />
+                        <span>{isInspecting ? "Close" : "Inspect"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="skill-action-btn"
+                        aria-label={`Share ${skill.name}`}
+                        title="Export skill package"
+                        onClick={() =>
+                          void run(async () => {
+                            const shared = await request<{
+                              kind: string;
+                              version: number;
+                              name: string;
+                              bundle: { files: Record<string, string>; source: string };
+                            }>(`/skills/${skill.id}/share`);
+                            const url = URL.createObjectURL(
+                              new Blob([`${JSON.stringify(shared, null, 2)}\n`], {
+                                type: "application/json",
+                              })
+                            );
+                            const link = document.createElement("a");
+                            link.href = url;
+                            link.download = `${shared.name}.openbot-skill.json`;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          }, "Skill package downloaded.")
+                        }
+                      >
+                        <Download size={13} />
+                        <span>Export</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="skill-action-btn danger"
+                        aria-label={`${skill.bundled ? "Disable" : "Remove"} ${skill.name}`}
+                        title={skill.bundled ? "Disable skill" : "Remove skill"}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              skill.bundled
+                                ? `Disable ${skill.name} across the studio? You can re-enable it per teammate.`
+                                : `Remove ${skill.name} from this studio?`
+                            )
+                          ) {
+                            void run(
+                              () => request(`/skills/${skill.id}`, "DELETE"),
+                              skill.bundled ? "Skill disabled." : "Skill removed."
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isInspecting && (
+                    <div className="skill-inspector-box">
+                      <div className="skill-inspector-header">
+                        <div className="skill-inspector-title">
+                          <FileCode size={14} />
+                          <strong>SKILL.md Recipe & System Instructions</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="skill-copy-btn"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(skill.instructions);
+                            setCopiedId(skill.id);
+                            setTimeout(() => setCopiedId(null), 1800);
+                          }}
+                        >
+                          {copiedId === skill.id ? (
+                            <>
+                              <Check size={12} /> Copied!
+                            </>
+                          ) : (
+                            "Copy instructions"
+                          )}
+                        </button>
+                      </div>
+                      <div className="skill-source-line">Source: {skill.source}</div>
+                      <pre className="skill-instructions-pre">{skill.instructions}</pre>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+        </div>
+
+        {skillSearch &&
+          !state.skills.some((skill) =>
+            `${skill.name} ${skill.description}`
+              .toLowerCase()
+              .includes(skillSearch.toLowerCase())
+          ) && (
+            <div className="skills-empty-search">
+              <Search size={24} />
+              <h4>No skills match "{skillSearch}"</h4>
+              <p>Try searching for other keywords or select another category tab above.</p>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => setSkillSearch("")}
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
+        <details className="purpose-disclosure skills-add-disclosure">
+          <summary>
+            <Plus size={18} />
+            <span>
+              Teach or Import a Community Skill
+              <small>Add custom recipes via URL, bundle file, or write in Markdown</small>
+            </span>
+            <ChevronDown size={16} />
+          </summary>
+          <div className="purpose-disclosure-body">
+            <div className="skill-import-options">
+              <div className="skill-import-card">
+                <h5>Import from URL</h5>
+                <p>Fetch a raw SKILL.md directly from GitHub or a web server.</p>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run(
+                      async () =>
+                        setPreview(
+                          await request<Preview>("/skills/fetch", "POST", {
+                            url: source,
+                          })
+                        ),
+                      "Downloaded for review. Not installed yet."
+                    );
+                  }}
+                >
+                  <input
+                    type="url"
+                    required
+                    value={source}
+                    placeholder="https://raw.githubusercontent.com/…/SKILL.md"
+                    onChange={(event) => {
+                      setSource(event.target.value);
+                      setPreview(null);
+                    }}
+                  />
+                  <button type="submit" className="button-secondary">
+                    Fetch & Inspect
+                  </button>
+                </form>
+              </div>
+
+              <div className="skill-import-card">
+                <h5>Open Skill Package</h5>
+                <p>Import a verified .openbot-skill.json exported from another studio.</p>
+                <input
+                  ref={skillFile}
+                  type="file"
+                  className="visually-hidden"
+                  accept=".json,application/json"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (skillFile.current) skillFile.current.value = "";
+                    if (!file) return;
+                    void run(async () => {
+                      if (file.size > 256_000)
+                        throw new Error(
+                          "That skill file is too large. Choose one under 256 KB."
+                        );
+                      const shared = JSON.parse(await file.text()) as {
+                        kind?: unknown;
+                        bundle?: unknown;
+                      };
+                      if (shared.kind !== "openbot-skill" || !shared.bundle)
+                        throw new Error("That file is not an OpenBot skill file.");
+                      setPreview(
+                        await request<Preview>("/skills/inspect", "POST", shared.bundle)
+                      );
+                    }, "Shared skill loaded for review. Not installed yet.");
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => skillFile.current?.click()}
+                >
+                  <Upload size={14} /> Choose File
+                </button>
+              </div>
+
+              <div className="skill-import-card wide">
+                <h5>Write SKILL.md</h5>
+                <p>Paste or write self-contained instructions with YAML frontmatter.</p>
+                <textarea
+                  rows={6}
+                  value={markdown}
+                  placeholder={`---\nname: meeting-review\ndescription: Review meeting notes\n---\nYour instructions…`}
+                  onChange={(event) => {
+                    setMarkdown(event.target.value);
+                    setPreview(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={!markdown.trim()}
+                  onClick={() =>
+                    void run(
+                      async () =>
+                        setPreview(
+                          await request<Preview>("/skills/inspect", "POST", {
+                            files: { "SKILL.md": markdown },
+                            source: "Manually provided by the studio owner",
+                          })
+                        ),
+                      "Ready to review. Not installed yet."
+                    )
+                  }
+                >
+                  Validate & Inspect
+                </button>
+              </div>
+            </div>
+
+            {preview && (
+              <div className="extension-review">
+                <h4>{preview.name}</h4>
+                <p>{preview.description}</p>
+                <small>
+                  {preview.license} · {Object.keys(preview.files).length} files · pinned {preview.digest.slice(0, 10)}
+                </small>
+                <ul>
+                  {preview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                  {preview.blockers.map((blocker) => (
+                    <li className="extension-error" key={blocker}>
+                      {blocker}
+                    </li>
+                  ))}
+                </ul>
+                <details>
+                  <summary>Read bundle contents</summary>
+                  {Object.entries(preview.files).map(([file, content]) => (
+                    <div key={file}>
+                      <h4>{file}</h4>
+                      <pre>{content}</pre>
+                    </div>
+                  ))}
+                </details>
+                <button
+                  type="button"
+                  className="button-primary"
+                  disabled={preview.blockers.length > 0}
+                  onClick={() =>
+                    void run(async () => {
+                      await request("/skills", "POST", {
+                        bundle: { files: preview.files, source: preview.source },
+                        digest: preview.digest,
+                        botIds: [botId],
+                      });
+                      setPreview(null);
+                      setMarkdown("");
+                    }, "Reviewed skill installed for this teammate.")
+                  }
+                >
+                  Approve & Install Skill
+                </button>
+              </div>
+            )}
+          </div>
+        </details>
+      </div>
+    )}
     {tab === "memory" && <>
       <p>Your corrections are protected. Task-learned notes expire after 30 days unless you change that here. Expired or conflicting notes are excluded from new-task context; past chats and running tasks are not erased.</p>
       {memories.length === 0 && <p className="extension-empty">No saved notes yet. Add a preference you want this teammate to remember.</p>}
       <button type="button" onClick={() => void run(async () => { setMemories(await request<PrivateMemory[]>(`/memory/${encodeURIComponent(botId)}`)); }, "Notes refreshed. Choose Edit for the latest version.")}>Refresh notes</button>
-      {memories.map((note) => <article className="extension-card" key={note.key}><h4>{note.key}</h4><p>{note.content}</p><small>{note.source === "owner" ? "Set by you · protected" : note.source === "task" ? "Learned in a task" : "Older saved note · protected"}{note.expiresAt ? ` · ${note.expired ? "Expired" : "Expires"} ${new Date(note.expiresAt).toLocaleString()}` : " · No expiry"}{note.conflict ? " · Conflicting note: review before use" : ""}</small><div className="extension-actions"><button type="button" onClick={() => { setMemoryKey(note.key); setMemoryText(note.content); setMemoryRevision(note.revision); setMemoryExpiry(note.expiresAt ? new Date(Date.parse(note.expiresAt) - new Date(note.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" onClick={() => void run(() => request(`/memory/${encodeURIComponent(botId)}`, "DELETE", { key: note.key, expectedRevision: note.revision }), "Memory removed from future tasks.")}><Trash2 size={15} />Forget</button></div></article>)}
-      <form onSubmit={(event) => { event.preventDefault(); void run(async () => { await request(`/memory/${encodeURIComponent(botId)}`, "PATCH", { key: memoryKey, content: memoryText, ...(memoryRevision ? { expectedRevision: memoryRevision } : {}), expiresAt: memoryExpiry ? new Date(memoryExpiry).toISOString() : null }); setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }, "Memory saved. Future tasks will use the correction."); }}>
-        <label>Note name<input value={memoryKey} maxLength={80} required disabled={Boolean(memoryRevision)} placeholder="Writing preference" onChange={(event) => setMemoryKey(event.target.value)} /></label><label>What should they remember?<textarea value={memoryText} rows={3} maxLength={1200} required placeholder="Use concise English and give dates in Belgian time." onChange={(event) => setMemoryText(event.target.value)} /></label><label>Keep until <small>optional · your local time; blank means no expiry</small><input type="datetime-local" value={memoryExpiry} onChange={(event) => setMemoryExpiry(event.target.value)} /></label><button className="extension-primary" type="submit">Save note</button><button type="button" onClick={() => { setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }}>Clear editor</button>
-      </form>
+      {memories.length > 0 && <SettingsGroup title="Saved notes">
+        <SettingsCard>
+          {memories.map((note) => <SettingsRow
+            key={note.key}
+            title={note.key}
+            description={<><span>{note.content}</span><span>{note.source === "owner" ? "Set by you · protected" : note.source === "task" ? "Learned in a task" : "Older saved note · protected"}{note.expiresAt ? ` · ${note.expired ? "Expired" : "Expires"} ${new Date(note.expiresAt).toLocaleString()}` : " · No expiry"}{note.conflict ? " · Conflicting note: review before use" : ""}</span></>}
+            control={<div className="extension-actions"><button type="button" onClick={() => { setMemoryKey(note.key); setMemoryText(note.content); setMemoryRevision(note.revision); setMemoryExpiry(note.expiresAt ? new Date(Date.parse(note.expiresAt) - new Date(note.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" onClick={() => void run(() => request(`/memory/${encodeURIComponent(botId)}`, "DELETE", { key: note.key, expectedRevision: note.revision }), "Memory removed from future tasks.")}><Trash2 size={15} />Forget</button></div>}
+          />)}
+        </SettingsCard>
+      </SettingsGroup>}
+      <SettingsGroup title="Note editor">
+        <SettingsCard>
+          <form style={{ display: "contents" }} onSubmit={(event) => { event.preventDefault(); void run(async () => { await request(`/memory/${encodeURIComponent(botId)}`, "PATCH", { key: memoryKey, content: memoryText, ...(memoryRevision ? { expectedRevision: memoryRevision } : {}), expiresAt: memoryExpiry ? new Date(memoryExpiry).toISOString() : null }); setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }, "Memory saved. Future tasks will use the correction."); }}>
+            <SettingsRow
+              title="Note name"
+              control={<input aria-label="Note name" value={memoryKey} maxLength={80} required disabled={Boolean(memoryRevision)} placeholder="Writing preference" onChange={(event) => setMemoryKey(event.target.value)} />}
+            />
+            <SettingsRow
+              title="What should they remember?"
+              control={<textarea aria-label="What should they remember?" value={memoryText} rows={3} maxLength={1200} required placeholder="Use concise English and give dates in Belgian time." onChange={(event) => setMemoryText(event.target.value)} />}
+            />
+            <SettingsRow
+              title="Keep until"
+              description="optional · your local time; blank means no expiry"
+              control={<input aria-label="Keep until" type="datetime-local" value={memoryExpiry} onChange={(event) => setMemoryExpiry(event.target.value)} />}
+            />
+            <SettingsRow
+              title="Save note"
+              control={<><button className="extension-primary" type="submit">Save note</button><button type="button" onClick={() => { setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }}>Clear editor</button></>}
+            />
+          </form>
+        </SettingsCard>
+      </SettingsGroup>
     </>}
     </fieldset>{busy && <p role="status" className="extension-notice"><LoaderCircle size={16} className="spin" />Working…</p>}
   </section>;

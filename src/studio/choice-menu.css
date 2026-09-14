@@ -5,33 +5,72 @@
 .choice-trigger {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface, #fff);
+  /* Clip the background to the rounded edge so no square corners peek
+   * through — Safari paints backdrop/filter layers square otherwise. */
+  background-clip: padding-box;
+  isolation: isolate;
+  overflow: hidden;
+  transform: translateZ(0);
   text-align: left;
-  font-size: 14px;
+  font-size: 13.5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: transform 0.08s ease-out, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.choice-trigger .mascot {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+.choice-trigger:active {
+  transform: scale(0.98);
+  filter: brightness(0.97);
+}
+.choice-trigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.choice-trigger:disabled {
+  opacity: .5;
+  cursor: default;
 }
 .choice-trigger > span {
   flex: 1;
+  min-width: 0;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.choice-trigger > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
 .choice-trigger:hover,
 .choice-trigger[aria-expanded="true"] {
-  background: var(--hover, #f4f4f4);
+  background: var(--surface-muted, #f8f9fa);
+  border-color: var(--line-strong, #c7c7cc);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 .choice-compact .choice-trigger {
-  padding: 4px 8px;
-  min-height: 34px;
-  border-color: transparent;
-  background: transparent;
-  font-size: 12px;
+  padding: 5px 10px 5px 7px;
+  min-height: 36px;
+  border-radius: 8px;
+  border-color: var(--line);
+  background: var(--surface, #fff);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.choice-compact .choice-trigger .mascot {
+  width: 24px;
+  height: 24px;
 }
 .choice-compact {
   max-width: min(230px, 60%);
@@ -40,17 +79,18 @@
   position: fixed;
   inset: auto;
   margin: 0;
-  padding: 5px;
+  padding: 4px;
   z-index: 20;
   background: var(--surface, #fff);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow:
-    0 8px 32px #00000018,
-    0 2px 6px #0000000a;
+  border-radius: 12px;
+  background-clip: padding-box;
+  isolation: isolate;
+  transform: translateZ(0);
   overflow-y: auto;
   overscroll-behavior: contain;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .choice-popover::backdrop {
   background: transparent;
@@ -58,16 +98,31 @@
 .choice-popover > button {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   width: 100%;
-  min-height: 42px;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 6px 10px;
   border-radius: 8px;
+  background-clip: padding-box;
   text-align: left;
+  transition: background 0.12s ease;
+}
+.choice-popover > button .mascot {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
 }
 .choice-popover > button:focus-visible {
   outline: none;
   background: var(--selection, #ebebeb);
+}
+.choice-popover > button:active {
+  filter: brightness(0.96);
+  transform: scale(0.98);
+}
+.choice-popover > button:disabled {
+  opacity: .5;
+  cursor: default;
 }
 .choice-popover > button:hover {
   background: var(--hover, #f5f5f5);
@@ -75,39 +130,31 @@
 .choice-popover > button > span {
   flex: 1;
   min-width: 0;
+  line-height: 1.4;
+}
+.choice-popover > button > svg:last-child {
+  flex-shrink: 0;
+  color: var(--ink);
+  align-self: center;
 }
 .choice-popover strong {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 .choice-popover small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.35;
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 .choice-popover > p {
   padding: 12px;
   font-size: 13px;
   color: var(--muted);
-}
-.choice-popover:popover-open {
-  animation: menu-appear 100ms ease-out;
-}
-@keyframes menu-appear {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .choice-popover:popover-open {
-    animation: none;
-  }
+  text-align: center;
 }

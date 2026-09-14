@@ -10,8 +10,19 @@ import {
   type ReactNode,
   type CSSProperties,
 } from "react";
+import { flushSync } from "react-dom";
+import { createSpring, rubberband } from "./spring";
 import {
+  Activity,
   ArrowRight,
+  Boxes,
+  Files,
+  FolderGit2,
+  Moon,
+  Smartphone,
+  Sparkles,
+  Sun,
+  WandSparkles,
   ArrowRightLeft,
   ArrowUp,
   CalendarDays,
@@ -73,6 +84,8 @@ import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancell
 import { groupConsecutiveActionEvents } from "./action-event-groups";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
+import { Advanced } from "./Advanced";
+import { SettingsGroup, SettingsCard, SettingsNavRow, SegmentedControl } from "./Settings";
 import { AppearanceEditor } from "./AppearanceEditor";
 import { useAppearance, type Appearance } from "./useAppearance";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
@@ -82,7 +95,7 @@ import "./project-rooms.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
-type Page = "home" | "activity" | "schedule" | "library" | "chat";
+type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
   | { kind: "create" }
   | { kind: "group"; threadId?: string }
@@ -257,6 +270,18 @@ function isMembershipText(text: string): boolean {
     /joined|left the group|now has .* in it\.?$/.test(clean)
   );
 }
+/** Machine markers (ROUTINE_HEARTBEAT_OK and friends) read as status codes,
+ *  not conversation. Humanize one for a quiet system line, or null. */
+function machineMarkerText(body: string): string | null {
+  const match = /^\s*ROUTINE_([A-Z0-9_]+)\s*$/.exec(body || "");
+  if (!match) return null;
+  const words = match[1]!.toLowerCase().split("_");
+  return words
+    .map((word, index) =>
+      index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word,
+    )
+    .join(" ");
+}
 /** Faces for an event pill: everyone the event names, de-duplicated. */
 function resolveEventFaces(
   data: Record<string, string | number | boolean | null>,
@@ -344,9 +369,333 @@ function eventDetail(message: Message): string {
   }
 }
 
+
+
+const SETTINGS_CATEGORIES: ReadonlyArray<{
+  title: string;
+  items: ReadonlyArray<{
+    id: CapabilityPanel;
+    title: string;
+    description: string;
+    icon: typeof Sparkles;
+    badge?: (state: AppState) => string | undefined;
+    badgeVariant?: (state: AppState) => "neutral" | "success" | "warning";
+    keywords: ReadonlyArray<string>;
+  }>;
+}> = [
+  {
+    title: "AI & Teammates",
+    items: [
+      {
+        id: "provider",
+        title: "Your AI",
+        description: "Models, providers, and API connections",
+        icon: Sparkles,
+        badge: (state) => (state.providers?.length ? `${state.providers.length} connected` : undefined),
+        badgeVariant: () => "success",
+        keywords: ["ai", "model", "provider", "opencode", "claude", "gpt", "ollama", "api key", "gemini", "deepseek", "tokens"],
+      },
+      {
+        id: "bot",
+        title: "Teammates",
+        description: "Personalities, instructions, and limits",
+        icon: UsersRound,
+        badge: (state) => (state.bots ? `${state.bots.length} active` : undefined),
+        badgeVariant: () => "neutral",
+        keywords: ["teammate", "bot", "role", "avatar", "character", "instructions", "prompt", "nova", "pixel", "scout"],
+      },
+      {
+        id: "connectors",
+        title: "Apps & Tools",
+        description: "Google Workspace, Slack, Notion, GitHub",
+        icon: Boxes,
+        keywords: ["apps", "tools", "connectors", "google", "workspace", "slack", "notion", "github", "drive", "email"],
+      },
+      {
+        id: "routines",
+        title: "Automations",
+        description: "Scheduled tasks, watchers, and cron routines",
+        icon: Clock,
+        badge: (state) => (state.routines?.length ? `${state.routines.length} routines` : undefined),
+        badgeVariant: () => "neutral",
+        keywords: ["automations", "routines", "cron", "schedule", "trigger", "watcher", "runner"],
+      },
+      {
+        id: "remote",
+        title: "Your Phone",
+        description: "Pair OpenBot mobile and away access",
+        icon: Smartphone,
+        keywords: ["phone", "remote", "away", "qr", "pair", "mobile", "ios", "android"],
+      },
+    ],
+  },
+  {
+    title: "System & Safety",
+    items: [
+      {
+        id: "control",
+        title: "Permissions & Safety",
+        description: "Mac access consent, tool-building, and safety",
+        icon: ShieldCheck,
+        badge: (state) => (state.settings?.yoloMode ? "YOLO active" : "Protected"),
+        badgeVariant: (state) => (state.settings?.yoloMode ? "warning" : "neutral"),
+        keywords: ["permissions", "safety", "mac access", "security", "yolo", "sandbox", "limits"],
+      },
+      {
+        id: "projects",
+        title: "Projects & Repositories",
+        description: "Local folders, git branches, and worktrees",
+        icon: FolderGit2,
+        keywords: ["projects", "repositories", "git", "folders", "code", "github", "worktree"],
+      },
+      {
+        id: "artifacts",
+        title: "Deliverables & Artifacts",
+        description: "Finished outputs, documents, and revisions",
+        icon: FileText,
+        keywords: ["deliverables", "artifacts", "documents", "outputs", "reports", "files"],
+      },
+    ],
+  },
+  {
+    title: "Developer & Advanced",
+    items: [
+      {
+        id: "teach",
+        title: "Skills & MCP Recipes",
+        description: "Learned actions, community tools, and memory",
+        icon: WandSparkles,
+        keywords: ["skills", "teach", "recipes", "mcp", "tools", "actions", "learn"],
+      },
+      {
+        id: "live",
+        title: "Activity & Recovery",
+        description: "Audit receipts, live tasks, and interrupted actions",
+        icon: Activity,
+        badge: (state) => (state.runs?.length ? `${state.runs.length} active` : undefined),
+        badgeVariant: () => "neutral",
+        keywords: ["activity", "recovery", "receipts", "live", "tasks", "audit"],
+      },
+      {
+        id: "files",
+        title: "Teammate Files",
+        description: "Inspect raw isolated teammate workspaces",
+        icon: Files,
+        keywords: ["teammate files", "scratchpad", "isolated", "workspaces", "raw"],
+      },
+    ],
+  },
+];
+
+function SettingsWorkspacePage({
+  activePanel,
+  setActivePanel,
+  state,
+  thread,
+  appearance,
+  setAppearance,
+  onOpenCapability,
+  onThread,
+  onRefresh,
+}: {
+  activePanel: CapabilityPanel;
+  setActivePanel: (panel: CapabilityPanel) => void;
+  state: AppState;
+  thread: string;
+  appearance: Appearance;
+  setAppearance: (next: Appearance) => void;
+  onOpenCapability: (panel: CapabilityPanel | null, targetThread?: string) => void;
+  onThread: (id: string) => void;
+  onRefresh: () => void;
+}) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [mobileMode, setMobileMode] = useState<"menu" | "detail">("detail");
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const allItems = useMemo(() => SETTINGS_CATEGORIES.flatMap((c) => c.items), []);
+  const activeItem = allItems.find((item) => item.id === activePanel) || allItems[0];
+
+  const q = query.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!q) return [];
+    return allItems.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.keywords.some((k) => k.includes(q)),
+    );
+  }, [allItems, q]);
+
+  const selectItem = (id: CapabilityPanel) => {
+    setActivePanel(id);
+    setMobileMode("detail");
+  };
+
+  return (
+    <div className={`settings-page-layout mobile-mode-${mobileMode}`}>
+      <aside className="settings-page-sidebar">
+        <div className="settings-sidebar-search">
+          <div className="settings-search-bar" style={{ height: 34, padding: "0 10px" }}>
+            <Search size={14} className="settings-search-icon" aria-hidden="true" />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search settings... (/)"
+              aria-label="Search settings"
+              className="settings-search-input"
+              style={{ fontSize: 12 }}
+            />
+            {query ? (
+              <button
+                type="button"
+                className="settings-search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery("");
+                  searchInputRef.current?.focus();
+                }}
+              >
+                <X size={11} />
+              </button>
+            ) : (
+              <kbd className="settings-search-kbd">/</kbd>
+            )}
+          </div>
+        </div>
+
+        <div className="settings-sidebar-scroll">
+          {q ? (
+            <div className="settings-sidebar-group">
+              <div className="settings-sidebar-group-title">
+                {searchResults.length} {searchResults.length === 1 ? "Result" : "Results"}
+              </div>
+              {searchResults.map((item) => {
+                const Icon = item.icon;
+                const isCurrent = item.id === activePanel;
+                const badge = item.badge?.(state);
+                const badgeVariant = item.badgeVariant?.(state);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`settings-nav-button${isCurrent ? " active" : ""}`}
+                    onClick={() => selectItem(item.id)}
+                  >
+                    <span className="settings-nav-button-icon">
+                      <Icon size={15} />
+                    </span>
+                    <span className="settings-nav-button-label">{item.title}</span>
+                    {badge && (
+                      <span className={`settings-nav-item-badge${badgeVariant ? ` ${badgeVariant}` : ""}`}>
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            SETTINGS_CATEGORIES.map((category) => (
+              <div key={category.title} className="settings-sidebar-group">
+                <div className="settings-sidebar-group-title">{category.title}</div>
+                {category.items.map((item) => {
+                  const Icon = item.icon;
+                  const isCurrent = item.id === activePanel;
+                  const badge = item.badge?.(state);
+                  const badgeVariant = item.badgeVariant?.(state);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`settings-nav-button${isCurrent ? " active" : ""}`}
+                      onClick={() => selectItem(item.id)}
+                    >
+                      <span className="settings-nav-button-icon">
+                        <Icon size={15} />
+                      </span>
+                      <span className="settings-nav-button-label">{item.title}</span>
+                      {badge && (
+                        <span className={`settings-nav-item-badge${badgeVariant ? ` ${badgeVariant}` : ""}`}>
+                          {badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="settings-sidebar-footer">
+          <SegmentedControl
+            ariaLabel="Appearance theme"
+            value={appearance}
+            onChange={(value) => setAppearance(value as Appearance)}
+            options={[
+              { value: "system", label: "Auto", icon: <Monitor size={13} /> },
+              { value: "light", label: "Light", icon: <Sun size={13} /> },
+              { value: "dark", label: "Dark", icon: <Moon size={13} /> },
+            ]}
+          />
+        </div>
+      </aside>
+
+      <section className="settings-page-content">
+        <header className="settings-page-header">
+          <h2 className="settings-page-title">{activeItem.title}</h2>
+          <p className="settings-page-desc">{activeItem.description}</p>
+        </header>
+        <div className="settings-page-body">
+          <Suspense fallback={<p className="quiet-copy" role="status">Opening {activeItem.title.toLowerCase()}…</p>}>
+            <CapabilityPanelHost
+              key={activePanel}
+              panel={activePanel}
+              state={state}
+              threadId={thread}
+              onOpen={(panel) => selectItem(panel)}
+              onThread={(id) => {
+                onOpenCapability(null, id);
+                onThread(id);
+              }}
+              onChange={onRefresh}
+            />
+          </Suspense>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function Studio() {
   const { appearance, setAppearance } = useAppearance();
-  const [page, setPage] = useState<Page>("chat"),
+  const [page, setPage] = useState<Page>(() => {
+    const p = new URLSearchParams(window.location.search).get("panel");
+    if (p === "settings" || isCapabilityPanel(p)) return "settings";
+    return "chat";
+  }),
     [thread, setThread] = useState(() => new URLSearchParams(window.location.search).get("thread")?.slice(0, 128) || "");
   const [state, setState] = useState<AppState | null>(null),
     [connections, setConnections] = useState<ConnectorStatus | null>(null),
@@ -367,7 +716,13 @@ export function Studio() {
     return isCapabilityPanel(value) ? value : null;
   });
   function openCapability(next: CapabilityPanel | null, targetThread?: string) {
-    setDetail(null); setCapability(next);
+    setDetail(null);
+    if (next) {
+      setPage("settings");
+      setCapability(next);
+    } else {
+      setCapability(null);
+    }
     if (targetThread) setThread(targetThread);
     const url = new URL(location.href); url.pathname = "/";
     if (next) url.searchParams.set("panel", next); else url.searchParams.delete("panel");
@@ -375,8 +730,9 @@ export function Studio() {
     history.pushState(null, "", url);
   }
   function openSettings() {
+    setDetail(null);
     setCapability(null);
-    setDetail({ kind: "settings" });
+    setPage("settings");
     const url = new URL(location.href);
     url.searchParams.set("panel", "settings");
     history.pushState(null, "", url);
@@ -396,7 +752,15 @@ export function Studio() {
     };
     const restore = () => {
       const url = new URL(location.href), panel = url.searchParams.get("panel");
-      setCapability(isCapabilityPanel(panel) ? panel : null); setDetail(panel === "settings" ? {kind: "settings"} : null);
+      if (panel === "settings" || isCapabilityPanel(panel)) {
+        setPage("settings");
+        setCapability(isCapabilityPanel(panel) ? panel : null);
+      } else if (page === "settings" && !panel) {
+        setPage("chat");
+        setCapability(null);
+      } else {
+        setCapability(isCapabilityPanel(panel) ? panel : null);
+      } setDetail(panel === "settings" ? {kind: "settings"} : null);
       if (url.searchParams.get("thread")) setThread(url.searchParams.get("thread")!);
     };
     document.addEventListener("click", follow); window.addEventListener("popstate", restore);
@@ -575,9 +939,15 @@ export function Studio() {
     setThread(id);
     setPage("chat");
     setDetail(null);
+    setCapability(null);
     nearBottom.current = true;
     const bot = state?.bots.find((item) => item.threadId === id);
     setRecipient(bot?.id || "");
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("panel")) {
+      url.searchParams.delete("panel");
+      window.history.pushState(null, "", url);
+    }
   };
   const navigate = (next: Page) => {
     setPage(next);
@@ -734,6 +1104,7 @@ export function Studio() {
           activity: "Activity",
           schedule: "Schedule",
           library: "Library",
+          settings: "Settings",
         }[page];
   const navItems = [
     ["home", "Chats", MessageCircle],
@@ -896,7 +1267,7 @@ export function Studio() {
             compact
             label="Choose a teammate"
             value={recipient}
-            choices={[{ value: "", label: "Your team", detail: "Let the team choose who can help", icon: <MessageCircle size={19}/> }, ...(state?.bots || []).map((bot) => ({ value: bot.id, label: bot.name, detail: bot.role, icon: <Face bot={bot} size={25}/> }))]}
+            choices={[{ value: "", label: "Your team", detail: "Let the team choose who can help", icon: <MessageCircle size={20}/> }, ...(state?.bots || []).map((bot) => ({ value: bot.id, label: bot.name, detail: bot.role, icon: <Face bot={bot} size={30}/> }))]}
             onChange={(selected) => {
               setRecipient(selected);
               if (page === "chat" && thread !== "team-room") {
@@ -1054,9 +1425,61 @@ export function Studio() {
   // Delete is a two-tap soft hide (the server keeps everything).
   const [swipedRow, setSwipedRow] = useState<string | null>(null);
   const [hideArmed, setHideArmed] = useState<string | null>(null);
-  const touchStartX = useRef<number | null>(null);
   const dragStartX = useRef<number | null>(null);
-  const dragMoved = useRef(false);
+  const dragStartY = useRef<number | null>(null);
+  // When the last drag released, as a timestamp. A trailing click right
+  // after a drag belongs to the gesture and is ignored; a sticky boolean
+  // would stay set forever when pointer capture retargets that click away
+  // from the row button, silently eating a later, deliberate tap.
+  const dragEndAt = useRef(0);
+  const dragEngaged = useRef(false);
+  const dragBase = useRef(0);
+  const dragX = useRef(0);
+  // Recent pointer positions for release-velocity: a flick's sign decides
+  // open vs. close, distance is only the fallback.
+  const gestureHist = useRef<Array<{ x: number; t: number }>>([]);
+  function trackGesture(x: number) {
+    const hist = gestureHist.current;
+    hist.push({ x, t: performance.now() });
+    if (hist.length > 8) hist.splice(0, hist.length - 8);
+  }
+  function releaseVelocity(): number {
+    const hist = gestureHist.current;
+    if (hist.length < 2) return 0;
+    const first = hist[0]!;
+    const last = hist[hist.length - 1]!;
+    const dt = last.t - first.t;
+    if (dt <= 0) return 0;
+    return (last.x - first.x) / dt; // px per ms; <0 flicked left, >0 right
+  }
+  // A spring settling on another row: commit it instantly so a new grab
+  // never leaves two rows mid-flight.
+  const flight = useRef<{
+    itemId: string;
+    spring: ReturnType<typeof createSpring>;
+    row: HTMLElement;
+    actions: HTMLElement | null;
+    target: number;
+  } | null>(null);
+  function clearRowInline(row: HTMLElement, actions: HTMLElement | null) {
+    row.style.transition = "";
+    row.style.transform = "";
+    if (actions) actions.style.opacity = "";
+  }
+  function finishFlight(commit: boolean) {
+    const f = flight.current;
+    flight.current = null;
+    if (!f) return;
+    f.spring.stop();
+    if (commit) {
+      const open = f.target < 0;
+      flushSync(() => {
+        setSwipedRow(open ? f.itemId : null);
+      });
+    }
+    f.row.closest(".conversation-cell")?.classList.remove("dragging");
+    clearRowInline(f.row, f.actions);
+  }
   const hideTimer = useRef<number | null>(null);
   async function hideThread(item: Thread) {
     if (hideArmed !== item.id) {
@@ -1068,6 +1491,7 @@ export function Studio() {
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
     setHideArmed(null);
     setSwipedRow(null);
+    try { navigator.vibrate?.(10); } catch { /* haptics unavailable */ }
     await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hidden: true }),
@@ -1127,41 +1551,156 @@ export function Studio() {
           ? () => openCapability("bot", bot.threadId)
           : undefined;
       const actionCount = 1 + (editRow ? 1 : 0) + (item.id !== "team-room" ? 1 : 0);
+      const shiftPx = actionCount * 48 + 4;
+      const rowParts = (cell: HTMLElement) => ({
+        row: cell.querySelector<HTMLElement>(".conversation-row"),
+        actions: cell.querySelector<HTMLElement>(".row-actions"),
+      });
+      const endRowDrag = (cell: HTMLElement, cancelled: boolean) => {
+        const startX = dragStartX.current;
+        dragStartX.current = null;
+        dragStartY.current = null;
+        if (startX == null || !dragEngaged.current) return;
+        dragEngaged.current = false;
+        const { row, actions } = rowParts(cell);
+        if (!row) return;
+        const v = cancelled ? 0 : releaseVelocity();
+        const x = dragX.current;
+        // A flick decides by direction; a slow drag by resting position.
+        const target =
+          !cancelled && Math.abs(v) > 0.25
+            ? v < 0
+              ? -shiftPx
+              : 0
+            : x < -shiftPx / 2
+              ? -shiftPx
+              : 0;
+        dragEndAt.current = performance.now();
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          cell.classList.remove("dragging");
+          setSwipedRow(target < 0 ? item.id : null);
+          clearRowInline(row, actions);
+          return;
+        }
+        let settled = false;
+        const spring = createSpring(
+          x,
+          (value) => {
+            row.style.transform = `translateX(${value}px)`;
+            if (actions)
+              actions.style.opacity = String(
+                Math.min(1, Math.max(0, -value / shiftPx)),
+              );
+            if (!settled && value === target) {
+              settled = true;
+              const open = target < 0;
+              flight.current = null;
+              // Commit first so the CSS resting state already matches when
+              // the inline transform comes off — no flash either way.
+              flushSync(() => {
+                setSwipedRow(open ? item.id : null);
+              });
+              cell.classList.remove("dragging");
+              clearRowInline(row, actions);
+            }
+          },
+          { response: 0.3, dampingRatio: 1 },
+        );
+        flight.current = { itemId: item.id, spring, row, actions, target };
+        spring.start(target, Math.max(-4000, Math.min(4000, v * 1000)));
+      };
       return (
         <div
           key={item.id}
           className={`conversation-cell${swipedRow === item.id ? " swiped" : ""}`}
-          style={{ "--shift": `${actionCount * 40}px` } as CSSProperties}
-          onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
-          onTouchEnd={(event) => {
-            const start = touchStartX.current;
-            touchStartX.current = null;
-            if (start == null) return;
-            const dx = (event.changedTouches[0]?.clientX ?? start) - start;
-            if (dx < -40) { dragMoved.current = true; setSwipedRow(item.id); }
-            else if (dx > 30) setSwipedRow(null);
-          }}
-          onMouseDown={(event) => {
-            if (event.button === 0) dragStartX.current = event.clientX;
-          }}
-          onMouseMove={(event) => {
-            const start = dragStartX.current;
-            if (start == null || swipedRow === item.id) return;
-            if (start - event.clientX > 40) {
-              dragMoved.current = true;
-              setSwipedRow(item.id);
-              dragStartX.current = null;
+          style={{ "--shift": `${shiftPx}px` } as CSSProperties}
+          onPointerDown={(event) => {
+            if (event.button > 0) return;
+            if ((event.target as HTMLElement).closest(".row-actions")) return;
+            const cell = event.currentTarget;
+            if (flight.current && flight.current.itemId !== item.id)
+              finishFlight(true);
+            else if (flight.current) {
+              // Grabbed mid-settle: keep blending from the live position.
+              flight.current.spring.stop();
+              flight.current = null;
             }
+            const { row } = rowParts(cell);
+            const inline = row?.style.transform
+              ? Number.parseFloat(row.style.transform.replace(/[^\d.-]/g, ""))
+              : Number.NaN;
+            dragBase.current =
+              Number.isFinite(inline) && row?.style.transform
+                ? inline
+                : swipedRow === item.id
+                  ? -shiftPx
+                  : 0;
+            dragX.current = dragBase.current;
+            dragStartX.current = event.clientX;
+            dragStartY.current = event.clientY;
+            dragEngaged.current = false;
+            gestureHist.current = [{ x: event.clientX, t: performance.now() }];
           }}
-          onMouseUp={() => { dragStartX.current = null; }}
-          onMouseLeave={() => { dragStartX.current = null; }}
+          onPointerMove={(event) => {
+            // Hovering without a pressed button is never a drag — reset so a
+            // later click can't inherit a stale gesture and get swallowed.
+            if (event.buttons === 0) {
+              dragStartX.current = null;
+              dragStartY.current = null;
+              dragEngaged.current = false;
+              return;
+            }
+            const startX = dragStartX.current;
+            const startY = dragStartY.current;
+            if (startX == null || startY == null) return;
+            const dx = event.clientX - startX;
+            const dy = event.clientY - startY;
+            if (!dragEngaged.current) {
+              if (Math.abs(dx) < 10) return;
+              // Vertical scrolling wins ties — let the list scroll instead.
+              if (Math.abs(dy) > Math.abs(dx)) {
+                dragStartX.current = null;
+                dragStartY.current = null;
+                return;
+              }
+              dragEngaged.current = true;
+              try {
+                event.currentTarget.setPointerCapture(event.pointerId);
+              } catch {
+                /* pointer already released */
+              }
+              event.currentTarget.classList.add("dragging");
+            }
+            trackGesture(event.clientX);
+            const cell = event.currentTarget;
+            const { row, actions } = rowParts(cell);
+            if (!row) return;
+            let x = dragBase.current + (event.clientX - startX);
+            // Rubber-band past both edges instead of hard-stopping.
+            if (x < -shiftPx) x = -shiftPx + rubberband(x + shiftPx, shiftPx);
+            else if (x > 0) x = rubberband(x, shiftPx);
+            dragX.current = x;
+            row.style.transition = "none";
+            row.style.transform = `translateX(${x}px)`;
+            if (actions)
+              actions.style.opacity = String(
+                Math.min(1, Math.max(0, -x / shiftPx)),
+              );
+          }}
+          onPointerUp={(event) => endRowDrag(event.currentTarget, false)}
+          onPointerCancel={(event) => endRowDrag(event.currentTarget, true)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && swipedRow === item.id) setSwipedRow(null);
+          }}
         >
         <button
           aria-label={item.title}
           title={item.title}
           className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}${liveAction ? " is-live" : ""}`}
           onClick={() => {
-            if (dragMoved.current) { dragMoved.current = false; return; }
+            // A click landing right after a drag release belongs to the
+            // gesture, not to a tap — ignore it, then forget it happened.
+            if (performance.now() - dragEndAt.current < 350) return;
             if (swipedRow === item.id) { setSwipedRow(null); return; }
             openThread(item.id);
           }}
@@ -1224,7 +1763,7 @@ export function Studio() {
         <span className="row-actions" aria-label={`Actions for ${item.title}`}>
           <button
             type="button"
-            className="row-action"
+            className="row-action row-action-pin"
             aria-label={item.pinned ? `Unpin ${item.title}` : `Pin ${item.title} to the top`}
             aria-pressed={item.pinned}
             title={item.pinned ? "Unpin" : "Pin to the top"}
@@ -1235,7 +1774,7 @@ export function Studio() {
           {editRow && (
             <button
               type="button"
-              className="row-action"
+              className="row-action row-action-edit"
               aria-label={`Edit ${item.title}`}
               title="Edit"
               onClick={() => { setSwipedRow(null); editRow(); }}
@@ -1246,7 +1785,7 @@ export function Studio() {
           {item.id !== "team-room" && (
             <button
               type="button"
-              className={`row-action${hideArmed === item.id ? " armed" : ""}`}
+              className={`row-action row-action-delete${hideArmed === item.id ? " armed" : ""}`}
               aria-label={hideArmed === item.id ? `Tap again to delete ${item.title}` : `Delete ${item.title}`}
               title={hideArmed === item.id ? "Tap again to confirm" : "Delete"}
               onClick={() => void hideThread(item)}
@@ -1330,7 +1869,8 @@ export function Studio() {
             <span>{online ? "Studio connected" : "Reconnecting"}</span>
             <button
               aria-label="Settings"
-              onClick={openSettings}
+              className={page === "settings" ? "active" : ""}
+              onClick={() => (page === "settings" ? navigate("chat") : openSettings())}
             >
               <Settings2 size={17} />
             </button>
@@ -1349,10 +1889,16 @@ export function Studio() {
             </button>
           </span>
           <span className="topbar-center">
-            {conversationBot ? (
+            {page === "settings" ? (
+              <span className="conversation-name">Settings</span>
+            ) : conversationBot ? (
               <>
-                <span className="identity-mascot" aria-hidden="true">
-                  <Face bot={conversationBot} size={54} />
+                <span
+                  className="identity-mascot identity-tap"
+                  aria-hidden="true"
+                  onClick={() => setDetail({ kind: "teammate", bot: conversationBot })}
+                >
+                  <Face bot={conversationBot} size={76} />
                 </span>
                 <button
                   className="identity-pill"
@@ -1367,10 +1913,16 @@ export function Studio() {
               </>
             ) : page === "chat" ? (
               <>
-                <span className="identity-mascot identity-stack" aria-hidden="true">
+                <span
+                  className="identity-mascot identity-stack identity-tap"
+                  aria-hidden="true"
+                  onClick={() =>
+                    narrow ? setDetail({ kind: "context" }) : setContextOpen((value) => !value)
+                  }
+                >
                   {headerMembers.length > 0 ? (
                     headerMembers.map((member) => (
-                      <Face key={member.id} bot={member} size={38} />
+                      <Face key={member.id} bot={member} size={50} />
                     ))
                   ) : (
                     <UsersRound size={26} strokeWidth={1.3} />
@@ -1445,6 +1997,19 @@ export function Studio() {
           </div>
         ) : (
           <>
+            {page === "settings" && state && (
+              <SettingsWorkspacePage
+                activePanel={capability || "provider"}
+                setActivePanel={(next) => openCapability(next)}
+                state={state}
+                thread={thread}
+                appearance={appearance}
+                setAppearance={(next) => setAppearance(next as Appearance)}
+                onOpenCapability={(next, targetThread) => openCapability(next, targetThread)}
+                onThread={(id) => openThread(id)}
+                onRefresh={() => setRefresh((n) => n + 1)}
+              />
+            )}
             {page === "home" && (
               <div className="page-content conversations-page">
                 <div className="page-heading">
@@ -1966,6 +2531,19 @@ export function Studio() {
                             </div>
                           );
                         }
+                        // Machine markers never earn a bubble either — one
+                        // quiet centered line, humanized.
+                        const marker =
+                          message.senderType !== "user"
+                            ? machineMarkerText(message.body)
+                            : null;
+                        if (marker) {
+                          return (
+                            <div key={message.id} className="chat-event is-centered" aria-label={message.body}>
+                              <span>{marker}</span>
+                            </div>
+                          );
+                        }
                         return (
                           <Fragment key={message.id}><article
                             className={`chat-message ${message.senderType === "user" ? "from-you" : "from-team"} ${startsGroup ? "" : "continues"}`}
@@ -2075,13 +2653,9 @@ export function Studio() {
           />
         </aside>
       )}
-      {capability && state && <Drawer title={capabilityTitles[capability]} settings onBack={openSettings} onClose={() => openCapability(null)}>
-        <Suspense fallback={<p className="quiet-copy" role="status">Opening {capabilityTitles[capability].toLowerCase()}…</p>}><CapabilityPanelHost key={capability} panel={capability} state={state} threadId={thread} onOpen={(panel) => openCapability(panel)} onThread={(id) => { openCapability(null, id); openThread(id); }} onChange={() => setRefresh((n) => n + 1)} /></Suspense>
-      </Drawer>}
-      {detail && (
+      {detail && detail.kind !== "settings" && (
         <Drawer
-          settings={detail.kind === "settings"}
-          onClose={() => detail.kind === "settings" ? openCapability(null) : setDetail(null)}
+          onClose={() => setDetail(null)}
           title={
             detail.kind === "context"
               ? "Conversation details"
@@ -2093,8 +2667,7 @@ export function Studio() {
                   ? "Create a teammate"
                   : detail.kind === "teammate"
                     ? `Meet ${detail.bot.name}`
-                    : detail.kind === "settings"
-                      ? "Settings"
+                    
                       : detail.kind === "search"
                         ? "Search your studio"
                         : detail.kind === "run"
@@ -2221,56 +2794,6 @@ export function Studio() {
               <AppearanceEditor key={detail.bot.id} bot={detail.bot} onSaved={(bot) => { setDetail({ kind: "teammate", bot }); setRefresh((n) => n + 1); }}/>
               <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
             </div>
-          )}
-          {detail.kind === "settings" && (
-            <>
-              <p className="drawer-intro">
-                Your team. Your connections. Your choices.
-              </p>
-              <div className="appearance-setting"><span>Appearance</span><ChoiceMenu label="Appearance" value={appearance}
-                choices={[{value:"system",label:"Match this device"},{value:"light",label:"Light"},{value:"dark",label:"Dark"}]}
-                onChange={(value) => setAppearance(value as Appearance)}/></div>
-              <div className="settings-list">
-                <a href="/?panel=provider">
-                  <span>
-                    Your AI<small>Choose providers and models</small>
-                  </span>
-                  <ChevronRight size={16} />
-                </a>
-                <a href="/?panel=connectors">
-                  <span>
-                    Apps & tools<small>Connect accounts and choose access</small>
-                  </span>
-                  <ChevronRight size={16} />
-                </a>
-                <a href="/?panel=bot"><span>Teammates<small>Character, instructions and individual limits</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=routines"><span>Routines<small>Schedule work and manage triggers</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=remote">
-                  <span>
-                    Your phone<small>Pair and manage away access</small>
-                  </span>
-                  <ChevronRight size={16} />
-                </a>
-                <a href="/?panel=control">
-                  <span>
-                    Permissions & usage<small>Review access and limits</small>
-                  </span>
-                  <ChevronRight size={16} />
-                </a>
-              </div>
-              <h3 className="settings-section-title">Workspace</h3>
-              <div className="settings-list">
-                <a href="/?panel=projects"><span>Projects<small>Build and test in folders you choose</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=teach"><span>Skills & recipes<small>Included methods and your own workflows</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=files"><span>Files<small>Each teammate’s private workspace</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=artifacts"><span>Finished work<small>Open results and their revisions</small></span><ChevronRight size={16} /></a>
-                <a href="/?panel=live"><span>Activity & recovery<small>Review results and work needing a hand</small></span><ChevronRight size={16} /></a>
-              </div>
-              <details className="auto-review-details">
-                <summary>Advanced approval rules</summary>
-                <AutoReviewRules />
-              </details>
-            </>
           )}
           {detail.kind === "search" && (
             <SearchStudio state={state} onOpen={openThread} />
@@ -2492,10 +3015,31 @@ function Drawer({
       }}
     >
       <header>
-        {onBack && <button className="drawer-back" aria-label="Back to settings" onClick={onBack}><ChevronLeft size={17} /><span>Settings</span></button>}
-        <h2>{title}</h2>
-        <button autoFocus aria-label="Close" onClick={onClose}>
-          <X size={20} />
+        {onBack ? (
+          <div className="drawer-header-nav">
+            <button
+              type="button"
+              className="drawer-back"
+              aria-label="Back to settings"
+              onClick={onBack}
+            >
+              <ChevronLeft size={16} />
+              <span>Settings</span>
+            </button>
+            <span className="drawer-breadcrumb-sep" aria-hidden="true">/</span>
+            <h2>{title}</h2>
+          </div>
+        ) : (
+          <h2>{title}</h2>
+        )}
+        <button
+          type="button"
+          autoFocus
+          className="drawer-close"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X size={18} />
         </button>
       </header>
       <div className="drawer-body">{children}</div>
