@@ -104,7 +104,7 @@ try {
   await providerSheet.getByLabel("Connection name", { exact: true }).fill("Local beta test");
   await providerSheet.getByLabel("API address", { exact: true }).fill("http://127.0.0.1:1/v1");
   await providerSheet.getByLabel("Model IDs", { exact: true }).fill("chosen-model");
-  assert.equal(await providerSheet.getByLabel("API key (optional)", { exact: true }).inputValue(), "");
+  assert.equal(await providerSheet.getByLabel("API key", { exact: true }).inputValue(), "");
   await settings.screenshot({ path: path.join(output, "provider-setup-desktop.png"), fullPage: true });
   await settings.setViewportSize({ width: 390, height: 844 });
   assert.ok(await providerSheet.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Provider setup fits a phone");
