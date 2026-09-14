@@ -6,18 +6,25 @@
 .workspace-chat > .topbar::before {
   content: "";
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   inset: -8px 0 -28px;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
     var(--ob-canvas) 0%,
-    color-mix(in srgb, var(--ob-canvas) 94%, transparent) 58%,
-    color-mix(in srgb, var(--ob-canvas) 68%, transparent) 80%,
+    color-mix(in srgb, var(--ob-canvas) 97%, transparent) 54%,
+    color-mix(in srgb, var(--ob-canvas) 82%, transparent) 78%,
     transparent 100%
   );
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(13px) saturate(135%);
+  -webkit-backdrop-filter: blur(13px) saturate(135%);
+}
+
+.workspace-chat > .topbar > .topbar-left,
+.workspace-chat > .topbar > .topbar-center,
+.workspace-chat > .topbar > .topbar-right {
+  position: relative;
+  z-index: 1;
 }
 
 /* OpenBot's design contract keeps decorative surfaces monochrome. Attention
@@ -34,8 +41,15 @@
 @media (max-width: 760px) {
   .workspace-chat > .topbar::before {
     inset: -8px 0 -22px;
-    backdrop-filter: blur(11px);
-    -webkit-backdrop-filter: blur(11px);
+    background: linear-gradient(
+      to bottom,
+      var(--ob-canvas) 0%,
+      color-mix(in srgb, var(--ob-canvas) 98%, transparent) 60%,
+      color-mix(in srgb, var(--ob-canvas) 88%, transparent) 80%,
+      transparent 100%
+    );
+    backdrop-filter: blur(16px) saturate(135%);
+    -webkit-backdrop-filter: blur(16px) saturate(135%);
   }
 
   .workspace-chat > .chat-scroll {
@@ -45,7 +59,7 @@
 
 @media (prefers-reduced-transparency: reduce) {
   .workspace-chat > .topbar::before {
-    background: linear-gradient(to bottom, var(--ob-canvas) 0 82%, transparent 100%);
+    background: linear-gradient(to bottom, var(--ob-canvas) 0 84%, transparent 100%);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
