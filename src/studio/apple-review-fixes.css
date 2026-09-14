@@ -1,0 +1,41 @@
+/* Visual corrections from the branch's own browser-acceptance screenshots. */
+.workspace-chat > .topbar {
+  isolation: isolate;
+}
+
+.workspace-chat > .topbar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -8px 0 -28px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--ob-canvas) 0%,
+    color-mix(in srgb, var(--ob-canvas) 94%, transparent) 58%,
+    color-mix(in srgb, var(--ob-canvas) 68%, transparent) 80%,
+    transparent 100%
+  );
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+@media (max-width: 760px) {
+  .workspace-chat > .topbar::before {
+    inset: -8px 0 -22px;
+    backdrop-filter: blur(11px);
+    -webkit-backdrop-filter: blur(11px);
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 140px !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .workspace-chat > .topbar::before {
+    background: linear-gradient(to bottom, var(--ob-canvas) 0 82%, transparent 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
