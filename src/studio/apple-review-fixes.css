@@ -27,6 +27,34 @@
   z-index: 1;
 }
 
+/* Project-room creation is a row command, not a stretched circular icon. */
+.project-rooms > .compose-secondary {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 7px;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 7px 6px 2px;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+  border-color: transparent !important;
+  color: var(--label-tertiary) !important;
+  font-size: 11.5px;
+  transition: background 140ms ease, color 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.project-rooms > .compose-secondary:hover {
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent) !important;
+  color: var(--label-primary) !important;
+}
+
+.project-rooms > .compose-secondary:active {
+  transform: scale(.98);
+}
+
 /* OpenBot's design contract keeps decorative surfaces monochrome. Attention
  * comes from placement, type and symbols; identity color stays with mascots. */
 .attention-section {
