@@ -11,6 +11,7 @@ import "./settings-shell.css";
 import "./apple-polish.css";
 import "./apple-pages.css";
 import "./apple-capabilities.css";
+import "./apple-brand.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
