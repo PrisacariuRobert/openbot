@@ -8,6 +8,7 @@ import {
   useState,
   type FormEvent,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import {
   ArrowRight,
@@ -24,6 +25,7 @@ import {
   LoaderCircle,
   MessageCircle,
   Monitor,
+  Pencil,
   Pin,
   Plus,
   Search,
@@ -31,6 +33,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   SlidersHorizontal,
+  Trash2,
   UsersRound,
   X,
   Zap,
@@ -73,6 +76,7 @@ import { ChoiceMenu } from "./ChoiceMenu";
 import { AppearanceEditor } from "./AppearanceEditor";
 import { useAppearance, type Appearance } from "./useAppearance";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
+import { foldTalkingPills } from "./talk-folds";
 import "./character-context.css";
 import "./project-rooms.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
@@ -251,6 +255,68 @@ function isMembershipText(text: string): boolean {
   return (
     clean.startsWith('The group "') ||
     /joined|left the group|now has .* in it\.?$/.test(clean)
+  );
+}
+/** Faces for an event pill: everyone the event names, de-duplicated. */
+function resolveEventFaces(
+  data: Record<string, string | number | boolean | null>,
+  bots: Bot[],
+  max: number,
+): Bot[] {
+  const found: Bot[] = [];
+  const push = (candidate?: Bot) => {
+    if (candidate && !found.some((face) => face.id === candidate.id)) found.push(candidate);
+  };
+  const byId = data.botId;
+  if (typeof byId === "string" && byId) push(bots.find((bot) => bot.id === byId));
+  for (const key of ["fromName", "toName"]) {
+    const name = data[key];
+    if (typeof name === "string" && name) push(bots.find((bot) => bot.name === name));
+  }
+  return found.slice(0, max);
+}
+/** One talking pill: faces + title, detail behind an inline chevron. */
+function TalkPill({
+  faces,
+  title,
+  lines,
+  meta,
+}: {
+  faces: Bot[];
+  title: string;
+  lines: string[];
+  meta?: string;
+}) {
+  const row = (
+    <>
+      <span className="chat-event-mark" aria-hidden="true">
+        {faces.length > 0 ? (
+          faces.map((face) => <Face key={face.id} bot={face} size={20} />)
+        ) : (
+          <MessageCircle size={14} />
+        )}
+      </span>
+      <span>
+        <strong>{title}</strong>
+        {meta && <small>{meta}</small>}
+      </span>
+    </>
+  );
+  if (!lines.length) return <div className="chat-event talk-pill">{row}</div>;
+  return (
+    <div className="chat-event talk-pill">
+      <details>
+        <summary>
+          {row}
+          <ChevronDown size={13} aria-hidden="true" />
+        </summary>
+        <div className="talk-lines">
+          {lines.map((line, index) => (
+            <small key={index}>{line}</small>
+          ))}
+        </div>
+      </details>
+    </div>
   );
 }
 function eventDetail(message: Message): string {
@@ -649,6 +715,12 @@ export function Studio() {
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
+  // Fold consecutive talking pills between the same pair — Apple groups
+  // repeated system lines instead of stacking five identical pills.
+  const talkFold = useMemo(
+    () => foldTalkingPills(state?.messages || []),
+    [state?.messages],
+  );
   const conversationBot =
     page === "chat"
       ? state?.bots.find((bot) => bot.threadId === thread)
@@ -963,7 +1035,14 @@ export function Studio() {
   const activeNow = activeNowBots(state?.bots || []);
   // Display lookups span active + retired teammates: a retired mascot is
   // still the right face for old groups and event pills.
-  const allBots = state ? [...state.bots, ...(state.retiredBots || [])] : [];  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
+  const allBots = state ? [...state.bots, ...(state.retiredBots || [])] : [];
+  const headerMembers =
+    page === "chat" && conversationThread
+      ? (conversationThread.botIds || [])
+          .map((id) => allBots.find((bot) => bot.id === id))
+          .filter((member): member is Bot => Boolean(member))
+          .slice(0, 2)
+      : [];  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
     void (async () => {
       await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -971,6 +1050,31 @@ export function Studio() {
       }).catch(() => {});
       setRefresh((n) => n + 1);
     })();
+  // Row quick actions: hover reveals on desktop, swipe reveals on touch.
+  // Delete is a two-tap soft hide (the server keeps everything).
+  const [swipedRow, setSwipedRow] = useState<string | null>(null);
+  const [hideArmed, setHideArmed] = useState<string | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const dragStartX = useRef<number | null>(null);
+  const dragMoved = useRef(false);
+  const hideTimer = useRef<number | null>(null);
+  async function hideThread(item: Thread) {
+    if (hideArmed !== item.id) {
+      setHideArmed(item.id);
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+      hideTimer.current = window.setTimeout(() => setHideArmed(null), 2600);
+      return;
+    }
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    setHideArmed(null);
+    setSwipedRow(null);
+    await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: true }),
+    }).catch(() => {});
+    if (thread === item.id) openThread("team-room");
+    setRefresh((n) => n + 1);
+  }
   const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
   const isGroupThread = (item: Thread) =>
     (item.botIds?.length ?? 0) > 1 ||
@@ -1011,13 +1115,56 @@ export function Studio() {
       const liveAction = liveBot
         ? liveBot.currentAction || (liveBot.status === "celebrating" ? "Celebrating" : "")
         : "";
+      // Group pills show who is talking plus one more face, so you see both
+      // sides of the conversation at a glance.
+      const liveFaces = liveBot
+        ? [liveBot, ...members.filter((member) => member.id !== liveBot.id)].slice(0, members.length > 1 ? 2 : 1)
+        : [];
+      const canEditGroup = item.id.startsWith("group-");
+      const editRow = canEditGroup
+        ? () => setDetail({ kind: "group", threadId: item.id })
+        : bot && !isGroupThread(item)
+          ? () => openCapability("bot", bot.threadId)
+          : undefined;
+      const actionCount = 1 + (editRow ? 1 : 0) + (item.id !== "team-room" ? 1 : 0);
       return (
-        <div key={item.id} className="conversation-cell">
+        <div
+          key={item.id}
+          className={`conversation-cell${swipedRow === item.id ? " swiped" : ""}`}
+          style={{ "--shift": `${actionCount * 40}px` } as CSSProperties}
+          onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+          onTouchEnd={(event) => {
+            const start = touchStartX.current;
+            touchStartX.current = null;
+            if (start == null) return;
+            const dx = (event.changedTouches[0]?.clientX ?? start) - start;
+            if (dx < -40) { dragMoved.current = true; setSwipedRow(item.id); }
+            else if (dx > 30) setSwipedRow(null);
+          }}
+          onMouseDown={(event) => {
+            if (event.button === 0) dragStartX.current = event.clientX;
+          }}
+          onMouseMove={(event) => {
+            const start = dragStartX.current;
+            if (start == null || swipedRow === item.id) return;
+            if (start - event.clientX > 40) {
+              dragMoved.current = true;
+              setSwipedRow(item.id);
+              dragStartX.current = null;
+            }
+          }}
+          onMouseUp={() => { dragStartX.current = null; }}
+          onMouseLeave={() => { dragStartX.current = null; }}
+        >
         <button
           aria-label={item.title}
           title={item.title}
           className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}${liveAction ? " is-live" : ""}`}
-          onClick={() => openThread(item.id)}
+          onClick={() => {
+            if (dragMoved.current) { dragMoved.current = false; return; }
+            if (swipedRow === item.id) { setSwipedRow(null); return; }
+            openThread(item.id);
+          }}
         >
           {members.length > 1 ? (
             <span className="group-stack" aria-hidden="true">
@@ -1053,7 +1200,9 @@ export function Studio() {
                 title={liveAction}
                 aria-label={`${liveBot.name} is live: ${liveAction}`}
               >
-                <Face bot={liveBot} size={18} />
+                {liveFaces.map((face) => (
+                  <Face key={face.id} bot={face} size={18} />
+                ))}
                 <span className="live-text">{liveAction}</span>
                 <span className="live-dots" aria-hidden="true"><i /><i /><i /></span>
               </span>
@@ -1072,15 +1221,40 @@ export function Studio() {
             )}
           </span>
         </button>
-        <button
-          type="button"
-          className="conversation-pin"
-          aria-label={`Pin ${item.title} to the top`}
-          title="Pin to the top"
-          onClick={() => setPin(item, true)}
-        >
-          <Pin size={13} />
-        </button>
+        <span className="row-actions" aria-label={`Actions for ${item.title}`}>
+          <button
+            type="button"
+            className="row-action"
+            aria-label={item.pinned ? `Unpin ${item.title}` : `Pin ${item.title} to the top`}
+            aria-pressed={item.pinned}
+            title={item.pinned ? "Unpin" : "Pin to the top"}
+            onClick={() => { setSwipedRow(null); setPin(item, !item.pinned); }}
+          >
+            <Pin size={15} />
+          </button>
+          {editRow && (
+            <button
+              type="button"
+              className="row-action"
+              aria-label={`Edit ${item.title}`}
+              title="Edit"
+              onClick={() => { setSwipedRow(null); editRow(); }}
+            >
+              <Pencil size={15} />
+            </button>
+          )}
+          {item.id !== "team-room" && (
+            <button
+              type="button"
+              className={`row-action${hideArmed === item.id ? " armed" : ""}`}
+              aria-label={hideArmed === item.id ? `Tap again to delete ${item.title}` : `Delete ${item.title}`}
+              title={hideArmed === item.id ? "Tap again to confirm" : "Delete"}
+              onClick={() => void hideThread(item)}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </span>
         </div>
       );
     };
@@ -1139,7 +1313,7 @@ export function Studio() {
               ))}
             </div>
           )}
-          <PinnedZone items={pinnedThreads} bots={state?.bots || []} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
+          <PinnedZone items={pinnedThreads} bots={allBots} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
@@ -1165,7 +1339,7 @@ export function Studio() {
       </aside>
       <main className={`workspace workspace-${page}`}>
         <header className="topbar">
-          <span>
+          <span className="topbar-left">
             <button
               className="topbar-control conversation-back"
               aria-label="All conversations"
@@ -1173,35 +1347,51 @@ export function Studio() {
             >
               <ChevronLeft size={20} />
             </button>
+          </span>
+          <span className="topbar-center">
             {conversationBot ? (
-              <button
-                className="topbar-control conversation-identity"
-                aria-label={`About ${conversationBot.name}`}
-                onClick={() =>
-                  setDetail({ kind: "teammate", bot: conversationBot })
-                }
-              >
-                <Face bot={conversationBot} size={33} />
-                <span className="conversation-identity-text">
-                  <span className="conversation-name">{title}</span>
-                  <span className="conversation-status">
-                    {activeNow.some((bot) => bot.id === conversationBot.id) ? (
-                      <>
-                        <i className="presence-dot" aria-hidden="true" />
-                        Active now
-                      </>
-                    ) : (
-                      conversationBot.role || "Teammate"
-                    )}
-                  </span>
+              <>
+                <span className="identity-mascot" aria-hidden="true">
+                  <Face bot={conversationBot} size={54} />
                 </span>
-                <ChevronDown size={12} />
-              </button>
+                <button
+                  className="identity-pill"
+                  aria-label={`About ${conversationBot.name}`}
+                  onClick={() =>
+                    setDetail({ kind: "teammate", bot: conversationBot })
+                  }
+                >
+                  <span className="conversation-name">{title}</span>
+                  <ChevronDown size={13} />
+                </button>
+              </>
+            ) : page === "chat" ? (
+              <>
+                <span className="identity-mascot identity-stack" aria-hidden="true">
+                  {headerMembers.length > 0 ? (
+                    headerMembers.map((member) => (
+                      <Face key={member.id} bot={member} size={38} />
+                    ))
+                  ) : (
+                    <UsersRound size={26} strokeWidth={1.3} />
+                  )}
+                </span>
+                <button
+                  className="identity-pill"
+                  aria-label={`About ${title}`}
+                  onClick={() =>
+                    narrow ? setDetail({ kind: "context" }) : setContextOpen((value) => !value)
+                  }
+                >
+                  <span className="conversation-name">{title}</span>
+                  <ChevronDown size={13} />
+                </button>
+              </>
             ) : (
               title
             )}
           </span>
-          <div>
+          <div className="topbar-right">
             {page === "chat" && state?.bots.length ? (
               <button
                 className="topbar-control"
@@ -1226,11 +1416,8 @@ export function Studio() {
               key={thread}
               thread={conversationThread}
               bot={conversationBot}
-              onEditTeammate={conversationBot ? () => openCapability("bot", conversationBot.threadId) : undefined}
-              onEditGroup={thread.startsWith("group-") ? () => setDetail({ kind: "group", threadId: thread }) : undefined}
               onDetails={() => narrow ? setDetail({ kind: "context" }) : setContextOpen(true)}
               onWorkspace={() => setDetail({ kind: "workspace" })}
-              onNewTeammate={() => setDetail({ kind: "create" })}
               onRemoved={() => { setRefresh((value) => value + 1); openThread("team-room"); }}
             />}
             {page !== "chat" && (
@@ -1714,21 +1901,14 @@ export function Studio() {
                         if (actionGroupMemberIds.has(message.id)) return null;
                         const actionGroup = actionGroupByFirstId.get(message.id);
                         const cancelledOutcome = cancelledRunForTrigger(state.runs, state.messages, message.id);
-                        // Event pills carry the teammate's mascot when the
-                        // event names them — never a generic icon.
-                        const eventFace = (() => {
-                          if (message.kind !== "event") return undefined;
-                          const data = message.eventData || {};
-                          if (data.botId) {
-                            const byId = allBots.find((bot) => bot.id === data.botId);
-                            if (byId) return byId;
-                          }
-                          const name = data.fromName || data.toName;
-                          if (typeof name === "string" && name) {
-                            return allBots.find((bot) => bot.name === name);
-                          }
-                          return undefined;
-                        })();
+                        // Event pills carry both teammates' mascots when the
+                        // event names them — talking feels two-sided.
+                        // Stops keep a single face.
+                        const eventFaces = resolveEventFaces(
+                          message.eventData || {},
+                          allBots,
+                          message.eventType === "run_stopped" ? 1 : 2,
+                        );
                         const previous = index > 0 ? state.messages[index - 1] : undefined;
                         const startsGroup =
                           !previous ||
@@ -1736,19 +1916,41 @@ export function Studio() {
                           previous.senderType === "system" ||
                           message.senderType === "system";
                         if (message.kind === "event") {
+                          const foldFirst = talkFold.firstOf.get(message.id);
+                          if (foldFirst && foldFirst.id !== message.id) return null;
+                          const fold = talkFold.folds.get(message.id);
+                          if (fold) {
+                            const data = fold.first.eventData || {};
+                            const from = String(data.fromName || "A teammate");
+                            const to = String(data.toName || "a teammate");
+                            return (
+                              <Fragment key={message.id}>
+                                <TalkPill
+                                  faces={resolveEventFaces(data, allBots, 2)}
+                                  title={`${from} ⇄ ${to}`}
+                                  meta={`${fold.items.length} exchanges`}
+                                  lines={fold.items.map((item) => eventDetail(item) || eventTitle(item))}
+                                />
+                              </Fragment>
+                            );
+                          }
                           return (                            <Fragment key={message.id}>{actionGroup ? <div className="chat-event action-completed-group" role="status" data-event="action_completed">
                               <details><summary><Check size={14} aria-hidden="true" /><span>{actionGroup.length} reviewed steps</span><ChevronDown size={14} aria-hidden="true" /></summary><div className="action-completed-records">{actionGroup.map((item) => <p key={item.id}><strong>{eventTitle(item)}</strong>{eventDetail(item) && <small>{eventDetail(item)}</small>}</p>)}</div></details>
-                            </div> : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
+                            </div> : ['handoff', 'teammate_message'].includes(message.eventType || '')
+                              ? <TalkPill
+                                  faces={eventFaces}
+                                  title={eventTitle(message)}
+                                  lines={eventDetail(message) ? [eventDetail(message)] : []}
+                                />
+                              : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
-                                {eventFace ? (
-                                  <Face bot={eventFace} size={20} />
+                                {eventFaces.length > 0 ? (
+                                  eventFaces.map((face) => <Face key={face.id} bot={face} size={20} />)
                                 ) : message.eventType === "routine_created" ? <Clock size={14} /> : message.eventType === "handoff" ? <ArrowRightLeft size={14} /> : message.eventType === "routine_run" ? <Zap size={14} /> : <MessageCircle size={14} />}
                               </span>
                               <span>
                                 <strong>{eventTitle(message)}</strong>
-                                {eventDetail(message) && (['handoff', 'teammate_message'].includes(message.eventType || '')
-                                  ? <details className="collaboration-detail"><summary>Details</summary><small>{eventDetail(message)}</small></details>
-                                  : <small>{eventDetail(message)}</small>)}
+                                {eventDetail(message) && <small>{eventDetail(message)}</small>}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>

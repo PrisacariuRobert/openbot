@@ -1,25 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Archive, FilePenLine, Info, Layers3, MoreHorizontal, Plus, UsersRound } from "lucide-react";
+import { Archive, Info, Layers3, MoreHorizontal } from "lucide-react";
 import type { Bot, Thread } from "../shared/types";
 import "./conversation-actions.css";
 
 export function ConversationActions({
   thread,
   bot,
-  onEditTeammate,
-  onEditGroup,
   onDetails,
   onWorkspace,
-  onNewTeammate,
   onRemoved,
 }: {
   thread: Thread;
   bot?: Bot;
-  onEditTeammate?: () => void;
-  onEditGroup?: () => void;
   onDetails: () => void;
   onWorkspace: () => void;
-  onNewTeammate: () => void;
   onRemoved: (botId: string) => void;
 }) {
   const id = useId();
@@ -127,11 +121,8 @@ export function ConversationActions({
           </div>
         ) : (
           <div className="conversation-actions-menu">
-            {bot && onEditTeammate && <button type="button" role="menuitem" onClick={() => choose(onEditTeammate)}><FilePenLine size={17} /><span>Edit teammate</span></button>}
-            {onEditGroup && <button type="button" role="menuitem" onClick={() => choose(onEditGroup)}><UsersRound size={17} /><span>Edit group</span></button>}
             <button type="button" role="menuitem" onClick={() => choose(onDetails)}><Info size={17} /><span>Conversation details</span></button>
             <button type="button" role="menuitem" onClick={() => choose(onWorkspace)}><Layers3 size={17} /><span>Workspace</span></button>
-            <button type="button" role="menuitem" onClick={() => choose(onNewTeammate)}><Plus size={17} /><span>New teammate</span></button>
             {bot && <button type="button" role="menuitem" className="conversation-remove-item" onClick={() => { setRemoveTarget({ id: bot.id, name: bot.name }); setError(""); }}><Archive size={17} /><span>Remove teammate…</span></button>}
           </div>
         )}

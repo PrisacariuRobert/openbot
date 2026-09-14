@@ -506,15 +506,20 @@ try {
     .getByRole("textbox", { name: "Message your team" })
     .fill("My test draft");
   const before = posts.length;
+  const chatUrl = page.url();
   await page.getByRole("textbox", { name: "Message your team" }).press("Enter");
-  await page.getByRole("dialog").getByRole("heading", { name: "Your AI", exact: true }).waitFor();
+  // The provider gate navigates to the Your AI settings page (not a dialog);
+  // returning to the conversation restores the draft from the server.
+  await page.getByRole("heading", { name: "Your AI", exact: true }).waitFor();
   assert.equal(posts.length, before, "Enter cannot bypass provider gate");
-  await page.keyboard.press("Escape");
+  await page.goto(chatUrl);
+  await page.getByRole("textbox", { name: "Message your team" }).waitFor();
   assert.equal(await page.getByRole("textbox", { name: "Message your team" }).inputValue(), "My test draft", "Provider choice keeps the draft");
   await page.getByRole("button", { name: "Send message" }).click();
-  await page.getByRole("dialog").getByRole("heading", { name: "Your AI", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Your AI", exact: true }).waitFor();
   assert.equal(posts.length, before, "Clicking Send opens the chooser; it does not start an unconfigured teammate");
-  await page.keyboard.press("Escape");
+  await page.goto(chatUrl);
+  await page.getByRole("textbox", { name: "Message your team" }).waitFor();
   await page
     .getByRole("combobox", { name: "Choose a teammate" })
     .click();
@@ -629,6 +634,17 @@ try {
   const contrastRatio = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
   assert.ok(contrastRatio >= 4.5, "Outgoing attachment labels retain accessible contrast on their card");
   assert.equal(fileContrast.background, "rgb(255, 255, 255)");
+  // Let the details rail finish sliding in: measuring mascot boxes while it
+  // is mid-transition offsets every painted pixel from its box. The rail
+  // settles on an identity matrix (its keyframes end at translateX(0)).
+  await page.waitForFunction(() => {
+    const rail = document.querySelector(
+      ".studio-shell.with-context .conversation-context",
+    );
+    if (!rail) return true;
+    const transform = getComputedStyle(rail).transform;
+    return transform === "none" || transform === "matrix(1, 0, 0, 1, 0, 0)";
+  });
   await capture("desktop-conversation-context");
   await page
     .getByRole("button", { name: "Close conversation details" })
@@ -637,7 +653,10 @@ try {
   const postsBeforeDelayedSend = posts.length;
   await page.getByRole("button", { name: "Send message" }).click();
   await page.waitForFunction(() => document.querySelector(".composer-hint")?.textContent === "Sending…");
-  await page.locator(".sidebar-conversations").getByRole("button", { name: "Nova", exact: true }).click();
+  // Reach Nova's thread by URL: sidebar clicks can land mid-reflow while the
+  // held send keeps the transcript updating, which retargets the click.
+  await page.goto(`${base}/studio.html?thread=bot-nova`);
+  await page.getByRole("textbox", { name: "Message your team" }).waitFor();
   await page.getByRole("textbox", { name: "Message your team" }).fill("A separate conversation draft.");
   while (!releaseSend) await delay(10);
   releaseSend(); holdSend = false;
@@ -647,6 +666,9 @@ try {
   assert.equal(posts.length, postsBeforeDelayedSend + 1);
   await page.locator(".sidebar-conversations").getByRole("button", { name: "Pixel", exact: true }).click();
   await page.getByRole("textbox", { name: "Message your team" }).fill("");
+  await page.waitForFunction(
+    () => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value === "",
+  );
   await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('button[aria-label="Add files"]')?.disabled);
   await page.getByLabel("Choose files", { exact: true }).setInputFiles({
     name: "file-only.txt", mimeType: "text/plain", buffer: Buffer.from("A file can be the whole message."),
@@ -692,7 +714,7 @@ try {
   // Check the actual, visible conversation identity, not the first SVG in DOM.
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
   await page.goto(base + "/studio.html?thread=bot-pixel");
-  const visibleMascot = page.locator(".topbar .conversation-identity .character");
+  const visibleMascot = page.locator(".topbar .identity-mascot .character");
   await visibleMascot.waitFor({ state: "visible" });
   const animations = await visibleMascot.evaluate((el) =>
     el.getAnimations({ subtree: true }).map((animation) => ({
