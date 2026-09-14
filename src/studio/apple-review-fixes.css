@@ -20,6 +20,17 @@
   -webkit-backdrop-filter: blur(9px);
 }
 
+/* OpenBot's design contract keeps decorative surfaces monochrome. Attention
+ * comes from placement, type and symbols; identity color stays with mascots. */
+.attention-section {
+  border-color: var(--ob-hairline) !important;
+  background: var(--ob-material-strong) !important;
+}
+
+.month-days i {
+  background: var(--label-secondary) !important;
+}
+
 @media (max-width: 760px) {
   .workspace-chat > .topbar::before {
     inset: -8px 0 -22px;
