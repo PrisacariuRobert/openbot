@@ -384,10 +384,8 @@ try {
   await page.getByText("Change their look", { exact: true }).click();
   await page.getByRole("button", { name: "Pebble shape" }).click();
   await page.getByRole("button", { name: "Leaf character" }).click();
-  await page
-    .getByRole("button", { name: "Save appearance", exact: true })
-    .click();
   await page.getByRole("alert").waitFor();
+  assert.equal(patches.length, 1, "Rapid appearance picks debounce to one PATCH");
   assert.deepEqual(patches[0], { mascot: "pebble", color: "#299575" });
   assert.equal(
     await page
@@ -404,16 +402,14 @@ try {
   assert.equal(await page.getByLabel("Saved appearances").textContent(), "0");
   mode = "success";
   hold = true;
+  release = null;
   patches.length = 0;
-  await page
-    .getByRole("button", { name: "Save appearance", exact: true })
-    .evaluate((element: HTMLElement) => {
-      element.click();
-      element.click();
-    });
-  await page.getByRole("button", { name: "Saving…", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Sky character" }).click();
+  await page.getByRole("button", { name: "Leaf character" }).click();
+  await page.getByRole("status").getByText("Saving their look…", { exact: true }).waitFor();
   while (!release) await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.equal(patches.length, 1, "Rapid clicks must produce one PATCH");
+  assert.equal(patches.length, 1, "Rapid appearance picks produce one in-flight PATCH");
+  assert.deepEqual(patches[0], { mascot: "pebble", color: "#299575" });
   (release as () => void)();
   hold = false;
   await page.waitForFunction(
@@ -425,12 +421,7 @@ try {
     await page.getByLabel("Saved character").textContent(),
     "pebble:#299575",
   );
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Save appearance", exact: true })
-      .isDisabled(),
-    true,
-  );
+  await page.getByRole("status").waitFor({ state: "detached" });
   assert.equal(await page.getByRole("alert").count(), 0);
   checks++;
 
