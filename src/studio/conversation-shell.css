@@ -22,7 +22,9 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 /* File thumbnail tile: quiet gray with the real extension — restraint, not
- * a black slab. Shared by composer chips and transcript file cards. */
+ * a black slab. Shared by composer chips and transcript file cards.
+ * Monochrome by contract: file-type colors would trip the visual-design
+ * chroma check, so every family uses the neutral file tokens. */
 .file-thumb {
   display: grid;
   place-items: center;
@@ -36,17 +38,8 @@
   font-weight: 700;
   letter-spacing: 0.05em;
 }
-.file-thumb.ft-text { background: var(--ft-text-bg); color: var(--ft-text-fg); }
-.file-thumb.ft-code { background: var(--ft-code-bg); color: var(--ft-code-fg); }
-.file-thumb.ft-data { background: var(--ft-data-bg); color: var(--ft-data-fg); }
-.file-thumb.ft-sheet { background: var(--ft-sheet-bg); color: var(--ft-sheet-fg); }
-.file-thumb.ft-slide { background: var(--ft-slide-bg); color: var(--ft-slide-fg); }
-.file-thumb.ft-pdf { background: var(--ft-pdf-bg); color: var(--ft-pdf-fg); }
-.file-thumb.ft-image { background: var(--ft-image-bg); color: var(--ft-image-fg); }
-.file-thumb.ft-media { background: var(--ft-media-bg); color: var(--ft-media-fg); }
-.file-thumb.ft-archive { background: var(--ft-archive-bg); color: var(--ft-archive-fg); }
-/* Inline sigla (VS Code explorer style): extension in the family color, no
- * box. Used by the compact file cards in transcript and composer. */
+/* Inline sigla (VS Code explorer style): the extension in ink, no box.
+ * Used by the compact file cards in transcript and composer. */
 .file-sigla {
   flex-shrink: 0;
   min-width: 32px;
@@ -54,17 +47,8 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--ft-file-fg);
+  color: var(--ink);
 }
-.file-sigla.ft-text { color: var(--ft-text-fg); }
-.file-sigla.ft-code { color: var(--ft-code-fg); }
-.file-sigla.ft-data { color: var(--ft-data-fg); }
-.file-sigla.ft-sheet { color: var(--ft-sheet-fg); }
-.file-sigla.ft-slide { color: var(--ft-slide-fg); }
-.file-sigla.ft-pdf { color: var(--ft-pdf-fg); }
-.file-sigla.ft-image { color: var(--ft-image-fg); }
-.file-sigla.ft-media { color: var(--ft-media-fg); }
-.file-sigla.ft-archive { color: var(--ft-archive-fg); }
 /* Live pill: Discord-style presence in the row. Mini mascot + what they're
  * doing + bouncing dots while live; back to the quiet line when done. */
 .live-pill {

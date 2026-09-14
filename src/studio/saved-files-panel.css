@@ -4,7 +4,7 @@
 .saved-files-heading-row h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .saved-files-heading-row p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 52ch; overflow-wrap: anywhere; }
 /* Quiet accent action — never a dark pill next to the heading. */
-.saved-files-add { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; color: var(--accent); padding: 8px 0 8px 12px; margin: 0; min-height: 44px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 8px; }
+.saved-files-add { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; color: var(--ink); padding: 8px 0 8px 12px; margin: 0; min-height: 44px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 8px; }
 .saved-files-add:hover { filter: brightness(1.1); }
 .saved-files-add:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .saved-file-confirm button, .saved-files-error button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); padding: 8px 12px; min-height: 40px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
