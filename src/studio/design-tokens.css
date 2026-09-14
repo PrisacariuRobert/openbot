@@ -83,9 +83,11 @@
   --text-caption-2: 11px;
 
   --font-system:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro",
+    system-ui, -system-ui, "Helvetica Neue", "Segoe UI", sans-serif, "Open Sans";
+  --font-mono:
+    "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Mono", Menlo,
+    monospace;
 
   --radius-bubble: 18px;
   --radius-card: 12px;

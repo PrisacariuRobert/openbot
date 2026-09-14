@@ -83,7 +83,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
   return <div className={`capabilities capability-${panel}`}>
     {error && <p className="panel-error" role="alert">{error}</p>}
     {notice && <p className="capability-notice" role="status">{notice}</p>}
-    {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role }))} onChange={setChosenBot} /></div>}
+    {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role, icon: <Character name={item.name} color={item.color} variant={item.mascot} size={28} /> }))} onChange={setChosenBot} /></div>}
     {["bot", "files", "computer", "teach"].includes(panel) && !bot && <p>Create a teammate first to use this feature.</p>}
     {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={(model) => model.split("/").at(-1) || model} onUpdateBot={saveBot}
       connectionTests={connectionTests}

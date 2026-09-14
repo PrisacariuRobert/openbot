@@ -3,6 +3,7 @@ import { ArrowRight, LoaderCircle, Plus } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
 import { isFreeTierModel } from "../shared/provider-config";
 import { Character } from "./Character";
+import { Advanced } from "./Advanced";
 import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { createTeammatePayload } from "./create-teammate-payload";
@@ -95,6 +96,18 @@ export function CreateTeammate({
       });
     return () => abort.abort();
   }, [reload]);
+  // Skip taps when there is nothing to choose: a sole connection (and a
+  // sole model) preselects itself. The user can still change it.
+  useEffect(() => {
+    if (!providers || providerId) return;
+    const connected = (providers.instances || []).filter((item) => item.connected);
+    if (connected.length !== 1) return;
+    const only = connected[0]!;
+    setProviderId(only.id);
+    const onlyModels = only.models || [];
+    if (!model && onlyModels.length === 1) setModel(onlyModels[0]!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providers]);
   const connection = providers?.instances.find(
     (item) => item.id === providerId,
   );
@@ -271,6 +284,11 @@ export function CreateTeammate({
         <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
       )}
       {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
+      <div className="teammate-section teammate-appearance">
+        <span className="section-label">Appearance</span>
+        <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
+      </div>
+      <Advanced title="Advanced" summary="Instructions, connections & ready-made teams">
       <div className="teammate-section">
         <label>
           Additional instructions
@@ -282,10 +300,6 @@ export function CreateTeammate({
             placeholder="Add what a good result looks like, and what they should ask you before doing."
           />
         </label>
-      </div>
-      <div className="teammate-section teammate-appearance">
-        <span className="section-label">Appearance</span>
-        <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
       </div>
       <details className="connection-management" open={providers && !providers.instances.some((item) => item.connected) ? true : undefined}>
       <summary>Manage AI connections</summary>
@@ -339,6 +353,7 @@ export function CreateTeammate({
         {teamNote && <p role="status">{teamNote}</p>}
         {teamError && <p role="alert" className="send-error">{teamError}</p>}
       </details>
+      </Advanced>
         </>
       )}
       {sheetMode === "import" && (

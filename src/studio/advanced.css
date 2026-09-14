@@ -1,0 +1,64 @@
+/* One quiet disclosure row for everything beyond daily needs. */
+.advanced-disclosure {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+.advanced-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 4px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.advanced-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-disclosure > summary > span {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+.advanced-disclosure > summary small {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.advanced-disclosure > summary > svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
+.advanced-disclosure[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.advanced-disclosure > summary:hover {
+  color: var(--ink);
+}
+.advanced-disclosure > summary:active {
+  filter: brightness(0.96);
+}
+.advanced-content {
+  display: grid;
+  gap: 16px;
+  padding: 8px 0 12px;
+  align-content: start;
+}
+.settings-list + .advanced-disclosure, .settings-card + .advanced-disclosure {
+  border-top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .advanced-disclosure > summary > svg {
+    transition: none;
+  }
+}

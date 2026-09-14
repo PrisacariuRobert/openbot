@@ -1,5 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource-variable/open-sans";
+import "@fontsource-variable/jetbrains-mono";
 import { Studio } from "./Studio";
 import { StudioAccess } from "./StudioAccess";
 import "./studio.css";

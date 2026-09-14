@@ -68,7 +68,7 @@ export function ConversationContext({
       )}
       {!bot && (
         <div className="context-picker"><span>Whose work?</span><ChoiceMenu label="Whose work?" value={chosen} onChange={setChosen}
-          choices={[{value:"",label:"The whole conversation"},...state.bots.map((item) => ({value:item.id,label:item.name,detail:item.role}))]}/></div>
+          choices={[{value:"",label:"The whole conversation"},...state.bots.map((item) => ({value:item.id,label:item.name,detail:item.role,icon:<Character name={item.name} color={item.color} variant={item.mascot} size={26} />}))]}/></div>
       )}
       {group && onEditGroup && (
         <div className="context-group">

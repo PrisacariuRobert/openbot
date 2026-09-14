@@ -6,9 +6,8 @@ import {
   KeyRound,
   LoaderCircle,
   Plus,
-  Server,
 } from "lucide-react";
-import { ProviderIcon } from "../ProviderIcon";
+import { SettingsCard, SettingsGroup, SettingsRow, SegmentedControl } from "../studio/Settings";
 import {
   isFreeTierModel,
   isLocalModelUrl,
@@ -210,61 +209,100 @@ export function ProviderPanel({
       );
     });
   };
-  const accountRow = (entry: ProviderCatalogEntry) => (
-    <article className="ai-account" key={entry.id}>
-      <span className={`ai-brand ai-brand-${entry.id}`}>
-        <ProviderIcon id={entry.id} />
-      </span>
-      <div className="ai-account-copy">
-        <h4>{entry.name}</h4>
-        <p>
-          {entry.connected
-            ? "Sign-in found on this host"
-            : entry.installed
-              ? entry.badge
-              : "Runtime not found on this host"}
-        </p>
-        <details>
-          <summary>About this connection</summary>
-          <p>
-            {entry.description} {entry.note}
-          </p>
-        </details>
-      </div>
-      {entry.connected ? (
-        <div className="ai-side">
-          <span className="ai-signed-in">
-            <Check size={13} /> Signed in
-          </span>
-          {connectionTest(entry.connectionId, `test-${entry.id}`)}
-        </div>
-      ) : entry.canConnect ? (
-        <button
-          type="button"
-          className="ai-action"
-          disabled={busy !== null}
-          onClick={() =>
-            void act(entry.id, async () => {
-              const next = await onConnect(entry.id);
-              setAttempt(next);
-              if (next.url)
-                window.open(next.url, "_blank", "noopener,noreferrer");
-            })
-          }
-        >
-          {busy === entry.id ? (
-            <LoaderCircle size={15} className="spinner" />
+  const accountRow = (entry: ProviderCatalogEntry) => {
+    const receipt = entry.connectionId ? connectionTests[entry.connectionId] : null;
+    return (
+      <SettingsRow
+        key={entry.id}
+        title={entry.name}
+        description={
+          <>
+            <span>
+              {entry.connected
+                ? "Sign-in found on this host"
+                : entry.installed
+                  ? entry.badge
+                  : "Runtime not found on this host"}
+            </span>
+            <details className="about-connection">
+              <summary>
+                <ChevronRight size={13} className="about-chevron" />
+                About this connection
+              </summary>
+              <p>
+                {entry.description} {entry.note}
+              </p>
+            </details>
+          </>
+        }
+        control={
+          entry.connected ? (
+            <div className="ai-side">
+              <div className="ai-status-stack">
+                <span className="ai-signed-in">
+                  <Check size={13} /> Signed in
+                </span>
+                {entry.connectionId && (
+                  <span className="ai-test-state" title={receipt?.error || undefined}>
+                    {receipt
+                      ? receipt.ok
+                        ? `Tested · ${modelLabel(receipt.model)} · ${testTime(receipt.testedAt)}`
+                        : `Last test failed · ${testTime(receipt.testedAt)}`
+                      : "Saved, not tested"}
+                  </span>
+                )}
+              </div>
+              {entry.connectionId && (
+                <button
+                  type="button"
+                  className="ai-action"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    void act(`test-${entry.id}`, async () => {
+                      const r = await onTestConnection(entry.connectionId!);
+                      if (!r.ok && r.error) setError(r.error);
+                    })
+                  }
+                >
+                  {busy === `test-${entry.id}` ? (
+                    <LoaderCircle size={14} className="spinner" />
+                  ) : receipt ? (
+                    "Test again"
+                  ) : (
+                    "Test connection"
+                  )}
+                </button>
+              )}
+            </div>
+          ) : entry.canConnect ? (
+            <button
+              type="button"
+              className="ai-action"
+              disabled={busy !== null}
+              onClick={() =>
+                void act(entry.id, async () => {
+                  const next = await onConnect(entry.id);
+                  setAttempt(next);
+                  if (next.url)
+                    window.open(next.url, "_blank", "noopener,noreferrer");
+                })
+              }
+            >
+              {busy === entry.id ? (
+                <LoaderCircle size={14} className="spinner" />
+              ) : (
+                "Connect"
+              )}
+            </button>
           ) : (
-            "Connect"
-          )}
-        </button>
-      ) : (
-        <span className="ai-state">
-          {entry.installed ? "Set up in OpenCode" : "Setup needed"}
-        </span>
-      )}
-    </article>
-  );
+            <span className="ai-state">
+              {entry.installed ? "Set up in OpenCode" : "Setup needed"}
+            </span>
+          )
+        }
+      />
+    );
+  };
   return (
     <div className="provider-settings">
       <header className="ai-intro">
@@ -283,31 +321,42 @@ export function ProviderPanel({
       </header>
       {!provider && <p role="status">Checking your connections…</p>}
       {needsChoice && (
-        <section className="ai-team" aria-label="Choose your first AI provider">
-          <h3>First, choose the AI you want to use</h3>
+        <SettingsGroup title="First, choose the AI you want to use">
           <p>No provider is selected for you. Connect an account below, or choose an existing connection. You can mix models later.</p>
-          <div className="ai-teammate-fields">
-            <label>Provider
-              <select aria-label="First provider" value={initialConnection} onChange={(event) => { setInitialConnection(event.target.value); setInitialModel(""); }} disabled={busy !== null}>
-                <option value="">Choose your provider</option>
-                {provider?.instances.filter((entry) => entry.connected && entry.models?.length).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-              </select>
-            </label>
-            <label>Model
-              <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
-                <option value="">Choose a model</option>
-                {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}{isFreeTierModel(model) ? " · Free tier" : ""}</option>)}
-              </select>
-            </label>
-          </div>
-          {isFreeTierModel(initialModel) && (
-            <p className="ai-help">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
-          )}
-          <p className="ai-help">Uses your account’s limits or API billing. OpenBot will not silently switch providers. The first task checks actual model access.</p>
-          <button className="button-primary" disabled={busy !== null || !initial?.connected || !initial?.models?.includes(initialModel)} onClick={() => void act("initial", () => onChooseInitial(initialConnection, initialModel))}>
-            Use this AI for unconfigured teammates
-          </button>
-        </section>
+          <SettingsCard>
+            <SettingsRow
+              title="Provider"
+              control={
+                <select aria-label="First provider" value={initialConnection} onChange={(event) => { setInitialConnection(event.target.value); setInitialModel(""); }} disabled={busy !== null}>
+                  <option value="">Choose your provider</option>
+                  {provider?.instances.filter((entry) => entry.connected && entry.models?.length).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+                </select>
+              }
+            />
+            <SettingsRow
+              title="Model"
+              control={
+                <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
+                  <option value="">Choose a model</option>
+                  {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}{isFreeTierModel(model) ? " · Free tier" : ""}</option>)}
+                </select>
+              }
+            >
+              {isFreeTierModel(initialModel) && (
+                <p className="settings-row-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+              )}
+            </SettingsRow>
+            <SettingsRow
+              title="Unconfigured teammates"
+              description="Uses your account’s limits or API billing. OpenBot will not silently switch providers. The first task checks actual model access."
+              control={
+                <button className="button-primary" disabled={busy !== null || !initial?.connected || !initial?.models?.includes(initialModel)} onClick={() => void act("initial", () => onChooseInitial(initialConnection, initialModel))}>
+                  Use this AI for unconfigured teammates
+                </button>
+              }
+            />
+          </SettingsCard>
+        </SettingsGroup>
       )}
       {error && (
         <div className="ai-feedback ai-error" role="alert">
@@ -321,36 +370,31 @@ export function ProviderPanel({
           <p>{notice}</p>
         </div>
       )}
-      <div className="ai-mode-switch" role="group" aria-label="Connection type">
-        <button
-          type="button"
-          aria-pressed={mode === "accounts"}
-          onClick={() => setMode("accounts")}
-        >
-          Accounts & subscriptions
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "api"}
-          onClick={() => setMode("api")}
-        >
-          API & local models
-        </button>
+      <div className="provider-mode-wrapper">
+        <SegmentedControl
+          ariaLabel="Connection type"
+          value={mode}
+          onChange={(val) => setMode(val as "accounts" | "api")}
+          options={[
+            { value: "accounts", label: "Accounts & Sign-in" },
+            { value: "api", label: "API Keys & Local Models" },
+          ]}
+        />
       </div>
       {mode === "accounts" ? (
-        <section aria-label="Accounts and subscriptions">
-          <div className="ai-list">
+        <SettingsGroup title="Accounts & subscriptions">
+          <SettingsCard>
             {provider?.catalog
               .filter((entry) => !["gitlab", "xai"].includes(entry.id))
               .map(accountRow)}
-          </div>
+          </SettingsCard>
           <details className="ai-more">
             <summary>More accounts</summary>
-            <div className="ai-list">
+            <SettingsCard>
               {provider?.catalog
                 .filter((entry) => ["gitlab", "xai"].includes(entry.id))
                 .map(accountRow)}
-            </div>
+            </SettingsCard>
           </details>
           <p className="ai-help">
             Sign-in uses the installed provider runtime. A saved sign-in doesn’t
@@ -406,28 +450,30 @@ export function ProviderPanel({
                   )}
               </div>
             )}
-        </section>
+        </SettingsGroup>
       ) : (
-        <section aria-label="API and local models">
+        <SettingsGroup title="API & local models">
           {savedApis.length > 0 && (
-            <div className="ai-list">
+            <SettingsCard>
               {savedApis.map((entry) => (
-                <article key={entry.id} className="ai-account">
-                  <span className="ai-brand">
-                    <Server size={20} />
-                  </span>
-                  <div className="ai-account-copy">
-                    <h4>{entry.name}</h4>
-                    <p>{entry.apiConfig?.baseUrl || "API-key connection"}</p>
-                    {!connectionTests[entry.id] && <p>{entry.note}</p>}
-                  </div>
-                  <div className="ai-side">
-                    <span className="ai-state">Saved</span>
-                    {connectionTest(entry.id, `test-${entry.id}`)}
-                  </div>
-                </article>
+                <SettingsRow
+                  key={entry.id}
+                  title={entry.name}
+                  description={
+                    <>
+                      <span>{entry.apiConfig?.baseUrl || "API-key connection"}</span>
+                      {!connectionTests[entry.id] && <span>{entry.note}</span>}
+                    </>
+                  }
+                  control={
+                    <div className="ai-side">
+                      <span className="ai-state">Saved</span>
+                      {connectionTest(entry.id, `test-${entry.id}`)}
+                    </div>
+                  }
+                />
               ))}
-            </div>
+            </SettingsCard>
           )}
           {!adding ? (
             <button
@@ -441,78 +487,91 @@ export function ProviderPanel({
               <Plus size={17} /> Add API or local model
             </button>
           ) : (
-            <form className="ai-form" onSubmit={submit}>
+            <form onSubmit={submit} style={{ display: "grid", gap: 16 }}>
               <h4>Add a model connection</h4>
-              <label>
-                Provider
-                <select
-                  aria-label="Provider"
-                  value={preset}
-                  onChange={(event) => choosePreset(event.target.value)}
-                >
-                  {Object.entries(presets).map(([id, value]) => (
-                    <option key={id} value={id}>
-                      {id === "custom"
-                        ? "Other compatible provider"
-                        : value.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Connection name
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  required
-                  maxLength={60}
-                />
-              </label>
-              <label>
-                API address
-                <input
-                  type="url"
-                  value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
-                  placeholder="https://your-provider.com/v1"
-                  spellCheck={false}
-                  required
-                />
-              </label>
-              <p className="ai-help">
-                {isLocalModelUrl(baseUrl)
-                  ? "Localhost means the computer running OpenBot, not your phone. Start your model server there first."
-                  : "Use the API address supplied by your provider, not its chat website."}
-              </p>
-              <label>
-                Model IDs
-                <textarea
-                  value={modelIds}
-                  onChange={(event) => setModelIds(event.target.value)}
-                  placeholder={
-                    isLocalModelUrl(baseUrl)
-                      ? "e.g. qwen3:8b"
-                      : "Paste exact IDs from your provider, one per line"
+              <SettingsCard>
+                <SettingsRow
+                  title="Provider"
+                  control={
+                    <select
+                      aria-label="Provider"
+                      value={preset}
+                      onChange={(event) => choosePreset(event.target.value)}
+                    >
+                      {Object.entries(presets).map(([id, value]) => (
+                        <option key={id} value={id}>
+                          {id === "custom"
+                            ? "Other compatible provider"
+                            : value.name}
+                        </option>
+                      ))}
+                    </select>
                   }
-                  rows={2}
-                  spellCheck={false}
-                  required
                 />
-              </label>
-              <p className="ai-help">
-                Choose models that support tool use for agent work. Names and
-                compatibility come from your provider.
-              </p>
-              <label>
-                API key{isLocalModelUrl(baseUrl) ? " (optional)" : ""}
-                <input
-                  type="password"
-                  value={secret}
-                  onChange={(event) => setSecret(event.target.value)}
-                  autoComplete="new-password"
-                  required={!isLocalModelUrl(baseUrl)}
+                <SettingsRow
+                  title="Connection name"
+                  control={
+                    <input
+                      aria-label="Connection name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                      maxLength={60}
+                    />
+                  }
                 />
-              </label>
+                <SettingsRow
+                  title="API address"
+                  description={
+                    isLocalModelUrl(baseUrl)
+                      ? "Localhost means the computer running OpenBot, not your phone. Start your model server there first."
+                      : "Use the API address supplied by your provider, not its chat website."
+                  }
+                  control={
+                    <input
+                      aria-label="API address"
+                      type="url"
+                      value={baseUrl}
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                      placeholder="https://your-provider.com/v1"
+                      spellCheck={false}
+                      required
+                    />
+                  }
+                />
+                <SettingsRow
+                  title="Model IDs"
+                  description="Choose models that support tool use for agent work. Names and compatibility come from your provider."
+                  control={
+                    <textarea
+                      aria-label="Model IDs"
+                      value={modelIds}
+                      onChange={(event) => setModelIds(event.target.value)}
+                      placeholder={
+                        isLocalModelUrl(baseUrl)
+                          ? "e.g. qwen3:8b"
+                          : "Paste exact IDs from your provider, one per line"
+                      }
+                      rows={2}
+                      spellCheck={false}
+                      required
+                    />
+                  }
+                />
+                <SettingsRow
+                  title={isLocalModelUrl(baseUrl) ? "API key (optional)" : "API key"}
+                  control={
+                    <input
+                      aria-label="API key"
+                      type="password"
+                      value={secret}
+                      onChange={(event) => setSecret(event.target.value)}
+                      autoComplete="new-password"
+                      required={!isLocalModelUrl(baseUrl)}
+                    />
+                  }
+                />
+              </SettingsCard>
               <details className="ai-advanced">
                 <summary>Advanced connection options</summary>
                 <label>
@@ -558,93 +617,95 @@ export function ProviderPanel({
               </div>
             </form>
           )}
-        </section>
+        </SettingsGroup>
       )}
-      <section className="ai-team" aria-labelledby="ai-team-heading">
-        <header>
-          <h3 id="ai-team-heading">Choose for each teammate</h3>
-          <p>Mix models to suit the work. Changes apply to their next task.</p>
-        </header>
-        {bots.map((bot) => {
-          const connection = provider?.instances.find(
-            (entry) => entry.id === bot.providerInstanceId,
-          );
-          const models = [
-            ...new Set([bot.model, ...(connection?.models || [])].filter(Boolean)),
-          ];
-          return (
-            <div key={bot.id} className="ai-teammate">
-              <div className="ai-teammate-title">
-                {mascot(bot)}
-                <strong>{bot.name}</strong>
-                <span>{bot.role}</span>
-              </div>
-              <div className="ai-teammate-fields">
-                <label>
-                  Connection
-                  <select
-                    aria-label={`${bot.name} connection`}
-                    value={bot.providerInstanceId || ""}
-                    disabled={busy !== null || !provider}
-                    onChange={(event) => {
-                      const next = provider?.instances.find(
-                        (entry) => entry.id === event.target.value,
-                      );
-                      if (next?.defaultModel)
-                        void act(bot.id, () =>
-                          onUpdateBot(bot.id, {
-                            providerInstanceId: next.id,
-                            model: next.defaultModel,
-                          }),
+      <SettingsGroup title="Choose for each teammate">
+        <p>Mix models to suit the work. Changes apply to their next task.</p>
+        <SettingsCard>
+          {bots.map((bot) => {
+            const connection = provider?.instances.find(
+              (entry) => entry.id === bot.providerInstanceId,
+            );
+            const models = [
+              ...new Set([bot.model, ...(connection?.models || [])].filter(Boolean)),
+            ];
+            return (
+              <div key={bot.id} className="ai-teammate">
+                <div className="ai-teammate-title">
+                  {mascot(bot)}
+                  <strong>{bot.name}</strong>
+                  <span>{bot.role}</span>
+                </div>
+                <SettingsRow
+                  title="Connection"
+                  control={
+                    <select
+                      aria-label={`${bot.name} connection`}
+                      value={bot.providerInstanceId || ""}
+                      disabled={busy !== null || !provider}
+                      onChange={(event) => {
+                        const next = provider?.instances.find(
+                          (entry) => entry.id === event.target.value,
                         );
-                    }}
-                  >
-                    {!connection && (
-                      <option value="">Choose a connection</option>
-                    )}
-                    {provider?.instances.map((entry) => (
-                      <option
-                        key={entry.id}
-                        value={entry.id}
-                        disabled={!entry.defaultModel}
-                      >
-                        {entry.name}
-                        {!entry.connected ? " · setup needed" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Model
-                  <select
-                    aria-label={`${bot.name} model`}
-                    value={bot.model}
-                    disabled={busy !== null || !connection?.connected}
-                    onChange={(event) =>
-                      void act(bot.id, () =>
-                        onUpdateBot(bot.id, { model: event.target.value }),
-                      )
-                    }
-                  >
-                    {!bot.model && <option value="">Choose a model</option>}
-                    {models.map((model) => (
-                      <option key={model} value={model}>
-                        {modelLabel(model)}
-                        {connection?.models?.includes(model)
-                          ? isFreeTierModel(model) ? " · Free tier" : ""
-                          : " · unavailable"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {isFreeTierModel(bot.model) && (
-                  <p className="ai-help">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
-                )}
+                        if (next?.defaultModel)
+                          void act(bot.id, () =>
+                            onUpdateBot(bot.id, {
+                              providerInstanceId: next.id,
+                              model: next.defaultModel,
+                            }),
+                          );
+                      }}
+                    >
+                      {!connection && (
+                        <option value="">Choose a connection</option>
+                      )}
+                      {provider?.instances.map((entry) => (
+                        <option
+                          key={entry.id}
+                          value={entry.id}
+                          disabled={!entry.defaultModel}
+                        >
+                          {entry.name}
+                          {!entry.connected ? " · setup needed" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  }
+                />
+                <SettingsRow
+                  title="Model"
+                  control={
+                    <select
+                      aria-label={`${bot.name} model`}
+                      value={bot.model}
+                      disabled={busy !== null || !connection?.connected}
+                      onChange={(event) =>
+                        void act(bot.id, () =>
+                          onUpdateBot(bot.id, { model: event.target.value }),
+                        )
+                      }
+                    >
+                      {!bot.model && <option value="">Choose a model</option>}
+                      {models.map((model) => (
+                        <option key={model} value={model}>
+                          {modelLabel(model)}
+                          {connection?.models?.includes(model)
+                            ? isFreeTierModel(model) ? " · Free tier" : ""
+                            : " · unavailable"}
+                        </option>
+                      ))}
+                    </select>
+                  }
+                >
+                  {isFreeTierModel(bot.model) && (
+                    <p className="settings-row-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+                  )}
+                </SettingsRow>
               </div>
-            </div>
-          );
-        })}
-      </section>
+            );
+          })}
+        </SettingsCard>
+      </SettingsGroup>
       <p className="ai-footnote">
         OpenCode {provider?.version || "not detected"} · Connections belong to
         this OpenBot host.

@@ -90,6 +90,8 @@ export function ChoiceMenu({
         ? { bottom: window.innerHeight - rect.top + 6, top: "auto" }
         : { top: rect.bottom + 6, bottom: "auto" }),
       maxHeight: Math.max(100, Math.min(320, up ? above : below)),
+      // The menu grows out of its trigger, not its own center.
+      transformOrigin: up ? "bottom center" : "top center",
     });
     popover.current.showPopover();
     setOpen(true);
