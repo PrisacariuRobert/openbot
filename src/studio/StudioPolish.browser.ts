@@ -421,7 +421,7 @@ try {
     await page.getByLabel("Saved character").textContent(),
     "pebble:#299575",
   );
-  await page.getByRole("status").waitFor({ state: "detached" });
+  await page.getByText("Saving their look…", { exact: true }).waitFor({ state: "detached" });
   assert.equal(await page.getByRole("alert").count(), 0);
   checks++;
 
