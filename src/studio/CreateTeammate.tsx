@@ -251,7 +251,7 @@ export function CreateTeammate({
                 <small>Powered by</small>
                 <strong>{connection.name} · {model}</strong>
               </span>
-              <button type="button" onClick={() => setShowAiChoices(true)}>Change</button>
+              <button type="button" aria-label="Change AI" onClick={() => setShowAiChoices(true)}>Change</button>
             </div>
           ) : (
             <div className="creation-ai-options">
