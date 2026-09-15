@@ -12,8 +12,14 @@
 .sidebar,
 .workspace,
 .conversation-context,
-.browser-pane {
+.browser-pane,
+.page-content,
+.settings-page-body,
+.settings-page-header,
+.detail-drawer,
+.create-teammate {
   min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
