@@ -119,7 +119,6 @@ export function CreateTeammate({
   const connection = providers?.instances.find((item) => item.id === providerId);
   const validSelection = Boolean(connection?.connected && connection.models?.includes(model));
   const simpleAiChoice = Boolean(validSelection && connectedProviders.length === 1 && connection?.models?.length === 1);
-  const showAiConfiguration = showAiChoices || !simpleAiChoice;
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -241,13 +240,18 @@ export function CreateTeammate({
             <small>Keep it simple. You can explain the rest naturally when you talk to them.</small>
           </label>
 
+          <div className="teammate-section teammate-appearance">
+            <span className="section-label">Appearance</span>
+            <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
+          </div>
+
           {simpleAiChoice && !showAiChoices && connection ? (
             <div className="creation-summary" aria-label="AI connection summary">
               <span>
-                <small>AI</small>
+                <small>Powered by</small>
                 <strong>{connection.name} · {model}</strong>
               </span>
-              <button type="button" onClick={() => setShowAiChoices(true)}>Change AI</button>
+              <button type="button" onClick={() => setShowAiChoices(true)}>Change</button>
             </div>
           ) : (
             <div className="creation-ai-options">
@@ -291,11 +295,6 @@ export function CreateTeammate({
             <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
           )}
           {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
-
-          <div className="teammate-section teammate-appearance">
-            <span className="section-label">Appearance</span>
-            <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
-          </div>
 
           <Advanced title="More options" summary="Instructions, connections & ready-made teams">
             <div className="teammate-section">
