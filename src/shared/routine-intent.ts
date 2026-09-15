@@ -35,7 +35,7 @@ export function parseRoutineIntent(input: string, timeZone?: string): RoutineInt
     if (/^(?:[A-Z]{2,5}|in\s+\w+)\b/.test(prompt) || /\b(?:except|until|starting|only|unless)\b/i.test(prompt)) return null;
     const short = prompt.replace(/[.!?]+$/g, "").slice(0, 44);
     return { schedule: parsed.data, intervalMinutes: 1440, name: short.charAt(0).toUpperCase() + short.slice(1), prompt,
-      confirmation: `Scheduled: ${scheduleLabel(parsed.data, 1440)}. I’ll ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}. You can preview, test or pause it in Automations. Your execution host needs to be awake.` };
+      confirmation: `Done — ${scheduleLabel(parsed.data, 1440).toLowerCase()}, I’ll ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}. It’s in Schedule if you ever want to review it.` };
   }
   // A wall-clock request must not fall through to an elapsed 24-hour interval.
   if (/\b(?:at\s+\d|weekdays?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tonight|tomorrow|except|until|starting)\b/i.test(text)) return null;
@@ -71,6 +71,6 @@ export function parseRoutineIntent(input: string, timeZone?: string): RoutineInt
     intervalMinutes,
     name: `${shortTask.charAt(0).toUpperCase()}${shortTask.slice(1)}`,
     prompt,
-    confirmation: `I’ll ${localText ? `post “${shortTask}” here` : friendlyTask} ${schedule.toLowerCase()}. You can test, pause or change it anytime in Automations.`,
+    confirmation: `Done — I’ll ${localText ? `post “${shortTask}” here` : friendlyTask} ${schedule.toLowerCase()}. It’s in Schedule if you ever want to review it.`,
   };
 }
