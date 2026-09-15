@@ -1,5 +1,22 @@
 /* Final HIG contracts that must win over visual refinements. */
 
+/* The application shell is a fixed window composition. Inset materials must
+ * consume space inside that window rather than making the document wider. */
+.studio-shell {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar,
+.workspace,
+.conversation-context,
+.browser-pane {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 /* A floating toolbar needs a legibility edge, not an opaque hard bar. */
 .workspace > .topbar {
   isolation: isolate;
