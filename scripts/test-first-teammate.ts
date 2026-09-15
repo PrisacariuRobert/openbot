@@ -100,23 +100,31 @@ try {
     const sheet = page.getByRole("dialog");
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
     await sheet.getByLabel("Their job").fill("Help plan my week");
-    // Instructions live behind the Advanced disclosure in the new form.
-    await sheet.locator("summary", { hasText: "Advanced" }).click();
+
+    // A sole valid provider/model is infrastructure, not a decision the user
+    // should have to make. It collapses to one calm summary row.
+    const aiSummary = sheet.getByLabel("AI connection summary");
+    await aiSummary.waitFor();
+    assert.match(await aiSummary.innerText(), new RegExp(provider.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(await aiSummary.innerText(), /opencode\/fixture-only/);
+    assert.equal(await sheet.getByRole("combobox", { name: "AI connection" }).count(), 0, "Redundant AI selectors stay hidden when there is only one valid choice");
+
+    await sheet.locator("summary", { hasText: "More options" }).click();
     await sheet
       .getByLabel("Additional instructions", { exact: true })
       .fill("Find a realistic plan. Ask before changing my calendar.");
     await sheet.getByRole("button", { name: "Sprout shape" }).click();
     await sheet.getByRole("button", { name: "Leaf character" }).click();
+    assert.ok(
+      await sheet.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
+      "A sole provider and model preselect, so the form is submittable without provider busywork",
+    );
+
+    // Power users can still expose and change the exact provider/model.
+    await sheet.getByRole("button", { name: "Change AI" }).click();
     assert.equal(
       await sheet.getByRole("combobox", { name: "AI connection" }).innerText(),
       provider.name,
-      "A sole connected provider preselects itself",
-    );
-    assert.ok(
-      await sheet
-        .getByRole("button", { name: "Create teammate", exact: true })
-        .isEnabled(),
-      "A sole provider and model preselect, so the form is submittable",
     );
     await sheet.getByRole("combobox", { name: "AI connection" }).click();
     await sheet.getByRole("option", { name: provider.name, exact: true }).click();
@@ -129,6 +137,7 @@ try {
       .getByRole("combobox", { name: /^Model/ })
       .click();
     await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
+
     await sheet.getByText("Manage AI connections", { exact: true }).click();
     available = false;
     await sheet.getByRole("button", { name: "Refresh connections" }).click();
@@ -143,6 +152,8 @@ try {
       "Remy",
       "Refresh keeps draft",
     );
+    await sheet.getByRole("button", { name: "Done choosing AI" }).click();
+    await aiSummary.waitFor();
     assert.ok(
       await sheet.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
       "Form has no horizontal overflow",
@@ -201,7 +212,7 @@ try {
   assert.ok(discoveries >= 6);
   assert.deepEqual(errors, []);
   console.log(
-    "Fresh studio + explicit provider/model + customization + real creation + persisted isolation passed at 1440/390/320px. No model calls. Screenshots: " +
+    "Fresh studio + simplified AI choice + customization + real creation + persisted isolation passed at 1440/390/320px. No model calls. Screenshots: " +
       output,
   );
 } finally {
