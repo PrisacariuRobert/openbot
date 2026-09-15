@@ -55,6 +55,109 @@
   transform: scale(.98);
 }
 
+/* A sole provider/model should feel like infrastructure, not another setup
+ * decision. The exact controls stay one tap away for people who want them. */
+.creation-summary {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-muted) 32%, var(--ob-material-strong));
+}
+
+.creation-summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.creation-summary small {
+  color: var(--label-tertiary);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.creation-summary strong {
+  overflow: hidden;
+  color: var(--label-primary);
+  font-size: 12px;
+  font-weight: 610;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creation-summary > button {
+  min-height: 32px;
+  margin-left: auto;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--label-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.creation-summary > button:hover,
+.creation-ai-done:hover,
+.create-secondary-path:hover,
+.import-back:hover {
+  background: color-mix(in srgb, var(--surface-muted) 66%, transparent);
+  color: var(--label-primary);
+}
+
+.creation-ai-options {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-muted) 24%, transparent);
+}
+
+.creation-ai-done {
+  justify-self: start;
+  min-height: 31px;
+  padding: 0 8px !important;
+  border-radius: 8px;
+}
+
+.create-secondary-path {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--label-tertiary);
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.create-secondary-path strong {
+  color: var(--label-secondary);
+  font-weight: 620;
+}
+
+.import-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin-bottom: 10px;
+  padding: 0 8px !important;
+  border-radius: 9px;
+}
+
 /* OpenBot's design contract keeps decorative surfaces monochrome. Attention
  * comes from placement, type and symbols; identity color stays with mascots. */
 .attention-section {
@@ -82,6 +185,11 @@
 
   .workspace-chat > .chat-scroll {
     padding-top: 140px !important;
+  }
+
+  .creation-summary,
+  .creation-ai-options {
+    border-radius: 12px;
   }
 }
 
