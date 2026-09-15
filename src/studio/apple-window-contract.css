@@ -48,6 +48,16 @@ header.topbar .topbar-right {
   max-width: 100%;
 }
 
+/* In a desktop split view the complete conversation sidebar is already the
+ * navigation affordance. Keep Back for compact layouts where that sidebar is
+ * off-screen, but do not duplicate it beside visible navigation. */
+@media (min-width: 761px) and (pointer: fine) {
+  header.topbar .conversation-back {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
 /* A slightly firmer scroll edge protects the contact header without creating
  * an opaque bar. */
 .workspace > .topbar::before {
