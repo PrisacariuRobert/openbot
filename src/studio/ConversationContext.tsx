@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { ArrowRight, CalendarDays, ShieldQuestion } from "lucide-react";
+import { ArrowRight, CalendarDays, ChevronDown, Monitor, ShieldQuestion } from "lucide-react";
 import type { AppState, Bot, Run } from "../shared/types";
 import { Character } from "./Character";
 import { BrowserAccessCard } from "./BrowserAccessCard";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { LiveComputer } from "./LiveComputer";
 import { orderContextRuns } from "./context-runs";
+
+const statusText = (status: Bot["status"]) =>
+  status === "working" ? "Working now" : status === "waiting" ? "Waiting for you" : "Ready";
 
 export function ConversationContext({
   state,
@@ -44,15 +47,160 @@ export function ConversationContext({
   const routines = state.routines.filter((routine) =>
     selected ? routine.botId === selected.id : routine.threadId === threadId,
   );
+
   return (
     <div className="conversation-context-content">
+      {!bot && (
+        <div className="context-picker">
+          <span>Show me</span>
+          <ChoiceMenu
+            label="Whose work?"
+            value={chosen}
+            onChange={setChosen}
+            choices={[
+              { value: "", label: "The whole conversation" },
+              ...state.bots.map((item) => ({
+                value: item.id,
+                label: item.name,
+                detail: item.role,
+                icon: <Character name={item.name} color={item.color} variant={item.mascot} size={26} />,
+              })),
+            ]}
+          />
+        </div>
+      )}
+
+      {group && onEditGroup && (
+        <div className="context-group">
+          <span>
+            <small>People in this room</small>
+            <strong>{group.botIds?.map((id) => state.bots.find((member) => member.id === id)?.name).filter(Boolean).join(" · ")}</strong>
+          </span>
+          <button className="text-action" onClick={onEditGroup}>
+            Change people <ArrowRight size={13} />
+          </button>
+        </div>
+      )}
+
+      {selected && (
+        <div className="context-person">
+          <Character
+            name={selected.name}
+            variant={selected.mascot}
+            color={selected.color}
+            status={selected.status}
+            size={52}
+          />
+          <div>
+            <strong>{selected.name}</strong>
+            <p>{selected.role}</p>
+            <small>{statusText(selected.status)}</small>
+          </div>
+        </div>
+      )}
+
+      <section className="context-now" aria-label="Work">
+        <div className="section-heading">
+          <h3>{activeRuns.length ? "Right now" : "Latest work"}</h3>
+        </div>
+        {currentRuns.length ? (
+          <>
+            {currentRuns.map((run) => (
+              <button
+                className="context-work"
+                key={run.id}
+                title={run.task?.goal || run.prompt}
+                aria-label={`Work: ${run.task?.goal || run.prompt}`}
+                onClick={() => onRun(run)}
+              >
+                <strong>{run.task?.goal || run.prompt}</strong>
+                <small>
+                  {run.status === "awaiting_approval"
+                    ? "Needs you to review something"
+                    : run.status === "completed"
+                      ? "Finished"
+                      : run.status === "waiting_for_teammate"
+                        ? "Checking with the team"
+                        : run.status === "queued"
+                          ? "Up next"
+                          : "Working"}
+                </small>
+                <ArrowRight size={13} />
+              </button>
+            ))}
+            {olderRuns.length > 0 && (
+              <details className="context-work-history">
+                <summary>Earlier work ({olderRuns.length})</summary>
+                {olderRuns.map((run) => (
+                  <button
+                    className="context-work"
+                    key={run.id}
+                    title={run.task?.goal || run.prompt}
+                    aria-label={`Work: ${run.task?.goal || run.prompt}`}
+                    onClick={() => onRun(run)}
+                  >
+                    <strong>{run.task?.goal || run.prompt}</strong>
+                    <small>{run.status === "failed" ? "Needs attention" : run.status === "completed" ? "Finished" : run.status}</small>
+                    <ArrowRight size={13} />
+                  </button>
+                ))}
+              </details>
+            )}
+          </>
+        ) : (
+          <p className="quiet-copy">When work starts, its progress and result will appear here.</p>
+        )}
+      </section>
+
+      {selected && (
+        <details className="context-capabilities">
+          <summary>
+            <span><Monitor size={15} /> Computer & web</span>
+            <span className="context-summary-note">Watch or help when needed</span>
+            <ChevronDown size={13} aria-hidden="true" />
+          </summary>
+          <div className="context-capabilities-body">
+            <LiveComputer bot={selected} threadId={selected.threadId} onTakeover={onTakeover} />
+            <BrowserAccessCard bot={selected} onTakeover={onTakeover} />
+          </div>
+        </details>
+      )}
+
+      <section aria-label="Routines">
+        <div className="section-heading">
+          <h3><CalendarDays size={15} /> Scheduled</h3>
+          <button onClick={onSchedule}>
+            See schedule <ArrowRight size={13} />
+          </button>
+        </div>
+        {routines.length ? (
+          routines.map((routine) => (
+            <button key={routine.id} className="context-work" onClick={onSchedule}>
+              <strong>{routine.name}</strong>
+              <small>
+                {!routine.enabled
+                  ? "Paused"
+                  : routine.nextRunAt
+                    ? `Next ${new Date(routine.nextRunAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}`
+                    : "Waiting for its trigger"}
+              </small>
+              <ArrowRight size={13} />
+            </button>
+          ))
+        ) : (
+          <p className="quiet-copy">Nothing repeats from this conversation yet. You can create one just by asking in chat.</p>
+        )}
+      </section>
+
       {onToggleSafety && (
         <section className="safety-card" aria-label="Safety">
-          <h3>Safety</h3>
+          <div className="section-heading">
+            <h3>Before important actions</h3>
+          </div>
           <p>
             {yoloMode
-              ? "Auto-approve is on: reviews pass by themselves. Sign-ins and access grants still pause."
-              : "Ask first: work can start, but sensitive actions wait for your approval."}
+              ? "Auto-approve is on. Sign-ins and new access still pause for you."
+              : "Ask first is on. OpenBot can work, but sensitive actions wait for your review."}
           </p>
           <button
             type="button"
@@ -66,111 +214,6 @@ export function ConversationContext({
           </button>
         </section>
       )}
-      {!bot && (
-        <div className="context-picker"><span>Whose work?</span><ChoiceMenu label="Whose work?" value={chosen} onChange={setChosen}
-          choices={[{value:"",label:"The whole conversation"},...state.bots.map((item) => ({value:item.id,label:item.name,detail:item.role,icon:<Character name={item.name} color={item.color} variant={item.mascot} size={26} />}))]}/></div>
-      )}
-      {group && onEditGroup && (
-        <div className="context-group">
-          <span>{group.botIds?.map((id) => state.bots.find((bot) => bot.id === id)?.name).filter(Boolean).join(" · ")}</span>
-          <button className="text-action" onClick={onEditGroup}>
-            Edit group <ArrowRight size={13} />
-          </button>
-        </div>
-      )}
-      {selected && (
-        <>
-          <div className="context-person">
-            <Character
-              name={selected.name}
-              variant={selected.mascot}
-              color={selected.color}
-              status={selected.status}
-              size={45}
-            />
-            <div>
-              <strong>{selected.name}</strong>
-              <p>{selected.role}</p>
-            </div>
-          </div>
-          <LiveComputer bot={selected} threadId={selected.threadId} onTakeover={onTakeover} />
-          <BrowserAccessCard bot={selected} onTakeover={onTakeover} />
-        </>
-      )}
-      <section>
-        <div className="section-heading">
-          <h3>Work</h3>
-        </div>
-        {currentRuns.length ? (
-          <>
-          {currentRuns.map((run) => (
-            <button
-              className="context-work"
-              key={run.id}
-              title={run.task?.goal || run.prompt}
-              aria-label={`Work: ${run.task?.goal || run.prompt}`}
-              onClick={() => onRun(run)}
-            >
-              <strong>{run.task?.goal || run.prompt}</strong>
-              <small>
-                {run.status === "awaiting_approval"
-                  ? "Needs your review"
-                  : run.status === "completed"
-                    ? "Finished"
-                    : run.status === "waiting_for_teammate"
-                      ? "Consulting the team"
-                      : run.status}
-              </small>
-              <ArrowRight size={13} />
-            </button>
-          ))}
-          {olderRuns.length > 0 && (
-            <details className="context-work-history">
-              <summary>Earlier work ({olderRuns.length})</summary>
-              {olderRuns.map((run) => (
-                <button className="context-work" key={run.id} title={run.task?.goal || run.prompt} aria-label={`Work: ${run.task?.goal || run.prompt}`} onClick={() => onRun(run)}>
-                  <strong>{run.task?.goal || run.prompt}</strong>
-                  <small>{run.status === "failed" ? "Failed" : run.status === "completed" ? "Finished" : run.status}</small>
-                  <ArrowRight size={13} />
-                </button>
-              ))}
-            </details>
-          )}
-          </>
-        ) : (
-          <p className="quiet-copy">Tasks and results will collect here.</p>
-        )}
-      </section>
-      <section>
-        <div className="section-heading">
-          <h3>
-            <CalendarDays size={15} /> Routines
-          </h3>
-          <button onClick={onSchedule}>
-            Schedule <ArrowRight size={13} />
-          </button>
-        </div>
-        {routines.length ? (
-          routines.map((routine) => (
-            <button
-              key={routine.id}
-              className="context-work"
-              onClick={onSchedule}
-            >
-              <strong>{routine.name}</strong>
-              <small>
-                {!routine.enabled
-                  ? "Paused"
-                  : routine.nextRunAt
-                    ? `Next: ${new Date(routine.nextRunAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}`
-                    : "Waiting for its trigger"}
-              </small>
-            </button>
-          ))
-        ) : (
-          <p className="quiet-copy">No routines for this conversation yet.</p>
-        )}
-      </section>
     </div>
   );
 }
