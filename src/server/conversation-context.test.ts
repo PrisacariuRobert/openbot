@@ -55,12 +55,15 @@ test("explicit teammate requests become private collaboration directions without
   assert.equal(explicitCollaborationDirection(f.db, f.make("Invite Scout into the group chat.")), "");
 });
 
-test("fresh conversation bridge preserves explicit collaboration even when there is no prior chat history", t => {
+test("fresh conversation bridge keeps explicit collaboration authoritative over starter continuity", t => {
   const f = fixture(t);
   const bridge = conversationBridge(f.db, f.make("Ask Scout to check this with you."));
   assert.match(bridge, /Owner collaboration command/);
   assert.match(bridge, /Scout/);
-  assert.doesNotMatch(bridge, /Conversation continuity/);
+  const directionAt = bridge.indexOf("Owner collaboration command");
+  const continuityAt = bridge.indexOf("Conversation continuity");
+  assert.ok(directionAt >= 0);
+  assert.ok(continuityAt < 0 || directionAt < continuityAt, "The owner's current collaboration command must come before background continuity");
 });
 
 test("small completed contexts can be reused, but a new request is not mislabeled as a resumed task", t => {
