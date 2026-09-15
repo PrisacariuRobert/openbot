@@ -101,6 +101,26 @@ header.topbar .topbar-center {
   margin-top: 70px !important;
 }
 
+/* Keep the tested button but use a familiar inspector/info glyph rather than
+ * a monitor, which reads as “computer” and makes the control feel broken. */
+header.topbar button[aria-label="Conversation details"] > svg {
+  display: none;
+}
+
+header.topbar button[aria-label="Conversation details"]::before {
+  content: "i";
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+
 /* The context rail is a persistent inspector, not a modal card stack. */
 .conversation-context > header {
   background: color-mix(in srgb, var(--obx-sidebar) 88%, transparent) !important;
