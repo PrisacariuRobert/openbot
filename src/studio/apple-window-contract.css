@@ -58,25 +58,109 @@ header.topbar .topbar-right {
   }
 }
 
-/* A slightly firmer scroll edge protects the contact header without creating
- * an opaque bar. */
+/* A little live-state pill already sits on the relevant conversation. A
+ * second “active now” strip duplicates the same person and makes navigation
+ * noisier, so the conversation row owns this status. */
+.sidebar .active-now {
+  display: none !important;
+}
+
+/* Live state should read as a secondary status line, not another row of tiny
+ * avatars inside the conversation row. */
+.conversation-row .live-pill {
+  min-height: 18px !important;
+  max-width: 100%;
+  gap: 5px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--label-secondary) !important;
+  font-size: 11px !important;
+}
+
+.conversation-row .live-pill .character {
+  display: none !important;
+}
+
+.conversation-row .live-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-row .live-dots {
+  flex: none;
+  opacity: .58;
+}
+
+/* A firmer scroll edge protects the contact header without creating an opaque
+ * toolbar. The header itself participates in the blur so scrolled text cannot
+ * ghost through the controls. */
+.workspace > .topbar {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 72%, transparent) 64%,
+    transparent 100%
+  ) !important;
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+}
+
 .workspace > .topbar::before {
   height: 88px;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--canvas) 96%, transparent) 0%,
-    color-mix(in srgb, var(--canvas) 82%, transparent) 48%,
-    color-mix(in srgb, var(--canvas) 36%, transparent) 76%,
+    color-mix(in srgb, var(--canvas) 98%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 88%, transparent) 48%,
+    color-mix(in srgb, var(--canvas) 42%, transparent) 78%,
     transparent 100%
   ) !important;
   backdrop-filter: blur(18px) saturate(145%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 68%, transparent 100%) !important;
-  mask-image: linear-gradient(to bottom, #000 0 68%, transparent 100%) !important;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 70%, transparent 100%) !important;
+  mask-image: linear-gradient(to bottom, #000 0 70%, transparent 100%) !important;
 }
 
 @media (max-width: 760px), (pointer: coarse) {
+  .workspace > .topbar {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--canvas) 98%, transparent) 0%,
+      color-mix(in srgb, var(--canvas) 90%, transparent) 62%,
+      transparent 100%
+    ) !important;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
   .workspace > .topbar::before {
-    height: 96px;
+    height: 104px;
+  }
+
+  /* Large-title pages should not squeeze a two-line action label beside the
+   * title. Keep its accessible text, but present the familiar + affordance. */
+  .conversations-page .page-heading .text-action {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0 !important;
+    border: 1px solid var(--obx-border) !important;
+    border-radius: 50% !important;
+    background: color-mix(in srgb, var(--obx-raised) 84%, transparent) !important;
+    box-shadow: none !important;
+    font-size: 0 !important;
+  }
+
+  .conversations-page .page-heading .text-action svg {
+    width: 18px;
+    height: 18px;
+    margin: 0;
   }
 }
