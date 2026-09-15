@@ -96,6 +96,12 @@ header.topbar .topbar-right {
   opacity: .58;
 }
 
+/* Sheets carry important controls and text; unlike navigation chrome they
+ * should not let the underlying page compete with their content. */
+.detail-drawer {
+  background: color-mix(in srgb, var(--system-background) 96%, var(--surface-muted)) !important;
+}
+
 /* A firmer scroll edge protects the contact header without creating an opaque
  * toolbar. The header itself participates in the blur so scrolled text cannot
  * ghost through the controls. */
@@ -141,6 +147,10 @@ header.topbar .topbar-right {
     height: 104px;
   }
 
+  .detail-drawer {
+    background: var(--system-background) !important;
+  }
+
   /* Large-title pages should not squeeze a two-line action label beside the
    * title. Keep its accessible text, but present the familiar + affordance. */
   .conversations-page .page-heading .text-action {
@@ -162,5 +172,10 @@ header.topbar .topbar-right {
     width: 18px;
     height: 18px;
     margin: 0;
+  }
+
+  .schedule-page .page-heading .primary {
+    white-space: nowrap;
+    padding-inline: 14px !important;
   }
 }
