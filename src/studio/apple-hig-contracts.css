@@ -23,6 +23,16 @@
   box-sizing: border-box;
 }
 
+/* A split-view pane owns its paint. Swipe actions, hover translations and
+ * scroll-edge material must never make the browser document horizontally
+ * scrollable. Vertical scrolling remains with the pane's existing scrollers. */
+.workspace,
+.sidebar,
+.conversation-context,
+.browser-pane {
+  overflow-x: clip;
+}
+
 /* A floating toolbar needs a legibility edge, not an opaque hard bar. */
 .workspace > .topbar {
   isolation: isolate;
