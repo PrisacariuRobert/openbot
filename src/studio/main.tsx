@@ -16,6 +16,7 @@ import "./apple-contract-fixes.css";
 import "./apple-review-fixes.css";
 import "./apple-experience.css";
 import "./apple-hig-contracts.css";
+import "./apple-window-contract.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
