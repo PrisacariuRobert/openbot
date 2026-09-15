@@ -19,6 +19,7 @@ import "./apple-hig-contracts.css";
 import "./apple-window-contract.css";
 import "./apple-final-refinement.css";
 import "./apple-control-system.css";
+import "./apple-content-cleanup.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());
