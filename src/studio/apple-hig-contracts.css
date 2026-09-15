@@ -27,18 +27,78 @@
   position: absolute;
   z-index: -1;
   inset: -12px -8px auto;
-  height: 105px;
+  height: 88px;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--canvas) 88%, transparent) 0%,
-    color-mix(in srgb, var(--canvas) 68%, transparent) 58%,
+    color-mix(in srgb, var(--canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 72%, transparent) 56%,
     transparent 100%
   );
-  backdrop-filter: blur(14px) saturate(135%);
-  -webkit-backdrop-filter: blur(14px) saturate(135%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 66%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0 66%, transparent 100%);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 64%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 64%, transparent 100%);
+}
+
+/* The teammate identity is a compact contact control. Character is present,
+ * but never tall enough to compete with or overlap the conversation. */
+header.topbar .topbar-center {
+  flex-direction: row !important;
+  gap: 7px !important;
+  min-height: 40px;
+}
+
+.identity-mascot,
+.identity-stack {
+  width: auto !important;
+  min-width: 36px;
+  height: 36px;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transform: none !important;
+  filter: none !important;
+}
+
+.identity-mascot .character,
+.identity-stack .character {
+  width: 36px !important;
+  height: 36px !important;
+  filter: drop-shadow(0 2px 4px rgba(18, 18, 28, .08));
+}
+
+.identity-stack .character + .character {
+  margin-left: -10px !important;
+}
+
+.identity-stack .character {
+  box-shadow: 0 0 0 2px var(--canvas) !important;
+}
+
+.identity-pill {
+  min-height: 34px !important;
+  padding: 5px 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  font-size: 14px !important;
+  font-weight: 630 !important;
+}
+
+.identity-pill:hover {
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent) !important;
+}
+
+.workspace-chat > .chat-scroll {
+  padding-top: 82px !important;
+}
+
+.workspace-chat > .error-banner {
+  margin-top: 70px !important;
 }
 
 /* The context rail is a persistent inspector, not a modal card stack. */
@@ -83,12 +143,40 @@ button:active:not(:disabled),
     padding: 2px !important;
   }
 
+  header.topbar .topbar-center {
+    gap: 5px !important;
+  }
+
+  .identity-mascot,
+  .identity-stack {
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .identity-mascot .character,
+  .identity-stack .character {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .identity-pill {
+    min-height: 38px !important;
+    max-width: min(46vw, 210px);
+    padding-inline: 8px !important;
+  }
+
+  .identity-pill .conversation-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .workspace-chat > .chat-scroll {
-    padding-top: 112px !important;
+    padding-top: 80px !important;
   }
 
   .workspace > .topbar::before {
-    height: 122px;
+    height: 96px;
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
@@ -105,8 +193,7 @@ button:active:not(:disabled),
   .conversation-context,
   .composer-chat,
   .topbar-right,
-  .topbar-left .topbar-control,
-  .identity-pill {
+  .topbar-left .topbar-control {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
@@ -115,8 +202,7 @@ button:active:not(:disabled),
   .conversation-context,
   .composer-chat,
   .topbar-right,
-  .topbar-left .topbar-control,
-  .identity-pill {
+  .topbar-left .topbar-control {
     background: var(--system-background) !important;
   }
 }
