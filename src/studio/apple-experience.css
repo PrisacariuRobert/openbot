@@ -1,0 +1,1068 @@
+/*
+ * Apple-quality interaction refinement.
+ *
+ * This layer is intentionally about hierarchy and behavior perception, not
+ * decoration. It follows the current Apple design direction: content first,
+ * navigation and controls floating above it, restrained materials, grouped
+ * toolbar actions, familiar control sizing, and continuity between the thing
+ * you act on and the surface that appears.
+ */
+
+:root,
+:root[data-appearance="light"] {
+  --obx-glass: rgba(255, 255, 255, .72);
+  --obx-glass-strong: rgba(255, 255, 255, .9);
+  --obx-sidebar: rgba(246, 246, 248, .76);
+  --obx-raised: rgba(255, 255, 255, .94);
+  --obx-border: rgba(60, 60, 67, .12);
+  --obx-border-strong: rgba(60, 60, 67, .2);
+  --obx-shadow-small: 0 1px 2px rgba(0, 0, 0, .025), 0 7px 22px rgba(18, 18, 28, .045);
+  --obx-shadow-float: 0 18px 46px rgba(18, 18, 28, .11), 0 1px 0 rgba(255, 255, 255, .7) inset;
+  --obx-toolbar-shadow: 0 8px 28px rgba(18, 18, 28, .08), 0 1px 0 rgba(255, 255, 255, .72) inset;
+  --obx-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+:root[data-appearance="dark"] {
+  --obx-glass: rgba(28, 28, 30, .72);
+  --obx-glass-strong: rgba(36, 36, 38, .9);
+  --obx-sidebar: rgba(22, 22, 23, .8);
+  --obx-raised: rgba(30, 30, 32, .94);
+  --obx-border: rgba(255, 255, 255, .09);
+  --obx-border-strong: rgba(255, 255, 255, .17);
+  --obx-shadow-small: 0 1px 2px rgba(0, 0, 0, .25), 0 10px 28px rgba(0, 0, 0, .18);
+  --obx-shadow-float: 0 20px 55px rgba(0, 0, 0, .4);
+  --obx-toolbar-shadow: 0 10px 32px rgba(0, 0, 0, .3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --obx-glass: rgba(28, 28, 30, .72);
+    --obx-glass-strong: rgba(36, 36, 38, .9);
+    --obx-sidebar: rgba(22, 22, 23, .8);
+    --obx-raised: rgba(30, 30, 32, .94);
+    --obx-border: rgba(255, 255, 255, .09);
+    --obx-border-strong: rgba(255, 255, 255, .17);
+    --obx-shadow-small: 0 1px 2px rgba(0, 0, 0, .25), 0 10px 28px rgba(0, 0, 0, .18);
+    --obx-shadow-float: 0 20px 55px rgba(0, 0, 0, .4);
+    --obx-toolbar-shadow: 0 10px 32px rgba(0, 0, 0, .3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Window anatomy: content is the canvas, chrome floats above it.
+   -------------------------------------------------------------------------- */
+
+.studio-shell {
+  grid-template-columns: 294px minmax(0, 1fr) !important;
+  gap: 0 !important;
+  background: var(--canvas) !important;
+}
+
+.studio-shell.with-context {
+  grid-template-columns: 286px minmax(0, 1fr) 344px !important;
+}
+
+.studio-shell.with-sign-in {
+  grid-template-columns: 286px minmax(0, 1fr) minmax(390px, 42%) !important;
+}
+
+.sidebar {
+  margin: 10px 8px 10px 10px !important;
+  height: calc(100dvh - 20px) !important;
+  padding: 15px 10px 11px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 22px !important;
+  background: var(--obx-sidebar) !important;
+  box-shadow: var(--obx-shadow-small) !important;
+  overflow: hidden;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+.wordmark {
+  min-height: 42px !important;
+  padding: 2px 10px 4px !important;
+  font-size: 20px !important;
+  font-weight: 720 !important;
+  letter-spacing: -.038em !important;
+}
+
+.wordmark-symbol {
+  width: 20px !important;
+  height: 24px !important;
+  border-radius: 7px !important;
+  transform: rotate(-5deg) !important;
+}
+
+.conversation-search {
+  min-height: 38px !important;
+  margin: 8px 5px 14px !important;
+  padding: 7px 11px !important;
+  border-color: var(--obx-border) !important;
+  border-radius: 11px !important;
+  background: color-mix(in srgb, var(--obx-glass-strong) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.conversation-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--obx-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent) !important;
+}
+
+.sidebar-conversations > header {
+  min-height: 48px !important;
+  padding: 2px 8px 6px !important;
+}
+
+.sidebar-conversations header > span:first-child {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+}
+
+.compose-primary {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 6px 15px rgba(20, 20, 28, .11) !important;
+}
+
+.compose-primary:hover {
+  transform: translateY(-1px) !important;
+}
+
+.pinned-zone {
+  padding: 3px 8px 12px !important;
+}
+
+.pinned-label {
+  padding: 0 3px 7px !important;
+  font-size: 10px !important;
+  font-weight: 630 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase;
+}
+
+.pinned-avatars {
+  gap: 10px !important;
+}
+
+.pinned-avatar {
+  width: 58px !important;
+}
+
+.pinned-open .character {
+  filter: drop-shadow(0 3px 7px rgba(18, 18, 28, .08)) !important;
+}
+
+.pinned-name {
+  margin-top: 4px !important;
+  font-size: 11px !important;
+}
+
+.active-now {
+  margin: 0 3px 6px !important;
+  padding: 2px 2px 6px !important;
+}
+
+.active-now-chip {
+  min-height: 28px !important;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.conversation-row {
+  min-height: 64px !important;
+  padding: 8px 9px !important;
+  border-radius: 11px !important;
+  box-shadow: none !important;
+}
+
+.conversation-row.current {
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.conversation-row:hover:not(.current) {
+  background: color-mix(in srgb, var(--surface-muted) 38%, transparent) !important;
+}
+
+.sidebar-conversations .conversation-cell + .conversation-cell::before {
+  margin-left: 64px !important;
+  border-top-color: color-mix(in srgb, var(--line) 55%, transparent) !important;
+}
+
+.conversation-heading strong {
+  font-size: 13.5px !important;
+  font-weight: 620 !important;
+}
+
+.conversation-copy > small,
+.conversation-heading time {
+  font-size: 11px !important;
+}
+
+.project-rooms {
+  margin: 7px 2px 0 !important;
+}
+
+.project-rooms > summary {
+  min-height: 36px !important;
+  padding: 0 7px !important;
+  color: var(--label-tertiary) !important;
+  font-size: 11.5px !important;
+}
+
+.project-rooms .text-action,
+.sidebar .text-action {
+  min-height: 34px;
+  border-radius: 9px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 9px 5px 0 !important;
+  border-top-color: color-mix(in srgb, var(--obx-border) 70%, transparent) !important;
+}
+
+.sidebar-bottom .workspace-link {
+  min-height: 42px !important;
+  padding: 0 8px !important;
+  border-radius: 10px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar: Apple groups related actions instead of floating many circles.
+   -------------------------------------------------------------------------- */
+
+.workspace-chat > .topbar,
+.workspace > .topbar {
+  padding: 13px 18px !important;
+}
+
+.topbar-left .topbar-control {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid var(--obx-border) !important;
+  background: var(--obx-glass) !important;
+  box-shadow: var(--obx-toolbar-shadow) !important;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.topbar-right {
+  gap: 1px !important;
+  padding: 3px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 999px !important;
+  background: var(--obx-glass) !important;
+  box-shadow: var(--obx-toolbar-shadow) !important;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+header.topbar .topbar-right .topbar-control,
+header.topbar .topbar-right .conversation-actions > button {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+header.topbar .topbar-right .topbar-control:hover,
+header.topbar .topbar-right .conversation-actions > button:hover {
+  transform: none !important;
+  background: color-mix(in srgb, var(--surface-muted) 68%, transparent) !important;
+}
+
+header.topbar .topbar-right .topbar-control:active,
+header.topbar .topbar-right .conversation-actions > button:active,
+.topbar-left .topbar-control:active {
+  transform: scale(.94) !important;
+}
+
+.identity-mascot {
+  margin-bottom: -10px !important;
+  transform: scale(.86);
+  transform-origin: center bottom;
+  filter: drop-shadow(0 5px 9px rgba(18, 18, 28, .075)) !important;
+}
+
+.identity-pill {
+  min-height: 34px !important;
+  padding: 6px 12px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 999px !important;
+  background: var(--obx-glass) !important;
+  box-shadow: 0 6px 18px rgba(18, 18, 28, .06) !important;
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  font-size: 14px !important;
+  font-weight: 630 !important;
+}
+
+.workspace-chat > .chat-scroll {
+  padding-top: 112px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Conversation: quieter bubbles, stronger reading rhythm.
+   -------------------------------------------------------------------------- */
+
+.chat-scroll {
+  padding-inline: clamp(18px, 3.5vw, 46px) !important;
+}
+
+.chat-messages {
+  max-width: 710px !important;
+}
+
+.chat-message {
+  margin-top: 19px !important;
+}
+
+.chat-message.continues {
+  margin-top: 4px !important;
+}
+
+.message-author {
+  margin-bottom: 5px !important;
+}
+
+.message-author strong {
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.message-author time {
+  font-size: 10.5px !important;
+}
+
+.from-team > .prose {
+  padding: 12px 15px !important;
+  border: 0 !important;
+  border-radius: 17px 17px 17px 5px !important;
+  background: color-mix(in srgb, var(--bubble-incoming) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.from-team.continues > .prose {
+  border-radius: 5px 17px 17px 5px !important;
+}
+
+.from-you {
+  padding: 12px 15px !important;
+  border-radius: 17px 17px 5px 17px !important;
+  box-shadow: 0 4px 12px rgba(15, 15, 22, .06) !important;
+}
+
+.prose {
+  font-size: 15px !important;
+  line-height: 1.52 !important;
+}
+
+.chat-event {
+  min-height: 31px !important;
+  margin-block: 11px !important;
+  padding: 5px 9px !important;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.chat-event.talk-pill:hover {
+  transform: none !important;
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent) !important;
+}
+
+.message-file,
+.delivery-card,
+.delivery-receipt,
+.work-receipt {
+  border-color: var(--obx-border) !important;
+  box-shadow: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Composer: one calm floating control, no competing boxes.
+   -------------------------------------------------------------------------- */
+
+.chat-compose {
+  padding: 8px 18px 16px !important;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--canvas) 90%, transparent) 35%, var(--canvas) 100%) !important;
+}
+
+.composer-chat {
+  max-width: 720px !important;
+  padding: 8px 9px 8px 11px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 18px !important;
+  background: var(--obx-glass-strong) !important;
+  box-shadow: var(--obx-shadow-float) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+.composer-chat:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--obx-border)) !important;
+  box-shadow: var(--obx-shadow-float), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent) !important;
+}
+
+.composer-chat textarea {
+  min-height: 38px !important;
+  padding: 6px 7px 5px !important;
+  font-size: 14.5px !important;
+}
+
+.composer-bar {
+  gap: 5px !important;
+}
+
+.composer-bar .add-file,
+.composer-mode,
+.choice-menu-trigger {
+  min-height: 34px !important;
+}
+
+.composer-bar .add-file {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.composer-mode {
+  padding-inline: 8px !important;
+  border-radius: 9px !important;
+  font-size: 11.5px !important;
+}
+
+.composer .send {
+  width: 35px !important;
+  height: 35px !important;
+}
+
+.chat-compose > p,
+.composer-hint {
+  font-size: 10px !important;
+  color: var(--label-tertiary) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Inspector: information hierarchy, not a stack of cards.
+   -------------------------------------------------------------------------- */
+
+.conversation-context {
+  background: var(--obx-sidebar) !important;
+  border-left: 1px solid var(--obx-border) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+.conversation-context-content {
+  padding: 12px 14px 30px !important;
+}
+
+.context-person {
+  gap: 11px !important;
+  padding: 10px 2px 18px !important;
+  border-bottom: 1px solid var(--obx-border);
+}
+
+.context-person strong {
+  font-size: 15px !important;
+}
+
+.context-person p,
+.context-person small {
+  font-size: 11px !important;
+}
+
+.conversation-context-content > section,
+.context-now,
+.safety-card {
+  margin: 0 !important;
+  padding: 16px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--obx-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.conversation-context-content > section:last-child,
+.safety-card:last-child {
+  border-bottom: 0 !important;
+}
+
+.conversation-context .section-heading {
+  min-height: 29px !important;
+  padding: 0 1px 7px !important;
+  border: 0 !important;
+}
+
+.conversation-context .section-heading h3 {
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+}
+
+.context-work {
+  min-height: 51px !important;
+  margin: 1px 0 !important;
+  padding: 9px 7px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.context-work:hover {
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent) !important;
+}
+
+.context-capabilities {
+  margin: 0 !important;
+  padding: 7px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--obx-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.context-capabilities > summary {
+  min-height: 48px !important;
+  padding: 6px 7px !important;
+  border-radius: 10px;
+}
+
+.context-capabilities > summary:hover {
+  background: color-mix(in srgb, var(--surface-muted) 48%, transparent);
+}
+
+.context-capabilities-body {
+  padding: 4px 0 8px !important;
+}
+
+.context-capabilities-body .live-computer,
+.context-capabilities-body .browser-access-card {
+  margin-top: 7px !important;
+  border-color: var(--obx-border) !important;
+  border-radius: 12px !important;
+  background: color-mix(in srgb, var(--obx-raised) 80%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.safety-card p {
+  margin: 2px 1px 11px !important;
+  font-size: 10.5px !important;
+  line-height: 1.48 !important;
+}
+
+.safety-toggle {
+  min-height: 34px !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+}
+
+/* --------------------------------------------------------------------------
+   Create teammate: identity first, configuration second.
+   -------------------------------------------------------------------------- */
+
+.create-teammate {
+  gap: 14px !important;
+}
+
+.create-teammate .new-character {
+  grid-template-columns: 96px minmax(0, 1fr) !important;
+  min-height: 112px !important;
+  margin: -2px 0 4px !important;
+  padding: 9px 4px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.create-teammate .new-character::after {
+  display: none !important;
+}
+
+.create-teammate .new-character .character {
+  filter: drop-shadow(0 7px 12px rgba(18, 18, 28, .09)) !important;
+}
+
+.create-teammate .new-character p {
+  font-size: 13px !important;
+  line-height: 1.42 !important;
+}
+
+.create-teammate .new-character strong {
+  margin-top: 5px !important;
+  font-size: 18px !important;
+  line-height: 1.18;
+}
+
+.create-teammate > label,
+.create-teammate .creation-field {
+  gap: 6px !important;
+  font-size: 12px !important;
+}
+
+.create-teammate :is(input, textarea, select) {
+  min-height: 42px !important;
+  padding: 9px 11px !important;
+  border-radius: 10px !important;
+  border-color: var(--obx-border) !important;
+  background: color-mix(in srgb, var(--obx-raised) 94%, transparent) !important;
+  font-size: 13.5px !important;
+  box-shadow: none !important;
+}
+
+.create-teammate :is(input, textarea, select):focus {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--obx-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+
+.creation-summary {
+  min-height: 53px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 11px !important;
+  background: color-mix(in srgb, var(--surface-muted) 34%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.creation-summary small {
+  font-size: 9.5px !important;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.creation-summary strong {
+  font-size: 11.5px !important;
+}
+
+.creation-summary button {
+  min-height: 32px !important;
+  padding-inline: 9px !important;
+  border-radius: 9px !important;
+}
+
+.teammate-section {
+  padding-top: 14px !important;
+  border-top-color: var(--obx-border) !important;
+}
+
+.appearance-picker fieldset {
+  margin: 12px 0 !important;
+}
+
+.appearance-picker legend {
+  margin-bottom: 8px !important;
+  font-size: 11px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.shape-options {
+  gap: 6px !important;
+}
+
+.shape-options button {
+  min-height: 68px !important;
+  padding: 7px 3px !important;
+  border: 1px solid transparent !important;
+  border-radius: 13px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.shape-options button:hover {
+  transform: none !important;
+  background: color-mix(in srgb, var(--surface-muted) 46%, transparent) !important;
+}
+
+.shape-options button[aria-pressed="true"] {
+  border-color: var(--obx-border-strong) !important;
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--label-primary) 26%, transparent) inset !important;
+}
+
+.color-options {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.color-options button {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 4px !important;
+  border: 1px solid transparent !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+}
+
+.color-options button:hover {
+  transform: scale(1.06) !important;
+}
+
+.color-options button[aria-pressed="true"] {
+  border-color: var(--label-primary) !important;
+  box-shadow: 0 0 0 2px var(--system-background) inset !important;
+}
+
+.color-swatch {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .08) inset;
+}
+
+.create-secondary-path {
+  margin-top: 3px !important;
+  padding: 10px 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--label-secondary) !important;
+  font-size: 11px !important;
+}
+
+.create-secondary-path strong {
+  color: var(--link) !important;
+  font-weight: 600 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Top-level pages: less dashboard, more focused content.
+   -------------------------------------------------------------------------- */
+
+.page-content {
+  width: min(940px, 100%) !important;
+  padding: 58px 46px 80px !important;
+}
+
+.page-heading {
+  margin: 0 0 29px !important;
+}
+
+.page-heading h1,
+.chat-empty h1 {
+  font-size: 32px !important;
+  font-weight: 680 !important;
+  letter-spacing: -.045em !important;
+}
+
+.page-heading .overline,
+.overline {
+  margin-bottom: 7px !important;
+  font-size: 9.5px !important;
+  letter-spacing: .08em !important;
+}
+
+.count-label {
+  padding: 4px 8px !important;
+  border-color: var(--obx-border) !important;
+  background: transparent !important;
+}
+
+.activity-page > section + section {
+  margin-top: 27px !important;
+}
+
+.activity-page .section-heading,
+.attention-section > h2 {
+  min-height: 34px !important;
+  padding: 0 3px 8px !important;
+  border-bottom-color: var(--obx-border) !important;
+}
+
+.attention-section {
+  padding: 12px 12px 2px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--obx-raised) 78%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.work-row {
+  min-height: 66px !important;
+  padding: 10px 6px !important;
+  border-bottom-color: color-mix(in srgb, var(--obx-border) 72%, transparent) !important;
+  border-radius: 9px !important;
+}
+
+.work-row:hover {
+  transform: none !important;
+  background: color-mix(in srgb, var(--surface-muted) 36%, transparent) !important;
+}
+
+.work-document {
+  width: 39px !important;
+  height: 39px !important;
+}
+
+.work-document > svg:not(.character) {
+  padding: 8px !important;
+  border-color: var(--obx-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.schedule-layout {
+  gap: 15px !important;
+}
+
+.month-view,
+.day-agenda {
+  border-color: var(--obx-border) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+
+.month-view {
+  background: color-mix(in srgb, var(--obx-raised) 72%, transparent) !important;
+}
+
+.day-agenda {
+  background: color-mix(in srgb, var(--obx-raised) 82%, transparent) !important;
+}
+
+.month-days > button {
+  height: 43px !important;
+}
+
+.month-days > button span {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.month-days button.chosen span {
+  box-shadow: none !important;
+}
+
+.app-list,
+.skill-list {
+  border-color: var(--obx-border) !important;
+  border-radius: 15px !important;
+  box-shadow: none !important;
+}
+
+.app-row,
+.skill-row {
+  min-height: 70px !important;
+  padding: 11px 12px !important;
+}
+
+.app-mark,
+.skill-number {
+  width: 38px !important;
+  height: 38px !important;
+  border-color: var(--obx-border) !important;
+  border-radius: 10px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Settings: familiar Mac preference rhythm and readable controls.
+   -------------------------------------------------------------------------- */
+
+.settings-page-layout {
+  background: var(--canvas) !important;
+}
+
+.settings-page-sidebar {
+  background: var(--obx-sidebar) !important;
+  border-right-color: var(--obx-border) !important;
+  backdrop-filter: blur(26px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(170%) !important;
+}
+
+.settings-nav-button {
+  min-height: 38px !important;
+  border-radius: 9px !important;
+}
+
+.settings-nav-button.active {
+  background: color-mix(in srgb, var(--system-background) 86%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.settings-page-header {
+  padding: 27px 32px 17px !important;
+  background: color-mix(in srgb, var(--canvas) 92%, transparent) !important;
+  border-bottom-color: var(--obx-border) !important;
+}
+
+.settings-page-title {
+  font-size: 21px !important;
+}
+
+.settings-page-body {
+  width: min(760px, 100%);
+  padding: 22px 32px 70px !important;
+}
+
+.settings-group {
+  margin-block: 21px !important;
+}
+
+.settings-card {
+  border-color: var(--obx-border) !important;
+  border-radius: 13px !important;
+  background: color-mix(in srgb, var(--obx-raised) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.settings-row {
+  min-height: 56px !important;
+  padding: 10px 13px !important;
+  border-top-color: color-mix(in srgb, var(--obx-border) 72%, transparent) !important;
+}
+
+.settings-row-text strong {
+  font-size: 12.5px !important;
+}
+
+.settings-row-text small {
+  font-size: 10px !important;
+}
+
+/* Menus and sheets need a stronger spatial relationship than page cards. */
+.conversation-actions-popover,
+.choice-menu-popover {
+  border-color: var(--obx-border) !important;
+  border-radius: 14px !important;
+  background: var(--obx-glass-strong) !important;
+  box-shadow: var(--obx-shadow-float) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+.detail-drawer {
+  border-color: var(--obx-border) !important;
+  background: var(--obx-raised) !important;
+  box-shadow: 0 26px 80px rgba(18, 18, 28, .18) !important;
+}
+
+.detail-drawer::backdrop {
+  background: rgba(20, 20, 24, .16) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Control states: nothing should look clickable without acting clickable.
+   -------------------------------------------------------------------------- */
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: default !important;
+  opacity: .42 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[role="option"]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 24%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 760px) {
+  .studio-shell,
+  .studio-shell.with-context,
+  .studio-shell.with-sign-in {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar {
+    margin: 0 !important;
+    height: 100dvh !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 105px !important;
+  }
+
+  .topbar-right {
+    padding: 2px !important;
+  }
+
+  header.topbar .topbar-right .topbar-control,
+  header.topbar .topbar-right .conversation-actions > button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
+
+  .identity-mascot {
+    transform: scale(.8);
+  }
+
+  .chat-scroll {
+    padding-inline: 12px !important;
+  }
+
+  .chat-compose {
+    padding: 7px 9px calc(11px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .composer-chat {
+    border-radius: 17px !important;
+  }
+
+  .page-content {
+    padding: 28px 16px calc(78px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .create-teammate .new-character {
+    grid-template-columns: 82px minmax(0, 1fr) !important;
+  }
+
+  .shape-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .settings-page-body,
+  .settings-page-header {
+    padding-inline: 18px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .identity-mascot,
+  .pinned-open .character,
+  .new-character .character {
+    animation: none !important;
+    transition: none !important;
+  }
+}
