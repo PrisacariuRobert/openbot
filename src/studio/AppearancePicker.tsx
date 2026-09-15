@@ -20,6 +20,7 @@ export function AppearancePicker({
   const presetValues = new Set(mascotColors.map(([, value]) => value.toLowerCase()));
   const isCustom = !presetValues.has(color.toLowerCase());
   const customValue = /^#[0-9a-f]{6}$/i.test(color) ? color : "#6757d9";
+
   return (
     <div className="appearance-picker">
       <fieldset>
@@ -44,6 +45,7 @@ export function AppearancePicker({
           ))}
         </div>
       </fieldset>
+
       <fieldset>
         <legend>Color</legend>
         <div className="color-options">
@@ -53,13 +55,13 @@ export function AppearancePicker({
               key={value}
               aria-label={`${label} character`}
               aria-pressed={color.toLowerCase() === value}
+              title={label}
               onClick={() => onColor(value)}
             >
-              <Character
-                name={`${label} preview`}
-                color={value}
-                variant={shape}
-                size={36}
+              <span
+                className="color-swatch"
+                style={{ background: value }}
+                aria-hidden="true"
               />
             </button>
           ))}
@@ -72,11 +74,10 @@ export function AppearancePicker({
             onClick={() => customInput.current?.click()}
           >
             {isCustom ? (
-              <Character
-                name="Custom color preview"
-                color={customValue}
-                variant={shape}
-                size={36}
+              <span
+                className="color-swatch"
+                style={{ background: customValue }}
+                aria-hidden="true"
               />
             ) : (
               <span className="rainbow-ring" aria-hidden="true" />
