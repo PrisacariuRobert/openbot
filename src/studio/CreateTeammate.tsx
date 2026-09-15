@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowRight, LoaderCircle, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, LoaderCircle, Plus } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
 import { isFreeTierModel } from "../shared/provider-config";
 import { Character } from "./Character";
@@ -40,6 +40,7 @@ export function CreateTeammate({
     [mascot, setMascot] = useState<MascotKind>("nova");
   const [providerId, setProviderId] = useState(""),
     [model, setModel] = useState("");
+  const [showAiChoices, setShowAiChoices] = useState(false);
   const [reload, setReload] = useState(0);
   const [providers, setProviders] = useState<ProviderStatus | null>(null),
     [error, setError] = useState(""),
@@ -53,11 +54,13 @@ export function CreateTeammate({
     [teamBusy, setTeamBusy] = useState<string | null>(null),
     [teamNote, setTeamNote] = useState(""),
     [teamError, setTeamError] = useState("");
+
   useEffect(() => {
     void fetch("/api/team-templates").then(async (response) => {
       if (response.ok) setTeamTemplates(await response.json() as TeamTemplate[]);
     }).catch(() => { /* The starter-team option simply stays hidden. */ });
   }, []);
+
   async function installTeam(template: TeamTemplate) {
     setTeamBusy(template.id);
     setTeamNote("");
@@ -74,12 +77,14 @@ export function CreateTeammate({
       setTeamBusy(null);
     }
   }
+
   const submitting = useRef(false);
   useEffect(() => {
     const returned = () => setReload((value) => value + 1);
     window.addEventListener("focus", returned);
     return () => window.removeEventListener("focus", returned);
   }, []);
+
   useEffect(() => {
     const abort = new AbortController();
     void fetch("/api/provider", { signal: abort.signal })
@@ -96,8 +101,9 @@ export function CreateTeammate({
       });
     return () => abort.abort();
   }, [reload]);
+
   // Skip taps when there is nothing to choose: a sole connection (and a
-  // sole model) preselects itself. The user can still change it.
+  // sole model) preselects itself. The user can still reveal and change it.
   useEffect(() => {
     if (!providers || providerId) return;
     const connected = (providers.instances || []).filter((item) => item.connected);
@@ -108,10 +114,13 @@ export function CreateTeammate({
     if (!model && onlyModels.length === 1) setModel(onlyModels[0]!);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providers]);
-  const connection = providers?.instances.find(
-    (item) => item.id === providerId,
-  );
+
+  const connectedProviders = (providers?.instances || []).filter((item) => item.connected);
+  const connection = providers?.instances.find((item) => item.id === providerId);
   const validSelection = Boolean(connection?.connected && connection.models?.includes(model));
+  const simpleAiChoice = Boolean(validSelection && connectedProviders.length === 1 && connection?.models?.length === 1);
+  const showAiConfiguration = showAiChoices || !simpleAiChoice;
+
   async function create(event: FormEvent) {
     event.preventDefault();
     if (submitting.current || !validSelection) return;
@@ -143,6 +152,7 @@ export function CreateTeammate({
       setBusy(false);
     }
   }
+
   async function previewImport() {
     setImportBusy(true);
     setImportNote("");
@@ -163,6 +173,7 @@ export function CreateTeammate({
       setImportBusy(false);
     }
   }
+
   async function applyImport() {
     if (submitting.current || !importPlan) return;
     submitting.current = true;
@@ -186,6 +197,7 @@ export function CreateTeammate({
       setImportBusy(false);
     }
   }
+
   return (
     <form className="create-teammate" onSubmit={(event) => void create(event)}>
       <div className="new-character">
@@ -197,167 +209,175 @@ export function CreateTeammate({
           size={104}
         />
         <p>
-          A little personality.
+          Someone you can simply talk to.
           <br />
-          <strong>A job that matters to you.</strong>
+          <strong>Give them one job to own.</strong>
         </p>
       </div>
-      <div className="sheet-mode" role="tablist" aria-label="How to add a teammate">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sheetMode === "create"}
-          className={sheetMode === "create" ? "current" : ""}
-          onClick={() => setSheetMode("create")}
-        >
-          Create new
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sheetMode === "import"}
-          className={sheetMode === "import" ? "current" : ""}
-          onClick={() => setSheetMode("import")}
-        >
-          Import from Hermes or OpenClaw
-        </button>
-      </div>
+
       {sheetMode === "create" && (
         <>
-      <label>
-        Name
-        <input
-          required
-          maxLength={30}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="What would you like to call them?"
-          autoComplete="off"
-        />
-      </label>
-      <label>
-        Their job
-        <input
-          required
-          maxLength={60}
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          placeholder="For example, help plan my week"
-        />
-        <small>Their job is used as instructions unless you add more.</small>
-      </label>
-      <div className="creation-field">
-        <span>AI connection</span>
-        <ChoiceMenu
-          label="AI connection"
-          value={providerId}
-          placeholder={
-            providers ? "Choose your AI service" : "Loading your connections…"
-          }
-          disabled={!providers}
-          choices={(providers?.instances || [])
-            .filter((item) => item.connected)
-            .map((item) => ({ value: item.id, label: item.name }))}
-          onChange={(value) => {
-            setProviderId(value);
-            setModel("");
-          }}
-        />
-      </div>
-      {connection && (
-        <div className="creation-field">
-          <span>Model</span>
-          <ChoiceMenu
-            label="Model"
-            value={model}
-            placeholder="Choose a model"
-            choices={(connection.models || []).map((item) => ({
-              value: item,
-              label: item,
-              detail: isFreeTierModel(item) ? "Free tier" : undefined,
-            }))}
-            onChange={setModel}
-          />
-        </div>
-      )}
-      {connection && isFreeTierModel(model) && (
-        <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
-      )}
-      {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
-      <div className="teammate-section teammate-appearance">
-        <span className="section-label">Appearance</span>
-        <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
-      </div>
-      <Advanced title="Advanced" summary="Instructions, connections & ready-made teams">
-      <div className="teammate-section">
-        <label>
-          Additional instructions
-          <textarea
-            rows={3}
-            maxLength={2000}
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Add what a good result looks like, and what they should ask you before doing."
-          />
-        </label>
-      </div>
-      <details className="connection-management" open={providers && !providers.instances.some((item) => item.connected) ? true : undefined}>
-      <summary>Manage AI connections</summary>
-      <a
-        className="text-action"
-        href="/?panel=provider"
-        target="_blank"
-        rel="noreferrer"
-      >
-        <Plus size={14} /> {providers?.instances.some((item) => item.connected) ? "Connect another AI service" : "Set up an AI connection"}
-      </a>
-      <p className="boundary-note">Setup opens separately so you won’t lose this draft. Return here afterward; your connections refresh automatically.</p>
-      <button
-        className="text-action"
-        type="button"
-        onClick={() => {
-          setError("");
-          setReload((value) => value + 1);
-        }}
-      >
-        Refresh connections
-      </button>
-      </details>
-      <p className="boundary-note">
-        No task starts yet. Existing Google-account permissions aren’t shared
-        with this new teammate. Studio-wide Mac access, if enabled, still
-        applies. Browser and private-computer access start off.
-      </p>
-      <details className="character-customize profile-import">
-        <summary>Start with a ready-made team</summary>
-        <small className="panel-note">Three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
-        {teamTemplates && (
-          <div className="team-template-list">
-            {teamTemplates.map((template) => (
-              <div className="team-template-row" key={template.id}>
-                <span>
-                  <strong>{template.name}</strong>
-                  <small>{template.description}</small>
-                </span>
-                <button
-                  type="button"
-                  disabled={teamBusy !== null}
-                  onClick={() => void installTeam(template)}
-                >
-                  {teamBusy === template.id ? "Creating…" : `Add ${template.members.length} teammates`}
-                </button>
+          <label>
+            Name
+            <input
+              required
+              maxLength={30}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="What would you like to call them?"
+              autoComplete="off"
+            />
+          </label>
+
+          <label>
+            Their job
+            <input
+              required
+              maxLength={60}
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="For example, help plan my week"
+            />
+            <small>Keep it simple. You can explain the rest naturally when you talk to them.</small>
+          </label>
+
+          {simpleAiChoice && !showAiChoices && connection ? (
+            <div className="creation-summary" aria-label="AI connection summary">
+              <span>
+                <small>AI</small>
+                <strong>{connection.name} · {model}</strong>
+              </span>
+              <button type="button" onClick={() => setShowAiChoices(true)}>Change AI</button>
+            </div>
+          ) : (
+            <div className="creation-ai-options">
+              <div className="creation-field">
+                <span>AI connection</span>
+                <ChoiceMenu
+                  label="AI connection"
+                  value={providerId}
+                  placeholder={providers ? "Choose your AI service" : "Loading your connections…"}
+                  disabled={!providers}
+                  choices={connectedProviders.map((item) => ({ value: item.id, label: item.name }))}
+                  onChange={(value) => {
+                    setProviderId(value);
+                    setModel("");
+                  }}
+                />
               </div>
-            ))}
+              {connection && (
+                <div className="creation-field">
+                  <span>Model</span>
+                  <ChoiceMenu
+                    label="Model"
+                    value={model}
+                    placeholder="Choose a model"
+                    choices={(connection.models || []).map((item) => ({
+                      value: item,
+                      label: item,
+                      detail: isFreeTierModel(item) ? "Free tier" : undefined,
+                    }))}
+                    onChange={setModel}
+                  />
+                </div>
+              )}
+              {simpleAiChoice && showAiChoices && (
+                <button className="text-action creation-ai-done" type="button" onClick={() => setShowAiChoices(false)}>Done choosing AI</button>
+              )}
+            </div>
+          )}
+
+          {connection && isFreeTierModel(model) && (
+            <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+          )}
+          {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
+
+          <div className="teammate-section teammate-appearance">
+            <span className="section-label">Appearance</span>
+            <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
           </div>
-        )}
-        {teamNote && <p role="status">{teamNote}</p>}
-        {teamError && <p role="alert" className="send-error">{teamError}</p>}
-      </details>
-      </Advanced>
+
+          <Advanced title="More options" summary="Instructions, connections & ready-made teams">
+            <div className="teammate-section">
+              <label>
+                Additional instructions
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="Add what a good result looks like, and what they should ask you before doing."
+                />
+              </label>
+            </div>
+
+            <details className="connection-management" open={providers && !providers.instances.some((item) => item.connected) ? true : undefined}>
+              <summary>Manage AI connections</summary>
+              <a
+                className="text-action"
+                href="/?panel=provider"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Plus size={14} /> {providers?.instances.some((item) => item.connected) ? "Connect another AI service" : "Set up an AI connection"}
+              </a>
+              <p className="boundary-note">Setup opens separately so you won’t lose this draft. Return here afterward; your connections refresh automatically.</p>
+              <button
+                className="text-action"
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setReload((value) => value + 1);
+                }}
+              >
+                Refresh connections
+              </button>
+            </details>
+
+            <p className="boundary-note">
+              No task starts yet. Existing Google-account permissions aren’t shared
+              with this new teammate. Studio-wide Mac access, if enabled, still
+              applies. Browser and private-computer access start off.
+            </p>
+
+            <details className="character-customize profile-import">
+              <summary>Start with a ready-made team</summary>
+              <small className="panel-note">Three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
+              {teamTemplates && (
+                <div className="team-template-list">
+                  {teamTemplates.map((template) => (
+                    <div className="team-template-row" key={template.id}>
+                      <span>
+                        <strong>{template.name}</strong>
+                        <small>{template.description}</small>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={teamBusy !== null}
+                        onClick={() => void installTeam(template)}
+                      >
+                        {teamBusy === template.id ? "Creating…" : `Add ${template.members.length} teammates`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {teamNote && <p role="status">{teamNote}</p>}
+              {teamError && <p role="alert" className="send-error">{teamError}</p>}
+            </details>
+          </Advanced>
+
+          <button className="create-secondary-path" type="button" onClick={() => setSheetMode("import")}>
+            Already use Hermes or OpenClaw? <strong>Import a teammate</strong>
+          </button>
         </>
       )}
+
       {sheetMode === "import" && (
         <div className="profile-import-panel">
+          <button className="text-action import-back" type="button" onClick={() => setSheetMode("create")}>
+            <ArrowLeft size={14} /> Create a new teammate instead
+          </button>
           <p className="panel-note">Bring a teammate you already raised in <strong>Hermes</strong> or <strong>OpenClaw</strong>: their persona, memories and text skills move; keys and chat history stay put. Point this at the profile folder.</p>
           <label>
             Profile folder
@@ -415,6 +435,7 @@ export function CreateTeammate({
           )}
         </div>
       )}
+
       {providers && providerId && !validSelection && model && (
         <p role="status">This connection or model is no longer available. Choose an available connection and model; your draft is still here.</p>
       )}
@@ -426,12 +447,7 @@ export function CreateTeammate({
       {sheetMode === "create" && (
         <button
           className="primary full-width"
-          disabled={
-            busy ||
-            !name.trim() ||
-            !role.trim() ||
-            !validSelection
-          }
+          disabled={busy || !name.trim() || !role.trim() || !validSelection}
         >
           {busy ? (
             <LoaderCircle size={17} className="spin" />
