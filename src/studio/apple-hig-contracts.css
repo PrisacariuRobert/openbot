@@ -109,6 +109,173 @@ header.topbar .topbar-center {
   -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
 
+/* Project rooms are about people. The chooser reads like a contact picker,
+ * not a matrix of settings toggles. */
+.group-editor {
+  gap: 16px !important;
+}
+
+.group-editor-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+
+.group-editor-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent);
+  color: var(--label-secondary);
+}
+
+.group-editor-heading .overline {
+  margin: 1px 0 4px !important;
+}
+
+.group-editor-heading .detail-title {
+  margin-bottom: 5px !important;
+}
+
+.group-editor-heading .drawer-intro {
+  margin: 0 !important;
+  max-width: 50ch;
+}
+
+.group-name {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--label-secondary) !important;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.group-name input {
+  min-height: 42px;
+  padding: 9px 11px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--obx-raised) 94%, transparent) !important;
+  font-size: 13.5px !important;
+}
+
+.group-name input:focus {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--obx-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+
+.group-members-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.group-members-heading small {
+  color: var(--label-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.group-members {
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--obx-border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--obx-raised) 88%, transparent);
+}
+
+.group-member {
+  min-height: 58px !important;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  gap: 10px !important;
+  align-items: center !important;
+  padding: 9px 11px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--label-primary) !important;
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--obx-border) 75%, transparent);
+}
+
+.group-member:last-child {
+  box-shadow: none;
+}
+
+.group-member:hover {
+  background: color-mix(in srgb, var(--surface-muted) 42%, transparent) !important;
+}
+
+.group-member.chosen {
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent) !important;
+}
+
+.group-member-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-member-copy strong,
+.group-member-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-copy strong {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.group-member-copy small {
+  width: auto !important;
+  font-size: 10px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.group-member-check {
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  border: 1px solid var(--obx-border-strong);
+  border-radius: 50%;
+  color: transparent;
+}
+
+.group-member.chosen .group-member-check {
+  border-color: var(--label-primary);
+  background: var(--label-primary);
+  color: var(--system-background);
+}
+
+.group-member:not(.chosen) .group-member-check svg,
+.group-member.chosen .group-member-check svg {
+  opacity: 1 !important;
+  color: inherit !important;
+}
+
+.group-editor > .primary.full-width {
+  min-height: 42px;
+  border-radius: 11px;
+}
+
 /* Do not let decorative motion interfere with direct manipulation. */
 button:active:not(:disabled),
 [role="button"]:active:not([aria-disabled="true"]) {
@@ -184,6 +351,10 @@ button:active:not(:disabled),
   .composer-mode,
   .choice-menu-trigger {
     padding-inline: 11px !important;
+  }
+
+  .group-member {
+    min-height: 64px !important;
   }
 }
 
