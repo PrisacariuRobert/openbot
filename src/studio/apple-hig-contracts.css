@@ -46,6 +46,13 @@ body,
   overflow-x: clip;
 }
 
+/* Chats has off-canvas swipe affordances and larger pinned hit targets. They
+ * belong to this page, not to the browser viewport. The page's own scrollWidth
+ * is still checked by acceptance, so a genuinely too-wide layout still fails. */
+.conversations-page {
+  overflow-x: clip;
+}
+
 /* A floating toolbar needs a legibility edge, not an opaque hard bar. */
 .workspace > .topbar {
   isolation: isolate;
