@@ -1,0 +1,33 @@
+/* OpenBot identity: the face stays the mark; motion is quiet and optional. */
+.wordmark-symbol::before,
+.wordmark-symbol::after {
+  transform-origin: center;
+}
+
+.wordmark-symbol span {
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), width 180ms ease;
+}
+
+.wordmark:hover .wordmark-symbol span {
+  transform: translateY(-.4px);
+  width: 6px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes openbot-mark-blink {
+    0%, 46%, 49%, 100% { transform: scaleY(1); }
+    47.5% { transform: scaleY(.08); }
+  }
+
+  .wordmark-symbol::before,
+  .wordmark-symbol::after {
+    animation: openbot-mark-blink 6.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-symbol::before,
+  .wordmark-symbol::after {
+    animation: none;
+  }
+}

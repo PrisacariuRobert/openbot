@@ -1,0 +1,182 @@
+/* Final content cleanup: human conversation first, system plumbing second. */
+
+/* Incoming teammate replies should read like content, not giant capsules. */
+.from-team > .prose,
+.from-team.continues > .prose {
+  max-width: min(680px, 100%) !important;
+  padding: 2px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--label-primary) !important;
+  text-align: left !important;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.from-team > .prose :is(p, ul, ol, blockquote) {
+  max-width: 66ch;
+}
+
+.from-team > .prose p {
+  margin: 0 0 10px;
+}
+
+.from-team > .prose p:last-child {
+  margin-bottom: 0;
+}
+
+.from-team > .prose blockquote {
+  margin: 10px 0;
+  padding: 1px 0 1px 12px;
+  border-left: 2px solid var(--afr-border-strong);
+  color: var(--label-secondary);
+}
+
+.from-team > .prose a {
+  color: var(--link);
+  text-underline-offset: 2px;
+}
+
+/* Routine execution is timeline metadata, not another chat bubble. */
+.chat-event[data-event="routine_run"] {
+  width: fit-content;
+  min-height: 26px !important;
+  margin: 9px auto !important;
+  padding: 3px 6px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: var(--label-tertiary) !important;
+  box-shadow: none !important;
+  font-size: 11.5px !important;
+}
+
+.chat-event[data-event="routine_run"] .chat-event-mark {
+  opacity: .72;
+}
+
+.chat-event[data-event="routine_run"] strong {
+  color: var(--label-secondary) !important;
+  font-weight: 590 !important;
+}
+
+.chat-event[data-event="routine_run"] small {
+  color: var(--label-tertiary) !important;
+}
+
+/* Successful health telemetry belongs to diagnostics, not the conversation. */
+.chat-event.is-centered[aria-label*="HEARTBEAT_OK"],
+.chat-event.is-centered[aria-label*="HEALTHCHECK_OK"] {
+  display: none !important;
+}
+
+/* Browser access is one compact disclosure row with protected edge padding. */
+.browser-access-card {
+  margin: 10px 0 16px !important;
+  padding: 0 !important;
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 12px !important;
+  background: color-mix(in srgb, var(--system-background) 92%, var(--surface-muted)) !important;
+  overflow: hidden;
+}
+
+.browser-access-card > summary {
+  min-height: 52px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 0 14px !important;
+  margin: 0 !important;
+  list-style: none !important;
+  color: var(--label-primary) !important;
+  font-size: 13px !important;
+  font-weight: 620 !important;
+  line-height: 1.25 !important;
+  border-radius: 0 !important;
+}
+
+.browser-access-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.browser-access-card > summary:hover {
+  background: var(--afr-fill) !important;
+}
+
+/* Replace the ambiguous + affordance with a disclosure chevron. */
+.browser-access-card > summary::after {
+  content: "" !important;
+  width: 7px !important;
+  height: 7px !important;
+  margin-left: auto !important;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px);
+  transform-origin: center;
+  color: var(--label-tertiary);
+  transition: transform 140ms ease;
+}
+
+.browser-access-card[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.browser-access-card[open] > summary {
+  border-bottom: 1px solid var(--afr-border);
+}
+
+.browser-access-card > :not(summary) {
+  margin-left: 14px !important;
+  margin-right: 14px !important;
+}
+
+.browser-access-card > p:first-of-type {
+  margin-top: 13px !important;
+}
+
+.browser-access-card > p:last-child {
+  margin-bottom: 14px !important;
+}
+
+.browser-access-card .browser-paths {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.browser-access-card .browser-paths > div {
+  min-height: 40px;
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--afr-border) 70%, transparent);
+}
+
+.browser-access-card .browser-paths > div:last-child {
+  border-bottom: 0;
+}
+
+.browser-access-card .text-action {
+  min-height: 34px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .browser-access-card > summary {
+    min-height: 56px !important;
+    padding-inline: 16px !important;
+  }
+
+  .browser-access-card > :not(summary) {
+    margin-left: 16px !important;
+    margin-right: 16px !important;
+  }
+
+  .from-team > .prose,
+  .from-team.continues > .prose {
+    max-width: 88vw !important;
+  }
+}

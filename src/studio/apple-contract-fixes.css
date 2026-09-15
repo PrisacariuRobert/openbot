@@ -1,0 +1,10 @@
+/* Keep visual polish inside OpenBot's tested semantic appearance contract. */
+:root[data-appearance="dark"] {
+  --ob-canvas: var(--grouped-background);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --ob-canvas: var(--grouped-background);
+  }
+}

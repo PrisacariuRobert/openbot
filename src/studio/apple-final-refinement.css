@@ -1,0 +1,870 @@
+/*
+ * Final interaction/visual refinement for the Studio.
+ *
+ * Intent: feel like a first-party Mac app without imitating Messages.
+ * Content stays primary; navigation and frequently used controls occupy a
+ * quieter top-level material layer. OpenBot's characters carry the color and
+ * personality. This file is loaded last on purpose.
+ */
+
+:root,
+:root[data-appearance="light"] {
+  --afr-sidebar: rgba(246, 246, 248, .78);
+  --afr-toolbar: rgba(255, 255, 255, .72);
+  --afr-toolbar-strong: rgba(255, 255, 255, .9);
+  --afr-surface: rgba(255, 255, 255, .88);
+  --afr-fill: rgba(118, 118, 128, .095);
+  --afr-fill-hover: rgba(118, 118, 128, .145);
+  --afr-selection: rgba(118, 118, 128, .13);
+  --afr-border: rgba(60, 60, 67, .12);
+  --afr-border-strong: rgba(60, 60, 67, .2);
+  --afr-shadow-toolbar: 0 8px 28px rgba(20, 20, 30, .075), 0 1px 0 rgba(255,255,255,.7) inset;
+  --afr-shadow-sheet: 0 24px 70px rgba(18, 18, 28, .16), 0 1px 0 rgba(255,255,255,.8) inset;
+  --afr-shadow-composer: 0 12px 36px rgba(18, 18, 28, .10), 0 1px 0 rgba(255,255,255,.75) inset;
+  --afr-ease: cubic-bezier(.2,.8,.2,1);
+}
+
+:root[data-appearance="dark"] {
+  --afr-sidebar: rgba(20, 20, 22, .80);
+  --afr-toolbar: rgba(38, 38, 40, .68);
+  --afr-toolbar-strong: rgba(42, 42, 44, .90);
+  --afr-surface: rgba(34, 34, 36, .88);
+  --afr-fill: rgba(255, 255, 255, .07);
+  --afr-fill-hover: rgba(255, 255, 255, .11);
+  --afr-selection: rgba(255, 255, 255, .10);
+  --afr-border: rgba(255, 255, 255, .085);
+  --afr-border-strong: rgba(255, 255, 255, .16);
+  --afr-shadow-toolbar: 0 10px 30px rgba(0,0,0,.30);
+  --afr-shadow-sheet: 0 28px 80px rgba(0,0,0,.48);
+  --afr-shadow-composer: 0 14px 40px rgba(0,0,0,.34);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --afr-sidebar: rgba(20, 20, 22, .80);
+    --afr-toolbar: rgba(38, 38, 40, .68);
+    --afr-toolbar-strong: rgba(42, 42, 44, .90);
+    --afr-surface: rgba(34, 34, 36, .88);
+    --afr-fill: rgba(255, 255, 255, .07);
+    --afr-fill-hover: rgba(255, 255, 255, .11);
+    --afr-selection: rgba(255, 255, 255, .10);
+    --afr-border: rgba(255, 255, 255, .085);
+    --afr-border-strong: rgba(255, 255, 255, .16);
+    --afr-shadow-toolbar: 0 10px 30px rgba(0,0,0,.30);
+    --afr-shadow-sheet: 0 28px 80px rgba(0,0,0,.48);
+    --afr-shadow-composer: 0 14px 40px rgba(0,0,0,.34);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mac window anatomy
+   -------------------------------------------------------------------------- */
+
+.studio-shell {
+  grid-template-columns: 286px minmax(0, 1fr) !important;
+  background: var(--canvas) !important;
+}
+
+.studio-shell.with-context {
+  grid-template-columns: 286px minmax(0, 1fr) 336px !important;
+}
+
+.studio-shell.with-sign-in {
+  grid-template-columns: 286px minmax(0, 1fr) minmax(380px, 42%) !important;
+}
+
+.sidebar {
+  margin: 0 !important;
+  height: 100dvh !important;
+  padding: 15px 12px 12px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--afr-border) !important;
+  border-radius: 0 !important;
+  background: var(--afr-sidebar) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(30px) saturate(175%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(175%) !important;
+}
+
+.wordmark {
+  min-height: 40px !important;
+  padding: 1px 9px 3px !important;
+  gap: 9px !important;
+  font-size: 19.5px !important;
+  font-weight: 720 !important;
+  letter-spacing: -.038em !important;
+}
+
+.wordmark-symbol {
+  width: 20px !important;
+  height: 23px !important;
+  transform: rotate(-4deg) !important;
+}
+
+.conversation-search {
+  min-height: 36px !important;
+  margin: 8px 4px 15px !important;
+  padding: 7px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  background: var(--afr-fill) !important;
+  box-shadow: none !important;
+}
+
+.conversation-search:hover {
+  background: var(--afr-fill-hover) !important;
+}
+
+.conversation-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--afr-border)) !important;
+  background: var(--system-background) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent) !important;
+}
+
+.sidebar-conversations > header {
+  min-height: 44px !important;
+  padding: 0 7px 6px !important;
+}
+
+.sidebar-conversations header > span:first-child {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  letter-spacing: -.012em !important;
+}
+
+.compose-primary {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 12px rgba(18,18,24,.10) !important;
+}
+
+.compose-primary:hover {
+  transform: scale(1.035) !important;
+}
+
+.compose-primary:active {
+  transform: scale(.94) !important;
+}
+
+.pinned-zone {
+  padding: 1px 6px 12px !important;
+}
+
+.pinned-avatars {
+  gap: 10px !important;
+}
+
+.pinned-avatar {
+  width: 56px !important;
+}
+
+.pinned-open .character {
+  filter: drop-shadow(0 3px 7px rgba(18,18,28,.075)) !important;
+}
+
+.pinned-name {
+  font-size: 10.5px !important;
+  font-weight: 570 !important;
+}
+
+.conversation-row {
+  min-height: 62px !important;
+  margin: 1px 0 !important;
+  padding: 8px 8px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.conversation-row.current {
+  background: var(--afr-selection) !important;
+}
+
+.conversation-row:hover:not(.current) {
+  background: var(--afr-fill) !important;
+}
+
+.sidebar-conversations .conversation-cell + .conversation-cell::before {
+  margin-left: 62px !important;
+  border-top-color: color-mix(in srgb, var(--line) 48%, transparent) !important;
+}
+
+.conversation-heading strong {
+  font-size: 13.5px !important;
+  font-weight: 620 !important;
+}
+
+.conversation-copy > small,
+.conversation-heading time,
+.conversation-row .live-pill {
+  font-size: 10.8px !important;
+}
+
+.project-rooms {
+  margin: 7px 0 0 !important;
+}
+
+.project-rooms > summary {
+  min-height: 34px !important;
+  padding-inline: 6px !important;
+}
+
+/* The secondary create action is a sidebar row, not another circular compose. */
+.project-rooms .compose-secondary,
+.sidebar .compose-secondary {
+  width: 100% !important;
+  min-height: 36px !important;
+  justify-content: flex-start !important;
+  gap: 7px !important;
+  padding: 7px 9px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: var(--label-secondary) !important;
+  box-shadow: none !important;
+  font-size: 11.5px !important;
+  font-weight: 520 !important;
+}
+
+.project-rooms .compose-secondary:hover,
+.sidebar .compose-secondary:hover {
+  background: var(--afr-fill) !important;
+  color: var(--label-primary) !important;
+}
+
+.sidebar-bottom {
+  padding: 10px 4px 0 !important;
+  border-top-color: color-mix(in srgb, var(--afr-border) 70%, transparent) !important;
+}
+
+.sidebar-bottom .workspace-link {
+  min-height: 40px !important;
+  padding: 0 8px !important;
+  border-radius: 9px !important;
+}
+
+.sidebar-bottom .workspace-link:hover {
+  background: var(--afr-fill) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Conversation toolbar
+   -------------------------------------------------------------------------- */
+
+.workspace > .topbar,
+.workspace-chat > .topbar {
+  min-height: 64px !important;
+  padding: 10px 16px !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.workspace > .topbar::before {
+  inset: -4px 0 auto !important;
+  height: 84px !important;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 94%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 74%, transparent) 60%,
+    transparent 100%
+  ) !important;
+  backdrop-filter: blur(16px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
+}
+
+header.topbar .topbar-center {
+  gap: 6px !important;
+}
+
+.identity-mascot,
+.identity-stack {
+  min-width: 32px !important;
+  height: 32px !important;
+}
+
+.identity-mascot .character,
+.identity-stack .character {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.identity-pill {
+  min-height: 32px !important;
+  padding: 4px 7px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+  font-weight: 640 !important;
+}
+
+.identity-pill:hover,
+.identity-pill[aria-expanded="true"] {
+  background: var(--afr-fill) !important;
+}
+
+.topbar-right {
+  gap: 0 !important;
+  padding: 3px !important;
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 999px !important;
+  background: var(--afr-toolbar) !important;
+  box-shadow: var(--afr-shadow-toolbar) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+header.topbar .topbar-right .topbar-control,
+header.topbar .topbar-right .conversation-actions > button {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+header.topbar .topbar-right .topbar-control:hover,
+header.topbar .topbar-right .conversation-actions > button:hover,
+header.topbar .topbar-right .topbar-control[aria-expanded="true"],
+header.topbar .topbar-right .conversation-actions > button[aria-expanded="true"] {
+  background: var(--afr-fill-hover) !important;
+}
+
+header.topbar .topbar-right button:active {
+  transform: scale(.92) !important;
+}
+
+.workspace-chat > .chat-scroll {
+  padding-top: 82px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Transcript: the work, not chrome, is the visual focus.
+   -------------------------------------------------------------------------- */
+
+.chat-scroll {
+  padding-inline: clamp(22px, 4.5vw, 62px) !important;
+}
+
+.chat-messages {
+  width: min(100%, 720px) !important;
+  max-width: 720px !important;
+}
+
+.chat-message {
+  margin-top: 18px !important;
+}
+
+.chat-message.continues {
+  margin-top: 4px !important;
+}
+
+.message-author {
+  margin-bottom: 5px !important;
+}
+
+.message-author strong {
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.message-author time {
+  font-size: 10.5px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.from-team > .prose {
+  max-width: 620px !important;
+  padding: 11px 14px !important;
+  border: 0 !important;
+  border-radius: 18px 18px 18px 6px !important;
+  background: color-mix(in srgb, var(--bubble-incoming) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.from-team.continues > .prose {
+  border-radius: 6px 18px 18px 6px !important;
+}
+
+.from-you {
+  max-width: min(76%, 520px) !important;
+  padding: 11px 15px !important;
+  border-radius: 18px 18px 6px 18px !important;
+  box-shadow: 0 4px 13px rgba(18,18,24,.065) !important;
+}
+
+.prose {
+  font-size: 15px !important;
+  line-height: 1.52 !important;
+  letter-spacing: -.005em !important;
+}
+
+.chat-event {
+  min-height: 29px !important;
+  margin-block: 10px !important;
+  padding: 4px 8px !important;
+  border: 0 !important;
+  background: var(--afr-fill) !important;
+  box-shadow: none !important;
+}
+
+.chat-event:hover {
+  background: var(--afr-fill-hover) !important;
+}
+
+.message-file,
+.delivery-card,
+.delivery-receipt,
+.work-receipt {
+  border-color: var(--afr-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Composer: one clear input surface.
+   -------------------------------------------------------------------------- */
+
+.chat-compose {
+  padding: 8px 18px 15px !important;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--canvas) 88%, transparent) 35%, var(--canvas) 100%) !important;
+}
+
+.composer-chat {
+  width: min(100%, 720px) !important;
+  max-width: 720px !important;
+  padding: 8px 9px 8px 10px !important;
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 20px !important;
+  background: var(--afr-toolbar-strong) !important;
+  box-shadow: var(--afr-shadow-composer) !important;
+  backdrop-filter: blur(24px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(170%) !important;
+}
+
+.composer-chat textarea {
+  min-height: 40px !important;
+  padding: 6px 7px 7px !important;
+  font-size: 14.5px !important;
+  line-height: 1.45 !important;
+}
+
+.composer-bar {
+  min-height: 38px !important;
+}
+
+.composer-bar .add-file,
+.composer .send {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border-radius: 50% !important;
+}
+
+.composer-mode,
+.choice-menu.choice-compact .choice-trigger,
+.safety-toggle {
+  min-height: 34px !important;
+  border-color: var(--afr-border) !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.composer-mode:hover,
+.choice-menu.choice-compact .choice-trigger:hover,
+.safety-toggle:hover {
+  background: var(--afr-fill) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Menus and popovers: anchored, scannable, platform-like.
+   -------------------------------------------------------------------------- */
+
+.choice-popover,
+.conversation-actions-popover {
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 14px !important;
+  background: var(--afr-toolbar-strong) !important;
+  box-shadow: var(--afr-shadow-sheet) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+.choice-popover {
+  padding: 5px !important;
+}
+
+.choice-popover > button,
+.conversation-actions-popover .conversation-actions-menu > button {
+  min-height: 38px !important;
+  border-radius: 9px !important;
+}
+
+.choice-popover > button:hover,
+.choice-popover > button:focus-visible,
+.conversation-actions-popover .conversation-actions-menu > button:hover,
+.conversation-actions-popover .conversation-actions-menu > button:focus-visible {
+  background: var(--afr-fill-hover) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Inspector: one continuous pane, not a stack of mini dashboards.
+   -------------------------------------------------------------------------- */
+
+.conversation-context {
+  border-left: 1px solid var(--afr-border) !important;
+  background: color-mix(in srgb, var(--afr-sidebar) 88%, var(--system-background)) !important;
+}
+
+.conversation-context > header {
+  min-height: 58px !important;
+  padding: 0 14px !important;
+  border-bottom: 1px solid var(--afr-border) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.conversation-context-content {
+  padding: 12px 14px 26px !important;
+}
+
+.context-person {
+  padding: 9px 4px 17px !important;
+  border-bottom: 1px solid var(--afr-border) !important;
+}
+
+.context-person strong {
+  font-size: 16px !important;
+  font-weight: 650 !important;
+}
+
+.context-person p,
+.context-person small {
+  color: var(--label-secondary) !important;
+}
+
+.conversation-context-content > section,
+.context-capabilities,
+.context-group {
+  margin: 0 !important;
+  padding: 17px 4px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--afr-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.conversation-context-content > section:last-child,
+.context-capabilities:last-child {
+  border-bottom: 0 !important;
+}
+
+.section-heading h3 {
+  font-size: 12.5px !important;
+  font-weight: 650 !important;
+}
+
+.context-work {
+  min-height: 48px !important;
+  padding: 8px 7px !important;
+  border-radius: 9px !important;
+}
+
+.context-work:hover {
+  background: var(--afr-fill) !important;
+}
+
+.context-capabilities > summary {
+  min-height: 40px !important;
+  border-radius: 9px !important;
+}
+
+.context-capabilities > summary:hover {
+  background: var(--afr-fill) !important;
+}
+
+.safety-card .safety-toggle {
+  margin-top: 7px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Teammate creation: person first, infrastructure second.
+   -------------------------------------------------------------------------- */
+
+.detail-drawer {
+  background: color-mix(in srgb, var(--system-background) 97%, var(--surface-muted)) !important;
+  box-shadow: -18px 0 55px rgba(18,18,28,.09) !important;
+}
+
+.create-teammate {
+  gap: 16px !important;
+}
+
+.new-character {
+  grid-template-columns: 92px minmax(0,1fr) !important;
+  gap: 16px !important;
+  align-items: center !important;
+  padding: 4px 0 7px !important;
+}
+
+.new-character .character {
+  filter: drop-shadow(0 8px 15px rgba(18,18,28,.09));
+}
+
+.new-character p {
+  margin: 0 !important;
+  color: var(--label-secondary) !important;
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+}
+
+.new-character p strong {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--label-primary) !important;
+  font-size: 17px !important;
+  line-height: 1.2 !important;
+  letter-spacing: -.018em;
+}
+
+.create-teammate > label,
+.create-teammate .teammate-section > label {
+  gap: 6px !important;
+  font-size: 11px !important;
+  font-weight: 620 !important;
+}
+
+.create-teammate input,
+.create-teammate textarea {
+  border-color: var(--afr-border) !important;
+  border-radius: 10px !important;
+  background: var(--system-background) !important;
+  box-shadow: none !important;
+}
+
+.create-teammate input {
+  min-height: 42px !important;
+}
+
+.create-teammate input:focus,
+.create-teammate textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--afr-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+
+.creation-summary {
+  min-height: 52px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 11px !important;
+  background: var(--afr-fill) !important;
+  box-shadow: none !important;
+}
+
+.creation-summary button {
+  min-height: 30px !important;
+  padding-inline: 8px !important;
+  border-radius: 8px !important;
+}
+
+.creation-summary button:hover {
+  background: var(--afr-fill-hover) !important;
+}
+
+.teammate-section.teammate-appearance {
+  padding-top: 3px !important;
+}
+
+.create-secondary-path {
+  min-height: 38px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--label-secondary) !important;
+  border-radius: 9px !important;
+}
+
+.create-secondary-path:hover {
+  background: var(--afr-fill) !important;
+  color: var(--label-primary) !important;
+}
+
+.create-teammate > .primary.full-width {
+  min-height: 43px !important;
+  border-radius: 11px !important;
+  box-shadow: 0 5px 14px rgba(18,18,24,.10) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Settings and management pages: fewer cards, stronger reading hierarchy.
+   -------------------------------------------------------------------------- */
+
+.settings-shell {
+  background: var(--canvas) !important;
+}
+
+.settings-sidebar {
+  border-right-color: var(--afr-border) !important;
+  background: color-mix(in srgb, var(--afr-sidebar) 92%, transparent) !important;
+}
+
+.settings-nav button,
+.settings-nav-item {
+  min-height: 36px !important;
+  border-radius: 9px !important;
+}
+
+.settings-nav button:hover,
+.settings-nav-item:hover {
+  background: var(--afr-fill) !important;
+}
+
+.settings-nav button.active,
+.settings-nav-item.active,
+.settings-nav [aria-current="page"] {
+  background: var(--afr-selection) !important;
+  box-shadow: none !important;
+}
+
+.settings-page-header {
+  border-bottom-color: var(--afr-border) !important;
+  background: transparent !important;
+}
+
+.settings-page-body {
+  padding-top: 22px !important;
+}
+
+.settings-group,
+.settings-card,
+.calm-card,
+.provider-settings,
+.capability-panel .settings-card {
+  box-shadow: none !important;
+}
+
+.settings-card,
+.calm-card,
+.provider-settings {
+  border-color: var(--afr-border) !important;
+  border-radius: 13px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Interaction contract: every visible control must feel clickable or disabled.
+   -------------------------------------------------------------------------- */
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+a[href] {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: default !important;
+  opacity: .48;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a[href]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Compact layouts
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 760px), (pointer: coarse) {
+  .sidebar {
+    border-right: 0 !important;
+    background: var(--system-background) !important;
+  }
+
+  .workspace > .topbar,
+  .workspace-chat > .topbar {
+    min-height: 60px !important;
+    padding: 8px 10px !important;
+  }
+
+  .workspace > .topbar::before {
+    height: 78px !important;
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 72px !important;
+  }
+
+  .chat-scroll {
+    padding-inline: 12px !important;
+  }
+
+  .chat-compose {
+    padding: 6px 9px 10px !important;
+  }
+
+  .composer-chat {
+    border-radius: 18px !important;
+    box-shadow: 0 7px 25px rgba(18,18,28,.11) !important;
+  }
+
+  .from-team > .prose {
+    max-width: 86vw !important;
+  }
+
+  .from-you {
+    max-width: 82vw !important;
+  }
+
+  .detail-drawer {
+    box-shadow: none !important;
+  }
+
+  .new-character {
+    grid-template-columns: 76px minmax(0,1fr) !important;
+    gap: 12px !important;
+  }
+
+  .new-character .character {
+    width: 76px !important;
+    height: 76px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-symbol,
+  .character,
+  button,
+  .conversation-row,
+  .choice-popover,
+  .conversation-actions-popover {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .topbar-right,
+  .composer-chat,
+  .choice-popover,
+  .conversation-actions-popover {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--system-background) !important;
+  }
+}

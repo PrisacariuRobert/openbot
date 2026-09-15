@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
-import { conversationBridge, MAX_REUSED_CONTEXT, reportedContextSize } from "./conversation-context.js";
+import { conversationBridge, explicitCollaborationDirection, MAX_REUSED_CONTEXT, reportedContextSize } from "./conversation-context.js";
 import { AttachmentService } from "./attachments.js";
 
 function fixture(t: { after(fn: () => void): void }) {
@@ -30,6 +30,40 @@ test("fresh contexts retain bounded extracted attachment text in the same conver
   assert.ok(bridge.length < 12000);
   const elsewhere = f.db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Check", status: "queued" });
   assert.doesNotMatch(conversationBridge(f.db, elsewhere), /Alex Example/);
+});
+
+test("explicit teammate requests become private collaboration directions without creating rooms", t => {
+  const f = fixture(t);
+  for (const prompt of [
+    "Ask Scout to verify the total before you answer me.",
+    "Have Scout research this too.",
+    "Scout should double-check these numbers.",
+    "Talk with Scout and confirm the source.",
+  ]) {
+    const run = f.make(prompt);
+    const direction = explicitCollaborationDirection(f.db, run);
+    assert.match(direction, /Owner collaboration command/);
+    assert.match(direction, /message_teammate/);
+    assert.match(direction, /botId="scout"/);
+    assert.match(direction, /expectsReply=true/);
+    assert.match(direction, /one combined answer/);
+    assert.doesNotMatch(direction, /create or modify a room.*unless/i);
+  }
+
+  assert.equal(explicitCollaborationDirection(f.db, f.make("Please verify the total yourself.")), "");
+  assert.equal(explicitCollaborationDirection(f.db, f.make("Add Scout to this project room.")), "");
+  assert.equal(explicitCollaborationDirection(f.db, f.make("Invite Scout into the group chat.")), "");
+});
+
+test("fresh conversation bridge keeps explicit collaboration authoritative over starter continuity", t => {
+  const f = fixture(t);
+  const bridge = conversationBridge(f.db, f.make("Ask Scout to check this with you."));
+  assert.match(bridge, /Owner collaboration command/);
+  assert.match(bridge, /Scout/);
+  const directionAt = bridge.indexOf("Owner collaboration command");
+  const continuityAt = bridge.indexOf("Conversation continuity");
+  assert.ok(directionAt >= 0);
+  assert.ok(continuityAt < 0 || directionAt < continuityAt, "The owner's current collaboration command must come before background continuity");
 });
 
 test("small completed contexts can be reused, but a new request is not mislabeled as a resumed task", t => {

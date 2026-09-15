@@ -1,0 +1,686 @@
+/*
+ * Deep capability polish: provider setup, apps, projects, files, automations,
+ * permissions, skills/memory, computer, phone, artifacts and recovery.
+ * Behavior stays in the existing React components; this file gives them one
+ * consistent first-party visual hierarchy.
+ */
+
+.capabilities {
+  font-size: 13.5px !important;
+  line-height: 1.5 !important;
+}
+
+.capabilities > * + * {
+  margin-top: 18px;
+}
+
+.capabilities :where(h3) {
+  font-size: 18px !important;
+  font-weight: 680 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.capabilities :where(h4) {
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+.capabilities :where(p) {
+  color: var(--label-secondary) !important;
+  font-size: 11.5px;
+  line-height: 1.55 !important;
+}
+
+.capabilities :where(small) {
+  color: var(--label-tertiary) !important;
+  font-size: 10.5px !important;
+  line-height: 1.45 !important;
+}
+
+/* Hero surfaces: quiet identity, one piece of character art, no dashboard chrome. */
+.capabilities :is(.connector-hero, .control-hero, .remote-hero, .teach-hero),
+.provider-settings .ai-intro {
+  position: relative;
+  min-height: 108px;
+  padding: 18px 20px !important;
+  margin: 0 0 18px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at 92% 15%, color-mix(in srgb, var(--surface-muted) 70%, transparent), transparent 31%),
+    var(--ob-material-strong) !important;
+  box-shadow: 0 6px 24px rgba(20,20,30,.035) !important;
+  overflow: hidden;
+}
+
+.capabilities :is(.connector-hero, .control-hero, .remote-hero, .teach-hero)::after,
+.provider-settings .ai-intro::after {
+  content: "";
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -75px;
+  bottom: -110px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-muted) 60%, transparent);
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.capabilities :is(.connector-hero, .control-hero, .remote-hero, .teach-hero) h3,
+.provider-settings .ai-intro h3 {
+  position: relative;
+  z-index: 1;
+  max-width: 31ch !important;
+  margin-bottom: 5px !important;
+  font-size: 20px !important;
+  line-height: 1.2 !important;
+}
+
+.capabilities :is(.connector-hero, .control-hero, .remote-hero, .teach-hero) p,
+.provider-settings .ai-intro p {
+  position: relative;
+  z-index: 1;
+  max-width: 56ch !important;
+  margin: 0 !important;
+}
+
+.provider-settings .ai-intro-mascot,
+.capabilities .teach-visual,
+.capabilities .remote-orbit,
+.capabilities .hero-orb {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 10px 16px rgba(20,20,30,.09));
+}
+
+/* Settings-group content inside capability pages. */
+.capabilities .settings-group {
+  margin-block: 22px !important;
+}
+
+.capabilities .settings-group-title {
+  margin: 0 0 8px 4px !important;
+  color: var(--label-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 650 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.capabilities .settings-card {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025) !important;
+}
+
+.capabilities .settings-row {
+  min-height: 58px !important;
+  padding: 11px 14px !important;
+  border-top-color: color-mix(in srgb, var(--ob-hairline) 80%, transparent) !important;
+}
+
+.capabilities .settings-row-text strong {
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.capabilities .settings-row-text small {
+  margin-top: 3px !important;
+}
+
+.capabilities :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea) {
+  min-height: 42px !important;
+  padding: 9px 10px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 10px !important;
+  background: var(--system-background) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.015) inset !important;
+  font-size: 12px !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.capabilities :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea):focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--ob-hairline)) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+
+.capabilities :where(button:not(.switch):not(.apple-segmented-item):not([role="option"]):not(.choice-trigger)) {
+  min-height: 38px !important;
+  padding: 8px 11px !important;
+  border-color: var(--ob-hairline) !important;
+  border-radius: 10px !important;
+  background: var(--system-background) !important;
+  font-size: 11.5px !important;
+  font-weight: 590 !important;
+  box-shadow: 0 2px 7px rgba(20,20,30,.025);
+  transition: transform 140ms var(--ob-motion), background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.capabilities :where(button:not(.switch):not(.apple-segmented-item):not([role="option"]):not(.choice-trigger)):hover:not(:disabled) {
+  background: var(--surface-muted) !important;
+  border-color: var(--ob-hairline-strong) !important;
+}
+
+.capabilities :where(button:not(.switch):not(.apple-segmented-item):not([role="option"]):not(.choice-trigger)):active:not(:disabled) {
+  transform: scale(.97);
+}
+
+.capabilities .button-primary,
+.capabilities button[type="submit"] {
+  background: var(--bubble-outgoing) !important;
+  border-color: var(--bubble-outgoing) !important;
+  color: var(--bubble-outgoing-label) !important;
+  box-shadow: 0 6px 16px rgba(18,18,24,.09) !important;
+}
+
+.capabilities .button-primary:hover:not(:disabled),
+.capabilities button[type="submit"]:hover:not(:disabled) {
+  background: var(--bubble-outgoing) !important;
+  opacity: 1 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(18,18,24,.12) !important;
+}
+
+/* Disclosures are navigation-quality rows, not bordered developer details. */
+.capabilities details.purpose-disclosure,
+.capabilities .purpose-disclosure,
+.capabilities .capability-disclosure,
+.capabilities details.ai-more,
+.capabilities details.ai-advanced,
+.capabilities details.browser-access-card {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025) !important;
+  overflow: hidden;
+}
+
+.capabilities details.purpose-disclosure[open],
+.capabilities .purpose-disclosure[open],
+.capabilities .capability-disclosure[open] {
+  border-color: var(--ob-hairline-strong) !important;
+  box-shadow: 0 7px 24px rgba(20,20,30,.04) !important;
+}
+
+.capabilities details.purpose-disclosure > summary,
+.capabilities .purpose-disclosure > summary,
+.capabilities .capability-disclosure > summary {
+  min-height: 56px !important;
+  padding: 11px 14px !important;
+  gap: 11px !important;
+  background: transparent !important;
+}
+
+.capabilities details.purpose-disclosure > summary:hover,
+.capabilities .purpose-disclosure > summary:hover,
+.capabilities .capability-disclosure > summary:hover {
+  background: color-mix(in srgb, var(--surface-muted) 45%, transparent) !important;
+}
+
+.capabilities .purpose-disclosure-body {
+  padding: 8px 14px 14px !important;
+  border-top: 1px solid var(--ob-hairline) !important;
+  background: transparent !important;
+}
+
+/* --------------------------------------------------------------------------
+   Your AI / providers
+   -------------------------------------------------------------------------- */
+
+.provider-settings {
+  max-width: 800px;
+}
+
+.provider-mode-wrapper {
+  margin: 14px 0 22px !important;
+}
+
+.provider-settings .apple-segmented-control {
+  width: 100%;
+  min-height: 39px;
+  padding: 3px !important;
+  border-radius: 11px !important;
+  background: var(--surface-muted) !important;
+}
+
+.provider-settings .apple-segmented-item {
+  min-height: 33px !important;
+  border-radius: 8px !important;
+  font-size: 11.5px !important;
+}
+
+.provider-settings .apple-segmented-item.is-selected {
+  background: var(--system-background) !important;
+  box-shadow: 0 2px 7px rgba(20,20,30,.07) !important;
+}
+
+.ai-feedback,
+.capability-notice,
+.panel-error {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 12px !important;
+  background: var(--ob-material-strong) !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 3px 12px rgba(20,20,30,.025);
+}
+
+.ai-login {
+  margin: 12px 0 !important;
+  padding: 14px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--surface-muted) 42%, var(--system-background)) !important;
+}
+
+.ai-teammate {
+  padding: 14px !important;
+  border-top: 1px solid var(--ob-hairline) !important;
+}
+
+.ai-teammate-title {
+  gap: 9px !important;
+  margin-bottom: 10px !important;
+}
+
+.ai-teammate-title .character {
+  filter: drop-shadow(0 3px 7px rgba(20,20,30,.06));
+}
+
+.ai-state,
+.ai-signed-in,
+.ai-test-state {
+  font-size: 9.5px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Apps & Tools
+   -------------------------------------------------------------------------- */
+
+.capabilities .connector-catalog {
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.capabilities .connector-card {
+  min-height: 160px;
+  padding: 15px 16px !important;
+  border-color: var(--ob-hairline) !important;
+  border-radius: 16px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025) !important;
+}
+
+.capabilities .connector-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--ob-hairline-strong) !important;
+  box-shadow: 0 8px 25px rgba(20,20,30,.045) !important;
+}
+
+.capabilities .connector-card.connected {
+  border-color: var(--ob-hairline) !important;
+}
+
+.capabilities .connector-logo {
+  width: 42px !important;
+  height: 42px !important;
+  border-color: var(--ob-hairline) !important;
+  background: var(--surface-muted) !important;
+}
+
+.capabilities .connector-status-badge {
+  border-radius: 999px !important;
+  padding: 4px 7px !important;
+  font-size: 9.5px !important;
+  background: var(--surface-muted) !important;
+  color: var(--label-secondary) !important;
+}
+
+.capabilities .connector-status-badge.connected {
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-muted)) !important;
+  color: var(--success) !important;
+}
+
+.capabilities .connector-manage {
+  min-height: 38px !important;
+  border-radius: 10px !important;
+  background: var(--surface-muted) !important;
+  box-shadow: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Control / permissions
+   -------------------------------------------------------------------------- */
+
+.control-panel .stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 9px !important;
+  margin: 12px 0 20px !important;
+}
+
+.control-panel .stat-grid > div {
+  min-height: 86px;
+  padding: 13px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 14px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 16px rgba(20,20,30,.025);
+}
+
+.control-panel .stat-grid strong {
+  font-size: 20px !important;
+  font-weight: 680 !important;
+  letter-spacing: -0.035em;
+}
+
+.control-panel .stat-grid span {
+  font-size: 9.5px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.setup-checklist {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  overflow: hidden;
+}
+
+.setup-checklist > div {
+  min-height: 60px;
+  padding: 10px 13px !important;
+  border-top: 1px solid var(--ob-hairline) !important;
+}
+
+.setup-checklist > div:first-child { border-top: 0 !important; }
+
+/* --------------------------------------------------------------------------
+   Projects / files / artifacts
+   -------------------------------------------------------------------------- */
+
+.files-view .settings-callout,
+.settings-callout {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--surface-muted) 35%, var(--ob-material-strong)) !important;
+  box-shadow: none !important;
+}
+
+.settings-callout > svg {
+  margin-top: 2px;
+}
+
+.file-preview {
+  max-width: 760px;
+}
+
+.file-preview-title {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.file-preview-title strong {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.artifact-revision-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.saved-files-panel,
+.code-projects-panel,
+.computer-panel,
+.routines-view,
+.teach-panel {
+  max-width: 820px;
+}
+
+.saved-files-dropzone {
+  min-height: 150px !important;
+  border: 1px dashed var(--ob-hairline-strong) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb, var(--surface-muted) 28%, transparent) !important;
+}
+
+.saved-file-row {
+  min-height: 60px;
+  border-color: var(--ob-hairline) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Computer
+   -------------------------------------------------------------------------- */
+
+.computer-panel .settings-card {
+  overflow: visible;
+}
+
+.computer-panel .security-footnote {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-muted) 34%, transparent);
+}
+
+.computer-panel .security-footnote p {
+  margin: 0 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Skills, MCP and memory
+   -------------------------------------------------------------------------- */
+
+.extensions-panel > header {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 17px 18px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 17px;
+  background: var(--ob-material-strong);
+  box-shadow: 0 5px 20px rgba(20,20,30,.03);
+}
+
+.extensions-panel > header h3 {
+  margin: 3px 0 4px !important;
+}
+
+.extension-eyebrow {
+  color: var(--label-tertiary) !important;
+  font-size: 9.5px !important;
+  font-weight: 650 !important;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.extension-teammate {
+  display: grid;
+  gap: 6px;
+  margin-block: 15px;
+  font-size: 10.5px;
+  color: var(--label-tertiary);
+}
+
+.extension-tool {
+  padding: 11px 0 !important;
+  border-top: 1px solid var(--ob-hairline) !important;
+}
+
+.extension-review,
+.privacy-note,
+.skill-portability-bar,
+.teach-hero {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025) !important;
+}
+
+.teaching-journey {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px !important;
+  margin: 14px 0 20px !important;
+  padding: 0 !important;
+  list-style: none;
+}
+
+.teaching-journey li {
+  min-height: 76px;
+  padding: 11px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 13px;
+  background: var(--ob-material-strong);
+}
+
+.teaching-journey li > span:first-child {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  background: var(--surface-muted) !important;
+  color: var(--label-primary) !important;
+}
+
+.skill-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 9px !important;
+  padding: 10px !important;
+}
+
+.skill-template-grid article {
+  min-height: 150px;
+  padding: 14px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 15px rgba(20,20,30,.02);
+}
+
+/* --------------------------------------------------------------------------
+   Automations / runner / recovery
+   -------------------------------------------------------------------------- */
+
+.automation-health,
+.runner-card,
+.runner-care,
+.automation-inbox,
+.hook-ready,
+.private-runner-guide {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 16px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 5px 22px rgba(20,20,30,.03) !important;
+}
+
+.automation-health > summary,
+.private-runner-guide > summary {
+  min-height: 56px;
+  padding: 11px 14px !important;
+}
+
+.runner-card {
+  padding: 15px !important;
+}
+
+.runner-stats {
+  gap: 7px !important;
+}
+
+.runner-stats > span,
+.runner-stats > div {
+  min-width: 78px;
+  padding: 8px 9px !important;
+  border-radius: 10px !important;
+  background: var(--surface-muted) !important;
+}
+
+.automation-inbox article {
+  border-top-color: var(--ob-hairline) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Phone / remote
+   -------------------------------------------------------------------------- */
+
+.remote-status,
+.away-pairing,
+.remote-access-card {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Activity & recovery / work receipts
+   -------------------------------------------------------------------------- */
+
+.capability-review,
+.work-receipt {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 5px 20px rgba(20,20,30,.03) !important;
+}
+
+.work-receipt {
+  overflow: hidden;
+}
+
+.work-receipt > section,
+.work-receipt > header,
+.work-receipt > footer {
+  border-color: var(--ob-hairline) !important;
+}
+
+.work-receipt-status,
+.work-receipt-source {
+  border-radius: 999px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive capability pages
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .capabilities :is(.connector-hero, .control-hero, .remote-hero, .teach-hero),
+  .provider-settings .ai-intro {
+    min-height: 96px;
+    padding: 15px !important;
+  }
+
+  .control-panel .stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .capabilities .connector-catalog,
+  .skill-template-grid,
+  .teaching-journey {
+    grid-template-columns: 1fr !important;
+  }
+
+  .capabilities :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea) {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capabilities .connector-card,
+  .capabilities button {
+    transition: none !important;
+  }
+}
