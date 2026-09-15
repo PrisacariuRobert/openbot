@@ -158,6 +158,161 @@
   border-radius: 9px;
 }
 
+/* The conversation inspector answers human questions first: who, now, tools,
+ * scheduled work, then safety. Advanced surfaces stay collapsed until needed. */
+.conversation-context-content {
+  display: grid;
+  gap: 20px;
+}
+
+.context-person {
+  display: grid !important;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px !important;
+  align-items: center;
+  padding: 10px 5px 15px !important;
+  border-bottom: 1px solid var(--ob-hairline);
+}
+
+.context-person > div:last-child {
+  min-width: 0;
+}
+
+.context-person strong {
+  font-size: 16px !important;
+  font-weight: 660 !important;
+  letter-spacing: -0.025em;
+}
+
+.context-person p {
+  margin: 2px 0 3px !important;
+  color: var(--label-secondary) !important;
+  font-size: 11px !important;
+}
+
+.context-person small {
+  color: var(--label-tertiary);
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.context-group {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 13px;
+  background: var(--ob-material-strong);
+}
+
+.context-group > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.context-group small {
+  color: var(--label-tertiary);
+  font-size: 9.5px;
+}
+
+.context-group strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 610;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-group .text-action {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.context-now .section-heading,
+.conversation-context-content > section .section-heading {
+  min-height: 32px;
+  margin-bottom: 6px;
+}
+
+.context-now .section-heading h3,
+.conversation-context-content > section .section-heading h3 {
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+}
+
+.context-capabilities {
+  border: 1px solid var(--ob-hairline);
+  border-radius: 14px;
+  background: var(--ob-material-strong);
+  overflow: hidden;
+}
+
+.context-capabilities > summary {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 14px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.context-capabilities > summary::-webkit-details-marker {
+  display: none;
+}
+
+.context-capabilities > summary > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 620;
+}
+
+.context-summary-note {
+  color: var(--label-tertiary);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.context-capabilities > summary > svg {
+  color: var(--label-tertiary);
+  transition: transform 150ms var(--ob-motion);
+}
+
+.context-capabilities[open] > summary > svg {
+  transform: rotate(180deg);
+}
+
+.context-capabilities > summary:hover {
+  background: color-mix(in srgb, var(--surface-muted) 46%, transparent);
+}
+
+.context-capabilities-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--ob-hairline);
+}
+
+.context-capabilities-body > :first-child {
+  margin-top: 10px;
+}
+
+.conversation-context-content .safety-card {
+  margin-top: 2px;
+  box-shadow: none !important;
+}
+
+.conversation-context-content .safety-card > p {
+  font-size: 10.5px !important;
+  line-height: 1.5 !important;
+}
+
 /* OpenBot's design contract keeps decorative surfaces monochrome. Attention
  * comes from placement, type and symbols; identity color stays with mascots. */
 .attention-section {
@@ -188,8 +343,18 @@
   }
 
   .creation-summary,
-  .creation-ai-options {
+  .creation-ai-options,
+  .context-capabilities,
+  .context-group {
     border-radius: 12px;
+  }
+
+  .context-summary-note {
+    display: none;
+  }
+
+  .context-capabilities > summary {
+    grid-template-columns: minmax(0, 1fr) 14px;
   }
 }
 
