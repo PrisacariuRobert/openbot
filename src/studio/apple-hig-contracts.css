@@ -1,5 +1,18 @@
 /* Final HIG contracts that must win over visual refinements. */
 
+/* OpenBot is a full-window split-view application. The browser document is
+ * never the scroller; each sidebar, transcript, page, inspector and sheet owns
+ * its own scrolling. This also prevents hidden swipe/actions or floating
+ * materials from creating a phantom document scrollbar. */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+}
+
 /* The application shell is a fixed window composition. Inset materials must
  * consume space inside that window rather than making the document wider. */
 .studio-shell {
