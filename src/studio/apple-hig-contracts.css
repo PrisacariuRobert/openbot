@@ -1,0 +1,105 @@
+/* Final HIG contracts that must win over visual refinements. */
+
+/* A floating toolbar needs a legibility edge, not an opaque hard bar. */
+.workspace > .topbar {
+  isolation: isolate;
+}
+
+.workspace > .topbar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -12px -8px auto;
+  height: 105px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 88%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 68%, transparent) 58%,
+    transparent 100%
+  );
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 66%, transparent 100%);
+}
+
+/* The context rail is a persistent inspector, not a modal card stack. */
+.conversation-context > header {
+  background: color-mix(in srgb, var(--obx-sidebar) 88%, transparent) !important;
+  border-bottom-color: var(--obx-border) !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* Do not let decorative motion interfere with direct manipulation. */
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transition-duration: 80ms !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  /* Apple touch guidance: interactive targets remain at least 44pt. */
+  header.topbar .topbar-control,
+  header.topbar .conversation-actions > button,
+  .topbar-left .topbar-control,
+  .composer-bar .add-file,
+  .composer .send,
+  .safety-toggle,
+  .choice-menu-trigger,
+  .composer-mode {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  header.topbar .topbar-control,
+  header.topbar .conversation-actions > button,
+  .topbar-left .topbar-control,
+  .composer-bar .add-file,
+  .composer .send {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .topbar-right {
+    gap: 0 !important;
+    padding: 2px !important;
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 112px !important;
+  }
+
+  .workspace > .topbar::before {
+    height: 122px;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .composer-mode,
+  .choice-menu-trigger {
+    padding-inline: 11px !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .workspace > .topbar::before,
+  .sidebar,
+  .conversation-context,
+  .composer-chat,
+  .topbar-right,
+  .topbar-left .topbar-control,
+  .identity-pill {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .sidebar,
+  .conversation-context,
+  .composer-chat,
+  .topbar-right,
+  .topbar-left .topbar-control,
+  .identity-pill {
+    background: var(--system-background) !important;
+  }
+}
