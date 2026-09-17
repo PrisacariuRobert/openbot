@@ -132,7 +132,7 @@ export function DeliveryReceipt({ run, teammates, reviews = [], hasDeliveredArti
   <details className="delivery-receipt"><summary>{passed ? <ShieldCheck size={14} /> : <CircleAlert size={14} />}<span>{label}</span></summary>
     {task.verificationSummary && <p>Teammate summary: {task.verificationSummary}</p>}
     {hosts.length > 0 && <p>OpenBot checked only the evidence described below. A file check does not verify every claim in the result.</p>}
-    <ul>{checks.map((check, index) => <li key={index}><Check size={13} opacity={check.passed ? 1 : .35} /><div><strong>{check.label}</strong><small>{check.source === "host" ? "Host check" : "Teammate report"} · {check.passed ? "Passed" : "Not confirmed"}{check.detail ? ` · ${check.detail}` : ""}</small></div></li>)}</ul>
+    <ul>{checks.map((check, index) => <li key={index}><Check size={13} opacity={check.passed ? 1 : .35} /><div><strong>{check.label}</strong><small>{check.source === "host" ? "Host check" : "Teammate report"} · {check.passed ? "Passed" : "Not confirmed"}{check.inputDigest ? ` · SHA-256 ${check.inputDigest.slice(0, 12)}` : ""}{check.detail ? ` · ${check.detail}` : ""}</small></div></li>)}</ul>
     {stepSummary && <p className="delivery-progress">Recorded plan: {stepSummary}</p>}
     {quietFallback && reviewPrompt}
   </details>
