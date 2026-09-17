@@ -9,7 +9,7 @@ function routine(triggerType: Routine["triggerType"], triggerConfig: Routine["tr
     id: "routine-1", name: "Issue triage", botId: "nova", botName: "Nova", botEmoji: "✦", threadId: "bot-nova", prompt: "Summarize the issue and suggest a next step.",
     cadence: "daily", intervalMinutes: 1440, triggerType, triggerConfig, hasWebhookSecret: triggerType === "github" || triggerType === "webhook", enabled: true,
     nextRunAt: null, lastRunAt: null, lastStatus: "never", runCount: 0, consecutiveFailures: 0, deduplicatedCount: 0, lastError: null, pausedReason: null,
-    lastSuccessAt: null, lastEventAt: null,
+    lastSuccessAt: null, lastEventAt: null, revision: 1,
   };
 }
 
