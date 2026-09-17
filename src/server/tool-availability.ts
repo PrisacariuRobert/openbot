@@ -17,6 +17,7 @@ export function toolAvailability(
     task_progress: true,
     task_verify: true,
     routine_create: true,
+    routine_list: true,
     remember: true,
     handoff: true,
     message_teammate: true,
