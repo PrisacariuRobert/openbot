@@ -121,9 +121,12 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
   const skillFile = useRef<HTMLInputElement>(null);
   const [memories, setMemories] = useState<PrivateMemory[]>([]), [memoryKey, setMemoryKey] = useState(""), [memoryText, setMemoryText] = useState("");
   const [memoryRevision, setMemoryRevision] = useState<string | undefined>(), [memoryExpiry, setMemoryExpiry] = useState("");
+  // U04d: first paint distinguishes loading from empty so a slow catalog
+  // never reads as "no skills".
+  const [skillsLoading, setSkillsLoading] = useState(true);
   useEffect(() => { setMemories([]); setMemoryKey(""); setMemoryText(""); setMemoryRevision(undefined); setMemoryExpiry(""); }, [botId]);
   const load = async () => setState(await request(""));
-  useEffect(() => { void load().catch((error) => setError(String(error.message))); }, []);
+  useEffect(() => { void load().catch((error) => setError(String(error.message))).finally(() => setSkillsLoading(false)); }, []);
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get("extensionSignIn");
     if (status === "ready") setNotice("Signed in. Check the connection, then choose which tools to share.");
@@ -297,6 +300,16 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
         </div>
 
         <div className="skills-cards-grid">
+          {skillsLoading ? (
+            <div className="empty-panel">
+              <LoaderCircle size={18} className="spin" />
+            </div>
+          ) : state.skills.length === 0 ? (
+            <div className="empty-panel">
+              <h4>No skills here yet</h4>
+              <p>Import a community skill below or teach this teammate a reusable method in conversation.</p>
+            </div>
+          ) : null}
           {state.skills
             .filter((skill) => {
               const meta = getSkillMeta(skill.id, skill.name);
@@ -459,9 +472,15 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
                           type="button"
                           className="skill-copy-btn"
                           onClick={() => {
-                            void navigator.clipboard.writeText(skill.instructions);
-                            setCopiedId(skill.id);
-                            setTimeout(() => setCopiedId(null), 1800);
+                            void (async () => {
+                              try {
+                                await navigator.clipboard.writeText(skill.instructions);
+                                setCopiedId(skill.id);
+                                setTimeout(() => setCopiedId(null), 1800);
+                              } catch {
+                                setError("Copy needs clipboard permission in this browser.");
+                              }
+                            })();
                           }}
                         >
                           {copiedId === skill.id ? (
@@ -678,7 +697,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { b
             key={note.key}
             title={note.key}
             description={<><span>{note.content}</span><span>{note.source === "owner" ? "Set by you · protected" : note.source === "task" ? "Learned in a task" : "Older saved note · protected"}{note.expiresAt ? ` · ${note.expired ? "Expired" : "Expires"} ${new Date(note.expiresAt).toLocaleString()}` : " · No expiry"}{note.conflict ? " · Conflicting note: review before use" : ""}</span></>}
-            control={<div className="extension-actions"><button type="button" onClick={() => { setMemoryKey(note.key); setMemoryText(note.content); setMemoryRevision(note.revision); setMemoryExpiry(note.expiresAt ? new Date(Date.parse(note.expiresAt) - new Date(note.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" onClick={() => void run(() => request(`/memory/${encodeURIComponent(botId)}`, "DELETE", { key: note.key, expectedRevision: note.revision }), "Memory removed from future tasks.")}><Trash2 size={15} />Forget</button></div>}
+            control={<div className="extension-actions"><button type="button" onClick={() => { setMemoryKey(note.key); setMemoryText(note.content); setMemoryRevision(note.revision); setMemoryExpiry(note.expiresAt ? new Date(Date.parse(note.expiresAt) - new Date(note.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" onClick={() => { if (!window.confirm(`Forget “${note.key}”? This permanently removes the correction; past chats keep what already happened.`)) return; void run(() => request(`/memory/${encodeURIComponent(botId)}`, "DELETE", { key: note.key, expectedRevision: note.revision }), "Memory removed from future tasks."); }}><Trash2 size={15} />Forget</button></div>}
           />)}
         </SettingsCard>
       </SettingsGroup>}
