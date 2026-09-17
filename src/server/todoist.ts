@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
 import type { TodoistTaskSummary } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { ApprovalReviewChangedError, ApprovedConnectorOutcomeUncertainError } from "./approval-review-binding.js";
 
 type FetchLike = typeof fetch;
 type Json = Record<string, unknown>;
 type TodoistCredentials = { accessToken: string; refreshToken?: string; expiresAt?: string };
 
-export type TodoistActivitySummary = {
-  id: string;
+export type TodoistActivitySummary = {  id: string;
   eventType: "added" | "updated" | "completed" | string;
   objectId: string;
   content: string;
@@ -16,6 +16,32 @@ export type TodoistActivitySummary = {
 };
 
 const SCOPE = "data:read_write";
+
+/** A Todoist object that does not exist (readback target gone). Distinct from
+ * transport failures: single-object readers map this to null, never to a retry. */
+export class TodoistNotFoundError extends Error {
+  constructor(path = "") {
+    super(path ? `Todoist did not find ${path}.` : "That Todoist task is no longer available.");
+  }
+}
+
+/** Only a full matching readback is proof. A matching id, an HTTP 200, or a
+ * confident model report is not. Fields the caller left unspecified take
+ * server defaults (inbox project, normal priority, no due date), so only
+ * explicitly requested fields bind the match — except an unrequested due
+ * date, which must stay absent. */
+export function todoistTaskMatchesCreate(
+  task: TodoistTaskSummary,
+  requested: { content: string; description: string; dueString: string; projectId: string; priority: number },
+): boolean {
+  if (!task.id || !task.content) return false;
+  if (task.content !== requested.content) return false;
+  if (task.description !== requested.description) return false;
+  if (requested.projectId && task.projectId !== requested.projectId) return false;
+  if (task.priority !== requested.priority) return false;
+  if (!requested.dueString && task.due !== null) return false;
+  return true;
+}
 
 function cleanText(value: unknown, limit = 2_000) {
   return typeof value === "string" ? value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, limit) : "";
@@ -139,13 +165,66 @@ export class TodoistConnector {
   async create(input: { content: string; description?: string; dueString?: string; projectId?: string; priority?: number }) {
     const content = cleanText(input.content, 500), description = cleanText(input.description, 4_000), dueString = cleanText(input.dueString, 200), projectId = cleanText(input.projectId, 200);
     if (!content) throw new Error("Give the Todoist task a title first.");
-    const result = await this.request("/api/v1/tasks", { method: "POST", body: {
-      content, ...(description ? { description } : {}), ...(dueString ? { due_string: dueString } : {}), ...(projectId ? { project_id: projectId } : {}),
-      ...(input.priority ? { priority: Math.max(1, Math.min(Math.round(input.priority), 4)) } : {}),
-    } });
-    const task = this.taskSummary(result);
-    if (!task) throw new Error("Todoist created the task but did not return its details.");
-    return task;
+    const priority = input.priority ? Math.max(1, Math.min(Math.round(input.priority), 4)) : undefined;
+    const requested = { content, description, dueString, projectId, priority: priority ?? 1 };
+    // P04a: the account that approves this write must be the account that
+    // performs it and the account that is read back. A reconnect or disconnect
+    // mid-flight invalidates the review instead of inspecting a new account.
+    const authorizationVersion = this.db.connectorAuthorizationVersion("todoist");
+    const assertSameAccount = () => {
+      if (this.db.connectorAuthorizationVersion("todoist") !== authorizationVersion) throw new ApprovalReviewChangedError(true);
+    };
+    let posted: Json;
+    try {
+      posted = await this.request("/api/v1/tasks", { method: "POST", body: {
+        content, ...(description ? { description } : {}), ...(dueString ? { due_string: dueString } : {}), ...(projectId ? { project_id: projectId } : {}),
+        ...(priority ? { priority } : {}),
+      } });
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      assertSameAccount();
+      // Todoist assigns the task id server-side, so a lost POST response has
+      // no addressable readback. It stays uncertain: never silently repeated
+      // (that could duplicate the task) and never reported as delivered.
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    const created = this.taskSummary(posted);
+    if (created && todoistTaskMatchesCreate(created, requested)) return { task: created, recovered: false };
+    const postedId = created?.id || (posted && typeof posted.id === "string" ? cleanText(posted.id, 200) : "");
+    if (!postedId) {
+      // A 200 without an addressable task id cannot be confirmed or safely
+      // repeated. Uncertain, not failed: the task may exist.
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    // Exactly one readback operation, no sleep loop and no second insert.
+    // Not found is NOT evidence that the original request was not applied.
+    assertSameAccount();
+    let read: TodoistTaskSummary | null = null;
+    try {
+      read = await this.getTask(postedId);
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    if (read && todoistTaskMatchesCreate(read, requested)) return { task: read, recovered: true };
+    // A missing or mismatched readback is not evidence the task was created
+    // correctly — and repeating the POST could duplicate it.
+    throw new ApprovedConnectorOutcomeUncertainError();
+  }
+
+  /** Independent readback of one task by id. A missing task is null (a
+   * correction target that no longer exists); any other failure throws. */
+  async getTask(id: string): Promise<TodoistTaskSummary | null> {
+    const clean = cleanText(id, 200);
+    if (!clean) return null;
+    try {
+      return this.taskSummary(await this.request(`/api/v1/tasks/${encodeURIComponent(clean)}`));
+    } catch (error) {
+      if (error instanceof TodoistNotFoundError) return null;
+      throw error;
+    }
   }
 
   async disconnect() {
@@ -179,6 +258,7 @@ export class TodoistConnector {
     });
     if (response.status === 401 && retry && current.refreshToken) { await this.refresh(configured.clientId, configured.clientSecret, current, version); return this.request(path, options, false); }
     const result = await response.json().catch(() => ({})) as Json;
+    if (response.status === 404) throw new TodoistNotFoundError(path);
     if (!response.ok) throw new Error(`Todoist could not complete that request (${cleanText(result.error_description || result.error || result.message, 400) || response.status}).`);
     this.db.markConnectorUsed("todoist");
     return result;

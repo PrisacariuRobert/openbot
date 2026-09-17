@@ -1636,14 +1636,33 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
   if (parsed.data.type === "todoist_task_create") {
     const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
     if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Creating Todoist tasks is not available for this teammate.");
-    const task = await todoist.create({
-      content: String(args.content || ""), description: args.description ? String(args.description) : undefined,
-      dueString: args.dueString ? String(args.dueString) : undefined, projectId: args.projectId ? String(args.projectId) : undefined,
-      priority: args.priority === undefined ? undefined : Number(args.priority),
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    if (!approval || !run) throw new Error("The approved request could not be found. Ask the teammate to propose it again.");
+    const authorizationVersion = db.connectorAuthorizationVersion("todoist");
+    const account = db.getConnector("todoist")?.accountEmail || "";
+    const reviewedFields = {
+      content: String(args.content || ""),
+      description: args.description ? String(args.description) : "",
+      dueString: args.dueString ? String(args.dueString) : "",
+      projectId: args.projectId ? String(args.projectId) : "",
+      priority: args.priority === undefined ? 1 : Math.max(1, Math.min(Math.round(Number(args.priority)), 4)),
+    };
+    const { task, recovered } = await todoist.create({
+      content: reviewedFields.content, description: reviewedFields.description || undefined,
+      dueString: reviewedFields.dueString || undefined, projectId: reviewedFields.projectId || undefined,
+      priority: args.priority === undefined ? undefined : reviewedFields.priority,
+    });
+    // P04a: bind the exact created resource to its originating scope so a
+    // later correction edits this same task in this same account — never a
+    // same-titled task elsewhere.
+    db.saveConnectorTaskRef({
+      connectorId: "todoist", resourceId: task.id, account, authorizationVersion,
+      threadId: run.threadId, runId: run.id, botId: bot.id,
+      reviewedFields, lastState: task,
     });
     db.addConnectorEvent({ connectorId: "todoist", botId: bot.id, action: "todoist_task_create", status: "completed", summary: `${bot.name} created the approved task “${task.content.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
-    return `The Todoist task was created: ${task.content}${task.url ? ` (${task.url})` : ""}.`;
+    return `The Todoist task was created and read back: ${task.content}${task.url ? ` (${task.url})` : ""}.${recovered ? " The create response was lost or incomplete; a matching Todoist readback confirmed the task without another create request." : ""}`;
   }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
