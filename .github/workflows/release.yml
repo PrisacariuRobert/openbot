@@ -135,6 +135,7 @@ jobs:
           tar -czf "dist-release/openbot-${VERSION}-darwin-arm64.tar.gz" -C /tmp/openbotDerived/Build/Products/Debug OpenBot.app
           (cd dist-release && shasum -a 256 "openbot-${VERSION}-darwin-arm64.tar.gz" > "openbot-${VERSION}-darwin-arm64.tar.gz.sha256")
           cp /tmp/openbotDerived/Build/Products/Debug/OpenBot.app/Contents/Resources/OpenBotRuntime/runtime-manifest.json "dist-release/openbot-${VERSION}-darwin-arm64.manifest.json"
+          node scripts/package-macos-dmg.mjs /tmp/openbotDerived/Build/Products/Debug/OpenBot.app dist-release
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: openbot-darwin-arm64
@@ -142,6 +143,7 @@ jobs:
             dist-release/*.tar.gz
             dist-release/*.sha256
             dist-release/*.manifest.json
+            dist-release/*.dmg
 
   publish:
     # Always consume the final Mac artifact. When signing is configured, a
@@ -245,4 +247,8 @@ jobs:
             signed/*.tar.gz
             signed/*.sha256
             signed/*.manifest.json
+            signed/*.dmg
           if-no-files-found: error
+        # The disk image is built from the pre-sign app and always ships
+        # unsigned (free Apple account: no Developer ID). If signing is ever
+        # enabled, re-image the Mac app from the signed bundle before upload.

@@ -70,7 +70,15 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 Engineering can continue with source tests, disposable data, browser fixtures, simulator builds and package checks. Wider distribution additionally needs:
 
 1. A working private vulnerability-reporting route and confirmation of repository merge rules.
-2. For a consumer Mac download, the selected Apple Developer identity and consent to use signing/notarization credentials through Apple's normal tools. Never paste private keys into a chat or issue. Without this, keep the release source-only.
+2. For a consumer Mac download there is no paid Apple Developer program, so
+   there is no Developer ID signing or notarization: the website ships an
+   unsigned `.dmg` with a `.sha256` sidecar (built by
+   `scripts/package-macos-dmg.mjs` and routed into the draft by
+   `.github/workflows/release.yml`). Never paste private keys into a chat
+   or issue. Tell users to verify the checksum, then right-click Open the
+   app once to get past Gatekeeper; document that macOS will warn because
+   the download is unsigned. If a paid membership ever exists, re-image
+   from the signed bundle and revisit this section.
 3. A clean second Mac/tester and a small pilot; the development machine is not an independent installation test.
 4. Explicitly authorized real service accounts for advertised integrations and the allowed model test budget. Fixture tests cannot supply that evidence.
 5. Only if promoting away access or production iPhone notifications: relay hosting/operating ownership, signed device setup and APNs credentials. These are not blockers for a clearly labeled Mac-first local source beta.

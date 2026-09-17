@@ -38,3 +38,14 @@ test("optional signing uses a supported step condition and configured signing fa
   assert.match(sign.run, /trap cleanup EXIT/);
   assert.doesNotMatch(publishing.if, /always\(|!cancelled\(/, "Failed dependencies must retain GitHub's default success gate.");
 });
+
+test("the unsigned website disk image rides the Mac artifact into the draft", () => {
+  const macos = workflow.jobs["app-macos"];
+  const archive = macos.steps.find((step) => step.name === "Archive");
+  assert.match(archive.run, /package-macos-dmg\.mjs/, "the image is built from the staged app");
+  const upload = macos.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+  assert.match(upload.with.path, /dist-release\/\*\.dmg/, "the image is uploaded with the Mac artifact");
+  const signing = workflow.jobs["sign-notarize"];
+  const finalArtifact = signing.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+  assert.match(finalArtifact.with.path, /signed\/\*\.dmg/, "the image reaches the draft review artifact");
+});
