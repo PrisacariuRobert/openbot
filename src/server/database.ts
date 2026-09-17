@@ -1992,6 +1992,10 @@ export class OpenBotDatabase {
           passed: check.passed,
           source: check.source === "host" ? "host" : "teammate",
           detail: typeof check.detail === "string" ? check.detail : null,
+          predicate: typeof check.predicate === "string" ? check.predicate : null,
+          inputDigest: typeof check.inputDigest === "string" ? check.inputDigest : null,
+          outputDigest: typeof check.outputDigest === "string" ? check.outputDigest : null,
+          observedAt: typeof check.observedAt === "string" ? check.observedAt : null,
         })),
     };
     return {
@@ -2372,6 +2376,12 @@ export class OpenBotDatabase {
       passed: check.passed,
       source: check.source === "host" ? "host" as const : "teammate" as const,
       detail: check.detail?.replace(/\s+/g, " ").trim().slice(0, 300) || null,
+      // P06a contract survives persistence: digests stay comparable after
+      // restart, refresh and reconnect instead of living only in memory.
+      predicate: check.predicate?.slice(0, 120) ?? null,
+      inputDigest: check.inputDigest ?? null,
+      outputDigest: check.outputDigest ?? null,
+      observedAt: check.observedAt ?? null,
     })).filter((check) => check.label).slice(0, 8);
     const status: TaskVerificationStatus = input.status === "passed" && checks.some((check) => !check.passed) ? "partial" : input.status;
     const steps = run.task.steps.map((step) => status === "passed" && !["blocked", "skipped"].includes(step.status) ? { ...step, status: "completed" as const } : step);
