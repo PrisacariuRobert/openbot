@@ -28,6 +28,8 @@ import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
+import { opencodeCompatibility } from "./runtime-compatibility.js";
+import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
@@ -86,7 +88,7 @@ import { inspectRunnerCare } from "./runner-care.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
-import type { AutomationEvent, ProviderConnectionTest, Routine, RoutineTriggerConfig, RunnerHealth, Readiness, ReadinessStep } from "../shared/types.js";
+import type { AutomationEvent, ProviderConnectionTest, Routine, RoutineTriggerConfig, RunnerHealth, Readiness } from "../shared/types.js";
 import { listWorkspaceFiles, readWorkspaceFile, replaceWorkspaceFile, resolveWorkspacePath, writeWorkspaceFile } from "./workspace-files.js";
 import { isHandoffPath, mediateHandoffArtifacts } from "./handoff-files.js";
 import { verifyTaskChecks } from "./verification-evidence.js";
@@ -667,24 +669,20 @@ app.get("/api/provider", async (_request, response) => {
 app.get("/api/readiness", async (_request, response) => {
   const status = await readProviderStatus(db, providerConnections.listAttempts());
   const connected = status.instances.filter((instance) => instance.connected);
-  const teammates = db.listBots().length;
-  const steps: ReadinessStep[] = [
-    {
-      id: "runtime", ready: status.cliAvailable,
-      label: "Model runtime",
-      detail: status.cliAvailable ? `OpenCode${status.version ? ` ${status.version.trim().split("\n")[0]}` : ""} is ready on this host.` : "Install the OpenCode runtime so teammates can work.",
-    },
-    {
-      id: "connection", ready: connected.length > 0,
-      label: "AI connection",
-      detail: connected.length ? `${connected.length} connected: ${connected.map((instance) => instance.name).slice(0, 3).join(", ")}.` : "Connect an AI account, key, or local model.",
-    },
-    {
-      id: "teammate", ready: teammates > 0,
-      label: "First teammate",
-      detail: teammates ? `${teammates} teammate${teammates === 1 ? "" : "s"} ready.` : "Create a teammate to start delegating work.",
-    },
-  ];
+  const compatibility = opencodeCompatibility();
+  const readyTeammates = db.listBots().filter((bot) => {
+    if (!bot.providerInstanceId || !bot.model) return false;
+    const provider = db.providerForBot(bot.id);
+    return Boolean(provider && modelBelongsToConnection(bot.model, provider));
+  }).length;
+  const steps = buildReadinessSteps({
+    cliAvailable: status.cliAvailable,
+    compatibility: compatibility.compatibility,
+    detectedVersion: compatibility.detectedVersion,
+    connectedNames: connected.map((instance) => instance.name),
+    readyTeammates,
+    totalTeammates: db.listBots().length,
+  });
   response.json({ ready: steps.every((step) => step.ready), steps } satisfies Readiness);
 });
 
