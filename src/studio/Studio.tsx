@@ -75,6 +75,7 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
+import { conversationMatches } from "./conversation-filter";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
@@ -1535,9 +1536,7 @@ export function Studio() {
     (item) =>
       !item.hidden &&
       !item.pinned &&
-      `${item.title} ${item.lastMessage || ""}`
-        .toLowerCase()
-        .includes(conversationQuery.toLowerCase()),
+      conversationMatches(item, allBots, conversationQuery),
   );
   const groupThreads = visibleThreads.filter(isGroupThread);
   const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
