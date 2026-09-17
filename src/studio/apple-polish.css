@@ -1,0 +1,1126 @@
+/*
+ * OpenBot premium polish layer.
+ *
+ * This file is deliberately loaded last. The Studio has accumulated several
+ * generations of shell rules; these overrides give the shipped conversation,
+ * creation and settings surfaces one authored visual system without changing
+ * application behavior or accessibility contracts.
+ */
+
+:root,
+:root[data-appearance="light"] {
+  --ob-canvas: #f6f6f8;
+  --ob-canvas-raised: #fbfbfc;
+  --ob-material: rgba(246, 246, 248, 0.82);
+  --ob-material-strong: rgba(255, 255, 255, 0.92);
+  --ob-hairline: rgba(60, 60, 67, 0.12);
+  --ob-hairline-strong: rgba(60, 60, 67, 0.2);
+  --ob-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 28px rgba(20, 20, 30, 0.045);
+  --ob-shadow-raised: 0 18px 55px rgba(20, 20, 30, 0.12), 0 2px 10px rgba(20, 20, 30, 0.06);
+  --ob-shadow-floating: 0 26px 80px rgba(15, 15, 25, 0.18), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  --ob-radius-panel: 20px;
+  --ob-radius-control: 12px;
+  --ob-radius-sheet: 22px;
+  --ob-sidebar-width: 302px;
+  --ob-motion: cubic-bezier(.2, .8, .2, 1);
+}
+
+:root[data-appearance="dark"] {
+  --ob-canvas: #111112;
+  --ob-canvas-raised: #1c1c1e;
+  --ob-material: rgba(27, 27, 29, 0.82);
+  --ob-material-strong: rgba(34, 34, 36, 0.94);
+  --ob-hairline: rgba(255, 255, 255, 0.09);
+  --ob-hairline-strong: rgba(255, 255, 255, 0.16);
+  --ob-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.14);
+  --ob-shadow-raised: 0 22px 70px rgba(0, 0, 0, 0.34), 0 2px 12px rgba(0, 0, 0, 0.28);
+  --ob-shadow-floating: 0 30px 90px rgba(0, 0, 0, 0.48);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --ob-canvas: #111112;
+    --ob-canvas-raised: #1c1c1e;
+    --ob-material: rgba(27, 27, 29, 0.82);
+    --ob-material-strong: rgba(34, 34, 36, 0.94);
+    --ob-hairline: rgba(255, 255, 255, 0.09);
+    --ob-hairline-strong: rgba(255, 255, 255, 0.16);
+    --ob-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.14);
+    --ob-shadow-raised: 0 22px 70px rgba(0, 0, 0, 0.34), 0 2px 12px rgba(0, 0, 0, 0.28);
+    --ob-shadow-floating: 0 30px 90px rgba(0, 0, 0, 0.48);
+  }
+}
+
+html,
+body {
+  background: var(--ob-canvas);
+}
+
+body {
+  letter-spacing: -0.006em;
+}
+
+/* --------------------------------------------------------------------------
+   Application shell
+   -------------------------------------------------------------------------- */
+
+.studio-shell {
+  grid-template-columns: var(--ob-sidebar-width) minmax(0, 1fr) !important;
+  background: var(--ob-canvas);
+}
+
+.studio-shell.with-context {
+  grid-template-columns: 282px minmax(0, 1fr) 338px !important;
+}
+
+.studio-shell.with-sign-in {
+  grid-template-columns: 292px minmax(0, 1fr) minmax(380px, 42%) !important;
+}
+
+.sidebar {
+  padding: 20px 14px 14px !important;
+  background: var(--ob-material) !important;
+  border-right: 1px solid var(--ob-hairline) !important;
+  backdrop-filter: blur(34px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(170%) !important;
+}
+
+.wordmark {
+  min-height: 38px;
+  padding-inline: 10px !important;
+  gap: 10px !important;
+  font-size: 21px !important;
+  font-weight: 760 !important;
+  letter-spacing: -0.045em !important;
+}
+
+.wordmark-symbol {
+  width: 21px !important;
+  height: 25px !important;
+  border-width: 1.7px !important;
+  border-radius: 8px !important;
+  transform: rotate(-7deg) !important;
+  transition: transform 220ms var(--ob-motion);
+}
+
+.wordmark:hover .wordmark-symbol {
+  transform: rotate(-3deg) translateY(-1px) !important;
+}
+
+.conversation-search {
+  min-height: 40px;
+  margin: 14px 8px 10px !important;
+  padding: 9px 12px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 13px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.025), 0 5px 16px rgba(0, 0, 0, 0.025);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.conversation-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--ob-hairline)) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent), 0 7px 20px rgba(0, 0, 0, 0.035);
+}
+
+.sidebar-conversations {
+  margin-top: 4px !important;
+  padding-inline: 0;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-conversations > header {
+  min-height: 56px;
+  padding: 6px 10px 8px !important;
+}
+
+.sidebar-conversations header > span:first-child {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  color: var(--label-primary) !important;
+  letter-spacing: -0.01em;
+}
+
+.compose-primary {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: var(--bubble-outgoing) !important;
+  color: var(--bubble-outgoing-label) !important;
+  box-shadow: 0 8px 18px rgba(18, 18, 22, 0.13), 0 1px 0 rgba(255, 255, 255, 0.14) inset;
+  transition: transform 160ms var(--ob-motion), opacity 140ms ease, box-shadow 160ms ease !important;
+}
+
+.compose-primary:hover {
+  opacity: 1 !important;
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 10px 24px rgba(18, 18, 22, 0.16), 0 1px 0 rgba(255, 255, 255, 0.16) inset;
+}
+
+.compose-primary:active {
+  transform: scale(.95);
+}
+
+/* Pinned people should feel like living contacts, not utility chips. */
+.pinned-zone {
+  padding: 6px 10px 14px !important;
+}
+
+.pinned-label {
+  padding: 0 6px 9px !important;
+  font-size: 10px !important;
+  letter-spacing: .12em !important;
+  opacity: .92;
+}
+
+.pinned-avatars {
+  gap: 14px 13px !important;
+}
+
+.pinned-avatar {
+  width: 62px !important;
+}
+
+.pinned-open {
+  gap: 7px !important;
+}
+
+.pinned-open .character {
+  transition: transform 220ms var(--ob-motion), filter 220ms ease;
+  filter: drop-shadow(0 4px 8px rgba(15, 15, 25, .08));
+}
+
+.pinned-open:hover .character {
+  transform: translateY(-2px) scale(1.025);
+  filter: drop-shadow(0 7px 13px rgba(15, 15, 25, .11));
+}
+
+.pinned-name {
+  font-size: 11.5px !important;
+  font-weight: 560 !important;
+}
+
+.pinned-unpin {
+  width: 24px !important;
+  height: 24px !important;
+  top: -2px !important;
+  right: -1px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+  opacity: 0;
+  transform: scale(.86);
+  transition: opacity 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.pinned-avatar:hover .pinned-unpin,
+.pinned-unpin:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.active-now {
+  margin: 0 6px 8px !important;
+  padding: 4px 4px 10px !important;
+  border-bottom: 0 !important;
+}
+
+.active-now-chip {
+  min-height: 30px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .025);
+}
+
+.conversation-cell {
+  margin: 0 2px;
+}
+
+.conversation-row {
+  min-height: 68px !important;
+  padding: 10px 10px !important;
+  border-radius: 14px !important;
+  transition: background 150ms ease, transform 220ms var(--ob-motion), box-shadow 150ms ease !important;
+}
+
+.conversation-row.current {
+  background: color-mix(in srgb, var(--surface-muted) 82%, var(--system-background)) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.45) inset, 0 5px 18px rgba(20,20,30,.035) !important;
+}
+
+.conversation-row:hover:not(.current) {
+  background: color-mix(in srgb, var(--surface-muted) 45%, transparent) !important;
+}
+
+.sidebar-conversations .conversation-cell + .conversation-cell::before {
+  margin-left: 66px !important;
+  border-top-color: color-mix(in srgb, var(--line) 78%, transparent) !important;
+}
+
+.conversation-heading strong {
+  font-size: 14px !important;
+  font-weight: 640 !important;
+  letter-spacing: -0.012em !important;
+}
+
+.conversation-copy > small,
+.conversation-heading time {
+  font-size: 11.5px !important;
+}
+
+.live-pill {
+  min-height: 23px !important;
+  background: color-mix(in srgb, var(--surface-muted) 78%, transparent) !important;
+  border: 1px solid var(--ob-hairline);
+  padding: 3px 9px 3px 3px !important;
+  font-size: 11.5px !important;
+}
+
+.project-rooms {
+  margin: 10px 4px 0;
+}
+
+.project-rooms > summary {
+  min-height: 42px;
+  padding-inline: 8px;
+  color: var(--label-tertiary);
+}
+
+.sidebar-bottom {
+  padding: 10px 8px 0 !important;
+  border-top: 1px solid var(--ob-hairline) !important;
+}
+
+.sidebar-bottom .workspace-link {
+  min-height: 46px !important;
+  margin: 2px 0 9px !important;
+  padding: 0 8px !important;
+  border-radius: 12px;
+  transition: background 140ms ease;
+}
+
+.sidebar-bottom .workspace-link:hover {
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
+}
+
+.workspace-link b {
+  color: var(--label-secondary);
+  font-size: 11px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Conversation canvas and header
+   -------------------------------------------------------------------------- */
+
+.workspace {
+  background:
+    radial-gradient(circle at 50% -18%, color-mix(in srgb, var(--surface-muted) 28%, transparent), transparent 36%),
+    var(--ob-canvas) !important;
+}
+
+.workspace-chat > .topbar {
+  padding: 14px 18px 11px !important;
+  pointer-events: none;
+}
+
+.workspace-chat > .topbar > * {
+  pointer-events: auto;
+}
+
+header.topbar .topbar-control,
+header.topbar .conversation-actions > button {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  border-color: var(--ob-hairline) !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 5px 20px rgba(20,20,30,.055), 0 1px 0 rgba(255,255,255,.6) inset !important;
+  transition: transform 150ms var(--ob-motion), background 150ms ease, border-color 150ms ease;
+}
+
+header.topbar .topbar-control:hover,
+header.topbar .conversation-actions > button:hover {
+  transform: translateY(-1px);
+  background: var(--system-background) !important;
+  border-color: var(--ob-hairline-strong) !important;
+}
+
+header.topbar .topbar-control:active,
+header.topbar .conversation-actions > button:active {
+  transform: scale(.95);
+}
+
+.identity-mascot {
+  margin-bottom: -14px !important;
+  filter: drop-shadow(0 8px 14px rgba(20,20,30,.08));
+}
+
+.identity-mascot .character {
+  transition: transform 220ms var(--ob-motion), filter 220ms ease;
+}
+
+.identity-tap:hover .character {
+  transform: translateY(-2px) scale(1.018);
+  filter: brightness(1.015);
+}
+
+.identity-pill {
+  min-height: 38px;
+  padding: 8px 15px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 7px 24px rgba(20,20,30,.055), 0 1px 0 rgba(255,255,255,.62) inset !important;
+  font-size: 15.5px !important;
+  font-weight: 650 !important;
+  transition: transform 150ms var(--ob-motion), border-color 150ms ease, background 150ms ease;
+}
+
+.identity-pill:hover {
+  border-color: var(--ob-hairline-strong) !important;
+  transform: translateY(-1px);
+}
+
+.identity-pill:active {
+  transform: scale(.98);
+}
+
+.workspace-chat > .chat-scroll {
+  padding-top: 148px !important;
+}
+
+.chat-scroll {
+  padding-inline: 26px !important;
+  padding-bottom: 18px !important;
+}
+
+.chat-messages {
+  max-width: 760px !important;
+}
+
+.chat-message {
+  margin-top: 22px !important;
+}
+
+.chat-message.continues {
+  margin-top: 5px !important;
+}
+
+.message-author {
+  margin-bottom: 7px !important;
+  gap: 8px !important;
+}
+
+.message-author .character {
+  filter: drop-shadow(0 2px 4px rgba(20,20,30,.07));
+}
+
+.message-author strong {
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+.message-author time {
+  font-size: 11.5px !important;
+}
+
+.from-team > .prose {
+  border: 1px solid color-mix(in srgb, var(--ob-hairline) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--bubble-incoming) 88%, var(--system-background)) !important;
+  box-shadow: 0 1px 1px rgba(0,0,0,.015) !important;
+  padding: 13px 16px !important;
+  border-radius: 19px 19px 19px 6px !important;
+  line-height: 1.58 !important;
+}
+
+.from-team.continues > .prose {
+  border-radius: 6px 19px 19px 6px !important;
+}
+
+.from-you {
+  padding: 13px 16px !important;
+  border-radius: 19px 19px 6px 19px !important;
+  box-shadow: 0 5px 14px rgba(15,15,20,.07) !important;
+  line-height: 1.56 !important;
+}
+
+.from-you.continues {
+  border-radius: 19px 6px 6px 19px !important;
+}
+
+.prose {
+  font-size: 15.5px !important;
+  line-height: 1.58 !important;
+}
+
+/* Teammate-to-teammate events are one of OpenBot's unique visual moments. */
+.chat-event {
+  min-height: 34px;
+  margin-block: 14px !important;
+  padding: 7px 11px !important;
+  border-color: var(--ob-hairline) !important;
+  background: color-mix(in srgb, var(--ob-material-strong) 74%, transparent) !important;
+  box-shadow: 0 3px 15px rgba(20,20,30,.025);
+  font-size: 11.5px !important;
+}
+
+.chat-event.talk-pill {
+  transition: transform 170ms var(--ob-motion), border-color 170ms ease, background 170ms ease;
+}
+
+.chat-event.talk-pill:hover {
+  transform: translateY(-1px);
+  border-color: var(--ob-hairline-strong) !important;
+  background: var(--ob-material-strong) !important;
+}
+
+.chat-event.action-completed-group {
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--surface-muted) 70%, transparent) !important;
+}
+
+.message-file,
+.delivery-card,
+.delivery-receipt,
+.work-receipt {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  box-shadow: var(--ob-shadow-soft);
+}
+
+.message-file:hover {
+  border-color: var(--ob-hairline-strong) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Composer: a single premium floating object
+   -------------------------------------------------------------------------- */
+
+.chat-compose {
+  padding: 10px 24px 22px !important;
+  background: linear-gradient(to bottom, transparent 0%, color-mix(in srgb, var(--ob-canvas) 94%, transparent) 28%, var(--ob-canvas) 100%);
+}
+
+.chat-compose > p {
+  margin-top: 7px !important;
+  color: var(--label-tertiary) !important;
+  font-size: 10.5px !important;
+  opacity: .9;
+}
+
+.composer-chat {
+  max-width: 780px;
+  margin-inline: auto;
+  padding: 10px 11px 10px 14px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 21px !important;
+  background: color-mix(in srgb, var(--ob-material-strong) 97%, transparent) !important;
+  box-shadow: 0 14px 40px rgba(18,18,28,.085), 0 2px 7px rgba(18,18,28,.035), 0 1px 0 rgba(255,255,255,.7) inset !important;
+  backdrop-filter: blur(26px) saturate(165%);
+  -webkit-backdrop-filter: blur(26px) saturate(165%);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms var(--ob-motion);
+}
+
+.composer-chat:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--ob-hairline)) !important;
+  box-shadow: 0 16px 46px rgba(18,18,28,.1), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent) !important;
+}
+
+.composer-chat textarea {
+  min-height: 42px !important;
+  padding: 7px 8px 6px !important;
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+}
+
+.composer-bar {
+  align-items: center !important;
+  gap: 7px !important;
+}
+
+.composer-bar .add-file,
+.composer-mode,
+.choice-menu-trigger {
+  min-height: 38px !important;
+}
+
+.composer-bar .add-file {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  transition: background 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.composer-bar .add-file:hover {
+  background: var(--surface-muted) !important;
+}
+
+.composer-bar .add-file:active {
+  transform: scale(.94);
+}
+
+.composer-mode {
+  border-radius: 11px !important;
+  padding-inline: 10px !important;
+  color: var(--label-secondary) !important;
+  background: transparent !important;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.composer-mode:hover {
+  background: var(--surface-muted) !important;
+  color: var(--label-primary) !important;
+}
+
+.composer-mode.yolo {
+  color: var(--warning) !important;
+}
+
+.composer-hint {
+  font-size: 10.5px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.composer .send {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background: var(--bubble-outgoing) !important;
+  color: var(--bubble-outgoing-label) !important;
+  transition: transform 140ms var(--ob-motion), opacity 140ms ease, box-shadow 140ms ease;
+}
+
+.composer .send:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(15,15,20,.13);
+}
+
+.composer .send:not(:disabled):hover {
+  transform: translateY(-1px) scale(1.025);
+}
+
+.composer .send:not(:disabled):active {
+  transform: scale(.93);
+}
+
+.compose-file {
+  border-color: var(--ob-hairline) !important;
+  background: color-mix(in srgb, var(--surface-muted) 70%, var(--system-background)) !important;
+  border-radius: 13px !important;
+  box-shadow: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Context rail and browser rail
+   -------------------------------------------------------------------------- */
+
+.conversation-context,
+.browser-pane {
+  background: var(--ob-material) !important;
+  border-left: 1px solid var(--ob-hairline) !important;
+  backdrop-filter: blur(28px) saturate(165%);
+  -webkit-backdrop-filter: blur(28px) saturate(165%);
+}
+
+.conversation-context > header,
+.browser-pane > header {
+  min-height: 58px;
+  padding: 12px 15px !important;
+}
+
+.conversation-context-content {
+  padding-inline: 14px;
+}
+
+.safety-card,
+.context-work,
+.browser-access-card,
+.live-computer {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 5px 18px rgba(20,20,30,.03);
+}
+
+.context-person {
+  padding: 14px 6px;
+}
+
+.context-person .character {
+  filter: drop-shadow(0 4px 9px rgba(20,20,30,.08));
+}
+
+/* --------------------------------------------------------------------------
+   Drawers, menus and top-layer surfaces
+   -------------------------------------------------------------------------- */
+
+.detail-drawer {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: var(--ob-radius-sheet) !important;
+  background: var(--ob-canvas-raised) !important;
+  box-shadow: var(--ob-shadow-floating) !important;
+}
+
+.detail-drawer::backdrop {
+  background: rgba(20,20,25,.18) !important;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.detail-drawer > header {
+  border-bottom-color: var(--ob-hairline) !important;
+  background: color-mix(in srgb, var(--ob-material-strong) 88%, transparent) !important;
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+}
+
+.detail-drawer .drawer-close {
+  border-radius: 50% !important;
+  background: var(--surface-muted) !important;
+  transition: transform 140ms var(--ob-motion), background 140ms ease;
+}
+
+.detail-drawer .drawer-close:hover {
+  transform: rotate(2deg) scale(1.03);
+}
+
+.conversation-actions-popover,
+.choice-menu-popover {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--ob-material-strong) 98%, transparent) !important;
+  box-shadow: var(--ob-shadow-raised) !important;
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+}
+
+.conversation-actions-menu button,
+.choice-menu-popover [role="option"] {
+  border-radius: 9px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Create teammate: character-first rather than form-first
+   -------------------------------------------------------------------------- */
+
+.create-teammate {
+  gap: 18px !important;
+}
+
+.create-teammate .new-character {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: 122px minmax(0, 1fr);
+  align-items: center !important;
+  gap: 18px !important;
+  min-height: 142px;
+  margin: -4px 0 2px !important;
+  padding: 18px 20px;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 19px;
+  background:
+    radial-gradient(circle at 64px 62px, color-mix(in srgb, var(--surface-muted) 68%, transparent), transparent 54%),
+    color-mix(in srgb, var(--ob-material-strong) 96%, transparent);
+  overflow: hidden;
+}
+
+.create-teammate .new-character::after {
+  content: "";
+  position: absolute;
+  inset: auto -42px -70px auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-muted) 44%, transparent);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.create-teammate .new-character .character {
+  justify-self: center;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 12px 18px rgba(20,20,30,.10));
+}
+
+.create-teammate .new-character p {
+  position: relative;
+  z-index: 1;
+  margin: 0 !important;
+  max-width: 35ch !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+.create-teammate .new-character strong {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--label-primary) !important;
+  font-size: 18px;
+  font-weight: 660 !important;
+  letter-spacing: -0.025em;
+}
+
+.sheet-mode {
+  padding: 3px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--surface-muted) !important;
+}
+
+.sheet-mode button {
+  min-height: 36px !important;
+  border-radius: 8px !important;
+  font-size: 11.5px !important;
+}
+
+.sheet-mode button.current {
+  border-color: var(--ob-hairline) !important;
+  background: var(--system-background) !important;
+  box-shadow: 0 2px 7px rgba(20,20,30,.06) !important;
+}
+
+.create-teammate > label,
+.create-teammate .creation-field {
+  gap: 7px !important;
+  color: var(--label-secondary) !important;
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.create-teammate :is(input, textarea, select) {
+  min-height: 46px !important;
+  padding: 11px 12px !important;
+  border-color: var(--ob-hairline) !important;
+  border-radius: 11px !important;
+  background: var(--ob-material-strong) !important;
+  font-size: 13.5px !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.create-teammate :is(input, textarea, select):focus {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--ob-hairline)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.teammate-section {
+  border-top-color: var(--ob-hairline) !important;
+  padding-top: 18px !important;
+}
+
+.appearance-picker fieldset {
+  margin: 15px 0 !important;
+}
+
+.shape-options {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.shape-options button {
+  min-height: 72px !important;
+  padding: 8px 4px !important;
+  border-color: var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--ob-material-strong) 88%, transparent);
+  transition: transform 160ms var(--ob-motion), background 160ms ease, border-color 160ms ease;
+}
+
+.shape-options button:hover {
+  transform: translateY(-1px);
+  background: var(--system-background) !important;
+}
+
+.shape-options button[aria-pressed="true"] {
+  border-color: var(--label-primary) !important;
+  box-shadow: 0 0 0 1px var(--label-primary) inset, 0 5px 16px rgba(20,20,30,.05);
+  background: var(--system-background) !important;
+}
+
+.color-options {
+  grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+.color-options button {
+  min-height: 44px !important;
+  border-radius: 11px !important;
+  transition: transform 150ms var(--ob-motion), background 150ms ease;
+}
+
+.color-options button:hover {
+  transform: translateY(-1px);
+}
+
+.character-customize,
+.profile-import {
+  border-color: var(--ob-hairline) !important;
+}
+
+.team-template-row,
+.profile-import-panel,
+.import-plan {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 14px !important;
+  background: var(--ob-material-strong) !important;
+}
+
+.first-teammate {
+  max-width: 560px !important;
+  padding-top: 72px !important;
+}
+
+.first-teammate-mark {
+  width: 92px !important;
+  height: 92px !important;
+  border: 1px solid var(--ob-hairline) !important;
+  background: var(--ob-material-strong);
+  box-shadow: var(--ob-shadow-soft);
+}
+
+.first-teammate h1 {
+  font-size: 34px !important;
+  letter-spacing: -0.045em !important;
+}
+
+.first-teammate p {
+  margin-top: 16px !important;
+  line-height: 1.65 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Settings: less card-stack, more native preference hierarchy
+   -------------------------------------------------------------------------- */
+
+.settings-page-layout {
+  background: var(--ob-canvas) !important;
+}
+
+.settings-page-sidebar {
+  background: var(--ob-material) !important;
+  border-right-color: var(--ob-hairline) !important;
+  backdrop-filter: blur(28px) saturate(165%);
+  -webkit-backdrop-filter: blur(28px) saturate(165%);
+}
+
+.settings-search-bar {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 10px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.025);
+}
+
+.settings-nav-button {
+  min-height: 38px;
+  border-radius: 9px !important;
+  transition: background 120ms ease, transform 120ms var(--ob-motion) !important;
+}
+
+.settings-nav-button.active {
+  background: var(--system-background) !important;
+  box-shadow: 0 2px 8px rgba(20,20,30,.055) !important;
+  font-weight: 600 !important;
+}
+
+.settings-nav-button:active:not(:disabled) {
+  transform: scale(.985) !important;
+}
+
+.settings-page-content {
+  background: var(--ob-canvas) !important;
+}
+
+.settings-page-header {
+  padding: 28px 32px 18px !important;
+  border-bottom-color: var(--ob-hairline) !important;
+  background: color-mix(in srgb, var(--ob-canvas) 88%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.settings-page-title {
+  font-size: 22px !important;
+  font-weight: 680 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.settings-page-desc {
+  margin-top: 4px !important;
+  font-size: 12px !important;
+}
+
+.settings-page-body {
+  padding: 24px 32px 64px !important;
+}
+
+.settings-group {
+  margin-block: 24px !important;
+}
+
+.settings-group-title {
+  margin-left: 4px !important;
+  margin-bottom: 8px !important;
+  font-size: 11px !important;
+  font-weight: 620 !important;
+  color: var(--label-tertiary) !important;
+  letter-spacing: 0 !important;
+}
+
+.settings-card {
+  border: 1px solid var(--ob-hairline) !important;
+  border-radius: 15px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 4px 18px rgba(20,20,30,.025);
+  overflow: hidden;
+}
+
+.settings-row {
+  min-height: 58px;
+  border-top-color: color-mix(in srgb, var(--ob-hairline) 80%, transparent) !important;
+  padding: 11px 14px !important;
+}
+
+.settings-row-text strong {
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.settings-row-text small {
+  margin-top: 3px !important;
+  color: var(--label-tertiary) !important;
+  line-height: 1.4 !important;
+}
+
+.settings-row :is(input, textarea, select) {
+  border-color: var(--ob-hairline) !important;
+  border-radius: 9px !important;
+  background: var(--system-background) !important;
+}
+
+.settings-nav-row:hover {
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent) !important;
+}
+
+.apple-segmented-control {
+  background: var(--surface-muted) !important;
+  border-radius: 9px !important;
+  padding: 3px !important;
+}
+
+.apple-segmented-item {
+  border-radius: 7px !important;
+}
+
+.apple-segmented-item.is-selected {
+  background: var(--system-background) !important;
+  box-shadow: 0 2px 6px rgba(20,20,30,.07) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Character movement: more life, never more noise
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ob-character-idle {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    45% { transform: translateY(-1.3px) rotate(.2deg); }
+    70% { transform: translateY(-.3px) rotate(-.15deg); }
+  }
+
+  .pinned-open .character,
+  .identity-mascot .character,
+  .new-character .character {
+    animation: ob-character-idle 4.8s ease-in-out infinite;
+  }
+
+  .pinned-avatar:nth-child(2n) .character {
+    animation-delay: -1.9s;
+  }
+
+  .pinned-avatar:nth-child(3n) .character {
+    animation-delay: -3.1s;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive pass
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  :root { --ob-sidebar-width: 272px; }
+  .shape-options { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    padding: 14px 10px 10px !important;
+  }
+
+  .conversation-search {
+    margin-inline: 4px !important;
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 126px !important;
+  }
+
+  .chat-scroll {
+    padding-inline: 13px !important;
+  }
+
+  .chat-compose {
+    padding: 8px 9px calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .composer-chat {
+    border-radius: 18px !important;
+    padding-inline: 9px !important;
+  }
+
+  .from-team,
+  .from-you {
+    max-width: 92% !important;
+  }
+
+  .from-team > .prose,
+  .from-you,
+  .prose {
+    font-size: var(--text-body-touch) !important;
+  }
+
+  .detail-drawer {
+    border-radius: 0 !important;
+    border-inline: 0 !important;
+  }
+
+  .create-teammate .new-character {
+    grid-template-columns: 92px minmax(0, 1fr);
+    min-height: 124px;
+    padding: 14px;
+  }
+
+  .create-teammate .new-character .character {
+    width: 82px !important;
+    height: 82px !important;
+  }
+
+  .shape-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .color-options {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .settings-page-header,
+  .settings-page-body {
+    padding-inline: 18px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinned-open .character,
+  .identity-mascot .character,
+  .new-character .character {
+    animation: none !important;
+  }
+}

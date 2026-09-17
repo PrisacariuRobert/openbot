@@ -1,0 +1,356 @@
+/*
+ * OpenBot control system.
+ *
+ * One visual grammar for every frequently-used control:
+ * - icon-only actions are circles
+ * - buttons, fields and menu rows are rounded rectangles
+ * - pills are reserved for status/filter chips
+ *
+ * Loaded last so old component-specific radii cannot drift apart again.
+ */
+
+:root {
+  --control-height: 38px;
+  --control-height-compact: 34px;
+  --control-radius: 10px;
+  --control-radius-large: 12px;
+  --control-hit: 40px;
+  --control-gap: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Conversation header: three equal icon actions, no giant capsule wrapper.
+   -------------------------------------------------------------------------- */
+
+.workspace > .topbar,
+.workspace-chat > .topbar {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 100%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 98%, transparent) 54%,
+    color-mix(in srgb, var(--canvas) 78%, transparent) 76%,
+    transparent 100%
+  ) !important;
+  backdrop-filter: blur(18px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
+}
+
+.workspace > .topbar::before {
+  z-index: -1 !important;
+  height: 92px !important;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 100%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 96%, transparent) 55%,
+    color-mix(in srgb, var(--canvas) 60%, transparent) 80%,
+    transparent 100%
+  ) !important;
+  backdrop-filter: blur(22px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(145%) !important;
+}
+
+.topbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--control-gap) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+header.topbar .topbar-right .topbar-control,
+header.topbar .topbar-right .conversation-actions > button,
+.topbar-left .topbar-control {
+  width: var(--control-hit) !important;
+  height: var(--control-hit) !important;
+  min-width: var(--control-hit) !important;
+  min-height: var(--control-hit) !important;
+  padding: 0 !important;
+  border: 1px solid var(--afr-border) !important;
+  border-radius: 50% !important;
+  background: var(--afr-toolbar) !important;
+  color: var(--label-secondary) !important;
+  box-shadow: 0 5px 16px rgba(18, 18, 24, .055) !important;
+  backdrop-filter: blur(22px) saturate(175%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(175%) !important;
+  display: grid !important;
+  place-items: center !important;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 100ms ease !important;
+}
+
+header.topbar .topbar-right .topbar-control:hover,
+header.topbar .topbar-right .conversation-actions > button:hover,
+.topbar-left .topbar-control:hover,
+header.topbar .topbar-right .topbar-control[aria-expanded="true"],
+header.topbar .topbar-right .conversation-actions > button[aria-expanded="true"] {
+  background: var(--afr-toolbar-strong) !important;
+  border-color: var(--afr-border-strong) !important;
+  color: var(--label-primary) !important;
+  transform: translateY(-1px) !important;
+}
+
+header.topbar .topbar-right button:active,
+.topbar-left .topbar-control:active {
+  transform: scale(.94) !important;
+}
+
+/* The contact identity is text + character, not another pill. */
+.identity-pill {
+  min-height: 36px !important;
+  padding: 5px 8px !important;
+  border-radius: var(--control-radius) !important;
+  background: transparent !important;
+}
+
+.identity-pill:hover,
+.identity-pill[aria-expanded="true"] {
+  background: var(--afr-fill) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Global control grammar.
+   -------------------------------------------------------------------------- */
+
+.primary,
+.secondary,
+.settings-action,
+.import-actions > button:not(.text-action),
+.team-template-row button,
+.creation-summary button,
+.create-secondary-path,
+.group-editor > .primary,
+.detail-drawer .primary,
+.detail-drawer .secondary {
+  min-height: var(--control-height) !important;
+  padding: 0 14px !important;
+  border-radius: var(--control-radius) !important;
+}
+
+/* Text/link actions get a real hit target without turning into pills. */
+.settings-page-body .text-action,
+.detail-drawer .text-action,
+.context-group .text-action,
+.section-heading > button,
+.project-rooms .compose-secondary,
+.sidebar .compose-secondary {
+  min-height: 32px !important;
+  padding: 5px 8px !important;
+  border-radius: 8px !important;
+}
+
+/* Fields and selector triggers share the same geometry. */
+:is(.create-teammate, .settings-page-body, .detail-drawer) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select),
+.choice-trigger {
+  border-radius: var(--control-radius) !important;
+}
+
+.choice-trigger:not(.choice-compact .choice-trigger) {
+  min-height: var(--control-height) !important;
+  padding-inline: 11px !important;
+}
+
+.choice-compact .choice-trigger,
+.composer-mode,
+.safety-toggle {
+  min-height: var(--control-height-compact) !important;
+  padding: 0 10px !important;
+  border-radius: var(--control-radius) !important;
+}
+
+/* Only semantic chips are pills. */
+:is(.status-pill, .badge, .settings-badge, .provider-status, .connection-status, .file-status, .routine-status) {
+  border-radius: 999px !important;
+}
+
+/* Menu surfaces are rounded panels; menu rows are rectangles. */
+.choice-popover,
+.conversation-actions-popover {
+  border-radius: 14px !important;
+  padding: 5px !important;
+}
+
+.choice-popover > button,
+.conversation-actions-popover .conversation-actions-menu > button {
+  min-height: 40px !important;
+  padding: 7px 10px !important;
+  border-radius: 9px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Appearance chooser: every swatch is a genuine, equally-sized control.
+   -------------------------------------------------------------------------- */
+
+.appearance-picker fieldset {
+  margin: 16px 0 !important;
+}
+
+.appearance-picker legend {
+  margin-bottom: 9px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--label-secondary) !important;
+}
+
+.shape-options {
+  gap: 7px !important;
+}
+
+.shape-options button {
+  min-height: 74px !important;
+  padding: 8px 6px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--control-radius-large) !important;
+  background: transparent !important;
+}
+
+.shape-options button:hover {
+  background: var(--afr-fill) !important;
+}
+
+.shape-options button[aria-pressed="true"] {
+  border-color: var(--afr-border-strong) !important;
+  background: var(--afr-selection) !important;
+}
+
+.color-options {
+  display: grid !important;
+  grid-template-columns: repeat(9, 38px) !important;
+  gap: 6px !important;
+  justify-content: start !important;
+}
+
+.color-options > button,
+.color-options > .custom-color-swatch {
+  position: relative;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--control-radius) !important;
+  background: transparent !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden;
+}
+
+.color-options > button:hover,
+.color-options > .custom-color-swatch:hover {
+  background: var(--afr-fill) !important;
+}
+
+.color-options > button[aria-pressed="true"],
+.color-options > .custom-color-swatch.is-custom {
+  border-color: var(--afr-border-strong) !important;
+  background: var(--afr-selection) !important;
+}
+
+.color-options .color-swatch,
+.custom-color-swatch .rainbow-ring {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 50% !important;
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.10);
+}
+
+.custom-color-swatch {
+  cursor: pointer;
+}
+
+.custom-color-input {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.custom-color-swatch:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar + inspector spacing.
+   -------------------------------------------------------------------------- */
+
+.sidebar-bottom .workspace-link,
+.conversation-row,
+.context-work,
+.context-capabilities > summary,
+.settings-nav button,
+.settings-nav-item {
+  border-radius: var(--control-radius) !important;
+}
+
+.context-work {
+  padding: 9px 8px !important;
+}
+
+.context-capabilities > summary {
+  padding: 8px !important;
+}
+
+/* Avoid controls whose icon/text touches the edge. */
+:is(.context-work, .agenda-row, .work-row, .settings-row, .settings-nav-row) > :first-child {
+  margin-left: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile: preserve the same grammar with larger hit areas.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 760px), (pointer: coarse) {
+  :root {
+    --control-hit: 44px;
+    --control-height: 44px;
+    --control-height-compact: 40px;
+  }
+
+  .workspace > .topbar,
+  .workspace-chat > .topbar {
+    background: linear-gradient(
+      to bottom,
+      var(--canvas) 0%,
+      color-mix(in srgb, var(--canvas) 98%, transparent) 62%,
+      color-mix(in srgb, var(--canvas) 72%, transparent) 82%,
+      transparent 100%
+    ) !important;
+  }
+
+  .color-options {
+    grid-template-columns: repeat(5, 44px) !important;
+    gap: 7px !important;
+  }
+
+  .color-options > button,
+  .color-options > .custom-color-swatch {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  header.topbar .topbar-right .topbar-control,
+  header.topbar .topbar-right .conversation-actions > button,
+  .topbar-left .topbar-control {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--system-background) !important;
+  }
+}

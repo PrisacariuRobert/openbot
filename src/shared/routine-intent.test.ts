@@ -7,6 +7,9 @@ test("clock requests retain their requested weekday, time and explicit or client
   const intent = parseRoutineIntent("Every weekday at 8 AM Europe/Brussels, prepare my brief");
   assert.deepEqual(intent?.schedule, { kind: "calendar", timeZone: "Europe/Brussels", time: "08:00", daysOfWeek: [1, 2, 3, 4, 5] });
   assert.equal(intent?.prompt, "prepare my brief");
+  assert.match(intent?.confirmation || "", /^Done —/);
+  assert.match(intent?.confirmation || "", /in Schedule if you ever want to review it/);
+  assert.doesNotMatch(intent?.confirmation || "", /open|go to|Automations/i);
   assert.deepEqual(parseRoutineIntent("Every Monday at 2:15 pm review the week", "America/New_York")?.schedule,
     { kind: "calendar", timeZone: "America/New_York", time: "14:15", daysOfWeek: [1] });
   assert.equal(routineScheduleInput.safeParse(parseRoutineIntent("Daily at 00:00 UTC check the queue")?.schedule).success, true);
@@ -23,7 +26,7 @@ test("understands a natural five-minute in-app message routine", () => {
     intervalMinutes: 5,
     name: "Hello",
     prompt: "Post this exact update in the current OpenBot conversation: hello",
-    confirmation: "I’ll post “hello” here every 5 minutes. You can test, pause or change it anytime in Automations.",
+    confirmation: "Done — I’ll post “hello” here every 5 minutes. It’s in Schedule if you ever want to review it.",
   });
 });
 

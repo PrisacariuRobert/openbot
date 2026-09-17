@@ -1,0 +1,563 @@
+/* Top-level Studio pages: Chats, Activity, Schedule and Library. */
+
+.page-content {
+  width: min(1120px, 100%) !important;
+  padding: 48px 58px 78px !important;
+}
+
+.page-heading {
+  margin: 4px 0 34px !important;
+  align-items: end !important;
+}
+
+.page-heading h1,
+.chat-empty h1 {
+  font-size: 34px !important;
+  font-weight: 690 !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.05em !important;
+}
+
+.page-heading .overline,
+.overline {
+  margin-bottom: 9px !important;
+  color: var(--label-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 650 !important;
+  letter-spacing: .09em !important;
+}
+
+.page-heading .primary {
+  min-height: 40px;
+  padding-inline: 15px !important;
+  border-radius: 11px !important;
+  background: var(--bubble-outgoing) !important;
+  color: var(--bubble-outgoing-label) !important;
+  box-shadow: 0 7px 18px rgba(20,20,28,.09);
+  transition: transform 150ms var(--ob-motion), box-shadow 150ms ease;
+}
+
+.page-heading .primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(20,20,28,.12);
+}
+
+.page-heading .primary:active {
+  transform: scale(.97);
+}
+
+.count-label {
+  padding: 5px 9px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 999px;
+  background: var(--ob-material-strong);
+  font-size: 10.5px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Chats / home
+   -------------------------------------------------------------------------- */
+
+.conversations-page .conversation-search {
+  max-width: 460px;
+  margin: 0 0 24px !important;
+}
+
+.favorite-teammates {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 14px !important;
+  margin: 0 0 28px !important;
+}
+
+.favorite-teammates button {
+  min-width: 88px;
+  padding: 10px 12px !important;
+  border: 1px solid transparent;
+  border-radius: 16px !important;
+  transition: transform 170ms var(--ob-motion), background 170ms ease, border-color 170ms ease;
+}
+
+.favorite-teammates button:hover {
+  transform: translateY(-2px);
+  border-color: var(--ob-hairline);
+  background: var(--ob-material-strong);
+}
+
+.favorite-teammates .character {
+  filter: drop-shadow(0 7px 12px rgba(20,20,30,.08));
+}
+
+.favorite-teammates button span {
+  margin-top: 7px;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+.inbox-conversations {
+  padding: 4px 0;
+  border-top: 1px solid var(--ob-hairline);
+}
+
+.inbox-conversations .conversation-cell {
+  margin-inline: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Activity
+   -------------------------------------------------------------------------- */
+
+.activity-page {
+  max-width: 1040px;
+}
+
+.activity-page > section + section {
+  margin-top: 31px !important;
+}
+
+.activity-page .section-heading,
+.attention-section > h2 {
+  min-height: 38px;
+  padding: 0 4px 10px !important;
+  border-bottom: 1px solid var(--ob-hairline) !important;
+}
+
+.activity-page .section-heading h2,
+.attention-section > h2 {
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.01em;
+}
+
+.attention-section {
+  padding: 15px 15px 3px;
+  border: 1px solid color-mix(in srgb, var(--warning) 18%, var(--ob-hairline));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--warning) 4%, var(--ob-material-strong));
+  box-shadow: 0 8px 26px rgba(20,20,30,.035);
+}
+
+.attention-section > h2 {
+  color: var(--label-primary);
+}
+
+.attention-section .work-row,
+.attention-section .attention-notice {
+  margin-inline: -3px;
+  padding-inline: 10px !important;
+  border-radius: 12px;
+}
+
+.work-row {
+  min-height: 72px;
+  padding: 12px 8px !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ob-hairline) 84%, transparent) !important;
+  border-radius: 12px;
+  transition: background 150ms ease, transform 150ms var(--ob-motion);
+}
+
+.work-row:hover {
+  background: color-mix(in srgb, var(--surface-muted) 48%, transparent);
+  transform: translateX(2px);
+}
+
+.work-row:hover strong {
+  color: var(--label-primary) !important;
+}
+
+.work-document {
+  width: 43px !important;
+  height: 47px !important;
+}
+
+.work-document > svg:not(.character) {
+  padding: 9px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 11px !important;
+  background: var(--ob-material-strong) !important;
+  box-shadow: 0 3px 10px rgba(20,20,30,.025);
+}
+
+.work-row strong {
+  font-size: 13px !important;
+  font-weight: 620 !important;
+}
+
+.work-row small,
+.work-meta {
+  font-size: 10.5px !important;
+}
+
+.attention-notice {
+  display: grid;
+  gap: 4px;
+  padding: 13px 10px !important;
+  border-bottom: 1px solid var(--ob-hairline);
+  text-decoration: none;
+  transition: background 150ms ease;
+}
+
+.attention-notice:hover {
+  background: color-mix(in srgb, var(--surface-muted) 46%, transparent);
+}
+
+.attention-notice strong {
+  font-size: 12px;
+}
+
+.attention-notice span,
+.attention-notice small {
+  font-size: 10.5px;
+  color: var(--label-tertiary);
+  line-height: 1.45;
+}
+
+.empty {
+  padding: 26px 6px !important;
+}
+
+.empty-rule {
+  width: 25px !important;
+  border-color: var(--ob-hairline-strong) !important;
+}
+
+.empty h3 {
+  color: var(--label-secondary) !important;
+  font-size: 13px !important;
+  font-weight: 620 !important;
+}
+
+.empty p,
+.quiet-copy {
+  color: var(--label-tertiary) !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Schedule
+   -------------------------------------------------------------------------- */
+
+.schedule-page {
+  max-width: 1080px;
+}
+
+.schedule-layout {
+  grid-template-columns: minmax(0, 1.18fr) minmax(300px, .82fr) !important;
+  gap: 18px !important;
+  align-items: start;
+}
+
+.month-view,
+.day-agenda {
+  border: 1px solid var(--ob-hairline);
+  border-radius: 18px;
+  background: var(--ob-material-strong);
+  box-shadow: 0 5px 22px rgba(20,20,30,.03);
+}
+
+.month-view {
+  padding: 18px 18px 16px;
+}
+
+.month-view > header {
+  margin-bottom: 14px !important;
+}
+
+.month-view > header h2 {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+}
+
+.month-view > header button {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  transition: background 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.month-view > header button:hover {
+  background: var(--surface-muted);
+}
+
+.month-view > header button:active {
+  transform: scale(.94);
+}
+
+.weekdays {
+  padding-bottom: 10px !important;
+  font-size: 10px !important;
+  font-weight: 650;
+}
+
+.month-days {
+  row-gap: 3px !important;
+}
+
+.month-days > button {
+  height: 45px !important;
+  border-radius: 11px;
+}
+
+.month-days > button span {
+  width: 35px !important;
+  height: 35px !important;
+  transition: background 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.month-days button:hover span {
+  background: color-mix(in srgb, var(--surface-muted) 78%, transparent) !important;
+  transform: scale(1.04);
+}
+
+.month-days button.chosen span {
+  background: var(--bubble-outgoing) !important;
+  color: var(--bubble-outgoing-label) !important;
+  box-shadow: 0 5px 12px rgba(20,20,30,.1);
+}
+
+.month-days i {
+  bottom: 3px !important;
+  width: 4px !important;
+  height: 4px !important;
+  background: var(--accent) !important;
+}
+
+.calendar-note {
+  margin: 15px 4px 0 !important;
+  padding-top: 12px;
+  border-top: 1px solid var(--ob-hairline);
+  font-size: 10.5px !important;
+  line-height: 1.55 !important;
+}
+
+.day-agenda {
+  padding: 17px 17px 16px !important;
+  border-left: 1px solid var(--ob-hairline) !important;
+}
+
+.day-agenda > h2 {
+  margin-bottom: 16px !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;
+}
+
+.day-agenda > .overline {
+  margin-bottom: 3px !important;
+}
+
+.day-agenda .agenda-row {
+  padding: 13px 4px !important;
+  border-color: var(--ob-hairline) !important;
+  border-radius: 10px;
+  transition: background 140ms ease;
+}
+
+.day-agenda .agenda-row:hover {
+  background: color-mix(in srgb, var(--surface-muted) 45%, transparent);
+}
+
+.agenda-row > time,
+.agenda-row strong,
+.agenda-row small {
+  font-size: 10.5px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Library
+   -------------------------------------------------------------------------- */
+
+.library-toolbar {
+  padding: 4px 4px 12px !important;
+  border-bottom: 1px solid var(--ob-hairline) !important;
+}
+
+.tabs {
+  gap: 5px !important;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.tabs button {
+  min-height: 31px;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 8px;
+  font-size: 10.5px !important;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.tabs button[aria-pressed="true"] {
+  background: var(--system-background);
+  color: var(--label-primary) !important;
+  box-shadow: 0 2px 6px rgba(20,20,30,.06);
+}
+
+.library-search {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 10px;
+  background: var(--ob-material-strong);
+}
+
+.library-search input {
+  width: 175px !important;
+  font-size: 11px !important;
+  outline: none !important;
+}
+
+.library-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--ob-hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.library-caption {
+  margin: 15px 4px 9px !important;
+  font-size: 10.5px !important;
+}
+
+.app-list,
+.skill-list {
+  border: 1px solid var(--ob-hairline);
+  border-radius: 17px;
+  background: var(--ob-material-strong);
+  overflow: hidden;
+  box-shadow: 0 5px 22px rgba(20,20,30,.025);
+}
+
+.app-row,
+.skill-row {
+  min-height: 76px;
+  gap: 14px !important;
+  padding: 13px 14px !important;
+  border-bottom: 1px solid var(--ob-hairline) !important;
+  transition: background 140ms ease, transform 140ms var(--ob-motion);
+}
+
+.app-row:last-child,
+.skill-row:last-child {
+  border-bottom: 0 !important;
+}
+
+.app-row:hover,
+.skill-row:hover {
+  background: color-mix(in srgb, var(--surface-muted) 42%, transparent) !important;
+}
+
+.app-row:active:not(:disabled),
+.skill-row:active:not(:disabled) {
+  transform: scale(.997);
+  filter: none !important;
+}
+
+.app-mark,
+.skill-number {
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px solid var(--ob-hairline);
+  border-radius: 12px !important;
+  background: var(--surface-muted);
+}
+
+.app-mark svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.app-row strong,
+.skill-row strong {
+  font-size: 12.5px !important;
+  font-weight: 620 !important;
+}
+
+.app-row small,
+.skill-row small {
+  font-size: 10.5px !important;
+  line-height: 1.45 !important;
+}
+
+.app-state,
+.skill-tag {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: 9.5px !important;
+}
+
+.library-page > .text-action,
+.page-content > .text-action {
+  margin-top: 10px;
+  padding: 9px 11px !important;
+  border-radius: 10px;
+}
+
+.library-page > .text-action:hover,
+.page-content > .text-action:hover {
+  background: color-mix(in srgb, var(--surface-muted) 55%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Mobile page polish
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .page-content {
+    padding: 28px 17px calc(76px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .page-heading {
+    margin-bottom: 25px !important;
+  }
+
+  .page-heading h1,
+  .chat-empty h1 {
+    font-size: 30px !important;
+  }
+
+  .schedule-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .day-agenda {
+    margin-top: 0;
+  }
+
+  .app-list,
+  .skill-list,
+  .month-view,
+  .day-agenda {
+    border-radius: 15px;
+  }
+
+  .library-toolbar {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .library-search {
+    width: 100%;
+  }
+
+  .library-search input {
+    width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  .app-row,
+  .skill-row {
+    padding-inline: 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favorite-teammates button,
+  .work-row,
+  .month-view > header button,
+  .month-days > button span,
+  .app-row,
+  .skill-row {
+    transition: none !important;
+  }
+}

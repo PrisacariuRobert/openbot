@@ -8,6 +8,18 @@ import "./studio.css";
 import "./conversation-shell.css";
 import "./design-tokens.css";
 import "./settings-shell.css";
+import "./apple-polish.css";
+import "./apple-pages.css";
+import "./apple-capabilities.css";
+import "./apple-brand.css";
+import "./apple-contract-fixes.css";
+import "./apple-review-fixes.css";
+import "./apple-experience.css";
+import "./apple-hig-contracts.css";
+import "./apple-window-contract.css";
+import "./apple-final-refinement.css";
+import "./apple-control-system.css";
+import "./apple-content-cleanup.css";
 import { applyAppearance, savedAppearance } from "./useAppearance";
 
 applyAppearance(savedAppearance());

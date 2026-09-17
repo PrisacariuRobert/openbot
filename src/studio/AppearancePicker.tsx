@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import type { MascotKind } from "../shared/types";
 import { Character } from "./Character";
 import { mascotColors, mascotShapes } from "./mascot-catalog";
@@ -16,10 +15,10 @@ export function AppearancePicker({
   onColor: (color: string) => void;
   onShape: (shape: MascotKind) => void;
 }) {
-  const customInput = useRef<HTMLInputElement>(null);
   const presetValues = new Set(mascotColors.map(([, value]) => value.toLowerCase()));
   const isCustom = !presetValues.has(color.toLowerCase());
   const customValue = /^#[0-9a-f]{6}$/i.test(color) ? color : "#6757d9";
+
   return (
     <div className="appearance-picker">
       <fieldset>
@@ -44,6 +43,7 @@ export function AppearancePicker({
           ))}
         </div>
       </fieldset>
+
       <fieldset>
         <legend>Color</legend>
         <div className="color-options">
@@ -53,45 +53,38 @@ export function AppearancePicker({
               key={value}
               aria-label={`${label} character`}
               aria-pressed={color.toLowerCase() === value}
+              title={label}
               onClick={() => onColor(value)}
             >
-              <Character
-                name={`${label} preview`}
-                color={value}
-                variant={shape}
-                size={36}
+              <span
+                className="color-swatch"
+                style={{ background: value }}
+                aria-hidden="true"
               />
             </button>
           ))}
-          <button
-            type="button"
-            className="custom-color-swatch"
-            aria-label="Custom character color"
-            aria-pressed={isCustom}
+          <label
+            className={`custom-color-swatch${isCustom ? " is-custom" : ""}`}
             title="Custom color"
-            onClick={() => customInput.current?.click()}
           >
             {isCustom ? (
-              <Character
-                name="Custom color preview"
-                color={customValue}
-                variant={shape}
-                size={36}
+              <span
+                className="color-swatch"
+                style={{ background: customValue }}
+                aria-hidden="true"
               />
             ) : (
               <span className="rainbow-ring" aria-hidden="true" />
             )}
-          </button>
+            <input
+              className="custom-color-input"
+              aria-label="Custom character color"
+              type="color"
+              value={customValue}
+              onChange={(event) => onColor(event.target.value)}
+            />
+          </label>
         </div>
-        <input
-          ref={customInput}
-          aria-hidden="true"
-          tabIndex={-1}
-          type="color"
-          hidden
-          value={customValue}
-          onChange={(event) => onColor(event.target.value)}
-        />
       </fieldset>
     </div>
   );

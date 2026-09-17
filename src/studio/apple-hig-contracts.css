@@ -1,0 +1,435 @@
+/* Final HIG contracts that must win over visual refinements. */
+
+/* OpenBot is a full-window split-view application. The browser document is
+ * never the scroller; each sidebar, transcript, page, inspector and sheet owns
+ * its own scrolling. This also prevents hidden swipe/actions or floating
+ * materials from creating a phantom document scrollbar. */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+/* The application shell is a fixed window composition. Inset materials must
+ * consume space inside that window rather than making the document wider. */
+.studio-shell {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar,
+.workspace,
+.conversation-context,
+.browser-pane,
+.page-content,
+.settings-page-body,
+.settings-page-header,
+.detail-drawer,
+.create-teammate {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* A split-view pane owns its paint. Swipe actions, hover translations and
+ * scroll-edge material must never make the browser document horizontally
+ * scrollable. Vertical scrolling remains with the pane's existing scrollers. */
+.workspace,
+.sidebar,
+.conversation-context,
+.browser-pane {
+  overflow-x: clip;
+}
+
+/* Chats has off-canvas swipe affordances and larger pinned hit targets. They
+ * belong to this page, not to the browser viewport. The page's own scrollWidth
+ * is still checked by acceptance, so a genuinely too-wide layout still fails. */
+.conversations-page {
+  overflow-x: clip;
+}
+
+/* A floating toolbar needs a legibility edge, not an opaque hard bar. */
+.workspace > .topbar {
+  isolation: isolate;
+}
+
+.workspace > .topbar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -12px -8px auto;
+  height: 88px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 72%, transparent) 56%,
+    transparent 100%
+  );
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 64%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 64%, transparent 100%);
+}
+
+/* The teammate identity is a compact contact control. Character is present,
+ * but never tall enough to compete with or overlap the conversation. */
+header.topbar .topbar-center {
+  flex-direction: row !important;
+  gap: 7px !important;
+  min-height: 40px;
+}
+
+.identity-mascot,
+.identity-stack {
+  width: auto !important;
+  min-width: 36px;
+  height: 36px;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transform: none !important;
+  filter: none !important;
+}
+
+.identity-mascot .character,
+.identity-stack .character {
+  width: 36px !important;
+  height: 36px !important;
+  filter: drop-shadow(0 2px 4px rgba(18, 18, 28, .08));
+}
+
+.identity-stack .character + .character {
+  margin-left: -10px !important;
+}
+
+.identity-stack .character {
+  box-shadow: 0 0 0 2px var(--canvas) !important;
+}
+
+.identity-pill {
+  min-height: 34px !important;
+  padding: 5px 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  font-size: 14px !important;
+  font-weight: 630 !important;
+}
+
+.identity-pill:hover {
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent) !important;
+}
+
+.workspace-chat > .chat-scroll {
+  padding-top: 82px !important;
+}
+
+.workspace-chat > .error-banner {
+  margin-top: 70px !important;
+}
+
+/* Keep the tested button but use a familiar inspector/info glyph rather than
+ * a monitor, which reads as “computer” and makes the control feel broken. */
+header.topbar button[aria-label="Conversation details"] > svg {
+  display: none;
+}
+
+header.topbar button[aria-label="Conversation details"]::before {
+  content: "i";
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+
+/* The context rail is a persistent inspector, not a modal card stack. */
+.conversation-context > header {
+  background: color-mix(in srgb, var(--obx-sidebar) 88%, transparent) !important;
+  border-bottom-color: var(--obx-border) !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* Project rooms are about people. The chooser reads like a contact picker,
+ * not a matrix of settings toggles. */
+.group-editor {
+  gap: 16px !important;
+}
+
+.group-editor-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+
+.group-editor-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent);
+  color: var(--label-secondary);
+}
+
+.group-editor-heading .overline {
+  margin: 1px 0 4px !important;
+}
+
+.group-editor-heading .detail-title {
+  margin-bottom: 5px !important;
+}
+
+.group-editor-heading .drawer-intro {
+  margin: 0 !important;
+  max-width: 50ch;
+}
+
+.group-name {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--label-secondary) !important;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.group-name input {
+  min-height: 42px;
+  padding: 9px 11px !important;
+  border: 1px solid var(--obx-border) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--obx-raised) 94%, transparent) !important;
+  font-size: 13.5px !important;
+}
+
+.group-name input:focus {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--obx-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+
+.group-members-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.group-members-heading small {
+  color: var(--label-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.group-members {
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--obx-border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--obx-raised) 88%, transparent);
+}
+
+.group-member {
+  min-height: 58px !important;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  gap: 10px !important;
+  align-items: center !important;
+  padding: 9px 11px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--label-primary) !important;
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--obx-border) 75%, transparent);
+}
+
+.group-member:last-child {
+  box-shadow: none;
+}
+
+.group-member:hover {
+  background: color-mix(in srgb, var(--surface-muted) 42%, transparent) !important;
+}
+
+.group-member.chosen {
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent) !important;
+}
+
+.group-member-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-member-copy strong,
+.group-member-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-copy strong {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.group-member-copy small {
+  width: auto !important;
+  font-size: 10px !important;
+  color: var(--label-tertiary) !important;
+}
+
+.group-member-check {
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  border: 1px solid var(--obx-border-strong);
+  border-radius: 50%;
+  color: transparent;
+}
+
+.group-member.chosen .group-member-check {
+  border-color: var(--label-primary);
+  background: var(--label-primary);
+  color: var(--system-background);
+}
+
+.group-member:not(.chosen) .group-member-check svg,
+.group-member.chosen .group-member-check svg {
+  opacity: 1 !important;
+  color: inherit !important;
+}
+
+.group-editor > .primary.full-width {
+  min-height: 42px;
+  border-radius: 11px;
+}
+
+/* Do not let decorative motion interfere with direct manipulation. */
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transition-duration: 80ms !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  /* Apple touch guidance: interactive targets remain at least 44pt. */
+  header.topbar .topbar-control,
+  header.topbar .conversation-actions > button,
+  .topbar-left .topbar-control,
+  .composer-bar .add-file,
+  .composer .send,
+  .safety-toggle,
+  .choice-menu-trigger,
+  .composer-mode {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  header.topbar .topbar-control,
+  header.topbar .conversation-actions > button,
+  .topbar-left .topbar-control,
+  .composer-bar .add-file,
+  .composer .send {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .topbar-right {
+    gap: 0 !important;
+    padding: 2px !important;
+  }
+
+  header.topbar .topbar-center {
+    gap: 5px !important;
+  }
+
+  .identity-mascot,
+  .identity-stack {
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .identity-mascot .character,
+  .identity-stack .character {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .identity-pill {
+    min-height: 38px !important;
+    max-width: min(46vw, 210px);
+    padding-inline: 8px !important;
+  }
+
+  .identity-pill .conversation-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-chat > .chat-scroll {
+    padding-top: 80px !important;
+  }
+
+  .workspace > .topbar::before {
+    height: 96px;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .composer-mode,
+  .choice-menu-trigger {
+    padding-inline: 11px !important;
+  }
+
+  .group-member {
+    min-height: 64px !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .workspace > .topbar::before,
+  .sidebar,
+  .conversation-context,
+  .composer-chat,
+  .topbar-right,
+  .topbar-left .topbar-control {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .sidebar,
+  .conversation-context,
+  .composer-chat,
+  .topbar-right,
+  .topbar-left .topbar-control {
+    background: var(--system-background) !important;
+  }
+}
