@@ -23,6 +23,12 @@ The current website is configured as an owner-private Sites preview. Public inde
 
 `public/media/openbot-introduction.mp4` is the current exported film; the VTT track describes its on-screen story. Run `npx tsx scripts/capture-marketing-ui.ts` from the OpenBot root to recapture the shipping React UI with disposable sample data. It does not call the user's host, sign in or execute a task. `../intro-film/public/actual-ui/manifest.json` records the captures. These are real layouts, not proof of real-account task completion.
 
+### Published screenshot set
+
+The website serves only `team.webp`, `day.webp`, and `build.webp` from `public/actual-ui/`. The retired Settings/provider screenshot tour no longer needs website copies. Its original PNG captures and manifest remain under `../intro-film/public/actual-ui/` for the registered film compositions and capture workflow. Do not remove those source captures when pruning the website output.
+
+Run `node scripts/check-static-assets.mjs` from the repository root after changing asset references. [Asset maintenance](../../docs/ASSET_MAINTENANCE.md) explains the retained runtime, native-catalog, and film assets.
+
 ## When the app is ready
 
 1. Verify the signed/notarized Mac release on a clean machine.

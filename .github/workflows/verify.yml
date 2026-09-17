@@ -28,6 +28,7 @@ jobs:
         run: |
           node --test .github/scripts/check-public-source.test.mjs
           node .github/scripts/check-public-source.mjs
+          node scripts/check-static-assets.mjs
       - name: Install code-search dependency
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: npm ci
