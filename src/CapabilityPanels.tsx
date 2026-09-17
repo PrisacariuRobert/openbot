@@ -6,6 +6,7 @@ import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
 import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
+import { prefixCrumbs, visibleWorkspaceFiles } from "./studio/file-navigation";
 import { groupActivityAttentionRuns } from "./studio/activity-attention";
 import { createTeammateRestoreCoordinator, type TeammateRestoreState } from "./studio/teammate-restore";
 import {
@@ -4991,21 +4992,45 @@ export function FilesPanel({ bot }: { bot: Bot }) {
       path: string;
       content: string;
     } | null>(null),
-    [loading, setLoading] = useState(true);
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState<string | null>(null),
+    [opening, setOpening] = useState<string | null>(null),
+    // U04c: folders drill down by path prefix instead of a dead Open button.
+    [prefix, setPrefix] = useState("");
   useEffect(() => {
-    setLoading(true);
-    api<WorkspaceFile[]>(`/api/bots/${bot.id}/files`)
-      .then(setFiles)
-      .finally(() => setLoading(false));
+    setSelected(null);
+    setPrefix("");
+    loadFiles();
   }, [bot.id]);
+  function loadFiles() {
+    setLoading(true);
+    setError(null);
+    api<WorkspaceFile[]>(`/api/bots/${bot.id}/files`).then(
+      (next) => setFiles(next),
+      (cause: unknown) => setError(cause instanceof Error ? cause.message : "Those files could not be listed."),
+    ).finally(() => setLoading(false));
+  }
   const open = async (file: WorkspaceFile) => {
-    if (file.kind === "file")
+    if (file.kind === "directory") {
+      setPrefix(file.path.endsWith("/") ? file.path : `${file.path}/`);
+      return;
+    }
+    setOpening(file.path);
+    setError(null);
+    try {
       setSelected(
         await api(
           `/api/bots/${bot.id}/file?path=${encodeURIComponent(file.path)}`,
         ),
       );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That file could not be opened.");
+    } finally {
+      setOpening(null);
+    }
   };
+  const crumbs = prefixCrumbs(prefix);
+  const visible = visibleWorkspaceFiles(files, prefix);
   if (selected)
     return (
       <div className="file-preview">
@@ -5032,22 +5057,42 @@ export function FilesPanel({ bot }: { bot: Bot }) {
         <div className="empty-panel">
           <LoaderCircle className="spinner" />
         </div>
+      ) : error ? (
+        <div className="empty-panel" role="alert">
+          <h3>Files aren’t loading</h3>
+          <p>{error}</p>
+          <button type="button" className="button-secondary" onClick={() => loadFiles()}>
+            <RefreshCw size={15} /> Retry
+          </button>
+        </div>
       ) : files.length ? (
-        <SettingsGroup title="Workspace files">
+        <SettingsGroup title={prefix ? `Workspace files · ${prefix}` : "Workspace files"}>
+          {error && <p className="panel-error" role="alert">{error}</p>}
+          {prefix && (
+            <div className="file-crumbs" role="navigation" aria-label="Folder">
+              <button type="button" onClick={() => setPrefix("")}>All files</button>
+              {crumbs.map((crumb, index) => (
+                <span key={crumb}>
+                  {" / "}
+                  <button type="button" onClick={() => setPrefix(`${crumbs.slice(0, index + 1).join("/")}/`)}>{crumb}</button>
+                </span>
+              ))}
+            </div>
+          )}
           <SettingsCard>
-            {files.map((file) => (
+            {visible.map((file) => (
               <SettingsRow
                 key={file.path}
-                title={file.path}
+                title={file.path.slice(prefix.length)}
                 description={file.kind === "file" ? `${Math.max(1, Math.round(file.size / 1024))} KB` : "Folder"}
                 control={
-                  <button type="button" onClick={() => void open(file)} aria-label={`Open ${file.path}`}>
+                  <button type="button" onClick={() => void open(file)} aria-label={`Open ${file.path}`} disabled={opening !== null}>
                     {file.kind === "directory" ? (
                       <Folder size={18} />
                     ) : (
                       <File size={18} />
                     )}
-                    <span>Open</span>
+                    <span>{opening === file.path ? "Opening…" : "Open"}</span>
                   </button>
                 }
               />
@@ -5134,6 +5179,9 @@ export function RoutinesPanel({
   onUnprotectRunner,
   onWakeRunner,
   onEnableNotifications,
+  /** Reload server state (used after a revision conflict so the next edit
+   * binds the current revision instead of 409-looping on a stale one). */
+  onRefresh,
 }: {
   routines: Routine[];
   events: AutomationEvent[];
@@ -5151,11 +5199,13 @@ export function RoutinesPanel({
   onReplay: (event: AutomationEvent) => Promise<void>;
   onRotateSecret: (routine: Routine) => Promise<RoutineSaveResult>;
   onResolveAlert: (alert: AutomationAlert) => Promise<void>;
-  onOpenResult: (routine: Routine) => void;
-  onProtectRunner: () => Promise<void>;
+  onOpenResult: (routine: Routine) => void;  onProtectRunner: () => Promise<void>;
   onUnprotectRunner: () => Promise<void>;
   onWakeRunner: () => Promise<void>;
   onEnableNotifications: () => Promise<boolean>;
+  /** Reload server state (used after a revision conflict so the next edit
+   * binds the current revision instead of 409-looping on a stale one). */
+  onRefresh: () => void;
 }) {
   const [creating, setCreating] = useState(routines.length === 0),
     [name, setName] = useState(""),
@@ -5186,6 +5236,10 @@ export function RoutinesPanel({
     [notionEntityId, setNotionEntityId] = useState("");
   const [enabled, setEnabled] = useState(true),
     [saving, setSaving] = useState(false),
+    // U04b: routine create/update/test/replay/rotate/clear failures surface
+    // here and above the list instead of vanishing. Same pattern as
+    // runRunnerAction below; kept separate so runner health copy stays put.
+    [actionError, setActionError] = useState<string | null>(null),
     [runnerBusy, setRunnerBusy] = useState(false),
     [runnerError, setRunnerError] = useState<string | null>(null),
     [runnerCare, setRunnerCare] = useState<RunnerCareStatus | null>(null),
@@ -5199,6 +5253,11 @@ export function RoutinesPanel({
     [transferCopied, setTransferCopied] = useState<"export" | "import" | null>(null),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
+  const runRoutineAction = async (action: () => Promise<void>) => {
+    setActionError(null);
+    try { await action(); }
+    catch (error) { setActionError(error instanceof Error ? error.message : "That automation change could not be saved."); }
+  };
   const [createdHook, setCreatedHook] = useState<{
     name: string;
     url: string;
@@ -5301,6 +5360,7 @@ export function RoutinesPanel({
     event.preventDefault();
     if (!selectedBot || !intervalValid || (triggerType === "schedule" && !scheduleValid) || saving) return;
     setSaving(true);
+    setActionError(null);
     const triggerConfig =
       triggerType === "webpage" ? { pageUrl: pageUrl.trim(), ...(pageSelector.trim() ? { pageSelector: pageSelector.trim() } : {}) } : triggerType === "github"
         ? {
@@ -5343,6 +5403,16 @@ export function RoutinesPanel({
           type: result.triggerType,
         });
       reset();
+    } catch (error) {
+      // The form stays open with every value so a 400 validation message or
+      // a 409 revision conflict can be repaired in place, not retyped. A
+      // conflict also refreshes the list underneath, so reopening Edit binds
+      // the current revision instead of 409-looping on the stale one. The
+      // code check is structural: failures arrive from different fetch
+      // helpers, only some of which carry a typed code.
+      const conflicted = (error as { code?: unknown } | null)?.code === "routine_conflict";
+      setActionError(error instanceof Error ? error.message : "That automation could not be saved.");
+      if (conflicted) onRefresh();
     } finally {
       setSaving(false);
     }
@@ -5606,7 +5676,10 @@ export function RoutinesPanel({
                     ["failed", "cancelled", "rate_limited"].includes(
                       sourceEvent.status,
                     ) && (
-                      <button onClick={() => void onReplay(sourceEvent)}>
+                      <button onClick={() => {
+                        if (!window.confirm(`Replay this event? It runs “${routine.name}” again with its real permissions.`)) return;
+                        void runRoutineAction(() => onReplay(sourceEvent));
+                      }}>
                         <RefreshCw size={12} /> Retry
                       </button>
                     )}
@@ -5615,7 +5688,7 @@ export function RoutinesPanel({
                       <ExternalLink size={12} /> Open
                     </button>
                   )}
-                  <button onClick={() => void onResolveAlert(alert)}>
+                  <button onClick={() => void runRoutineAction(() => onResolveAlert(alert))}>
                     <Check size={12} /> Clear
                   </button>
                 </div>
@@ -5669,6 +5742,7 @@ export function RoutinesPanel({
 
       {routines.length > 0 && (
         <div className="routine-list">
+          {actionError && <em className="runner-error" role="alert"><CircleAlert size={11} /> {actionError}</em>}
           {routines.map((routine) => {
             const bot =
               bots.find((item) => item.id === routine.botId) || bots[0]!;
@@ -5713,7 +5787,7 @@ export function RoutinesPanel({
                           `Test “${routine.name}” now? This uses the real permissions and can perform real actions.`,
                         )
                       )
-                        void onRun(routine);
+                        void runRoutineAction(() => onRun(routine));
                     }}
                     title="Test with real permissions"
                   >
@@ -5762,7 +5836,8 @@ export function RoutinesPanel({
                               "Create a new signing secret? The previous secret will stop working immediately.",
                             )
                           )
-                            void onRotateSecret(routine).then((result) => {
+                            void runRoutineAction(async () => {
+                              const result = await onRotateSecret(routine);
                               if (result.webhook)
                                 setCreatedHook({
                                   name: result.name,
@@ -5854,9 +5929,12 @@ export function RoutinesPanel({
                           {["failed", "cancelled", "rate_limited"].includes(
                             item.status,
                           ) && (
-                            <button onClick={() => void onReplay(item)}>
-                              <RefreshCw size={12} /> Retry
-                            </button>
+                          <button onClick={() => {
+                            if (!window.confirm(`Retry this event? It runs “${routine.name}” again with its real permissions.`)) return;
+                            void runRoutineAction(() => onReplay(item));
+                          }}>
+                            <RefreshCw size={12} /> Retry
+                          </button>
                           )}
                           <button onClick={() => onOpenResult(routine)}>
                             <ExternalLink size={12} /> Open
@@ -6273,6 +6351,7 @@ export function RoutinesPanel({
             </p>
           </div>
           <div className="form-actions">
+            {actionError && <em className="runner-error" role="alert"><CircleAlert size={11} /> {actionError}</em>}
             <button type="button" className="button-secondary" onClick={reset}>
               Cancel
             </button>
@@ -7026,16 +7105,35 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]),
     [selected, setSelected] = useState<ArtifactSummary | null>(null),
     [revisions, setRevisions] = useState<Attachment[]>([]),
-    [loading, setLoading] = useState(true);
-  useEffect(() => {
+    [loading, setLoading] = useState(true),
+    // U04c: revision fetch and list load surface errors instead of an
+    // empty card or a false-negative empty panel.
+    [error, setError] = useState<string | null>(null),
+    [revisionsLoading, setRevisionsLoading] = useState(false),
+    [revisionsError, setRevisionsError] = useState<string | null>(null);
+  function loadArtifacts() {
     setLoading(true);
-    api<ArtifactSummary[]>("/api/artifacts")
-      .then(setArtifacts)
-      .finally(() => setLoading(false));
+    setError(null);
+    api<ArtifactSummary[]>("/api/artifacts").then(
+      (next) => setArtifacts(next),
+      (cause: unknown) => setError(cause instanceof Error ? cause.message : "Those artifacts could not be listed."),
+    ).finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    loadArtifacts();
   }, []);
   const open = async (artifact: ArtifactSummary) => {
     setSelected(artifact);
-    setRevisions(await api<Attachment[]>(`/api/artifacts/${artifact.id}/revisions`));
+    setRevisions([]);
+    setRevisionsError(null);
+    setRevisionsLoading(true);
+    try {
+      setRevisions(await api<Attachment[]>(`/api/artifacts/${artifact.id}/revisions`));
+    } catch (cause) {
+      setRevisionsError(cause instanceof Error ? cause.message : "Those revisions could not be loaded.");
+    } finally {
+      setRevisionsLoading(false);
+    }
   };
   if (selected)
     return (
@@ -7054,6 +7152,19 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
           {selected.botName ? ` by ${selected.botName}` : ""} in {selected.threadTitle}.
         </p>
         <div className="file-list">
+          {revisionsLoading ? (
+            <div className="empty-panel">
+              <LoaderCircle className="spinner" />
+            </div>
+          ) : revisionsError ? (
+            <div className="empty-panel" role="alert">
+              <h3>Revisions aren’t loading</h3>
+              <p>{revisionsError}</p>
+              <button type="button" className="button-secondary" onClick={() => selected && void open(selected)}>
+                <RefreshCw size={15} /> Retry
+              </button>
+            </div>
+          ) : (
           <SettingsCard>
             {revisions.map((revision) => (
               <SettingsRow
@@ -7075,6 +7186,7 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
               />
             ))}
           </SettingsCard>
+          )}
         </div>
         <button className="text-action" onClick={() => { onOpenThread(selected.threadId); setSelected(null); }}>
           Open {selected.threadTitle} <ArrowRight size={14} />
@@ -7092,6 +7204,14 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
       {loading ? (
         <div className="empty-panel">
           <LoaderCircle className="spinner" />
+        </div>
+      ) : error ? (
+        <div className="empty-panel" role="alert">
+          <h3>Artifacts aren’t loading</h3>
+          <p>{error}</p>
+          <button type="button" className="button-secondary" onClick={() => loadArtifacts()}>
+            <RefreshCw size={15} /> Retry
+          </button>
         </div>
       ) : artifacts.length ? (
         <SettingsGroup title="Artifacts">

@@ -795,3 +795,8 @@
 .capabilities button.switch[data-on] {
   background: #34c759 !important;
 }
+
+/* U04c: folder breadcrumb for workspace drill-down. Token roles only. */
+.file-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.file-crumbs button { border: none; background: none; padding: 2px 4px; font: inherit; color: var(--accent); cursor: pointer; border-radius: 6px; }
+.file-crumbs button:hover { background: var(--surface-muted); }

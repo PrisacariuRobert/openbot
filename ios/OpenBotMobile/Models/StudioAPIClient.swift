@@ -311,14 +311,15 @@ struct StudioAPIClient {
         catch { throw StudioAPIError.invalidResponse }
     }
 
-    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String? = nil, expectedWorkKind: String? = nil) async throws {
+    func sendMessage(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String? = nil, expectedWorkKind: String? = nil, requestId: String? = nil) async throws {
         let payload = try JSONEncoder().encode(MessageRequest(
             threadId: threadID,
             body: body,
             targetBotIds: targetBotIDs,
             attachmentIds: attachmentIDs,
             replyToId: replyToID,
-            expectedWorkKind: expectedWorkKind
+            expectedWorkKind: expectedWorkKind,
+            requestId: requestId
         ))
         _ = try await dataRequest("api/messages", method: "POST", body: payload)
     }
@@ -588,8 +589,12 @@ struct StudioAPIClient {
         guard let http = response as? HTTPURLResponse else { throw StudioAPIError.unreachable }
         if http.statusCode == 401 { throw StudioAPIError.unauthorized }
         guard (200..<300).contains(http.statusCode) else {
-            let message = data.flatMap { try? JSONDecoder().decode(ServerMessage.self, from: $0).error }
-            throw StudioAPIError.server(message ?? "OpenBot could not finish that request.")
+            let envelope = data.flatMap { try? JSONDecoder().decode(ServerMessage.self, from: $0) }
+            let message = envelope?.error ?? "OpenBot could not finish that request."
+            if http.statusCode == 409 && envelope?.code == "request_conflict" {
+                throw StudioAPIError.submissionConflict(message)
+            }
+            throw StudioAPIError.server(message)
         }
     }
 }
@@ -602,6 +607,25 @@ private struct MessageRequest: Encodable {
     let attachmentIds: [String]
     let replyToId: String?
     let expectedWorkKind: String?
+    /// P01c retry key. Encoded only when present: the host rejects an
+    /// explicit null, and a missing key simply opts out of replay protection.
+    let requestId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case timeZone, threadId, body, targetBotIds, attachmentIds, replyToId, expectedWorkKind, requestId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(timeZone, forKey: .timeZone)
+        try container.encode(threadId, forKey: .threadId)
+        try container.encode(body, forKey: .body)
+        try container.encode(targetBotIds, forKey: .targetBotIds)
+        try container.encode(attachmentIds, forKey: .attachmentIds)
+        try container.encodeIfPresent(replyToId, forKey: .replyToId)
+        try container.encodeIfPresent(expectedWorkKind, forKey: .expectedWorkKind)
+        try container.encodeIfPresent(requestId, forKey: .requestId)
+    }
 }
 private struct MessageReactionRequest: Encodable { let emoji: String }
 
@@ -725,13 +749,16 @@ private struct SkillUpdateRequest: Encodable {
     let startUrl: String
 }
 
-private struct ServerMessage: Decodable { let error: String }
+private struct ServerMessage: Decodable { let error: String; let code: String? }
 
 enum StudioAPIError: LocalizedError {
     case unauthorized
     case unreachable
     case invalidResponse
     case server(String)
+    /// Same requestId, changed payload: the host changed nothing. Callers
+    /// rotate their retry key and keep the unsent content.
+    case submissionConflict(String)
 
     static func isCancelledRequest(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled
@@ -743,6 +770,7 @@ enum StudioAPIError: LocalizedError {
         case .unreachable: return "Your OpenBot home did not answer. Check that it is running."
         case .invalidResponse: return "OpenBot sent something this app could not read. Update both apps and try again."
         case .server(let message): return message
+        case .submissionConflict(let message): return message
         }
     }
 }

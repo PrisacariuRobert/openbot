@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
 import { intervalSchedule, routineScheduleInput, nextRoutineOccurrence, schedulePreview } from "../shared/calendar-schedule.js";
-import { OpenBotDatabase, messageSubmissionDigest } from "./database.js";
+import { OpenBotDatabase, RoutineRevisionConflictError, messageSubmissionDigest } from "./database.js";
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
@@ -28,6 +28,8 @@ import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
+import { opencodeCompatibility } from "./runtime-compatibility.js";
+import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
@@ -86,7 +88,7 @@ import { inspectRunnerCare } from "./runner-care.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
-import type { AutomationEvent, ProviderConnectionTest, Routine, RoutineTriggerConfig, RunnerHealth, Readiness, ReadinessStep } from "../shared/types.js";
+import type { AutomationEvent, ProviderConnectionTest, Routine, RoutineTriggerConfig, RunnerHealth, Readiness } from "../shared/types.js";
 import { listWorkspaceFiles, readWorkspaceFile, replaceWorkspaceFile, resolveWorkspacePath, writeWorkspaceFile } from "./workspace-files.js";
 import { isHandoffPath, mediateHandoffArtifacts } from "./handoff-files.js";
 import { verifyTaskChecks } from "./verification-evidence.js";
@@ -129,7 +131,7 @@ db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus
 // The tester browser always starts at the studio itself (loopback), never at
 // a relay or LAN address — its scope is loopback-only by construction.
 const tester = new TesterBrowser(db.dataDir, `http://127.0.0.1:${port}/`);
-const browserSignIns = new BrowserSignIns(db);
+const browserSignIns = new BrowserSignIns(db, browserNavigationGrants);
 const googleWorkspace = new GoogleWorkspaceConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/google/callback"), approvedConnectorDispatch.fetch);
 const appReads = new AppReadService(db);
 const slack = new SlackConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/slack/callback"), approvedConnectorDispatch.fetch);
@@ -667,24 +669,20 @@ app.get("/api/provider", async (_request, response) => {
 app.get("/api/readiness", async (_request, response) => {
   const status = await readProviderStatus(db, providerConnections.listAttempts());
   const connected = status.instances.filter((instance) => instance.connected);
-  const teammates = db.listBots().length;
-  const steps: ReadinessStep[] = [
-    {
-      id: "runtime", ready: status.cliAvailable,
-      label: "Model runtime",
-      detail: status.cliAvailable ? `OpenCode${status.version ? ` ${status.version.trim().split("\n")[0]}` : ""} is ready on this host.` : "Install the OpenCode runtime so teammates can work.",
-    },
-    {
-      id: "connection", ready: connected.length > 0,
-      label: "AI connection",
-      detail: connected.length ? `${connected.length} connected: ${connected.map((instance) => instance.name).slice(0, 3).join(", ")}.` : "Connect an AI account, key, or local model.",
-    },
-    {
-      id: "teammate", ready: teammates > 0,
-      label: "First teammate",
-      detail: teammates ? `${teammates} teammate${teammates === 1 ? "" : "s"} ready.` : "Create a teammate to start delegating work.",
-    },
-  ];
+  const compatibility = opencodeCompatibility();
+  const readyTeammates = db.listBots().filter((bot) => {
+    if (!bot.providerInstanceId || !bot.model) return false;
+    const provider = db.providerForBot(bot.id);
+    return Boolean(provider && modelBelongsToConnection(bot.model, provider));
+  }).length;
+  const steps = buildReadinessSteps({
+    cliAvailable: status.cliAvailable,
+    compatibility: compatibility.compatibility,
+    detectedVersion: compatibility.detectedVersion,
+    connectedNames: connected.map((instance) => instance.name),
+    readyTeammates,
+    totalTeammates: db.listBots().length,
+  });
   response.json({ ready: steps.every((step) => step.ready), steps } satisfies Readiness);
 });
 
@@ -1315,8 +1313,18 @@ app.get("/api/attachments/:id/preview", (request, response) => {
   stream.pipe(response);
 });
 
-const messageInput = z.object({
-  timeZone: z.string().max(100).optional(),
+/** Staging fault-injection catalogue, v1 (P09a). Armed per requestId or runId
+ * through POST /api/tester/faults (staging only; 404 in production).
+ * Expected outcomes, each covered by fault-lifecycle/fault-catalogue tests:
+ * - after_verified_artifact: the run stops through the normal failure path
+ *   right after a host-verified check passes (source=tester_fault).
+ * - before_dispatch: the run fails before any model process starts — zero
+ *   model output, zero workspace writes, same tester_fault receipt.
+ * Firing consumes the arm (one-shot, like the original point). Sibling runs
+ * and other points are unaffected. Unknown points are rejected at arming. */
+const TESTER_FAULT_POINTS = ["after_verified_artifact", "before_dispatch"] as const;
+
+const messageInput = z.object({  timeZone: z.string().max(100).optional(),
   expectedWorkKind: z.enum(["morning", "inbox", "meeting", "weekly"]).optional(),
   threadId: z.string().min(1), body: z.string().trim().max(20_000).default(""),
   targetBotIds: z.array(z.string()).max(6).optional(), attachmentIds: z.array(z.string()).max(6).default([]), replyToId: z.string().uuid().nullable().optional(),
@@ -1492,8 +1500,10 @@ app.post("/api/messages", (request, response) => {
   if (parsed.data.requestId && submissionDigest) {
     // Gate 1a: bind a request-scoped tester fault to the runs it created, so
     // the fault can be armed before execution (avoids the start/arm race).
+    // Every catalogued point propagates; unknown points never reach storage
+    // because the arming route rejects them.
     const armed = db.extensionRecord<{ point: string; once: boolean }>("test-fault", `request:${parsed.data.requestId}`);
-    if (armed?.point === "after_verified_artifact") for (const run of runs) db.saveExtensionRecord("test-fault", `run:${run.id}`, armed);
+    if (armed && (TESTER_FAULT_POINTS as readonly string[]).includes(armed.point)) for (const run of runs) db.saveExtensionRecord("test-fault", `run:${run.id}`, armed);
     db.saveMessageSubmission({
       requestId: parsed.data.requestId,
       threadId: thread.id,
@@ -1633,17 +1643,88 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     broadcast({ type: "connector", at: Date.now() });
     return `The approved note was added to ${result.title}${result.url ? ` (${result.url})` : ""}.`;
   }
+  if (parsed.data.type === "routine_resume" || parsed.data.type === "routine_update" || parsed.data.type === "routine_delete") {
+    // P03b/c: execute an owner-reviewed routine change. The review stays
+    // bound to this exact resource and revision: a moved routine or a changed
+    // revision needs a fresh proposal instead of running stale.
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    const input = routineToolMutationInput.safeParse(args);
+    const routine = input.success ? db.getRoutine(input.data.routineId) : null;
+    if (!approval || !run || !input.success) throw new Error("The approved request could not be restored safely. Prepare it again for a fresh review.");
+    if (routine && routine.threadId !== run.threadId) throw new Error("That routine is no longer in this conversation. List this conversation's routines and propose the change again.");
+    if (parsed.data.type === "routine_delete") {
+      const expected = input.data.expectedRevision;
+      if (routine && expected !== undefined && routine.revision !== expected) throw new ApprovalReviewChangedError();
+      if (!routine) {
+        const receipt = db.getDeletedRoutineReceipt(input.data.routineId);
+        if (receipt && receipt.threadId === run.threadId) return `“${receipt.name}” was already deleted on ${receipt.createdAt}. Its past results stay available; it will not run again.`;
+        throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
+      }
+      db.deleteRoutine(routine.id, run.id);
+      db.addActivity({ runId: run.id, botId: run.botId, kind: "tool", label: `Deleted ${routine.name}`, detail: null });
+      broadcast();
+      return `“${routine.name}” was deleted. Its past conversation results stay available; it will not run again.`;
+    }
+    if (!routine) throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
+    const expected = input.data.expectedRevision;
+    if (expected !== undefined && routine.revision !== expected) throw new ApprovalReviewChangedError();
+    if (parsed.data.type === "routine_resume" && routine.enabled) return `“${routine.name}” is already running (revision ${routine.revision}). Nothing was changed.`;
+    const patch: RoutinePatch = parsed.data.type === "routine_resume"
+      ? { enabled: true }
+      : {
+        ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+        ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
+        ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
+        ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
+      };
+    if (parsed.data.type === "routine_update" && Object.keys(patch).length === 0) throw new Error("The approved change is empty. Propose the edit again.");
+    const { nextTriggerType, next } = resolveRoutineUpdate(routine, patch);
+    const mutationError = routineMutationError(next, routine, nextTriggerType);
+    if (mutationError) throw new Error(mutationError);
+    let updated: Routine | null = null;
+    try {
+      updated = db.updateRoutine(routine.id, next, expected);
+    } catch (error) {
+      if (error instanceof RoutineRevisionConflictError) throw new ApprovalReviewChangedError();
+      throw error;
+    }
+    if (!updated) throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
+    db.addActivity({ runId: run.id, botId: run.botId, kind: "tool", label: `${parsed.data.type === "routine_resume" ? "Resumed" : "Updated"} ${updated.name}`, detail: null });
+    broadcast();
+    return parsed.data.type === "routine_resume"
+      ? `“${updated.name}” is resumed and will run ${updated.scheduleLabel || "on its schedule"}${updated.nextRunAt ? ` next at ${updated.nextRunAt}` : ""}.`
+      : `“${updated.name}” was updated to revision ${updated.revision}.`;
+  }
   if (parsed.data.type === "todoist_task_create") {
     const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
     if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Creating Todoist tasks is not available for this teammate.");
-    const task = await todoist.create({
-      content: String(args.content || ""), description: args.description ? String(args.description) : undefined,
-      dueString: args.dueString ? String(args.dueString) : undefined, projectId: args.projectId ? String(args.projectId) : undefined,
-      priority: args.priority === undefined ? undefined : Number(args.priority),
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    if (!approval || !run) throw new Error("The approved request could not be found. Ask the teammate to propose it again.");
+    const authorizationVersion = db.connectorAuthorizationVersion("todoist");
+    const account = db.getConnector("todoist")?.accountEmail || "";
+    const reviewedFields = {
+      content: String(args.content || ""),
+      description: args.description ? String(args.description) : "",
+      dueString: args.dueString ? String(args.dueString) : "",
+      projectId: args.projectId ? String(args.projectId) : "",
+      priority: args.priority === undefined ? 1 : Math.max(1, Math.min(Math.round(Number(args.priority)), 4)),
+    };
+    const { task, recovered } = await todoist.create({
+      content: reviewedFields.content, description: reviewedFields.description || undefined,
+      dueString: reviewedFields.dueString || undefined, projectId: reviewedFields.projectId || undefined,
+      priority: args.priority === undefined ? undefined : reviewedFields.priority,
+    });
+    // P04a: bind the exact created resource to its originating scope so a
+    // later correction edits this same task in this same account — never a
+    // same-titled task elsewhere.
+    db.saveConnectorTaskRef({
+      connectorId: "todoist", resourceId: task.id, account, authorizationVersion,
+      threadId: run.threadId, runId: run.id, botId: bot.id,
+      reviewedFields, lastState: task,
     });
     db.addConnectorEvent({ connectorId: "todoist", botId: bot.id, action: "todoist_task_create", status: "completed", summary: `${bot.name} created the approved task “${task.content.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
-    return `The Todoist task was created: ${task.content}${task.url ? ` (${task.url})` : ""}.`;
+    return `The Todoist task was created and read back: ${task.content}${task.url ? ` (${task.url})` : ""}.${recovered ? " The create response was lost or incomplete; a matching Todoist readback confirmed the task without another create request." : ""}`;
   }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
@@ -2305,10 +2386,10 @@ app.post("/api/tester/faults", (request, response) => {
   const parsed = z.object({
     requestId: z.string().min(8).max(80).optional(),
     runId: z.string().min(1).max(80).optional(),
-    point: z.literal("after_verified_artifact"),
+    point: z.enum(TESTER_FAULT_POINTS),
     once: z.boolean().optional(),
   }).safeParse(request.body);
-  if (!parsed.success || (!parsed.data.requestId && !parsed.data.runId)) return response.status(400).json({ error: "Give a requestId or runId and point=after_verified_artifact." });
+  if (!parsed.success || (!parsed.data.requestId && !parsed.data.runId)) return response.status(400).json({ error: `Give a requestId or runId and point=${TESTER_FAULT_POINTS.join(" | ")}.` });
   const record = { point: parsed.data.point, once: parsed.data.once !== false, armedAt: new Date().toISOString() };
   if (parsed.data.runId) db.saveExtensionRecord("test-fault", `run:${parsed.data.runId}`, record);
   if (parsed.data.requestId) db.saveExtensionRecord("test-fault", `request:${parsed.data.requestId}`, record);
@@ -2600,7 +2681,43 @@ const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
   intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage"]).optional(), triggerConfig: triggerConfigInput.optional(),
   schedule: routineScheduleInput.optional(),
+  expectedRevision: z.number().int().min(1).optional(),
 });
+
+type RoutinePatch = Partial<Pick<Routine, "name" | "botId" | "threadId" | "prompt" | "intervalMinutes" | "schedule" | "enabled" | "triggerType" | "triggerConfig">>;
+// Exact-id mutation arguments shared by the scoped model tools and
+// approved-action execution (P03b). Trigger, teammate and conversation can
+// only change through the owner UI, never through these tools.
+const routineToolMutationInput = z.object({
+  routineId: z.string().min(1).max(200),
+  expectedRevision: z.number().int().min(1).optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  prompt: z.string().trim().min(1).max(10_000).optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200).optional(),
+  schedule: routineScheduleInput.optional(),
+});
+// Single merge rule for routine edits (P03b). The owner PATCH route and the
+// scoped model tools share it, so neither can drift into its own divergent
+// PATCH semantics: only requested fields change, the trigger/source is kept.
+function resolveRoutineUpdate(current: Routine, patch: RoutinePatch) {
+  const nextTriggerType = patch.triggerType ?? current.triggerType;
+  const next = { name: patch.name ?? current.name, botId: patch.botId ?? current.botId, threadId: patch.threadId ?? current.threadId, prompt: patch.prompt ?? current.prompt, intervalMinutes: patch.intervalMinutes ?? current.intervalMinutes, schedule: patch.schedule ?? (nextTriggerType === "schedule" ? current.schedule : intervalSchedule), enabled: patch.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: patch.triggerConfig ?? current.triggerConfig };
+  return { nextTriggerType, next };
+}
+// Single validation rule for routine mutations (P03b). Owner PATCH, scoped
+// model tools and approved-action execution share it, so enabling or editing
+// a routine is revalidated the same way everywhere.
+function routineMutationError(next: { botId: string; threadId: string; enabled: boolean; intervalMinutes: number; schedule?: Routine["schedule"]; triggerType?: string; triggerConfig?: Routine["triggerConfig"] }, current: Routine, nextTriggerType: string): string | null {
+  const scheduleError = routineScheduleError({ schedule: next.schedule, triggerType: next.triggerType, enabled: next.enabled, intervalMinutes: next.intervalMinutes }, current);
+  if (scheduleError) return scheduleError;
+  if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return "Choose a valid teammate and conversation.";
+  const watchError = pageWatchError({ triggerType: next.triggerType, triggerConfig: next.triggerConfig, intervalMinutes: next.intervalMinutes }, current.id);
+  if (watchError) return watchError;
+  if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft.";
+  if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.`;
+  if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.`;
+  return null;
+}
 
 function routineScheduleError(input: { schedule?: Routine["schedule"]; triggerType?: string; enabled?: boolean; intervalMinutes: number }, current?: Routine): string | null {
   const schedule = input.schedule ?? current?.schedule ?? intervalSchedule;
@@ -2695,20 +2812,20 @@ app.patch("/api/routines/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Routine not found." });
   const parsed = routineInput.partial().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Check the routine name, teammate, instructions and repeat time." });
-  const nextTriggerType = parsed.data.triggerType ?? current.triggerType;
-  const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, schedule: parsed.data.schedule ?? (nextTriggerType === "schedule" ? current.schedule : intervalSchedule), enabled: parsed.data.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: parsed.data.triggerConfig ?? current.triggerConfig };
-  const scheduleError = routineScheduleError(next, current);
-  if (scheduleError) return response.status(400).json({ error: scheduleError });
-  if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
-  const watchError = pageWatchError(next, current.id);
-  if (watchError) return response.status(400).json({ error: watchError });
-  if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
-  if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
-  if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.` });
+  const { nextTriggerType, next } = resolveRoutineUpdate(current, parsed.data);
+  const mutationError = routineMutationError(next, current, nextTriggerType);
+  if (mutationError) return response.status(400).json({ error: mutationError });
   const needsSecret = nextTriggerType === "webhook" || nextTriggerType === "github", webhookSecret = needsSecret && !current.hasWebhookSecret ? randomBytes(32).toString("base64url") : null;
-  const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret });
-  if (!routine) return response.status(404).json({ error: "Routine not found." });
-  broadcast(); response.json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
+  try {
+    const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret }, parsed.data.expectedRevision);
+    if (!routine) return response.status(404).json({ error: "Routine not found." });
+    broadcast(); response.json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
+  } catch (error) {
+    if (error instanceof RoutineRevisionConflictError) {
+      return response.status(409).json({ error: error.message, code: "routine_conflict", currentRevision: error.currentRevision });
+    }
+    throw error;
+  }
 });
 app.delete("/api/routines/:id", (request, response) => {
   if (!db.deleteRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
@@ -2900,18 +3017,21 @@ app.post("/api/bots/:id/browser/type", async (request, response) => {
 app.post("/api/bots/:id/browser/takeover/click", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a point inside the browser preview." });
+  browserNavigationGrants.revokeBot(request.params.id);
   try { response.json(await browser.takeoverClick(request.params.id, parsed.data.x, parsed.data.y)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 app.post("/api/bots/:id/browser/takeover/type", async (request, response) => {
   const parsed = z.object({ value: z.string().max(4_000), replace: z.boolean().default(false) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That text is too long for secure takeover." });
+  browserNavigationGrants.revokeBot(request.params.id);
   try { response.json(await browser.takeoverType(request.params.id, parsed.data.value, parsed.data.replace)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
+  browserNavigationGrants.revokeBot(request.params.id);
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -2921,6 +3041,7 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
 app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
   const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
+  browserNavigationGrants.revokeBot(request.params.id);
   try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -2929,6 +3050,7 @@ app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
 app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
+  browserNavigationGrants.revokeBot(request.params.id);
   try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3078,7 +3200,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3232,6 +3354,7 @@ app.post("/api/internal/tools", async (request, response) => {
             kind: z.literal("workspace_file"), path: z.string().trim().min(1).max(2_048),
             minBytes: z.number().int().min(0).max(500_000).optional(),
             contains: z.array(z.string().min(1).max(200)).max(8).optional(),
+            expectedDigest: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
           }).optional(),
         })).min(1).max(8),
       }).safeParse(args);
@@ -3661,6 +3784,109 @@ app.post("/api/internal/tools", async (request, response) => {
       const file = await dropbox.read(input.data.fileIdOrPath);
       db.addConnectorEvent({ connectorId: "dropbox", botId, action, status: "completed", summary: `${bot.name} read “${file.name.slice(0, 120)}” from Dropbox` });
       broadcast({ type: "connector", at: Date.now() }); return response.json(file);
+    }
+    if (action === "routine_list") {
+      // P03a: read-only scoped listing. The host preamble above already bound
+      // this call to a running run of this bot; only routines of that run's
+      // conversation are visible, never other threads. Summaries carry ids
+      // for exact follow-ups, never prompts or secrets.
+      const sourceRun = db.getRun(runId)!;
+      const input = z.object({ query: z.string().trim().max(200).default("") }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_list at most a short name filter." });
+      const needle = input.data.query.toLocaleLowerCase();
+      const routines = db.listRoutines(sourceRun.threadId)
+        .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
+        .slice(0, 50)
+        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
+      return response.json({ routines, count: routines.length, scope: "conversation" });
+    }
+    if (action === "routine_update" || action === "routine_pause" || action === "routine_resume" || action === "routine_delete") {
+      // P03b/c: exact-id follow-ups in this conversation. The host preamble
+      // above already bound the call to a running run of this bot. Pausing is
+      // the safe direction and executes directly; resume, update and delete
+      // arm or end future autonomous work and always pause for the owner's
+      // exact review.
+      const sourceRun = db.getRun(runId)!;
+      const input = routineToolMutationInput.safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_update, routine_pause, routine_resume or routine_delete the exact routine id from routine_list." });
+      const routine = db.getRoutine(input.data.routineId);
+      if (!routine || routine.threadId !== sourceRun.threadId) return response.status(404).json({ error: "That routine is not in this conversation. List this conversation's routines and use one of those ids." });
+      const revisionNote = `listed at revision ${routine.revision}`;
+      const revisionOrConflict = () => {
+        if (input.data.expectedRevision !== undefined && routine.revision !== input.data.expectedRevision) {
+          const conflict = new RoutineRevisionConflictError(routine.revision);
+          return response.status(409).json({ error: conflict.message, code: "routine_conflict", currentRevision: conflict.currentRevision });
+        }
+        return null;
+      };
+      const describeChange = (next: { name: string; prompt: string; intervalMinutes: number; schedule?: Routine["schedule"]; enabled: boolean }) => {
+        const changes: string[] = [];
+        if (next.name !== routine.name) changes.push(`name “${routine.name}” → “${next.name}”`);
+        if (next.prompt !== routine.prompt) changes.push(`instructions changed (${routine.prompt.length} → ${next.prompt.length} chars)`);
+        if (next.intervalMinutes !== routine.intervalMinutes) changes.push(`repeat every ${routine.intervalMinutes} → ${next.intervalMinutes} minutes`);
+        if (JSON.stringify(next.schedule ?? null) !== JSON.stringify(routine.schedule ?? null)) changes.push("schedule changed");
+        if (next.enabled !== routine.enabled) changes.push(next.enabled ? "paused → running" : "running → paused");
+        return changes.length ? changes.join("; ") : "no visible change";
+      };
+      if (action === "routine_pause") {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        if (!routine.enabled) return response.json({ ok: true, routineId: routine.id, enabled: false, revision: routine.revision, unchanged: true });
+        const { nextTriggerType, next } = resolveRoutineUpdate(routine, { enabled: false });
+        const mutationError = routineMutationError(next, routine, nextTriggerType);
+        if (mutationError) return response.status(400).json({ error: mutationError });
+        try {
+          const updated = db.updateRoutine(routine.id, next, input.data.expectedRevision)!;
+          db.addActivity({ runId, botId, kind: "tool", label: `Paused ${updated.name}`, detail: null });
+          broadcast();
+          return response.json({ ok: true, routineId: updated.id, enabled: false, revision: updated.revision, nextRunAt: updated.nextRunAt });
+        } catch (error) {
+          if (error instanceof RoutineRevisionConflictError) return response.status(409).json({ error: error.message, code: "routine_conflict", currentRevision: error.currentRevision });
+          throw error;
+        }
+      }
+      const patch: RoutinePatch = action === "routine_resume"
+        ? { enabled: true }
+        : action === "routine_delete"
+          ? {}
+          : {
+            ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+            ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
+            ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
+            ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
+          };
+      if (action === "routine_update" && Object.keys(patch).length === 0) return response.status(400).json({ error: "Say what should change: name, instructions, repeat time or schedule." });
+      if (action === "routine_resume" && routine.enabled) {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        return response.json({ ok: true, routineId: routine.id, enabled: true, revision: routine.revision, unchanged: true });
+      }
+      if (action === "routine_delete") {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        const deleteSummary = `Delete “${routine.name}” so it never runs again. Its past conversation results stay available and the deletion is recorded.`;
+        return holdForApproval(
+          "external",
+          `${bot.name} wants to delete “${routine.name}” (${revisionNote}): ${deleteSummary} Only this routine is deleted; nothing else changes.`,
+          `Delete “${routine.name}”`,
+          { type: action, botId, routineId: routine.id, routineName: routine.name, expectedRevision: input.data.expectedRevision, changeSummary: deleteSummary },
+        );
+      }
+      const { nextTriggerType, next } = resolveRoutineUpdate(routine, patch);
+      const mutationError = routineMutationError(next, routine, nextTriggerType);
+      if (mutationError) return response.status(400).json({ error: mutationError });
+      const changeText = describeChange(next);
+      const verb = action === "routine_resume" ? "resume" : "change";
+      return holdForApproval(
+        "external",
+        `${bot.name} wants to ${verb} “${routine.name}” (${revisionNote}): ${changeText}. Only this routine changes; nothing else is enabled, broadened or deleted.`,
+        `${action === "routine_resume" ? "Resume" : "Change"} “${routine.name}”`,
+        {
+          type: action, botId, routineId: routine.id, routineName: routine.name,
+          expectedRevision: input.data.expectedRevision, changeSummary: changeText,
+          ...Object.fromEntries(Object.entries({ name: input.data.name, prompt: input.data.prompt, intervalMinutes: input.data.intervalMinutes, schedule: input.data.schedule }).filter(([, value]) => value !== undefined)),
+        },
+      );
     }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;

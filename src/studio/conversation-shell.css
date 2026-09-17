@@ -455,10 +455,12 @@
 .row-action-pin[aria-pressed="true"] svg { fill: currentColor; }
 .row-action-edit { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 .row-action-edit:hover { background: var(--surface-muted); }
-.row-action-delete { background: var(--danger); }
-.row-action-delete:hover { filter: brightness(1.08); }
-.row-action-delete.armed { background: #a50010; }
-:root[data-appearance="dark"] .row-action-delete.armed { background: #ff6961; color: #40000a; }
+.row-action-archive { background: var(--danger); }
+.row-action-archive:hover { filter: brightness(1.08); }
+.row-action-archive.armed { background: #a50010; }
+:root[data-appearance="dark"] .row-action-archive.armed { background: #ff6961; color: #40000a; }
+.row-action-unhide { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.row-action-unhide:hover { background: var(--surface-muted); }
 .conversation-cell:focus-within > .conversation-row,
 .conversation-cell.swiped > .conversation-row {
   transform: translateX(calc(-1 * var(--shift, 148px)));
@@ -521,7 +523,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent, #e0574f);
+  background: var(--accent, #0071e3);
   border: 2px solid var(--surface);
 }
 .pinned-unpin {
@@ -2346,3 +2348,36 @@ a.message-file:hover {
     /* transform: translateY(-1px); removed for HIG */
   }
 }
+
+/* U02c: per-message contextual actions. Quiet by default, fully keyboard
+ * reachable; failures stay visible on the row. Token roles only. */
+.message-controls { display: flex; align-items: center; gap: 2px; margin-top: 4px; opacity: .55; }
+.chat-message:hover .message-controls, .message-controls:focus-within { opacity: 1; }
+.message-control { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--label-secondary); cursor: pointer; }
+.message-control:hover { background: var(--tertiary-system-background); color: var(--label-primary); }
+.message-reactions { display: inline-flex; gap: 2px; margin-left: 4px; }
+.message-reaction { font-size: 16px; line-height: 1; padding: 4px; border-radius: 8px; border: none; background: transparent; cursor: pointer; }
+.message-reaction:hover { background: var(--tertiary-system-background); }
+.message-reaction-list { display: inline-flex; gap: 4px; margin-left: 6px; }
+.message-reaction-chip { font-size: 12px; padding: 1px 7px; border-radius: 999px; background: var(--tertiary-system-background); color: var(--label-secondary); }
+.message-reaction-chip.reacted { background: var(--accent-soft); color: var(--label-primary); }
+.message-control-error { font-size: 12px; color: var(--danger); margin-left: 6px; }
+.message-reply-context { font-size: 12px; color: var(--label-secondary); border-left: 2px solid var(--separator-strong); padding-left: 8px; margin: 2px 0 4px; }
+.compose-reply { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--label-secondary); background: var(--tertiary-system-background); border-radius: 10px; padding: 6px 6px 6px 12px; margin-bottom: 8px; }
+.compose-reply-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose-reply-cancel { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; border: none; background: transparent; color: var(--label-secondary); cursor: pointer; }
+.compose-reply-cancel:hover { background: var(--separator); color: var(--label-primary); }
+
+/* U03: narrow sign-in overlay. Same handoff as the beside-chat pane, as a
+ * returnable fullscreen layer with a clear back-to-chat control. Token
+ * roles only; layered above app chrome below native dialogs. */
+.browser-pane-narrow {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border-left: none;
+  background: var(--system-background);
+}
+.browser-pane-narrow > header { justify-content: flex-start; }
+.browser-pane-narrow > header h2 { flex: 1; text-align: center; }
+.browser-pane-narrow-spacer { width: 40px; flex: none; }

@@ -59,6 +59,7 @@ import type {
   TaskVerificationStatus,
   TaughtWorkflow,
   Thread,
+  TodoistTaskSummary,
   UsageSummary,
 } from "../shared/types.js";
 import { SecretVault } from "./vault.js";
@@ -134,6 +135,42 @@ export type MessageSubmissionReceipt = {
   routedTo: Array<{ id: string; name: string }>;
   attachmentIds: string[];
   responseStatus: number;
+  createdAt: string;
+};
+
+/** A routine mutation lost a revision race (P03b). The caller must re-list
+ * and confirm against currentRevision instead of overwriting it. */
+export class RoutineRevisionConflictError extends Error {
+  constructor(readonly currentRevision: number) {
+    super(`That routine changed while you were looking at it (now revision ${currentRevision}). List it again and confirm the change on the current schedule.`);
+  }
+}
+export type ConnectorTaskRef = {
+  connectorId: string;
+  resourceId: string;
+  account: string;
+  authorizationVersion: number;
+  threadId: string;
+  runId: string;
+  botId: string;
+  reviewedFields: { content: string; description: string; dueString: string; projectId: string; priority: number };
+  lastState: TodoistTaskSummary;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A deleted routine's durable receipt (P03c). The row itself is gone, but
+ * what it was, which revision died, and which run deleted it is recorded —
+ * so history stays attributable and an old retry can never resurrect it.
+ * Past runs and events keep their routine id and stay readable as orphans. */
+export type DeletedRoutineReceipt = {
+  routineId: string;
+  name: string;
+  botId: string;
+  threadId: string;
+  triggerType: string;
+  revisionAtDelete: number;
+  deletedByRunId: string | null;
   createdAt: string;
 };
 
@@ -746,6 +783,31 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS message_submissions_thread_time ON message_submissions(thread_id,created_at DESC);
+      CREATE TABLE IF NOT EXISTS connector_task_refs (
+        connector_id TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        account TEXT NOT NULL DEFAULT '',
+        authorization_version INTEGER NOT NULL DEFAULT 0,
+        thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        reviewed_fields_json TEXT NOT NULL DEFAULT '{}',
+        last_state_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(connector_id, resource_id)
+      );
+      CREATE INDEX IF NOT EXISTS connector_task_refs_thread_time ON connector_task_refs(thread_id,created_at DESC);
+      CREATE TABLE IF NOT EXISTS deleted_routine_receipts (
+        routine_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        thread_id TEXT NOT NULL,
+        trigger_type TEXT NOT NULL DEFAULT 'schedule',
+        revision_at_delete INTEGER NOT NULL DEFAULT 1,
+        deleted_by_run_id TEXT,
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS bot_connector_access (
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         connector_id TEXT NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
@@ -926,6 +988,7 @@ export class OpenBotDatabase {
     this.addColumn("routines", "deduplicated_count INTEGER NOT NULL DEFAULT 0");
     this.addColumn("routines", "last_error TEXT");
     this.addColumn("routines", "paused_reason TEXT");
+    this.addColumn("routines", "revision INTEGER NOT NULL DEFAULT 1");
     this.addColumn("routines", "last_success_at TEXT");
     this.addColumn("routines", "last_event_at TEXT");
     this.addColumn("runs", "automation_event_id TEXT");
@@ -1929,6 +1992,10 @@ export class OpenBotDatabase {
           passed: check.passed,
           source: check.source === "host" ? "host" : "teammate",
           detail: typeof check.detail === "string" ? check.detail : null,
+          predicate: typeof check.predicate === "string" ? check.predicate : null,
+          inputDigest: typeof check.inputDigest === "string" ? check.inputDigest : null,
+          outputDigest: typeof check.outputDigest === "string" ? check.outputDigest : null,
+          observedAt: typeof check.observedAt === "string" ? check.observedAt : null,
         })),
     };
     return {
@@ -2309,6 +2376,12 @@ export class OpenBotDatabase {
       passed: check.passed,
       source: check.source === "host" ? "host" as const : "teammate" as const,
       detail: check.detail?.replace(/\s+/g, " ").trim().slice(0, 300) || null,
+      // P06a contract survives persistence: digests stay comparable after
+      // restart, refresh and reconnect instead of living only in memory.
+      predicate: check.predicate?.slice(0, 120) ?? null,
+      inputDigest: check.inputDigest ?? null,
+      outputDigest: check.outputDigest ?? null,
+      observedAt: check.observedAt ?? null,
     })).filter((check) => check.label).slice(0, 8);
     const status: TaskVerificationStatus = input.status === "passed" && checks.some((check) => !check.passed) ? "partial" : input.status;
     const steps = run.task.steps.map((step) => status === "passed" && !["blocked", "skipped"].includes(step.status) ? { ...step, status: "completed" as const } : step);
@@ -2644,6 +2717,12 @@ export class OpenBotDatabase {
 
   listApprovals(): Approval[] {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.status='pending' ORDER BY a.created_at ASC").all() as Row[]).map((row) => this.approvalFromRow(row));
+  }
+
+  /** Every review for one run, decided or not (P07a). Attention measurement
+   * must see approved and denied reviews too, not just pending ones. */
+  listRunApprovals(runId: string): Approval[] {
+    return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.run_id=? ORDER BY a.created_at ASC").all(runId) as Row[]).map((row) => this.approvalFromRow(row));
   }
 
   decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
@@ -3408,6 +3487,51 @@ export class OpenBotDatabase {
     return over;
   }
 
+  /** Scoped external-object identity (P04a). One row per connector resource
+   * created through an approved action: which account and authorization
+   * version created it, which thread/run/bot owns it, the exact reviewed
+   * fields, and the last read-back state. Corrections (P04b) resolve the
+   * same resource id in the same account — never by title alone — and a
+   * changed account or authorization version invalidates the reference. */
+  getConnectorTaskRef(connectorId: string, resourceId: string): ConnectorTaskRef | null {
+    const row = this.db.prepare("SELECT * FROM connector_task_refs WHERE connector_id=? AND resource_id=?").get(connectorId, resourceId) as Row | undefined;
+    if (!row) return null;
+    return {
+      connectorId: String(row.connector_id),
+      resourceId: String(row.resource_id),
+      account: String(row.account || ""),
+      authorizationVersion: Number(row.authorization_version || 0),
+      threadId: String(row.thread_id),
+      runId: String(row.run_id),
+      botId: String(row.bot_id),
+      reviewedFields: JSON.parse(String(row.reviewed_fields_json || "{}")) as ConnectorTaskRef["reviewedFields"],
+      lastState: JSON.parse(String(row.last_state_json || "{}")) as TodoistTaskSummary,
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+    };
+  }
+
+  saveConnectorTaskRef(input: {
+    connectorId: string; resourceId: string; account: string; authorizationVersion: number;
+    threadId: string; runId: string; botId: string;
+    reviewedFields: ConnectorTaskRef["reviewedFields"]; lastState: TodoistTaskSummary;
+  }): ConnectorTaskRef {
+    const at = now();
+    this.db.prepare(`INSERT INTO connector_task_refs
+      (connector_id,resource_id,account,authorization_version,thread_id,run_id,bot_id,reviewed_fields_json,last_state_json,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(connector_id,resource_id) DO UPDATE SET
+        account=excluded.account,authorization_version=excluded.authorization_version,
+        thread_id=excluded.thread_id,run_id=excluded.run_id,bot_id=excluded.bot_id,
+        reviewed_fields_json=excluded.reviewed_fields_json,last_state_json=excluded.last_state_json,
+        updated_at=excluded.updated_at`).run(
+      input.connectorId, input.resourceId, input.account, input.authorizationVersion,
+      input.threadId, input.runId, input.botId,
+      JSON.stringify(input.reviewedFields), JSON.stringify(input.lastState), at, at,
+    );
+    return this.getConnectorTaskRef(input.connectorId, input.resourceId)!;
+  }
+
   runDepth(runId: string): number {
     const row = this.db.prepare(`WITH RECURSIVE chain(id,parent_run_id,depth) AS (
       SELECT id,parent_run_id,0 FROM runs WHERE id=?
@@ -3547,6 +3671,7 @@ export class OpenBotDatabase {
       lastStatus: (row.last_status || "never") as Routine["lastStatus"], runCount: Number(row.run_count || 0),
       consecutiveFailures: Number(row.consecutive_failures || 0), deduplicatedCount: Number(row.deduplicated_count || 0),
       lastError: row.last_error ? String(row.last_error) : null, pausedReason: row.paused_reason ? String(row.paused_reason) : null,
+      revision: Number(row.revision || 1),
       lastSuccessAt: row.last_success_at ? String(row.last_success_at) : null, lastEventAt: row.last_event_at ? String(row.last_event_at) : null,
     };
   }
@@ -3556,13 +3681,22 @@ export class OpenBotDatabase {
     return row ? this.routineFromRow(row) : null;
   }
 
-  listRoutines(): Routine[] {
-    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
+  /** All routines, or only the routines of one conversation when threadId is
+   * given. Scoped listing (P03a) is the identity foundation for follow-up
+   * management: corrections resolve these ids, never titles alone. */
+  listRoutines(threadId?: string): Routine[] {
+    if (!threadId) return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
+    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.thread_id=? ORDER BY r.rowid DESC").all(threadId) as Row[]).map((row) => this.routineFromRow(row));
   }
 
-  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; schedule?: RoutineSchedule; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }): Routine | null {
+  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; schedule?: RoutineSchedule; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }, expectedRevision?: number): Routine | null {
     const routine = this.getRoutine(id);
     if (!routine) return null;
+    // P03b: stale writers lose instead of silently overwriting a newer
+    // schedule. Absent expectedRevision keeps legacy owner-UI behavior.
+    if (expectedRevision !== undefined && routine.revision !== expectedRevision) {
+      throw new RoutineRevisionConflictError(routine.revision);
+    }
     new WorkflowValidation(this).routineBinding({ ...input, id });
     if (input.enabled) new WorkflowValidation(this).assertRoutine({ ...input, id });
     const intervalMinutes = normalizeRoutineInterval(input.intervalMinutes);
@@ -3580,33 +3714,64 @@ export class OpenBotDatabase {
     const lastEventAt = connectorTriggerChanged ? now() : routine.lastEventAt;
     if (connectorTriggerChanged) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
     else if (triggerType === "dropbox" && routine.triggerConfig.dropboxPath !== triggerConfig.dropboxPath) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=? AND source='dropbox'").run(id);
-    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,schedule_json=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,schedule_json=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END,revision=revision+1 WHERE id=?").run(
       input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, JSON.stringify(schedule), triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, lastEventAt, input.enabled ? 1 : 0, id,
     );
+    // P03c: resuming restarts connector automations from a fresh baseline no
+    // matter which writer enabled it (owner UI toggle, PATCH, or reviewed
+    // model resume). Pause preserves cursors; only the paused→running
+    // transition rebaselines, exactly like the legacy toggle did.
+    if (input.enabled && !routine.enabled) {
+      if (["todoist", "dropbox"].includes(triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+      if (["todoist", "dropbox", "slack", "notion"].includes(triggerType)) this.db.prepare("UPDATE routines SET last_event_at=? WHERE id=?").run(now(), id);
+    }
     new WorkflowValidation(this).bindRoutine({ ...input, id });
     return this.getRoutine(id);
   }
 
-  deleteRoutine(id: string): boolean {
-    return this.db.prepare("DELETE FROM routines WHERE id=?").run(id).changes > 0;
+  deleteRoutine(id: string, deletedByRunId: string | null = null): boolean {
+    const routine = this.getRoutine(id);
+    if (!routine) return false;
+    if (this.db.prepare("DELETE FROM routines WHERE id=?").run(id).changes === 0) return false;
+    // First receipt wins: a routine id is never reused, so the original
+    // deletion record stays the attributable one.
+    this.db.prepare(`INSERT OR IGNORE INTO deleted_routine_receipts
+      (routine_id,name,bot_id,thread_id,trigger_type,revision_at_delete,deleted_by_run_id,created_at)
+      VALUES (?,?,?,?,?,?,?,?)`).run(
+      id, routine.name, routine.botId, routine.threadId, routine.triggerType,
+      routine.revision, deletedByRunId, now(),
+    );
+    return true;
+  }
+
+  getDeletedRoutineReceipt(id: string): DeletedRoutineReceipt | null {
+    const row = this.db.prepare("SELECT * FROM deleted_routine_receipts WHERE routine_id=?").get(id) as Row | undefined;
+    if (!row) return null;
+    return {
+      routineId: String(row.routine_id), name: String(row.name), botId: String(row.bot_id),
+      threadId: String(row.thread_id), triggerType: String(row.trigger_type || "schedule"),
+      revisionAtDelete: Number(row.revision_at_delete || 1),
+      deletedByRunId: row.deleted_by_run_id ? String(row.deleted_by_run_id) : null,
+      createdAt: String(row.created_at),
+    };
+  }
+
+  toggleRoutine(id: string, enabled: boolean, expectedRevision?: number): Routine | null {
+    // P03c: the legacy toggle shares the guarded update path instead of
+    // bypassing revision safety with its own UPDATE.
+    const routine = this.getRoutine(id);
+    if (!routine) return null;
+    if (enabled === routine.enabled) return routine;
+    return this.updateRoutine(id, {
+      name: routine.name, botId: routine.botId, threadId: routine.threadId, prompt: routine.prompt,
+      intervalMinutes: routine.intervalMinutes, schedule: routine.schedule, enabled,
+      triggerType: routine.triggerType, triggerConfig: routine.triggerConfig,
+    }, expectedRevision);
   }
 
   listRoutineRuns(id: string, limit = 20): Run[] {
     const rows = this.db.prepare(this.runSelect("WHERE r.routine_id=? ORDER BY r.created_at DESC LIMIT ?")).all(id, Math.max(1, Math.min(limit, 100))) as Row[];
     return rows.map((row) => this.runFromRow(row));
-  }
-
-  toggleRoutine(id: string, enabled: boolean): Routine | null {
-    const routine = this.getRoutine(id);
-    if (!routine) return null;
-    if (enabled) new WorkflowValidation(this).assertRoutine(routine);
-    if (enabled === routine.enabled) return routine;
-    const nextRunAt = enabled && routine.triggerType === "schedule" ? nextRoutineOccurrence(routine.schedule ?? intervalSchedule, routine.intervalMinutes, Date.now()) : null;
-    if (enabled && routine.schedule?.kind === "once" && !nextRunAt) throw new Error("Choose a future date before enabling this one-time routine.");
-    const lastEventAt = enabled && ["todoist", "dropbox", "slack", "notion"].includes(routine.triggerType) ? now() : routine.lastEventAt;
-    if (enabled && ["todoist", "dropbox"].includes(routine.triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
-    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, nextRunAt, lastEventAt, enabled ? 1 : 0, id);
-    return this.getRoutine(id);
   }
 
   dueRoutines(): Routine[] {

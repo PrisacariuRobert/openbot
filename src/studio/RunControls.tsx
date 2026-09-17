@@ -215,7 +215,7 @@ export function RunControls({
           </label>}
           {completeReview && preview?.browserSignIn && (onSignInPane
             ? <div className="sign-in-pane-cta">
-                <p className="run-control-note">Sign in on the private screen beside this chat — it drives your teammate’s own browser, and passwords stay out of the conversation.</p>
+                <p className="run-control-note">Sign in on the private browser screen — it drives your teammate’s own browser, and passwords stay out of the conversation.</p>
                 <button type="button" className="primary" onClick={() => onSignInPane(approval!.id)}><LockKeyhole size={14} strokeWidth={2} />Open the private browser</button>
               </div>
             : <BrowserSignInPanel key={approval!.id} approvalId={approval!.id} handoff={preview.browserSignIn} disabled={busy || needsRefresh || Boolean(notice)} onBusyChange={setSignInBusy} onInteraction={() => setReviewed(false)} />)}

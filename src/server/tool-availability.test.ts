@@ -22,6 +22,11 @@ test("standard reports expose only source collection and saved results", () => {
     assert.equal(flags.task_progress, false);
     assert.equal(flags.task_verify, false);
     assert.equal(flags.routine_create, false);
+    assert.equal(flags.routine_list, false);
+    assert.equal(flags.routine_update, false);
+    assert.equal(flags.routine_pause, false);
+    assert.equal(flags.routine_resume, false);
+    assert.equal(flags.routine_delete, false);
     assert.equal(flags.remember, false);
     assert.equal(flags.handoff, false);
     assert.equal(flags.message_teammate, false);
@@ -69,7 +74,7 @@ test("keeps irrelevant app schemas out of a file-only task and updates after cap
       readFileSync(path.join(workspace, "opencode.json"), "utf8"),
     );
     assert.equal(config.tools.gmail_search, false);
-    for (const name of ["task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate"]) {
+    for (const name of ["task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate"]) {
       assert.equal(config.tools[name], true, `${name} tool is exposed`);
       assert.equal(config.permission[name], "allow", `${name} permission is allowed`);
       assert.equal(config.agent.openbot.permission[name], "allow", `${name} agent permission is allowed`);

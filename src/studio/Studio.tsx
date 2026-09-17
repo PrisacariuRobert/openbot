@@ -25,6 +25,7 @@ import {
   WandSparkles,
   ArrowRightLeft,
   ArrowUp,
+  Archive,
   CalendarDays,
   Check,
   ChevronDown,
@@ -44,7 +45,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   SlidersHorizontal,
-  Trash2,
+  Undo2,
   UsersRound,
   X,
   Zap,
@@ -75,6 +76,10 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
+import { conversationMatches } from "./conversation-filter";
+import { selectPendingSignIn } from "./signin-pane";
+import { MessageControls } from "./MessageControls";
+import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
 import { ConversationProgress } from "./ConversationProgress";
@@ -149,7 +154,11 @@ async function api<T>(
   }
   const result = await response.json();
   if (!response.ok)
-    throw new Error(result.error || "That didn’t work. Please try again.");
+    throw apiError(
+      response.status,
+      result,
+      "That didn’t work. Please try again.",
+    );
   return result as T;
 }
 function Face({
@@ -768,6 +777,13 @@ export function Studio() {
   }, []);
   const composerDraft = useConversationDraft(thread, state?.draft);
   const attached = useConversationAttachments(thread);
+  // P01c: one submission key per unsent content. Retries reuse it so a lost
+  // response replays instead of duplicating; anything new rotates it.
+  // U02c: reply target for the composer. Cleared when the conversation
+  // changes or the send lands; the host validates it still exists.
+  const [replyTo, setReplyTo] = useState<{ id: string; senderName: string; body: string } | null>(null);
+  useEffect(() => { setReplyTo(null); }, [thread]);
+  const sendKeys = useRef(createSubmissionKeys());
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
@@ -820,13 +836,14 @@ export function Studio() {
   }, []);
   // Split view: when a teammate waits on a private sign-in in this
   // conversation, open the live website beside the chat, the way a second
-  // column of work belongs next to the conversation. It closes itself once
-  // the handoff is decided, and the task card reopens it on request.
+  // column of work belongs next to the conversation. Narrow screens get the
+  // same handoff as a returnable fullscreen overlay instead of a dead end.
+  // It closes itself once the handoff is decided, and the task card reopens
+  // it on request.
   const pendingSignInId = useMemo(() => {
-    if (!state || narrow) return null;
-    const threadRuns = new Set(state.runs.filter((run) => run.threadId === thread).map((run) => run.id));
-    return state.approvals.find((approval) => approval.kind === "browser" && approval.requiresSignIn === true && approval.status === "pending" && threadRuns.has(approval.runId))?.id || null;
-  }, [state, thread, narrow]);
+    if (!state) return null;
+    return selectPendingSignIn(state.approvals, state.runs, thread);
+  }, [state, thread]);
   useEffect(() => { setSignInPane(pendingSignInId); }, [pendingSignInId]);
   const [calendarDate, setCalendarDate] = useState(dayKey(new Date()));
   const [month, setMonth] = useState(dayKey(new Date()).slice(0, 7) + "-01");
@@ -1013,6 +1030,13 @@ export function Studio() {
     setSendError("");
     const sentDraft = composerDraft.capture();
     const sentFiles = attached.files.map((file) => file.id);
+    const sendScope = {
+      threadId: targetThread,
+      body,
+      targetBotIds: recipient ? [recipient] : [],
+      attachmentIds: sentFiles,
+      replyToId: replyTo?.id ?? null,
+    };
     try {
       await api("/api/messages", {
         threadId: targetThread,
@@ -1020,17 +1044,30 @@ export function Studio() {
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         targetBotIds: recipient ? [recipient] : [],
         attachmentIds: sentFiles,
-        replyToId: null,
+        replyToId: replyTo?.id ?? null,
+        requestId: sendKeys.current.keyFor(sendScope),
       });
+      // Delivered or replayed: the next deliberate send is new work.
+      sendKeys.current.rotate();
+      setReplyTo(null);
       composerDraft.clearSent(sentDraft);
       attached.clear(targetThread, sentFiles);
       setRefresh((n) => n + 1);
     } catch (reason) {
-      setSendError(
-        reason instanceof Error
-          ? reason.message
-          : "Your message wasn’t sent. It’s still here to try again.",
-      );
+      if (reason instanceof ApiError && reason.code === "request_conflict") {
+        // Same key, changed payload: the host changed nothing. Rotate so the
+        // next press sends fresh, and keep the exact unsent content.
+        sendKeys.current.rotate();
+        setSendError(
+          "That retry didn’t match your original send, so nothing was duplicated. Review your message and send again — your draft is untouched.",
+        );
+      } else {
+        setSendError(
+          reason instanceof Error
+            ? reason.message
+            : "Your message wasn’t sent. It’s still here to try again.",
+        );
+      }
     } finally {
       setSending(false);
     }
@@ -1160,6 +1197,16 @@ export function Studio() {
       <label className="sr-only" htmlFor="studio-message">
         Message your team
       </label>
+      {replyTo && (
+        <div className="compose-reply" role="status">
+          <span className="compose-reply-preview">
+            Replying to {replyTo.senderName}: {replyTo.body.replace(/\s+/g, " ").trim().slice(0, 120)}
+          </span>
+          <button type="button" className="compose-reply-cancel" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
       <textarea
         ref={input}
         id="studio-message"
@@ -1422,9 +1469,11 @@ export function Studio() {
       setRefresh((n) => n + 1);
     })();
   // Row quick actions: hover reveals on desktop, swipe reveals on touch.
-  // Delete is a two-tap soft hide (the server keeps everything).
+  // Archiving is a two-tap reversible hide: the server keeps everything and
+  // the Archived section below can bring the chat back. There is no hard
+  // conversation delete in this client; nothing here may promise one.
   const [swipedRow, setSwipedRow] = useState<string | null>(null);
-  const [hideArmed, setHideArmed] = useState<string | null>(null);
+  const [archiveArmed, setArchiveArmed] = useState<string | null>(null);
   const dragStartX = useRef<number | null>(null);
   const dragStartY = useRef<number | null>(null);
   // When the last drag released, as a timestamp. A trailing click right
@@ -1480,16 +1529,16 @@ export function Studio() {
     f.row.closest(".conversation-cell")?.classList.remove("dragging");
     clearRowInline(f.row, f.actions);
   }
-  const hideTimer = useRef<number | null>(null);
-  async function hideThread(item: Thread) {
-    if (hideArmed !== item.id) {
-      setHideArmed(item.id);
-      if (hideTimer.current) window.clearTimeout(hideTimer.current);
-      hideTimer.current = window.setTimeout(() => setHideArmed(null), 2600);
+  const archiveTimer = useRef<number | null>(null);
+  async function archiveThread(item: Thread) {
+    if (archiveArmed !== item.id) {
+      setArchiveArmed(item.id);
+      if (archiveTimer.current) window.clearTimeout(archiveTimer.current);
+      archiveTimer.current = window.setTimeout(() => setArchiveArmed(null), 2600);
       return;
     }
-    if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    setHideArmed(null);
+    if (archiveTimer.current) window.clearTimeout(archiveTimer.current);
+    setArchiveArmed(null);
     setSwipedRow(null);
     try { navigator.vibrate?.(10); } catch { /* haptics unavailable */ }
     await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
@@ -1499,7 +1548,15 @@ export function Studio() {
     if (thread === item.id) openThread("team-room");
     setRefresh((n) => n + 1);
   }
+  async function unhideThread(item: Thread) {
+    await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: false }),
+    }).catch(() => {});
+    setRefresh((n) => n + 1);
+  }
   const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
+  const archivedThreads = (state?.threads || []).filter((item) => item.hidden);
   const isGroupThread = (item: Thread) =>
     (item.botIds?.length ?? 0) > 1 ||
     item.id.startsWith("group-") ||
@@ -1508,9 +1565,7 @@ export function Studio() {
     (item) =>
       !item.hidden &&
       !item.pinned &&
-      `${item.title} ${item.lastMessage || ""}`
-        .toLowerCase()
-        .includes(conversationQuery.toLowerCase()),
+      conversationMatches(item, allBots, conversationQuery),
   );
   const groupThreads = visibleThreads.filter(isGroupThread);
   const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
@@ -1785,12 +1840,12 @@ export function Studio() {
           {item.id !== "team-room" && (
             <button
               type="button"
-              className={`row-action row-action-delete${hideArmed === item.id ? " armed" : ""}`}
-              aria-label={hideArmed === item.id ? `Tap again to delete ${item.title}` : `Delete ${item.title}`}
-              title={hideArmed === item.id ? "Tap again to confirm" : "Delete"}
-              onClick={() => void hideThread(item)}
+              className={`row-action row-action-archive${archiveArmed === item.id ? " armed" : ""}`}
+              aria-label={archiveArmed === item.id ? `Tap again to archive ${item.title}` : `Archive ${item.title}`}
+              title={archiveArmed === item.id ? "Tap again to confirm" : "Archive"}
+              onClick={() => void archiveThread(item)}
             >
-              <Trash2 size={15} />
+              <Archive size={15} />
             </button>
           )}
         </span>
@@ -1805,6 +1860,32 @@ export function Studio() {
         {groupThreads.map(threadRow)}
         <button className="compose-secondary" onClick={() => setDetail({ kind: "group" })}><Plus size={15} /> New project room</button>
       </details>
+      {archivedThreads.length > 0 && (
+        <details className="archived-chats">
+          <summary>Archived ({archivedThreads.length})</summary>
+          {archivedThreads.map((item) => (
+            <div key={item.id} className="conversation-cell archived-cell">
+              <button
+                aria-label={item.title}
+                title={item.title}
+                className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}`}
+                onClick={() => openThread(item.id)}
+              >
+                <span className="conversation-title">{item.title}</span>
+              </button>
+              <button
+                type="button"
+                className="row-action row-action-unhide"
+                aria-label={`Unhide ${item.title}`}
+                title="Unhide"
+                onClick={() => void unhideThread(item)}
+              >
+                <Undo2 size={15} />
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
     </>
   );
   return (
@@ -2561,7 +2642,7 @@ export function Studio() {
                                 <time>{timeText(message.createdAt)}</time>
                               </div>
                             )}
-                            <div className="prose">
+                            <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
@@ -2570,6 +2651,17 @@ export function Studio() {
                                 </details>
                               )}
                             </div>
+                            {message.replyTo && (
+                              <div className="message-reply-context">
+                                Replying to {message.replyTo.senderName}: {message.replyTo.body}
+                              </div>
+                            )}
+                            <MessageControls
+                              messageId={message.id}
+                              reactions={message.reactions || []}
+                              onReply={() => setReplyTo({ id: message.id, senderName: message.senderName, body: message.body })}
+                              onReacted={() => setRefresh((n) => n + 1)}
+                            />
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
@@ -2624,6 +2716,19 @@ export function Studio() {
           <BrowserSignInPanel key={signInPane} approvalId={signInPane} disabled={false}
             onBusyChange={() => {}} onInteraction={() => {}} />
         </aside>
+      )}
+      {signInPane && narrow && page === "chat" && (
+        <div className="browser-pane browser-pane-narrow" role="dialog" aria-modal="true" aria-label="Private browser">
+          <header>
+            <button aria-label="Back to chat" onClick={() => setSignInPane(null)}>
+              <ChevronLeft size={19} />
+            </button>
+            <h2>Private browser</h2>
+            <span className="browser-pane-narrow-spacer" aria-hidden="true" />
+          </header>
+          <BrowserSignInPanel key={signInPane} approvalId={signInPane} disabled={false}
+            onBusyChange={() => {}} onInteraction={() => {}} />
+        </div>
       )}
       {contextOpen && !narrow && page === "chat" && state && (
         <aside

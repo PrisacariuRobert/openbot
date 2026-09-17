@@ -76,6 +76,26 @@ export class BrowserNavigationGrants {
     if (["completed", "failed", "cancelled"].includes(status)) this.grants.delete(runId);
   }
 
+  /** Explicit revocation (P07b). Owner takeover, sign-in walls and completed
+   * handoffs can change the page, tab or signed-in account under an issued
+   * allowance, so the allowance dies instead of auto-clicking a new context.
+   * Returns true when a grant was actually removed. */
+  revoke(runId: string): boolean {
+    return this.grants.delete(runId);
+  }
+
+  /** Revoke every grant of one teammate's browser. Returns the count removed. */
+  revokeBot(botId: string): number {
+    let removed = 0;
+    for (const [runId, grant] of this.grants) {
+      if (grant.botId === botId) {
+        this.grants.delete(runId);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   claim(runId: string, botId: string, target: BrowserTarget, runStatus: RunStatus | null, requiredByRule = false, now = Date.now()): boolean {
     if (runStatus !== "running") {
       if (runStatus) this.observeRunStatus(runId, runStatus);

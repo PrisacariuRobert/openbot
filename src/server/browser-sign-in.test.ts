@@ -127,3 +127,20 @@ test("profile operations are serialized, including after a failed operation", as
 test("both provider harnesses expose the same credential-free sign-in tool", () => {
   for (const file of ["workspace.ts", "claude-mcp.mjs", "tool-availability.ts", "opencode.ts"]) assert.match(readFileSync(new URL(file, import.meta.url), "utf8"), /browser_request_sign_in/);
 });
+
+test("sign-in walls and completed handoffs revoke navigation allowances", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-sign-in-revoke-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const revoked: string[] = [];
+    const handoffs = new BrowserSignIns(db, { revokeBot: (botId: string) => { revoked.push(botId); return 1; } });
+    const run = db.createRun({ botId: "nova", threadId: db.getBot("nova")!.threadId, prompt: "Read the ticket.", status: "running" });
+    const approval = handoffs.request("nova", run.id, "https://support.example.test/login");
+    assert.deepEqual(revoked, ["nova"], "a login wall revokes before the handoff is even created");
+    handoffs.continue(approval.id);
+    assert.deepEqual(revoked, ["nova", "nova"], "a completed handoff revokes again: the account may be new");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

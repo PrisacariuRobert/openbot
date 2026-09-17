@@ -290,6 +290,25 @@ export function approvalPreview(
       }
     }
     preview.fields.push({ label: "Effect", value: "Move the listed regular files on the same filesystem and create missing destination folders. Existing destination files are never replaced. File access is checked again before execution. If a batch stops partway, completed moves remain in place and unfinished work needs a fresh review; it is not automatically replayed." });
+  } else if (object.type === "routine_resume" || object.type === "routine_update" || object.type === "routine_delete") {
+    // P03b/c: exact routine review. The id, bound revision and change summary
+    // are fingerprinted into the review; execution rechecks all three.
+    const routineId = typeof args.routineId === "string" ? args.routineId : "";
+    const routineName = typeof args.routineName === "string" ? args.routineName : "";
+    const boundRevision = typeof args.expectedRevision === "number" ? args.expectedRevision : null;
+    const changeSummary = typeof args.changeSummary === "string" ? args.changeSummary : "";
+    const actionLabel = object.type === "routine_resume" ? "Resume" : object.type === "routine_delete" ? "Delete" : "Change";
+    const effect = object.type === "routine_delete"
+      ? "Only this routine is deleted; its past conversation results stay available and the deletion is recorded. If the routine changed since this review, approval fails and asks for a fresh proposal."
+      : "Only this routine changes; nothing else is enabled, broadened or deleted. If the routine changed since this review, approval fails and asks for a fresh proposal.";
+    if (!routineId || !routineName || boundRevision === null || !changeSummary.trim()) incomplete = true;
+    else
+      preview.fields.push(
+        { label: "Routine", value: visible(`${routineName} (${routineId.slice(0, 8)}…)`) },
+        { label: "Listed at revision", value: String(boundRevision) },
+        { label: actionLabel, value: visible(changeSummary) },
+        { label: "Effect", value: effect },
+      );
   } else if (object.type === "google_calendar_create") {
     field("title", "Title", true);
     field("start", "Start (including offset)", true);
@@ -339,7 +358,7 @@ export function approvalPreview(
         incomplete = true;
     }
   } else supported = false;
-  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
+  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && object.type !== "routine_resume" && object.type !== "routine_update" && object.type !== "routine_delete" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
     if (!accountLabel?.trim()) incomplete = true;
     preview.fields.unshift({
       label: "Connected account",

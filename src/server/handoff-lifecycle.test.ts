@@ -96,7 +96,11 @@ test("mediated handoff copies one exact object read-only with provenance and no 
     assert.deepEqual(recipientBytes, sourceBytes, "recipient bytes equal origin bytes");
 
     // The child run prompt references the mediated path, never Alpha's workspace.
-    const childRun = db.listChildRuns(db.getRun(record.originRunId!)!.id)[0]!;
+    // The consultant run starts asynchronously after the handoff record lands,
+    // so wait for it instead of assuming it is already present.
+    let childRun;
+    for (let n = 0; n < 100 && !childRun; n++) { childRun = db.listChildRuns(db.getRun(record.originRunId!)!.id)[0]; if (!childRun) await delay(100); }
+    assert.ok(childRun, "consultant child run did not start");
     assert.ok(childRun.prompt.includes(record.recipientPath), "recipient prompt uses the mediated path");
     assert.equal(childRun.prompt.includes(alphaWs), false, "recipient prompt must not expose the origin workspace path");
 

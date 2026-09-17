@@ -27,6 +27,17 @@ export interface TaskVerificationCheck {
   passed: boolean;
   source?: "teammate" | "host";
   detail?: string | null;
+  /** P06a: what the host actually evaluated, e.g. "utf8-text:readable,min-bytes,markers". Teammate reports carry none. */
+  predicate?: string | null;
+  /** P06a: SHA-256 hex of the exact bytes the host read, so a later reader
+   * can tell same-named different bytes apart. Null when nothing was read. */
+  inputDigest?: string | null;
+  /** P06a: SHA-256 hex of the checked output. For read checks it equals the
+   * input digest; transforms record their own result digest. */
+  outputDigest?: string | null;
+  /** P06a: ISO time of the host observation. A receipt is evidence as of
+   * this time, not a standing guarantee about later bytes. */
+  observedAt?: string | null;
 }
 
 export interface TaskContract {
@@ -450,6 +461,10 @@ export interface Routine {
   deduplicatedCount: number;
   lastError: string | null;
   pausedReason: string | null;
+  /** Optimistic-concurrency guard (P03b). Every mutation bumps it; callers
+   * pass the revision they listed and a mismatch is a 409, never a silent
+   * overwrite. Native readers ignore it until they adopt it. */
+  revision: number;
   lastSuccessAt: string | null;
   lastEventAt: string | null;
 }

@@ -120,3 +120,21 @@ test("grant request stays default-off, is descriptor-bound, and rechecks current
   assert.equal(reviewedBrowserNavigationGrant({ ...action, args: { ...action.args, navigationAllowanceOffer: { ...offer, origin: "https://other.example.test" } } }, true, []).valid, false, "the offer origin must match the exact reviewed page");
   assert.notEqual(approvalReviewFingerprint("fixture", { action }), approvalReviewFingerprint("fixture", { action: withoutOffer }), "the host offer is part of the review binding");
 });
+
+test("explicit revocation kills allowances without touching other runs or bots", () => {
+  const grants = new BrowserNavigationGrants(), now = 1_000;
+  const offer = browserNavigationAllowanceOffer(target())!;
+  grants.issue("run-a", "nova", offer, now);
+  grants.issue("run-b", "nova", offer, now);
+  grants.issue("run-c", "pixel", offer, now);
+  assert.equal(grants.revoke("missing"), false, "revoking nothing reports nothing removed");
+  assert.equal(grants.revoke("run-a"), true);
+  assert.equal(grants.claim("run-a", "nova", target(), "running", false, now), false, "a revoked grant never clicks again");
+  assert.equal(grants.claim("run-b", "nova", target(), "running", false, now), true, "sibling runs keep their own allowance");
+  assert.equal(grants.revokeBot("nobody"), 0);
+  assert.equal(grants.revokeBot("nova"), 1, "only nova's remaining grant dies");
+  assert.equal(grants.claim("run-b", "nova", target(), "running", false, now), false);
+  assert.equal(grants.claim("run-c", "pixel", target(), "running", false, now), true, "other teammates are unaffected");
+  assert.equal(grants.revokeBot("pixel"), 1);
+  assert.equal(grants.claim("run-c", "pixel", target(), "running", false, now), false);
+});
