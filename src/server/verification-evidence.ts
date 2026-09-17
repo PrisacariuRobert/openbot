@@ -8,6 +8,10 @@ export interface WorkspaceFileEvidence {
   path: string;
   minBytes?: number;
   contains?: string[];
+  /** P06b: SHA-256 hex of the exact bytes the reporter claims to have
+   * checked. When present the host fails the check if the bytes moved
+   * instead of certifying a file it never saw in that state. */
+  expectedDigest?: string;
 }
 
 export interface VerificationCheckInput {
@@ -51,8 +55,17 @@ export function verifyWorkspaceFileEvidence(root: string, label: string, evidenc
   const bytes = Buffer.byteLength(file.content, "utf8");
   const missingContent = (evidence.contains || []).some((text) => !file.content.includes(text));
   const tooSmall = evidence.minBytes !== undefined && bytes < evidence.minBytes;
-  const passed = !missingContent && !tooSmall;
   const fullDigest = createHash("sha256").update(file.content).digest("hex");
+  // P06b: a claimed observation binds exact bytes. Moved bytes fail the
+  // check with both digests recorded — never a pass on unseen content.
+  if (typeof evidence.expectedDigest === "string" && evidence.expectedDigest.toLowerCase() !== fullDigest) {
+    return {
+      label, passed: false, source: "host",
+      detail: `The file changed since the reported observation (expected SHA-256 ${evidence.expectedDigest.slice(0, 12)}, reopened SHA-256 ${fullDigest.slice(0, 12)}). Re-check the current bytes instead of trusting the earlier claim.`,
+      predicate, inputDigest: fullDigest, outputDigest: fullDigest, observedAt,
+    };
+  }
+  const passed = !missingContent && !tooSmall;
   const digest = fullDigest.slice(0, 12);
   const reason = tooSmall
     ? `The file has ${bytes.toLocaleString()} bytes; at least ${evidence.minBytes!.toLocaleString()} were required.`

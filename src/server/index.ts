@@ -3356,6 +3356,7 @@ app.post("/api/internal/tools", async (request, response) => {
             kind: z.literal("workspace_file"), path: z.string().trim().min(1).max(2_048),
             minBytes: z.number().int().min(0).max(500_000).optional(),
             contains: z.array(z.string().min(1).max(200)).max(8).optional(),
+            expectedDigest: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
           }).optional(),
         })).min(1).max(8),
       }).safeParse(args);
