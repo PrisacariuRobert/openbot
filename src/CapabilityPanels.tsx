@@ -5304,7 +5304,10 @@ export function RoutinesPanel({
   const intervalValid =
     !["schedule", "webpage"].includes(triggerType) ||
     (intervalMinutes >= (triggerType === "webpage" ? 15 : 5) && intervalMinutes <= 43_200);
-  const copy = (value: string) => void navigator.clipboard.writeText(value);
+  const copy = async (value: string): Promise<boolean> => {
+    try { await navigator.clipboard.writeText(value); return true; }
+    catch { setRunnerError("Copy needs clipboard permission in this browser."); return false; }
+  };
   const reset = () => {
     setCalendarSchedule({ kind: "calendar", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", time: "08:00", daysOfWeek: [1, 2, 3, 4, 5] });
     setName("");
@@ -5581,7 +5584,7 @@ export function RoutinesPanel({
           <div className="runner-maintenance-actions">
             <span><RefreshCw size={15} /><span><b>Backup-first updates</b><small>Refuses unsafe source changes and restores the previous service if health checks fail.</small></span></span>
             <code>./deploy/private-runner/update.sh</code>
-            <button onClick={() => { copy("./deploy/private-runner/update.sh"); setUpdateCopied(true); }}><Copy size={12} /> {updateCopied ? "Copied" : "Copy update"}</button>
+            <button onClick={() => { void copy("./deploy/private-runner/update.sh").then((ok) => { if (ok) setUpdateCopied(true); }); }}><Copy size={12} /> {updateCopied ? "Copied" : "Copy update"}</button>
           </div>
           <div className={`runner-health-alerts ${runnerCare.alerts.enabled ? "enabled" : ""}`}>
             <span className="runner-health-alert-icon"><Bell size={16} /></span>
@@ -5615,8 +5618,8 @@ export function RoutinesPanel({
           <div className="runner-home-transfer">
             <span className="runner-transfer-icon"><KeyRound size={16} /></span>
             <span><b>Move this home without exposing it</b><small>Your studio, subscriptions, browser state, and projects become one authenticated encrypted file. The passphrase is entered only in the host terminal.</small></span>
-            <div className="runner-transfer-command"><code>./deploy/private-runner/export-home.sh</code><button onClick={() => { copy("./deploy/private-runner/export-home.sh"); setTransferCopied("export"); }}><Copy size={12} /> {transferCopied === "export" ? "Copied" : "Export"}</button></div>
-            <div className="runner-transfer-command"><code>./deploy/private-runner/import-home.sh your-file.openbot-home</code><button onClick={() => { copy("./deploy/private-runner/import-home.sh your-file.openbot-home"); setTransferCopied("import"); }}><Copy size={12} /> {transferCopied === "import" ? "Copied" : "Import"}</button></div>
+            <div className="runner-transfer-command"><code>./deploy/private-runner/export-home.sh</code><button onClick={() => { void copy("./deploy/private-runner/export-home.sh").then((ok) => { if (ok) setTransferCopied("export"); }); }}><Copy size={12} /> {transferCopied === "export" ? "Copied" : "Export"}</button></div>
+            <div className="runner-transfer-command"><code>./deploy/private-runner/import-home.sh your-file.openbot-home</code><button onClick={() => { void copy("./deploy/private-runner/import-home.sh your-file.openbot-home").then((ok) => { if (ok) setTransferCopied("import"); }); }}><Copy size={12} /> {transferCopied === "import" ? "Copied" : "Import"}</button></div>
             <small className="runner-transfer-note"><ShieldCheck size={11} /> Import verifies and stages everything first, keeps a fresh recovery copy, and restores the old home if the new one does not become healthy.</small>
           </div>
         </section>
@@ -5646,7 +5649,7 @@ export function RoutinesPanel({
             </label>
             <div className="private-setup-command">
               <code>{setupCommand}</code>
-              <button disabled={!privateDomainValid} onClick={() => { copy(setupCommand); setSetupCopied(true); }}><Copy size={12} /> {setupCopied ? "Copied" : "Copy setup"}</button>
+              <button disabled={!privateDomainValid} onClick={() => { void copy(setupCommand).then((ok) => { if (ok) setSetupCopied(true); }); }}><Copy size={12} /> {setupCopied ? "Copied" : "Copy setup"}</button>
             </div>
             <div className="private-ownership-note"><ShieldCheck size={13} /><span><b>Nothing moves by itself.</b> Setup creates a new private home; migration stays a separate owner decision.</span></div>
             <small>Complete server, DNS, migration and backup steps: deploy/private-runner/README.md</small>

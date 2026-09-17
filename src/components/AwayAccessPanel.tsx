@@ -66,7 +66,7 @@ export function AwayAccessPanel() {
             ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.<span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
             : <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</>}
           control={invitation && seconds > 0
-            ? <button onClick={() => { setInvitation(null); void request("/pairing", "DELETE").catch(() => {}); }}>Hide and cancel code</button>
+            ? <button onClick={() => void (async () => { setBusy(true); setError(""); try { await request("/pairing", "DELETE"); setInvitation(null); } catch (error) { setError(error instanceof Error ? error.message : "That code could not be cancelled."); } finally { setBusy(false); } })()} disabled={busy}>Hide and cancel code</button>
             : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my iPhone"}</button>}
         >
           {invitation && seconds > 0 && <img src={invitation.qr} width="240" height="240" alt="Scan this code with OpenBot on your iPhone to pair it with this studio" />}
