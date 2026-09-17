@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { skillAuthoringFixture } from "./testing/skill-authoring-fixture.js";
+import { describeRunAttention } from "./run-attention.js";
 
 /** Q01a-1: deterministic journey J1 (routine lifecycle) from
  * verification/cases.json, executed through the production conversation
@@ -131,6 +132,16 @@ async function runVariant(variant: "J1A" | "J1B") {
     const routines = f.db.listRoutines("bot-nova");
     assert.equal(routines.filter((routine) => routine.name.startsWith("Journey brief")).length, 0, "no duplicate target");
     assert.equal(routines.length, clutter ? 1 : 0, "exactly the intended record history remains");
+    // P07a lives here from day one: the journey's supervision footprint is
+    // asserted, not estimated — three exact reviews, all approved, five
+    // tool-labeled activities (set up, paused, resumed, updated, deleted),
+    // inside the time box.
+    const attention = describeRunAttention(f.db, runId)!;
+    assert.equal(attention.approvals, 3, "resume + update + delete each asked exactly once");
+    assert.equal(attention.approved, 3);
+    assert.equal(attention.denied, 0);
+    assert.equal(attention.toolActivities, 5, "set up + paused + resumed + updated + deleted");
+    assert.ok(attention.elapsedSeconds < 120);
     return { f, runId, routines };
   } catch (error) {
     await f.close();

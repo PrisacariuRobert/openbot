@@ -2709,6 +2709,12 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.status='pending' ORDER BY a.created_at ASC").all() as Row[]).map((row) => this.approvalFromRow(row));
   }
 
+  /** Every review for one run, decided or not (P07a). Attention measurement
+   * must see approved and denied reviews too, not just pending ones. */
+  listRunApprovals(runId: string): Approval[] {
+    return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.run_id=? ORDER BY a.created_at ASC").all(runId) as Row[]).map((row) => this.approvalFromRow(row));
+  }
+
   decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
     const approval = this.getApproval(id);
     if (!approval || approval.status !== "pending" || approval.kind === "budget") return null;
