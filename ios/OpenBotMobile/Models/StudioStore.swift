@@ -173,20 +173,60 @@ final class StudioStore: ObservableObject {
         defer { isSending = false }
         do {
             let attachments = try await files.asyncMap { try await client.upload(threadID: destination, fileURL: $0) }
+            // P01c: one retry key per unsent content. A lost response retried
+            // with the same key replays instead of duplicating; anything
+            // deliberately new rotates it.
+            let requestId = submissionKey(
+                threadID: destination,
+                body: cleanBody,
+                targetBotIDs: targetBotID.map { [$0] } ?? [],
+                attachmentIDs: attachments.map(\.id),
+                replyToID: replyToID
+            )
             try await client.sendMessage(
                 threadID: destination,
                 body: cleanBody,
                 targetBotIDs: targetBotID.map { [$0] } ?? [],
                 attachmentIDs: attachments.map(\.id),
                 replyToID: replyToID,
-                expectedWorkKind: expectedWorkKind
+                expectedWorkKind: expectedWorkKind,
+                requestId: requestId
             )
+            rotateSubmissionKey()
             await refresh(silent: true)
             return true
         } catch {
+            // Same key, changed payload: the host changed nothing. Rotate so
+            // the next attempt sends fresh; the composer text is untouched.
+            if case StudioAPIError.submissionConflict = error { rotateSubmissionKey() }
             handle(error)
             return false
         }
+    }
+
+    // MARK: - Submission retry keys (P01c, mirrors web submission-keys.ts)
+
+    private var submissionFingerprint = ""
+    private var submissionKeyValue = UUID().uuidString
+
+    private func submissionKey(threadID: String, body: String, targetBotIDs: [String], attachmentIDs: [String], replyToID: String?) -> String {
+        let fingerprint = [
+            threadID,
+            body,
+            targetBotIDs.sorted().joined(separator: ","),
+            attachmentIDs.joined(separator: ","),
+            replyToID ?? "",
+        ].joined(separator: "\u{1F}")
+        if fingerprint != submissionFingerprint {
+            submissionFingerprint = fingerprint
+            submissionKeyValue = UUID().uuidString
+        }
+        return submissionKeyValue
+    }
+
+    private func rotateSubmissionKey() {
+        submissionFingerprint = ""
+        submissionKeyValue = UUID().uuidString
     }
 
     func toggleReaction(messageID: String, emoji: String) async {
