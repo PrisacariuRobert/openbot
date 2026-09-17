@@ -77,6 +77,7 @@ import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { conversationMatches } from "./conversation-filter";
+import { MessageControls } from "./MessageControls";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
@@ -777,6 +778,10 @@ export function Studio() {
   const attached = useConversationAttachments(thread);
   // P01c: one submission key per unsent content. Retries reuse it so a lost
   // response replays instead of duplicating; anything new rotates it.
+  // U02c: reply target for the composer. Cleared when the conversation
+  // changes or the send lands; the host validates it still exists.
+  const [replyTo, setReplyTo] = useState<{ id: string; senderName: string; body: string } | null>(null);
+  useEffect(() => { setReplyTo(null); }, [thread]);
   const sendKeys = useRef(createSubmissionKeys());
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
@@ -1028,7 +1033,7 @@ export function Studio() {
       body,
       targetBotIds: recipient ? [recipient] : [],
       attachmentIds: sentFiles,
-      replyToId: null,
+      replyToId: replyTo?.id ?? null,
     };
     try {
       await api("/api/messages", {
@@ -1037,11 +1042,12 @@ export function Studio() {
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         targetBotIds: recipient ? [recipient] : [],
         attachmentIds: sentFiles,
-        replyToId: null,
+        replyToId: replyTo?.id ?? null,
         requestId: sendKeys.current.keyFor(sendScope),
       });
       // Delivered or replayed: the next deliberate send is new work.
       sendKeys.current.rotate();
+      setReplyTo(null);
       composerDraft.clearSent(sentDraft);
       attached.clear(targetThread, sentFiles);
       setRefresh((n) => n + 1);
@@ -1189,6 +1195,16 @@ export function Studio() {
       <label className="sr-only" htmlFor="studio-message">
         Message your team
       </label>
+      {replyTo && (
+        <div className="compose-reply" role="status">
+          <span className="compose-reply-preview">
+            Replying to {replyTo.senderName}: {replyTo.body.replace(/\s+/g, " ").trim().slice(0, 120)}
+          </span>
+          <button type="button" className="compose-reply-cancel" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
       <textarea
         ref={input}
         id="studio-message"
@@ -2624,7 +2640,7 @@ export function Studio() {
                                 <time>{timeText(message.createdAt)}</time>
                               </div>
                             )}
-                            <div className="prose">
+                            <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
@@ -2633,6 +2649,17 @@ export function Studio() {
                                 </details>
                               )}
                             </div>
+                            {message.replyTo && (
+                              <div className="message-reply-context">
+                                Replying to {message.replyTo.senderName}: {message.replyTo.body}
+                              </div>
+                            )}
+                            <MessageControls
+                              messageId={message.id}
+                              reactions={message.reactions || []}
+                              onReply={() => setReplyTo({ id: message.id, senderName: message.senderName, body: message.body })}
+                              onReacted={() => setRefresh((n) => n + 1)}
+                            />
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
