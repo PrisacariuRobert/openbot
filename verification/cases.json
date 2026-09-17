@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "suite": "Q01a deterministic journey baseline",
+  "notes": "Scripted transport through the production conversation runtime: no model, no paid allowance, no live accounts. Each journey runs its variants against a fixture server; oracles assert durable end-state (single history, no duplicate effects, revision chains, receipts). Live-model variants (Q01b) reuse these definitions with owner-authorized configurations.",
+  "journeys": [
+    {
+      "id": "J1",
+      "title": "Routine lifecycle in conversation",
+      "requirement": "P03",
+      "prompt": "Take the Journey brief routine through its full lifecycle in this conversation.",
+      "variants": [
+        {
+          "id": "J1A",
+          "setup": "clean thread; created enabled so pause is exercised (tool default is paused)",
+          "script": ["create", "list", "pause", "resume", "update", "delete"],
+          "oracles": {
+            "targetHistories": 1,
+            "finalExists": false,
+            "revisionAtDelete": 4,
+            "deletedByRunIsJourneyRun": true,
+            "maxToolCalls": 12
+          }
+        },
+        {
+          "id": "J1B",
+          "setup": "one unrelated decoy routine in the same thread",
+          "script": ["create", "list", "pause", "resume", "update", "delete"],
+          "oracles": {
+            "targetHistories": 1,
+            "finalExists": false,
+            "revisionAtDelete": 4,
+            "decoyEnabled": true,
+            "decoyRevision": 1,
+            "maxToolCalls": 12
+          }
+        }
+      ],
+      "invariants": [
+        "Exactly one routine history exists for the target id",
+        "No step creates a duplicate routine, run or receipt",
+        "Revisions advance 1 (create) -> 2 (pause) -> 3 (resume) -> 4 (update); the deletion receipt pins 4",
+        "Pause, resume, update and delete each resolve the listed id, never a title guess",
+        "A stale revision at any step is a conflict, never an overwrite"
+      ]
+    }
+  ]
+}
