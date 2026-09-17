@@ -21,6 +21,7 @@ export function toolAvailability(
     routine_update: true,
     routine_pause: true,
     routine_resume: true,
+    routine_delete: true,
     remember: true,
     handoff: true,
     message_teammate: true,
