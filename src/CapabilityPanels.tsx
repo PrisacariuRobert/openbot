@@ -6903,7 +6903,7 @@ export function TeachPanel({
           </SettingsGroup>
         </form>
       )}
-      {error && <p className="panel-error">{error}</p>}
+      {error && <p className="panel-error" role="alert">{error}</p>}
       <div className="skill-portability-bar">
         <input
           ref={importInput}
@@ -6956,7 +6956,7 @@ export function TeachPanel({
               >
                 <em>{workflow.description}</em>
                 <div className="workflow-actions">
-                  <button onClick={() => void onUse(workflow)}>
+                  <button onClick={() => void (async () => { setBusy(true); setError(""); try { await onUse(workflow); } catch (error) { setError(error instanceof Error ? error.message : "That skill could not be started."); } finally { setBusy(false); } })()} disabled={busy}>
                     <Play size={12} /> Use
                   </button>
                   <button onClick={() => edit(workflow)}>
