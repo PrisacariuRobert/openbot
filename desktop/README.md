@@ -1,7 +1,6 @@
 # OpenBot desktop shell
 
-One Electron shell around the same web client the browser and relay serve, so the design stays identical on every platform. The shell's job is the machine around the studio: start (or attach to) the owner's local OpenBot server, then get out of the way — the same model as [T3 Code](https://github.com/pingdotgg/t3code): one server, thin clients.
-
+One Electron shell around the same web client the browser and relay serve, so the design stays identical on every platform. The shell's job is the machine around the studio: start (or attach to) the owner's local OpenBot server, then get out of the way.
 ## Run in development
 
 With any OpenBot server already running (dev or the Mac app's background runner):
