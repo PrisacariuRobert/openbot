@@ -30,6 +30,7 @@ type Props = {
   onUpdateBot: (id: string, patch: Partial<Bot>) => Promise<void>;
   onChooseInitial: (providerInstanceId: string, model: string) => Promise<void>;
   onAdd: (input: ProviderInput) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onConnect: (id: ProviderCatalogEntry["id"]) => Promise<ProviderLoginAttempt>;
   onFinish: (id: string, code: string) => Promise<void>;
   connectionTests: Record<string, ProviderConnectionTest>;
@@ -80,6 +81,7 @@ export function ProviderPanel({
   onUpdateBot,
   onChooseInitial,
   onAdd,
+  onDelete,
   onConnect,
   onFinish,
   connectionTests,
@@ -453,6 +455,9 @@ export function ProviderPanel({
         </SettingsGroup>
       ) : (
         <SettingsGroup title="API & local models">
+          {savedApis.length === 0 && (
+            <p className="capability-notice">No API or local connections yet. Add one to use a hosted key or a model on your own machine — teammates keep working on their current connections either way.</p>
+          )}
           {savedApis.length > 0 && (
             <SettingsCard>
               {savedApis.map((entry) => (
@@ -469,6 +474,19 @@ export function ProviderPanel({
                     <div className="ai-side">
                       <span className="ai-state">Saved</span>
                       {connectionTest(entry.id, `test-${entry.id}`)}
+                      <button
+                        type="button"
+                        className="ai-action"
+                        disabled={busy !== null}
+                        aria-label={`Remove ${entry.name}`}
+                        title="Remove this connection"
+                        onClick={() => {
+                          if (!window.confirm(`Remove “${entry.name}”? Teammates using it must switch connections first; saved keys are deleted.`)) return;
+                          void act(`delete-${entry.id}`, () => onDelete(entry.id));
+                        }}
+                      >
+                        Remove
+                      </button>
                     </div>
                   }
                 />
