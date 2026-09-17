@@ -2,6 +2,16 @@
   "schema_version": 1,
   "suite": "Q01a deterministic journey baseline",
   "notes": "Scripted transport through the production conversation runtime: no model, no paid allowance, no live accounts. Each journey runs its variants against a fixture server; oracles assert durable end-state (single history, no duplicate effects, revision chains, receipts). Live-model variants (Q01b) reuse these definitions with owner-authorized configurations.",
+  "liveConfigurations": {
+    "status": "SMOKE_VERIFIED 2026-09-17 on owner allowance (uncapped per owner 2026-09-17)",
+    "models": ["opencode-go/deepseek-v4.1-flash", "opencode-go/muse-spark-1.3-contributor"],
+    "smoke": {
+      "task": "single routine_list observation run per model",
+      "deepseek-v4.1-flash": { "status": "completed", "inputTokens": 14199, "outputTokens": 53, "cost": 0.002216922, "elapsedMs": 15664 },
+      "muse-spark-1.3-contributor": { "status": "completed", "inputTokens": 13573, "outputTokens": 92, "cost": 0.001542408, "elapsedMs": 15556 }
+    },
+    "fullMatrix": "NOT_RUN — 20 definitions x 3 variants x 2 configurations, gated on smoke review"
+  },
   "journeys": [
     {
       "id": "J1",
