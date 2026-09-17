@@ -6,6 +6,7 @@ import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
 import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
+import { prefixCrumbs, visibleWorkspaceFiles } from "./studio/file-navigation";
 import { groupActivityAttentionRuns } from "./studio/activity-attention";
 import { createTeammateRestoreCoordinator, type TeammateRestoreState } from "./studio/teammate-restore";
 import {
@@ -4991,21 +4992,45 @@ export function FilesPanel({ bot }: { bot: Bot }) {
       path: string;
       content: string;
     } | null>(null),
-    [loading, setLoading] = useState(true);
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState<string | null>(null),
+    [opening, setOpening] = useState<string | null>(null),
+    // U04c: folders drill down by path prefix instead of a dead Open button.
+    [prefix, setPrefix] = useState("");
   useEffect(() => {
-    setLoading(true);
-    api<WorkspaceFile[]>(`/api/bots/${bot.id}/files`)
-      .then(setFiles)
-      .finally(() => setLoading(false));
+    setSelected(null);
+    setPrefix("");
+    loadFiles();
   }, [bot.id]);
+  function loadFiles() {
+    setLoading(true);
+    setError(null);
+    api<WorkspaceFile[]>(`/api/bots/${bot.id}/files`).then(
+      (next) => setFiles(next),
+      (cause: unknown) => setError(cause instanceof Error ? cause.message : "Those files could not be listed."),
+    ).finally(() => setLoading(false));
+  }
   const open = async (file: WorkspaceFile) => {
-    if (file.kind === "file")
+    if (file.kind === "directory") {
+      setPrefix(file.path.endsWith("/") ? file.path : `${file.path}/`);
+      return;
+    }
+    setOpening(file.path);
+    setError(null);
+    try {
       setSelected(
         await api(
           `/api/bots/${bot.id}/file?path=${encodeURIComponent(file.path)}`,
         ),
       );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That file could not be opened.");
+    } finally {
+      setOpening(null);
+    }
   };
+  const crumbs = prefixCrumbs(prefix);
+  const visible = visibleWorkspaceFiles(files, prefix);
   if (selected)
     return (
       <div className="file-preview">
@@ -5032,22 +5057,42 @@ export function FilesPanel({ bot }: { bot: Bot }) {
         <div className="empty-panel">
           <LoaderCircle className="spinner" />
         </div>
+      ) : error ? (
+        <div className="empty-panel" role="alert">
+          <h3>Files aren’t loading</h3>
+          <p>{error}</p>
+          <button type="button" className="button-secondary" onClick={() => loadFiles()}>
+            <RefreshCw size={15} /> Retry
+          </button>
+        </div>
       ) : files.length ? (
-        <SettingsGroup title="Workspace files">
+        <SettingsGroup title={prefix ? `Workspace files · ${prefix}` : "Workspace files"}>
+          {error && <p className="panel-error" role="alert">{error}</p>}
+          {prefix && (
+            <div className="file-crumbs" role="navigation" aria-label="Folder">
+              <button type="button" onClick={() => setPrefix("")}>All files</button>
+              {crumbs.map((crumb, index) => (
+                <span key={crumb}>
+                  {" / "}
+                  <button type="button" onClick={() => setPrefix(`${crumbs.slice(0, index + 1).join("/")}/`)}>{crumb}</button>
+                </span>
+              ))}
+            </div>
+          )}
           <SettingsCard>
-            {files.map((file) => (
+            {visible.map((file) => (
               <SettingsRow
                 key={file.path}
-                title={file.path}
+                title={file.path.slice(prefix.length)}
                 description={file.kind === "file" ? `${Math.max(1, Math.round(file.size / 1024))} KB` : "Folder"}
                 control={
-                  <button type="button" onClick={() => void open(file)} aria-label={`Open ${file.path}`}>
+                  <button type="button" onClick={() => void open(file)} aria-label={`Open ${file.path}`} disabled={opening !== null}>
                     {file.kind === "directory" ? (
                       <Folder size={18} />
                     ) : (
                       <File size={18} />
                     )}
-                    <span>Open</span>
+                    <span>{opening === file.path ? "Opening…" : "Open"}</span>
                   </button>
                 }
               />
@@ -7060,16 +7105,35 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]),
     [selected, setSelected] = useState<ArtifactSummary | null>(null),
     [revisions, setRevisions] = useState<Attachment[]>([]),
-    [loading, setLoading] = useState(true);
-  useEffect(() => {
+    [loading, setLoading] = useState(true),
+    // U04c: revision fetch and list load surface errors instead of an
+    // empty card or a false-negative empty panel.
+    [error, setError] = useState<string | null>(null),
+    [revisionsLoading, setRevisionsLoading] = useState(false),
+    [revisionsError, setRevisionsError] = useState<string | null>(null);
+  function loadArtifacts() {
     setLoading(true);
-    api<ArtifactSummary[]>("/api/artifacts")
-      .then(setArtifacts)
-      .finally(() => setLoading(false));
+    setError(null);
+    api<ArtifactSummary[]>("/api/artifacts").then(
+      (next) => setArtifacts(next),
+      (cause: unknown) => setError(cause instanceof Error ? cause.message : "Those artifacts could not be listed."),
+    ).finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    loadArtifacts();
   }, []);
   const open = async (artifact: ArtifactSummary) => {
     setSelected(artifact);
-    setRevisions(await api<Attachment[]>(`/api/artifacts/${artifact.id}/revisions`));
+    setRevisions([]);
+    setRevisionsError(null);
+    setRevisionsLoading(true);
+    try {
+      setRevisions(await api<Attachment[]>(`/api/artifacts/${artifact.id}/revisions`));
+    } catch (cause) {
+      setRevisionsError(cause instanceof Error ? cause.message : "Those revisions could not be loaded.");
+    } finally {
+      setRevisionsLoading(false);
+    }
   };
   if (selected)
     return (
@@ -7088,6 +7152,19 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
           {selected.botName ? ` by ${selected.botName}` : ""} in {selected.threadTitle}.
         </p>
         <div className="file-list">
+          {revisionsLoading ? (
+            <div className="empty-panel">
+              <LoaderCircle className="spinner" />
+            </div>
+          ) : revisionsError ? (
+            <div className="empty-panel" role="alert">
+              <h3>Revisions aren’t loading</h3>
+              <p>{revisionsError}</p>
+              <button type="button" className="button-secondary" onClick={() => selected && void open(selected)}>
+                <RefreshCw size={15} /> Retry
+              </button>
+            </div>
+          ) : (
           <SettingsCard>
             {revisions.map((revision) => (
               <SettingsRow
@@ -7109,6 +7186,7 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
               />
             ))}
           </SettingsCard>
+          )}
         </div>
         <button className="text-action" onClick={() => { onOpenThread(selected.threadId); setSelected(null); }}>
           Open {selected.threadTitle} <ArrowRight size={14} />
@@ -7126,6 +7204,14 @@ export function ArtifactsPanel({ onOpenThread }: { onOpenThread: (id: string) =>
       {loading ? (
         <div className="empty-panel">
           <LoaderCircle className="spinner" />
+        </div>
+      ) : error ? (
+        <div className="empty-panel" role="alert">
+          <h3>Artifacts aren’t loading</h3>
+          <p>{error}</p>
+          <button type="button" className="button-secondary" onClick={() => loadArtifacts()}>
+            <RefreshCw size={15} /> Retry
+          </button>
         </div>
       ) : artifacts.length ? (
         <SettingsGroup title="Artifacts">
