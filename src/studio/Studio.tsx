@@ -1,3 +1,7 @@
+import { useMessagesMotion } from "./useMessagesMotion";
+import { MessageActionMenu, messageReactions, type MessageReactionValue } from "./MessageActionMenu";
+import { ConversationReplies } from "./conversation-replies.mjs";
+import { isGroupMembershipNotice } from "./system-message-presentation.mjs";
 import {
   Fragment,
   lazy,
@@ -264,11 +268,7 @@ function eventTitle(message: Message): string {
 /** Group membership events read as noise in bubbles and lists — they render
  * as centered system pills and member names instead. */
 function isMembershipText(text: string): boolean {
-  const clean = text.replace(/[*#_`]/g, "");
-  return (
-    clean.startsWith('The group "') ||
-    /joined|left the group|now has .* in it\.?$/.test(clean)
-  );
+  return isGroupMembershipNotice(text);
 }
 /** Machine markers (ROUTINE_HEARTBEAT_OK and friends) read as status codes,
  *  not conversation. Humanize one for a quiet system line, or null. */
@@ -700,6 +700,7 @@ export function Studio() {
   const [state, setState] = useState<AppState | null>(null),
     [connections, setConnections] = useState<ConnectorStatus | null>(null),
     [skills, setSkills] = useState<CommunitySkill[]>([]);
+  useMessagesMotion(Boolean(state));
   const [error, setError] = useState(""),
     [draftNotice, setDraftNotice] = useState(""),
     [online, setOnline] = useState(false),
@@ -768,6 +769,29 @@ export function Studio() {
   }, []);
   const composerDraft = useConversationDraft(thread, state?.draft);
   const attached = useConversationAttachments(thread);
+  const [replyStore] = useState(() => new ConversationReplies());
+  const [, refreshReplies] = useState(0);
+  const reply = replyStore.view(thread);
+  const reactionRequests = useRef(new Set<string>());
+  const chooseReply = (message: Message) => {
+    if (!replyStore.choose(thread, message)) return;
+    refreshReplies(value => value + 1);
+    setDraftNotice("");
+    requestAnimationFrame(() => input.current?.focus({ preventScroll: true }));
+  };
+  const reactToMessage = async (message: Message, emoji: MessageReactionValue) => {
+    if (reactionRequests.current.has(message.id)) return;
+    reactionRequests.current.add(message.id);
+    try {
+      const changed = await api<Message>(`/api/messages/${encodeURIComponent(message.id)}/reactions`, { emoji });
+      if (changed.id !== message.id || changed.threadId !== message.threadId) {
+        throw new Error("OpenBot could not confirm that reaction. Refresh this conversation before trying again.");
+      }
+      setState(current => current?.activeThreadId === changed.threadId
+        ? { ...current, messages: current.messages.map(item => item.id === changed.id ? changed : item) }
+        : current);
+    } finally { reactionRequests.current.delete(message.id); }
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
@@ -1012,6 +1036,7 @@ export function Studio() {
     setSending(true);
     setSendError("");
     const sentDraft = composerDraft.capture();
+    const sentReply = replyStore.capture(targetThread);
     const sentFiles = attached.files.map((file) => file.id);
     try {
       await api("/api/messages", {
@@ -1020,9 +1045,11 @@ export function Studio() {
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         targetBotIds: recipient ? [recipient] : [],
         attachmentIds: sentFiles,
-        replyToId: null,
+        replyToId: sentReply?.id ?? null,
       });
       composerDraft.clearSent(sentDraft);
+      replyStore.clearSent(sentReply);
+      refreshReplies(value => value + 1);
       attached.clear(targetThread, sentFiles);
       setRefresh((n) => n + 1);
     } catch (reason) {
@@ -1129,6 +1156,10 @@ export function Studio() {
           event.target.value = "";
         }}
       />
+      {reply && <div className="ob-compose-reply" aria-label={`Replying to ${reply.senderName}`}>
+        <span><strong>Replying to {reply.senderName}</strong><span>{reply.body || "Attachment"}</span></span>
+        <button type="button" aria-label="Cancel reply" onClick={() => { replyStore.clear(thread); refreshReplies(value => value + 1); input.current?.focus(); }}><X size={16} aria-hidden="true" /></button>
+      </div>}
       {attached.files.length > 0 && (
         <div className="compose-files">
           {attached.files.map((file) => {
@@ -2523,7 +2554,7 @@ export function Studio() {
                         }
                         // Membership noise never earns a full bubble — quiet
                         // centered system line, like every real chat app.
-                        if (message.senderType !== "user" && isMembershipText(message.body)) {
+                        if (message.senderType !== "user" && (message.senderType === "system" && isMembershipText(message.body))) {
                           return (
                             <div key={message.id} className="chat-event is-centered" aria-label={message.body}>
                               <UsersRound size={13} aria-hidden="true" />
@@ -2547,7 +2578,7 @@ export function Studio() {
                         return (
                           <Fragment key={message.id}><article
                             className={`chat-message ${message.senderType === "user" ? "from-you" : "from-team"} ${startsGroup ? "" : "continues"}`}
-
+                            data-message-id={message.id}
                           >
                             {message.senderType !== "user" && startsGroup && (
                               <div className="message-author">
@@ -2561,6 +2592,9 @@ export function Studio() {
                                 <time>{timeText(message.createdAt)}</time>
                               </div>
                             )}
+                            {message.replyTo && <div className="ob-message-quote" aria-label={`Reply to ${message.replyTo.senderName}`}>
+                              <strong>{message.replyTo.senderName}</strong><span>{message.replyTo.body || "Attachment"}</span>
+                            </div>}
                             <div className="prose">
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
@@ -2573,6 +2607,22 @@ export function Studio() {
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
+                            <div className="ob-message-footer">
+                              {message.reactions.length > 0 && <div className="ob-message-reactions" role="group" aria-label="Message reactions">
+                                {message.reactions.map(reaction => {
+                                  const option = messageReactions.find(item => item.value === reaction.emoji);
+                                  if (!option) return null;
+                                  const { Icon } = option;
+                                  return <button key={reaction.emoji} type="button" disabled={!online}
+                                    aria-label={`${option.label}: ${reaction.count}`} aria-pressed={reaction.reactedByYou}
+                                    onClick={() => void reactToMessage(message, option.value).catch(cause => setError(cause instanceof Error ? cause.message : "Couldn’t update reaction."))}>
+                                    <Icon size={13} aria-hidden="true" /><span>{reaction.count}</span>
+                                  </button>;
+                                })}
+                              </div>}
+                              <MessageActionMenu message={message} onReply={() => chooseReply(message)}
+                                onReact={value => reactToMessage(message, value)} disabled={!online} />
+                            </div>
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })

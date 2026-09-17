@@ -131,11 +131,12 @@ server.tool("studio_state", "Snapshot of the studio: teammates with status, conv
 server.tool("send_message", "Send a chat message as the owner. Starts teammate task runs. Use targetBotIds to direct it; omit to let routing decide. To attach files: fixture_upload first, then pass the returned attachment ids here in the SAME flow — the run cannot see files you do not bind.", {
   threadId: z.string().describe("team-room, a group id, or a bot thread id."),
   body: z.string().min(1).max(20_000),
+  replyToId: z.string().uuid().optional().describe("Existing message in the same conversation to quote. The backend validates the thread."),
   targetBotIds: z.array(z.string()).max(6).optional(),
   attachmentIds: z.array(z.string()).max(6).optional().describe("Attachment ids from fixture_upload (or the app UI). The server rejects unknown, cross-thread, or already-claimed files before any model work starts."),
   requestId: z.string().min(8).max(80).optional().describe("Caller-generated idempotency key: retrying with the same key replays the original result instead of sending twice."),
-}, async ({ threadId, body, targetBotIds, attachmentIds, requestId }) => {
-  const result = await call("/api/messages", { threadId, body, ...(targetBotIds ? { targetBotIds } : {}), ...(attachmentIds ? { attachmentIds } : {}), ...(requestId ? { requestId } : {}) }) as AnyRecord;
+}, async ({ threadId, body, replyToId, targetBotIds, attachmentIds, requestId }) => {
+  const result = await call("/api/messages", { threadId, body, ...(replyToId ? { replyToId } : {}), ...(targetBotIds ? { targetBotIds } : {}), ...(attachmentIds ? { attachmentIds } : {}), ...(requestId ? { requestId } : {}) }) as AnyRecord;
   return { content: [{ type: "text", text: JSON.stringify(result, null, 1).slice(0, 4_000) }] };
 });
 

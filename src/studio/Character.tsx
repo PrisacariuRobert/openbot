@@ -32,6 +32,8 @@ export function Character({
       role="img"
       aria-label={`${name}, ${status}`}
       data-shape={shape}
+      data-status={status}
+      data-mood={mood}
       style={
         {
           "--character-color": /^#[0-9a-f]{6}$/i.test(color)
