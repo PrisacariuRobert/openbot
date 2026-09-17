@@ -29,7 +29,9 @@ test("registers a private Todoist client, reads tasks, and creates only through 
     assert.equal(db.getConnector("todoist")?.accountEmail, "Robert");
     assert.equal((await connector.tasks("launch"))[0]?.due, "2026-09-04");
     assert.deepEqual((await connector.activities())[0], { id: "activity-1", eventType: "completed", objectId: "task-1", content: "Prepare launch", occurredAt: "2026-09-04T10:00:00Z", projectId: "project-1" });
-    assert.equal((await connector.create({ content: "Ship OpenBot", priority: 4 })).content, "Ship OpenBot");
+    const created = await connector.create({ content: "Ship OpenBot", priority: 4 });
+    assert.equal(created.task.content, "Ship OpenBot");
+    assert.equal(created.recovered, false);
     assert.equal((await connector.health()).email, "robert@example.com");
     await assert.rejects(() => connector.completeOAuth(oauth.state, "replay"), /sign-in expired/);
     db.close();

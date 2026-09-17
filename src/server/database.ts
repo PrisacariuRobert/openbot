@@ -59,6 +59,7 @@ import type {
   TaskVerificationStatus,
   TaughtWorkflow,
   Thread,
+  TodoistTaskSummary,
   UsageSummary,
 } from "../shared/types.js";
 import { SecretVault } from "./vault.js";
@@ -135,6 +136,20 @@ export type MessageSubmissionReceipt = {
   attachmentIds: string[];
   responseStatus: number;
   createdAt: string;
+};
+
+export type ConnectorTaskRef = {
+  connectorId: string;
+  resourceId: string;
+  account: string;
+  authorizationVersion: number;
+  threadId: string;
+  runId: string;
+  botId: string;
+  reviewedFields: { content: string; description: string; dueString: string; projectId: string; priority: number };
+  lastState: TodoistTaskSummary;
+  createdAt: string;
+  updatedAt: string;
 };
 
 function taskGoal(prompt: string): string {
@@ -746,6 +761,21 @@ export class OpenBotDatabase {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS message_submissions_thread_time ON message_submissions(thread_id,created_at DESC);
+      CREATE TABLE IF NOT EXISTS connector_task_refs (
+        connector_id TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        account TEXT NOT NULL DEFAULT '',
+        authorization_version INTEGER NOT NULL DEFAULT 0,
+        thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        reviewed_fields_json TEXT NOT NULL DEFAULT '{}',
+        last_state_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(connector_id, resource_id)
+      );
+      CREATE INDEX IF NOT EXISTS connector_task_refs_thread_time ON connector_task_refs(thread_id,created_at DESC);
       CREATE TABLE IF NOT EXISTS bot_connector_access (
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         connector_id TEXT NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
@@ -3406,6 +3436,51 @@ export class OpenBotDatabase {
       SELECT request_id FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?
     )`).run(over);
     return over;
+  }
+
+  /** Scoped external-object identity (P04a). One row per connector resource
+   * created through an approved action: which account and authorization
+   * version created it, which thread/run/bot owns it, the exact reviewed
+   * fields, and the last read-back state. Corrections (P04b) resolve the
+   * same resource id in the same account — never by title alone — and a
+   * changed account or authorization version invalidates the reference. */
+  getConnectorTaskRef(connectorId: string, resourceId: string): ConnectorTaskRef | null {
+    const row = this.db.prepare("SELECT * FROM connector_task_refs WHERE connector_id=? AND resource_id=?").get(connectorId, resourceId) as Row | undefined;
+    if (!row) return null;
+    return {
+      connectorId: String(row.connector_id),
+      resourceId: String(row.resource_id),
+      account: String(row.account || ""),
+      authorizationVersion: Number(row.authorization_version || 0),
+      threadId: String(row.thread_id),
+      runId: String(row.run_id),
+      botId: String(row.bot_id),
+      reviewedFields: JSON.parse(String(row.reviewed_fields_json || "{}")) as ConnectorTaskRef["reviewedFields"],
+      lastState: JSON.parse(String(row.last_state_json || "{}")) as TodoistTaskSummary,
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+    };
+  }
+
+  saveConnectorTaskRef(input: {
+    connectorId: string; resourceId: string; account: string; authorizationVersion: number;
+    threadId: string; runId: string; botId: string;
+    reviewedFields: ConnectorTaskRef["reviewedFields"]; lastState: TodoistTaskSummary;
+  }): ConnectorTaskRef {
+    const at = now();
+    this.db.prepare(`INSERT INTO connector_task_refs
+      (connector_id,resource_id,account,authorization_version,thread_id,run_id,bot_id,reviewed_fields_json,last_state_json,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(connector_id,resource_id) DO UPDATE SET
+        account=excluded.account,authorization_version=excluded.authorization_version,
+        thread_id=excluded.thread_id,run_id=excluded.run_id,bot_id=excluded.bot_id,
+        reviewed_fields_json=excluded.reviewed_fields_json,last_state_json=excluded.last_state_json,
+        updated_at=excluded.updated_at`).run(
+      input.connectorId, input.resourceId, input.account, input.authorizationVersion,
+      input.threadId, input.runId, input.botId,
+      JSON.stringify(input.reviewedFields), JSON.stringify(input.lastState), at, at,
+    );
+    return this.getConnectorTaskRef(input.connectorId, input.resourceId)!;
   }
 
   runDepth(runId: string): number {
