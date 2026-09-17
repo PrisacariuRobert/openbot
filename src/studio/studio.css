@@ -2,13 +2,13 @@
 :root {
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", system-ui, -system-ui, "Segoe UI", sans-serif, "Open Sans";
-  color: var(--ink);
-  background: var(--surface);
+  /* U01a: roles, not legacy aliases. design-tokens.css owns --ink/--line/
+   * --muted as aliases of these same roles and loads after this sheet, so
+   * the values below are identical to the old ones in every appearance. */
+  color: var(--label-primary);
+  background: var(--system-background);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
-  --line: #ececec;
-  --muted: #858585;
-  --ink: #202020;
 }
 * {
   box-sizing: border-box;
