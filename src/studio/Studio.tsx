@@ -75,6 +75,7 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
+import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
 import { ConversationProgress } from "./ConversationProgress";
@@ -149,7 +150,11 @@ async function api<T>(
   }
   const result = await response.json();
   if (!response.ok)
-    throw new Error(result.error || "That didn’t work. Please try again.");
+    throw apiError(
+      response.status,
+      result,
+      "That didn’t work. Please try again.",
+    );
   return result as T;
 }
 function Face({
@@ -768,6 +773,9 @@ export function Studio() {
   }, []);
   const composerDraft = useConversationDraft(thread, state?.draft);
   const attached = useConversationAttachments(thread);
+  // P01c: one submission key per unsent content. Retries reuse it so a lost
+  // response replays instead of duplicating; anything new rotates it.
+  const sendKeys = useRef(createSubmissionKeys());
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
@@ -1013,6 +1021,13 @@ export function Studio() {
     setSendError("");
     const sentDraft = composerDraft.capture();
     const sentFiles = attached.files.map((file) => file.id);
+    const sendScope = {
+      threadId: targetThread,
+      body,
+      targetBotIds: recipient ? [recipient] : [],
+      attachmentIds: sentFiles,
+      replyToId: null,
+    };
     try {
       await api("/api/messages", {
         threadId: targetThread,
@@ -1021,16 +1036,28 @@ export function Studio() {
         targetBotIds: recipient ? [recipient] : [],
         attachmentIds: sentFiles,
         replyToId: null,
+        requestId: sendKeys.current.keyFor(sendScope),
       });
+      // Delivered or replayed: the next deliberate send is new work.
+      sendKeys.current.rotate();
       composerDraft.clearSent(sentDraft);
       attached.clear(targetThread, sentFiles);
       setRefresh((n) => n + 1);
     } catch (reason) {
-      setSendError(
-        reason instanceof Error
-          ? reason.message
-          : "Your message wasn’t sent. It’s still here to try again.",
-      );
+      if (reason instanceof ApiError && reason.code === "request_conflict") {
+        // Same key, changed payload: the host changed nothing. Rotate so the
+        // next press sends fresh, and keep the exact unsent content.
+        sendKeys.current.rotate();
+        setSendError(
+          "That retry didn’t match your original send, so nothing was duplicated. Review your message and send again — your draft is untouched.",
+        );
+      } else {
+        setSendError(
+          reason instanceof Error
+            ? reason.message
+            : "Your message wasn’t sent. It’s still here to try again.",
+        );
+      }
     } finally {
       setSending(false);
     }
