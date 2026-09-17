@@ -102,6 +102,41 @@ function jsonRecord(value: string | number | null | undefined): Record<string, s
   } catch { return {}; }
 }
 
+/** Canonical payload digest for POST /api/messages idempotency (P01).
+ * Binds every semantic input: thread, final text, attachment IDs in order
+ * (order is meaningful), reply target, explicitly selected teammates
+ * (sorted — order is not meaningful), time zone and expected work kind.
+ * Same requestId + different digest is a conflict, never a silent reuse. */
+export function messageSubmissionDigest(input: {
+  threadId: string; body: string; attachmentIds: string[];
+  replyToId?: string | null; targetBotIds?: string[];
+  timeZone?: string; expectedWorkKind?: string;
+}): string {
+  const canonical = {
+    threadId: input.threadId,
+    body: input.body,
+    attachmentIds: [...input.attachmentIds],
+    replyToId: input.replyToId ?? null,
+    targetBotIds: [...(input.targetBotIds ?? [])].sort(),
+    timeZone: input.timeZone ?? null,
+    expectedWorkKind: input.expectedWorkKind ?? null,
+  };
+  return createHash("sha256").update(stableJson(canonical)).digest("hex");
+}
+
+export type MessageSubmissionReceipt = {
+  requestId: string;
+  threadId: string;
+  payloadDigest: string;
+  messageId: string | null;
+  runIds: string[];
+  routineIds: string[];
+  routedTo: Array<{ id: string; name: string }>;
+  attachmentIds: string[];
+  responseStatus: number;
+  createdAt: string;
+};
+
 function taskGoal(prompt: string): string {
   return prompt.split("\n\nFiles attached by the user")[0]!.replace(/^(?:Handoff|Private teammate message) from [^:]+:\s*/i, "").replace(/\s+/g, " ").trim().slice(0, 240) || "Finish the requested work";
 }
@@ -698,6 +733,19 @@ export class OpenBotDatabase {
         dedupe_key TEXT NOT NULL UNIQUE,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS message_submissions (
+        request_id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+        payload_digest TEXT NOT NULL,
+        message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,
+        run_ids_json TEXT NOT NULL DEFAULT '[]',
+        routine_ids_json TEXT NOT NULL DEFAULT '[]',
+        routed_to_json TEXT NOT NULL DEFAULT '[]',
+        attachment_ids_json TEXT NOT NULL DEFAULT '[]',
+        response_status INTEGER NOT NULL DEFAULT 202,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS message_submissions_thread_time ON message_submissions(thread_id,created_at DESC);
       CREATE TABLE IF NOT EXISTS bot_connector_access (
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         connector_id TEXT NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
@@ -3297,6 +3345,67 @@ export class OpenBotDatabase {
 
   claimDedupe(key: string): boolean {
     try { this.db.prepare("INSERT INTO dedupe_keys (dedupe_key,created_at) VALUES (?,?)").run(key, now()); return true; } catch { return false; }
+  }
+
+  /** Durable POST /api/messages submission receipt (P01). First writer wins;
+   * a retried requestId with the same digest replays stored IDs instead of
+   * creating a second message/routine/run. Same requestId with a different
+   * digest is a caller conflict — the stored row is never overwritten here. */
+  getMessageSubmission(requestId: string): MessageSubmissionReceipt | null {
+    const row = this.db.prepare("SELECT * FROM message_submissions WHERE request_id=?").get(requestId) as Row | undefined;
+    if (!row) return null;
+    return {
+      requestId: String(row.request_id),
+      threadId: String(row.thread_id),
+      payloadDigest: String(row.payload_digest),
+      messageId: row.message_id ? String(row.message_id) : null,
+      runIds: jsonArray<string>(row.run_ids_json),
+      routineIds: jsonArray<string>(row.routine_ids_json),
+      routedTo: jsonArray<{ id: string; name: string }>(row.routed_to_json),
+      attachmentIds: jsonArray<string>(row.attachment_ids_json),
+      responseStatus: Number(row.response_status ?? 202),
+      createdAt: String(row.created_at),
+    };
+  }
+
+  saveMessageSubmission(input: {
+    requestId: string; threadId: string; payloadDigest: string;
+    messageId: string | null; runIds: string[]; routineIds: string[];
+    routedTo: Array<{ id: string; name: string }>; attachmentIds: string[];
+    responseStatus: number;
+  }): MessageSubmissionReceipt {
+    const createdAt = now();
+    try {
+      this.db.prepare(`INSERT INTO message_submissions
+        (request_id,thread_id,payload_digest,message_id,run_ids_json,routine_ids_json,routed_to_json,attachment_ids_json,response_status,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+        input.requestId, input.threadId, input.payloadDigest, input.messageId,
+        JSON.stringify(input.runIds), JSON.stringify(input.routineIds),
+        JSON.stringify(input.routedTo), JSON.stringify(input.attachmentIds),
+        input.responseStatus, createdAt,
+      );
+    } catch {
+      // A concurrent identical submission already stored its receipt: keep the
+      // original so a retry can never fork a second message/run history.
+      const existing = this.getMessageSubmission(input.requestId);
+      if (existing) return existing;
+      throw new Error("That request is already being processed. Reuse its result instead of sending it again.");
+    }
+    this.pruneMessageSubmissions(1000);
+    return this.getMessageSubmission(input.requestId)!;
+  }
+
+  /** Bounded retention: keep the most recent receipts so transport retries
+   * inside the retry window replay instead of duplicating. Oldest rows fall
+   * off; an intentionally repeated task must use a new requestId. */
+  pruneMessageSubmissions(limit = 1000): number {
+    const row = this.db.prepare("SELECT COUNT(*) AS count FROM message_submissions").get() as Row;
+    const over = Number(row?.count ?? 0) - Math.max(1, limit);
+    if (over <= 0) return 0;
+    this.db.prepare(`DELETE FROM message_submissions WHERE request_id IN (
+      SELECT request_id FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?
+    )`).run(over);
+    return over;
   }
 
   runDepth(runId: string): number {
