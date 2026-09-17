@@ -1,6 +1,7 @@
 import type { OpenBotDatabase } from "./database";
 import { browserWebsiteBlock } from "./browser-access";
 import { signInOrigin } from "../shared/browser-sign-in";
+import type { BrowserNavigationGrants } from "./browser-navigation-grants.js";
 
 /** A durable owner handoff, not permission to submit a form or proof of login. */
 export class BrowserSignIns {
@@ -8,7 +9,7 @@ export class BrowserSignIns {
   /** Completed handoffs per teammate+site (best-effort, memory-only): a repeat
    * ask shortly after one says so on the card instead of nagging fresh. */
   private completedAt = new Map<string, number>();
-  constructor(private db: OpenBotDatabase) {}
+  constructor(private db: OpenBotDatabase, private grants?: Pick<BrowserNavigationGrants, "revokeBot">) {}
 
   async withProfile<T>(botId: string, operation: () => Promise<T>): Promise<T> {
     const before = this.locks.get(botId) ?? Promise.resolve();
@@ -42,6 +43,9 @@ export class BrowserSignIns {
   }
 
   request(botId: string, runId: string, currentUrl: string, evidence?: { source: "host" | "teammate"; observedUrl?: string; observedText?: string }) {
+    // A login wall means the session already changed under any issued
+    // allowance: revoke first, even if this request itself is a duplicate.
+    this.grants?.revokeBot(botId);
     const existing = this.pending(botId);
     if (existing) {
       if (existing.runId === runId) return existing;
@@ -79,6 +83,9 @@ export class BrowserSignIns {
 
   continue(approvalId: string) {
     const { run, siteOrigin } = this.details(approvalId);
+    // The owner just authenticated, possibly as a different account: no
+    // pre-handoff navigation allowance survives the handoff.
+    this.grants?.revokeBot(run.botId);
     // Save before enqueueing: recovery must never resume with the old refusal alone.
     this.db.setRunPrompt(run.id, `${run.prompt}\n\n[Owner sign-in handoff completed for ${siteOrigin}. This is NOT proof of authentication. Inspect your current browser page, verify the intended account and relevant service, then continue the original request. If still gated, call browser_request_sign_in again. Never request passwords in chat. Do not repeat completed actions or bypass separate approvals for sending, publishing, deleting or purchasing.]`);
     this.completedAt.set(`${run.botId} ${siteOrigin}`, Date.now());
