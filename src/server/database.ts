@@ -3631,8 +3631,12 @@ export class OpenBotDatabase {
     return row ? this.routineFromRow(row) : null;
   }
 
-  listRoutines(): Routine[] {
-    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
+  /** All routines, or only the routines of one conversation when threadId is
+   * given. Scoped listing (P03a) is the identity foundation for follow-up
+   * management: corrections resolve these ids, never titles alone. */
+  listRoutines(threadId?: string): Routine[] {
+    if (!threadId) return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id ORDER BY r.rowid DESC").all() as Row[]).map((row) => this.routineFromRow(row));
+    return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.thread_id=? ORDER BY r.rowid DESC").all(threadId) as Row[]).map((row) => this.routineFromRow(row));
   }
 
   updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; schedule?: RoutineSchedule; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }): Routine | null {

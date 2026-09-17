@@ -86,6 +86,7 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     assert.ok(exposed.includes("notion_read"));
     assert.ok(exposed.includes("notion_update"));
     assert.ok(exposed.includes("routine_create"));
+    assert.ok(exposed.includes("routine_list"));
     assert.ok(exposed.includes("mac_list"));
     assert.ok(exposed.includes("mac_read"));
     assert.ok(exposed.includes("mac_organize"));

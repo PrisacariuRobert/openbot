@@ -3097,7 +3097,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3680,6 +3680,21 @@ app.post("/api/internal/tools", async (request, response) => {
       const file = await dropbox.read(input.data.fileIdOrPath);
       db.addConnectorEvent({ connectorId: "dropbox", botId, action, status: "completed", summary: `${bot.name} read “${file.name.slice(0, 120)}” from Dropbox` });
       broadcast({ type: "connector", at: Date.now() }); return response.json(file);
+    }
+    if (action === "routine_list") {
+      // P03a: read-only scoped listing. The host preamble above already bound
+      // this call to a running run of this bot; only routines of that run's
+      // conversation are visible, never other threads. Summaries carry ids
+      // for exact follow-ups, never prompts or secrets.
+      const sourceRun = db.getRun(runId)!;
+      const input = z.object({ query: z.string().trim().max(200).default("") }).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_list at most a short name filter." });
+      const needle = input.data.query.toLocaleLowerCase();
+      const routines = db.listRoutines(sourceRun.threadId)
+        .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
+        .slice(0, 50)
+        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId }));
+      return response.json({ routines, count: routines.length, scope: "conversation" });
     }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;
