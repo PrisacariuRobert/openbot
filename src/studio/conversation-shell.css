@@ -2367,3 +2367,17 @@ a.message-file:hover {
 .compose-reply-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compose-reply-cancel { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; border: none; background: transparent; color: var(--label-secondary); cursor: pointer; }
 .compose-reply-cancel:hover { background: var(--separator); color: var(--label-primary); }
+
+/* U03: narrow sign-in overlay. Same handoff as the beside-chat pane, as a
+ * returnable fullscreen layer with a clear back-to-chat control. Token
+ * roles only; layered above app chrome below native dialogs. */
+.browser-pane-narrow {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border-left: none;
+  background: var(--system-background);
+}
+.browser-pane-narrow > header { justify-content: flex-start; }
+.browser-pane-narrow > header h2 { flex: 1; text-align: center; }
+.browser-pane-narrow-spacer { width: 40px; flex: none; }

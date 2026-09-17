@@ -77,6 +77,7 @@ import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { conversationMatches } from "./conversation-filter";
+import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 import { useConversationAttachments } from "./useConversationAttachments";
@@ -835,13 +836,14 @@ export function Studio() {
   }, []);
   // Split view: when a teammate waits on a private sign-in in this
   // conversation, open the live website beside the chat, the way a second
-  // column of work belongs next to the conversation. It closes itself once
-  // the handoff is decided, and the task card reopens it on request.
+  // column of work belongs next to the conversation. Narrow screens get the
+  // same handoff as a returnable fullscreen overlay instead of a dead end.
+  // It closes itself once the handoff is decided, and the task card reopens
+  // it on request.
   const pendingSignInId = useMemo(() => {
-    if (!state || narrow) return null;
-    const threadRuns = new Set(state.runs.filter((run) => run.threadId === thread).map((run) => run.id));
-    return state.approvals.find((approval) => approval.kind === "browser" && approval.requiresSignIn === true && approval.status === "pending" && threadRuns.has(approval.runId))?.id || null;
-  }, [state, thread, narrow]);
+    if (!state) return null;
+    return selectPendingSignIn(state.approvals, state.runs, thread);
+  }, [state, thread]);
   useEffect(() => { setSignInPane(pendingSignInId); }, [pendingSignInId]);
   const [calendarDate, setCalendarDate] = useState(dayKey(new Date()));
   const [month, setMonth] = useState(dayKey(new Date()).slice(0, 7) + "-01");
@@ -2714,6 +2716,19 @@ export function Studio() {
           <BrowserSignInPanel key={signInPane} approvalId={signInPane} disabled={false}
             onBusyChange={() => {}} onInteraction={() => {}} />
         </aside>
+      )}
+      {signInPane && narrow && page === "chat" && (
+        <div className="browser-pane browser-pane-narrow" role="dialog" aria-modal="true" aria-label="Private browser">
+          <header>
+            <button aria-label="Back to chat" onClick={() => setSignInPane(null)}>
+              <ChevronLeft size={19} />
+            </button>
+            <h2>Private browser</h2>
+            <span className="browser-pane-narrow-spacer" aria-hidden="true" />
+          </header>
+          <BrowserSignInPanel key={signInPane} approvalId={signInPane} disabled={false}
+            onBusyChange={() => {}} onInteraction={() => {}} />
+        </div>
       )}
       {contextOpen && !narrow && page === "chat" && state && (
         <aside
