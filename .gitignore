@@ -38,3 +38,7 @@ scripts/courier-watch.mjs
 scripts/wake-builder.mjs
 scripts/wake-supervisor.mjs
 scripts/com.openbot.*.plist
+
+# Finder archive metadata, never application assets.
+__MACOSX/
+._*
