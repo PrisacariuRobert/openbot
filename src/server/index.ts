@@ -1315,8 +1315,18 @@ app.get("/api/attachments/:id/preview", (request, response) => {
   stream.pipe(response);
 });
 
-const messageInput = z.object({
-  timeZone: z.string().max(100).optional(),
+/** Staging fault-injection catalogue, v1 (P09a). Armed per requestId or runId
+ * through POST /api/tester/faults (staging only; 404 in production).
+ * Expected outcomes, each covered by fault-lifecycle/fault-catalogue tests:
+ * - after_verified_artifact: the run stops through the normal failure path
+ *   right after a host-verified check passes (source=tester_fault).
+ * - before_dispatch: the run fails before any model process starts — zero
+ *   model output, zero workspace writes, same tester_fault receipt.
+ * Firing consumes the arm (one-shot, like the original point). Sibling runs
+ * and other points are unaffected. Unknown points are rejected at arming. */
+const TESTER_FAULT_POINTS = ["after_verified_artifact", "before_dispatch"] as const;
+
+const messageInput = z.object({  timeZone: z.string().max(100).optional(),
   expectedWorkKind: z.enum(["morning", "inbox", "meeting", "weekly"]).optional(),
   threadId: z.string().min(1), body: z.string().trim().max(20_000).default(""),
   targetBotIds: z.array(z.string()).max(6).optional(), attachmentIds: z.array(z.string()).max(6).default([]), replyToId: z.string().uuid().nullable().optional(),
@@ -1492,8 +1502,10 @@ app.post("/api/messages", (request, response) => {
   if (parsed.data.requestId && submissionDigest) {
     // Gate 1a: bind a request-scoped tester fault to the runs it created, so
     // the fault can be armed before execution (avoids the start/arm race).
+    // Every catalogued point propagates; unknown points never reach storage
+    // because the arming route rejects them.
     const armed = db.extensionRecord<{ point: string; once: boolean }>("test-fault", `request:${parsed.data.requestId}`);
-    if (armed?.point === "after_verified_artifact") for (const run of runs) db.saveExtensionRecord("test-fault", `run:${run.id}`, armed);
+    if (armed && (TESTER_FAULT_POINTS as readonly string[]).includes(armed.point)) for (const run of runs) db.saveExtensionRecord("test-fault", `run:${run.id}`, armed);
     db.saveMessageSubmission({
       requestId: parsed.data.requestId,
       threadId: thread.id,
@@ -2376,10 +2388,10 @@ app.post("/api/tester/faults", (request, response) => {
   const parsed = z.object({
     requestId: z.string().min(8).max(80).optional(),
     runId: z.string().min(1).max(80).optional(),
-    point: z.literal("after_verified_artifact"),
+    point: z.enum(TESTER_FAULT_POINTS),
     once: z.boolean().optional(),
   }).safeParse(request.body);
-  if (!parsed.success || (!parsed.data.requestId && !parsed.data.runId)) return response.status(400).json({ error: "Give a requestId or runId and point=after_verified_artifact." });
+  if (!parsed.success || (!parsed.data.requestId && !parsed.data.runId)) return response.status(400).json({ error: `Give a requestId or runId and point=${TESTER_FAULT_POINTS.join(" | ")}.` });
   const record = { point: parsed.data.point, once: parsed.data.once !== false, armedAt: new Date().toISOString() };
   if (parsed.data.runId) db.saveExtensionRecord("test-fault", `run:${parsed.data.runId}`, record);
   if (parsed.data.requestId) db.saveExtensionRecord("test-fault", `request:${parsed.data.requestId}`, record);
