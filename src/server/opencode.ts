@@ -372,6 +372,15 @@ export class OpenCodeRunner {
         const excludedBotIds = [...this.running.keys()].map((runId) => this.options.db.getRun(runId)?.botId).filter((id): id is string => Boolean(id));
         const run = this.options.db.claimNextQueuedRun(excludedBotIds, this.instanceId);
         if (!run || this.running.has(run.id)) break;
+        // P09a: a pre-dispatch fault stops the run before any model process
+        // starts — same tester_fault receipt as mid-run faults, zero output.
+        const dispatchFault = this.options.db.extensionRecord<{ point: string; once: boolean }>("test-fault", `run:${run.id}`);
+        if (dispatchFault?.point === "before_dispatch") {
+          this.options.db.saveExtensionRecord("test-fault", `run:${run.id}`, { point: "consumed", once: false, consumedAt: new Date().toISOString() });
+          this.failBeforeStart(run, executionStopMessage.tester_fault, "Tester fault injected");
+          this.options.db.addActivity({ runId: run.id, botId: run.botId, kind: "error", label: "Tester fault injected", detail: "source=tester_fault · before_dispatch" });
+          continue;
+        }
         if (this.enforceJobBudget(run.id)) continue;
         // S3-P03: reserve roughly one bounded model step before dispatch so
         // a run that cannot afford another step is blocked before any model
