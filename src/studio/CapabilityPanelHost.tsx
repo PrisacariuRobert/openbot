@@ -10,12 +10,16 @@ import "./capability-panels.css";
 import "./settings-pages.css";
 
 import type { CapabilityPanel } from "./capability-navigation";
+import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 async function request<T = unknown>(url: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Couldn’t save that change. Please try again.");
+  if (!response.ok) throw apiError(response.status, result, "Couldn’t save that change. Please try again.");
   return result as T;
 }
+// P01c: workflow/skill shortcuts resend on retry taps. One key per unsent
+// content replays instead of duplicating; a conflict rotates the key.
+const workflowKeys = createSubmissionKeys();
 
 /** Functional settings share Studio's dialog, palette and navigation. There is
  * no second app shell, separate conversation state or hidden legacy route. */
@@ -65,6 +69,19 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
   async function change<T = unknown>(url: string, method = "POST", body?: unknown, message?: string): Promise<T> {
     const result = await request<T>(url, method, body); onChange(); if (message) setNotice(message); return result;
   }
+  /** Workflow/skill shortcuts send through /api/messages with a stable
+   * retry key, then navigate. A conflict rotates the key and surfaces the
+   * host message so a retry tap sends fresh instead of 409-looping. */
+  async function workflowMessage(threadId: string, body: string, targetBotIds: string[], expectedWorkKind?: string): Promise<void> {
+    const scope = { threadId, body, targetBotIds, attachmentIds: [] as string[], replyToId: null, expectedWorkKind };
+    try {
+      await change("/api/messages", "POST", { threadId, body, expectedWorkKind, targetBotIds, attachmentIds: [], requestId: workflowKeys.keyFor(scope) });
+      onThread(threadId);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "request_conflict") workflowKeys.rotate();
+      throw error;
+    }
+  }
   const saveBot = async (id: string, patch: Partial<Bot>) => { await change(`/api/bots/${encodeURIComponent(id)}`, "PATCH", patch); await loadProvider(); };
   const notifications = async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotice("Background notifications are unavailable in this browser."); return false; }
@@ -97,7 +114,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
       onConnect={(providerId) => request<ProviderLoginAttempt>("/api/provider/connect", "POST", { providerId })}
       onFinish={async (id, code) => { await request(`/api/provider/connect/${encodeURIComponent(id)}/callback`, "POST", { code }); await loadProvider(); }} />}
     {panel === "connectors" && <ConnectorPanel status={connections} bots={state.bots} onRefresh={loadConnections} onNotice={setNotice} onStartWorkflow={async (prompt, expectedWorkKind, botId) => {
-      await change("/api/messages", "POST", { threadId: "team-room", body: prompt, expectedWorkKind, targetBotIds: botId ? [botId] : [], attachmentIds: [] }); onThread("team-room");
+      await workflowMessage("team-room", prompt, botId ? [botId] : [], expectedWorkKind);
     }} />}
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
@@ -110,7 +127,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {panel === "computer" && bot && <ComputerPanel key={bot.id} bot={bot} onTeach={() => onOpen("teach")} />}
     {panel === "teach" && <><p className="capability-notice">Teach through conversation: ask your teammate to “learn this workflow”, or type /learn followed by what you want to reuse. You review the instructions before they are saved.</p><ExtensionsPanel bots={state.bots} skillsOnly selectedBotId={bot?.id} />{bot && <details className="capability-disclosure"><summary>Your learned workflows</summary><TeachPanel key={bot.id} bot={bot} bots={state.bots} hideOwnerSwitcher onBotChange={setChosenBot} onNotice={setNotice} onUse={async (workflow) => {
       const owner = state.bots.find((item) => item.id === workflow.botId) || bot;
-      await change("/api/messages", "POST", { threadId: owner.threadId, body: `/${workflow.skillSlug}`, targetBotIds: [owner.id], attachmentIds: [] }); onThread(owner.threadId);
+      await workflowMessage(owner.threadId, `/${workflow.skillSlug}`, [owner.id]);
     }} /></details>}</>}
     {panel === "control" && <ControlPanel state={state} onNotify={() => void notifications().catch((e: Error) => setError(e.message))} onOpenProvider={() => onOpen("provider")} onOpenRemote={() => onOpen("remote")} onOpenConnectors={() => onOpen("connectors")} onOpenProjects={() => onOpen("projects")} onOpenSkills={() => onOpen("teach")} onSetMacAccess={async (enabled) => { await change("/api/settings", "PATCH", { macAccessEnabled: enabled }); }} onSetSelfExtend={async (enabled) => { await change("/api/settings", "PATCH", { selfExtendEnabled: enabled }); }} onSetCodingModel={async (model) => { await change("/api/settings", "PATCH", { codingModel: model }); }} onSetEmbeddings={async (providerInstanceId, model) => { await change("/api/settings", "PATCH", { embeddingsProviderInstanceId: providerInstanceId, embeddingsModel: model }); }} onRecallDelegation={async (runId) => { await change(`/api/delegations/${encodeURIComponent(runId)}/recall`, "POST"); }} onSetMaxTeammates={async (max) => { await change("/api/settings", "PATCH", { maxTeammates: max }); }} onRestoreTeammate={async (id) => { await change(`/api/bots/${encodeURIComponent(id)}/restore`, "POST", undefined, "Teammate restored."); }} onSetYoloMode={async (enabled) => { await change("/api/settings", "PATCH", { yoloMode: enabled }); }} onImportTeammate={async (bundle) => await change<{ name: string; skills: number; routines: number } & { bot: Bot }>("/api/bots/import", "POST", bundle).then((result) => ({ name: result.bot.name, skills: result.skills, routines: result.routines }))} />}
     {panel === "routines" && <RoutinesPanel routines={state.routines} events={state.automationEvents} alerts={state.automationAlerts} runner={state.runner} bots={state.bots}
