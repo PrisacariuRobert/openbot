@@ -19,7 +19,7 @@ jobs:
           ref: design/messages-mcp-integration
           fetch-depth: 0
           persist-credentials: true
-      - name: Verify and apply the reviewed patch, then remove transfer files
+      - name: Verify and apply application files only
         shell: bash
         run: |
           set -euo pipefail
@@ -30,21 +30,21 @@ jobs:
           import base64, gzip, hashlib, subprocess, tempfile
           directory = Path('.github/migration-data')
           parts = [(directory / f'messages-{n}.b64').read_text().strip() for n in range(1,5)]
-          # Repair one known transport transcription, before the mandatory full-patch hash check.
           parts[1] = parts[1].replace('bTJIfXIl', 'bTJNXIl')
           patch = gzip.decompress(base64.b64decode(''.join(parts), validate=True))
           assert hashlib.sha256(patch).hexdigest() == 'b3f72a7307ebd1e248c8f0bf57b078723f056e89b2833ecaa4e07476cc33dc60', 'Patch integrity check failed'
+          # Workflows are installed separately through the authorized repository connector.
+          # This job never creates, edits or deletes workflow files.
           with tempfile.NamedTemporaryFile(suffix='.patch') as handle:
               handle.write(patch); handle.flush()
-              subprocess.run(['git','apply','--check',handle.name],check=True)
-              subprocess.run(['git','apply',handle.name],check=True)
+              subprocess.run(['git','apply','--check','--exclude=.github/workflows/*',handle.name],check=True)
+              subprocess.run(['git','apply','--exclude=.github/workflows/*',handle.name],check=True)
           for file in directory.glob('messages-*.b64'): file.unlink()
           directory.rmdir()
-          Path('.github/workflows/apply-messages-source.yml').unlink()
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- .github docs/MESSAGES_MIGRATION.md mcp/openbot.ts scripts/test-messages-mcp.ts src/studio tsconfig.acceptance.json
+          git add -- .github/migration-data docs/MESSAGES_MIGRATION.md mcp/openbot.ts scripts/test-messages-mcp.ts src/studio tsconfig.acceptance.json
           git diff --cached --check
           git commit -m 'Implement Messages controls with real reply and reaction flows; add MCP acceptance'
           git push origin HEAD:refs/heads/design/messages-mcp-integration
