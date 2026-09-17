@@ -1,0 +1,56 @@
+name: Messages MCP acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'src/studio/**'
+      - 'src/shared/**'
+      - 'src/server/**'
+      - 'mcp/**'
+      - 'scripts/test-messages-mcp.ts'
+      - 'package*.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/messages-mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: messages-mcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  messages-mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Pure presentation and reply-state regression tests
+        run: node --test src/studio/system-message-presentation.test.mjs src/studio/browser-access-presentation.test.mjs src/studio/conversation-replies.test.mjs
+      - run: npm run build
+      - run: npm run check:acceptance
+      - name: Install lockfile-matched tester browser
+        run: |
+          npx --no-install playwright-core install --with-deps chromium
+          node --input-type=module -e 'import { chromium } from "playwright-core"; import { appendFileSync } from "node:fs"; appendFileSync(process.env.GITHUB_ENV, `OPENBOT_CHROME_PATH=${chromium.executablePath()}\n`);'
+      - name: Exercise the real Studio through the bundled MCP server
+        env:
+          OPENBOT_LOAD_ENV: '0'
+          OPENBOT_MCP_QA_OUTPUT: qa/mcp-messages
+        run: node --import tsx scripts/test-messages-mcp.ts
+      - name: Retain synthetic screenshots and MCP evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: messages-mcp-${{ github.sha }}
+          path: qa/mcp-messages/
+          retention-days: 7
+          if-no-files-found: ignore
