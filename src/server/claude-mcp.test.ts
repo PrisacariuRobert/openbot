@@ -90,6 +90,7 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     assert.ok(exposed.includes("routine_update"));
     assert.ok(exposed.includes("routine_pause"));
     assert.ok(exposed.includes("routine_resume"));
+    assert.ok(exposed.includes("routine_delete"));
     assert.ok(exposed.includes("mac_list"));
     assert.ok(exposed.includes("mac_read"));
     assert.ok(exposed.includes("mac_organize"));

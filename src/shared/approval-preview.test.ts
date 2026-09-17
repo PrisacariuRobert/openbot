@@ -488,3 +488,12 @@ test("routine resume/update reviews bind the exact routine, revision and change 
   }
   assert.equal(approvalPreview({ ...approval, kind: "prompt" }, run, { type: "routine_resume", botId: "bot", args: { routineId: "r", routineName: "N", expectedRevision: 1, changeSummary: "c" } }).canApprove, true);
 });
+
+test("routine delete reviews the exact target with history-preserving effect", () => {
+  const result = approvalPreview(approval, run, { type: "routine_delete", botId: "bot", args: { routineId: "routine-9", routineName: "Old brief", expectedRevision: 3, changeSummary: "Delete “Old brief” so it never runs again. Its past conversation results stay available and the deletion is recorded." } });
+  assert.equal(result.canApprove, true);
+  assert.deepEqual(result.fields.map((field) => field.label), ["Routine", "Listed at revision", "Delete", "Effect"]);
+  assert.match(result.fields[3]!.value, /stay available/);
+  assert.equal(result.fields.some((field) => field.label === "Connected account"), false);
+  assert.equal(approvalPreview(approval, run, { type: "routine_delete", botId: "bot", args: { routineId: "routine-9", routineName: "Old brief", expectedRevision: 3 } }).canApprove, false);
+});

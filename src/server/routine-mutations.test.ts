@@ -102,7 +102,7 @@ test("pause executes directly with revision conflicts and thread bounds", { time
     },
   });
   try {
-    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Pause Monday review and prepare the rest." });
+    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Show the automation follow-ups." });
     assert.equal(response.status, 202, await response.clone().text());
     const { runs } = (await response.json()) as { runs: Array<{ id: string }> };
     const runId = runs[0]!.id;
@@ -148,7 +148,7 @@ test("resume binds exact review and executes against the bound revision", { time
     const { mkdirSync: mkdir, writeFileSync: write } = await import("node:fs");
     mkdir(path.join(f.db.workspacesDir, "nova"), { recursive: true });
     write(path.join(f.db.workspacesDir, "nova", ".routine-target"), JSON.stringify(target));
-    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Resume Monday review." });
+    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Show the automation follow-ups." });
     assert.equal(response.status, 202, await response.clone().text());
     const { runs } = (await response.json()) as { runs: Array<{ id: string }> };
     const runId = runs[0]!.id;
@@ -186,7 +186,7 @@ test("stale reviewed update fails instead of overwriting", { timeout: 180_000 },
     const { mkdirSync: mkdir, writeFileSync: write } = await import("node:fs");
     mkdir(path.join(f.db.workspacesDir, "nova"), { recursive: true });
     write(path.join(f.db.workspacesDir, "nova", ".routine-target"), JSON.stringify(target));
-    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Rename Monday review." });
+    const response = await f.post("/api/messages", { threadId: "bot-nova", targetBotIds: ["nova"], body: "Show the automation follow-ups." });
     assert.equal(response.status, 202, await response.clone().text());
     const { runs } = (await response.json()) as { runs: Array<{ id: string }> };
     const runId = runs[0]!.id;

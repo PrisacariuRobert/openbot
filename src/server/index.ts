@@ -1633,14 +1633,29 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     broadcast({ type: "connector", at: Date.now() });
     return `The approved note was added to ${result.title}${result.url ? ` (${result.url})` : ""}.`;
   }
-  if (parsed.data.type === "routine_resume" || parsed.data.type === "routine_update") {
-    // P03b: execute an owner-reviewed routine change. The review stays bound
-    // to this exact resource and revision: a moved routine or a changed
+  if (parsed.data.type === "routine_resume" || parsed.data.type === "routine_update" || parsed.data.type === "routine_delete") {
+    // P03b/c: execute an owner-reviewed routine change. The review stays
+    // bound to this exact resource and revision: a moved routine or a changed
     // revision needs a fresh proposal instead of running stale.
     const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
     const input = routineToolMutationInput.safeParse(args);
     const routine = input.success ? db.getRoutine(input.data.routineId) : null;
-    if (!approval || !run || !input.success || !routine || routine.threadId !== run.threadId) throw new Error("That routine is no longer in this conversation. List this conversation's routines and propose the change again.");
+    if (!approval || !run || !input.success) throw new Error("The approved request could not be restored safely. Prepare it again for a fresh review.");
+    if (routine && routine.threadId !== run.threadId) throw new Error("That routine is no longer in this conversation. List this conversation's routines and propose the change again.");
+    if (parsed.data.type === "routine_delete") {
+      const expected = input.data.expectedRevision;
+      if (routine && expected !== undefined && routine.revision !== expected) throw new ApprovalReviewChangedError();
+      if (!routine) {
+        const receipt = db.getDeletedRoutineReceipt(input.data.routineId);
+        if (receipt && receipt.threadId === run.threadId) return `“${receipt.name}” was already deleted on ${receipt.createdAt}. Its past results stay available; it will not run again.`;
+        throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
+      }
+      db.deleteRoutine(routine.id, run.id);
+      db.addActivity({ runId: run.id, botId: run.botId, kind: "tool", label: `Deleted ${routine.name}`, detail: null });
+      broadcast();
+      return `“${routine.name}” was deleted. Its past conversation results stay available; it will not run again.`;
+    }
+    if (!routine) throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
     const expected = input.data.expectedRevision;
     if (expected !== undefined && routine.revision !== expected) throw new ApprovalReviewChangedError();
     if (parsed.data.type === "routine_resume" && routine.enabled) return `“${routine.name}” is already running (revision ${routine.revision}). Nothing was changed.`;
@@ -3170,7 +3185,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3769,14 +3784,15 @@ app.post("/api/internal/tools", async (request, response) => {
         .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
       return response.json({ routines, count: routines.length, scope: "conversation" });
     }
-    if (action === "routine_update" || action === "routine_pause" || action === "routine_resume") {
-      // P03b: exact-id follow-ups in this conversation. The host preamble
+    if (action === "routine_update" || action === "routine_pause" || action === "routine_resume" || action === "routine_delete") {
+      // P03b/c: exact-id follow-ups in this conversation. The host preamble
       // above already bound the call to a running run of this bot. Pausing is
-      // the safe direction and executes directly; resume and update arm
-      // future autonomous work and always pause for the owner's exact review.
+      // the safe direction and executes directly; resume, update and delete
+      // arm or end future autonomous work and always pause for the owner's
+      // exact review.
       const sourceRun = db.getRun(runId)!;
       const input = routineToolMutationInput.safeParse(args);
-      if (!input.success) return response.status(400).json({ error: "Give routine_update, routine_pause or routine_resume the exact routine id from routine_list." });
+      if (!input.success) return response.status(400).json({ error: "Give routine_update, routine_pause, routine_resume or routine_delete the exact routine id from routine_list." });
       const routine = db.getRoutine(input.data.routineId);
       if (!routine || routine.threadId !== sourceRun.threadId) return response.status(404).json({ error: "That routine is not in this conversation. List this conversation's routines and use one of those ids." });
       const revisionNote = `listed at revision ${routine.revision}`;
@@ -3815,17 +3831,30 @@ app.post("/api/internal/tools", async (request, response) => {
       }
       const patch: RoutinePatch = action === "routine_resume"
         ? { enabled: true }
-        : {
-          ...(input.data.name !== undefined ? { name: input.data.name } : {}),
-          ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
-          ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
-          ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
-        };
+        : action === "routine_delete"
+          ? {}
+          : {
+            ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+            ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
+            ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
+            ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
+          };
       if (action === "routine_update" && Object.keys(patch).length === 0) return response.status(400).json({ error: "Say what should change: name, instructions, repeat time or schedule." });
       if (action === "routine_resume" && routine.enabled) {
         const conflicted = revisionOrConflict();
         if (conflicted) return;
         return response.json({ ok: true, routineId: routine.id, enabled: true, revision: routine.revision, unchanged: true });
+      }
+      if (action === "routine_delete") {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        const deleteSummary = `Delete “${routine.name}” so it never runs again. Its past conversation results stay available and the deletion is recorded.`;
+        return holdForApproval(
+          "external",
+          `${bot.name} wants to delete “${routine.name}” (${revisionNote}): ${deleteSummary} Only this routine is deleted; nothing else changes.`,
+          `Delete “${routine.name}”`,
+          { type: action, botId, routineId: routine.id, routineName: routine.name, expectedRevision: input.data.expectedRevision, changeSummary: deleteSummary },
+        );
       }
       const { nextTriggerType, next } = resolveRoutineUpdate(routine, patch);
       const mutationError = routineMutationError(next, routine, nextTriggerType);

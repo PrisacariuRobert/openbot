@@ -145,8 +145,8 @@ export class RoutineRevisionConflictError extends Error {
     super(`That routine changed while you were looking at it (now revision ${currentRevision}). List it again and confirm the change on the current schedule.`);
   }
 }
-
-export type ConnectorTaskRef = {  connectorId: string;
+export type ConnectorTaskRef = {
+  connectorId: string;
   resourceId: string;
   account: string;
   authorizationVersion: number;
@@ -157,6 +157,21 @@ export type ConnectorTaskRef = {  connectorId: string;
   lastState: TodoistTaskSummary;
   createdAt: string;
   updatedAt: string;
+};
+
+/** A deleted routine's durable receipt (P03c). The row itself is gone, but
+ * what it was, which revision died, and which run deleted it is recorded —
+ * so history stays attributable and an old retry can never resurrect it.
+ * Past runs and events keep their routine id and stay readable as orphans. */
+export type DeletedRoutineReceipt = {
+  routineId: string;
+  name: string;
+  botId: string;
+  threadId: string;
+  triggerType: string;
+  revisionAtDelete: number;
+  deletedByRunId: string | null;
+  createdAt: string;
 };
 
 function taskGoal(prompt: string): string {
@@ -783,6 +798,16 @@ export class OpenBotDatabase {
         PRIMARY KEY(connector_id, resource_id)
       );
       CREATE INDEX IF NOT EXISTS connector_task_refs_thread_time ON connector_task_refs(thread_id,created_at DESC);
+      CREATE TABLE IF NOT EXISTS deleted_routine_receipts (
+        routine_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+        thread_id TEXT NOT NULL,
+        trigger_type TEXT NOT NULL DEFAULT 'schedule',
+        revision_at_delete INTEGER NOT NULL DEFAULT 1,
+        deleted_by_run_id TEXT,
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS bot_connector_access (
         bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
         connector_id TEXT NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
@@ -3676,30 +3701,61 @@ export class OpenBotDatabase {
     this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,schedule_json=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END,revision=revision+1 WHERE id=?").run(
       input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, JSON.stringify(schedule), triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, lastEventAt, input.enabled ? 1 : 0, id,
     );
+    // P03c: resuming restarts connector automations from a fresh baseline no
+    // matter which writer enabled it (owner UI toggle, PATCH, or reviewed
+    // model resume). Pause preserves cursors; only the paused→running
+    // transition rebaselines, exactly like the legacy toggle did.
+    if (input.enabled && !routine.enabled) {
+      if (["todoist", "dropbox"].includes(triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
+      if (["todoist", "dropbox", "slack", "notion"].includes(triggerType)) this.db.prepare("UPDATE routines SET last_event_at=? WHERE id=?").run(now(), id);
+    }
     new WorkflowValidation(this).bindRoutine({ ...input, id });
     return this.getRoutine(id);
   }
 
-  deleteRoutine(id: string): boolean {
-    return this.db.prepare("DELETE FROM routines WHERE id=?").run(id).changes > 0;
+  deleteRoutine(id: string, deletedByRunId: string | null = null): boolean {
+    const routine = this.getRoutine(id);
+    if (!routine) return false;
+    if (this.db.prepare("DELETE FROM routines WHERE id=?").run(id).changes === 0) return false;
+    // First receipt wins: a routine id is never reused, so the original
+    // deletion record stays the attributable one.
+    this.db.prepare(`INSERT OR IGNORE INTO deleted_routine_receipts
+      (routine_id,name,bot_id,thread_id,trigger_type,revision_at_delete,deleted_by_run_id,created_at)
+      VALUES (?,?,?,?,?,?,?,?)`).run(
+      id, routine.name, routine.botId, routine.threadId, routine.triggerType,
+      routine.revision, deletedByRunId, now(),
+    );
+    return true;
+  }
+
+  getDeletedRoutineReceipt(id: string): DeletedRoutineReceipt | null {
+    const row = this.db.prepare("SELECT * FROM deleted_routine_receipts WHERE routine_id=?").get(id) as Row | undefined;
+    if (!row) return null;
+    return {
+      routineId: String(row.routine_id), name: String(row.name), botId: String(row.bot_id),
+      threadId: String(row.thread_id), triggerType: String(row.trigger_type || "schedule"),
+      revisionAtDelete: Number(row.revision_at_delete || 1),
+      deletedByRunId: row.deleted_by_run_id ? String(row.deleted_by_run_id) : null,
+      createdAt: String(row.created_at),
+    };
+  }
+
+  toggleRoutine(id: string, enabled: boolean, expectedRevision?: number): Routine | null {
+    // P03c: the legacy toggle shares the guarded update path instead of
+    // bypassing revision safety with its own UPDATE.
+    const routine = this.getRoutine(id);
+    if (!routine) return null;
+    if (enabled === routine.enabled) return routine;
+    return this.updateRoutine(id, {
+      name: routine.name, botId: routine.botId, threadId: routine.threadId, prompt: routine.prompt,
+      intervalMinutes: routine.intervalMinutes, schedule: routine.schedule, enabled,
+      triggerType: routine.triggerType, triggerConfig: routine.triggerConfig,
+    }, expectedRevision);
   }
 
   listRoutineRuns(id: string, limit = 20): Run[] {
     const rows = this.db.prepare(this.runSelect("WHERE r.routine_id=? ORDER BY r.created_at DESC LIMIT ?")).all(id, Math.max(1, Math.min(limit, 100))) as Row[];
     return rows.map((row) => this.runFromRow(row));
-  }
-
-  toggleRoutine(id: string, enabled: boolean): Routine | null {
-    const routine = this.getRoutine(id);
-    if (!routine) return null;
-    if (enabled) new WorkflowValidation(this).assertRoutine(routine);
-    if (enabled === routine.enabled) return routine;
-    const nextRunAt = enabled && routine.triggerType === "schedule" ? nextRoutineOccurrence(routine.schedule ?? intervalSchedule, routine.intervalMinutes, Date.now()) : null;
-    if (enabled && routine.schedule?.kind === "once" && !nextRunAt) throw new Error("Choose a future date before enabling this one-time routine.");
-    const lastEventAt = enabled && ["todoist", "dropbox", "slack", "notion"].includes(routine.triggerType) ? now() : routine.lastEventAt;
-    if (enabled && ["todoist", "dropbox"].includes(routine.triggerType)) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
-    this.db.prepare("UPDATE routines SET enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(enabled ? 1 : 0, nextRunAt, lastEventAt, enabled ? 1 : 0, id);
-    return this.getRoutine(id);
   }
 
   dueRoutines(): Routine[] {
