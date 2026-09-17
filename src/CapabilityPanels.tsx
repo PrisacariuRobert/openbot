@@ -1565,7 +1565,12 @@ export function CodeProjectsPanel({
     [adding, setAdding] = useState(false),
     [cloning, setCloning] = useState(false),
     [busy, setBusy] = useState<string | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    // U04c: list-load failure is its own state so a failed reload never
+    // wipes a loaded list, and loading never reads as "no projects yet".
+    // Action errors (connect/clone/grant) keep using `error` below.
+    [loading, setLoading] = useState(true),
+    [loadError, setLoadError] = useState<string | null>(null);
   const [name, setName] = useState(""),
     [rootPath, setRootPath] = useState(""),
     [levels, setLevels] = useState<Record<string, ProjectLevel>>(() =>
@@ -1577,10 +1582,15 @@ export function CodeProjectsPanel({
     async () => setData(await api<CodeProjectsData>("/api/code-projects")),
     [],
   );
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
+    refresh().catch((reason) =>
+      setLoadError(reason instanceof Error ? reason.message : String(reason)),
+    ).finally(() => setLoading(false));
+  };
   useEffect(() => {
-    void refresh().catch((reason) =>
-      setError(reason instanceof Error ? reason.message : String(reason)),
-    );
+    load();
   }, [refresh]);
   const grants = (selected: Record<string, ProjectLevel>) =>
     bots.map((bot) => {
@@ -1742,7 +1752,19 @@ export function CodeProjectsPanel({
         </div>
         <Terminal size={49} />
       </div>
-      {data?.projects.length ? (
+      {loading ? (
+        <div className="empty-panel">
+          <LoaderCircle className="spinner" />
+        </div>
+      ) : loadError ? (
+        <div className="empty-panel" role="alert">
+          <h3>Projects aren’t loading</h3>
+          <p>{loadError}</p>
+          <button type="button" className="button-secondary" onClick={() => load()}>
+            <RefreshCw size={15} /> Retry
+          </button>
+        </div>
+      ) : data?.projects.length ? (
         <section>
           <div className="panel-section-heading">
             <div>
@@ -2241,7 +2263,7 @@ export function CodeProjectsPanel({
           <strong>Fast work, calm review.</strong> Every task gets its own isolated branch so agents work without changing your main folder. Publishing always waits for approval.
         </p>
       </div>
-      {error && <p className="panel-error">{error}</p>}
+      {error && <p className="panel-error" role="alert">{error}</p>}
     </div>
   );
 }
