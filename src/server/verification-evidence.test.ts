@@ -67,3 +67,50 @@ test("host verification does not follow a workspace symlink", () => {
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test("evidence contract binds predicate, digests and observation time", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-evidence-contract-"));
+  try {
+    writeFileSync(path.join(root, "brief.md"), "# Brief\n\nShipped.\n", "utf8");
+    const passed = verifyWorkspaceFileEvidence(root, "Brief is complete", {
+      kind: "workspace_file", path: "brief.md", contains: ["# Brief"],
+    });
+    assert.equal(passed.passed, true);
+    assert.equal(passed.source, "host");
+    assert.equal(passed.predicate, "utf8-text:readable,min-bytes,markers-present");
+    assert.match(passed.inputDigest || "", /^[a-f0-9]{64}$/);
+    assert.equal(passed.outputDigest, passed.inputDigest);
+    assert.ok(passed.observedAt && Number.isFinite(Date.parse(passed.observedAt)), "observation time is a real timestamp");
+
+    // A failed check still proves exactly which bytes were examined.
+    const failed = verifyWorkspaceFileEvidence(root, "Brief mentions owner", {
+      kind: "workspace_file", path: "brief.md", contains: ["## Owner"],
+    });
+    assert.equal(failed.passed, false);
+    assert.equal(failed.inputDigest, passed.inputDigest, "same bytes, same digest, different verdict");
+    assert.equal(failed.predicate, passed.predicate);
+
+    // Same name, different bytes: the receipt cannot confuse them.
+    writeFileSync(path.join(root, "brief.md"), "# Brief\n\nRewritten.\n", "utf8");
+    const rewritten = verifyWorkspaceFileEvidence(root, "Brief is complete", {
+      kind: "workspace_file", path: "brief.md", contains: ["# Brief"],
+    });
+    assert.equal(rewritten.passed, true);
+    assert.notEqual(rewritten.inputDigest, passed.inputDigest);
+
+    // Nothing read, nothing claimed: digests stay null.
+    const missing = verifyWorkspaceFileEvidence(root, "Missing file", { kind: "workspace_file", path: "gone.md" });
+    assert.equal(missing.passed, false);
+    assert.equal(missing.inputDigest, null);
+    assert.equal(missing.outputDigest, null);
+    assert.equal(missing.predicate, "utf8-text:readable,min-bytes,markers-present");
+
+    // Teammate-only reports carry no host contract fields.
+    const [modelOnly] = verifyTaskChecks(root, [{ label: "Model says done", passed: true }]);
+    assert.equal(modelOnly!.source, "teammate");
+    assert.equal(modelOnly!.predicate, undefined);
+    assert.equal(modelOnly!.inputDigest, undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
