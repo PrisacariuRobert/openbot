@@ -455,10 +455,12 @@
 .row-action-pin[aria-pressed="true"] svg { fill: currentColor; }
 .row-action-edit { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 .row-action-edit:hover { background: var(--surface-muted); }
-.row-action-delete { background: var(--danger); }
-.row-action-delete:hover { filter: brightness(1.08); }
-.row-action-delete.armed { background: #a50010; }
-:root[data-appearance="dark"] .row-action-delete.armed { background: #ff6961; color: #40000a; }
+.row-action-archive { background: var(--danger); }
+.row-action-archive:hover { filter: brightness(1.08); }
+.row-action-archive.armed { background: #a50010; }
+:root[data-appearance="dark"] .row-action-archive.armed { background: #ff6961; color: #40000a; }
+.row-action-unhide { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.row-action-unhide:hover { background: var(--surface-muted); }
 .conversation-cell:focus-within > .conversation-row,
 .conversation-cell.swiped > .conversation-row {
   transform: translateX(calc(-1 * var(--shift, 148px)));

@@ -25,6 +25,7 @@ import {
   WandSparkles,
   ArrowRightLeft,
   ArrowUp,
+  Archive,
   CalendarDays,
   Check,
   ChevronDown,
@@ -44,7 +45,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   SlidersHorizontal,
-  Trash2,
+  Undo2,
   UsersRound,
   X,
   Zap,
@@ -1450,9 +1451,11 @@ export function Studio() {
       setRefresh((n) => n + 1);
     })();
   // Row quick actions: hover reveals on desktop, swipe reveals on touch.
-  // Delete is a two-tap soft hide (the server keeps everything).
+  // Archiving is a two-tap reversible hide: the server keeps everything and
+  // the Archived section below can bring the chat back. There is no hard
+  // conversation delete in this client; nothing here may promise one.
   const [swipedRow, setSwipedRow] = useState<string | null>(null);
-  const [hideArmed, setHideArmed] = useState<string | null>(null);
+  const [archiveArmed, setArchiveArmed] = useState<string | null>(null);
   const dragStartX = useRef<number | null>(null);
   const dragStartY = useRef<number | null>(null);
   // When the last drag released, as a timestamp. A trailing click right
@@ -1508,16 +1511,16 @@ export function Studio() {
     f.row.closest(".conversation-cell")?.classList.remove("dragging");
     clearRowInline(f.row, f.actions);
   }
-  const hideTimer = useRef<number | null>(null);
-  async function hideThread(item: Thread) {
-    if (hideArmed !== item.id) {
-      setHideArmed(item.id);
-      if (hideTimer.current) window.clearTimeout(hideTimer.current);
-      hideTimer.current = window.setTimeout(() => setHideArmed(null), 2600);
+  const archiveTimer = useRef<number | null>(null);
+  async function archiveThread(item: Thread) {
+    if (archiveArmed !== item.id) {
+      setArchiveArmed(item.id);
+      if (archiveTimer.current) window.clearTimeout(archiveTimer.current);
+      archiveTimer.current = window.setTimeout(() => setArchiveArmed(null), 2600);
       return;
     }
-    if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    setHideArmed(null);
+    if (archiveTimer.current) window.clearTimeout(archiveTimer.current);
+    setArchiveArmed(null);
     setSwipedRow(null);
     try { navigator.vibrate?.(10); } catch { /* haptics unavailable */ }
     await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
@@ -1527,7 +1530,15 @@ export function Studio() {
     if (thread === item.id) openThread("team-room");
     setRefresh((n) => n + 1);
   }
+  async function unhideThread(item: Thread) {
+    await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: false }),
+    }).catch(() => {});
+    setRefresh((n) => n + 1);
+  }
   const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
+  const archivedThreads = (state?.threads || []).filter((item) => item.hidden);
   const isGroupThread = (item: Thread) =>
     (item.botIds?.length ?? 0) > 1 ||
     item.id.startsWith("group-") ||
@@ -1811,12 +1822,12 @@ export function Studio() {
           {item.id !== "team-room" && (
             <button
               type="button"
-              className={`row-action row-action-delete${hideArmed === item.id ? " armed" : ""}`}
-              aria-label={hideArmed === item.id ? `Tap again to delete ${item.title}` : `Delete ${item.title}`}
-              title={hideArmed === item.id ? "Tap again to confirm" : "Delete"}
-              onClick={() => void hideThread(item)}
+              className={`row-action row-action-archive${archiveArmed === item.id ? " armed" : ""}`}
+              aria-label={archiveArmed === item.id ? `Tap again to archive ${item.title}` : `Archive ${item.title}`}
+              title={archiveArmed === item.id ? "Tap again to confirm" : "Archive"}
+              onClick={() => void archiveThread(item)}
             >
-              <Trash2 size={15} />
+              <Archive size={15} />
             </button>
           )}
         </span>
@@ -1831,6 +1842,32 @@ export function Studio() {
         {groupThreads.map(threadRow)}
         <button className="compose-secondary" onClick={() => setDetail({ kind: "group" })}><Plus size={15} /> New project room</button>
       </details>
+      {archivedThreads.length > 0 && (
+        <details className="archived-chats">
+          <summary>Archived ({archivedThreads.length})</summary>
+          {archivedThreads.map((item) => (
+            <div key={item.id} className="conversation-cell archived-cell">
+              <button
+                aria-label={item.title}
+                title={item.title}
+                className={`conversation-row ${page === "chat" && thread === item.id ? "current" : ""}`}
+                onClick={() => openThread(item.id)}
+              >
+                <span className="conversation-title">{item.title}</span>
+              </button>
+              <button
+                type="button"
+                className="row-action row-action-unhide"
+                aria-label={`Unhide ${item.title}`}
+                title="Unhide"
+                onClick={() => void unhideThread(item)}
+              >
+                <Undo2 size={15} />
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
     </>
   );
   return (
