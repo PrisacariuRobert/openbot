@@ -64,8 +64,9 @@ try {
   const newButton = page.getByRole("button", { name: "Add an automation" });
   await newButton.click();
   const form = page.locator(".routine-form");
-  await form.getByLabel("Name", { exact: true }).fill("Weekday review");
+  await form.getByLabel("Automation name", { exact: true }).fill("Weekday review");
   await form.getByLabel("What should happen?", { exact: true }).fill("Prepare a source-linked brief. Do not send messages.");
+  await form.getByText('Trigger details').click();
   await form.getByLabel("Time", { exact: true }).fill("08:00");
   await form.locator(".schedule-zone > summary").click();
   await form.getByLabel("Time zone", { exact: true }).fill("Europe/Brussels");
@@ -80,9 +81,24 @@ try {
   state = await (await request("/api/state")).json();
   const created = state.routines.find((r) => r.name === "Weekday review")!;
   assert.deepEqual(created.schedule, { kind: "calendar", timeZone: "Europe/Brussels", time: "08:00", daysOfWeek: [1, 2, 3, 4, 5] });
+  // U04b: a stale edit surfaces its conflict in the form instead of
+  // vanishing. Open Edit, move the revision underneath via API, submit,
+  // and require the visible 409 with values kept for repair.
+  const weekdayRow = page.locator("article.routine-card", { hasText: "Weekday review" });
+  await weekdayRow.locator("summary", { hasText: "Manage" }).click();
+  await weekdayRow.getByRole("button", { name: "Edit" }).click();
+  await form.getByLabel("Automation name", { exact: true }).fill("Weekday review v2");
+  assert.equal((await request(`/api/routines/${created.id}`, { name: "Weekday review raced" }, "PATCH")).status, 200);
+  await form.getByRole("button", { name: /save changes/i }).click();
+  const formError = form.locator(".form-actions .runner-error");
+  await formError.waitFor({ state: "visible" });
+  assert.match(await formError.textContent() || "", /changed while you were looking|changed since revision|conflict/i);
+  assert.equal(await form.getByLabel("Automation name", { exact: true }).inputValue(), "Weekday review v2", "failed edit keeps its values");
+  await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Add an automation" }).click();
-  await form.getByLabel("Name", { exact: true }).fill("One calendar selection");
+  await form.getByLabel("Automation name", { exact: true }).fill("One calendar selection");
   await form.getByLabel("What should happen?", { exact: true }).fill("A future fixture. Do not run during the test.");
+  await form.getByText('Trigger details').click();
   await form.getByLabel("Repeat", { exact: true }).selectOption("once");
   await form.getByRole("button", { name: "Next month", exact: true }).click();
   const firstDate = form.locator(".schedule-calendar td:not(.outside) button").first();
