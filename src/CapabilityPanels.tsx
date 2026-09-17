@@ -5134,6 +5134,9 @@ export function RoutinesPanel({
   onUnprotectRunner,
   onWakeRunner,
   onEnableNotifications,
+  /** Reload server state (used after a revision conflict so the next edit
+   * binds the current revision instead of 409-looping on a stale one). */
+  onRefresh,
 }: {
   routines: Routine[];
   events: AutomationEvent[];
@@ -5151,11 +5154,13 @@ export function RoutinesPanel({
   onReplay: (event: AutomationEvent) => Promise<void>;
   onRotateSecret: (routine: Routine) => Promise<RoutineSaveResult>;
   onResolveAlert: (alert: AutomationAlert) => Promise<void>;
-  onOpenResult: (routine: Routine) => void;
-  onProtectRunner: () => Promise<void>;
+  onOpenResult: (routine: Routine) => void;  onProtectRunner: () => Promise<void>;
   onUnprotectRunner: () => Promise<void>;
   onWakeRunner: () => Promise<void>;
   onEnableNotifications: () => Promise<boolean>;
+  /** Reload server state (used after a revision conflict so the next edit
+   * binds the current revision instead of 409-looping on a stale one). */
+  onRefresh: () => void;
 }) {
   const [creating, setCreating] = useState(routines.length === 0),
     [name, setName] = useState(""),
@@ -5186,6 +5191,10 @@ export function RoutinesPanel({
     [notionEntityId, setNotionEntityId] = useState("");
   const [enabled, setEnabled] = useState(true),
     [saving, setSaving] = useState(false),
+    // U04b: routine create/update/test/replay/rotate/clear failures surface
+    // here and above the list instead of vanishing. Same pattern as
+    // runRunnerAction below; kept separate so runner health copy stays put.
+    [actionError, setActionError] = useState<string | null>(null),
     [runnerBusy, setRunnerBusy] = useState(false),
     [runnerError, setRunnerError] = useState<string | null>(null),
     [runnerCare, setRunnerCare] = useState<RunnerCareStatus | null>(null),
@@ -5199,6 +5208,11 @@ export function RoutinesPanel({
     [transferCopied, setTransferCopied] = useState<"export" | "import" | null>(null),
     [editing, setEditing] = useState<Routine | null>(null),
     [openHistory, setOpenHistory] = useState<string | null>(null);
+  const runRoutineAction = async (action: () => Promise<void>) => {
+    setActionError(null);
+    try { await action(); }
+    catch (error) { setActionError(error instanceof Error ? error.message : "That automation change could not be saved."); }
+  };
   const [createdHook, setCreatedHook] = useState<{
     name: string;
     url: string;
@@ -5301,6 +5315,7 @@ export function RoutinesPanel({
     event.preventDefault();
     if (!selectedBot || !intervalValid || (triggerType === "schedule" && !scheduleValid) || saving) return;
     setSaving(true);
+    setActionError(null);
     const triggerConfig =
       triggerType === "webpage" ? { pageUrl: pageUrl.trim(), ...(pageSelector.trim() ? { pageSelector: pageSelector.trim() } : {}) } : triggerType === "github"
         ? {
@@ -5343,6 +5358,16 @@ export function RoutinesPanel({
           type: result.triggerType,
         });
       reset();
+    } catch (error) {
+      // The form stays open with every value so a 400 validation message or
+      // a 409 revision conflict can be repaired in place, not retyped. A
+      // conflict also refreshes the list underneath, so reopening Edit binds
+      // the current revision instead of 409-looping on the stale one. The
+      // code check is structural: failures arrive from different fetch
+      // helpers, only some of which carry a typed code.
+      const conflicted = (error as { code?: unknown } | null)?.code === "routine_conflict";
+      setActionError(error instanceof Error ? error.message : "That automation could not be saved.");
+      if (conflicted) onRefresh();
     } finally {
       setSaving(false);
     }
@@ -5606,7 +5631,10 @@ export function RoutinesPanel({
                     ["failed", "cancelled", "rate_limited"].includes(
                       sourceEvent.status,
                     ) && (
-                      <button onClick={() => void onReplay(sourceEvent)}>
+                      <button onClick={() => {
+                        if (!window.confirm(`Replay this event? It runs “${routine.name}” again with its real permissions.`)) return;
+                        void runRoutineAction(() => onReplay(sourceEvent));
+                      }}>
                         <RefreshCw size={12} /> Retry
                       </button>
                     )}
@@ -5615,7 +5643,7 @@ export function RoutinesPanel({
                       <ExternalLink size={12} /> Open
                     </button>
                   )}
-                  <button onClick={() => void onResolveAlert(alert)}>
+                  <button onClick={() => void runRoutineAction(() => onResolveAlert(alert))}>
                     <Check size={12} /> Clear
                   </button>
                 </div>
@@ -5669,6 +5697,7 @@ export function RoutinesPanel({
 
       {routines.length > 0 && (
         <div className="routine-list">
+          {actionError && <em className="runner-error" role="alert"><CircleAlert size={11} /> {actionError}</em>}
           {routines.map((routine) => {
             const bot =
               bots.find((item) => item.id === routine.botId) || bots[0]!;
@@ -5713,7 +5742,7 @@ export function RoutinesPanel({
                           `Test “${routine.name}” now? This uses the real permissions and can perform real actions.`,
                         )
                       )
-                        void onRun(routine);
+                        void runRoutineAction(() => onRun(routine));
                     }}
                     title="Test with real permissions"
                   >
@@ -5762,7 +5791,8 @@ export function RoutinesPanel({
                               "Create a new signing secret? The previous secret will stop working immediately.",
                             )
                           )
-                            void onRotateSecret(routine).then((result) => {
+                            void runRoutineAction(async () => {
+                              const result = await onRotateSecret(routine);
                               if (result.webhook)
                                 setCreatedHook({
                                   name: result.name,
@@ -5854,9 +5884,12 @@ export function RoutinesPanel({
                           {["failed", "cancelled", "rate_limited"].includes(
                             item.status,
                           ) && (
-                            <button onClick={() => void onReplay(item)}>
-                              <RefreshCw size={12} /> Retry
-                            </button>
+                          <button onClick={() => {
+                            if (!window.confirm(`Retry this event? It runs “${routine.name}” again with its real permissions.`)) return;
+                            void runRoutineAction(() => onReplay(item));
+                          }}>
+                            <RefreshCw size={12} /> Retry
+                          </button>
                           )}
                           <button onClick={() => onOpenResult(routine)}>
                             <ExternalLink size={12} /> Open
@@ -6273,6 +6306,7 @@ export function RoutinesPanel({
             </p>
           </div>
           <div className="form-actions">
+            {actionError && <em className="runner-error" role="alert"><CircleAlert size={11} /> {actionError}</em>}
             <button type="button" className="button-secondary" onClick={reset}>
               Cancel
             </button>
