@@ -450,6 +450,10 @@ export interface Routine {
   deduplicatedCount: number;
   lastError: string | null;
   pausedReason: string | null;
+  /** Optimistic-concurrency guard (P03b). Every mutation bumps it; callers
+   * pass the revision they listed and a mismatch is a 409, never a silent
+   * overwrite. Native readers ignore it until they adopt it. */
+  revision: number;
   lastSuccessAt: string | null;
   lastEventAt: string | null;
 }

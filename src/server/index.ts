@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
 import { intervalSchedule, routineScheduleInput, nextRoutineOccurrence, schedulePreview } from "../shared/calendar-schedule.js";
-import { OpenBotDatabase, messageSubmissionDigest } from "./database.js";
+import { OpenBotDatabase, RoutineRevisionConflictError, messageSubmissionDigest } from "./database.js";
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
@@ -1633,6 +1633,43 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     broadcast({ type: "connector", at: Date.now() });
     return `The approved note was added to ${result.title}${result.url ? ` (${result.url})` : ""}.`;
   }
+  if (parsed.data.type === "routine_resume" || parsed.data.type === "routine_update") {
+    // P03b: execute an owner-reviewed routine change. The review stays bound
+    // to this exact resource and revision: a moved routine or a changed
+    // revision needs a fresh proposal instead of running stale.
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    const input = routineToolMutationInput.safeParse(args);
+    const routine = input.success ? db.getRoutine(input.data.routineId) : null;
+    if (!approval || !run || !input.success || !routine || routine.threadId !== run.threadId) throw new Error("That routine is no longer in this conversation. List this conversation's routines and propose the change again.");
+    const expected = input.data.expectedRevision;
+    if (expected !== undefined && routine.revision !== expected) throw new ApprovalReviewChangedError();
+    if (parsed.data.type === "routine_resume" && routine.enabled) return `“${routine.name}” is already running (revision ${routine.revision}). Nothing was changed.`;
+    const patch: RoutinePatch = parsed.data.type === "routine_resume"
+      ? { enabled: true }
+      : {
+        ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+        ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
+        ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
+        ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
+      };
+    if (parsed.data.type === "routine_update" && Object.keys(patch).length === 0) throw new Error("The approved change is empty. Propose the edit again.");
+    const { nextTriggerType, next } = resolveRoutineUpdate(routine, patch);
+    const mutationError = routineMutationError(next, routine, nextTriggerType);
+    if (mutationError) throw new Error(mutationError);
+    let updated: Routine | null = null;
+    try {
+      updated = db.updateRoutine(routine.id, next, expected);
+    } catch (error) {
+      if (error instanceof RoutineRevisionConflictError) throw new ApprovalReviewChangedError();
+      throw error;
+    }
+    if (!updated) throw new Error("That routine is no longer available. List this conversation's routines and propose the change again.");
+    db.addActivity({ runId: run.id, botId: run.botId, kind: "tool", label: `${parsed.data.type === "routine_resume" ? "Resumed" : "Updated"} ${updated.name}`, detail: null });
+    broadcast();
+    return parsed.data.type === "routine_resume"
+      ? `“${updated.name}” is resumed and will run ${updated.scheduleLabel || "on its schedule"}${updated.nextRunAt ? ` next at ${updated.nextRunAt}` : ""}.`
+      : `“${updated.name}” was updated to revision ${updated.revision}.`;
+  }
   if (parsed.data.type === "todoist_task_create") {
     const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
     if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Creating Todoist tasks is not available for this teammate.");
@@ -2619,7 +2656,43 @@ const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
   intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage"]).optional(), triggerConfig: triggerConfigInput.optional(),
   schedule: routineScheduleInput.optional(),
+  expectedRevision: z.number().int().min(1).optional(),
 });
+
+type RoutinePatch = Partial<Pick<Routine, "name" | "botId" | "threadId" | "prompt" | "intervalMinutes" | "schedule" | "enabled" | "triggerType" | "triggerConfig">>;
+// Exact-id mutation arguments shared by the scoped model tools and
+// approved-action execution (P03b). Trigger, teammate and conversation can
+// only change through the owner UI, never through these tools.
+const routineToolMutationInput = z.object({
+  routineId: z.string().min(1).max(200),
+  expectedRevision: z.number().int().min(1).optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  prompt: z.string().trim().min(1).max(10_000).optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200).optional(),
+  schedule: routineScheduleInput.optional(),
+});
+// Single merge rule for routine edits (P03b). The owner PATCH route and the
+// scoped model tools share it, so neither can drift into its own divergent
+// PATCH semantics: only requested fields change, the trigger/source is kept.
+function resolveRoutineUpdate(current: Routine, patch: RoutinePatch) {
+  const nextTriggerType = patch.triggerType ?? current.triggerType;
+  const next = { name: patch.name ?? current.name, botId: patch.botId ?? current.botId, threadId: patch.threadId ?? current.threadId, prompt: patch.prompt ?? current.prompt, intervalMinutes: patch.intervalMinutes ?? current.intervalMinutes, schedule: patch.schedule ?? (nextTriggerType === "schedule" ? current.schedule : intervalSchedule), enabled: patch.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: patch.triggerConfig ?? current.triggerConfig };
+  return { nextTriggerType, next };
+}
+// Single validation rule for routine mutations (P03b). Owner PATCH, scoped
+// model tools and approved-action execution share it, so enabling or editing
+// a routine is revalidated the same way everywhere.
+function routineMutationError(next: { botId: string; threadId: string; enabled: boolean; intervalMinutes: number; schedule?: Routine["schedule"]; triggerType?: string; triggerConfig?: Routine["triggerConfig"] }, current: Routine, nextTriggerType: string): string | null {
+  const scheduleError = routineScheduleError({ schedule: next.schedule, triggerType: next.triggerType, enabled: next.enabled, intervalMinutes: next.intervalMinutes }, current);
+  if (scheduleError) return scheduleError;
+  if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return "Choose a valid teammate and conversation.";
+  const watchError = pageWatchError({ triggerType: next.triggerType, triggerConfig: next.triggerConfig, intervalMinutes: next.intervalMinutes }, current.id);
+  if (watchError) return watchError;
+  if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft.";
+  if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.`;
+  if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.`;
+  return null;
+}
 
 function routineScheduleError(input: { schedule?: Routine["schedule"]; triggerType?: string; enabled?: boolean; intervalMinutes: number }, current?: Routine): string | null {
   const schedule = input.schedule ?? current?.schedule ?? intervalSchedule;
@@ -2714,20 +2787,20 @@ app.patch("/api/routines/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Routine not found." });
   const parsed = routineInput.partial().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Check the routine name, teammate, instructions and repeat time." });
-  const nextTriggerType = parsed.data.triggerType ?? current.triggerType;
-  const next = { name: parsed.data.name ?? current.name, botId: parsed.data.botId ?? current.botId, threadId: parsed.data.threadId ?? current.threadId, prompt: parsed.data.prompt ?? current.prompt, intervalMinutes: parsed.data.intervalMinutes ?? current.intervalMinutes, schedule: parsed.data.schedule ?? (nextTriggerType === "schedule" ? current.schedule : intervalSchedule), enabled: parsed.data.enabled ?? current.enabled, triggerType: nextTriggerType, triggerConfig: parsed.data.triggerConfig ?? current.triggerConfig };
-  const scheduleError = routineScheduleError(next, current);
-  if (scheduleError) return response.status(400).json({ error: scheduleError });
-  if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return response.status(400).json({ error: "Choose a valid teammate and conversation." });
-  const watchError = pageWatchError(next, current.id);
-  if (watchError) return response.status(400).json({ error: watchError });
-  if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return response.status(400).json({ error: "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft." });
-  if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.` });
-  if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return response.status(400).json({ error: `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.` });
+  const { nextTriggerType, next } = resolveRoutineUpdate(current, parsed.data);
+  const mutationError = routineMutationError(next, current, nextTriggerType);
+  if (mutationError) return response.status(400).json({ error: mutationError });
   const needsSecret = nextTriggerType === "webhook" || nextTriggerType === "github", webhookSecret = needsSecret && !current.hasWebhookSecret ? randomBytes(32).toString("base64url") : null;
-  const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret });
-  if (!routine) return response.status(404).json({ error: "Routine not found." });
-  broadcast(); response.json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
+  try {
+    const routine = db.updateRoutine(request.params.id, { ...next, webhookSecret }, parsed.data.expectedRevision);
+    if (!routine) return response.status(404).json({ error: "Routine not found." });
+    broadcast(); response.json({ ...routine, ...(webhookSecret ? { webhook: { url: `${appUrl.replace(/\/$/, "")}/api/automation-hooks/${routine.id}`, secret: webhookSecret } } : {}) });
+  } catch (error) {
+    if (error instanceof RoutineRevisionConflictError) {
+      return response.status(409).json({ error: error.message, code: "routine_conflict", currentRevision: error.currentRevision });
+    }
+    throw error;
+  }
 });
 app.delete("/api/routines/:id", (request, response) => {
   if (!db.deleteRoutine(request.params.id)) return response.status(404).json({ error: "Routine not found." });
@@ -3097,7 +3170,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3693,8 +3766,82 @@ app.post("/api/internal/tools", async (request, response) => {
       const routines = db.listRoutines(sourceRun.threadId)
         .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
         .slice(0, 50)
-        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId }));
+        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
       return response.json({ routines, count: routines.length, scope: "conversation" });
+    }
+    if (action === "routine_update" || action === "routine_pause" || action === "routine_resume") {
+      // P03b: exact-id follow-ups in this conversation. The host preamble
+      // above already bound the call to a running run of this bot. Pausing is
+      // the safe direction and executes directly; resume and update arm
+      // future autonomous work and always pause for the owner's exact review.
+      const sourceRun = db.getRun(runId)!;
+      const input = routineToolMutationInput.safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_update, routine_pause or routine_resume the exact routine id from routine_list." });
+      const routine = db.getRoutine(input.data.routineId);
+      if (!routine || routine.threadId !== sourceRun.threadId) return response.status(404).json({ error: "That routine is not in this conversation. List this conversation's routines and use one of those ids." });
+      const revisionNote = `listed at revision ${routine.revision}`;
+      const revisionOrConflict = () => {
+        if (input.data.expectedRevision !== undefined && routine.revision !== input.data.expectedRevision) {
+          const conflict = new RoutineRevisionConflictError(routine.revision);
+          return response.status(409).json({ error: conflict.message, code: "routine_conflict", currentRevision: conflict.currentRevision });
+        }
+        return null;
+      };
+      const describeChange = (next: { name: string; prompt: string; intervalMinutes: number; schedule?: Routine["schedule"]; enabled: boolean }) => {
+        const changes: string[] = [];
+        if (next.name !== routine.name) changes.push(`name “${routine.name}” → “${next.name}”`);
+        if (next.prompt !== routine.prompt) changes.push(`instructions changed (${routine.prompt.length} → ${next.prompt.length} chars)`);
+        if (next.intervalMinutes !== routine.intervalMinutes) changes.push(`repeat every ${routine.intervalMinutes} → ${next.intervalMinutes} minutes`);
+        if (JSON.stringify(next.schedule ?? null) !== JSON.stringify(routine.schedule ?? null)) changes.push("schedule changed");
+        if (next.enabled !== routine.enabled) changes.push(next.enabled ? "paused → running" : "running → paused");
+        return changes.length ? changes.join("; ") : "no visible change";
+      };
+      if (action === "routine_pause") {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        if (!routine.enabled) return response.json({ ok: true, routineId: routine.id, enabled: false, revision: routine.revision, unchanged: true });
+        const { nextTriggerType, next } = resolveRoutineUpdate(routine, { enabled: false });
+        const mutationError = routineMutationError(next, routine, nextTriggerType);
+        if (mutationError) return response.status(400).json({ error: mutationError });
+        try {
+          const updated = db.updateRoutine(routine.id, next, input.data.expectedRevision)!;
+          db.addActivity({ runId, botId, kind: "tool", label: `Paused ${updated.name}`, detail: null });
+          broadcast();
+          return response.json({ ok: true, routineId: updated.id, enabled: false, revision: updated.revision, nextRunAt: updated.nextRunAt });
+        } catch (error) {
+          if (error instanceof RoutineRevisionConflictError) return response.status(409).json({ error: error.message, code: "routine_conflict", currentRevision: error.currentRevision });
+          throw error;
+        }
+      }
+      const patch: RoutinePatch = action === "routine_resume"
+        ? { enabled: true }
+        : {
+          ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+          ...(input.data.prompt !== undefined ? { prompt: input.data.prompt } : {}),
+          ...(input.data.intervalMinutes !== undefined ? { intervalMinutes: input.data.intervalMinutes } : {}),
+          ...(input.data.schedule !== undefined ? { schedule: input.data.schedule } : {}),
+        };
+      if (action === "routine_update" && Object.keys(patch).length === 0) return response.status(400).json({ error: "Say what should change: name, instructions, repeat time or schedule." });
+      if (action === "routine_resume" && routine.enabled) {
+        const conflicted = revisionOrConflict();
+        if (conflicted) return;
+        return response.json({ ok: true, routineId: routine.id, enabled: true, revision: routine.revision, unchanged: true });
+      }
+      const { nextTriggerType, next } = resolveRoutineUpdate(routine, patch);
+      const mutationError = routineMutationError(next, routine, nextTriggerType);
+      if (mutationError) return response.status(400).json({ error: mutationError });
+      const changeText = describeChange(next);
+      const verb = action === "routine_resume" ? "resume" : "change";
+      return holdForApproval(
+        "external",
+        `${bot.name} wants to ${verb} “${routine.name}” (${revisionNote}): ${changeText}. Only this routine changes; nothing else is enabled, broadened or deleted.`,
+        `${action === "routine_resume" ? "Resume" : "Change"} “${routine.name}”`,
+        {
+          type: action, botId, routineId: routine.id, routineName: routine.name,
+          expectedRevision: input.data.expectedRevision, changeSummary: changeText,
+          ...Object.fromEntries(Object.entries({ name: input.data.name, prompt: input.data.prompt, intervalMinutes: input.data.intervalMinutes, schedule: input.data.schedule }).filter(([, value]) => value !== undefined)),
+        },
+      );
     }
     if (action === "routine_create") {
       const sourceRun = db.getRun(runId)!;

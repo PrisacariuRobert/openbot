@@ -467,3 +467,24 @@ test("self-extension review shows the capability, plan and tool effect without a
   assert.doesNotMatch(JSON.stringify(leaked), /hunter2/);
   assert.equal(approvalPreview(approval, run, { type: "self_extend", botId: "bot", args: { capability: "Converter" } }).canApprove, false);
 });
+
+test("routine resume/update reviews bind the exact routine, revision and change with no connected account", () => {
+  const resume = approvalPreview(approval, run, { type: "routine_resume", botId: "bot", args: { routineId: "routine-123", routineName: "Monday review", expectedRevision: 2, changeSummary: "paused → running" } });
+  assert.equal(resume.canApprove, true);
+  assert.deepEqual(resume.fields.map((field) => field.label), ["Routine", "Listed at revision", "Resume", "Effect"]);
+  assert.match(resume.fields[0]!.value, /Monday review/);
+  assert.match(resume.fields[0]!.value, /routine-/);
+  assert.equal(resume.fields[1]!.value, "2");
+  assert.equal(resume.fields.some((field) => field.label === "Connected account"), false);
+  const update = approvalPreview(approval, run, { type: "routine_update", botId: "bot", args: { routineId: "routine-123", routineName: "Monday review", expectedRevision: 4, changeSummary: "repeat every 10080 → 60 minutes" } });
+  assert.equal(update.canApprove, true);
+  assert.equal(update.fields.find((field) => field.label === "Change")!.value, "repeat every 10080 → 60 minutes");
+  for (const args of [
+    { routineId: "routine-123", routineName: "Monday review", expectedRevision: 2 },
+    { routineId: "", routineName: "Monday review", expectedRevision: 2, changeSummary: "paused → running" },
+    { routineId: "routine-123", routineName: "Monday review", changeSummary: "paused → running" },
+  ]) {
+    assert.equal(approvalPreview(approval, run, { type: "routine_resume", botId: "bot", args }).canApprove, false, JSON.stringify(args));
+  }
+  assert.equal(approvalPreview({ ...approval, kind: "prompt" }, run, { type: "routine_resume", botId: "bot", args: { routineId: "r", routineName: "N", expectedRevision: 1, changeSummary: "c" } }).canApprove, true);
+});

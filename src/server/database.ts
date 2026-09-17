@@ -138,8 +138,15 @@ export type MessageSubmissionReceipt = {
   createdAt: string;
 };
 
-export type ConnectorTaskRef = {
-  connectorId: string;
+/** A routine mutation lost a revision race (P03b). The caller must re-list
+ * and confirm against currentRevision instead of overwriting it. */
+export class RoutineRevisionConflictError extends Error {
+  constructor(readonly currentRevision: number) {
+    super(`That routine changed while you were looking at it (now revision ${currentRevision}). List it again and confirm the change on the current schedule.`);
+  }
+}
+
+export type ConnectorTaskRef = {  connectorId: string;
   resourceId: string;
   account: string;
   authorizationVersion: number;
@@ -956,6 +963,7 @@ export class OpenBotDatabase {
     this.addColumn("routines", "deduplicated_count INTEGER NOT NULL DEFAULT 0");
     this.addColumn("routines", "last_error TEXT");
     this.addColumn("routines", "paused_reason TEXT");
+    this.addColumn("routines", "revision INTEGER NOT NULL DEFAULT 1");
     this.addColumn("routines", "last_success_at TEXT");
     this.addColumn("routines", "last_event_at TEXT");
     this.addColumn("runs", "automation_event_id TEXT");
@@ -3622,6 +3630,7 @@ export class OpenBotDatabase {
       lastStatus: (row.last_status || "never") as Routine["lastStatus"], runCount: Number(row.run_count || 0),
       consecutiveFailures: Number(row.consecutive_failures || 0), deduplicatedCount: Number(row.deduplicated_count || 0),
       lastError: row.last_error ? String(row.last_error) : null, pausedReason: row.paused_reason ? String(row.paused_reason) : null,
+      revision: Number(row.revision || 1),
       lastSuccessAt: row.last_success_at ? String(row.last_success_at) : null, lastEventAt: row.last_event_at ? String(row.last_event_at) : null,
     };
   }
@@ -3639,9 +3648,14 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.thread_id=? ORDER BY r.rowid DESC").all(threadId) as Row[]).map((row) => this.routineFromRow(row));
   }
 
-  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; schedule?: RoutineSchedule; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }): Routine | null {
+  updateRoutine(id: string, input: { name: string; botId: string; threadId: string; prompt: string; intervalMinutes: number; schedule?: RoutineSchedule; enabled: boolean; triggerType?: AutomationTriggerType; triggerConfig?: RoutineTriggerConfig; webhookSecret?: string | null }, expectedRevision?: number): Routine | null {
     const routine = this.getRoutine(id);
     if (!routine) return null;
+    // P03b: stale writers lose instead of silently overwriting a newer
+    // schedule. Absent expectedRevision keeps legacy owner-UI behavior.
+    if (expectedRevision !== undefined && routine.revision !== expectedRevision) {
+      throw new RoutineRevisionConflictError(routine.revision);
+    }
     new WorkflowValidation(this).routineBinding({ ...input, id });
     if (input.enabled) new WorkflowValidation(this).assertRoutine({ ...input, id });
     const intervalMinutes = normalizeRoutineInterval(input.intervalMinutes);
@@ -3659,7 +3673,7 @@ export class OpenBotDatabase {
     const lastEventAt = connectorTriggerChanged ? now() : routine.lastEventAt;
     if (connectorTriggerChanged) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=?").run(id);
     else if (triggerType === "dropbox" && routine.triggerConfig.dropboxPath !== triggerConfig.dropboxPath) this.db.prepare("DELETE FROM automation_cursors WHERE routine_id=? AND source='dropbox'").run(id);
-    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,schedule_json=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END WHERE id=?").run(
+    this.db.prepare("UPDATE routines SET name=?,bot_id=?,thread_id=?,prompt=?,cadence=?,interval_minutes=?,schedule_json=?,trigger_type=?,trigger_config_json=?,webhook_secret_ciphertext=COALESCE(?,webhook_secret_ciphertext),enabled=?,next_run_at=?,last_event_at=?,paused_reason=CASE WHEN ? THEN NULL ELSE paused_reason END,revision=revision+1 WHERE id=?").run(
       input.name, input.botId, input.threadId, input.prompt, legacyCadence(intervalMinutes), intervalMinutes, JSON.stringify(schedule), triggerType, JSON.stringify(triggerConfig), secret ?? null, input.enabled ? 1 : 0, nextRunAt, lastEventAt, input.enabled ? 1 : 0, id,
     );
     new WorkflowValidation(this).bindRoutine({ ...input, id });
