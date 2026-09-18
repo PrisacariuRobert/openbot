@@ -12,7 +12,7 @@ test("bundled methods work out of the box, preserve attribution and grant no acc
   const root = mkdtempSync(path.join(tmpdir(), "openbot-bundled-")), db = new OpenBotDatabase(root);
   try {
     const library = new CommunitySkills(db), skills = library.list();
-    assert.equal(skills.length, 7);
+    assert.equal(skills.length, 8);
     for (const skill of skills) {
       assert.equal(skill.bundled, true); assert.deepEqual(skill.blockers, []);
       assert.ok(skill.botIds.includes("nova") && skill.botIds.includes("pixel"));
