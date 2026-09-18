@@ -30,5 +30,9 @@
   {
     "id": "todoist-browser-tasks",
     "source": "OpenBot maintained built-in method"
+  },
+  {
+    "id": "google-calendar-browser-tasks",
+    "source": "OpenBot maintained built-in method"
   }
 ]
