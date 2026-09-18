@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import type { TodoistTaskSummary } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { ApprovalReviewChangedError, ApprovedConnectorOutcomeUncertainError } from "./approval-review-binding.js";
@@ -40,6 +41,52 @@ export function todoistTaskMatchesCreate(
   if (requested.projectId && task.projectId !== requested.projectId) return false;
   if (task.priority !== requested.priority) return false;
   if (!requested.dueString && task.due !== null) return false;
+  return true;
+}
+
+/** P04b: reviewed correction of one exact task. Every field is optional, but
+ * at least one change is required. Empty strings are real values, not "keep
+ * old value": description "" asks Todoist to clear the description and
+ * clearDue asks it to drop the due date. Both are verified by readback —
+ * a server that ignores them yields an uncertain outcome, never a false
+ * success. Priority 0 is rejected: Todoist priorities are 1-4. */
+export const todoistTaskUpdateInput = z.object({
+  taskId: z.string().trim().min(1).max(200),
+  content: z.string().trim().min(1).max(500).optional(),
+  description: z.string().trim().max(4_000).optional(),
+  dueString: z.string().trim().min(1).max(200).optional(),
+  clearDue: z.boolean().optional(),
+  priority: z.number().int().min(1).max(4).optional(),
+}).refine(
+  (value) => value.content !== undefined || value.description !== undefined || value.dueString !== undefined || value.clearDue === true || value.priority !== undefined,
+  { message: "Say what should change: title, description, due date or priority." },
+).refine(
+  (value) => !(value.dueString !== undefined && value.clearDue === true),
+  { message: "Change the due date or clear it, not both in one review." },
+);
+
+export const todoistTaskCompleteInput = z.object({
+  taskId: z.string().trim().min(1).max(200),
+});
+
+export type TodoistTaskUpdate = z.infer<typeof todoistTaskUpdateInput>;
+
+/** Only explicitly requested fields bind the match. dueString is a human
+ * phrase the server normalizes, so the readback only needs to still carry a
+ * due date; clearDue requires its absence. */
+export function todoistTaskMatchesUpdate(
+  task: TodoistTaskSummary,
+  requested: { content?: string; description?: string; dueString?: string; clearDue?: boolean; priority?: number },
+): boolean {
+  if (!task.id) return false;
+  if (requested.content !== undefined && task.content !== requested.content) return false;
+  if (requested.description !== undefined && task.description !== requested.description) return false;
+  if (requested.priority !== undefined && task.priority !== requested.priority) return false;
+  if (requested.clearDue === true) {
+    if (task.due !== null) return false;
+  } else if (requested.dueString !== undefined) {
+    if (task.due === null) return false;
+  }
   return true;
 }
 
@@ -225,6 +272,106 @@ export class TodoistConnector {
       if (error instanceof TodoistNotFoundError) return null;
       throw error;
     }
+  }
+
+  /** P04b: correct one exact task in the approving account. The task is
+   * addressed by its stable id — never by title — and the approving account
+   * is pinned for the whole call. Only requested fields are sent (explicit
+   * undefined checks, so an intentional "" is not dropped as falsy); the
+   * readback must show every requested change or the outcome is uncertain. */
+  async update(id: string, input: { content?: string; description?: string; dueString?: string; clearDue?: boolean; priority?: number }) {
+    const taskId = cleanText(id, 200);
+    if (!taskId) throw new Error("Give the exact Todoist task id from the task list.");
+    const parsed = todoistTaskUpdateInput.safeParse({ ...input, taskId });
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "That Todoist change is incomplete.");
+    const changes = parsed.data;
+    const authorizationVersion = this.db.connectorAuthorizationVersion("todoist");
+    const assertSameAccount = () => {
+      if (this.db.connectorAuthorizationVersion("todoist") !== authorizationVersion) throw new ApprovalReviewChangedError(true);
+    };
+    let base: TodoistTaskSummary | null = null;
+    try {
+      base = await this.getTask(taskId);
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    if (!base) throw new TodoistNotFoundError(taskId);
+    if (base.completed) throw new Error("That Todoist task is already completed. Reopen it in Todoist before editing it.");
+    const body: Json = {
+      ...(changes.content !== undefined ? { content: changes.content } : {}),
+      ...(changes.description !== undefined ? { description: changes.description } : {}),
+      ...(changes.priority !== undefined ? { priority: changes.priority } : {}),
+      ...(changes.dueString !== undefined ? { due_string: changes.dueString } : {}),
+      ...(changes.clearDue === true ? { due_string: "" } : {}),
+    };
+    try {
+      await this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}`, { method: "POST", body });
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError || error instanceof TodoistNotFoundError) throw error;
+      assertSameAccount();
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    assertSameAccount();
+    let read: TodoistTaskSummary | null = null;
+    try {
+      read = await this.getTask(taskId);
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError || error instanceof TodoistNotFoundError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    if (read && todoistTaskMatchesUpdate(read, changes)) return { task: read, base };
+    throw new ApprovedConnectorOutcomeUncertainError();
+  }
+
+  /** P04c: complete one exact task in the approving account. Closing is
+   * idempotent: an already-completed task succeeds without another write.
+   * A recurring task reschedules on close, so a changed due date with the
+   * same id also counts as completed. A missing readback is uncertain —
+   * a close cannot be told apart from a delete without it. */
+  async complete(id: string) {
+    const taskId = cleanText(id, 200);
+    if (!taskId) throw new Error("Give the exact Todoist task id from the task list.");
+    const parsed = todoistTaskCompleteInput.safeParse({ taskId });
+    if (!parsed.success) throw new Error("Give the exact Todoist task id from the task list.");
+    const authorizationVersion = this.db.connectorAuthorizationVersion("todoist");
+    const assertSameAccount = () => {
+      if (this.db.connectorAuthorizationVersion("todoist") !== authorizationVersion) throw new ApprovalReviewChangedError(true);
+    };
+    let base: TodoistTaskSummary | null = null;
+    try {
+      base = await this.getTask(taskId);
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    if (!base) throw new TodoistNotFoundError(taskId);
+    if (base.completed) return { task: base, alreadyCompleted: true as const };
+    try {
+      await this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}/close`, { method: "POST" });
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError || error instanceof TodoistNotFoundError) throw error;
+      assertSameAccount();
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    assertSameAccount();
+    let read: TodoistTaskSummary | null = null;
+    try {
+      read = await this.getTask(taskId);
+      assertSameAccount();
+    } catch (error) {
+      if (error instanceof ApprovalReviewChangedError || error instanceof TodoistNotFoundError) throw error;
+      throw new ApprovedConnectorOutcomeUncertainError();
+    }
+    if (read && (read.completed || (base.due !== null && read.due !== null && read.due !== base.due))) {
+      return { task: read, alreadyCompleted: false as const };
+    }
+    throw new ApprovedConnectorOutcomeUncertainError();
   }
 
   async disconnect() {
