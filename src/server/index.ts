@@ -1881,7 +1881,9 @@ function connectorActionFor(actionType: string) {
     slack_post: { connectorId: "slack", denied: "The Slack message was not posted because you chose Not now" },
     notion_update: { connectorId: "notion", denied: "Nothing was added to Notion because you chose Not now" },
     todoist_task_create: { connectorId: "todoist", denied: "The Todoist task was not created because you chose Not now" },
-  } as const)[actionType as "gmail_send" | "gmail_reply" | "google_drive_create" | "google_calendar_create" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create"];
+    todoist_task_update: { connectorId: "todoist", denied: "The Todoist task was not changed because you chose Not now" },
+    todoist_task_complete: { connectorId: "todoist", denied: "The Todoist task was not completed because you chose Not now" },
+  } as const)[actionType as "gmail_send" | "gmail_reply" | "google_drive_create" | "google_calendar_create" | "github_issue_create" | "slack_post" | "notion_update" | "todoist_task_create" | "todoist_task_update" | "todoist_task_complete"];
 }
 
 async function executeApprovedAction(approvalId: string, reviewedFingerprint: string) {

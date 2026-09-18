@@ -74,6 +74,37 @@ test("every MCP bridge action is accepted by the shared host tool endpoint", () 
   }
 });
 
+test("every MCP bridge action is allowlisted for the Claude runtime", () => {
+  const opencodeSource = readFileSync(new URL("./opencode.ts", import.meta.url), "utf8");
+  const actions = [...bridgeSource.matchAll(/action: "([a-z_]+)"/g)].map((match) => match[1]);
+  // Pre-existing P02 residual (not this slice): these bridge actions were
+  // never added to the Claude CLI allowlist, so Claude-runtime teammates
+  // cannot call them. Widening that permission surface needs its own
+  // reviewed slice; this pin keeps the gap visible instead of silent.
+  const knownGaps = new Set([
+    "browser_upload_saved_file",
+    "routine_list",
+    "routine_update",
+    "routine_pause",
+    "routine_resume",
+    "routine_delete",
+  ]);
+  for (const action of new Set(actions)) {
+    if (action === "bash") continue; // local-only workspace tool, not an MCP host action
+    if (knownGaps.has(action)) {
+      assert.ok(
+        !opencodeSource.includes(`mcp__openbot__${action}`),
+        `known gap closed for ${action}: remove it from knownGaps and rely on the positive pin`,
+      );
+      continue;
+    }
+    assert.ok(
+      opencodeSource.includes(`mcp__openbot__${action}`),
+      `MCP action ${action} must be in the Claude runtime allowlist or Claude models cannot call it`,
+    );
+  }
+});
+
 test("Todoist correction tools exist in both adapters with the exact task id required", () => {
   const listed = listBridgeTools();
   for (const name of ["todoist_task_update", "todoist_task_complete"]) {
