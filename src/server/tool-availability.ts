@@ -107,7 +107,7 @@ export function toolAvailability(
       id: "todoist",
       service: "todoist",
       read: ["todoist_tasks"],
-      write: ["todoist_task_create"],
+      write: ["todoist_task_create", "todoist_task_update", "todoist_task_complete"],
     },
     {
       id: "dropbox",
