@@ -26,5 +26,9 @@
   {
     "id": "private-team-review",
     "source": "OpenBot maintained built-in method"
+  },
+  {
+    "id": "todoist-browser-tasks",
+    "source": "OpenBot maintained built-in method"
   }
 ]
