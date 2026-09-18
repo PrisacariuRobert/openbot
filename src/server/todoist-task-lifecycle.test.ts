@@ -260,8 +260,7 @@ test("complete without a confirming readback is uncertain, not success", async (
   });
 });
 
-test("matcher binds only requested update fields", () => {
-  const task = { id: "t", content: "Ship", description: "d", projectId: "p", priority: 2, due: "2026-09-18", completed: false, url: "u" };
+test("matcher binds only requested update fields", () => {  const task = { id: "t", content: "Ship", description: "d", projectId: "p", priority: 2, due: "2026-09-18", completed: false, url: "u" };
   assert.equal(todoistTaskMatchesUpdate(task, { content: "Ship" }), true);
   assert.equal(todoistTaskMatchesUpdate(task, { content: "Other" }), false);
   assert.equal(todoistTaskMatchesUpdate(task, { description: "" }), false);
@@ -272,4 +271,37 @@ test("matcher binds only requested update fields", () => {
   assert.equal(todoistTaskMatchesUpdate({ ...task, due: null }, { clearDue: true }), true);
   assert.equal(todoistTaskMatchesUpdate({ ...task, priority: 4 }, { priority: 2 }), false);
   assert.equal(todoistTaskMatchesUpdate({ ...task, id: "" }, { content: "Ship" }), false);
+});
+
+test("journey: create, correct and complete refer to one task id in one account", async () => {
+  let state: TaskRow | null = null;
+  let posts = 0;
+  await fixture(async (connector, requests) => {
+    const created = await connector.create({ content: "Ship OpenBot", description: "Draft", dueString: "tomorrow" });
+    assert.equal(created.recovered, false);
+    const id = created.task.id;
+    const edited = await connector.update(id, { dueString: "next week", priority: 4 });
+    assert.equal(edited.task.id, id, "the correction edits the same task, never a same-titled one");
+    const done = await connector.complete(id);
+    assert.equal(done.alreadyCompleted, false);
+    assert.equal(done.task.id, id);
+    assert.equal(done.task.completed, true);
+    const writes = requests.filter((entry) => entry.method === "POST" && !entry.url.includes("access_token"));
+    assert.equal(writes.length, 3, "create, one update, one close — no duplicates, no retries");
+  }, (method, url, body) => {
+    if (url.includes("/oauth/access_token")) return Response.json({ access_token: "t", refresh_token: "r", expires_in: 3600 });
+    if (method === "GET") return Response.json(state ?? { error: "Not found" }, state ? undefined : { status: 404 });
+    posts += 1;
+    if (url.endsWith("/tasks") && method === "POST") {
+      const payload = JSON.parse(body) as Record<string, unknown>;
+      state = taskRow({ id: "task-7", content: payload.content, description: payload.description ?? "", project_id: "project-1", priority: 1, due: { date: "2026-09-19" } });
+      return Response.json(state);
+    }
+    if (url.endsWith("/close")) {
+      state = { ...(state as TaskRow), is_completed: true };
+      return Response.json(null);
+    }
+    state = applyUpdate((state as TaskRow), body);
+    return Response.json(state);
+  });
 });
