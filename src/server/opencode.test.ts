@@ -171,6 +171,12 @@ test("turns internal tool names into friendly progress updates", () => {
   assert.deepEqual(toolActivity({ part: { tool: "notion_update", state: {} } }), {
     label: "Preparing a Notion update for your approval", detail: null, kind: "tool",
   });
+  assert.deepEqual(toolActivity({ part: { tool: "todoist_task_update", state: {} } }), {
+    label: "Preparing a Todoist change for your approval", detail: null, kind: "tool",
+  });
+  assert.deepEqual(toolActivity({ part: { tool: "todoist_task_complete", state: {} } }), {
+    label: "Preparing a Todoist completion for your approval", detail: null, kind: "tool",
+  });
   assert.deepEqual(toolActivity({ part: { tool: "mac_organize", state: {} } }), {
     label: "Preparing a tidy-up for your approval", detail: null, kind: "tool",
   });
