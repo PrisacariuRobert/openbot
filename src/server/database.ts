@@ -153,7 +153,7 @@ export type ConnectorTaskRef = {
   threadId: string;
   runId: string;
   botId: string;
-  reviewedFields: { content: string; description: string; dueString: string; projectId: string; priority: number };
+  reviewedFields: Record<string, string | number | boolean>;
   lastState: TodoistTaskSummary;
   createdAt: string;
   updatedAt: string;

@@ -73,3 +73,14 @@ test("every MCP bridge action is accepted by the shared host tool endpoint", () 
     );
   }
 });
+
+test("Todoist correction tools exist in both adapters with the exact task id required", () => {
+  const listed = listBridgeTools();
+  for (const name of ["todoist_task_update", "todoist_task_complete"]) {
+    const tool = listed.find((candidate) => candidate.name === name);
+    assert.ok(tool, `MCP bridge must expose ${name}`);
+    assert.deepEqual(tool?.inputSchema?.required, ["taskId"], `${name} must address one exact task id`);
+  }
+  assert.match(workspaceSource, /todoist_task_update/);
+  assert.match(workspaceSource, /todoist_task_complete/);
+});

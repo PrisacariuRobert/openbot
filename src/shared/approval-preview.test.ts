@@ -341,6 +341,8 @@ test("supported executor argument sets match the complete projected review contr
     github_issue_create: ["repository", "title", "body", "publicationIdentity"],
     notion_update: ["pageId", "content", "heading"],
     todoist_task_create: ["content", "description", "dueString", "projectId", "priority"],
+    todoist_task_update: ["taskId", "base", "content", "description", "dueString", "clearDue", "priority"],
+    todoist_task_complete: ["taskId", "base"],
     mac_organize: ["moves"],
   };
   for (const [type, keys] of Object.entries(expected)) {
@@ -391,6 +393,24 @@ test("Todoist reviews project, literal due phrase, all content and exact priorit
   assert.equal(defaults.canApprove, true);
   assert.match(defaults.fields.find(field => field.label === "Project ID")!.value, /default inbox/);
   assert.match(defaults.fields.find(field => field.label === "Priority")!.value, /default \(normal\)/);
+});
+
+test("Todoist correction reviews the exact task, the listed field changes and clears", () => {
+  const result = approvalPreview(approval, run, { type: "todoist_task_update", botId: "bot", args: { taskId: "task-7", content: "Ship v2", description: "", clearDue: true, priority: 4 } });
+  assert.equal(result.canApprove, true);
+  assert.equal(result.fields.find(field => field.label === "Task ID")?.value, "task-7");
+  assert.equal(result.fields.find(field => field.label === "New title")?.value, "Ship v2");
+  assert.match(result.fields.find(field => field.label === "New description")?.value || "", /Clear the description/);
+  assert.equal(result.fields.find(field => field.label === "Due date")?.value, "Clear it.");
+  assert.match(result.fields.find(field => field.label === "New priority")?.value || "", /Urgent/);
+  assert.match(result.fields.find(field => field.label === "Scope")?.value || "", /exact task id/);
+  const done = approvalPreview(approval, run, { type: "todoist_task_complete", botId: "bot", args: { taskId: "task-7" } });
+  assert.equal(done.canApprove, true);
+  assert.match(done.fields.find(field => field.label === "Effect")?.value || "", /reading the task back/);
+  for (const args of [{ taskId: "task-7" }, { taskId: "task-7", priority: 0 }, { taskId: "task-7", dueString: "x", clearDue: true }, { taskId: "" }, { content: "x" }]) {
+    assert.equal(approvalPreview(approval, run, { type: "todoist_task_update", botId: "bot", args }).canApprove, false);
+  }
+  assert.equal(approvalPreview(approval, run, { type: "todoist_task_complete", botId: "bot", args: { taskId: "" } }).canApprove, false);
 });
 
 test("new connected actions fail closed for missing identity and malformed optional fields", () => {

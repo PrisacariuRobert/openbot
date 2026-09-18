@@ -47,7 +47,8 @@ import { CodeBenchmarkService } from "./code-benchmark.js";
 import { GitHubConnector } from "./github.js";
 import { SlackConnector } from "./slack.js";
 import { NotionConnector } from "./notion.js";
-import { TodoistConnector } from "./todoist.js";
+import { TodoistConnector, TodoistNotFoundError, todoistTaskCompleteInput, todoistTaskUpdateInput } from "./todoist.js";
+import type { TodoistTaskSummary } from "../shared/types.js";
 import { DropboxConnector } from "./dropbox.js";
 import { CONNECTOR_MANIFESTS, friendlyConnectorError, manifestCatalogEntry } from "./connectors.js";
 import type { Bot, CodeProject, CodeProjectEdit, CodeProjectReview, CodeProjectSuggestion, CodeTaskReview, CodeTaskWorkspace, ConnectorStatus, GoogleConnectorService, ProviderInstance } from "../shared/types.js";
@@ -1726,6 +1727,101 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     broadcast({ type: "connector", at: Date.now() });
     return `The Todoist task was created and read back: ${task.content}${task.url ? ` (${task.url})` : ""}.${recovered ? " The create response was lost or incomplete; a matching Todoist readback confirmed the task without another create request." : ""}`;
   }
+  if (parsed.data.type === "todoist_task_update") {
+    // P04b: execute an owner-reviewed correction of one exact task. The
+    // review stays bound to this task id, account and base snapshot: a
+    // completed, deleted, replaced-account or changed task needs a fresh
+    // proposal instead of running stale.
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
+    if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Changing Todoist tasks is not available for this teammate.");
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    if (!approval || !run) throw new Error("The approved request could not be found. Ask the teammate to propose it again.");
+    const authorizationVersion = db.connectorAuthorizationVersion("todoist");
+    const account = db.getConnector("todoist")?.accountEmail || "";
+    const stored = db.getConnectorTaskRef("todoist", String(args.taskId || ""));
+    if (stored && (stored.account !== account || stored.authorizationVersion !== authorizationVersion)) {
+      throw new ApprovalReviewChangedError(true);
+    }
+    if (!todoistTaskUpdateInput.safeParse(args).success) throw new Error("The approved request could not be restored safely. Prepare it again for a fresh review.");
+    const base = (args.base as { content?: string; description?: string; due?: string | null; priority?: number } | undefined) || {};
+    let current: TodoistTaskSummary | null = null;
+    try {
+      current = await todoist.getTask(String(args.taskId || ""));
+    } catch (error) {
+      if (error instanceof TodoistNotFoundError) throw new Error("That Todoist task is no longer available. List the tasks again and propose the change on a current one.");
+      throw error;
+    }
+    if (!current) throw new Error("That Todoist task is no longer available. List the tasks again and propose the change on a current one.");
+    if (current.completed) {
+      throw new ApprovalReviewChangedError();
+    }
+    if (
+      (base.content !== undefined && base.content !== current.content) ||
+      (base.description !== undefined && base.description !== current.description) ||
+      (base.due !== undefined && base.due !== current.due) ||
+      (base.priority !== undefined && base.priority !== current.priority)
+    ) {
+      throw new ApprovalReviewChangedError();
+    }
+    const { task } = await todoist.update(String(args.taskId || ""), {
+      content: args.content === undefined ? undefined : String(args.content),
+      description: args.description === undefined ? undefined : String(args.description),
+      dueString: args.dueString === undefined ? undefined : String(args.dueString),
+      clearDue: args.clearDue === true,
+      priority: args.priority === undefined ? undefined : Number(args.priority),
+    });
+    db.saveConnectorTaskRef({
+      connectorId: "todoist", resourceId: task.id, account, authorizationVersion,
+      threadId: run.threadId, runId: run.id, botId: bot.id,
+      reviewedFields: {
+        ...(args.content !== undefined ? { content: String(args.content) } : {}),
+        ...(args.description !== undefined ? { description: String(args.description) } : {}),
+        ...(args.dueString !== undefined ? { dueString: String(args.dueString) } : {}),
+        ...(args.clearDue === true ? { clearDue: true } : {}),
+        ...(args.priority !== undefined ? { priority: Number(args.priority) } : {}),
+      }, lastState: task,
+    });
+    db.addConnectorEvent({ connectorId: "todoist", botId: bot.id, action: "todoist_task_update", status: "completed", summary: `${bot.name} edited the approved task “${task.content.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return `The Todoist task was edited and read back: “${task.content}”.${task.url ? ` (${task.url})` : ""}`;
+  }
+  if (parsed.data.type === "todoist_task_complete") {
+    // P04c: execute an owner-reviewed completion of one exact task. Closing
+    // is idempotent: an already-completed task succeeds without another
+    // write, and a replaced account invalidates the review.
+    const bot = db.getBot(parsed.data.botId), access = db.getBotConnectorAccess(parsed.data.botId, "todoist", "todoist");
+    if (!bot || !access?.canSend || !db.getConnector("todoist")?.connected) throw new Error("Changing Todoist tasks is not available for this teammate.");
+    const approval = db.getApproval(approvalID), run = approval ? db.getRun(approval.runId) : null;
+    if (!approval || !run) throw new Error("The approved request could not be found. Ask the teammate to propose it again.");
+    const authorizationVersion = db.connectorAuthorizationVersion("todoist");
+    const account = db.getConnector("todoist")?.accountEmail || "";
+    const stored = db.getConnectorTaskRef("todoist", String(args.taskId || ""));
+    if (stored && (stored.account !== account || stored.authorizationVersion !== authorizationVersion)) {
+      throw new ApprovalReviewChangedError(true);
+    }
+    if (!todoistTaskCompleteInput.safeParse(args).success) throw new Error("The approved request could not be restored safely. Prepare it again for a fresh review.");
+    const base = (args.base as { content?: string } | undefined) || {};
+    let result;
+    try {
+      result = await todoist.complete(String(args.taskId || ""));
+    } catch (error) {
+      if (error instanceof TodoistNotFoundError) throw new Error("That Todoist task is no longer available. List the tasks again and propose the change on a current one.");
+      throw error;
+    }
+    if (!result.alreadyCompleted && base.content !== undefined && base.content !== result.task.content) {
+      throw new ApprovalReviewChangedError();
+    }
+    db.saveConnectorTaskRef({
+      connectorId: "todoist", resourceId: result.task.id, account, authorizationVersion,
+      threadId: run.threadId, runId: run.id, botId: bot.id,
+      reviewedFields: { completed: true }, lastState: result.task,
+    });
+    db.addConnectorEvent({ connectorId: "todoist", botId: bot.id, action: "todoist_task_complete", status: "completed", summary: `${bot.name} completed the approved task “${result.task.content.slice(0, 120)}”` });
+    broadcast({ type: "connector", at: Date.now() });
+    return result.alreadyCompleted
+      ? `“${result.task.content}” was already completed; nothing was changed.${result.task.url ? ` (${result.task.url})` : ""}`
+      : `The Todoist task was completed and read back: “${result.task.content}”.${result.task.url ? ` (${result.task.url})` : ""}`;
+  }
   if (parsed.data.type === "mac_organize") {
     if (!db.getStudioSettings().macAccessEnabled) throw new Error("Files on this Mac are turned off for the studio.");
     const moves = z.array(z.object({ from: z.string().min(1).max(1_000), to: z.string().min(1).max(1_000) })).min(1).max(100).parse(args.moves) as MacFileMove[];
@@ -3200,7 +3296,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3746,17 +3842,56 @@ app.post("/api/internal/tools", async (request, response) => {
         input.data,
       );
     }
-    if (action === "todoist_tasks" || action === "todoist_task_create") {
+    if (action === "todoist_tasks" || action === "todoist_task_create" || action === "todoist_task_update" || action === "todoist_task_complete") {
       const connection = db.getConnector("todoist"), access = db.getBotConnectorAccess(botId, "todoist", "todoist");
       if (!connection?.connected) return response.status(409).json({ error: "Todoist is not connected yet. Ask the user to connect it in Apps & Tools." });
       if (action === "todoist_tasks" && !access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Todoist tasks." });
-      if (action === "todoist_task_create" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to prepare Todoist tasks." });
+      if (action !== "todoist_tasks" && !access?.canSend) return response.status(403).json({ error: "This teammate does not have permission to change Todoist tasks." });
       if (action === "todoist_tasks") {
         const input = z.object({ query: z.string().trim().max(500).default(""), maxResults: z.number().int().min(1).max(20).optional() }).safeParse(args);
         if (!input.success) return response.status(400).json({ error: "Give Todoist a short task search." });
         const tasks = await todoist.tasks(input.data.query, input.data.maxResults || 20);
         db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "completed", summary: `${bot.name} checked ${tasks.length} active Todoist task${tasks.length === 1 ? "" : "s"}` });
         broadcast({ type: "connector", at: Date.now() }); return response.json({ tasks, count: tasks.length });
+      }
+      if (action === "todoist_task_complete") {
+        const input = todoistTaskCompleteInput.safeParse(args);
+        if (!input.success) return response.status(400).json({ error: "Give the exact Todoist task id from the task list." });
+        let current: TodoistTaskSummary | null = null;
+        try {
+          current = await todoist.getTask(input.data.taskId);
+        } catch {
+          return response.status(409).json({ error: "Todoist could not be read right now. Try the completion again shortly." });
+        }
+        if (!current) return response.status(409).json({ error: "That Todoist task is no longer available. List the tasks again and propose the change on a current one." });
+        if (current.completed) {
+          db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "completed", summary: `${bot.name} confirmed “${current.content.slice(0, 120)}” was already completed` });
+          broadcast({ type: "connector", at: Date.now() }); return response.json({ task: current, alreadyCompleted: true });
+        }
+        db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "waiting", summary: `${bot.name} prepared completing “${current.content.slice(0, 120)}” for approval` });
+        broadcast({ type: "connector", at: Date.now() });
+        return holdForApproval("external", `${bot.name} wants to complete this Todoist task: “${current.content}”. Subtasks close with it; a recurring task moves to its next occurrence instead.`, `Complete “${current.content}” in Todoist`, { ...input.data, base: { content: current.content, completed: current.completed } });
+      }
+      if (action === "todoist_task_update") {
+        const input = todoistTaskUpdateInput.safeParse(args);
+        if (!input.success) return response.status(400).json({ error: input.error.issues[0]?.message || "Say what should change on that Todoist task." });
+        let current: TodoistTaskSummary | null = null;
+        try {
+          current = await todoist.getTask(input.data.taskId);
+        } catch {
+          return response.status(409).json({ error: "Todoist could not be read right now. Try the edit again shortly." });
+        }
+        if (!current) return response.status(409).json({ error: "That Todoist task is no longer available. List the tasks again and propose the change on a current one." });
+        if (current.completed) return response.status(409).json({ error: "That Todoist task is already completed. Reopen it in Todoist before editing it." });
+        const changes: string[] = [];
+        if (input.data.content !== undefined) changes.push(`Title: “${current.content}” → “${input.data.content}”.`);
+        if (input.data.description !== undefined) changes.push(input.data.description ? `Description: replace with ${input.data.description.length} reviewed characters.` : "Description: clear it.");
+        if (input.data.dueString !== undefined) changes.push(`Due: ${current.due || "none"} → “${input.data.dueString}” (Todoist interprets the phrase; the change is confirmed by reading the task back).`);
+        if (input.data.clearDue === true) changes.push(`Due: ${current.due || "none"} → none.`);
+        if (input.data.priority !== undefined) changes.push(`Priority: ${current.priority} → ${input.data.priority}.`);
+        db.addConnectorEvent({ connectorId: "todoist", botId, action, status: "waiting", summary: `${bot.name} prepared editing “${current.content.slice(0, 120)}” for approval` });
+        broadcast({ type: "connector", at: Date.now() });
+        return holdForApproval("external", `${bot.name} wants to edit this Todoist task (“${current.content}”, ${input.data.taskId}): ${changes.join(" ")} Only the listed fields change.`, `Edit “${current.content}” in Todoist`, { ...input.data, base: { content: current.content, description: current.description, due: current.due, priority: current.priority, completed: current.completed } });
       }
       const input = z.object({
         content: z.string().trim().min(1).max(500), description: z.string().trim().max(4_000).optional(), dueString: z.string().trim().max(200).optional(),

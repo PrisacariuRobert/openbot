@@ -262,6 +262,23 @@ export function approvalPreview(
     if (args.priority !== undefined && (typeof args.priority !== "number" || !Number.isInteger(args.priority) || args.priority < 1 || args.priority > 4)) incomplete = true;
     else preview.fields.push({ label: "Priority", value: args.priority === undefined ? "Todoist default (normal)" : `${args.priority} — ${["Normal", "Medium", "High", "Urgent"][args.priority - 1]}` });
     preview.fields.push({ label: "Date interpretation", value: "Todoist interprets the due-date phrase using the connected account's settings. This review does not convert it into a verified date or time." });
+  } else if (object.type === "todoist_task_update") {
+    boundedText("taskId", "Task ID", 200, true);
+    if (args.content !== undefined) boundedText("content", "New title", 500, true);
+    if (args.description !== undefined) {
+      if (typeof args.description !== "string" || args.description.length > 4_000) incomplete = true;
+      else preview.fields.push({ label: "New description", value: args.description.trim() ? visible(args.description) : "Clear the description." });
+    }
+    if (args.dueString !== undefined) boundedText("dueString", "New due-date phrase", 200, true);
+    if (args.clearDue === true) preview.fields.push({ label: "Due date", value: "Clear it." });
+    if (args.priority !== undefined && (typeof args.priority !== "number" || !Number.isInteger(args.priority) || args.priority < 1 || args.priority > 4)) incomplete = true;
+    else if (args.priority !== undefined) preview.fields.push({ label: "New priority", value: `${args.priority} — ${["Normal", "Medium", "High", "Urgent"][args.priority - 1]}` });
+    if (args.content === undefined && args.description === undefined && args.dueString === undefined && args.clearDue !== true && args.priority === undefined) incomplete = true;
+    if (args.dueString !== undefined && args.clearDue === true) incomplete = true;
+    preview.fields.push({ label: "Scope", value: "Only the listed fields change, on this exact task id in the connected account. The task is read again before the change; a completed, deleted or changed task needs a fresh proposal." });
+  } else if (object.type === "todoist_task_complete") {
+    boundedText("taskId", "Task ID", 200, true);
+    preview.fields.push({ label: "Effect", value: "Close this exact task. Its subtasks close with it; a recurring task moves to its next occurrence instead. Closing is verified by reading the task back." });
   } else if (object.type === "skill_propose") {
     if (!authoredSkillSchema.safeParse(args).success) incomplete = true;
     field("name", "Skill name", true);
