@@ -12,10 +12,7 @@ test("bundled methods work out of the box, preserve attribution and grant no acc
   const root = mkdtempSync(path.join(tmpdir(), "openbot-bundled-")), db = new OpenBotDatabase(root);
   try {
     const library = new CommunitySkills(db), skills = library.list();
-    // NOTE: 9 counts this gmail skill on top of main's 8. If the Calendar
-    // skill PR (#66) merges first, main becomes 9 and this must become 10
-    // when integrating main before merge.
-    assert.equal(skills.length, 9);
+    assert.equal(skills.length, 10);
     for (const skill of skills) {
       assert.equal(skill.bundled, true); assert.deepEqual(skill.blockers, []);
       assert.ok(skill.botIds.includes("nova") && skill.botIds.includes("pixel"));
