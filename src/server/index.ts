@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
 import { intervalSchedule, routineScheduleInput, nextRoutineOccurrence, schedulePreview } from "../shared/calendar-schedule.js";
 import { OpenBotDatabase, RoutineRevisionConflictError, messageSubmissionDigest } from "./database.js";
+import { tombstoneHttpMapping, validateReplayDisclosure } from "./message-admission.js";
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
@@ -132,7 +133,16 @@ db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus
 // The tester browser always starts at the studio itself (loopback), never at
 // a relay or LAN address — its scope is loopback-only by construction.
 const tester = new TesterBrowser(db.dataDir, `http://127.0.0.1:${port}/`);
-const browserSignIns = new BrowserSignIns(db, browserNavigationGrants);
+const browserSignIns = new BrowserSignIns(db, { revokeBot: (botId: string) => {
+  // R03: sign-in request/completion changes the session/account under any
+  // issued allowance or observation: revoke navigation grants, bump the
+  // durable input epoch (in-flight new-path actions must re-observe), and
+  // drop registry observations. Best-effort beyond the grant revocation.
+  const removed = browserNavigationGrants.revokeBot(botId);
+  try { db.revokeBotInput(botId); } catch { /* best-effort */ }
+  try { browser.revokeObservationsForBot(botId); } catch { /* best-effort */ }
+  return removed;
+} });
 const googleWorkspace = new GoogleWorkspaceConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/google/callback"), approvedConnectorDispatch.fetch);
 const appReads = new AppReadService(db);
 const slack = new SlackConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/slack/callback"), approvedConnectorDispatch.fetch);
@@ -276,6 +286,29 @@ for (const receipt of interruptedApprovedActions) {
   db.updateRun(receipt.runId, { status: "failed", error: detail, finishedAt: new Date().toISOString(), taskStage: "blocked" });
   db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Check what happened before retrying", detail });
 }
+// R02: recover journal actions that may have dispatched but never observed
+// an outcome. They become uncertain and will not repeat until reconciled.
+try {
+  const recoveredJournal = db.recoverInterruptedJournalActions();
+  for (const record of recoveredJournal) {
+    try {
+      if (db.getRun(record.runId)) {
+        db.addActivity({ runId: record.runId, botId: record.botId, kind: "error", label: "Check what happened before retrying", detail: `${record.target} may or may not have completed before OpenBot restarted. It has not been repeated.` });
+      }
+    } catch {
+      // Recovery state is already durable; activity annotation is best-effort.
+    }
+  }
+  if (recoveredJournal.length > 0) console.log(`[R02] recovered ${recoveredJournal.length} interrupted journal action(s) as uncertain`);
+} catch (error) {
+  console.warn("[R02] journal recovery failed:", error instanceof Error ? error.message : error);
+}
+try {
+  const repaired = db.repairPendingSubmissionIntents();
+  if (repaired > 0) console.log(`[R01] repaired ${repaired} pending submission intent(s) as uncertain`);
+} catch (error) {
+  console.warn("[R01] pending submission repair failed:", error instanceof Error ? error.message : error);
+}
 for (const receipt of db.listPreparedApprovedActions()) {
   // The in-memory review binding cannot survive restart. Do not silently
   // authorize a prepared write against an account that may have changed.
@@ -310,6 +343,14 @@ function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
   if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return false;
   if (!runner.cancelTask(run.id)) return false;
+  // R03: stopping invalidates in-flight new-path actions admitted under the
+  // older input epoch, and drops their observations. They must re-observe.
+  try {
+    db.revokeBotInput(run.botId);
+    browser.revokeObservationsForBot(run.botId);
+  } catch {
+    // Revocation is best-effort; cancellation still proceeds.
+  }
   db.addActivity({ runId: run.id, botId: run.botId, kind: "status", label, detail: null });
   // P-02: a cancellation must leave a persistent visible acknowledgment next
   // to the task — not just a record the owner has to go looking for.
@@ -1356,13 +1397,45 @@ function submissionDigestFor(data: {
   });
 }
 
-function replaySubmission(response: express.Response, requestId: string, digest: string) {
+function replaySubmission(response: express.Response, requestId: string, digest: string, threadId: string) {
   const existing = db.getMessageSubmission(requestId);
-  if (!existing) return null;
-  if (existing.payloadDigest !== digest) {
-    response.status(409).json({
+  if (!existing) {
+    // R01: bounded full receipts compact; retained tombstones answer replay
+    // with an explicit expired/uncertain conflict instead of silently
+    // recreating work. The stored reason is preserved: an orphaned first
+    // attempt has an UNKNOWN outcome and must never be described as
+    // "nothing happened".
+    const tombstone = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; createdAt: string; reason: "pruned" | "orphan-repaired" }>(
+      "message-submission-tombstone",
+      requestId,
+    );
+    if (tombstone && (tombstone.reason === "pruned" || tombstone.reason === "orphan-repaired")) {
+      const mapped = tombstoneHttpMapping(
+        { requestId: tombstone.requestId, threadId: tombstone.threadId, payloadDigest: tombstone.payloadDigest, createdAt: tombstone.createdAt, reason: tombstone.reason },
+        digest,
+      );
+      response.status(mapped.status).json({ error: mapped.error, code: mapped.code, requestId });
+      return true as const;
+    }
+    // Legacy tombstones without a reason predate reason preservation;
+    // treat them as compacted receipts, never as proof of no work.
+    if (tombstone) {
+      const mapped = tombstoneHttpMapping(
+        { requestId: tombstone.requestId, threadId: tombstone.threadId, payloadDigest: tombstone.payloadDigest, createdAt: tombstone.createdAt, reason: "pruned" },
+        digest,
+      );
+      response.status(mapped.status).json({ error: mapped.error, code: mapped.code, requestId });
+      return true as const;
+    }
+    return null;
+  }
+  // R01: thread-match disclosure — a replay must never leak another
+  // conversation's receipt. Mismatch is a conflict, not a replay.
+  const disclosure = validateReplayDisclosure(existing, threadId, digest);
+  if (!disclosure.ok) {
+    response.status(disclosure.status).json({
       error: "This retry does not match the original request. Nothing was changed — send it again with a new request.",
-      code: "request_conflict",
+      code: disclosure.code,
       requestId,
     });
     return true as const;
@@ -1388,6 +1461,51 @@ app.post("/api/messages", (request, response) => {
   if (!parsed.success) return response.status(400).json({ error: "Please write a message first." });
   const thread = db.getThread(parsed.data.threadId);
   if (!thread) return response.status(404).json({ error: "Conversation not found." });
+  // R01: durable replay runs before any new-admission eligibility check
+  // (targets, provider, budget, unclaimed attachments, reply target) but
+  // after thread visibility is established. A replay creates nothing, so
+  // changed budget/provider/attachment-claim state must not block recovery
+  // of the original IDs — and a claimed attachment on retry is proof of the
+  // first admission, not a 400. Thread mismatch stays a 409 conflict (no
+  // cross-thread disclosure); revoked thread access still 404s above.
+  const submissionDigest = parsed.data.requestId ? submissionDigestFor({
+    threadId: thread.id,
+    body: parsed.data.body,
+    attachmentIds: parsed.data.attachmentIds,
+    replyToId: parsed.data.replyToId ?? null,
+    targetBotIds: parsed.data.targetBotIds,
+    timeZone: parsed.data.timeZone,
+    expectedWorkKind: parsed.data.expectedWorkKind,
+  }) : null;
+  if (parsed.data.requestId && submissionDigest) {
+    const replayed = replaySubmission(response, parsed.data.requestId, submissionDigest, thread.id);
+    if (replayed) return;
+    // R01: ANY existing pending intent for this request ID is handled here,
+    // before eligibility and staging — regardless of thread. A different
+    // thread or payload digest is a conflict that preserves the original
+    // marker byte-for-byte and creates no message, run, routine, claim or
+    // inbox copy. Only a matching thread+digest takes the in-progress path.
+    // (Staging below upserts the same key, so without this branch a foreign
+    // retry could replace thread A's unresolved marker.)
+    const pending = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; startedAt: string }>(
+      "message-submission-pending",
+      parsed.data.requestId,
+    );
+    if (pending) {
+      if (pending.threadId !== thread.id || pending.payloadDigest !== submissionDigest) {
+        return response.status(409).json({
+          error: "This retry does not match the original request. Nothing was changed — send it again with a new request.",
+          code: "request_conflict",
+          requestId: parsed.data.requestId,
+        });
+      }
+      return response.status(409).json({
+        error: "This request is already being processed. Wait for its result instead of sending it again.",
+        code: "request_in_progress",
+        requestId: parsed.data.requestId,
+      });
+    }
+  }
   const candidates = db.getThreadBots(thread.id);
   const invoked = invokedWorkflow(parsed.data.body, db.listWorkflows());
   const workflow = invoked && candidates.some((bot) => bot.id === invoked.botId) ? invoked : null;
@@ -1423,20 +1541,30 @@ app.post("/api/messages", (request, response) => {
     const reply = db.getMessage(parsed.data.replyToId);
     if (!reply || reply.threadId !== thread.id) return response.status(400).json({ error: "That message is no longer available to reply to." });
   }
-  // Durable replay check runs after read-only validation but before any
-  // message, attachment claim, routine or run is created.
-  const submissionDigest = parsed.data.requestId ? submissionDigestFor({
-    threadId: thread.id,
-    body: parsed.data.body,
-    attachmentIds: parsed.data.attachmentIds,
-    replyToId: parsed.data.replyToId ?? null,
-    targetBotIds: parsed.data.targetBotIds,
-    timeZone: parsed.data.timeZone,
-    expectedWorkKind: parsed.data.expectedWorkKind,
-  }) : null;
+  // Durable admission: the replay check above already ran before any
+  // eligibility validation. Stage the pending intent here — after all
+  // read-only validation, before any message, attachment claim, routine or
+  // run is created — so a crash in the window below repairs as uncertain.
   if (parsed.data.requestId && submissionDigest) {
-    const replayed = replaySubmission(response, parsed.data.requestId, submissionDigest);
-    if (replayed) return;
+    // R01 fail-closed: the pending marker must be durably staged before any
+    // work object exists. If staging fails, the request is refused with
+    // nothing created — the client keeps the exact draft and retries with
+    // the SAME requestId. Proceeding without the marker would allow a crash
+    // to fork an untracked duplicate history.
+    try {
+      db.saveExtensionRecord("message-submission-pending", parsed.data.requestId, {
+        requestId: parsed.data.requestId,
+        threadId: thread.id,
+        payloadDigest: submissionDigest,
+        startedAt: new Date().toISOString(),
+      });
+    } catch {
+      return response.status(500).json({
+        error: "OpenBot could not stage this request safely, so nothing was started and your uploads are still available. Retry with the same request.",
+        code: "request_not_staged",
+        requestId: parsed.data.requestId,
+      });
+    }
   }
   const body = parsed.data.body || `Shared ${parsed.data.attachmentIds.length} file${parsed.data.attachmentIds.length === 1 ? "" : "s"}.`;
   const userMessage = db.addMessage({ threadId: thread.id, senderType: "user", senderId: null, body, replyToId: parsed.data.replyToId });
@@ -1445,9 +1573,14 @@ app.post("/api/messages", (request, response) => {
     const file = db.attachmentFile(attachment.id)!;
     const workspaceName = `${attachment.id.slice(0, 8)}-${attachment.name}`;
     for (const bot of requested) {
+      // R01: stage inbox copies to temp then rename so a crash cannot leave
+      // a half-copied workspace that a retry would double-count.
       const inbox = path.join(db.workspacesDir, bot.id, "inbox", userMessage.id);
       mkdirSync(inbox, { recursive: true });
-      copyFileSync(file.storagePath, path.join(inbox, workspaceName));
+      const tmpPath = path.join(inbox, `.${workspaceName}.part`);
+      const finalPath = path.join(inbox, workspaceName);
+      copyFileSync(file.storagePath, tmpPath);
+      renameSync(tmpPath, finalPath);
     }
     return attachmentPromptBlock(attachment, db.attachmentText(attachment.id)).replace("{{WORKSPACE_PATH}}", `inbox/${userMessage.id}/${workspaceName}`);
   });
@@ -1470,6 +1603,13 @@ app.post("/api/messages", (request, response) => {
         attachmentIds: attachments.map((attachment) => attachment.id),
         responseStatus: 201,
       });
+      // R01: durable admission committed — clear the pending intent so
+      // startup repair does not mistake this for an orphan.
+      try {
+        db.deleteExtensionRecord("message-submission-pending", parsed.data.requestId);
+      } catch {
+        // Best-effort cleanup.
+      }
     }
     broadcast();
     return response.status(201).json({ routines, routineIds: routines.map((routine) => routine.id), messageId: userMessage.id, routedTo, attachments, ...(parsed.data.requestId ? { requestId: parsed.data.requestId } : {}) });
@@ -1516,6 +1656,12 @@ app.post("/api/messages", (request, response) => {
       attachmentIds: attachments.map((attachment) => attachment.id),
       responseStatus: 202,
     });
+    // R01: durable admission committed — clear the pending intent.
+    try {
+      db.deleteExtensionRecord("message-submission-pending", parsed.data.requestId);
+    } catch {
+      // Best-effort cleanup.
+    }
   }
   response.status(202).json({ runs, redirected, ...messageResult, ...(parsed.data.requestId ? { requestId: parsed.data.requestId } : {}) });
 });
@@ -3116,6 +3262,14 @@ app.post("/api/bots/:id/browser/takeover/click", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a point inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverClick(request.params.id, parsed.data.x, parsed.data.y)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3123,6 +3277,14 @@ app.post("/api/bots/:id/browser/takeover/type", async (request, response) => {
   const parsed = z.object({ value: z.string().max(4_000), replace: z.boolean().default(false) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That text is too long for secure takeover." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverType(request.params.id, parsed.data.value, parsed.data.replace)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3130,6 +3292,14 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3140,6 +3310,14 @@ app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
   const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3149,6 +3327,14 @@ app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });

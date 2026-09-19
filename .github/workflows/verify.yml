@@ -110,6 +110,11 @@ jobs:
         run: npm run test:browser-sessions
       - name: Test browser tabs and active-tab routing
         run: npm run test:browser-tabs
+      - name: Test computer-use admission, journal and executor fixtures
+        # Deterministic and credential-free: disposable dirs, loopback HTTP,
+        # lockfile Chromium via OPENBOT_CHROME_PATH. No model, provider,
+        # live-account or paid prerequisites.
+        run: npm run test:r01-http-fixtures && npm run test:computer-use-fixtures
       - name: Retain synthetic browser evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

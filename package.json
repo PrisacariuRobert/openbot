@@ -24,6 +24,8 @@
     "test:browser-sessions": "tsx scripts/test-browser-session-workflows.ts",
     "test:browser-tabs": "tsx scripts/test-browser-tabs.ts",
     "test:browser-sign-in": "tsx scripts/test-browser-sign-in.ts",
+    "test:r01-http-fixtures": "tsx scripts/run-r01-http-fixtures.ts",
+    "test:computer-use-fixtures": "tsx scripts/run-browser-integration-fixtures.ts",
     "test:workflow-checks-ui": "tsx scripts/test-workflow-checks-ui.ts",
     "test:skill-authoring-ui": "tsx scripts/test-skill-authoring-ui.ts",
     "test:customer-workflow-ui": "tsx scripts/test-customer-workflow-ui.ts",

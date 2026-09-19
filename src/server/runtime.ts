@@ -13,6 +13,12 @@ import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTempla
 import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
 import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
+import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
+import { issueSemanticTarget, reresolveSemanticTarget } from "./semantic-targets.js";
+import { validateVisualAction } from "./visual-grounding.js";
+import { journalPropose, journalTransition, journalReconcile, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
+import { selectModality } from "./modality-router.js";
+import { storeObservation, getObservation, findObservationWithTarget, invalidateObservationsForRun, invalidateObservationsForBot, type CapturedObservation, type RegistryTarget, type RegistryPane } from "./observation-registry.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
@@ -479,9 +485,13 @@ export class BrowserManager {
   private async page(botId: string): Promise<Page> {
     const context = await this.context(botId);
     const active = this.activePage(botId);
-    if (active) return active;
+    if (active) {
+      this.trackDocumentGenerations(active);
+      return active;
+    }
     const fresh = await context.newPage();
     this.activePages.set(botId, fresh);
+    this.trackDocumentGenerations(fresh);
     return fresh;
   }
 
@@ -492,6 +502,53 @@ export class BrowserManager {
   private readonly tabIds = new WeakMap<Page, string>();
   private readonly tabSeq = new Map<string, number>();
   static readonly maxTabs = 8;
+
+  /** Host-owned document navigation generations (Finding D): bumped on
+   * every main-frame navigation of a tracked page. Same-URL reloads and
+   * navigations advance the generation even though the URL is unchanged. */
+  private readonly documentGenerations = new WeakMap<Page, number>();
+  private readonly generationListeners = new WeakSet<Page>();
+
+  private trackDocumentGenerations(page: Page): void {
+    if (this.generationListeners.has(page)) return;
+    this.generationListeners.add(page);
+    if (!this.documentGenerations.has(page)) this.documentGenerations.set(page, 1);
+    page.on("framenavigated", (frame) => {
+      try {
+        if (frame === page.mainFrame() && !page.isClosed()) {
+          this.documentGenerations.set(page, (this.documentGenerations.get(page) ?? 1) + 1);
+        }
+      } catch {
+        // Listener bookkeeping never breaks navigation.
+      }
+    });
+  }
+
+  /** Content generation bound to a live page: title plus a bounded hash of
+   * the serialized document. Same-URL in-place replacement changes the
+   * hash while the URL stays put. Closure-free (in-page constraint). */
+  private async contentGeneration(page: Page): Promise<{ hash: string; length: number }> {
+    try {
+      return await page.evaluate(() => {
+        const root = document.documentElement;
+        const html = root ? root.outerHTML : "";
+        const sample = `${document.title}|${html.length}|${html.slice(0, 2000)}|${html.slice(-2000)}`;
+        let hash = 0x811c9dc5;
+        for (let index = 0; index < sample.length; index += 1) {
+          hash ^= sample.charCodeAt(index);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return { hash: (hash >>> 0).toString(36), length: html.length };
+      });
+    } catch {
+      return { hash: "unreadable", length: -1 };
+    }
+  }
+
+  private documentEpochFor(botId: string, page: Page, contentHash: string): string {
+    this.trackDocumentGenerations(page);
+    return `${this.tabId(botId, page)}:${this.documentGenerations.get(page) ?? 1}:${contentHash}`;
+  }
 
   private activePage(botId: string): Page | null {
     const context = this.contexts.get(botId);
@@ -983,19 +1040,85 @@ export class BrowserManager {
     if (reason) throw new Error(reason);
   }
 
-  async click(botId: string, selector: string, fingerprint?: string) {
+  async click(botId: string, selector: string, fingerprint?: string, actionTimeoutMs = 12_000) {
     const page = await this.page(botId);
     await this.assertTarget(botId, selector, fingerprint);
-    await page.locator(selector).first().click({ timeout: 12_000 });
+    await page.locator(selector).first().click({ timeout: actionTimeoutMs });
     this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
   }
 
-  async type(botId: string, selector: string, value: string, fingerprint?: string) {
+  async type(botId: string, selector: string, value: string, fingerprint?: string, actionTimeoutMs = 12_000) {
     const page = await this.page(botId);
     await this.assertTarget(botId, selector, fingerprint);
     const locator = page.locator(selector).first();
-    await locator.fill(value, { timeout: 12_000 });
+    await locator.fill(value, { timeout: actionTimeoutMs });
+    return { url: page.url(), title: await page.title() };
+  }
+
+  /** Finding B: revocation-aware readiness wait plus a short committed
+   * input. The legacy click/type wait up to 12s inside a locator action
+   * with no cancellation guard; a revoke-then-enable sequence would fire
+   * the waiting input. Here readiness is polled in short slices, and every
+   * slice re-reads run status, secure-handoff state and the durable input
+   * epoch. Only a control that is actionable AND unrevoked reaches the
+   * final short-timeout input — and a revocation landing inside that final
+   * window is reported as uncertain, never as success. */
+  private assertNotRevoked(botId: string, runId: string, admittedEpoch: number): void {
+    const run = this.db.getRun(runId);
+    if (!run || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task stopped while the control was becoming ready. Nothing was sent.");
+    }
+    if (this.secureHandoffActive(botId)) {
+      throw new Error("SECURE_MODE: owner sign-in started while waiting. Nothing was sent.");
+    }
+    if (this.db.botInputEpoch(botId) !== admittedEpoch) {
+      throw new Error("USER_TAKEOVER: control changed hands while waiting. Nothing was sent.");
+    }
+  }
+
+  private async waitForActionable(
+    page: Page,
+    selector: string,
+    botId: string,
+    runId: string,
+    admittedEpoch: number,
+    deadlineMs = 12_000,
+  ): Promise<void> {
+    const start = Date.now();
+    for (;;) {
+      this.assertNotRevoked(botId, runId, admittedEpoch);
+      try {
+        await page.locator(selector).first().click({ trial: true, timeout: 250 });
+        this.assertNotRevoked(botId, runId, admittedEpoch);
+        return;
+      } catch (error) {
+        // A revocation refusal must surface immediately, never be mistaken
+        // for a control that is merely not ready yet.
+        if (error instanceof Error && /stopped while|SECURE_MODE|USER_TAKEOVER/.test(error.message)) throw error;
+        if (Date.now() - start >= deadlineMs) {
+          throw new Error("The control never became ready. Observe again.");
+        }
+        await page.waitForTimeout(150);
+      }
+    }
+  }
+
+  private async cancellableClick(botId: string, page: Page, selector: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+    await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
+    await this.assertTarget(botId, selector, fingerprint);
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.locator(selector).first().click({ timeout: 2_000 });
+    this.assertPageAccess(botId, page);
+    return { url: page.url(), title: await page.title() };
+  }
+
+  private async cancellableType(botId: string, page: Page, selector: string, value: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+    await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
+    await this.assertTarget(botId, selector, fingerprint);
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.locator(selector).first().fill(value, { timeout: 2_000 });
+    this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
   }
 
@@ -1069,6 +1192,798 @@ export class BrowserManager {
       const page = await this.page(botId);
       return `data:image/jpeg;base64,${(await page.screenshot({ type: "jpeg", quality: 62 })).toString("base64")}`;
     } catch { return null; }
+  }
+
+  /**
+   * R03 — Host-captured scoped observation. Everything authoritative is
+   * derived by the host: tab/document identity, viewport/scroll/DPR,
+   * secure-entry state (live login-wall probe), scope permission, owner
+   * epoch (revocation-bound), visual capability (server registry, never a
+   * caller assertion), and the opaque control/pane targets issued from the
+   * actually rendered page. Callers receive IDs only.
+   */
+  async observeScoped(
+    botId: string,
+    runId: string,
+    input: { surface: "browser-dom" | "browser-visual"; sessionId: string },
+  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; paneTokens: string[] }> {
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId) throw new Error("That task is not available to this teammate.");
+    if (["completed", "failed", "cancelled"].includes(run.status)) throw new Error("That task has already finished.");
+    const bot = this.db.getBot(botId);
+    if (!bot?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    // Secure entry is explicit handoff state, not page-content inference: a
+    // password field sitting in a normal form is enumerated-but-redacted
+    // (snapshot masks values; secret entry itself goes through owner
+    // takeover). Only an active owner sign-in handoff pauses model-visible
+    // capture and input. Content walls still trigger handoff requests
+    // through the existing sign-in paths; they do not silently expand here.
+    const secureMode = this.secureHandoffActive(botId);
+    const observationId = newObservationId();
+    const capturedAt = Date.now();
+    const expiresAtMs = capturedAt + OBSERVATION_TTL_MS;
+    const expiresAt = new Date(expiresAtMs).toISOString();
+    if (secureMode) {
+      // Minimized capture under a credential wall: identity + envelope only,
+      // no control enumeration, no pixels for the model.
+      const minimal = this.captureIdentity(page, botId);
+      storeObservation({
+        observationId, runId, botId, sessionId: input.sessionId,
+        tabId: minimal.tabId, documentEpoch: minimal.documentEpoch, framePath: "/",
+        account: "", ownerEpoch: this.ownerEpochFor(run.threadId, botId),
+        viewport: minimal.viewport, deviceScale: 1, browserZoom: 100,
+        scroll: { x: 0, y: 0 }, imageWidth: minimal.viewport.cssWidth, imageHeight: minimal.viewport.cssHeight,
+        secureMode: true, capturedAt, expiresAt: expiresAtMs,
+        targets: [], panes: [],
+        page,
+      });
+      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], paneTokens: [] };
+    }
+    const snapshot = await this.snapshot(botId);
+    const { redacted } = redactSecretsForProvider(snapshot.text.slice(0, 8000));
+    const identity = this.captureIdentity(page, botId);
+    const live = await page.evaluate(() => ({ dpr: window.devicePixelRatio || 1, sx: window.scrollX || 0, sy: window.scrollY || 0 }));
+    const deviceScale = Number.isFinite(live.dpr) && live.dpr > 0 ? live.dpr : 1;
+    const scroll = {
+      x: Number.isFinite(live.sx) ? live.sx : 0,
+      y: Number.isFinite(live.sy) ? live.sy : 0,
+    };
+    // Finding D: the document epoch is a host-owned generation — tab id,
+    // navigation generation and content hash — never the bare URL. Same-URL
+    // reloads, replacement documents and tab swaps all invalidate it.
+    const content = await this.contentGeneration(page);
+    const documentEpoch = this.documentEpochFor(botId, page, content.hash);
+    const rawTargets = await this.queryControls(page);
+    const targets: RegistryTarget[] = rawTargets.map((control) => {
+      const fingerprint = createHash("sha256")
+        .update(JSON.stringify([observationId, control.framePath, control.role, control.label, control.bounds]))
+        .digest("hex")
+        .slice(0, 32);
+      const issued = issueSemanticTarget({
+        observationId,
+        documentEpoch,
+        framePath: control.framePath,
+        role: control.role,
+        label: control.label,
+        bounds: control.bounds,
+        selectorHint: control.selector,
+      });
+      return {
+        targetId: issued.targetId,
+        role: control.role,
+        label: control.label,
+        bounds: control.bounds,
+        selector: control.selector,
+        framePath: control.framePath,
+        fingerprint,
+        reviewDigest: control.reviewDigest,
+      };
+    });
+    const panes: RegistryPane[] = (await this.queryScrollableRegions(page)).map((pane, index) => ({
+      paneToken: `pane_${observationId.slice(4, 12)}_${index}`,
+      framePath: pane.framePath,
+      selector: pane.selector,
+      label: pane.label,
+    }));
+    storeObservation({
+      observationId, runId, botId, sessionId: input.sessionId,
+      tabId: identity.tabId, documentEpoch, framePath: "/",
+      account: "", ownerEpoch: this.ownerEpochFor(run.threadId, botId),
+      viewport: identity.viewport, deviceScale, browserZoom: 100,
+      scroll,
+      imageWidth: Math.round(identity.viewport.cssWidth * deviceScale),
+      imageHeight: Math.round(identity.viewport.cssHeight * deviceScale),
+      secureMode: false, capturedAt, expiresAt: expiresAtMs,
+      targets, panes,
+      page,
+    });
+    const looksCanvas = /canvas|diagram|visual editor|chart/i.test(snapshot.text.slice(0, 2000));
+    const route = selectModality({
+      canvasPrimary: looksCanvas,
+      semanticCount: Math.min(250, snapshot.text.split("\n").length),
+      opaqueWidgets: looksCanvas ? 1 : 0,
+      visualCapability: this.defaultVisualCapability(),
+      nativeGranted: false,
+    });
+    return {
+      observationId, expiresAt, textPreview: redacted.slice(0, 4000),
+      modality: route.modality, reason: route.reason,
+      targetIds: targets.map((target) => target.targetId),
+      paneTokens: panes.map((pane) => pane.paneToken),
+    };
+  }
+
+  /** Active owner sign-in handoff for this teammate's browser: model-visible
+   * capture and model input pause until the handoff completes. Host-owned
+   * approval state — never a caller assertion. Fail-closed: an unreadable
+   * approval store pauses input rather than authorizing it. */
+  private secureHandoffActive(botId: string): boolean {
+    try {
+      return this.db.listApprovals().some(
+        (entry) =>
+          entry.botId === botId &&
+          (this.db.getApprovalAction(entry.id) as { type?: string } | null)?.type === "browser_sign_in",
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  /** Host-owned owner epoch: thread identity plus the teammate's durable
+   * input-revocation counter. Stop/takeover/sign-in bumps invalidate every
+   * observation captured under an older epoch. */
+  private ownerEpochFor(threadId: string, botId: string): string {
+    return `thread:${threadId}:input${this.db.botInputEpoch(botId)}`;
+  }
+
+  private captureIdentity(page: Page, botId: string): {
+    tabId: string; documentEpoch: string;
+    viewport: { cssWidth: number; cssHeight: number };
+  } {
+    const viewport = page.viewportSize() || { width: 1280, height: 820 };
+    return {
+      tabId: this.tabId(botId, page),
+      documentEpoch: page.url(),
+      viewport: { cssWidth: viewport.width, cssHeight: viewport.height },
+    };
+  }
+
+  /** Visible interactive controls of the live main frame, evaluated in-page.
+   * Closure-free by necessity (see detectLoginWall): only argument-position
+   * arrows and plain loops — no nested const-bound functions, which tsx
+   * rewrites with a __name helper that does not exist inside the page.
+   *
+   * Finding C: every control also carries a host-observed canonical review
+   * digest (tag, role, label, input type, autocomplete, href, form method,
+   * statefulness and bounded redacted form fields, hashed in-page). The
+   * executor re-runs the SAME routine for the acted-upon selector and
+   * requires byte equality: a changed form value, destination or attribute
+   * changes the digest and forces a new review instead of dispatch. */
+  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }>> {
+    return page.locator("body").evaluate(async (body, selectorArg) => {
+      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }> = [];
+      let candidates: Element[] = [];
+      if (selectorArg) {
+        const single = body.querySelectorAll(selectorArg);
+        if (single.length !== 1) return out;
+        candidates = [single[0]!];
+      } else {
+        candidates = [...body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]")];
+      }
+      for (const node of candidates) {
+        const html = node as HTMLElement;
+        const rect = html.getBoundingClientRect();
+        if (!selectorArg && (rect.width <= 0 || rect.height <= 0 || getComputedStyle(node).visibility === "hidden")) continue;
+        let selector = html.tagName.toLowerCase();
+        if (html.id) selector = `#${CSS.escape(html.id)}`;
+        else if (html.getAttribute("data-testid")) selector = `[data-testid="${CSS.escape(html.getAttribute("data-testid")!)}"]`;
+        else if (html.getAttribute("name")) selector = `${html.tagName.toLowerCase()}[name="${CSS.escape(html.getAttribute("name")!)}"]`;
+        else if (html.getAttribute("aria-label")) selector = `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(html.getAttribute("aria-label")!)}"]`;
+        else {
+          const parent = html.parentElement;
+          const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
+          const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
+          const prefix = parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : "";
+          selector = `${prefix}${html.tagName.toLowerCase()}${suffix}`;
+        }
+        const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
+        const input = node as HTMLInputElement;
+        const form = input.form || node.closest("form");
+        const dialog = node.closest("dialog,[role=dialog]");
+        const navigation = !form && !dialog && node.matches("button,a,[role=button],[role=link]") ? node.closest("nav,aside,[role=navigation],[role=menu]") : null;
+        const scope = form || dialog || navigation || document.body;
+        const stateful = node.matches("input,textarea,select,[contenteditable=true],[role=checkbox],[role=switch],[role=radio],[role=option],[role=slider],[role=spinbutton],[role=textbox],[role=combobox]") ? "1" : "0";
+        const scopeControls = [...scope.querySelectorAll("input:not([type=hidden]),textarea,select,[contenteditable=true]")].filter((el) => (el as HTMLElement).getClientRects().length > 0).slice(0, 24);
+        const fields: Array<{ label: string; value: string }> = [];
+        for (const el of scopeControls) {
+          const field = el as HTMLElement;
+          const name = (field.getAttribute("aria-label") || field.getAttribute("placeholder") || field.getAttribute("name") || "field").slice(0, 200);
+          const raw = field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio") ? String(field.checked) : field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement ? field.value : field.textContent || "";
+          const secret = /password|passcode|one-time-code|cc-|secret|token|verification/i.test(`${field.getAttribute("type") || ""} ${field.getAttribute("autocomplete") || ""} ${name}`);
+          fields.push({ label: name, value: secret ? "[Private field hidden]" : raw.slice(0, 2000) });
+        }
+        const canonical = JSON.stringify({
+          tag: node.tagName.toLowerCase(),
+          role: node.getAttribute("role") || "",
+          label,
+          inputType: node instanceof HTMLInputElement || node instanceof HTMLButtonElement ? (node as HTMLInputElement).type : "",
+          autocomplete: node.getAttribute("autocomplete") || "",
+          href: node instanceof HTMLAnchorElement ? (node as HTMLAnchorElement).href : "",
+          formMethod: form ? (form as HTMLFormElement).method.toLowerCase() : "",
+          stateful,
+          fields,
+          url: location.href,
+        });
+        const digestBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+        const digestView = new Uint8Array(digestBytes);
+        let reviewDigest = "";
+        for (let index = 0; index < digestView.length; index += 1) reviewDigest += digestView[index]!.toString(16).padStart(2, "0");
+        out.push({
+          role: node.getAttribute("role") || node.tagName.toLowerCase(),
+          label,
+          bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          selector,
+          framePath: "/",
+          reviewDigest,
+        });
+        if (out.length >= 150) break;
+      }
+      return out;
+    }, onlySelector);
+  }
+
+  /** Re-run the observation-time review routine for one selector and return
+   * its canonical digest. Same routine, same bytes: equality with the
+   * stored digest means the bounded target/form/destination state is
+   * unchanged since review. Null when the selector no longer resolves
+   * uniquely (destroyed or ambiguous — both refuse). */
+  private async controlReviewDigest(page: Page, selector: string): Promise<string | null> {
+    try {
+      const rows = await this.queryControls(page, selector);
+      return rows.length === 1 ? rows[0]!.reviewDigest : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Scrollable regions of the live page (main frame + owned same-origin
+   * iframes), evaluated in-page under the same closure-free constraint. */
+  private async queryScrollableRegions(page: Page): Promise<Array<{ selector: string; framePath: string; label: string }>> {
+    const main = await page.locator("body").evaluate((body) => {
+      const panes: Array<{ selector: string; framePath: string; label: string }> = [];
+      const candidates = [body, ...body.querySelectorAll("div,main,section,article,aside,ul,table")];
+      for (const candidate of candidates) {
+        const html = candidate as HTMLElement;
+        if (html.scrollHeight > html.clientHeight + 4 && html.clientHeight > 40 && getComputedStyle(html).overflowY !== "visible") {
+          let selector = html.tagName.toLowerCase();
+          if (html.id) selector = `#${CSS.escape(html.id)}`;
+          else if (html.getAttribute("data-testid")) selector = `[data-testid="${CSS.escape(html.getAttribute("data-testid")!)}"]`;
+          panes.push({ selector, framePath: "/", label: (html.getAttribute("aria-label") || html.id || html.tagName).toLowerCase().slice(0, 120) });
+          if (panes.length >= 20) break;
+        }
+      }
+      return panes;
+    });
+    // Owned same-origin iframes: addressable via frameSelector + selector.
+    // Only frames whose DOCUMENT actually scrolls are issued as panes.
+    const frames: Array<{ selector: string; framePath: string; label: string }> = [];
+    for (const frame of page.frames()) {
+      if (frame === page.mainFrame()) continue;
+      let origin = "";
+      try {
+        origin = new URL(frame.url()).origin;
+      } catch {
+        continue;
+      }
+      if (!origin.startsWith("http://127.0.0.1") && !origin.startsWith("http://localhost")) continue;
+      const scrollable = await frame.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 4).catch(() => false);
+      if (!scrollable) continue;
+      const frameElement = await frame.frameElement().catch(() => null);
+      if (!frameElement) continue;
+      const frameSelector = await frameElement.evaluate((node) => {
+        const html = node as HTMLElement;
+        if (html.id) return `#${CSS.escape(html.id)}`;
+        const testId = html.getAttribute("data-testid");
+        if (testId) return `iframe[data-testid="${CSS.escape(testId)}"]`;
+        return "iframe";
+      }).catch(() => null);
+      if (frameSelector) frames.push({ selector: "body", framePath: frameSelector, label: `frame ${frameSelector}`.slice(0, 120) });
+    }
+    return [...main, ...frames].slice(0, 24);
+  }
+
+  /** Drop every registry observation for a teammate (Stop/takeover/
+   * sign-in). Queued proposals must re-observe; the durable input epoch
+   * (checked in assertPreInput) makes pre-revocation observations unusable
+   * even if an ID is replayed. */
+  revokeObservationsForBot(botId: string): number {
+    return invalidateObservationsForBot(botId);
+  }
+
+  revokeObservationsForRun(runId: string): number {
+    return invalidateObservationsForRun(runId);
+  }
+
+  /** Server-owned visual capability registry. Callers name an adapter; the
+   * host decides what it may receive. Unknown adapters are text-only:
+   * VISION_UNAVAILABLE instead of guessed coordinates. Process-local and
+   * empty by default — a restart clears registrations (fail-closed).
+   * Host/test setup registers entries via registerVisualAdapter. */
+  private readonly visualAdapters = new Map<string, "visual-supported" | "text-only">();
+
+  registerVisualAdapter(adapterId: string, capability: "visual-supported" | "text-only"): void {
+    this.visualAdapters.set(adapterId, capability);
+  }
+
+  visualCapabilityForAdapter(adapterId: string): "visual-supported" | "text-only" {
+    return this.visualAdapters.get(adapterId) ?? "text-only";
+  }
+
+  private defaultVisualCapability(): "visual-supported" | "text-only" {
+    return [...this.visualAdapters.values()].includes("visual-supported") ? "visual-supported" : "text-only";
+  }
+
+  /**
+   * R03 — Host-authoritative semantic action. The caller supplies only an
+   * opaque targetId (issued by observeScoped from the live page), the action
+   * kind, and — for typing — the final value plus its review digest. The
+   * host looks the target up, re-resolves it against the CURRENT page
+   * (unique role/label match in the same frame + production fingerprint
+   * equality), re-checks run/bot authorization, scope, secure mode, owner
+   * epoch and input ownership immediately before input, admits the exact
+   * final payload to the durable journal, and dispatches through the
+   * reviewed-fingerprint click/type path. Anything else is refused with
+   * zero input.
+   */
+  async semanticAct(
+    botId: string,
+    runId: string,
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null; approvalId?: string | null; mutationKey?: string | null },
+  ): Promise<{ url: string; title: string }> {
+    const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
+      throw new Error("A bounded typed value is required.");
+    }
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    // Finding C: an explicitly supplied approval must be a real,
+    // host-owned, approved record for this run and teammate — a free-form
+    // digest string is identity only, never authorization. When the
+    // approval names a selector it must name this target's selector.
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, target.selector);
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId, mutationKey: input.mutationKey ?? null }))
+      .digest("hex");
+    const actionId = `sem_${target.fingerprint}_${payloadDigest.slice(0, 12)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-dom",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
+      ownershipEpoch: observation.ownerEpoch, target: target.label,
+      payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
+    });
+    // Pin the observed page (Finding D): the pinned object must still be
+    // open and must still be the active tab. A tab switch, no matter the
+    // URL, invalidates the observation.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      journalTransition(this.db, actionId, "failed_before_effect", "tab changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again.");
+    }
+    // Revalidate the host-owned document generation on the pinned page.
+    await this.assertDocumentEpoch(botId, page, observation, actionId);
+    // Re-resolve against the CURRENT document: unique live match in the
+    // same frame. Same-named controls stay distinguishable (AMBIGUOUS →
+    // zero input); a vanished control is TARGET_DESTROYED.
+    const liveCandidates = (await this.queryControls(page)).filter(
+      (candidate) => candidate.framePath === target.framePath && candidate.role === target.role && candidate.label === target.label,
+    );
+    if (liveCandidates.length === 0) {
+      journalTransition(this.db, actionId, "failed_before_effect", "target destroyed before dispatch");
+      throw new Error("TARGET_DESTROYED: the control is gone. Observe again.");
+    }
+    if (liveCandidates.length > 1 || !liveCandidates.some((candidate) => candidate.selector === target.selector)) {
+      journalTransition(this.db, actionId, "failed_before_effect", "ambiguous target at dispatch");
+      throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    }
+    // Finding C: re-run the observation-time review routine and require
+    // byte equality with the stored digest. A changed form value,
+    // destination or attribute forces a new review — the fresh state is
+    // never substituted as the approved baseline.
+    const liveDigest = await this.controlReviewDigest(page, target.selector);
+    if (liveDigest === null || liveDigest !== target.reviewDigest) {
+      journalTransition(this.db, actionId, "failed_before_effect", "reviewed state changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the form or control changed after review. Request a new review.");
+    }
+    const fresh = await this.describeTarget(botId, target.selector);
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
+    journalTransition(this.db, actionId, "dispatch_started");
+    try {
+      // Production reviewed-fingerprint path: the live fingerprint was just
+      // proven equal to reviewed state, and click/type re-verify it at
+      // dispatch with cancellable readiness below.
+      const result = input.kind === "click"
+        ? await this.cancellableClick(botId, page, target.selector, fresh.fingerprint, runId, admittedEpoch)
+        : await this.cancellableType(botId, page, target.selector, input.value ?? "", fresh.fingerprint, runId, admittedEpoch);
+      journalTransition(this.db, actionId, "effect_observed");
+      return result;
+    } catch (error) {
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /** Validate an explicitly supplied approval against host records. */
+  private assertApprovalBinding(approvalId: string, runId: string, botId: string, selector: string | null): void {
+    const approval = this.db.getApproval(approvalId);
+    if (!approval || approval.status !== "approved" || approval.runId !== runId || approval.botId !== botId) {
+      throw new Error("That approval is not a completed host review for this task and teammate.");
+    }
+    const action = this.db.getApprovalAction(approvalId) as { args?: { selector?: unknown } } | null;
+    const approvedSelector = action?.args && typeof action.args.selector === "string" ? action.args.selector : null;
+    if (approvedSelector && selector && approvedSelector !== selector) {
+      throw new Error("That approval names a different control. Request a new review.");
+    }
+  }
+
+  /** Eligibility checked BEFORE journal admission so refused work leaves
+   * no admitted row behind: secure entry, runnable task, enabled teammate.
+   * Epoch/ownership freshness is re-checked in assertPreInput right before
+   * input, after every await. */
+  private assertActEligible(observation: CapturedObservation, runId: string, botId: string): void {
+    if (observation.secureMode) {
+      throw new Error("SECURE_MODE: owner sign-in is showing. Model-visible input is paused until handoff completes.");
+    }
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task is not runnable. Observe again under the current task.");
+    }
+    if (!this.db.getBot(botId)?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
+  }
+
+  /** Shared pre-input gate, checked immediately before every new-path
+   * dispatch — after all awaits, not just after observation. Denial, Stop,
+   * takeover, secure entry and uncertainty prevent dispatch. */
+  private assertPreInput(
+    observation: CapturedObservation,
+    runId: string,
+    botId: string,
+    admittedEpoch: number,
+  ): void {
+    if (observation.secureMode || this.secureHandoffActive(botId)) {
+      throw new Error("SECURE_MODE: owner sign-in is showing. Model-visible input is paused until handoff completes.");
+    }
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task is no longer runnable. Observe again under the current task.");
+    }
+    const bot = this.db.getBot(botId);
+    if (!bot?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
+    if (this.db.botInputEpoch(botId) !== admittedEpoch) {
+      throw new Error("USER_TAKEOVER: control changed hands after this action was admitted. Observe again.");
+    }
+    const current = getObservation(observation.observationId);
+    if (!current || current.ownerEpoch !== this.ownerEpochFor(run.threadId, botId)) {
+      throw new Error("STALE_OBSERVATION: ownership changed after observation. Observe again.");
+    }
+  }
+
+  /** Revalidate the host-owned document generation on the pinned page.
+   * Same-URL reloads, replacement documents and navigations all change the
+   * generation even though the URL is unchanged. */
+  private async assertDocumentEpoch(botId: string, page: Page, observation: CapturedObservation, actionId: string): Promise<void> {
+    const content = await this.contentGeneration(page);
+    const epoch = this.documentEpochFor(botId, page, content.hash);
+    if (epoch !== observation.documentEpoch) {
+      journalTransition(this.db, actionId, "failed_before_effect", "document changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the document changed after observation. Observe again.");
+    }
+  }
+
+  /** Admit the exact final payload to the durable journal. Returns the
+   * input-ownership epoch bound to the admission for pre-input re-check. */
+  private admitAction(input: {
+    actionId: string; runId: string; botId: string; surface: "browser-dom" | "browser-visual" | "native";
+    surfaceIdentity: string; ownershipEpoch: string; target: string;
+    payloadDigest: string; reviewDigest: string | null; account: string;
+    mutationKey?: string | null;
+  }): number {
+    journalPropose(this.db, { ...input });
+    if (input.mutationKey) this.assertMutationFence(input.mutationKey, input.runId, input.botId, input.actionId);
+    if (!admitOnce(this.db, input.actionId)) {
+      throw new Error("This action was already admitted. Check its result instead of sending it again.");
+    }
+    return this.db.botInputEpoch(input.botId);
+  }
+
+  /** Finding A: refuse when the same logical mutation is already unresolved
+   * (or already completed) under any observation, renderer or attempt. The
+   * mutation key is assigned by the accountable outer layer per unit of
+   * intended effect; distinct genuinely-new work uses distinct keys, so the
+   * fence never bans unrelated actions. */
+  private assertMutationFence(mutationKey: string, runId: string, botId: string, actionId: string): void {
+    const clashes = this.db.journalActionFindByMutation(mutationKey, runId, botId).filter((row) => row.actionId !== actionId);
+    const unresolved = clashes.filter((row) => row.stage !== "verified" && row.stage !== "failed_before_effect");
+    if (unresolved.length > 0) {
+      journalTransition(this.db, actionId, "failed_before_effect", "same unresolved mutation exists");
+      throw new Error("UNCERTAIN_CONFLICT: the same effect is already unresolved. Reconcile it before sending it again.");
+    }
+    if (clashes.some((row) => row.stage === "verified")) {
+      journalTransition(this.db, actionId, "failed_before_effect", "same mutation already completed");
+      throw new Error("DUPLICATE_MUTATION: this effect already completed. Check its result instead of sending it again.");
+    }
+  }
+
+  /** Resolve an opaque target to its host-captured observation, enforcing
+   * run/bot/session binding and observation freshness. Never mints targets
+   * from caller labels. */
+  private requireActionObservation(targetId: string, runId: string, botId: string, sessionId: string): CapturedObservation {
+    const observation = findObservationWithTarget(targetId);
+    if (!observation) throw new Error("STALE_OBSERVATION: unknown or expired observation. Observe again.");
+    if (observation.runId !== runId || observation.botId !== botId || observation.sessionId !== sessionId) {
+      throw new Error("That observation belongs to a different task or teammate.");
+    }
+    return observation;
+  }
+
+  /**
+   * R03 — Registry-bound visual action. The caller supplies an observation
+   * ID, an adapter ID, and image-relative coordinates. The transform comes
+   * from the host-captured observation — never caller geometry. Capability
+   * is derived from the server-owned adapter registry. Freshness (TTL, tab,
+   * document, account, owner epoch), live geometry (viewport, DPR product,
+   * scroll), secure mode, run authorization and input ownership are all
+   * checked immediately before input; assertPageAccess runs before AND
+   * after. Held buttons/modifiers release on every exit path.
+   */
+  async visualAct(
+    botId: string,
+    runId: string,
+    input: {
+      observationId: string;
+      sessionId: string;
+      adapterId: string;
+      action: "click" | "double-click" | "drag" | "scroll" | "key";
+      point: { x: number; y: number };
+      endPoint?: { x: number; y: number };
+      key?: string;
+      approvalId?: string | null;
+      mutationKey?: string | null;
+    },
+  ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
+    const capability = this.visualCapabilityForAdapter(input.adapterId);
+    const observation = getObservation(input.observationId);
+    if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    if (capability !== "visual-supported") {
+      throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+    }
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, null);
+    // Pin the observed page (Finding D): it must still be open and active.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again before acting.");
+    }
+    this.assertPageAccess(botId, page);
+    // Finding D: revalidate the host-owned document generation on the
+    // pinned page. Same-URL replacement, reloads and navigations refuse.
+    const content = await this.contentGeneration(page);
+    if (this.documentEpochFor(botId, page, content.hash) !== observation.documentEpoch) {
+      throw new Error("STALE_OBSERVATION: the document changed after observation. Observe again before acting.");
+    }
+    const live = await page.evaluate(() => ({
+      dpr: window.devicePixelRatio || 1,
+      w: window.innerWidth || 0,
+      h: window.innerHeight || 0,
+      sx: window.scrollX || 0,
+      sy: window.scrollY || 0,
+    }));
+    const transform = {
+      observationId: observation.observationId,
+      capturedX: 0,
+      capturedY: 0,
+      capturedWidth: observation.viewport.cssWidth,
+      capturedHeight: observation.viewport.cssHeight,
+      cropX: 0,
+      cropY: 0,
+      cropWidth: observation.imageWidth,
+      cropHeight: observation.imageHeight,
+      imageWidth: observation.imageWidth,
+      imageHeight: observation.imageHeight,
+      deviceScale: observation.deviceScale,
+      browserZoom: observation.browserZoom,
+    };
+    const validated = validateVisualAction(
+      {
+        observationId: observation.observationId,
+        transform,
+        action: input.action,
+        point: input.point,
+        endPoint: input.endPoint,
+        key: input.key,
+        currentGeometry: {
+          cssWidth: live.w,
+          cssHeight: live.h,
+          deviceScale: live.dpr,
+          browserZoom: observation.browserZoom,
+          scrollX: live.sx,
+          scrollY: live.sy,
+        },
+        capturedScroll: observation.scroll,
+      },
+      capability,
+    );
+    // Browser zoom folds into devicePixelRatio: the live product must match.
+    if (validated.ok && Math.abs(live.dpr - (observation.deviceScale * observation.browserZoom) / 100) > 0.01) {
+      throw new Error("STALE_OBSERVATION: zoom/scale drift since observation. Observe again before acting.");
+    }
+    if (validated.ok && (Math.abs(live.w - observation.viewport.cssWidth) > 2 || Math.abs(live.h - observation.viewport.cssHeight) > 2)) {
+      throw new Error("STALE_OBSERVATION: the window changed after observation. Observe again before acting.");
+    }
+    if (!validated.ok) {
+      if (validated.reason === "VISION_UNAVAILABLE") throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+      throw new Error(`${validated.reason}: the screenshot changed after observation. Observe again before acting.`);
+    }
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId, mutationKey: input.mutationKey ?? null }))
+      .digest("hex");
+    const actionId = `vis_${observation.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}_${payloadDigest.slice(0, 8)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-visual",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/obs:${observation.observationId}`,
+      ownershipEpoch: observation.ownerEpoch, target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
+      payloadDigest, reviewDigest: null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
+    });
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
+    this.assertPageAccess(botId, page);
+    if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
+      journalTransition(this.db, actionId, "failed_before_effect", "input lease held by another task");
+      throw new Error("Another task holds the input lease. Wait for it to finish.");
+    }
+    journalTransition(this.db, actionId, "dispatch_started");
+    // Finding B: revocation is re-checked between every input phase, and
+    // held buttons release on every exit. A cancelled action stops between
+    // phases instead of completing a stale gesture.
+    const checkPhase = (phase: string) => {
+      try {
+        this.assertNotRevoked(botId, runId, admittedEpoch);
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)} (before ${phase})`);
+      }
+    };
+    try {
+      if (input.action === "click") {
+        checkPhase("click");
+        await page.mouse.click(validated.cssX, validated.cssY);
+      } else if (input.action === "double-click") {
+        checkPhase("double-click");
+        await page.mouse.dblclick(validated.cssX, validated.cssY);
+      } else if (input.action === "drag" && input.endPoint) {
+        const end = validateVisualAction(
+          {
+            observationId: observation.observationId, transform, action: "drag",
+            point: input.endPoint, currentGeometry: { cssWidth: live.w, cssHeight: live.h, deviceScale: live.dpr, browserZoom: observation.browserZoom, scrollX: live.sx, scrollY: live.sy },
+            capturedScroll: observation.scroll,
+          },
+          capability,
+        );
+        if (!end.ok) throw new Error(`${end.reason}: drag end point invalid. Observe again.`);
+        checkPhase("drag-press");
+        await page.mouse.move(validated.cssX, validated.cssY);
+        await page.mouse.down();
+        try {
+          checkPhase("drag-move");
+          await page.mouse.move(end.cssX, end.cssY, { steps: 12 });
+        } finally {
+          await page.mouse.up().catch(() => undefined);
+        }
+      } else if (input.action === "scroll") {
+        checkPhase("scroll");
+        await page.mouse.move(validated.cssX, validated.cssY);
+        await page.mouse.wheel(0, 400);
+      } else if (input.action === "key" && input.key) {
+        checkPhase("focus-click");
+        await page.mouse.click(validated.cssX, validated.cssY);
+        checkPhase("key-press");
+        await page.keyboard.press(input.key);
+      } else {
+        throw new Error("That visual action is not supported with these arguments.");
+      }
+      await page.waitForTimeout(180);
+      this.assertPageAccess(botId, page);
+      journalTransition(this.db, actionId, "effect_observed");
+      releaseDesktopLease(runId);
+      return { url: page.url(), title: await page.title(), cssX: validated.cssX, cssY: validated.cssY };
+    } catch (error) {
+      await page.mouse.up().catch(() => undefined);
+      releaseDesktopLease(runId);
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * R03/R06 — Region scroll against the actually authorized region. The
+   * pane token is opaque (issued by observeScoped from the live page); the
+   * host resolves it to a frame + selector, scrolls THAT element, and reads
+   * back its scroll position. The requested region is never discarded.
+   */
+  async scrollPane(
+    botId: string,
+    runId: string,
+    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number; approvalId?: string | null; mutationKey?: string | null },
+  ): Promise<{ url: string; title: string; moved: number; beforeTop: number; afterTop: number }> {
+    const observation = getObservation(input.observationId);
+    if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
+    if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, pane.selector);
+    const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
+    if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded, mutationKey: input.mutationKey ?? null }))
+      .digest("hex");
+    const actionId = `scr_${observation.observationId}_${pane.paneToken}_${payloadDigest.slice(0, 8)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-dom",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${pane.framePath}`,
+      ownershipEpoch: observation.ownerEpoch, target: `scroll ${pane.label}`,
+      payloadDigest, reviewDigest: null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
+    });
+    // Pin the observed page and revalidate its document generation: a
+    // replacement document at the same URL refuses instead of scrolling
+    // the new content.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      journalTransition(this.db, actionId, "failed_before_effect", "tab changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again.");
+    }
+    await this.assertDocumentEpoch(botId, page, observation, actionId);
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
+    this.assertPageAccess(botId, page);
+    journalTransition(this.db, actionId, "dispatch_started");
+    try {
+      // Unique resolution: an ambiguous or vanished pane refuses instead
+      // of scrolling an arbitrary first match.
+      const frameScope = pane.framePath === "/" ? page : page.frameLocator(pane.framePath);
+      const scroller = frameScope.locator(pane.selector === "body" ? "html" : pane.selector);
+      if ((await scroller.count()) !== 1) {
+        throw new Error("That scroll region is no longer unique. Observe again.");
+      }
+      const readTop = async (): Promise<number> => scroller.first().evaluate((node) => {
+        const html = node as HTMLElement;
+        if (html.tagName === "HTML") return document.documentElement.scrollTop;
+        return html.scrollTop;
+      });
+      const beforeTop = await readTop();
+      this.assertNotRevoked(botId, runId, admittedEpoch);
+      await scroller.first().evaluate((node, dy) => {
+        const html = node as HTMLElement;
+        if (html.tagName === "HTML") document.documentElement.scrollBy(0, dy);
+        else html.scrollBy(0, dy);
+      }, bounded);
+      await page.waitForTimeout(140);
+      const afterTop = await readTop();
+      this.assertPageAccess(botId, page);
+      journalTransition(this.db, actionId, "effect_observed");
+      return { url: page.url(), title: await page.title(), moved: afterTop - beforeTop, beforeTop, afterTop };
+    } catch (error) {
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   async status(botId: string, computer: ComputerManager): Promise<ComputerStatus> {
