@@ -485,9 +485,13 @@ export class BrowserManager {
   private async page(botId: string): Promise<Page> {
     const context = await this.context(botId);
     const active = this.activePage(botId);
-    if (active) return active;
+    if (active) {
+      this.trackDocumentGenerations(active);
+      return active;
+    }
     const fresh = await context.newPage();
     this.activePages.set(botId, fresh);
+    this.trackDocumentGenerations(fresh);
     return fresh;
   }
 
@@ -498,6 +502,53 @@ export class BrowserManager {
   private readonly tabIds = new WeakMap<Page, string>();
   private readonly tabSeq = new Map<string, number>();
   static readonly maxTabs = 8;
+
+  /** Host-owned document navigation generations (Finding D): bumped on
+   * every main-frame navigation of a tracked page. Same-URL reloads and
+   * navigations advance the generation even though the URL is unchanged. */
+  private readonly documentGenerations = new WeakMap<Page, number>();
+  private readonly generationListeners = new WeakSet<Page>();
+
+  private trackDocumentGenerations(page: Page): void {
+    if (this.generationListeners.has(page)) return;
+    this.generationListeners.add(page);
+    if (!this.documentGenerations.has(page)) this.documentGenerations.set(page, 1);
+    page.on("framenavigated", (frame) => {
+      try {
+        if (frame === page.mainFrame() && !page.isClosed()) {
+          this.documentGenerations.set(page, (this.documentGenerations.get(page) ?? 1) + 1);
+        }
+      } catch {
+        // Listener bookkeeping never breaks navigation.
+      }
+    });
+  }
+
+  /** Content generation bound to a live page: title plus a bounded hash of
+   * the serialized document. Same-URL in-place replacement changes the
+   * hash while the URL stays put. Closure-free (in-page constraint). */
+  private async contentGeneration(page: Page): Promise<{ hash: string; length: number }> {
+    try {
+      return await page.evaluate(() => {
+        const root = document.documentElement;
+        const html = root ? root.outerHTML : "";
+        const sample = `${document.title}|${html.length}|${html.slice(0, 2000)}|${html.slice(-2000)}`;
+        let hash = 0x811c9dc5;
+        for (let index = 0; index < sample.length; index += 1) {
+          hash ^= sample.charCodeAt(index);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return { hash: (hash >>> 0).toString(36), length: html.length };
+      });
+    } catch {
+      return { hash: "unreadable", length: -1 };
+    }
+  }
+
+  private documentEpochFor(botId: string, page: Page, contentHash: string): string {
+    this.trackDocumentGenerations(page);
+    return `${this.tabId(botId, page)}:${this.documentGenerations.get(page) ?? 1}:${contentHash}`;
+  }
 
   private activePage(botId: string): Page | null {
     const context = this.contexts.get(botId);
@@ -989,19 +1040,85 @@ export class BrowserManager {
     if (reason) throw new Error(reason);
   }
 
-  async click(botId: string, selector: string, fingerprint?: string) {
+  async click(botId: string, selector: string, fingerprint?: string, actionTimeoutMs = 12_000) {
     const page = await this.page(botId);
     await this.assertTarget(botId, selector, fingerprint);
-    await page.locator(selector).first().click({ timeout: 12_000 });
+    await page.locator(selector).first().click({ timeout: actionTimeoutMs });
     this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
   }
 
-  async type(botId: string, selector: string, value: string, fingerprint?: string) {
+  async type(botId: string, selector: string, value: string, fingerprint?: string, actionTimeoutMs = 12_000) {
     const page = await this.page(botId);
     await this.assertTarget(botId, selector, fingerprint);
     const locator = page.locator(selector).first();
-    await locator.fill(value, { timeout: 12_000 });
+    await locator.fill(value, { timeout: actionTimeoutMs });
+    return { url: page.url(), title: await page.title() };
+  }
+
+  /** Finding B: revocation-aware readiness wait plus a short committed
+   * input. The legacy click/type wait up to 12s inside a locator action
+   * with no cancellation guard; a revoke-then-enable sequence would fire
+   * the waiting input. Here readiness is polled in short slices, and every
+   * slice re-reads run status, secure-handoff state and the durable input
+   * epoch. Only a control that is actionable AND unrevoked reaches the
+   * final short-timeout input — and a revocation landing inside that final
+   * window is reported as uncertain, never as success. */
+  private assertNotRevoked(botId: string, runId: string, admittedEpoch: number): void {
+    const run = this.db.getRun(runId);
+    if (!run || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task stopped while the control was becoming ready. Nothing was sent.");
+    }
+    if (this.secureHandoffActive(botId)) {
+      throw new Error("SECURE_MODE: owner sign-in started while waiting. Nothing was sent.");
+    }
+    if (this.db.botInputEpoch(botId) !== admittedEpoch) {
+      throw new Error("USER_TAKEOVER: control changed hands while waiting. Nothing was sent.");
+    }
+  }
+
+  private async waitForActionable(
+    page: Page,
+    selector: string,
+    botId: string,
+    runId: string,
+    admittedEpoch: number,
+    deadlineMs = 12_000,
+  ): Promise<void> {
+    const start = Date.now();
+    for (;;) {
+      this.assertNotRevoked(botId, runId, admittedEpoch);
+      try {
+        await page.locator(selector).first().click({ trial: true, timeout: 250 });
+        this.assertNotRevoked(botId, runId, admittedEpoch);
+        return;
+      } catch (error) {
+        // A revocation refusal must surface immediately, never be mistaken
+        // for a control that is merely not ready yet.
+        if (error instanceof Error && /stopped while|SECURE_MODE|USER_TAKEOVER/.test(error.message)) throw error;
+        if (Date.now() - start >= deadlineMs) {
+          throw new Error("The control never became ready. Observe again.");
+        }
+        await page.waitForTimeout(150);
+      }
+    }
+  }
+
+  private async cancellableClick(botId: string, page: Page, selector: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+    await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
+    await this.assertTarget(botId, selector, fingerprint);
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.locator(selector).first().click({ timeout: 2_000 });
+    this.assertPageAccess(botId, page);
+    return { url: page.url(), title: await page.title() };
+  }
+
+  private async cancellableType(botId: string, page: Page, selector: string, value: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+    await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
+    await this.assertTarget(botId, selector, fingerprint);
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.locator(selector).first().fill(value, { timeout: 2_000 });
+    this.assertPageAccess(botId, page);
     return { url: page.url(), title: await page.title() };
   }
 
@@ -1120,6 +1237,7 @@ export class BrowserManager {
         scroll: { x: 0, y: 0 }, imageWidth: minimal.viewport.cssWidth, imageHeight: minimal.viewport.cssHeight,
         secureMode: true, capturedAt, expiresAt: expiresAtMs,
         targets: [], panes: [],
+        page,
       });
       return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], paneTokens: [] };
     }
@@ -1132,6 +1250,11 @@ export class BrowserManager {
       x: Number.isFinite(live.sx) ? live.sx : 0,
       y: Number.isFinite(live.sy) ? live.sy : 0,
     };
+    // Finding D: the document epoch is a host-owned generation — tab id,
+    // navigation generation and content hash — never the bare URL. Same-URL
+    // reloads, replacement documents and tab swaps all invalidate it.
+    const content = await this.contentGeneration(page);
+    const documentEpoch = this.documentEpochFor(botId, page, content.hash);
     const rawTargets = await this.queryControls(page);
     const targets: RegistryTarget[] = rawTargets.map((control) => {
       const fingerprint = createHash("sha256")
@@ -1140,7 +1263,7 @@ export class BrowserManager {
         .slice(0, 32);
       const issued = issueSemanticTarget({
         observationId,
-        documentEpoch: identity.documentEpoch,
+        documentEpoch,
         framePath: control.framePath,
         role: control.role,
         label: control.label,
@@ -1155,6 +1278,7 @@ export class BrowserManager {
         selector: control.selector,
         framePath: control.framePath,
         fingerprint,
+        reviewDigest: control.reviewDigest,
       };
     });
     const panes: RegistryPane[] = (await this.queryScrollableRegions(page)).map((pane, index) => ({
@@ -1165,7 +1289,7 @@ export class BrowserManager {
     }));
     storeObservation({
       observationId, runId, botId, sessionId: input.sessionId,
-      tabId: identity.tabId, documentEpoch: identity.documentEpoch, framePath: "/",
+      tabId: identity.tabId, documentEpoch, framePath: "/",
       account: "", ownerEpoch: this.ownerEpochFor(run.threadId, botId),
       viewport: identity.viewport, deviceScale, browserZoom: 100,
       scroll,
@@ -1173,6 +1297,7 @@ export class BrowserManager {
       imageHeight: Math.round(identity.viewport.cssHeight * deviceScale),
       secureMode: false, capturedAt, expiresAt: expiresAtMs,
       targets, panes,
+      page,
     });
     const looksCanvas = /canvas|diagram|visual editor|chart/i.test(snapshot.text.slice(0, 2000));
     const route = selectModality({
@@ -1192,7 +1317,8 @@ export class BrowserManager {
 
   /** Active owner sign-in handoff for this teammate's browser: model-visible
    * capture and model input pause until the handoff completes. Host-owned
-   * approval state — never a caller assertion. */
+   * approval state — never a caller assertion. Fail-closed: an unreadable
+   * approval store pauses input rather than authorizing it. */
   private secureHandoffActive(botId: string): boolean {
     try {
       return this.db.listApprovals().some(
@@ -1201,7 +1327,7 @@ export class BrowserManager {
           (this.db.getApprovalAction(entry.id) as { type?: string } | null)?.type === "browser_sign_in",
       );
     } catch {
-      return false;
+      return true;
     }
   }
 
@@ -1227,15 +1353,29 @@ export class BrowserManager {
   /** Visible interactive controls of the live main frame, evaluated in-page.
    * Closure-free by necessity (see detectLoginWall): only argument-position
    * arrows and plain loops — no nested const-bound functions, which tsx
-   * rewrites with a __name helper that does not exist inside the page. */
-  private async queryControls(page: Page): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string }>> {
-    return page.locator("body").evaluate((body) => {
-      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string }> = [];
-      const nodes = body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]");
-      for (const node of nodes) {
+   * rewrites with a __name helper that does not exist inside the page.
+   *
+   * Finding C: every control also carries a host-observed canonical review
+   * digest (tag, role, label, input type, autocomplete, href, form method,
+   * statefulness and bounded redacted form fields, hashed in-page). The
+   * executor re-runs the SAME routine for the acted-upon selector and
+   * requires byte equality: a changed form value, destination or attribute
+   * changes the digest and forces a new review instead of dispatch. */
+  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }>> {
+    return page.locator("body").evaluate(async (body, selectorArg) => {
+      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }> = [];
+      let candidates: Element[] = [];
+      if (selectorArg) {
+        const single = body.querySelectorAll(selectorArg);
+        if (single.length !== 1) return out;
+        candidates = [single[0]!];
+      } else {
+        candidates = [...body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]")];
+      }
+      for (const node of candidates) {
         const html = node as HTMLElement;
         const rect = html.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0 || getComputedStyle(node).visibility === "hidden") continue;
+        if (!selectorArg && (rect.width <= 0 || rect.height <= 0 || getComputedStyle(node).visibility === "hidden")) continue;
         let selector = html.tagName.toLowerCase();
         if (html.id) selector = `#${CSS.escape(html.id)}`;
         else if (html.getAttribute("data-testid")) selector = `[data-testid="${CSS.escape(html.getAttribute("data-testid")!)}"]`;
@@ -1249,17 +1389,63 @@ export class BrowserManager {
           selector = `${prefix}${html.tagName.toLowerCase()}${suffix}`;
         }
         const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
+        const input = node as HTMLInputElement;
+        const form = input.form || node.closest("form");
+        const dialog = node.closest("dialog,[role=dialog]");
+        const navigation = !form && !dialog && node.matches("button,a,[role=button],[role=link]") ? node.closest("nav,aside,[role=navigation],[role=menu]") : null;
+        const scope = form || dialog || navigation || document.body;
+        const stateful = node.matches("input,textarea,select,[contenteditable=true],[role=checkbox],[role=switch],[role=radio],[role=option],[role=slider],[role=spinbutton],[role=textbox],[role=combobox]") ? "1" : "0";
+        const scopeControls = [...scope.querySelectorAll("input:not([type=hidden]),textarea,select,[contenteditable=true]")].filter((el) => (el as HTMLElement).getClientRects().length > 0).slice(0, 24);
+        const fields: Array<{ label: string; value: string }> = [];
+        for (const el of scopeControls) {
+          const field = el as HTMLElement;
+          const name = (field.getAttribute("aria-label") || field.getAttribute("placeholder") || field.getAttribute("name") || "field").slice(0, 200);
+          const raw = field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio") ? String(field.checked) : field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement ? field.value : field.textContent || "";
+          const secret = /password|passcode|one-time-code|cc-|secret|token|verification/i.test(`${field.getAttribute("type") || ""} ${field.getAttribute("autocomplete") || ""} ${name}`);
+          fields.push({ label: name, value: secret ? "[Private field hidden]" : raw.slice(0, 2000) });
+        }
+        const canonical = JSON.stringify({
+          tag: node.tagName.toLowerCase(),
+          role: node.getAttribute("role") || "",
+          label,
+          inputType: node instanceof HTMLInputElement || node instanceof HTMLButtonElement ? (node as HTMLInputElement).type : "",
+          autocomplete: node.getAttribute("autocomplete") || "",
+          href: node instanceof HTMLAnchorElement ? (node as HTMLAnchorElement).href : "",
+          formMethod: form ? (form as HTMLFormElement).method.toLowerCase() : "",
+          stateful,
+          fields,
+          url: location.href,
+        });
+        const digestBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+        const digestView = new Uint8Array(digestBytes);
+        let reviewDigest = "";
+        for (let index = 0; index < digestView.length; index += 1) reviewDigest += digestView[index]!.toString(16).padStart(2, "0");
         out.push({
-          role: html.getAttribute("role") || html.tagName.toLowerCase(),
+          role: node.getAttribute("role") || node.tagName.toLowerCase(),
           label,
           bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           selector,
           framePath: "/",
+          reviewDigest,
         });
         if (out.length >= 150) break;
       }
       return out;
-    });
+    }, onlySelector);
+  }
+
+  /** Re-run the observation-time review routine for one selector and return
+   * its canonical digest. Same routine, same bytes: equality with the
+   * stored digest means the bounded target/form/destination state is
+   * unchanged since review. Null when the selector no longer resolves
+   * uniquely (destroyed or ambiguous — both refuse). */
+  private async controlReviewDigest(page: Page, selector: string): Promise<string | null> {
+    try {
+      const rows = await this.queryControls(page, selector);
+      return rows.length === 1 ? rows[0]!.reviewDigest : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Scrollable regions of the live page (main frame + owned same-origin
@@ -1351,7 +1537,7 @@ export class BrowserManager {
   async semanticAct(
     botId: string,
     runId: string,
-    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null },
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null; approvalId?: string | null; mutationKey?: string | null },
   ): Promise<{ url: string; title: string }> {
     const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
     const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
@@ -1361,6 +1547,11 @@ export class BrowserManager {
     }
     // Eligibility before admission: refusals leave no journal row behind.
     this.assertActEligible(observation, runId, botId);
+    // Finding C: an explicitly supplied approval must be a real,
+    // host-owned, approved record for this run and teammate — a free-form
+    // digest string is identity only, never authorization. When the
+    // approval names a selector it must name this target's selector.
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, target.selector);
     const payloadDigest = createHash("sha256")
       .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId }))
       .digest("hex");
@@ -1370,11 +1561,21 @@ export class BrowserManager {
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: target.label,
       payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
     });
-    // Re-resolve against the CURRENT page: unique live match + production
-    // fingerprint equality. A rerendered same-label node is STALE, and
-    // same-named controls stay distinguishable (AMBIGUOUS → zero input).
-    const page = await this.page(botId);
+    // Pin the observed page (Finding D): the pinned object must still be
+    // open and must still be the active tab. A tab switch, no matter the
+    // URL, invalidates the observation.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      journalTransition(this.db, actionId, "failed_before_effect", "tab changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again.");
+    }
+    // Revalidate the host-owned document generation on the pinned page.
+    await this.assertDocumentEpoch(botId, page, observation, actionId);
+    // Re-resolve against the CURRENT document: unique live match in the
+    // same frame. Same-named controls stay distinguishable (AMBIGUOUS →
+    // zero input); a vanished control is TARGET_DESTROYED.
     const liveCandidates = (await this.queryControls(page)).filter(
       (candidate) => candidate.framePath === target.framePath && candidate.role === target.role && candidate.label === target.label,
     );
@@ -1386,23 +1587,43 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "ambiguous target at dispatch");
       throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
     }
-    const fresh = await this.describeTarget(botId, target.selector);
-    if (fresh.label !== target.label || fresh.url !== observation.documentEpoch) {
-      journalTransition(this.db, actionId, "failed_before_effect", "control identity changed before dispatch");
-      throw new Error("STALE_OBSERVATION: the page or control changed after review. Observe again.");
+    // Finding C: re-run the observation-time review routine and require
+    // byte equality with the stored digest. A changed form value,
+    // destination or attribute forces a new review — the fresh state is
+    // never substituted as the approved baseline.
+    const liveDigest = await this.controlReviewDigest(page, target.selector);
+    if (liveDigest === null || liveDigest !== target.reviewDigest) {
+      journalTransition(this.db, actionId, "failed_before_effect", "reviewed state changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the form or control changed after review. Request a new review.");
     }
+    const fresh = await this.describeTarget(botId, target.selector);
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     journalTransition(this.db, actionId, "dispatch_started");
     try {
-      // Production reviewed-fingerprint path: exact approval semantics.
+      // Production reviewed-fingerprint path: the live fingerprint was just
+      // proven equal to reviewed state, and click/type re-verify it at
+      // dispatch with cancellable readiness below.
       const result = input.kind === "click"
-        ? await this.click(botId, target.selector, fresh.fingerprint)
-        : await this.type(botId, target.selector, input.value ?? "", fresh.fingerprint);
+        ? await this.cancellableClick(botId, page, target.selector, fresh.fingerprint, runId, admittedEpoch)
+        : await this.cancellableType(botId, page, target.selector, input.value ?? "", fresh.fingerprint, runId, admittedEpoch);
       journalTransition(this.db, actionId, "effect_observed");
       return result;
     } catch (error) {
       journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
       throw error;
+    }
+  }
+
+  /** Validate an explicitly supplied approval against host records. */
+  private assertApprovalBinding(approvalId: string, runId: string, botId: string, selector: string | null): void {
+    const approval = this.db.getApproval(approvalId);
+    if (!approval || approval.status !== "approved" || approval.runId !== runId || approval.botId !== botId) {
+      throw new Error("That approval is not a completed host review for this task and teammate.");
+    }
+    const action = this.db.getApprovalAction(approvalId) as { args?: { selector?: unknown } } | null;
+    const approvedSelector = action?.args && typeof action.args.selector === "string" ? action.args.selector : null;
+    if (approvedSelector && selector && approvedSelector !== selector) {
+      throw new Error("That approval names a different control. Request a new review.");
     }
   }
 
@@ -1448,18 +1669,50 @@ export class BrowserManager {
     }
   }
 
+  /** Revalidate the host-owned document generation on the pinned page.
+   * Same-URL reloads, replacement documents and navigations all change the
+   * generation even though the URL is unchanged. */
+  private async assertDocumentEpoch(botId: string, page: Page, observation: CapturedObservation, actionId: string): Promise<void> {
+    const content = await this.contentGeneration(page);
+    const epoch = this.documentEpochFor(botId, page, content.hash);
+    if (epoch !== observation.documentEpoch) {
+      journalTransition(this.db, actionId, "failed_before_effect", "document changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the document changed after observation. Observe again.");
+    }
+  }
+
   /** Admit the exact final payload to the durable journal. Returns the
    * input-ownership epoch bound to the admission for pre-input re-check. */
   private admitAction(input: {
     actionId: string; runId: string; botId: string; surface: "browser-dom" | "browser-visual" | "native";
     surfaceIdentity: string; ownershipEpoch: string; target: string;
     payloadDigest: string; reviewDigest: string | null; account: string;
+    mutationKey?: string | null;
   }): number {
     journalPropose(this.db, { ...input });
+    if (input.mutationKey) this.assertMutationFence(input.mutationKey, input.runId, input.botId, input.actionId);
     if (!admitOnce(this.db, input.actionId)) {
       throw new Error("This action was already admitted. Check its result instead of sending it again.");
     }
     return this.db.botInputEpoch(input.botId);
+  }
+
+  /** Finding A: refuse when the same logical mutation is already unresolved
+   * (or already completed) under any observation, renderer or attempt. The
+   * mutation key is assigned by the accountable outer layer per unit of
+   * intended effect; distinct genuinely-new work uses distinct keys, so the
+   * fence never bans unrelated actions. */
+  private assertMutationFence(mutationKey: string, runId: string, botId: string, actionId: string): void {
+    const clashes = this.db.journalActionFindByMutation(mutationKey, runId, botId).filter((row) => row.actionId !== actionId);
+    const unresolved = clashes.filter((row) => row.stage !== "verified" && row.stage !== "failed_before_effect");
+    if (unresolved.length > 0) {
+      journalTransition(this.db, actionId, "failed_before_effect", "same unresolved mutation exists");
+      throw new Error("UNCERTAIN_CONFLICT: the same effect is already unresolved. Reconcile it before sending it again.");
+    }
+    if (clashes.some((row) => row.stage === "verified")) {
+      journalTransition(this.db, actionId, "failed_before_effect", "same mutation already completed");
+      throw new Error("DUPLICATE_MUTATION: this effect already completed. Check its result instead of sending it again.");
+    }
   }
 
   /** Resolve an opaque target to its host-captured observation, enforcing
@@ -1495,6 +1748,8 @@ export class BrowserManager {
       point: { x: number; y: number };
       endPoint?: { x: number; y: number };
       key?: string;
+      approvalId?: string | null;
+      mutationKey?: string | null;
     },
   ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
     const capability = this.visualCapabilityForAdapter(input.adapterId);
@@ -1507,12 +1762,18 @@ export class BrowserManager {
     }
     // Eligibility before admission: refusals leave no journal row behind.
     this.assertActEligible(observation, runId, botId);
-    const page = await this.page(botId);
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, null);
+    // Pin the observed page (Finding D): it must still be open and active.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again before acting.");
+    }
     this.assertPageAccess(botId, page);
-    // Tab and document binding: the active tab and URL must still be the
-    // observed ones. A navigation or tab switch invalidates the screenshot.
-    if (this.tabId(botId, page) !== observation.tabId || page.url() !== observation.documentEpoch) {
-      throw new Error("STALE_OBSERVATION: tab or page changed after observation. Observe again before acting.");
+    // Finding D: revalidate the host-owned document generation on the
+    // pinned page. Same-URL replacement, reloads and navigations refuse.
+    const content = await this.contentGeneration(page);
+    if (this.documentEpochFor(botId, page, content.hash) !== observation.documentEpoch) {
+      throw new Error("STALE_OBSERVATION: the document changed after observation. Observe again before acting.");
     }
     const live = await page.evaluate(() => ({
       dpr: window.devicePixelRatio || 1,
@@ -1576,6 +1837,7 @@ export class BrowserManager {
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/obs:${observation.observationId}`,
       ownershipEpoch: observation.ownerEpoch, target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
       payloadDigest, reviewDigest: null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
     });
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
@@ -1584,10 +1846,24 @@ export class BrowserManager {
       throw new Error("Another task holds the input lease. Wait for it to finish.");
     }
     journalTransition(this.db, actionId, "dispatch_started");
+    // Finding B: revocation is re-checked between every input phase, and
+    // held buttons release on every exit. A cancelled action stops between
+    // phases instead of completing a stale gesture.
+    const checkPhase = (phase: string) => {
+      try {
+        this.assertNotRevoked(botId, runId, admittedEpoch);
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)} (before ${phase})`);
+      }
+    };
     try {
-      if (input.action === "click") await page.mouse.click(validated.cssX, validated.cssY);
-      else if (input.action === "double-click") await page.mouse.dblclick(validated.cssX, validated.cssY);
-      else if (input.action === "drag" && input.endPoint) {
+      if (input.action === "click") {
+        checkPhase("click");
+        await page.mouse.click(validated.cssX, validated.cssY);
+      } else if (input.action === "double-click") {
+        checkPhase("double-click");
+        await page.mouse.dblclick(validated.cssX, validated.cssY);
+      } else if (input.action === "drag" && input.endPoint) {
         const end = validateVisualAction(
           {
             observationId: observation.observationId, transform, action: "drag",
@@ -1597,18 +1873,23 @@ export class BrowserManager {
           capability,
         );
         if (!end.ok) throw new Error(`${end.reason}: drag end point invalid. Observe again.`);
+        checkPhase("drag-press");
         await page.mouse.move(validated.cssX, validated.cssY);
         await page.mouse.down();
         try {
+          checkPhase("drag-move");
           await page.mouse.move(end.cssX, end.cssY, { steps: 12 });
         } finally {
           await page.mouse.up().catch(() => undefined);
         }
       } else if (input.action === "scroll") {
+        checkPhase("scroll");
         await page.mouse.move(validated.cssX, validated.cssY);
         await page.mouse.wheel(0, 400);
       } else if (input.action === "key" && input.key) {
+        checkPhase("focus-click");
         await page.mouse.click(validated.cssX, validated.cssY);
+        checkPhase("key-press");
         await page.keyboard.press(input.key);
       } else {
         throw new Error("That visual action is not supported with these arguments.");
@@ -1635,7 +1916,7 @@ export class BrowserManager {
   async scrollPane(
     botId: string,
     runId: string,
-    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number },
+    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number; approvalId?: string | null; mutationKey?: string | null },
   ): Promise<{ url: string; title: string; moved: number; beforeTop: number; afterTop: number }> {
     const observation = getObservation(input.observationId);
     if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
@@ -1645,6 +1926,7 @@ export class BrowserManager {
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
     // Eligibility before admission: refusals leave no journal row behind.
     this.assertActEligible(observation, runId, botId);
+    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, pane.selector);
     const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
     if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     const payloadDigest = createHash("sha256")
@@ -1656,17 +1938,42 @@ export class BrowserManager {
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${pane.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: `scroll ${pane.label}`,
       payloadDigest, reviewDigest: null, account: observation.account,
+      mutationKey: input.mutationKey ?? null,
     });
-    const page = await this.page(botId);
+    // Pin the observed page and revalidate its document generation: a
+    // replacement document at the same URL refuses instead of scrolling
+    // the new content.
+    const page = observation.page;
+    if (page.isClosed() || this.activePage(botId) !== page) {
+      journalTransition(this.db, actionId, "failed_before_effect", "tab changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the tab changed after observation. Observe again.");
+    }
+    await this.assertDocumentEpoch(botId, page, observation, actionId);
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
     journalTransition(this.db, actionId, "dispatch_started");
     try {
+      // Unique resolution: an ambiguous or vanished pane refuses instead
+      // of scrolling an arbitrary first match.
       const frameScope = pane.framePath === "/" ? page : page.frameLocator(pane.framePath);
-      const beforeTop = await frameScope.locator(pane.selector).first().evaluate((node) => (node as HTMLElement).scrollTop);
-      await frameScope.locator(pane.selector).first().evaluate((node, dy) => { (node as HTMLElement).scrollBy(0, dy); }, bounded);
+      const scroller = frameScope.locator(pane.selector === "body" ? "html" : pane.selector);
+      if ((await scroller.count()) !== 1) {
+        throw new Error("That scroll region is no longer unique. Observe again.");
+      }
+      const readTop = async (): Promise<number> => scroller.first().evaluate((node) => {
+        const html = node as HTMLElement;
+        if (html.tagName === "HTML") return document.documentElement.scrollTop;
+        return html.scrollTop;
+      });
+      const beforeTop = await readTop();
+      this.assertNotRevoked(botId, runId, admittedEpoch);
+      await scroller.first().evaluate((node, dy) => {
+        const html = node as HTMLElement;
+        if (html.tagName === "HTML") document.documentElement.scrollBy(0, dy);
+        else html.scrollBy(0, dy);
+      }, bounded);
       await page.waitForTimeout(140);
-      const afterTop = await frameScope.locator(pane.selector).first().evaluate((node) => (node as HTMLElement).scrollTop);
+      const afterTop = await readTop();
       this.assertPageAccess(botId, page);
       journalTransition(this.db, actionId, "effect_observed");
       return { url: page.url(), title: await page.title(), moved: afterTop - beforeTop, beforeTop, afterTop };

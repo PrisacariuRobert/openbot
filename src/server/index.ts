@@ -3262,7 +3262,14 @@ app.post("/api/bots/:id/browser/takeover/click", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a point inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
-  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverClick(request.params.id, parsed.data.x, parsed.data.y)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3270,7 +3277,14 @@ app.post("/api/bots/:id/browser/takeover/type", async (request, response) => {
   const parsed = z.object({ value: z.string().max(4_000), replace: z.boolean().default(false) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That text is too long for secure takeover." });
   browserNavigationGrants.revokeBot(request.params.id);
-  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverType(request.params.id, parsed.data.value, parsed.data.replace)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3278,7 +3292,14 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
   browserNavigationGrants.revokeBot(request.params.id);
-  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3289,7 +3310,14 @@ app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
   const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
   browserNavigationGrants.revokeBot(request.params.id);
-  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3299,7 +3327,14 @@ app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
-  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
+  try {
+    db.revokeBotInput(request.params.id);
+    browser.revokeObservationsForBot(request.params.id);
+  } catch {
+    // Finding B: a failed revocation must not silently leave old input
+    // authority usable while the route proceeds to input.
+    return response.status(500).json({ error: "OpenBot could not establish exclusive input ownership. Nothing was sent — try again." });
+  }
   try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });

@@ -9,11 +9,18 @@
  * freshness, authorization scope, and input ownership immediately before
  * input. Unknown or expired IDs are refused.
  *
+ * Identity model (Finding D): a document is a host-owned generation
+ * (tab id + navigation generation + content hash), never a bare URL. The
+ * live Page object is pinned in the entry; dispatch requires the pinned
+ * page to still be the active tab and the generation to match. Unknown or
+ * changed identity invalidates the observation.
+ *
  * Entries are short-lived (15s TTL) and process-local by design: a restart
  * clears the registry, which is fail-closed — pre-restart observation IDs
  * can never authorize post-restart input. Durable cross-restart state
  * (journal, tombstones, input epochs) lives in OpenBotDatabase instead.
  */
+import type { Page } from "playwright-core";
 import { OBSERVATION_TTL_MS } from "./observation-envelope.js";
 
 export type RegistryTarget = {
@@ -24,6 +31,12 @@ export type RegistryTarget = {
   selector: string;
   framePath: string;
   fingerprint: string;
+  /** Host-observed canonical review digest (Finding C): tag, role, label,
+   * input type, autocomplete, href, form method, statefulness and bounded
+   * redacted form fields, hashed in-page at observation time with the same
+   * routine the executor re-runs at action time. A changed form value,
+   * destination or control attribute changes the digest. */
+  reviewDigest: string;
 };
 
 export type RegistryPane = {
@@ -54,6 +67,8 @@ export type CapturedObservation = {
   expiresAt: number;
   targets: RegistryTarget[];
   panes: RegistryPane[];
+  /** Pinned live page (Finding D). Process-local by design. */
+  page: Page;
 };
 
 const registry = new Map<string, CapturedObservation>();

@@ -151,6 +151,12 @@ export type ActionJournalRecord = {
   payloadDigest: string;
   reviewDigest: string | null;
   account: string;
+  /** Host-owned logical mutation identity (Finding A): the accountable
+   * outer layer assigns one key per unit of intended effect. The fence
+   * survives re-observation, renderer switches and restarts; distinct
+   * genuinely-new work uses distinct keys. Null when the caller declares
+   * no logical identity (legacy direct calls). */
+  mutationKey: string | null;
   stage:
     | "proposed"
     | "validated"
@@ -1070,7 +1076,8 @@ export class OpenBotDatabase {
     this.addColumn("runs", "active_duration_ms INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_steps INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_override TEXT");
-    this.addColumn("bots", "retired_at TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.addColumn("bots", "retired_at TEXT");
+    this.addColumn("action_journal", "mutation_key TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -2787,16 +2794,17 @@ export class OpenBotDatabase {
     actionId: string; runId: string; botId: string; surface: string;
     surfaceIdentity: string; ownershipEpoch: string; target: string;
     payloadDigest: string; reviewDigest?: string | null; account?: string;
+    mutationKey?: string | null;
     detail?: string | null;
   }): ActionJournalRecord {
     const at = now();
     try {
       this.db.prepare(`INSERT INTO action_journal
-        (action_id,run_id,bot_id,surface,surface_identity,ownership_epoch,target,payload_digest,review_digest,account,stage,detail,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,?,?)`).run(
+        (action_id,run_id,bot_id,surface,surface_identity,ownership_epoch,target,payload_digest,review_digest,account,mutation_key,stage,detail,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         input.actionId, input.runId, input.botId, input.surface, input.surfaceIdentity,
         input.ownershipEpoch, input.target, input.payloadDigest, input.reviewDigest ?? null,
-        input.account ?? "", "proposed", input.detail ?? null, at, at,
+        input.account ?? "", input.mutationKey ?? null, "proposed", input.detail ?? null, at, at,
       );
       return this.journalActionGet(input.actionId)!;
     } catch {
@@ -2813,7 +2821,8 @@ export class OpenBotDatabase {
         existing.target === input.target &&
         existing.payloadDigest === input.payloadDigest &&
         (existing.reviewDigest ?? null) === (input.reviewDigest ?? null) &&
-        (existing.account ?? "") === (input.account ?? "");
+        (existing.account ?? "") === (input.account ?? "") &&
+        (existing.mutationKey ?? null) === (input.mutationKey ?? null);
       if (!same) throw new Error("That action ID is already bound to a different run, teammate, target or payload. Use a new action for new work.");
       return existing;
     }
@@ -2836,6 +2845,7 @@ export class OpenBotDatabase {
       payloadDigest: String(row.payload_digest),
       reviewDigest: row.review_digest == null ? null : String(row.review_digest),
       account: String(row.account ?? ""),
+      mutationKey: row.mutation_key == null ? null : String(row.mutation_key),
       stage: String(row.stage) as ActionJournalRecord["stage"],
       detail: row.detail == null ? null : String(row.detail),
       createdAt: String(row.created_at),
@@ -2887,6 +2897,14 @@ export class OpenBotDatabase {
 
   listUncertainJournalActions(): ActionJournalRecord[] {
     return (this.db.prepare("SELECT * FROM action_journal WHERE stage='outcome_uncertain' OR stage='dispatch_started' OR stage='effect_observed' ORDER BY updated_at ASC").all() as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
+  /** Finding A: every journal row carrying one logical mutation identity,
+   * for one run and teammate. The mutation fence consults these across
+   * observation IDs, renderers, attempts and restarts. */
+  journalActionFindByMutation(mutationKey: string, runId: string, botId: string): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE mutation_key=? AND run_id=? AND bot_id=? ORDER BY created_at ASC").all(mutationKey, runId, botId) as Row[])
       .map((row) => this.journalActionFromRow(row));
   }
 

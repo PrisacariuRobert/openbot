@@ -36,6 +36,7 @@ export type JournaledAction = {
   reviewDigest: string | null;
   target: string;
   account: string;
+  mutationKey: string | null;
   createdAt: string;
   updatedAt: string;
   detail: string | null;
@@ -54,6 +55,7 @@ function toJournaled(record: ActionJournalRecord): JournaledAction {
     reviewDigest: record.reviewDigest,
     target: record.target,
     account: record.account,
+    mutationKey: record.mutationKey,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     detail: record.detail,
@@ -62,7 +64,7 @@ function toJournaled(record: ActionJournalRecord): JournaledAction {
 
 export function journalPropose(
   db: OpenBotDatabase,
-  input: Omit<JournaledAction, "stage" | "createdAt" | "updatedAt" | "detail" | "account"> & { detail?: string | null; account?: string },
+  input: Omit<JournaledAction, "stage" | "createdAt" | "updatedAt" | "detail" | "account" | "mutationKey"> & { detail?: string | null; account?: string; mutationKey?: string | null },
 ): JournaledAction {
   const record = db.journalActionPropose({
     actionId: input.actionId,
@@ -75,6 +77,7 @@ export function journalPropose(
     payloadDigest: input.payloadDigest,
     reviewDigest: input.reviewDigest,
     account: input.account,
+    mutationKey: input.mutationKey,
     detail: input.detail,
   });
   return toJournaled(record);
