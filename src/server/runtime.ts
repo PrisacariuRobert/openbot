@@ -1104,21 +1104,72 @@ export class BrowserManager {
     }
   }
 
-  private async cancellableClick(botId: string, page: Page, selector: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+  /** Finding B (round 4): the commit phase performs zero waiting
+   * primitives. After trial readiness, every step is an immediate query
+   * or dispatch with a synchronous revocation read between steps — there
+   * is no second auto-wait for a revocation to land inside. A control
+   * that is not immediately actionable refuses instead of waiting. */
+  private async commitClick(page: Page, selector: string, botId: string, runId: string, admittedEpoch: number): Promise<void> {
+    const locator = page.locator(selector).first();
+    if (!(await locator.isEnabled().catch(() => false))) {
+      throw new Error("The control is not enabled right now. Observe again.");
+    }
+    const box = await locator.boundingBox().catch(() => null);
+    if (!box) throw new Error("The control has no screen position right now. Observe again.");
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  }
+
+  private async commitType(page: Page, selector: string, value: string, botId: string, runId: string, admittedEpoch: number): Promise<void> {
+    const locator = page.locator(selector).first();
+    if (!(await locator.isEditable().catch(() => false))) {
+      throw new Error("The field is not editable right now. Observe again.");
+    }
+    const box = await locator.boundingBox().catch(() => null);
+    if (!box) throw new Error("The field has no screen position right now. Observe again.");
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    this.assertNotRevoked(botId, runId, admittedEpoch);
+    if (!(await locator.isEditable().catch(() => false))) {
+      throw new Error("The field stopped being editable before typing. Observe again.");
+    }
+    // Keystroke insertion performs no readiness waits: revocation is
+    // checked before the first keystroke, and ownership afterwards.
+    await page.keyboard.type(value, { delay: 0 });
+  }
+
+  /** Ownership check after input crossed the dispatch boundary. A change
+   * here does NOT mean nothing happened — the effect may be partial — so
+   * callers record uncertainty and reconcile through readback. */
+  private assertStillOwned(botId: string, runId: string, admittedEpoch: number): void {
+    try {
+      this.assertNotRevoked(botId, runId, admittedEpoch);
+    } catch (error) {
+      throw new Error(`Ownership changed during input (${error instanceof Error ? error.message : String(error)}). The effect may have occurred — verify before retrying.`);
+    }
+  }
+
+  private async cancellableClick(botId: string, page: Page, selector: string, fingerprint: string, runId: string, admittedEpoch: number, beforeCommit?: () => Promise<void>): Promise<{ url: string; title: string }> {
     await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
     await this.assertTarget(botId, selector, fingerprint);
-    this.assertNotRevoked(botId, runId, admittedEpoch);
-    await page.locator(selector).first().click({ timeout: 2_000 });
+    // Test-only barrier: lets a fixture deterministically interleave a
+    // control-state change and revocation between readiness and commit.
+    // Never passed by production callers.
+    if (beforeCommit) await beforeCommit();
+    await this.commitClick(page, selector, botId, runId, admittedEpoch);
     this.assertPageAccess(botId, page);
+    this.assertStillOwned(botId, runId, admittedEpoch);
     return { url: page.url(), title: await page.title() };
   }
 
-  private async cancellableType(botId: string, page: Page, selector: string, value: string, fingerprint: string, runId: string, admittedEpoch: number): Promise<{ url: string; title: string }> {
+  private async cancellableType(botId: string, page: Page, selector: string, value: string, fingerprint: string, runId: string, admittedEpoch: number, beforeCommit?: () => Promise<void>): Promise<{ url: string; title: string }> {
     await this.waitForActionable(page, selector, botId, runId, admittedEpoch);
     await this.assertTarget(botId, selector, fingerprint);
-    this.assertNotRevoked(botId, runId, admittedEpoch);
-    await page.locator(selector).first().fill(value, { timeout: 2_000 });
+    // Test-only barrier: see cancellableClick.
+    if (beforeCommit) await beforeCommit();
+    await this.commitType(page, selector, value, botId, runId, admittedEpoch);
     this.assertPageAccess(botId, page);
+    this.assertStillOwned(botId, runId, admittedEpoch);
     return { url: page.url(), title: await page.title() };
   }
 
@@ -1540,7 +1591,7 @@ export class BrowserManager {
   async semanticAct(
     botId: string,
     runId: string,
-    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null; approvalId?: string | null; mutationKey?: string | null },
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null; approvalId?: string | null; mutationKey?: string | null; __testBarrier?: { beforeCommit?: () => Promise<void> } },
   ): Promise<{ url: string; title: string }> {
     const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
     const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
@@ -1607,12 +1658,23 @@ export class BrowserManager {
       // proven equal to reviewed state, and click/type re-verify it at
       // dispatch with cancellable readiness below.
       const result = input.kind === "click"
-        ? await this.cancellableClick(botId, page, target.selector, fresh.fingerprint, runId, admittedEpoch)
-        : await this.cancellableType(botId, page, target.selector, input.value ?? "", fresh.fingerprint, runId, admittedEpoch);
+        ? await this.cancellableClick(botId, page, target.selector, fresh.fingerprint, runId, admittedEpoch, input.__testBarrier?.beforeCommit)
+        : await this.cancellableType(botId, page, target.selector, input.value ?? "", fresh.fingerprint, runId, admittedEpoch, input.__testBarrier?.beforeCommit);
       journalTransition(this.db, actionId, "effect_observed");
       return result;
     } catch (error) {
-      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      // Failures that prove nothing was sent (never-ready control, wait-
+      // phase revocation, pre-commit refusal) stay retryable. Anything at
+      // or after the dispatch boundary is uncertain and reconciles through
+      // readback — never reported as ordinary success or silent absence.
+      // Post-commit ownership notes embed the revocation text, so they are
+      // classified first: the effect may already have occurred.
+      const message = error instanceof Error ? error.message : String(error);
+      const crossedBoundary = /Ownership changed during input/i.test(message);
+      const nothingSent =
+        !crossedBoundary &&
+        /never became ready|not enabled right now|not editable|no screen position|That task stopped while|Nothing was sent|USER_TAKEOVER|SECURE_MODE|That task is no longer runnable|browser access is turned off/i.test(message);
+      journalTransition(this.db, actionId, nothingSent ? "failed_before_effect" : "outcome_uncertain", message);
       throw error;
     }
   }

@@ -27,7 +27,8 @@ const grants = new BrowserNavigationGrants();
 type ClickEvent = { kind: "click"; id: string | null; x: number; y: number };
 type CanvasEvent = { kind: "canvas"; x: number; y: number };
 type ScrollEvent = { kind: "scroll"; id: string; top: number };
-type FixtureEvent = ClickEvent | CanvasEvent | ScrollEvent;
+type FieldEvent = { kind: "field-input"; id: string; top: number };
+type FixtureEvent = ClickEvent | CanvasEvent | ScrollEvent | FieldEvent;
 const events: FixtureEvent[] = [];
 let submits: string[] = [];
 const clicks = () => events.filter((event) => event.kind === "click") as ClickEvent[];
@@ -72,6 +73,8 @@ for (const id of ["intended", "decoy-pane"]) {
   const pane = document.getElementById(id);
   if (pane) pane.addEventListener("scroll", () => send({ kind: "scroll", id, top: pane.scrollTop }), { passive: true });
 }
+const taskName = document.querySelector('input[aria-label="Task name"]');
+if (taskName) taskName.addEventListener("input", () => send({ kind: "field-input", id: "task-name", top: 0 }));
 const late = document.getElementById("late-save");
 if (late) setTimeout(() => { late.removeAttribute("disabled"); }, 3000);
 </script>
@@ -137,6 +140,8 @@ const record = (id: string, pass: boolean, detail: string) => {
   console.log(`${pass ? "PASS" : "FAIL"} ${id}: ${detail}`);
 };
 const SESSION = "sess-fixture-1";
+const FIELD_INPUT_BEACON = "field-input";
+const fieldInputs = () => events.filter((event) => event.kind === FIELD_INPUT_BEACON);
 
 try {
   clearLeasesForTests();
@@ -540,6 +545,65 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 3500));
     assert.equal(clicks().filter((event) => event.id === "late-save").length, 0, "zero late-save clicks even after the control enabled itself");
     record("F10-cancel-wait", true, "revocation during the readiness wait prevents all later input");
+  }
+
+  // F10b — revocation between readiness and commit: the trial already
+  // succeeded, then the owner cancels and the input epoch moves before the
+  // commit phase runs. The commit-time guards must refuse with zero input
+  // and no success result — for both click and fill. The barrier makes the
+  // interleaving deterministic; production never passes one.
+  {
+    const finalRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "final-phase task", status: "running" });
+    await browser.open("nova", `${base}/form`);
+    // Click variant.
+    const clickObs = await browser.observeScoped("nova", finalRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const clickTarget = getObservation(clickObs.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const clicksBeforeFinal = clicks().length;
+    let clickError: unknown = null;
+    try {
+      await browser.semanticAct("nova", finalRun.id, {
+        targetId: clickTarget.targetId,
+        sessionId: SESSION,
+        kind: "click",
+        __testBarrier: {
+          beforeCommit: async () => {
+            db.updateRun(finalRun.id, { status: "cancelled" });
+            db.revokeBotInput("nova");
+          },
+        },
+      });
+    } catch (error) {
+      clickError = error;
+    }
+    assert.ok(clickError instanceof Error && /USER_TAKEOVER|stopped while|no longer runnable/.test(clickError.message), `final-phase click refused after revoke (got: ${(clickError as Error)?.message.slice(0, 90)})`);
+    assert.equal(clicks().length, clicksBeforeFinal, "zero clicks dispatched after readiness succeeded");
+    // Fill variant on a fresh running task.
+    const fillRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "final-phase fill task", status: "running" });
+    const fillObs = await browser.observeScoped("nova", fillRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const fillTarget = getObservation(fillObs.observationId)!.targets.find((target) => target.selector === 'input[name="field"]')!;
+    const fieldsBeforeFinal = fieldInputs().length;
+    let fillError: unknown = null;
+    try {
+      await browser.semanticAct("nova", fillRun.id, {
+        targetId: fillTarget.targetId,
+        sessionId: SESSION,
+        kind: "type",
+        value: "changed",
+        __testBarrier: {
+          beforeCommit: async () => {
+            db.updateRun(fillRun.id, { status: "cancelled" });
+            db.revokeBotInput("nova");
+          },
+        },
+      });
+    } catch (error) {
+      fillError = error;
+    }
+    assert.ok(fillError instanceof Error && /USER_TAKEOVER|stopped while|no longer runnable/.test(fillError.message), `final-phase fill refused after revoke (got: ${(fillError as Error)?.message.slice(0, 90)})`);
+    assert.equal(fieldInputs().length, fieldsBeforeFinal, "zero input events dispatched after readiness succeeded");
+    const snapAfter = await browser.snapshot("nova");
+    assert.ok(!snapAfter.text.includes("changed"), "field value unchanged after refused fill");
+    record("F10b-final-phase", true, "revocation between readiness and commit refuses click and fill with zero input");
   }
 } catch (error) {
   record("HARNESS", false, error instanceof Error ? error.message : String(error));
