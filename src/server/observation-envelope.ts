@@ -105,19 +105,22 @@ export function gateObservationCapture(input: {
 }
 
 /** Scan tool errors/traces/clipboard/downloads/receipts for secret leakage.
- * Returns redacted text + whether a secret was found (caller must stop on
- * unresolved sensitive boundaries). Synthetic values only in tests. */
+ * Removes EVERY recognized value (global match — a second token must never
+ * survive because the first was removed). Returns redacted text + whether a
+ * secret was found (caller must stop on unresolved sensitive boundaries).
+ * Detection regexes stay non-global (no stateful-lastIndex surprises); the
+ * replacement uses a fresh global instance per call. Synthetic values only
+ * in tests. Text redaction is one layer: image privacy comes from
+ * minimized/blocked capture (secure mode, opaque regions), never from
+ * redacting pixels after the fact. */
 export function redactSecretsForProvider(text: string): { redacted: string; found: boolean } {
-  let found = false;
-  let redacted = text.replace(SECRET_VALUE, (match) => {
-    found = true;
-    return "[redacted-secret]";
-  });
+  const found = SECRET_VALUE.test(text) || /password\s*[:=]\s*\S+/i.test(text);
+  // Fresh global regex per call: module-level /g instances keep lastIndex
+  // across calls and would skip matches unpredictably.
+  const valuePattern = new RegExp(SECRET_VALUE.source, "g");
+  let redacted = text.replace(valuePattern, "[redacted-secret]");
   // Password assignments are always masked even without a recognizable token shape.
-  if (/password\s*[:=]\s*\S+/i.test(redacted)) {
-    found = true;
-    redacted = redacted.replace(/password\s*[:=]\s*\S+/gi, "password: [redacted-secret]");
-  }
+  redacted = redacted.replace(/password\s*[:=]\s*\S+/gi, "password: [redacted-secret]");
   return { redacted, found };
 }
 

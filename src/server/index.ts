@@ -133,7 +133,16 @@ db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus
 // The tester browser always starts at the studio itself (loopback), never at
 // a relay or LAN address — its scope is loopback-only by construction.
 const tester = new TesterBrowser(db.dataDir, `http://127.0.0.1:${port}/`);
-const browserSignIns = new BrowserSignIns(db, browserNavigationGrants);
+const browserSignIns = new BrowserSignIns(db, { revokeBot: (botId: string) => {
+  // R03: sign-in request/completion changes the session/account under any
+  // issued allowance or observation: revoke navigation grants, bump the
+  // durable input epoch (in-flight new-path actions must re-observe), and
+  // drop registry observations. Best-effort beyond the grant revocation.
+  const removed = browserNavigationGrants.revokeBot(botId);
+  try { db.revokeBotInput(botId); } catch { /* best-effort */ }
+  try { browser.revokeObservationsForBot(botId); } catch { /* best-effort */ }
+  return removed;
+} });
 const googleWorkspace = new GoogleWorkspaceConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/google/callback"), approvedConnectorDispatch.fetch);
 const appReads = new AppReadService(db);
 const slack = new SlackConnector(db, deploymentCallbackUrl(deployment, "/api/connectors/slack/callback"), approvedConnectorDispatch.fetch);
@@ -334,6 +343,14 @@ function stopRun(runId: string, label = "Stopped by you") {
   const run = db.getRun(runId);
   if (!run || ["completed", "failed", "cancelled"].includes(run.status)) return false;
   if (!runner.cancelTask(run.id)) return false;
+  // R03: stopping invalidates in-flight new-path actions admitted under the
+  // older input epoch, and drops their observations. They must re-observe.
+  try {
+    db.revokeBotInput(run.botId);
+    browser.revokeObservationsForBot(run.botId);
+  } catch {
+    // Revocation is best-effort; cancellation still proceeds.
+  }
   db.addActivity({ runId: run.id, botId: run.botId, kind: "status", label, detail: null });
   // P-02: a cancellation must leave a persistent visible acknowledgment next
   // to the task — not just a record the owner has to go looking for.
@@ -3241,6 +3258,7 @@ app.post("/api/bots/:id/browser/takeover/click", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a point inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
   try { response.json(await browser.takeoverClick(request.params.id, parsed.data.x, parsed.data.y)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3248,6 +3266,7 @@ app.post("/api/bots/:id/browser/takeover/type", async (request, response) => {
   const parsed = z.object({ value: z.string().max(4_000), replace: z.boolean().default(false) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "That text is too long for secure takeover." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
   try { response.json(await browser.takeoverType(request.params.id, parsed.data.value, parsed.data.replace)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3255,6 +3274,7 @@ app.post("/api/bots/:id/browser/takeover/key", async (request, response) => {
   const parsed = z.object({ key: z.enum(["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose a supported browser key." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
   try { response.json(await browser.takeoverKey(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3265,6 +3285,7 @@ app.post("/api/bots/:id/browser/takeover/press", async (request, response) => {
   const parsed = z.object({ key: z.string().min(1).max(12).regex(/^(?:[ -~]|Enter|Backspace|Delete|Tab|Escape|Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down)|F(?:[1-9]|1[0-2]))$/) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Type one character or a supported key at a time." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
   try { response.json(await browser.takeoverPress(request.params.id, parsed.data.key)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
@@ -3274,6 +3295,7 @@ app.post("/api/bots/:id/browser/takeover/scroll", async (request, response) => {
   const parsed = z.object({ x: z.number().min(0).max(1280), y: z.number().min(0).max(820), deltaY: z.number().min(-3000).max(3000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Scroll inside the browser preview." });
   browserNavigationGrants.revokeBot(request.params.id);
+  try { db.revokeBotInput(request.params.id); browser.revokeObservationsForBot(request.params.id); } catch { /* Revocation is best-effort. */ }
   try { response.json(await browser.takeoverScroll(request.params.id, parsed.data.x, parsed.data.y, parsed.data.deltaY)); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 });

@@ -252,6 +252,27 @@ test("B01 credential fields and secure mode never reach the model", () => {
   const leak = redactSecretsForProvider("password: hunter2-secret and code 123456");
   assert.ok(leak.found);
   assert.ok(!leak.redacted.includes("hunter2-secret"));
+  // Reviewer counterexample: two token-shaped values — both must go.
+  const twoTokens = redactSecretsForProvider("primary=sk-reviewOnlyAlphaTokenA backup=sk-reviewOnlyBetaTokenB");
+  assert.ok(twoTokens.found);
+  assert.ok(!twoTokens.redacted.includes("sk-reviewOnlyAlphaTokenA"), "first token removed");
+  assert.ok(!twoTokens.redacted.includes("sk-reviewOnlyBetaTokenB"), "second token removed");
+  // Outbound sink shapes: tool text, error, diagnostic and receipt payloads.
+  const sinkPayloads = [
+    `tool browser_click failed: auth xoxb-testSinkTokenOne and retry xoxp-testSinkTokenTwoSuffix`,
+    `diagnostic trace otp=482910 backup=sk-sinkThirdTokenValue password: sink-secret-word`,
+    JSON.stringify({ receipt: "run-1", webhook: "ghp_sinkFourthToken0123456789", note: "ok" }),
+  ];
+  for (const payload of sinkPayloads) {
+    const screened = redactSecretsForProvider(payload);
+    assert.ok(screened.found, `sink payload flagged: ${payload.slice(0, 40)}`);
+    assert.ok(!/sk-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{10,}|xox[baprs]-[A-Za-z0-9-]{6,}/.test(screened.redacted), "no token-shaped value survives");
+    assert.ok(!screened.redacted.includes("sink-secret-word"), "password assignment masked");
+  }
+  // Repeated calls cannot skip via stateful regex (fresh global per call).
+  for (let i = 0; i < 3; i++) {
+    assert.ok(!redactSecretsForProvider("key sk-repeatTokenValueAA").redacted.includes("sk-repeatTokenValueAA"));
+  }
   const g1 = { cssWidth: 1280, cssHeight: 800, deviceScale: 2, browserZoom: 100, scrollX: 0, scrollY: 0 };
   assert.equal(sameGeometry(g1, { ...g1 }), true);
   assert.equal(sameGeometry(g1, { ...g1, scrollY: 200 }), false);
@@ -345,6 +366,24 @@ test("B03 crop transforms map exactly; stale screenshots rejected", () => {
     "visual-supported",
   );
   assert.deepEqual(staleZoom, { ok: false, reason: "STALE_OBSERVATION" });
+  // Reviewer counterexamples: NaN never maps; scrolled content invalidates.
+  assert.deepEqual(visualToCss(parent, { x: NaN, y: 100 }).ok, false, "NaN x never yields a screen point");
+  assert.deepEqual(visualToCss(parent, { x: 100, y: Infinity }).ok, false, "infinite y never yields a screen point");
+  const nanAction = validateVisualAction(
+    { observationId: "obs-v1", transform: parent, action: "click", point: { x: NaN, y: 100 }, currentGeometry: { cssWidth: 1280, cssHeight: 800, deviceScale: 2, browserZoom: 100, scrollX: 0, scrollY: 0 } },
+    "visual-supported",
+  );
+  assert.deepEqual(nanAction, { ok: false, reason: "STALE_OBSERVATION" });
+  const scrolled = validateVisualAction(
+    { observationId: "obs-v1", transform: parent, action: "click", point: { x: 100, y: 100 }, currentGeometry: { cssWidth: 1280, cssHeight: 800, deviceScale: 2, browserZoom: 100, scrollX: 0, scrollY: 0 }, capturedScroll: { x: 0, y: 300 } },
+    "visual-supported",
+  );
+  assert.deepEqual(scrolled, { ok: false, reason: "STALE_OBSERVATION" }, "scroll drift invalidates the transform");
+  const unscrolled = validateVisualAction(
+    { observationId: "obs-v1", transform: parent, action: "click", point: { x: 100, y: 100 }, currentGeometry: { cssWidth: 1280, cssHeight: 800, deviceScale: 2, browserZoom: 100, scrollX: 0, scrollY: 1 }, capturedScroll: { x: 0, y: 0 } },
+    "visual-supported",
+  );
+  assert.equal(unscrolled.ok, true, "sub-pixel jitter stays valid");
 });
 
 // B04: rich input + file transfer

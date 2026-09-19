@@ -14,10 +14,11 @@ import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
 import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
 import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
-import { issueSemanticTarget, scrollRegionForTarget } from "./semantic-targets.js";
-import { visualToCss, validateVisualAction } from "./visual-grounding.js";
-import { journalPropose, journalTransition, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
+import { issueSemanticTarget, reresolveSemanticTarget } from "./semantic-targets.js";
+import { validateVisualAction } from "./visual-grounding.js";
+import { journalPropose, journalTransition, journalReconcile, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
 import { selectModality } from "./modality-router.js";
+import { storeObservation, getObservation, findObservationWithTarget, invalidateObservationsForRun, invalidateObservationsForBot, type CapturedObservation, type RegistryTarget, type RegistryPane } from "./observation-registry.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
@@ -1077,78 +1078,310 @@ export class BrowserManager {
   }
 
   /**
-   * B01/B02/B03/B06 — Scoped observation with privacy gating + host-issued
-   * semantic targets + visual capability routing. Additive; existing
-   * snapshot()/screenshot()/click()/type() behavior unchanged.
-   *
-   * Returns a bounded observation envelope metadata + redacted text preview
-   * without exposing raw secrets to the model. Freshness TTL 15s; geometry
-   * changes invalidate visual observations.
+   * R03 — Host-captured scoped observation. Everything authoritative is
+   * derived by the host: tab/document identity, viewport/scroll/DPR,
+   * secure-entry state (live login-wall probe), scope permission, owner
+   * epoch (revocation-bound), visual capability (server registry, never a
+   * caller assertion), and the opaque control/pane targets issued from the
+   * actually rendered page. Callers receive IDs only.
    */
   async observeScoped(
     botId: string,
     runId: string,
-    input: { surface: "browser-dom" | "browser-visual"; secureMode: boolean; scopeAllowed: boolean; sessionId: string; ownerEpoch: string },
-  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string }> {
+    input: { surface: "browser-dom" | "browser-visual"; sessionId: string },
+  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; paneTokens: string[] }> {
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId) throw new Error("That task is not available to this teammate.");
+    if (["completed", "failed", "cancelled"].includes(run.status)) throw new Error("That task has already finished.");
+    const bot = this.db.getBot(botId);
+    if (!bot?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
+    const secureWall = await detectLoginWall(page);
+    const secureMode = secureWall !== null;
     const observationId = newObservationId();
-    const expiresAt = new Date(Date.now() + OBSERVATION_TTL_MS).toISOString();
-    // Privacy gate applies to the whole capture, not just a preview.
-    const gate = gateObservationCapture({ secureMode: input.secureMode, scopeAllowed: input.scopeAllowed, fieldName: "", fieldType: "", autocomplete: "", opaqueSensitive: false });
-    if (!gate.allowed) {
-      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE" };
+    const capturedAt = Date.now();
+    const expiresAtMs = capturedAt + OBSERVATION_TTL_MS;
+    const expiresAt = new Date(expiresAtMs).toISOString();
+    if (secureMode) {
+      // Minimized capture under a credential wall: identity + envelope only,
+      // no control enumeration, no pixels for the model.
+      const minimal = this.captureIdentity(page, botId);
+      storeObservation({
+        observationId, runId, botId, sessionId: input.sessionId,
+        tabId: minimal.tabId, documentEpoch: minimal.documentEpoch, framePath: "/",
+        account: "", ownerEpoch: this.ownerEpochFor(run.threadId, botId),
+        viewport: minimal.viewport, deviceScale: 1, browserZoom: 100,
+        scroll: { x: 0, y: 0 }, imageWidth: minimal.viewport.cssWidth, imageHeight: minimal.viewport.cssHeight,
+        secureMode: true, capturedAt, expiresAt: expiresAtMs,
+        targets: [], panes: [],
+      });
+      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], paneTokens: [] };
     }
     const snapshot = await this.snapshot(botId);
     const { redacted } = redactSecretsForProvider(snapshot.text.slice(0, 8000));
-    // Capability routing: canvas/opaque pages go visual immediately when supported.
+    const identity = this.captureIdentity(page, botId);
+    const live = await page.evaluate(() => ({ dpr: window.devicePixelRatio || 1, sx: window.scrollX || 0, sy: window.scrollY || 0 }));
+    const deviceScale = Number.isFinite(live.dpr) && live.dpr > 0 ? live.dpr : 1;
+    const scroll = {
+      x: Number.isFinite(live.sx) ? live.sx : 0,
+      y: Number.isFinite(live.sy) ? live.sy : 0,
+    };
+    const rawTargets = await this.queryControls(page);
+    const targets: RegistryTarget[] = rawTargets.map((control) => {
+      const fingerprint = createHash("sha256")
+        .update(JSON.stringify([observationId, control.framePath, control.role, control.label, control.bounds]))
+        .digest("hex")
+        .slice(0, 32);
+      const issued = issueSemanticTarget({
+        observationId,
+        documentEpoch: identity.documentEpoch,
+        framePath: control.framePath,
+        role: control.role,
+        label: control.label,
+        bounds: control.bounds,
+        selectorHint: control.selector,
+      });
+      return {
+        targetId: issued.targetId,
+        role: control.role,
+        label: control.label,
+        bounds: control.bounds,
+        selector: control.selector,
+        framePath: control.framePath,
+        fingerprint,
+      };
+    });
+    const panes: RegistryPane[] = (await this.queryScrollableRegions(page)).map((pane, index) => ({
+      paneToken: `pane_${observationId.slice(4, 12)}_${index}`,
+      framePath: pane.framePath,
+      selector: pane.selector,
+      label: pane.label,
+    }));
+    storeObservation({
+      observationId, runId, botId, sessionId: input.sessionId,
+      tabId: identity.tabId, documentEpoch: identity.documentEpoch, framePath: "/",
+      account: "", ownerEpoch: this.ownerEpochFor(run.threadId, botId),
+      viewport: identity.viewport, deviceScale, browserZoom: 100,
+      scroll,
+      imageWidth: Math.round(identity.viewport.cssWidth * deviceScale),
+      imageHeight: Math.round(identity.viewport.cssHeight * deviceScale),
+      secureMode: false, capturedAt, expiresAt: expiresAtMs,
+      targets, panes,
+    });
     const looksCanvas = /canvas|diagram|visual editor|chart/i.test(snapshot.text.slice(0, 2000));
     const route = selectModality({
       canvasPrimary: looksCanvas,
       semanticCount: Math.min(250, snapshot.text.split("\n").length),
       opaqueWidgets: looksCanvas ? 1 : 0,
-      visualCapability: "visual-supported",
+      visualCapability: this.defaultVisualCapability(),
       nativeGranted: false,
     });
-    return { observationId, expiresAt, textPreview: redacted.slice(0, 4000), modality: route.modality, reason: route.reason };
+    return {
+      observationId, expiresAt, textPreview: redacted.slice(0, 4000),
+      modality: route.modality, reason: route.reason,
+      targetIds: targets.map((target) => target.targetId),
+      paneTokens: panes.map((pane) => pane.paneToken),
+    };
+  }
+
+  /** Host-owned owner epoch: thread identity plus the teammate's durable
+   * input-revocation counter. Stop/takeover/sign-in bumps invalidate every
+   * observation captured under an older epoch. */
+  private ownerEpochFor(threadId: string, botId: string): string {
+    return `thread:${threadId}:input${this.db.botInputEpoch(botId)}`;
+  }
+
+  private captureIdentity(page: Page, botId: string): {
+    tabId: string; documentEpoch: string;
+    viewport: { cssWidth: number; cssHeight: number };
+  } {
+    const viewport = page.viewportSize() || { width: 1280, height: 820 };
+    return {
+      tabId: this.tabId(botId, page),
+      documentEpoch: page.url(),
+      viewport: { cssWidth: viewport.width, cssHeight: viewport.height },
+    };
+  }
+
+  /** Visible interactive controls of the live main frame, evaluated in-page.
+   * Closure-free by necessity (see detectLoginWall): no external references. */
+  private async queryControls(page: Page): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string }>> {
+    return page.locator("body").evaluate((body) => {
+      const pickSelector = (element: Element): string => {
+        const html = element as HTMLElement;
+        if (html.id) return `#${CSS.escape(html.id)}`;
+        const testId = html.getAttribute("data-testid");
+        if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
+        const name = html.getAttribute("name");
+        if (name) return `${html.tagName.toLowerCase()}[name="${CSS.escape(name)}"]`;
+        const aria = html.getAttribute("aria-label");
+        if (aria) return `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(aria)}"]`;
+        const parent = html.parentElement;
+        const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
+        const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
+        return `${parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : ""}${html.tagName.toLowerCase()}${suffix}`;
+      };
+      const nodes = [...body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]")];
+      const visible = nodes.filter((node) => {
+        const rect = (node as HTMLElement).getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && getComputedStyle(node).visibility !== "hidden";
+      }).slice(0, 150);
+      return visible.map((node) => {
+        const html = node as HTMLElement;
+        const rect = html.getBoundingClientRect();
+        const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
+        return {
+          role: html.getAttribute("role") || html.tagName.toLowerCase(),
+          label,
+          bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          selector: pickSelector(node),
+          framePath: "/",
+        };
+      });
+    });
+  }
+
+  /** Scrollable regions of the live page (main frame + owned same-origin
+   * iframes), evaluated in-page. Tokens are opaque; the host resolves them. */
+  private async queryScrollableRegions(page: Page): Promise<Array<{ selector: string; framePath: string; label: string }>> {
+    const main = await page.locator("body").evaluate((body) => {
+      const pickSelector = (element: Element): string => {
+        const html = element as HTMLElement;
+        if (html.id) return `#${CSS.escape(html.id)}`;
+        const testId = html.getAttribute("data-testid");
+        if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
+        return html.tagName.toLowerCase();
+      };
+      const panes: Array<{ selector: string; framePath: string; label: string }> = [];
+      const candidates = [body, ...body.querySelectorAll("div,main,section,article,aside,ul,table")];
+      for (const candidate of candidates) {
+        const html = candidate as HTMLElement;
+        if (html.scrollHeight > html.clientHeight + 4 && html.clientHeight > 40 && getComputedStyle(html).overflowY !== "visible") {
+          panes.push({ selector: pickSelector(candidate), framePath: "/", label: (html.getAttribute("aria-label") || html.id || html.tagName).toLowerCase().slice(0, 120) });
+          if (panes.length >= 20) break;
+        }
+      }
+      return panes;
+    });
+    // Owned same-origin iframes: addressable via frameSelector + selector.
+    const frames: Array<{ selector: string; framePath: string; label: string }> = [];
+    for (const frame of page.frames()) {
+      if (frame === page.mainFrame()) continue;
+      let origin = "";
+      try {
+        origin = new URL(frame.url()).origin;
+      } catch {
+        continue;
+      }
+      if (!origin.startsWith("http://127.0.0.1") && !origin.startsWith("http://localhost")) continue;
+      const frameElement = await frame.frameElement().catch(() => null);
+      if (!frameElement) continue;
+      const frameSelector = await frameElement.evaluate((node) => {
+        const html = node as HTMLElement;
+        if (html.id) return `#${CSS.escape(html.id)}`;
+        const testId = html.getAttribute("data-testid");
+        if (testId) return `iframe[data-testid="${CSS.escape(testId)}"]`;
+        return "iframe";
+      }).catch(() => null);
+      if (frameSelector) frames.push({ selector: "body", framePath: frameSelector, label: `frame ${frameSelector}`.slice(0, 120) });
+    }
+    return [...main, ...frames].slice(0, 24);
+  }
+
+  /** Drop every registry observation for a teammate (Stop/takeover/
+   * sign-in). Queued proposals must re-observe; the durable input epoch
+   * (checked in assertPreInput) makes pre-revocation observations unusable
+   * even if an ID is replayed. */
+  revokeObservationsForBot(botId: string): number {
+    return invalidateObservationsForBot(botId);
+  }
+
+  revokeObservationsForRun(runId: string): number {
+    return invalidateObservationsForRun(runId);
+  }
+
+  /** Server-owned visual capability registry. Callers name an adapter; the
+   * host decides what it may receive. Unknown adapters are text-only:
+   * VISION_UNAVAILABLE instead of guessed coordinates. Process-local and
+   * empty by default — a restart clears registrations (fail-closed).
+   * Host/test setup registers entries via registerVisualAdapter. */
+  private readonly visualAdapters = new Map<string, "visual-supported" | "text-only">();
+
+  registerVisualAdapter(adapterId: string, capability: "visual-supported" | "text-only"): void {
+    this.visualAdapters.set(adapterId, capability);
+  }
+
+  visualCapabilityForAdapter(adapterId: string): "visual-supported" | "text-only" {
+    return this.visualAdapters.get(adapterId) ?? "text-only";
+  }
+
+  private defaultVisualCapability(): "visual-supported" | "text-only" {
+    return [...this.visualAdapters.values()].includes("visual-supported") ? "visual-supported" : "text-only";
   }
 
   /**
-   * B02 — Host-issued semantic action: the model proposes an opaque targetId
-   * bound to observation/document/frame epoch; the host re-resolves
-   * conservatively before dispatch. Journals admission (R02) so double
-   * invocation / renderer switching cannot fork the mutation.
+   * R03 — Host-authoritative semantic action. The caller supplies only an
+   * opaque targetId (issued by observeScoped from the live page), the action
+   * kind, and — for typing — the final value plus its review digest. The
+   * host looks the target up, re-resolves it against the CURRENT page
+   * (unique role/label match in the same frame + production fingerprint
+   * equality), re-checks run/bot authorization, scope, secure mode, owner
+   * epoch and input ownership immediately before input, admits the exact
+   * final payload to the durable journal, and dispatches through the
+   * reviewed-fingerprint click/type path. Anything else is refused with
+   * zero input.
    */
   async semanticAct(
     botId: string,
     runId: string,
-    input: { observationId: string; documentEpoch: string; framePath: string; role: string; label: string; selector: string; kind: "click" | "type"; value?: string },
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; reviewDigest?: string | null },
   ): Promise<{ url: string; title: string }> {
-    const issued = issueSemanticTarget({
-      observationId: input.observationId,
-      documentEpoch: input.documentEpoch,
-      framePath: input.framePath,
-      role: input.role,
-      label: input.label,
-      bounds: null,
-      selectorHint: input.selector,
+    const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
+      throw new Error("A bounded typed value is required.");
+    }
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId }))
+      .digest("hex");
+    const actionId = `sem_${target.fingerprint}_${payloadDigest.slice(0, 12)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-dom",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
+      ownershipEpoch: observation.ownerEpoch, target: target.label,
+      payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
     });
-    const actionId = `sem_${issued.fingerprint}`;
-    journalPropose(this.db, {
-      actionId,
-      runId,
-      botId,
-      surface: "browser-dom",
-      surfaceIdentity: `tab:${botId}/doc:${input.documentEpoch}/frame:${input.framePath}`,
-      ownershipEpoch: input.documentEpoch,
-      payloadDigest: issued.fingerprint,
-      reviewDigest: null,
-      target: input.label,
-    });
-    if (!admitOnce(this.db, actionId)) throw new Error("This action was already admitted. Check its result instead of sending it again.");
+    // Re-resolve against the CURRENT page: unique live match + production
+    // fingerprint equality. A rerendered same-label node is STALE, and
+    // same-named controls stay distinguishable (AMBIGUOUS → zero input).
+    const page = await this.page(botId);
+    const liveCandidates = (await this.queryControls(page)).filter(
+      (candidate) => candidate.framePath === target.framePath && candidate.role === target.role && candidate.label === target.label,
+    );
+    if (liveCandidates.length === 0) {
+      journalTransition(this.db, actionId, "failed_before_effect", "target destroyed before dispatch");
+      throw new Error("TARGET_DESTROYED: the control is gone. Observe again.");
+    }
+    if (liveCandidates.length > 1 || !liveCandidates.some((candidate) => candidate.selector === target.selector)) {
+      journalTransition(this.db, actionId, "failed_before_effect", "ambiguous target at dispatch");
+      throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    }
+    const fresh = await this.describeTarget(botId, target.selector);
+    if (fresh.label !== target.label || fresh.url !== observation.documentEpoch) {
+      journalTransition(this.db, actionId, "failed_before_effect", "control identity changed before dispatch");
+      throw new Error("STALE_OBSERVATION: the page or control changed after review. Observe again.");
+    }
+    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
     journalTransition(this.db, actionId, "dispatch_started");
     try {
-      const result = input.kind === "click" ? await this.click(botId, input.selector) : await this.type(botId, input.selector, input.value ?? "");
+      // Production reviewed-fingerprint path: exact approval semantics.
+      const result = input.kind === "click"
+        ? await this.click(botId, target.selector, fresh.fingerprint)
+        : await this.type(botId, target.selector, input.value ?? "", fresh.fingerprint);
       journalTransition(this.db, actionId, "effect_observed");
       return result;
     } catch (error) {
@@ -1157,124 +1390,270 @@ export class BrowserManager {
     }
   }
 
+  /** Eligibility checked BEFORE journal admission so refused work leaves
+   * no admitted row behind: secure entry, runnable task, enabled teammate.
+   * Epoch/ownership freshness is re-checked in assertPreInput right before
+   * input, after every await. */
+  private assertActEligible(observation: CapturedObservation, runId: string, botId: string): void {
+    if (observation.secureMode) {
+      throw new Error("SECURE_MODE: owner sign-in is showing. Model-visible input is paused until handoff completes.");
+    }
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task is not runnable. Observe again under the current task.");
+    }
+    if (!this.db.getBot(botId)?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
+  }
+
+  /** Shared pre-input gate, checked immediately before every new-path
+   * dispatch — after all awaits, not just after observation. Denial, Stop,
+   * takeover, secure entry and uncertainty prevent dispatch. */
+  private assertPreInput(
+    observation: CapturedObservation,
+    runId: string,
+    botId: string,
+    admittedEpoch: number,
+    secureWall: string | null,
+  ): void {
+    if (secureWall !== null || observation.secureMode) {
+      throw new Error("SECURE_MODE: owner sign-in is showing. Model-visible input is paused until handoff completes.");
+    }
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || ["completed", "failed", "cancelled"].includes(run.status)) {
+      throw new Error("That task is no longer runnable. Observe again under the current task.");
+    }
+    const bot = this.db.getBot(botId);
+    if (!bot?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
+    if (this.db.botInputEpoch(botId) !== admittedEpoch) {
+      throw new Error("USER_TAKEOVER: control changed hands after this action was admitted. Observe again.");
+    }
+    const current = getObservation(observation.observationId);
+    if (!current || current.ownerEpoch !== this.ownerEpochFor(run.threadId, botId)) {
+      throw new Error("STALE_OBSERVATION: ownership changed after observation. Observe again.");
+    }
+  }
+
+  /** Admit the exact final payload to the durable journal. Returns the
+   * input-ownership epoch bound to the admission for pre-input re-check. */
+  private admitAction(input: {
+    actionId: string; runId: string; botId: string; surface: "browser-dom" | "browser-visual" | "native";
+    surfaceIdentity: string; ownershipEpoch: string; target: string;
+    payloadDigest: string; reviewDigest: string | null; account: string;
+  }): number {
+    journalPropose(this.db, { ...input });
+    if (!admitOnce(this.db, input.actionId)) {
+      throw new Error("This action was already admitted. Check its result instead of sending it again.");
+    }
+    return this.db.botInputEpoch(input.botId);
+  }
+
+  /** Resolve an opaque target to its host-captured observation, enforcing
+   * run/bot/session binding and observation freshness. Never mints targets
+   * from caller labels. */
+  private requireActionObservation(targetId: string, runId: string, botId: string, sessionId: string): CapturedObservation {
+    const observation = findObservationWithTarget(targetId);
+    if (!observation) throw new Error("STALE_OBSERVATION: unknown or expired observation. Observe again.");
+    if (observation.runId !== runId || observation.botId !== botId || observation.sessionId !== sessionId) {
+      throw new Error("That observation belongs to a different task or teammate.");
+    }
+    return observation;
+  }
+
   /**
-   * B03 — Visual action with exact coordinate transform. Model coordinates
-   * refer to the exact delivered image; the host maps to CSS px and validates
-   * scope + geometry freshness before input. Text-only configs get
-   * VISION_UNAVAILABLE instead of guessed coordinates.
+   * R03 — Registry-bound visual action. The caller supplies an observation
+   * ID, an adapter ID, and image-relative coordinates. The transform comes
+   * from the host-captured observation — never caller geometry. Capability
+   * is derived from the server-owned adapter registry. Freshness (TTL, tab,
+   * document, account, owner epoch), live geometry (viewport, DPR product,
+   * scroll), secure mode, run authorization and input ownership are all
+   * checked immediately before input; assertPageAccess runs before AND
+   * after. Held buttons/modifiers release on every exit path.
    */
   async visualAct(
     botId: string,
     runId: string,
     input: {
       observationId: string;
-      imageWidth: number;
-      imageHeight: number;
-      capturedWidth: number;
-      capturedHeight: number;
-      deviceScale: number;
-      browserZoom: number;
+      sessionId: string;
+      adapterId: string;
+      action: "click" | "double-click" | "drag" | "scroll" | "key";
       point: { x: number; y: number };
-      capability: "visual-supported" | "text-only";
+      endPoint?: { x: number; y: number };
+      key?: string;
     },
-  ): Promise<{ url: string; title: string }> {
+  ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
+    const capability = this.visualCapabilityForAdapter(input.adapterId);
+    const observation = getObservation(input.observationId);
+    if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    if (capability !== "visual-supported") {
+      throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+    }
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    const live = await page.evaluate(() => ({
+      dpr: window.devicePixelRatio || 1,
+      w: window.innerWidth || 0,
+      h: window.innerHeight || 0,
+      sx: window.scrollX || 0,
+      sy: window.scrollY || 0,
+    }));
     const transform = {
-      observationId: input.observationId,
+      observationId: observation.observationId,
       capturedX: 0,
       capturedY: 0,
-      capturedWidth: input.capturedWidth,
-      capturedHeight: input.capturedHeight,
+      capturedWidth: observation.viewport.cssWidth,
+      capturedHeight: observation.viewport.cssHeight,
       cropX: 0,
       cropY: 0,
-      cropWidth: input.capturedWidth * input.deviceScale,
-      cropHeight: input.capturedHeight * input.deviceScale,
-      imageWidth: input.imageWidth,
-      imageHeight: input.imageHeight,
-      deviceScale: input.deviceScale,
-      browserZoom: input.browserZoom,
+      cropWidth: observation.imageWidth,
+      cropHeight: observation.imageHeight,
+      imageWidth: observation.imageWidth,
+      imageHeight: observation.imageHeight,
+      deviceScale: observation.deviceScale,
+      browserZoom: observation.browserZoom,
     };
-    const page = await this.page(botId);
-    // B03: read live geometry before validating — a layout/zoom/window
-    // change since the observation invalidates the transform. Browser zoom
-    // multiplies devicePixelRatio, so the live product must match the
-    // observation's deviceScale * browserZoom/100 exactly.
-    const live = await page.evaluate(() => ({ dpr: window.devicePixelRatio, w: window.innerWidth, h: window.innerHeight }));
-    const viewport = page.viewportSize();
     const validated = validateVisualAction(
       {
-        observationId: input.observationId,
+        observationId: observation.observationId,
         transform,
-        action: "click",
+        action: input.action,
         point: input.point,
+        endPoint: input.endPoint,
+        key: input.key,
         currentGeometry: {
-          cssWidth: live.w || viewport?.width || input.capturedWidth,
-          cssHeight: live.h || viewport?.height || input.capturedHeight,
-          deviceScale: live.dpr || input.deviceScale,
-          browserZoom: input.browserZoom,
-          scrollX: 0,
-          scrollY: 0,
+          cssWidth: live.w,
+          cssHeight: live.h,
+          deviceScale: live.dpr,
+          browserZoom: observation.browserZoom,
+          scrollX: live.sx,
+          scrollY: live.sy,
         },
+        capturedScroll: observation.scroll,
       },
-      input.capability,
+      capability,
     );
-    // The shared validator compares deviceScale/browserZoom fields; enforce
-    // the live product match here since zoom folds into devicePixelRatio.
-    const expectedDpr = (transform.deviceScale * transform.browserZoom) / 100;
-    const liveDpr = live.dpr || 0;
-    if (validated.ok && Math.abs(liveDpr - expectedDpr) > 0.01) {
-      throw new Error("STALE_OBSERVATION: the screenshot changed after observation (zoom/scale drift). Observe again before acting.");
+    // Browser zoom folds into devicePixelRatio: the live product must match.
+    if (validated.ok && Math.abs(live.dpr - (observation.deviceScale * observation.browserZoom) / 100) > 0.01) {
+      throw new Error("STALE_OBSERVATION: zoom/scale drift since observation. Observe again before acting.");
     }
-    if (
-      validated.ok &&
-      (Math.abs((live.w || 0) - transform.capturedWidth) > 2 || Math.abs((live.h || 0) - transform.capturedHeight) > 2)
-    ) {
+    if (validated.ok && (Math.abs(live.w - observation.viewport.cssWidth) > 2 || Math.abs(live.h - observation.viewport.cssHeight) > 2)) {
       throw new Error("STALE_OBSERVATION: the window changed after observation. Observe again before acting.");
     }
     if (!validated.ok) {
-      const reason = validated.reason;
-      if (reason === "VISION_UNAVAILABLE") throw new Error("VISION_UNAVAILABLE: this configuration cannot ground visual targets. Hand back the task instead of guessing coordinates.");
-      throw new Error(`${reason}: the screenshot changed after observation. Observe again before acting.`);
+      if (validated.reason === "VISION_UNAVAILABLE") throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+      throw new Error(`${validated.reason}: the screenshot changed after observation. Observe again before acting.`);
     }
-    const actionId = `vis_${input.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}`;
-    journalPropose(this.db, {
-      actionId,
-      runId,
-      botId,
-      surface: "browser-visual",
-      surfaceIdentity: `tab:${botId}/obs:${input.observationId}`,
-      ownershipEpoch: input.observationId,
-      payloadDigest: actionId,
-      reviewDigest: null,
-      target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId }))
+      .digest("hex");
+    const actionId = `vis_${observation.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}_${payloadDigest.slice(0, 8)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-visual",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/obs:${observation.observationId}`,
+      ownershipEpoch: observation.ownerEpoch, target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
+      payloadDigest, reviewDigest: null, account: observation.account,
     });
-    if (!admitOnce(this.db, actionId)) throw new Error("This visual action was already admitted.");
+    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
+    this.assertPageAccess(botId, page);
     if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
+      journalTransition(this.db, actionId, "failed_before_effect", "input lease held by another task");
       throw new Error("Another task holds the input lease. Wait for it to finish.");
     }
     journalTransition(this.db, actionId, "dispatch_started");
     try {
-      await page.mouse.click(validated.cssX, validated.cssY);
+      if (input.action === "click") await page.mouse.click(validated.cssX, validated.cssY);
+      else if (input.action === "double-click") await page.mouse.dblclick(validated.cssX, validated.cssY);
+      else if (input.action === "drag" && input.endPoint) {
+        const end = validateVisualAction(
+          {
+            observationId: observation.observationId, transform, action: "drag",
+            point: input.endPoint, currentGeometry: { cssWidth: live.w, cssHeight: live.h, deviceScale: live.dpr, browserZoom: observation.browserZoom, scrollX: live.sx, scrollY: live.sy },
+            capturedScroll: observation.scroll,
+          },
+          capability,
+        );
+        if (!end.ok) throw new Error(`${end.reason}: drag end point invalid. Observe again.`);
+        await page.mouse.move(validated.cssX, validated.cssY);
+        await page.mouse.down();
+        try {
+          await page.mouse.move(end.cssX, end.cssY, { steps: 12 });
+        } finally {
+          await page.mouse.up().catch(() => undefined);
+        }
+      } else if (input.action === "scroll") {
+        await page.mouse.move(validated.cssX, validated.cssY);
+        await page.mouse.wheel(0, 400);
+      } else if (input.action === "key" && input.key) {
+        await page.mouse.click(validated.cssX, validated.cssY);
+        await page.keyboard.press(input.key);
+      } else {
+        throw new Error("That visual action is not supported with these arguments.");
+      }
       await page.waitForTimeout(180);
       this.assertPageAccess(botId, page);
       journalTransition(this.db, actionId, "effect_observed");
       releaseDesktopLease(runId);
-      return { url: page.url(), title: await page.title() };
+      return { url: page.url(), title: await page.title(), cssX: validated.cssX, cssY: validated.cssY };
     } catch (error) {
+      await page.mouse.up().catch(() => undefined);
       releaseDesktopLease(runId);
       journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
 
-  /** B02 — Region-specific scroll of the intended pane (bounded). */
-  async scrollPane(botId: string, framePath: string, paneId: string | null, deltaY: number): Promise<{ url: string; title: string }> {
+  /**
+   * R03/R06 — Region scroll against the actually authorized region. The
+   * pane token is opaque (issued by observeScoped from the live page); the
+   * host resolves it to a frame + selector, scrolls THAT element, and reads
+   * back its scroll position. The requested region is never discarded.
+   */
+  async scrollPane(
+    botId: string,
+    runId: string,
+    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number },
+  ): Promise<{ url: string; title: string; moved: number; beforeTop: number; afterTop: number }> {
+    const observation = getObservation(input.observationId);
+    if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
+    if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
+    const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
+    if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
+    const payloadDigest = createHash("sha256")
+      .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded }))
+      .digest("hex");
+    const actionId = `scr_${observation.observationId}_${pane.paneToken}_${payloadDigest.slice(0, 8)}`;
+    const admittedEpoch = this.admitAction({
+      actionId, runId, botId, surface: "browser-dom",
+      surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${pane.framePath}`,
+      ownershipEpoch: observation.ownerEpoch, target: `scroll ${pane.label}`,
+      payloadDigest, reviewDigest: null, account: observation.account,
+    });
     const page = await this.page(botId);
+    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
     this.assertPageAccess(botId, page);
-    const region = scrollRegionForTarget({ framePath, paneId, deltaY });
-    void region;
-    await page.mouse.wheel(0, Math.max(-3000, Math.min(3000, deltaY)));
-    await page.waitForTimeout(140);
-    return { url: page.url(), title: await page.title() };
+    journalTransition(this.db, actionId, "dispatch_started");
+    try {
+      const frameScope = pane.framePath === "/" ? page : page.frameLocator(pane.framePath);
+      const beforeTop = await frameScope.locator(pane.selector).first().evaluate((node) => (node as HTMLElement).scrollTop);
+      await frameScope.locator(pane.selector).first().evaluate((node, dy) => { (node as HTMLElement).scrollBy(0, dy); }, bounded);
+      await page.waitForTimeout(140);
+      const afterTop = await frameScope.locator(pane.selector).first().evaluate((node) => (node as HTMLElement).scrollTop);
+      this.assertPageAccess(botId, page);
+      journalTransition(this.db, actionId, "effect_observed");
+      return { url: page.url(), title: await page.title(), moved: afterTop - beforeTop, beforeTop, afterTop };
+    } catch (error) {
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   async status(botId: string, computer: ComputerManager): Promise<ComputerStatus> {

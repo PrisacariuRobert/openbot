@@ -2760,6 +2760,21 @@ export class OpenBotDatabase {
     return result.changes === 1 ? this.getApprovedAction(id) : null;
   }
 
+  /** R02/R03 input-ownership epoch per teammate. Stop, takeover and
+   * sign-in handoff bump the epoch; in-flight action proposals admitted
+   * under an older epoch are refused dispatch. Stored durably so the
+   * revocation survives restarts; defaults to 0 (never revoked). */
+  botInputEpoch(botId: string): number {
+    const record = this.extensionRecord<{ epoch: number }>("input-epoch", botId);
+    return record?.epoch ?? 0;
+  }
+
+  revokeBotInput(botId: string): number {
+    const next = this.botInputEpoch(botId) + 1;
+    this.saveExtensionRecord("input-epoch", botId, { epoch: next });
+    return next;
+  }
+
   /** R02 durable action journal (renderer-independent companion to
    * approved_actions). Every browser/visual/native dispatch admits here
    * first: one admitted mutation can never fork a second version through

@@ -36,13 +36,25 @@ export type VisualPoint = { x: number; y: number };
 /**
  * Map a model-reported point (delivered-image px) to browser CSS px.
  * Constrained request, not authority: callers must still validate scope +
- * geometry freshness before input. Refuses negative/out-of-view points.
+ * geometry freshness before input. Refuses negative/out-of-view points and
+ * non-finite coordinates (NaN/Infinity never map to a screen point).
  */
 export function visualToCss(
   transform: ImageTransform,
   point: VisualPoint,
 ): { ok: true; cssX: number; cssY: number } | { ok: false; reason: "OUT_OF_VIEW" | "STALE_TRANSFORM" } {
-  if (transform.imageWidth <= 0 || transform.imageHeight <= 0 || transform.cropWidth <= 0 || transform.cropHeight <= 0) {
+  if (
+    !Number.isFinite(point.x) ||
+    !Number.isFinite(point.y) ||
+    !Number.isFinite(transform.imageWidth) ||
+    !Number.isFinite(transform.imageHeight) ||
+    !Number.isFinite(transform.cropWidth) ||
+    !Number.isFinite(transform.cropHeight) ||
+    !Number.isFinite(transform.cropX) ||
+    !Number.isFinite(transform.cropY) ||
+    !Number.isFinite(transform.deviceScale) ||
+    transform.deviceScale <= 0
+  ) {
     return { ok: false, reason: "STALE_TRANSFORM" };
   }
   if (point.x < 0 || point.y < 0 || point.x > transform.imageWidth || point.y > transform.imageHeight) {
@@ -93,6 +105,9 @@ export type VisualActionRequest = {
   endPoint?: VisualPoint;
   key?: string;
   currentGeometry: { cssWidth: number; cssHeight: number; deviceScale: number; browserZoom: number; scrollX: number; scrollY: number };
+  /** Scroll offsets captured with the observation. Any material scroll drift
+   * since capture invalidates the transform — pixels moved under the point. */
+  capturedScroll?: { x: number; y: number };
 };
 
 export function validateVisualAction(
@@ -104,8 +119,33 @@ export function validateVisualAction(
   if (!["click", "double-click", "drag", "scroll", "key", "zoom-inspect"].includes(request.action)) {
     return { ok: false, reason: "UNSUPPORTED_ACTION" };
   }
-  // Geometry check: layout/zoom/window/focus change invalidates the transform.
-  if (request.transform.deviceScale !== request.currentGeometry.deviceScale || request.transform.browserZoom !== request.currentGeometry.browserZoom) {
+  if (!Number.isFinite(request.point.x) || !Number.isFinite(request.point.y)) {
+    return { ok: false, reason: "STALE_OBSERVATION" };
+  }
+  if (request.endPoint && (!Number.isFinite(request.endPoint.x) || !Number.isFinite(request.endPoint.y))) {
+    return { ok: false, reason: "STALE_OBSERVATION" };
+  }
+  // Geometry check: layout/zoom/window/scroll/focus change invalidates the
+  // transform. Scroll drift of even a few pixels moves content under a
+  // previously valid point, so it is checked alongside scale and size.
+  const geometry = request.currentGeometry;
+  if (
+    !Number.isFinite(geometry.cssWidth) ||
+    !Number.isFinite(geometry.cssHeight) ||
+    !Number.isFinite(geometry.deviceScale) ||
+    !Number.isFinite(geometry.browserZoom) ||
+    !Number.isFinite(geometry.scrollX) ||
+    !Number.isFinite(geometry.scrollY)
+  ) {
+    return { ok: false, reason: "STALE_OBSERVATION" };
+  }
+  if (request.transform.deviceScale !== geometry.deviceScale || request.transform.browserZoom !== geometry.browserZoom) {
+    return { ok: false, reason: "STALE_OBSERVATION" };
+  }
+  if (
+    request.capturedScroll &&
+    (Math.abs(request.capturedScroll.x - geometry.scrollX) > 2 || Math.abs(request.capturedScroll.y - geometry.scrollY) > 2)
+  ) {
     return { ok: false, reason: "STALE_OBSERVATION" };
   }
   const mapped = visualToCss(request.transform, request.point);
