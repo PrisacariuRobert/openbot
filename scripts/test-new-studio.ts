@@ -493,16 +493,14 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 960 });
   unconfigured = true;
-  await page.goto(base + "/studio.html");
-  await page
-    .locator(".sidebar-conversations")
-    .getByRole("button", { name: "Nova", exact: true })
-    .click();
+  await page.goto(`${base}/studio.html?thread=bot-nova`);
+  await page.getByRole("button", { name: "About Nova", exact: true }).waitFor();
   await page
     .getByRole("textbox", { name: "Message your team" })
     .fill("My test draft");
   const before = posts.length;
   const chatUrl = page.url();
+  await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')?.disabled === false);
   await page.getByRole("textbox", { name: "Message your team" }).press("Enter");
   // The provider gate navigates to the Your AI settings page (not a dialog);
   // returning to the conversation restores the draft from the server.
