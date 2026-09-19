@@ -129,13 +129,13 @@ a.file-card:active {
 /* Result first. Supporting evidence is one labelled disclosure, not another answer. */
 .delivery-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
 .delivery-summary > details { margin: 0; padding: 0; border: 0; font-size: 12px; color: var(--secondary); max-width: 100%; }
-.delivery-summary > details > summary { display: flex; align-items: center; gap: 8px; width: fit-content; min-height: 40px; padding: 8px 0; box-sizing: border-box; border: 0; border-radius: 0; cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; }
-.delivery-summary > details > summary:hover { color: var(--ink); text-decoration: underline; }
+.delivery-summary > details > summary { display: flex; align-items: center; gap: 8px; width: fit-content; min-height: 40px; padding: 8px 10px; box-sizing: border-box; border: 0; border-radius: 9px; cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; }
+.delivery-summary > details > summary:hover { color: var(--ink); text-decoration: none; }
 .delivery-summary summary::-webkit-details-marker { display: none; }
 .delivery-summary > details > summary::after { content: none; }
 .delivery-summary > details[open] { flex-basis: 100%; }
 .delivery-summary > details[open] > summary { color: var(--ink); }
-.delivery-summary > details > summary:hover { background: var(--surface-muted); }
+.delivery-summary > details > summary:hover { background: color-mix(in srgb, var(--surface-muted) 65%, transparent); }
 .delivery-summary > details > summary:active:not(:disabled) { filter: brightness(.96); }
 .delivery-summary > details > summary:focus-visible, .delivery-review-cta:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .delivery-summary .delivery-review-cta { min-height: 40px; padding: 8px 12px; margin: 0; font-size: 12px; }

@@ -821,7 +821,7 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
 .action-completed-group .action-completed-records { padding-bottom: 8px; }
 .action-completed-group details p small { display: block; }
 .from-team {
-  max-width: 88%; min-width: min(489px, 88%); width: fit-content; position: relative; padding-left: 37px;
+  max-width: 88%; min-width: 0; width: fit-content; position: relative; padding-left: 37px;
 }
 .from-team > .prose {
   background: color-mix(in srgb, var(--message-tint, var(--secondary)) 9%, var(--system-background));
@@ -832,7 +832,7 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
   border-radius: 4px 16px 16px 4px;
 }
 .from-you {
-  background: var(--bubble-outgoing); border-radius: 18px 18px 6px 18px; padding: 11px 15px; box-shadow: none; font-size: 15px; line-height: 22px; color: var(--bubble-outgoing-label); max-width: min(520px, 85%); min-width: min(480px, 85%);
+  background: var(--bubble-outgoing); border-radius: 18px 18px 6px 18px; padding: 11px 15px; box-shadow: none; font-size: 15px; line-height: 22px; color: var(--bubble-outgoing-label); max-width: min(520px, 85%); min-width: 0; width: fit-content;
 }
 .from-you.continues {
   border-radius: 16px 4px 4px 16px;
@@ -2223,3 +2223,6 @@ a.message-file:hover {
 .row-action-toggle:focus-visible { opacity: 1; }
 .conversation-cell.swiped .row-action-toggle { visibility: hidden; }
 @media(hover:none) { .row-action-toggle { opacity: 1; } }
+
+/* Results retain a readable document width; ordinary bubbles fit their text. */
+.from-team:has(.delivered-file) { min-width: min(489px, 88%); }
