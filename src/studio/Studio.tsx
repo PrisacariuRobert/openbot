@@ -1,3 +1,5 @@
+import type { Attachment } from "../shared/types";
+import { DocumentPane } from "./DocumentPane";
 import {
   Fragment,
   lazy,
@@ -341,110 +343,22 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
     badgeVariant?: (state: AppState) => "neutral" | "success" | "warning";
     keywords: ReadonlyArray<string>;
   }>;
-}> = [
-  {
-    title: "AI & Teammates",
-    items: [
-      {
-        id: "provider",
-        title: "Your AI",
-        description: "Models, providers, and API connections",
-        icon: Sparkles,
-        badge: (state) => (state.providers?.length ? `${state.providers.length} connected` : undefined),
-        badgeVariant: () => "success",
-        keywords: ["ai", "model", "provider", "opencode", "claude", "gpt", "ollama", "api key", "gemini", "deepseek", "tokens"],
-      },
-      {
-        id: "bot",
-        title: "Teammates",
-        description: "Personalities, instructions, and limits",
-        icon: UsersRound,
-        badge: (state) => (state.bots ? `${state.bots.length} active` : undefined),
-        badgeVariant: () => "neutral",
-        keywords: ["teammate", "bot", "role", "avatar", "character", "instructions", "prompt", "nova", "pixel", "scout"],
-      },
-      {
-        id: "connectors",
-        title: "Apps & Tools",
-        description: "Google Workspace, Slack, Notion, GitHub",
-        icon: Boxes,
-        keywords: ["apps", "tools", "connectors", "google", "workspace", "slack", "notion", "github", "drive", "email"],
-      },
-      {
-        id: "routines",
-        title: "Automations",
-        description: "Scheduled tasks, watchers, and cron routines",
-        icon: Clock,
-        badge: (state) => (state.routines?.length ? `${state.routines.length} routines` : undefined),
-        badgeVariant: () => "neutral",
-        keywords: ["automations", "routines", "cron", "schedule", "trigger", "watcher", "runner"],
-      },
-      {
-        id: "remote",
-        title: "Your Phone",
-        description: "Pair OpenBot mobile and away access",
-        icon: Smartphone,
-        keywords: ["phone", "remote", "away", "qr", "pair", "mobile", "ios", "android"],
-      },
-    ],
-  },
-  {
-    title: "System & Safety",
-    items: [
-      {
-        id: "control",
-        title: "Permissions & Safety",
-        description: "Mac access consent, tool-building, and safety",
-        icon: ShieldCheck,
-        badge: (state) => (state.settings?.yoloMode ? "YOLO active" : "Protected"),
-        badgeVariant: (state) => (state.settings?.yoloMode ? "warning" : "neutral"),
-        keywords: ["permissions", "safety", "mac access", "security", "yolo", "sandbox", "limits"],
-      },
-      {
-        id: "projects",
-        title: "Projects & Repositories",
-        description: "Local folders, git branches, and worktrees",
-        icon: FolderGit2,
-        keywords: ["projects", "repositories", "git", "folders", "code", "github", "worktree"],
-      },
-      {
-        id: "artifacts",
-        title: "Deliverables & Artifacts",
-        description: "Finished outputs, documents, and revisions",
-        icon: FileText,
-        keywords: ["deliverables", "artifacts", "documents", "outputs", "reports", "files"],
-      },
-    ],
-  },
-  {
-    title: "Developer & Advanced",
-    items: [
-      {
-        id: "teach",
-        title: "Skills & MCP Recipes",
-        description: "Learned actions, community tools, and memory",
-        icon: WandSparkles,
-        keywords: ["skills", "teach", "recipes", "mcp", "tools", "actions", "learn"],
-      },
-      {
-        id: "live",
-        title: "Activity & Recovery",
-        description: "Audit receipts, live tasks, and interrupted actions",
-        icon: Activity,
-        badge: (state) => (state.runs?.length ? `${state.runs.length} active` : undefined),
-        badgeVariant: () => "neutral",
-        keywords: ["activity", "recovery", "receipts", "live", "tasks", "audit"],
-      },
-      {
-        id: "files",
-        title: "Teammate Files",
-        description: "Inspect raw isolated teammate workspaces",
-        icon: Files,
-        keywords: ["teammate files", "scratchpad", "isolated", "workspaces", "raw"],
-      },
-    ],
-  },
-];
+}> = [{ title: "Workspace", items: [
+{ id: "team", title: "Your team", description: "A few useful personalities. One familiar place to work.", icon: UsersRound, keywords: ["teammates", "import", "restore"] },
+{ id: "provider", title: "Your AI", description: "Choose the connection. Keep the conversation.", icon: Sparkles, keywords: ["models", "provider", "api key", "account", "local"] },
+{ id: "connectors", title: "Apps & tools", description: "Familiar tools. Clear boundaries.", icon: Boxes, keywords: ["google", "slack", "notion", "github", "connectors", "mcp"] },
+{ id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] },
+{ id: "projects", title: "Projects", description: "Real changes, with room to review.", icon: FolderGit2, keywords: ["git", "code", "worktree"] },
+{ id: "artifacts", title: "Files & results", description: "What came back, and the source it came from.", icon: FileText, keywords: ["documents", "deliverables", "revisions"] },
+{ id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
+{ id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
+{ id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
+{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] },
+{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] },
+{ id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
+{ id: "files", title: "Private files", description: "Inspect their workspace without widening access.", icon: Files, keywords: ["scratchpad", "files"] },
+{ id: "computer", title: "Computer", description: "A private workspace with visible boundaries.", icon: Monitor, keywords: ["browser", "container", "desktop"] }
+]}];
 
 function SettingsWorkspacePage({
   activePanel,
@@ -456,7 +370,9 @@ function SettingsWorkspacePage({
   onOpenCapability,
   onThread,
   onRefresh,
+  onCreate,
 }: {
+  onCreate: () => void;
   activePanel: CapabilityPanel;
   setActivePanel: (panel: CapabilityPanel) => void;
   state: AppState;
@@ -521,7 +437,7 @@ function SettingsWorkspacePage({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search settings... (/)"
+              placeholder="Search"
               aria-label="Search settings"
               className="settings-search-input"
               style={{ fontSize: 12 }}
@@ -559,6 +475,7 @@ function SettingsWorkspacePage({
                   <button
                     key={item.id}
                     type="button"
+                    aria-current={isCurrent ? "page" : undefined}
                     className={`settings-nav-button${isCurrent ? " active" : ""}`}
                     onClick={() => selectItem(item.id)}
                   >
@@ -588,7 +505,8 @@ function SettingsWorkspacePage({
                     <button
                       key={item.id}
                       type="button"
-                      className={`settings-nav-button${isCurrent ? " active" : ""}`}
+                      aria-current={isCurrent ? "page" : undefined}
+                    className={`settings-nav-button${isCurrent ? " active" : ""}`}
                       onClick={() => selectItem(item.id)}
                     >
                       <span className="settings-nav-button-icon">
@@ -624,6 +542,7 @@ function SettingsWorkspacePage({
 
       <section className="settings-page-content">
         <header className="settings-page-header">
+          <button className="settings-mobile-back" onClick={() => setMobileMode("menu")}><ChevronLeft size={18} /> Workspace</button>
           <h2 className="settings-page-title">{activeItem.title}</h2>
           <p className="settings-page-desc">{activeItem.description}</p>
         </header>
@@ -631,6 +550,8 @@ function SettingsWorkspacePage({
           <Suspense fallback={<p className="quiet-copy" role="status">Opening {activeItem.title.toLowerCase()}…</p>}>
             <CapabilityPanelHost
               key={activePanel}
+              onCreate={onCreate}
+              onEditBot={(id) => onOpenCapability("bot", id)}
               panel={activePanel}
               state={state}
               threadId={thread}
@@ -667,6 +588,8 @@ export function Studio() {
   const sendError = sendErrors[thread] || "";
   const setSendError = (message: string) => setSendErrors((items) => ({ ...items, [thread]: message }));
   const firstLoad = useRef(true);
+  const [documentFile, setDocumentFile] = useState<Attachment | null>(null);
+  useEffect(() => setDocumentFile(null), [thread]);
   const [detail, setDetail] = useState<Detail | null>(() => new URLSearchParams(location.search).get("panel") === "settings" ? {kind: "settings"} : null),
     [recipient, setRecipient] = useState(""),
     [sending, setSending] = useState(false);
@@ -1844,7 +1767,7 @@ export function Studio() {
   );
   return (
     <div
-      className={`studio-shell ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
+      className={`studio-shell ${documentFile && page === "chat" ? "with-document" : ""} ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
     >
       <aside className="sidebar">
         <a className="wordmark" href="/">
@@ -1896,7 +1819,7 @@ export function Studio() {
           <button
             className="workspace-link"
             aria-label="Open workspace"
-            onClick={() => setDetail({ kind: "workspace" })}
+            onClick={() => openCapability("team")}
           >
             <Layers3 size={17} /> Workspace{" "}
             {attentionCount > 0 && <b>{attentionCount} need you</b>}
@@ -1927,7 +1850,7 @@ export function Studio() {
           </span>
           <span className="topbar-center">
             {page === "settings" ? (
-              <span className="conversation-name">Settings</span>
+              <span className="conversation-name"><Settings2 size={17} /> Workspace</span>
             ) : conversationBot ? (
               <>
                 <span
@@ -1981,6 +1904,7 @@ export function Studio() {
             )}
           </span>
           <div className="topbar-right">
+            {page === "settings" && <button className="workspace-return" onClick={() => openThread(thread)}>Back to conversation</button>}
             {page === "chat" && state?.bots.length ? (
               <button
                 className="topbar-control"
@@ -2036,7 +1960,8 @@ export function Studio() {
           <>
             {page === "settings" && state && (
               <SettingsWorkspacePage
-                activePanel={capability || "provider"}
+                onCreate={() => setDetail({ kind: "create" })}
+                activePanel={capability || "team"}
                 setActivePanel={(next) => openCapability(next)}
                 state={state}
                 thread={thread}
@@ -2460,27 +2385,9 @@ export function Studio() {
                   <div className="chat-messages">
                     {state.activeThreadId === thread && state.messages[0] && <div className="conversation-date">{dayKey(state.messages[0].createdAt) === dayKey(new Date()) ? "Today" : dateText(state.messages[0].createdAt)} · {timeText(state.messages[0].createdAt)}</div>}
                     {!state.bots.length ? (
-                      <div className="first-teammate">
-                        <span className="first-teammate-mark">
-                          <MessageCircle size={36} strokeWidth={1.2} />
-                          <Plus size={18} />
-                        </span>
-                        <p className="overline">YOUR STUDIO, FROM THE START</p>
-                        <h1>Make room for a little help.</h1>
-                        <p>
-                          Create a teammate for something you want off your
-                          plate. Start with one—you can add more later.
-                        </p>
-                        <button
-                          className="primary"
-                          onClick={() => setDetail({ kind: "create" })}
-                        >
-                          Create your first teammate <ArrowRight size={16} />
-                        </button>
-                        <small>
-                          You choose their personality, their job and the AI
-                          they use.
-                        </small>
+                      <div className="first-teammate refined-welcome">
+                        <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><h1>A small team.<br/>A familiar conversation.</h1><p>A little help with the work.<br/>A little more room for you.</p></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>Bring an existing teammate</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>
@@ -2621,7 +2528,7 @@ export function Studio() {
                               onReacted={() => setRefresh((n) => n + 1)}
                             />
                             {message.senderType === "bot" && message.runId
-                              ? <DeliveryCard message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
+                              ? <DeliveryCard onOpenDocument={file => { setContextOpen(false); setDocumentFile(file); }} message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
@@ -2716,8 +2623,10 @@ export function Studio() {
           />
         </aside>
       )}
+      {documentFile && page === "chat" && <DocumentPane key={documentFile.id} file={documentFile} files={conversationFiles} canRevise={composerDraft.ready} modal={narrow} onClose={() => setDocumentFile(null)} onRevise={file => { setDraft(`${draft}${draft ? "\n\n" : ""}Please revise ${file.name} (attachment ${file.id}, revision ${file.revision}): `); requestAnimationFrame(() => document.getElementById("studio-message")?.focus()); }} />}
       {detail && detail.kind !== "settings" && (
         <Drawer
+          kind={detail.kind}
           onClose={() => setDetail(null)}
           title={
             detail.kind === "context"
@@ -2806,11 +2715,12 @@ export function Studio() {
                 variant={detail.bot.mascot}
                 status={detail.bot.status}
                 mood="happy"
-                size={130}
+                size={76}
               />
               <p className="overline">YOUR TEAMMATE</p>
               <h2 className="detail-title">{detail.bot.name}</h2>
               <p className="teammate-specialty">{detail.bot.role}</p>
+              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`} onClick={(event) => { event.preventDefault(); openCapability("bot", detail.bot.threadId); }}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
               <p className="drawer-intro">
                 Talk to {detail.bot.name} directly, or ask the whole team. They
                 can consult each other, with one teammate bringing you the final
@@ -2855,7 +2765,6 @@ export function Studio() {
                 <ArrowRight size={15} />
               </button>
               <AppearanceEditor key={detail.bot.id} bot={detail.bot} onSaved={(bot) => { setDetail({ kind: "teammate", bot }); setRefresh((n) => n + 1); }}/>
-              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`} onClick={(event) => { event.preventDefault(); openCapability("bot", detail.bot.threadId); }}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
             </div>
           )}
           {detail.kind === "search" && (
@@ -3014,12 +2923,14 @@ export function Studio() {
 }
 
 function Drawer({
+  kind,
   title,
   children,
   onClose,
   onBack,
   settings = false,
 }: {
+  kind?: string;
   title: string;
   children: ReactNode;
   onClose: () => void;
@@ -3044,7 +2955,7 @@ function Drawer({
   return (
     <dialog
       ref={ref}
-      className={`detail-drawer${settings ? " settings-drawer" : ""}`}
+      className={`detail-drawer detail-${kind || "default"}${settings ? " settings-drawer" : ""}`}
       aria-label={title}
       onCancel={onClose}
       onKeyDown={(event) => {

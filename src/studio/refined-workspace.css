@@ -1,0 +1,106 @@
+/* Refined workspace, Figma 103:1523 and companion journeys. */
+.settings-page-sidebar { width: 202px; flex-basis: 202px; border: 0; background: var(--system-background); }
+.settings-sidebar-scroll { padding: 15px; gap: 4px; }
+.settings-sidebar-group { gap: 4px; }
+.settings-sidebar-group-title { display: none; }
+.settings-sidebar-search { padding: 15px 15px 0; }
+.settings-search-bar:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.settings-search-bar input:focus-visible { outline: none; }
+.settings-nav-button { min-height: 42px; font-size: 13px; padding: 10px; border-radius: 10px; }
+.settings-nav-button.active .settings-nav-button-icon { color: var(--secondary); }
+.settings-page-header { position: static; padding: 34px 38px 0; background: var(--system-background); backdrop-filter: none; border: 0; }
+:root[data-appearance="dark"] .settings-page-header { background: var(--system-background); border: 0; }
+.settings-page-title { font-size: 36px; line-height: 42px; letter-spacing: -1px; margin-bottom: 8px; }
+.settings-page-desc { font-size: 15px; line-height: 22px; }
+.settings-page-body { max-width: none; padding: 24px 38px 48px; }
+.workspace-settings .topbar-center { justify-content: flex-start; }
+.workspace-settings .conversation-name { display: flex; align-items: center; gap: 12px; font-size: 17px; }
+.workspace-return, .capabilities .workspace-page-actions > button { min-height: 40px; padding: 10px 18px; background: var(--tertiary-system-background); border: 0; border-radius: 9px; font-size: 13px; }
+.settings-mobile-back { display: none; }
+.capabilities .workspace-page-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.capabilities .workspace-page-actions > .button-primary { background: var(--strong); color: var(--on-strong); }
+.capabilities .workspace-page-actions > button { display: inline-flex; align-items: center; gap: 8px; }
+.capabilities .workspace-team-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.capabilities .workspace-teammate { border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 14px; }
+.workspace-teammate-identity { display: flex; align-items: center; width: 100%; text-align: left; padding: 0; border: 0; background: transparent; gap: 14px; }
+.workspace-teammate-identity > span { flex: 1; min-width: 0; }
+.workspace-teammate-identity strong { font-size: 17px; line-height: 23px; }
+.workspace-teammate-identity small { margin-top: 5px; font-size: 13px; }
+.workspace-teammate-chat { display: flex; align-items: center; gap: 6px; width: fit-content; font-size: 11px; background: transparent; border: 0; padding: 4px 0; color: var(--secondary); }
+.capabilities .workspace-note { display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: 16px; background: var(--surface-pixel-message); margin-bottom: 22px; }
+.capabilities .workspace-note > svg { flex: none; }
+.capabilities .workspace-note strong { font-size: 17px; line-height: 23px; }
+.capabilities .workspace-note p { font-size: 13px; line-height: 19px; margin: 6px 0 0; }
+.capabilities .workspace-row-group { border: 1px solid var(--line); border-radius: 16px; padding: 8px 18px; margin-bottom: 24px; }
+.capabilities .workspace-list-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 0; border: 0; background: transparent; text-align: left; }
+.capabilities .workspace-list-row + .workspace-list-row { border-top: 1px solid var(--line); }
+.capabilities .workspace-list-row > span { flex: 1; min-width: 0; }
+.capabilities .workspace-list-row small { margin-top: 4px; }
+.capabilities .workspace-usage-totals { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-bottom: 28px; }
+.capabilities .workspace-usage-totals > div { border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.capabilities .workspace-usage-totals strong { font-size: 26px; font-weight: 600; }
+.capabilities .workspace-restoration { margin-top: 28px; }
+.capabilities .workspace-footnote { font-size: 11px; line-height: 17px; color: var(--secondary); margin-top: 24px; }
+.capabilities .workspace-empty { padding: 16px 0; }
+@media (max-width: 1100px) { .capabilities .workspace-team-grid { grid-template-columns: minmax(0,1fr); } .settings-page-header { padding-inline: 24px; } .settings-page-body { padding-inline: 24px; } }
+@media (max-width: 768px) {
+  .settings-page-sidebar { width: 100%; flex: 1; }
+  .settings-page-header { padding: 16px 16px 0; }
+  .settings-page-title { font-size: 26px; line-height: 32px; }
+  .settings-page-body { padding: 20px 16px 32px; }
+  .settings-mobile-back { display: inline-flex; align-items: center; gap: 5px; padding: 0; min-height: 40px; margin-bottom: 8px; border: 0; background: transparent; color: var(--secondary); }
+  .workspace-return { max-width: 130px; padding-inline: 10px; }
+  .capabilities .workspace-note { padding: 16px; gap: 12px; }
+  .capabilities .workspace-note > svg { width: 38px; height: 38px; }
+  .capabilities .workspace-usage-totals { gap: 6px; }
+  .capabilities .workspace-usage-totals > div { padding: 12px 8px; }
+  .capabilities .workspace-usage-totals strong { font-size: 20px; }
+}
+
+.workspace-settings { border: 1px solid var(--line); border-radius: 24px; }
+.capabilities .workspace-page-actions { justify-content: flex-start; }
+.settings-sidebar-footer .apple-segmented-control { display: flex; width: 100%; gap: 0; padding: 3px; }
+.settings-sidebar-footer .apple-segmented-item { min-width: 0; flex: 1; padding: 6px 3px; font-size: 11px; }
+.settings-sidebar-footer .apple-segmented-icon { display: none; }
+@media(max-width:768px) { .workspace-settings { border: 0; border-radius: 0; } }
+
+/* Apply the refined hierarchy to existing forms without changing their handlers. */
+.capabilities .settings-group-title { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--secondary); }
+.capabilities .settings-group-header { padding-inline: 0; }
+.capabilities .settings-card { border-radius: 16px; box-shadow: none; }
+.capabilities .settings-row { padding: 18px; }
+.capabilities .settings-row-text strong { font-size: 13px; font-weight: 500; }
+.capabilities .settings-row-text small { font-size: 13px; line-height: 19px; margin-top: 5px; }
+.capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) { padding: 20px 24px; border: 0; border-radius: 16px; background: var(--surface-pixel-message); margin-bottom: 24px; }
+.capabilities .ai-intro { flex-direction: row-reverse; justify-content: flex-end; gap: 18px; }
+.capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) h3 { font-size: 17px; line-height: 23px; letter-spacing: -.4px; margin-bottom: 5px; }
+.capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) p { font-size: 13px; line-height: 19px; margin: 0; }
+.capabilities .connector-catalog { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.capabilities .connector-card { border-radius: 16px; box-shadow: none; }
+.capabilities .connector-card-category { text-transform: none; letter-spacing: 0; }
+.capabilities .connector-capability-tag { font-size: 11px; }
+.capabilities .capability-owner { border: 0; margin-bottom: 22px; padding-top: 0; }
+.capabilities .bot-hero { padding: 20px; border-radius: 16px; background: var(--surface-pixel-message); }
+.capabilities .bot-hero .capability-pills { padding-top: 8px; }
+.capability-control .control-hero, .capability-control .stat-grid { display: none; }
+.capabilities .workspace-row-action { flex: none; font-size: 11px; color: var(--secondary); }
+.capabilities .panel-error { border-radius: 14px; padding: 16px; line-height: 1.5; }
+.capabilities .extension-card { border-radius: 16px; box-shadow: none; }
+.capabilities :is(.extension-empty, .empty-panel) { border-style: solid; border-radius: 16px; }
+.capabilities .extensions-panel > header { margin-bottom: 20px; }
+.capabilities .workspace-list-row > small { max-width: 35%; text-align: right; }
+@media (max-width: 768px) {
+  .settings-nav-button-label { white-space: normal; overflow: visible; }
+  .capabilities .connector-catalog { grid-template-columns: minmax(0,1fr); }
+  .capabilities .workspace-list-row { flex-wrap: wrap; }
+  .capabilities .workspace-row-action { margin-left: 50px; }
+  .capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) { padding: 16px; }
+}
+.capabilities .workspace-import-preview { border: 1px solid var(--line); border-radius: 20px; padding: 24px; margin-bottom: 24px; }
+.capabilities .panel-error strong { font-size: 17px; }
+.capabilities .panel-error button { margin-top: 12px; }
+.capabilities .workspace-list-row > .workspace-row-action { flex: none; margin-left: auto; }
+.capabilities .settings-row:has(textarea) .settings-row-control { flex-basis: 100%; width: 100%; }
+.capabilities .settings-row:has(textarea) textarea { width: 100%; min-height: 110px; }
+.capability-teach .settings-row-text small > span { display: block; margin-top: 3px; }
+.workspace-settings :is(.mobile-search,.mobile-workspace,.conversation-back) { display: none; }

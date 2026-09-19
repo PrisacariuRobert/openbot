@@ -12,8 +12,8 @@ import { fileLabel, fileSiglaClass } from "./file-glyph";
 /** A finished result: files as tappable file cards with a type tile, name,
  * and size — the way attachments look in a real conversation app — then a
  * single whisper of provenance. */
-export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles = [] }: {
-  message: Message; run?: Run; childRuns?: Run[]; teammates?: Bot[]; visibleFiles?: Attachment[];
+export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles = [], onOpenDocument }: {
+  message: Message; run?: Run; childRuns?: Run[]; teammates?: Bot[]; visibleFiles?: Attachment[]; onOpenDocument?: (file: Attachment) => void;
 }) {
   if (!run || run.status !== "completed" || !run.task.tracked)
     return <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>;
@@ -46,7 +46,7 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
         const newer = newerDeliveredVersion(file, visibleFiles);
         return (
           <div className="delivery-version" key={file.id}>
-            <DeliveredFile file={file} artifact author={teammates?.find(bot => bot.id === run.botId)} />
+            <DeliveredFile file={file} artifact onOpenDocument={onOpenDocument} author={teammates?.find(bot => bot.id === run.botId)} />
             {newer && <p className="delivery-newer">A newer version is ready. <a href={newer.url} target="_blank" rel="noreferrer">Open v{newer.revision}<ChevronRight size={13} aria-hidden="true" /></a></p>}
           </div>
         );
@@ -134,7 +134,7 @@ export function DeliveryReceipt({ run, teammates, reviews = [], hasDeliveredArti
  * content on a sheet of paper, not a generic icon row. Quick Look, not a
  * file manager: you see the first lines before you decide to open it.
  * Plain uploads keep the compact row (artifact={false}). */
-export function DeliveredFile({ file, artifact = false, author }: { file: Attachment; artifact?: boolean; author?: Bot }) {
+export function DeliveredFile({ file, artifact = false, author, onOpenDocument }: { file: Attachment; artifact?: boolean; author?: Bot; onOpenDocument?: (file: Attachment) => void }) {
   const size = `${Math.max(1, Math.ceil(file.size / 1000))} KB`;
   const meta = [size, file.kind, file.source === "artifact" ? "Result" : null, file.revision > 1 ? `v${file.revision}` : null].filter(Boolean).join(" · ");
   if (!artifact) {
@@ -158,7 +158,7 @@ export function DeliveredFile({ file, artifact = false, author }: { file: Attach
     .slice(0, 5);
   const image = file.kind === "image" && file.previewUrl;
   return <section className="delivered-file delivered-paper" aria-label={`File: ${file.name}`}>
-    <a className="document-paper" href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}, revision ${file.revision}`}>
+    <a className="document-paper" onClick={onOpenDocument ? (event) => { event.preventDefault(); onOpenDocument(file); } : undefined} href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}, revision ${file.revision}`}>
       {author && <span className="document-author" aria-hidden="true"><Character name={author.name} color={author.color} variant={author.mascot} size={58} mood="happy" /></span>}
       <span className="document-identity"><FileText size={14}/><span>{file.name}</span><small>REVISION / {String(file.revision).padStart(2, "0")}</small></span>
       {image ? <img className="document-preview-image" src={file.previewUrl!} alt="" /> : <>

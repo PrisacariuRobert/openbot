@@ -49,7 +49,7 @@ const socket=createServer();await new Promise<void>(resolve=>socket.listen(0,'12
 const base=`http://127.0.0.1:${port}`;
 const bundle=process.env.OPENBOT_TEST_BUNDLE;
 const serverRoot=bundle ? path.join(bundle,'app') : process.cwd();
-const server=spawn(bundle ? path.join(bundle,'bin/node') : process.execPath,['--import','tsx','src/server/index.ts'],{cwd:serverRoot,stdio:['ignore','pipe','pipe'],env:{...process.env,OPENBOT_LOAD_ENV:'0',OPENBOT_DATA_DIR:data,OPENBOT_PORT:String(port),OPENBOT_HOST:'127.0.0.1',OPENBOT_APP_URL:base,NODE_ENV:'production',OPENBOT_DEPLOYMENT_MODE:'local'}});
+const server=spawn(bundle ? path.join(bundle,'bin/node') : process.execPath,['--import','tsx','src/server/index.ts'],{cwd:serverRoot,stdio:['ignore','pipe','pipe'],env:{...process.env,PATH:bundle ? `${path.join(bundle,'bin')}${path.delimiter}${process.env.PATH || ''}` : process.env.PATH,OPENBOT_LOAD_ENV:'0',OPENBOT_DATA_DIR:data,OPENBOT_PORT:String(port),OPENBOT_HOST:'127.0.0.1',OPENBOT_APP_URL:base,NODE_ENV:'production',OPENBOT_DEPLOYMENT_MODE:'local'}});
 let log='';server.stdout?.on('data',c=>log+=c);server.stderr?.on('data',c=>log+=c);
 let electron:Awaited<ReturnType<typeof _electron.launch>>|undefined;
 let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
@@ -81,7 +81,14 @@ try {
  const downloadPath=path.join(root,'downloaded-launch-note.md');
  await electron.evaluate(({session},savePath)=>{session.defaultSession.once('will-download',(_event: unknown,item: {setSavePath(path: string): void; once(event: string, listener: (event: unknown, state: string) => void): void})=>{item.setSavePath(savePath);item.once('done',(_event: unknown,state: string)=>{(globalThis as any).__figmaDownload=state})})},downloadPath);
  await page.getByRole('link',{name:'Open Meet OpenBot.md, revision 2',exact:true}).click();
+ await page.getByRole('complementary',{name:'Document preview'}).waitFor();
+ await page.screenshot({path:path.join(output,'document-preview.png'),scale:'css'});
+ await page.getByRole('link',{name:'Open original',exact:true}).click();
  let downloadState='';for(let i=0;i<60;i++){downloadState=await electron.evaluate(()=> (globalThis as any).__figmaDownload);if(downloadState)break;await delay(100)}assert.equal(downloadState,'completed','Electron saves actual delivered file');
+ await page.getByRole('button',{name:'Ask for a change',exact:true}).click();
+ await page.waitForFunction(()=> (document.querySelector('#studio-message') as HTMLTextAreaElement)?.value.includes('revision 2'));
+ await input.fill('');await delay(700);
+ await page.getByRole('button',{name:'Close document',exact:true}).click();
 
  const original=await page.evaluate(async url=>(await fetch(url)).text(),file.url);assert.equal(original,text,'document uses actual stored bytes');
  await page.getByLabel('Find a conversation').fill('Scout');assert.equal(await page.getByRole('button',{name:'Pixel',exact:true}).count(),0);await page.getByLabel('Find a conversation').fill('');
@@ -91,6 +98,7 @@ try {
  }
  browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
  const phone=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+ phone.on('pageerror',error=>errors.push(`phone: ${error.message}`));
  await phone.goto(`${base}/?thread=${threadId}`);await phone.locator('#studio-message').waitFor();await phone.emulateMedia({reducedMotion:'reduce'});await delay(500);
  await phone.locator('.chat-scroll').evaluate(el=>el.scrollTop=0);await phone.screenshot({path:path.join(output,'phone-390x844.png')});
  assert.ok(await phone.getByText('Give this launch note a little more us.',{exact:false}).isVisible());
@@ -99,10 +107,80 @@ try {
  assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'320px has no horizontal overflow');
  const reviewBounds=await phone.locator('.delivery-reviews > summary').boundingBox();assert.ok(reviewBounds && reviewBounds.height<90,'review byline stays readable at 320px');
  console.log('PASS phone emulation: visible messages, 390px and 320px, no horizontal overflow');
+ if (process.env.OPENBOT_TEST_ALL_SCREENS === '1') {
+   await phone.setViewportSize({width:390,height:844});
+   await phone.getByRole('link',{name:'Open Meet OpenBot.md, revision 2',exact:true}).click();
+   await phone.getByRole('dialog',{name:'Document preview'}).waitFor();
+   await phone.screenshot({path:path.join(output,'phone-document.png')});
+   await phone.getByRole('button',{name:'Close document',exact:true}).click();
+   await page.goto(`${base}/?thread=${threadId}`);
+   const search = page.getByLabel('Find a conversation'); await search.waitFor(); await search.focus();
+   const focus = await search.evaluate(input => ({ input: getComputedStyle(input).outlineStyle, wrapper: getComputedStyle(input.parentElement!).outlineStyle }));
+   assert.equal(focus.input, 'none'); assert.equal(focus.wrapper, 'solid');
+   await page.screenshot({path:path.join(output,'search-focus.png'),scale:'css'});
+   const panels = ['team','provider','connectors','routines','projects','artifacts','teach','control','usage','remote','live','bot','files','computer'];
+   for (const panel of panels) {
+     await page.goto(`${base}/?thread=${threadId}&panel=${panel}`);
+     await page.locator(`.capability-${panel}`).waitFor();
+     if (panel === 'provider') await page.getByText('Checking your connections…',{exact:true}).waitFor({state:'hidden',timeout:90000});
+     await delay(600);
+     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: desktop overflow`);
+     await page.mouse.move(1400,900);
+     await page.screenshot({path:path.join(output,`workspace-${panel}.png`),scale:'css'});
+     await phone.setViewportSize({width:390,height:844});
+     await phone.goto(`${base}/?thread=${threadId}&panel=${panel}`);
+     await phone.locator(`.capability-${panel}`).waitFor(); await delay(250);
+     assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: phone overflow`);
+     await phone.screenshot({path:path.join(output,`phone-${panel}.png`)});
+     await phone.setViewportSize({width:320,height:844});
+     assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: 320px phone overflow`);
+     await phone.locator('.settings-mobile-back').click();
+     assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
+   }
+   await page.goto(`${base}/?thread=${threadId}&panel=teach`);
+   await page.getByLabel('Note name',{exact:true}).fill('Writing preference');
+   await page.getByLabel('What should they remember?',{exact:true}).fill('Keep the launch note concise. Synthetic UI check.');
+   await page.getByRole('button',{name:'Save note',exact:true}).click();
+   await page.getByText('Memory saved. Future tasks will use the correction.',{exact:true}).waitFor();
+   const notes=await page.evaluate(async id=>(await fetch(`/api/extensions/memory/${id}`)).json(),pixel.id);
+   assert.ok(notes.some((note:any)=>note.key==='Writing preference' && note.content.includes('Synthetic UI check')));
+   await page.screenshot({path:path.join(output,'memory-saved.png'),scale:'css'});
+   await page.goto(`${base}/?thread=${threadId}&panel=team`);
+   const profile={kind:'openbot-teammate',version:1,bot:{name:'Imported fixture',role:'Preview only',instructions:'No external work',emoji:'o',mascot:'blob',color:'#d86889'},skills:[],routines:[]};
+   await page.getByLabel('Import a teammate profile',{exact:true}).setInputFiles({name:'teammate.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(profile))});
+   await page.getByRole('region',{name:'Profile preview'}).waitFor();
+   const beforeImport=await page.evaluate(async()=> (await (await fetch('/api/state')).json()).bots.length);assert.equal(beforeImport,6,'choosing a profile does not import it');
+   await page.screenshot({path:path.join(output,'profile-import-preview.png'),scale:'css'});
+   await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+   console.log('PASS settings behavior: memory saved through real API; profile preview and cancellation do not create a teammate');
+   await page.goto(`${base}/?thread=${threadId}&panel=team`); await page.locator('.workspace-team-grid').getByRole('button',{name:'Edit Pixel',exact:true}).click();
+   await page.locator('.capability-bot').waitFor();
+   assert.equal(new URL(page.url()).searchParams.get('thread'),threadId);
+   await page.getByRole('button',{name:'Back to conversation',exact:true}).click(); await page.locator('#studio-message').waitFor();
+   await page.getByRole('button',{name:'About Pixel',exact:true}).click();
+   await page.screenshot({path:path.join(output,'teammate-profile.png'),scale:'css'});
+   await page.getByRole('link',{name:'Edit & manage teammate',exact:false}).click();await page.locator('.capability-bot').waitFor();
+   await page.getByRole('button',{name:'Back to conversation',exact:true}).click();await page.locator('#studio-message').waitFor();
+   console.log('PASS all workspace screens: 14 desktop and phone routes, single focus ring, mobile return navigation, teammate edit, back to conversation');
+ }
  const expanded=new OpenBotDatabase(root,{dataDir:data});expanded.updateStudioSettings({maxTeammates:40});
  for(let i=1;i<=24;i++) expanded.createBot({name:`Synthetic teammate ${String(i).padStart(2,'0')} with a deliberately long name`,emoji:'',mascot:'blob',color:'#8780bf',role:'Layout stress fixture',instructions:'No external work',computerEnabled:false,browserEnabled:false});expanded.close();
  await page.reload();await page.getByLabel('Find a conversation').waitFor();await page.getByLabel('Find a conversation').fill('Synthetic teammate 24');await page.getByRole('button',{name:'Synthetic teammate 24 with a deliberately long name',exact:true}).waitFor();
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.getByLabel('Find a conversation').fill('');await page.screenshot({path:path.join(output,'electron-30-conversations.png'),scale:'css'});
  console.log('PASS 30 conversations: searchable long names, scrolling layout, no horizontal page overflow');
+ if (process.env.OPENBOT_TEST_ALL_SCREENS === '1') {
+   const empty=new OpenBotDatabase(root,{dataDir:data});for(const bot of empty.listBots()) empty.retireBot(bot.id);empty.close();
+   await page.goto(`${base}/?thread=team-room`);await page.locator('.refined-welcome').waitFor();
+   await page.screenshot({path:path.join(output,'welcome.png'),scale:'css'});
+   await page.getByRole('button',{name:'Create your first teammate',exact:false}).click();
+   await page.getByRole('dialog',{name:'Create a teammate',exact:true}).waitFor();
+   await page.screenshot({path:path.join(output,'create-teammate.png'),scale:'css'});
+   await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);
+   await phone.goto(`${base}/?thread=team-room`);await phone.locator('.refined-welcome').waitFor();
+   await phone.screenshot({path:path.join(output,'phone-welcome.png')});
+   console.log('PASS empty-team welcome and creation dialog: real retired roster, Escape restores conversation, no teammate automatically created');
+ }
+
+ assert.deepEqual(errors,[], 'desktop and phone routes have no uncaught renderer errors');
 
 }finally{await browser?.close();if(electron){electron.process().kill("SIGTERM")}server.kill('SIGTERM');writeFileSync(path.join(root,'server.log'),log)}

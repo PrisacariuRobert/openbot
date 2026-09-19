@@ -1,3 +1,5 @@
+> Historical first-screen checkpoint. The approved extension and current passing aggregate results are documented in [workspace-evidence.md](workspace-evidence.md).
+
 # D1 delivery evidence — 2026-09-19
 
 Branch `codex/approved-figma-conversation` is based on fetched `origin/main` `acebd8b9f42fe71e5e13aa7cfc791ceead44b636`. Original checkout remains on its existing branch with its existing untracked work. No push, merge, tag or release was performed.
