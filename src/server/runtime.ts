@@ -1467,6 +1467,7 @@ export class BrowserManager {
       return panes;
     });
     // Owned same-origin iframes: addressable via frameSelector + selector.
+    // Only frames whose DOCUMENT actually scrolls are issued as panes.
     const frames: Array<{ selector: string; framePath: string; label: string }> = [];
     for (const frame of page.frames()) {
       if (frame === page.mainFrame()) continue;
@@ -1477,6 +1478,8 @@ export class BrowserManager {
         continue;
       }
       if (!origin.startsWith("http://127.0.0.1") && !origin.startsWith("http://localhost")) continue;
+      const scrollable = await frame.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 4).catch(() => false);
+      if (!scrollable) continue;
       const frameElement = await frame.frameElement().catch(() => null);
       if (!frameElement) continue;
       const frameSelector = await frameElement.evaluate((node) => {
@@ -1553,7 +1556,7 @@ export class BrowserManager {
     // approval names a selector it must name this target's selector.
     if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, target.selector);
     const payloadDigest = createHash("sha256")
-      .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId }))
+      .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `sem_${target.fingerprint}_${payloadDigest.slice(0, 12)}`;
     const admittedEpoch = this.admitAction({
@@ -1829,7 +1832,7 @@ export class BrowserManager {
       throw new Error(`${validated.reason}: the screenshot changed after observation. Observe again before acting.`);
     }
     const payloadDigest = createHash("sha256")
-      .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId }))
+      .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `vis_${observation.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}_${payloadDigest.slice(0, 8)}`;
     const admittedEpoch = this.admitAction({
@@ -1930,7 +1933,7 @@ export class BrowserManager {
     const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
     if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     const payloadDigest = createHash("sha256")
-      .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded }))
+      .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `scr_${observation.observationId}_${pane.paneToken}_${payloadDigest.slice(0, 8)}`;
     const admittedEpoch = this.admitAction({

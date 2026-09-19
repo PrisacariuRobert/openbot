@@ -44,6 +44,7 @@ const FORM = `<!doctype html><title>Fixture form</title><main>
 <button type="button" id="decoy" aria-label="Submit">Submit</button>
 <button type="button" id="dup-a">Duplicate</button>
 <button type="button" id="dup-b">Duplicate</button>
+<button type="button" id="late-save" disabled>Late save</button>
 </form>
 <input type="file" id="upload" aria-label="Attach file">
 <canvas id="pad" style="position:fixed;left:100px;top:100px;width:400px;height:200px;" width="400" height="200"></canvas>
@@ -71,15 +72,16 @@ for (const id of ["intended", "decoy-pane"]) {
   const pane = document.getElementById(id);
   if (pane) pane.addEventListener("scroll", () => send({ kind: "scroll", id, top: pane.scrollTop }), { passive: true });
 }
+const late = document.getElementById("late-save");
+if (late) setTimeout(() => { late.removeAttribute("disabled"); }, 3000);
 </script>
 </main>`;
 
 const SUB = `<!doctype html><title>Sub frame</title><main>
-<div id="inner" aria-label="Frame lane" style="height:120px;overflow-y:auto;border:1px solid #999;"><div style="height:900px;">frame lane</div></div>
+<div style="height:900px;">frame lane</div>
 <script>
 const send = (payload) => { try { navigator.sendBeacon("/events", JSON.stringify(payload)); } catch {} };
-const inner = document.getElementById("inner");
-if (inner) inner.addEventListener("scroll", () => send({ kind: "scroll", id: "sub-inner", top: inner.scrollTop }), { passive: true });
+document.addEventListener("scroll", () => send({ kind: "scroll", id: "sub-doc", top: document.documentElement.scrollTop }), { passive: true });
 </script>
 </main>`;
 
@@ -112,6 +114,12 @@ const server = createServer((req, res) => {
       res.statusCode = 204;
       res.end();
     });
+    return;
+  }
+  if (url.pathname === "/counts" && req.method === "GET") {
+    // Independent permitted readback: authoritative server-side counters.
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ submits: submits.length, clicks: clicks().length, canvas: canvasHits().length }));
     return;
   }
   res.setHeader("content-type", "text/html; charset=utf-8");
@@ -175,6 +183,7 @@ try {
   const ambiguous = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
   const ambiguousDup = getObservation(ambiguous.observationId)!.targets.find((target) => target.selector === "#dup-a")!;
   const submitsBeforeAmbiguous = submits.length;
+  const clicksBeforeAmbiguous = clicks().length;
   let ambiguousError: unknown = null;
   try {
     await browser.semanticAct("nova", run.id, { targetId: ambiguousDup.targetId, sessionId: SESSION, kind: "click" });
@@ -183,6 +192,7 @@ try {
   }
   assert.ok(ambiguousError instanceof Error && /AMBIGUOUS_TARGET/.test(ambiguousError.message), "duplicate labels refused");
   assert.equal(submits.length, submitsBeforeAmbiguous, "zero submits on ambiguous target");
+  assert.equal(clicks().length, clicksBeforeAmbiguous, "zero clicks dispatched for ambiguous controls");
   record("F3-ambiguous", true, "duplicate Duplicate controls → AMBIGUOUS_TARGET through semanticAct, no dispatch");
 
   // F4 — canvas click at the fixed-geometry center with a real local oracle.
@@ -332,9 +342,12 @@ try {
   assert.match(owned.url, /\/form/);
   record("F6-stop-takeover", true, "revoked observations refuse with zero input; grants revoked; owner takeover dispatched");
 
-  // F7 — accepted effect, lost response, restart: no repeat without reconcile.
+  // F7 — journal-state recovery across a database reopen (NOT an
+  // accepted-effect response-loss test: it proves durable uncertain
+  // recovery and non-readmission, while F9 proves the effect/readback
+  // oracle below).
   {
-    const actionId = "fix-f7-restart-action";
+    const actionId = "fix-f7-journal-state";
     db.journalActionPropose({
       actionId, runId: run.id, botId: "nova", surface: "browser-dom",
       surfaceIdentity: "tab:9/doc:fixture/frame:/", ownershipEpoch: "epoch-9",
@@ -349,6 +362,7 @@ try {
     db.close();
     db = new OpenBotDatabase(root, { dataDir: path.join(root, "data") });
     browser = new BrowserManager(db, { headlessTeaching: true });
+    browser.registerVisualAdapter("fixture-visual", "visual-supported");
     const recovered = db.recoverInterruptedJournalActions();
     const recoveredIds = new Set(recovered.map((record) => record.actionId));
     assert.ok(recoveredIds.has(actionId), "restart recovery marks the in-flight action uncertain");
@@ -360,7 +374,7 @@ try {
     const reconciled = db.journalActionReconcile(actionId, "verified", "owner read back the submitted fixture row");
     assert.equal(reconciled?.stage, "verified", "owner reconciliation resolves without re-dispatch");
     assert.equal(db.journalActionAdmit(actionId), false, "reconciled actions stay non-admittable");
-    record("F7-uncertain", true, "post-restart recovery → uncertain → reconcile, never readmitted");
+    record("F7-journal-recovery", true, "reopen → uncertain → reconcile, never readmitted (state recovery; see F9 for effect/readback)");
   }
 
   // F8 — intended pane scrolls; decoy and frame panes verified independently.
@@ -376,6 +390,157 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 400));
   assert.equal(scrollTops("decoy-pane").length, decoyTopsBefore, "decoy pane never scrolled");
   record("F8-scroll-pane", true, `intended pane +${moved.moved}px, decoy untouched; region resolved, not discarded`);
+
+  // F8b — owned iframe document scrolls through its frame token.
+  {
+    const framePane = registryAfter.panes.find((pane) => pane.framePath === "#sub");
+    assert.ok(framePane, "host observed the owned iframe pane");
+    const subBefore = scrollTops("sub-doc").length;
+    const frameMoved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: framePane.paneToken, deltaY: 200 });
+    assert.ok(frameMoved.moved > 0, `iframe pane moved (${frameMoved.beforeTop} → ${frameMoved.afterTop})`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.ok(scrollTops("sub-doc").length > subBefore, "iframe scroll beaconed from the owned frame document");
+    assert.equal(scrollTops("decoy-pane").length, decoyTopsBefore, "decoy still untouched");
+    record("F8b-iframe-pane", true, `owned frame document +${frameMoved.moved}px via frame token`);
+  }
+
+  // F9a — logical mutation fence with a real effect and real readback.
+  // One synthetic irreversible effect (a form submit counted by the
+  // independent server): click accepted, result reporting lost afterwards
+  // (documented simulation of post-acceptance response loss), fresh
+  // observation retry refused, renderer-switch retry refused, restart
+  // retry refused, real server-counter readback reconciles without another
+  // mutation, completed key refuses duplicates, and a new key still works.
+  const readCounts = async (): Promise<{ submits: number; clicks: number; canvas: number }> =>
+    (await (await fetch(`${base}/counts`)).json()) as { submits: number; clicks: number; canvas: number };
+  {
+    const keyA = "mut-f9a-save-effect";
+    await browser.open("nova", `${base}/form`);
+    const before = await readCounts();
+    const o1 = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+    const go1 = getObservation(o1.observationId)!.targets.find((target) => target.selector === "#go")!;
+    await browser.semanticAct("nova", run.id, { targetId: go1.targetId, sessionId: SESSION, kind: "click", mutationKey: keyA });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const afterFirst = await readCounts();
+    assert.equal(afterFirst.submits, before.submits + 1, "first effect really submitted");
+    // Result reporting lost after the accepted effect (documented stand-in
+    // for a post-acceptance response loss): the row goes uncertain while
+    // the server-side effect stands.
+    const firstRow = db.journalActionFindByMutation(keyA, run.id, "nova")[0]!;
+    assert.equal(firstRow.stage, "effect_observed");
+    assert.ok(db.journalActionTransition(firstRow.actionId, "outcome_uncertain", "fixture: simulated result-return loss after accepted click"));
+    // Fresh observation, same mutation: refused with zero new effects.
+    // (The first submit navigated to the Done page, so re-open the form to
+    // observe the same control again — the fresh-observation retry shape.)
+    await browser.open("nova", `${base}/form`);
+    const o2 = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+    const go2 = getObservation(o2.observationId)!.targets.find((target) => target.selector === "#go")!;
+    let freshError: unknown = null;
+    try {
+      await browser.semanticAct("nova", run.id, { targetId: go2.targetId, sessionId: SESSION, kind: "click", mutationKey: keyA });
+    } catch (error) {
+      freshError = error;
+    }
+    assert.ok(freshError instanceof Error && /UNCERTAIN_CONFLICT/.test(freshError.message), "fresh observation cannot repeat the unresolved mutation");
+    // Renderer switch, same mutation: refused with zero new effects.
+    const ov = await browser.observeScoped("nova", run.id, { surface: "browser-visual", sessionId: SESSION });
+    let visualError: unknown = null;
+    try {
+      await browser.visualAct("nova", run.id, { observationId: ov.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: keyA });
+    } catch (error) {
+      visualError = error;
+    }
+    assert.ok(visualError instanceof Error && /UNCERTAIN_CONFLICT/.test(visualError.message), "renderer switch cannot repeat the unresolved mutation");
+    const afterRetries = await readCounts();
+    assert.deepEqual(afterRetries, afterFirst, "zero new effects across refused retries");
+    // Restart: the fence survives on durable rows, not observation memory.
+    await browser.close().catch(() => undefined);
+    db.close();
+    const { clearObservationsForTests } = await import("../src/server/observation-registry.js");
+    clearObservationsForTests();
+    db = new OpenBotDatabase(root, { dataDir: path.join(root, "data") });
+    browser = new BrowserManager(db, { headlessTeaching: true });
+    browser.registerVisualAdapter("fixture-visual", "visual-supported");
+    await browser.open("nova", `${base}/form`);
+    const o3 = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+    const go3 = getObservation(o3.observationId)!.targets.find((target) => target.selector === "#go")!;
+    let restartError: unknown = null;
+    try {
+      await browser.semanticAct("nova", run.id, { targetId: go3.targetId, sessionId: SESSION, kind: "click", mutationKey: keyA });
+    } catch (error) {
+      restartError = error;
+    }
+    assert.ok(restartError instanceof Error && /UNCERTAIN_CONFLICT/.test(restartError.message), "restart cannot repeat the unresolved mutation");
+    // Independent permitted readback binds the evidence to the effect.
+    const readback = await readCounts();
+    assert.equal(readback.submits, afterFirst.submits, "readback confirms exactly the first effect, no more");
+    const reconciled = db.journalActionReconcile(firstRow.actionId, "verified", `fixture server submits==${readback.submits} for ${keyA}`);
+    assert.equal(reconciled?.stage, "verified", "readback evidence reconciles without re-dispatch");
+    let duplicateError: unknown = null;
+    try {
+      await browser.semanticAct("nova", run.id, { targetId: go3.targetId, sessionId: SESSION, kind: "click", mutationKey: keyA });
+    } catch (error) {
+      duplicateError = error;
+    }
+    assert.ok(duplicateError instanceof Error && /DUPLICATE_MUTATION/.test(duplicateError.message), "completed mutation refuses duplicates");
+    // Distinct genuinely-new work with a new key still proceeds: no blanket ban.
+    const afterDuplicateCheck = await readCounts();
+    await browser.semanticAct("nova", run.id, { targetId: go3.targetId, sessionId: SESSION, kind: "click", mutationKey: "mut-f9a-second-intent" });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const afterNewKey = await readCounts();
+    assert.equal(afterNewKey.submits, afterDuplicateCheck.submits + 1, "new mutation key performs new work");
+    record("F9a-mutation-fence", true, "same effect fenced across obs/renderer/restart; readback reconciles; new keys unaffected");
+  }
+
+  // F9b — a real post-acceptance failure: the focus click lands, then the
+  // key commit fails, leaving an uncertain row with a genuine accepted
+  // effect and no silent success.
+  {
+    const keyB = "mut-f9b-key-effect";
+    await browser.open("nova", `${base}/form`);
+    const before = await readCounts();
+    const ob = await browser.observeScoped("nova", run.id, { surface: "browser-visual", sessionId: SESSION });
+    let keyError: unknown = null;
+    try {
+      await browser.visualAct("nova", run.id, { observationId: ob.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "key", point: { x: 300, y: 200 }, key: "NotARealKey123", mutationKey: keyB });
+    } catch (error) {
+      keyError = error;
+    }
+    assert.ok(keyError instanceof Error, "invalid key commit fails");
+    const rows = db.journalActionFindByMutation(keyB, run.id, "nova");
+    assert.equal(rows.length, 1, "one journal row for the attempt");
+    assert.equal(rows[0]!.stage, "outcome_uncertain", "post-acceptance failure is uncertain, not success");
+    const after = await readCounts();
+    assert.ok(after.canvas >= before.canvas, "focus effect was accepted before the failure");
+    record("F9b-real-uncertain", true, "accepted focus effect + failed commit → uncertain with genuine evidence");
+  }
+
+  // F10 — cancellation owns the pending wait: Save starts disabled, the act
+  // waits without input, the run is cancelled and the input epoch bumped
+  // (the exact durable effects of the real Stop route), the control
+  // enables itself, and zero clicks ever land.
+  {
+    const stopRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "stoppable task", status: "running" });
+    await browser.open("nova", `${base}/form`);
+    const obs = await browser.observeScoped("nova", stopRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const late = getObservation(obs.observationId)!.targets.find((target) => target.selector === "#late-save")!;
+    const clicksBeforeStop = clicks().length;
+    const pendingAct = browser.semanticAct("nova", stopRun.id, { targetId: late.targetId, sessionId: SESSION, kind: "click" });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.equal(clicks().length, clicksBeforeStop, "no input while the control is still disabled");
+    db.updateRun(stopRun.id, { status: "cancelled" });
+    db.revokeBotInput("nova");
+    let stopError: unknown = null;
+    try {
+      await pendingAct;
+    } catch (error) {
+      stopError = error;
+    }
+    assert.ok(stopError instanceof Error && /stopped while|USER_TAKEOVER|That task/.test(stopError.message), `waiting input refused after cancel (got: ${(stopError as Error)?.message.slice(0, 80)})`);
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    assert.equal(clicks().filter((event) => event.id === "late-save").length, 0, "zero late-save clicks even after the control enabled itself");
+    record("F10-cancel-wait", true, "revocation during the readiness wait prevents all later input");
+  }
 } catch (error) {
   record("HARNESS", false, error instanceof Error ? error.message : String(error));
   throw error;

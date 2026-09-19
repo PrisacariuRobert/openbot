@@ -195,6 +195,67 @@ test("R02 journal survives restart and refuses mismatched identity reuse", () =>
   }
 });
 
+test("R02 logical mutation fence survives observations, renderers and restart", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-mutation-"));
+  let db = new OpenBotDatabase(root);
+  const propose = (actionId: string, key: string | null) =>
+    db.journalActionPropose({
+      actionId, runId: "run-1", botId: "bot-1", surface: "browser-dom",
+      surfaceIdentity: "tab:t1/doc:e1/frame:/", ownershipEpoch: "epoch-1",
+      target: "Save", payloadDigest: `payload-${actionId}`, reviewDigest: null,
+      account: "", mutationKey: key,
+    });
+  const fence = (actionId: string, key: string): string | null => {
+    const clashes = db.journalActionFindByMutation(key, "run-1", "bot-1").filter((row) => row.actionId !== actionId);
+    const unresolved = clashes.filter((row) => row.stage !== "verified" && row.stage !== "failed_before_effect");
+    // Mirrors admitAction: a refused attempt is terminally marked so it
+    // never fences later checks itself.
+    if (unresolved.length > 0) {
+      db.journalActionTransition(actionId, "failed_before_effect", "same unresolved mutation exists");
+      return "UNCERTAIN_CONFLICT";
+    }
+    if (clashes.some((row) => row.stage === "verified")) {
+      db.journalActionTransition(actionId, "failed_before_effect", "same mutation already completed");
+      return "DUPLICATE_MUTATION";
+    }
+    return null;
+  };
+  try {
+    // First attempt goes uncertain; a fresh observation (new action ID,
+    // same key) is fenced without dispatch.
+    propose("act-mut-1", "mut-key-1");
+    assert.equal(db.journalActionAdmit("act-mut-1"), true);
+    assert.ok(db.journalActionTransition("act-mut-1", "dispatch_started"));
+    assert.ok(db.journalActionTransition("act-mut-1", "outcome_uncertain", "result lost"));
+    propose("act-mut-2", "mut-key-1");
+    assert.equal(fence("act-mut-2", "mut-key-1"), "UNCERTAIN_CONFLICT", "same unresolved mutation refused across action IDs");
+    // Renderer switch is the same logical effect: still fenced.
+    propose("act-mut-3", "mut-key-1");
+    assert.equal(fence("act-mut-3", "mut-key-1"), "UNCERTAIN_CONFLICT");
+    // Restart: durable rows keep the fence.
+    db.close();
+    db = new OpenBotDatabase(root);
+    propose("act-mut-4", "mut-key-1");
+    assert.equal(fence("act-mut-4", "mut-key-1"), "UNCERTAIN_CONFLICT", "fence survives restart");
+    // Real-evidence reconcile lifts uncertainty into completed; the same
+    // key then refuses as a duplicate while a new key proceeds.
+    assert.equal(db.journalActionReconcile("act-mut-1", "verified", "readback: exactly one effect")?.stage, "verified");
+    propose("act-mut-5", "mut-key-1");
+    assert.equal(fence("act-mut-5", "mut-key-1"), "DUPLICATE_MUTATION");
+    propose("act-mut-6", "mut-key-2");
+    assert.equal(fence("act-mut-6", "mut-key-2"), null, "distinct new work is never fenced");
+    // A failed attempt (no effect) does not fence its key's retry.
+    propose("act-mut-7", "mut-key-3");
+    assert.equal(db.journalActionAdmit("act-mut-7"), true);
+    assert.ok(db.journalActionTransition("act-mut-7", "failed_before_effect", "refused pre-dispatch"));
+    propose("act-mut-8", "mut-key-3");
+    assert.equal(fence("act-mut-8", "mut-key-3"), null, "failed attempts remain retryable under the same key");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("R02 concurrent processes cannot both dispatch the same action", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-race-"));
   const db1 = new OpenBotDatabase(root);

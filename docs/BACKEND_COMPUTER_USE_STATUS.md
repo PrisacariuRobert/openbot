@@ -14,17 +14,26 @@ Branch: backend/computer-use-gaps-20260919 (clean worktree, owner tree untouched
 Client contracts: Codex Electron + studio UI preserved; protected-source diff
 expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
 
-## Ticket assessment (current main, executed evidence)
+## Ticket assessment (round 3: authority and recovery repair)
 
-- R01 submission replay: FIXED, then hardened per review. Replay precedes
-  eligibility (claimed attachments prove first admission; changed
-  budget/provider govern new work only; thread 404 / 409 mismatch / 409
-  payload conflict preserved). Prune and repair are atomic and fail
-  closed; staging failure refuses with 500 and nothing created; orphan
-  tombstones answer request_uncertain and never claim nothing happened.
-  Proven by scripts/run-r01-http-fixtures.ts (8/8 on the real endpoint)
-  plus message-admission-replay.test.ts (route-order cases, fail-closed
-  injection cases, source-order guard).
+Round-3 findings A–E status: R01 pending cross-thread collision FIXED
+(HTTP H9); logical mutation fence NEW (F9a/unit); observed-state review
+binding NEW (R1 regression covered in F1-form-change cases); tab/document
+generations + pinned pages NEW (F4b/two-tab/reload/replacement cases);
+cancellable input NEW (F10); approvalId validation NEW (unit + fixture
+hooks). Model-loop exposure, native mode and Jev remain disabled; the
+candidate remains infrastructure-only, not autonomous-complete.
+
+- R01 submission replay: replay precedes eligibility (claimed attachments
+  prove first admission; changed budget/provider govern new work only;
+  thread 404 / 409 mismatch / 409 payload conflict preserved). Any pending
+  ID is resolved before eligibility: foreign thread/digest conflicts and
+  preserves the marker. Prune and repair are atomic and fail closed;
+  staging failure refuses with 500 and nothing created; orphan tombstones
+  answer request_uncertain and never claim nothing happened. Proven by
+  scripts/run-r01-http-fixtures.ts (9/9 on the real endpoint) plus
+  message-admission-replay.test.ts (route-order, fail-closed injection,
+  source-order guard).
 - R02 action journal: DB-backed action_journal table with the same
   conditional-update discipline as approved_actions (no FKs: the journal is
   the recovery record of last resort). admitOnce refuses admitted,
@@ -41,12 +50,16 @@ expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
   per-call globals. Text redaction proven; image privacy rests on
   minimized/blocked capture, stated as such.
 - B02/B03/B06 semantic/visual/routing: opaque host-issued targets and
-  registry transforms; unique live re-resolution with production
-  fingerprint equality; capability from the server adapter registry
-  (unknown → VISION_UNAVAILABLE); live tab/document/DPR/scroll/size
-  enforcement with assertPageAccess before and after input; final
-  value/kind bound into the journal digest; NaN/non-finite rejected.
-  Fixture-proven (F1–F4b, F8); model-loop wiring intentionally absent.
+  registry transforms; logical mutation keys fence unresolved/completed
+  effects across observations, renderers and restarts; unique live
+  re-resolution with stored review-digest equality (form changes force a
+  new review); capability from the server adapter registry (unknown →
+  VISION_UNAVAILABLE); pinned pages with tab/generation/content-hash
+  enforcement; assertPageAccess before and after input; cancellable
+  readiness waits with revocation checks between drag/key/scroll phases;
+  final value/kind/mutation bound into the journal digest; NaN/non-finite
+  rejected. Fixture-proven (F1–F4b, F8–F10); model-loop wiring
+  intentionally absent.
 - B04 upload/rich/download: upload live-proven with origin binding (F5);
   download helpers unit-tested BUT no BrowserManager download-capture API
   exists — documented follow-up, not claimed. Region scroll resolves the
@@ -79,26 +92,29 @@ expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
 
 ## Evidence (review candidate round 2, executed 2026-09-19)
 
-- `tsc --noEmit`: clean. `npm test`: 886 pass, 0 fail.
+- `tsc --noEmit`: clean. `npm test`: 887 pass, 0 fail.
 - `npm run check:acceptance`, `npm run build` (pre-existing chunk-size
   warning only), `npm run check:release`, `npm run test:desktop`,
   `npm run test:packaging`, `npm run test:browser-tabs|sessions|sign-in`:
   all pass (disposable data).
-- `scripts/run-r01-http-fixtures.ts`: 8/8 PASS against the real server —
+- `scripts/run-r01-http-fixtures.ts`: 9/9 PASS against the real server —
   file-bearing 202→200 replay with identical IDs, 409 payload/thread
   conflicts, one admission across ten concurrent sends and SIGKILL restart,
   convergence after an aborted send, 500 request_not_staged with zero
   writes under a held database lock (5.2s busy-timeout proof), working
-  cancel/takeover routes.
-- `scripts/run-browser-integration-fixtures.ts`: 10/10 PASS on real
+  cancel/takeover routes, and pending-only cross-thread 409s with marker
+  preservation pre/post-restart.
+- `scripts/run-browser-integration-fixtures.ts`: 14/14 PASS on real
   headless system Chrome, disposable data dir, 127.0.0.1 fixture server —
   opaque-ID submit with server oracle, stale/ambiguous refusal with zero
-  input, canvas-local (200,100) ±3px with unknown-adapter/stale-ID/tab-
-  change refusal and zero input, reviewed upload with origin refusal,
-  password + plain-text-OTP masking, real-handoff secure mode with
-  pre/post-handoff refusal, revocation with zero input, restart recovery
-  to uncertain with owner reconcile, intended-pane +200px scroll with
-  decoy untouched.
+  input and zero clicks, canvas-local (200,100) ±3px with unknown-adapter/
+  stale-ID/tab-change refusal and zero input, reviewed upload with origin
+  refusal, password + plain-text-OTP masking, real-handoff secure mode with
+  pre/post-handoff refusal, revocation with zero input, journal-state
+  recovery, intended-pane +200px and iframe-pane scroll with decoy
+  untouched, mutation fence across obs/renderer/restart with real counter
+  readback, real post-acceptance uncertain, and cancel-during-wait with
+  zero later clicks.
 - Failing-before (independent review on 26a988f, not re-fabricated here):
   fail-open prune/repair/staging catches; Map-backed journal re-admitting
   uncertain work, invisible across processes, reusing mismatched IDs;
@@ -157,7 +173,11 @@ Round 2 — every row below was re-proven after the R1–R6 repair pass.
 - P01/L01 (`package-readiness.ts`): packaging tests PASS; clean-install,
   pilot, release decision NOT_RUN (blocked).
 
-## Remaining blockers (need owner authorization, not code)
+## Remaining work (code fixes first, then authorization-gated evidence)
 
-Live-model smoke, 120-slot matrix, 7-day soak, second-Mac install, pilot,
+Code owned by this branch: keep the deterministic suites above green and
+await independent re-review of findings A–E before any exposure change.
+Separately gated (require explicit owner authorization, not run here):
+live-model smoke, 120-slot matrix, 7-day soak, second-Mac install, pilot,
 and any paid/provider spend. No merge/release without explicit approval.
+Known unfinished product work: BrowserManager download-capture API.
