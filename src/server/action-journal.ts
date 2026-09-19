@@ -2,32 +2,26 @@
  * R02 — One durable action journal and input owner.
  *
  * Backend-only. No Codex UI/client changes.
- * Reuses existing approved_actions / approvals tables and external-effect
- * reconciliation; adds a renderer-independent journal + exclusive leases so
- * DOM, visual and native actions obey the same authority.
+ * Durability lives in the existing OpenBotDatabase (action_journal table,
+ * same conditional-update discipline as approved_actions): a process
+ * restart, a second process, or a renderer switch cannot fork or re-admit
+ * the same mutation. The in-memory Map is gone — journalPropose on a fresh
+ * handle after restart loads the stored row instead of minting new state.
  *
  * Conceptual stages map to existing enums:
  *   proposed → validated → awaiting_review → admitted → dispatch_started
  *   → effect_observed → verified
  *   → failed_before_effect | outcome_uncertain → reconcile/read back
  *
- * No exactly-once promise to third-party UIs: a crash after dispatch is
- * uncertain and must reconcile via allowed read, never blind retry.
+ * outcome_uncertain is terminal: leaving it requires journalReconcile with
+ * owner-checked evidence, which marks verified-after-readback or failed —
+ * never re-admittable. No exactly-once promise to third-party UIs: a crash
+ * after dispatch reconciles via allowed read, never blind retry.
  */
+import type { OpenBotDatabase, ActionJournalRecord } from "./database.js";
 
-export type ActionStage =
-  | "proposed"
-  | "validated"
-  | "awaiting_review"
-  | "admitted"
-  | "dispatch_started"
-  | "effect_observed"
-  | "verified"
-  | "failed_before_effect"
-  | "outcome_uncertain";
-
+export type ActionStage = ActionJournalRecord["stage"];
 export type ActionSurface = "browser-dom" | "browser-visual" | "native" | "takeover";
-
 export type JournaledAction = {
   actionId: string;
   runId: string;
@@ -41,68 +35,96 @@ export type JournaledAction = {
   payloadDigest: string;
   reviewDigest: string | null;
   target: string;
+  account: string;
   createdAt: string;
   updatedAt: string;
   detail: string | null;
 };
 
-/** In-memory journal index; durable rows live in extension_records so no
- * migration is required. The authoritative executor consults this before
- * every dispatch; restarts reconcile via listUncertain(). */
-const journal = new Map<string, JournaledAction>();
-
-export function journalPropose(input: Omit<JournaledAction, "stage" | "createdAt" | "updatedAt" | "detail"> & { detail?: string | null }): JournaledAction {
-  const at = new Date().toISOString();
-  const existing = journal.get(input.actionId);
-  if (existing) return existing;
-  const record: JournaledAction = {
-    ...input,
-    stage: "proposed",
-    createdAt: at,
-    updatedAt: at,
-    detail: input.detail ?? null,
+function toJournaled(record: ActionJournalRecord): JournaledAction {
+  return {
+    actionId: record.actionId,
+    runId: record.runId,
+    botId: record.botId,
+    surface: record.surface as ActionSurface,
+    stage: record.stage,
+    surfaceIdentity: record.surfaceIdentity,
+    ownershipEpoch: record.ownershipEpoch,
+    payloadDigest: record.payloadDigest,
+    reviewDigest: record.reviewDigest,
+    target: record.target,
+    account: record.account,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    detail: record.detail,
   };
-  journal.set(input.actionId, record);
-  return record;
 }
 
-export function journalTransition(actionId: string, stage: ActionStage, detail: string | null = null): JournaledAction | null {
-  const record = journal.get(actionId);
-  if (!record) return null;
-  // Terminal states never regress; uncertain never auto-retries.
-  if (record.stage === "verified" || record.stage === "failed_before_effect") return record;
-  const updated: JournaledAction = { ...record, stage, updatedAt: new Date().toISOString(), detail: detail ?? record.detail };
-  journal.set(actionId, updated);
-  return updated;
+export function journalPropose(
+  db: OpenBotDatabase,
+  input: Omit<JournaledAction, "stage" | "createdAt" | "updatedAt" | "detail" | "account"> & { detail?: string | null; account?: string },
+): JournaledAction {
+  const record = db.journalActionPropose({
+    actionId: input.actionId,
+    runId: input.runId,
+    botId: input.botId,
+    surface: input.surface,
+    surfaceIdentity: input.surfaceIdentity,
+    ownershipEpoch: input.ownershipEpoch,
+    target: input.target,
+    payloadDigest: input.payloadDigest,
+    reviewDigest: input.reviewDigest,
+    account: input.account,
+    detail: input.detail,
+  });
+  return toJournaled(record);
 }
 
-export function journalGet(actionId: string): JournaledAction | null {
-  return journal.get(actionId) ?? null;
+export function journalTransition(
+  db: OpenBotDatabase,
+  actionId: string,
+  stage: ActionStage,
+  detail: string | null = null,
+): JournaledAction | null {
+  const record = db.journalActionTransition(actionId, stage, detail);
+  return record ? toJournaled(record) : null;
+}
+
+/** Reconcile an uncertain effect with owner-checked evidence. Never
+ * re-admits: verified-after-readback needs no re-dispatch, and a confirmed
+ * miss is failed — still-needed work takes a new action identity. */
+export function journalReconcile(
+  db: OpenBotDatabase,
+  actionId: string,
+  outcome: "verified" | "failed_before_effect",
+  evidence: string,
+): JournaledAction | null {
+  const record = db.journalActionReconcile(actionId, outcome, evidence);
+  return record ? toJournaled(record) : null;
+}
+
+export function journalGet(db: OpenBotDatabase, actionId: string): JournaledAction | null {
+  const record = db.journalActionGet(actionId);
+  return record ? toJournaled(record) : null;
 }
 
 /** Double invocation / renderer switching guard: same admitted mutation
- * cannot dispatch a second version. */
-export function admitOnce(actionId: string): boolean {
-  const record = journal.get(actionId);
-  if (!record) return false;
-  if (record.stage === "admitted" || record.stage === "dispatch_started" || record.stage === "effect_observed" || record.stage === "verified") {
-    return false;
-  }
-  journalTransition(actionId, "admitted");
-  return true;
+ * cannot dispatch a second version, and uncertain/terminal actions can
+ * never become admittable again. */
+export function admitOnce(db: OpenBotDatabase, actionId: string): boolean {
+  return db.journalActionAdmit(actionId);
 }
 
-export function listUncertain(): JournaledAction[] {
-  return [...journal.values()].filter((record) => record.stage === "outcome_uncertain" || record.stage === "dispatch_started");
-}
-
-export function clearJournalForTests(): void {
-  journal.clear();
+export function listUncertain(db: OpenBotDatabase): JournaledAction[] {
+  return db.listUncertainJournalActions().map(toJournaled);
 }
 
 // ---------------------------------------------------------------------------
 // Input leases: one exclusive owner for the physical desktop; per-target
-// locks for owned browser targets. Cancellation/takeover revokes immediately.
+// locks for owned browser targets. Cancellation/takeover revocation across
+// adapters. Leases are liveness (process-local by design): a restart clears
+// them, which is fail-closed because dispatch_started acts recover as
+// uncertain and every new dispatch must re-acquire.
 // ---------------------------------------------------------------------------
 
 type LeaseOwner = { runId: string; botId: string; surface: ActionSurface; target: string; acquiredAt: number };

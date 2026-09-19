@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { OpenBotDatabase } from "../src/server/testing/database.js";
 import { BrowserManager } from "../src/server/runtime.js";
 import { BrowserNavigationGrants } from "../src/server/browser-navigation-grants.js";
-import { revokeAllLeases, clearJournalForTests, clearLeasesForTests, listUncertain } from "../src/server/action-journal.js";
+import { revokeAllLeases, clearLeasesForTests, listUncertain } from "../src/server/action-journal.js";
 import { reresolveSemanticTarget, issueSemanticTarget, clearSemanticTargetsForTests } from "../src/server/semantic-targets.js";
 import { redactSecretsForProvider } from "../src/server/observation-envelope.js";
 
@@ -81,7 +81,6 @@ const record = (id: string, pass: boolean, detail: string) => {
 };
 
 try {
-  clearJournalForTests();
   clearLeasesForTests();
   clearSemanticTargetsForTests();
 
@@ -216,7 +215,7 @@ try {
     kind: "click",
   }).then(() => null, (error: unknown) => error);
   assert.ok(doomed instanceof Error, "missing target fails instead of force-clicking");
-  const uncertain = listUncertain().filter((record) => record.surface === "browser-dom");
+  const uncertain = listUncertain(db).filter((record) => record.surface === "browser-dom");
   assert.ok(uncertain.length >= 1, "journal holds the uncertain action for reconciliation");
   record("F7-uncertain", true, "destroyed target → error surfaced; journal holds outcome_uncertain, no silent retry");
 } catch (error) {

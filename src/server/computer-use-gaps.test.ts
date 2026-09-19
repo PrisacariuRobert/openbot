@@ -20,13 +20,14 @@ import {
 import {
   journalPropose,
   journalTransition,
+  journalReconcile,
+  journalGet,
   admitOnce,
   listUncertain,
   acquireDesktopLease,
   releaseDesktopLease,
   revokeAllLeases,
   acquireTargetLock,
-  clearJournalForTests,
   clearLeasesForTests,
 } from "./action-journal.js";
 import {
@@ -108,28 +109,116 @@ test("R01 tombstones persist via extension records and prune retains them", () =
   }
 });
 
-// R02: journal + leases
+// R02: durable journal + leases (DB-backed; survives restart and processes)
 test("R02 double dispatch and renderer switching cannot fork a mutation", () => {
-  clearJournalForTests();
-  const base = {
-    actionId: "act-1",
-    runId: "run-1",
-    botId: "bot-1",
-    surface: "browser-dom" as const,
-    surfaceIdentity: "tab:t1/doc:e1/frame:/",
-    ownershipEpoch: "epoch-1",
-    payloadDigest: "p1",
-    reviewDigest: "r1",
-    target: "submit",
-  };
-  journalPropose(base);
-  assert.equal(admitOnce("act-1"), true);
-  assert.equal(admitOnce("act-1"), false, "second admission of same mutation refuses");
-  journalTransition("act-1", "dispatch_started");
-  assert.equal(admitOnce("act-1"), false);
-  journalTransition("act-1", "outcome_uncertain", "crash after click");
-  assert.equal(listUncertain().length, 1);
-  clearJournalForTests();
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const base = {
+      actionId: "act-1",
+      runId: "run-1",
+      botId: "bot-1",
+      surface: "browser-dom" as const,
+      surfaceIdentity: "tab:t1/doc:e1/frame:/",
+      ownershipEpoch: "epoch-1",
+      payloadDigest: "p1",
+      reviewDigest: "r1",
+      target: "submit",
+    };
+    journalPropose(db, base);
+    assert.equal(admitOnce(db, "act-1"), true);
+    assert.equal(admitOnce(db, "act-1"), false, "second admission of same mutation refuses");
+    journalTransition(db, "act-1", "dispatch_started");
+    assert.equal(admitOnce(db, "act-1"), false);
+    journalTransition(db, "act-1", "outcome_uncertain", "crash after click");
+    assert.equal(listUncertain(db).length, 1);
+    // Uncertainty is terminal: readmission via any driver is refused, and no
+    // transition can smuggle it back to an admittable stage.
+    assert.equal(admitOnce(db, "act-1"), false, "uncertain actions are never readmitted");
+    assert.equal(journalTransition(db, "act-1", "admitted"), null, "uncertain cannot transition back to admitted");
+    // Reconciliation resolves without re-dispatch and stays non-admittable.
+    const reconciled = journalReconcile(db, "act-1", "failed_before_effect", "owner checked: no such task created");
+    assert.equal(reconciled?.stage, "failed_before_effect");
+    assert.equal(admitOnce(db, "act-1"), false, "terminal refusal cannot return successful admission");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("R02 journal survives restart and refuses mismatched identity reuse", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-restart-"));
+  let db = new OpenBotDatabase(root);
+  try {
+    journalPropose(db, {
+      actionId: "act-restart-1",
+      runId: "run-1",
+      botId: "bot-1",
+      surface: "browser-visual",
+      surfaceIdentity: "tab:t1/obs:o1",
+      ownershipEpoch: "o1",
+      payloadDigest: "p1",
+      reviewDigest: null,
+      target: "100,200",
+    });
+    assert.equal(admitOnce(db, "act-restart-1"), true);
+    assert.ok(journalTransition(db, "act-restart-1", "dispatch_started"), "valid transition allowed");
+    db.close();
+    // A new process on the same data dir sees the stored record.
+    db = new OpenBotDatabase(root);
+    const loaded = journalGet(db, "act-restart-1");
+    assert.equal(loaded?.stage, "dispatch_started", "in-flight stage survives restart");
+    assert.equal(admitOnce(db, "act-restart-1"), false, "restart does not reset admission");
+    // Restart recovery marks it uncertain; readmission stays refused.
+    const recovered = db.recoverInterruptedJournalActions();
+    assert.equal(recovered.length, 1);
+    assert.equal(journalGet(db, "act-restart-1")?.stage, "outcome_uncertain");
+    assert.equal(admitOnce(db, "act-restart-1"), false);
+    // Reusing the ID with a different payload/bot is a conflict, not adoption.
+    assert.throws(
+      () => journalPropose(db, {
+        actionId: "act-restart-1",
+        runId: "run-2",
+        botId: "bot-2",
+        surface: "browser-visual",
+        surfaceIdentity: "tab:t1/obs:o1",
+        ownershipEpoch: "o1",
+        payloadDigest: "different-payload",
+        reviewDigest: null,
+        target: "100,200",
+      }),
+      /different run/,
+    );
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("R02 concurrent processes cannot both dispatch the same action", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-race-"));
+  const db1 = new OpenBotDatabase(root);
+  const db2 = new OpenBotDatabase(root);
+  try {
+    const input = {
+      actionId: "act-race-1",
+      runId: "run-1",
+      botId: "bot-1",
+      surface: "browser-dom" as const,
+      surfaceIdentity: "tab:t1/doc:e1/frame:/",
+      ownershipEpoch: "epoch-1",
+      payloadDigest: "p1",
+      reviewDigest: null,
+      target: "submit",
+    };
+    journalPropose(db1, input);
+    const wins = [admitOnce(db1, "act-race-1"), admitOnce(db2, "act-race-1")].filter(Boolean).length;
+    assert.equal(wins, 1, "exactly one process admits");
+  } finally {
+    db1.close();
+    db2.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("R02 desktop lease is exclusive; takeover revokes", () => {

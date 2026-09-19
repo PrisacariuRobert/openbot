@@ -277,7 +277,23 @@ for (const receipt of interruptedApprovedActions) {
   db.updateRun(receipt.runId, { status: "failed", error: detail, finishedAt: new Date().toISOString(), taskStage: "blocked" });
   db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Check what happened before retrying", detail });
 }
-// R01: repair pending submission intents with no receipt as uncertain tombstones (never blind retry).
+// R02: recover journal actions that may have dispatched but never observed
+// an outcome. They become uncertain and will not repeat until reconciled.
+try {
+  const recoveredJournal = db.recoverInterruptedJournalActions();
+  for (const record of recoveredJournal) {
+    try {
+      if (db.getRun(record.runId)) {
+        db.addActivity({ runId: record.runId, botId: record.botId, kind: "error", label: "Check what happened before retrying", detail: `${record.target} may or may not have completed before OpenBot restarted. It has not been repeated.` });
+      }
+    } catch {
+      // Recovery state is already durable; activity annotation is best-effort.
+    }
+  }
+  if (recoveredJournal.length > 0) console.log(`[R02] recovered ${recoveredJournal.length} interrupted journal action(s) as uncertain`);
+} catch (error) {
+  console.warn("[R02] journal recovery failed:", error instanceof Error ? error.message : error);
+}
 try {
   const repaired = db.repairPendingSubmissionIntents();
   if (repaired > 0) console.log(`[R01] repaired ${repaired} pending submission intent(s) as uncertain`);

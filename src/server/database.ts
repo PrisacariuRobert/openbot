@@ -138,6 +138,34 @@ export type MessageSubmissionReceipt = {
   createdAt: string;
 };
 
+/** One durable action-journal row (R02). Renderer-independent companion to
+ * approved_actions: DOM, visual and native dispatches admit here first. */
+export type ActionJournalRecord = {
+  actionId: string;
+  runId: string;
+  botId: string;
+  surface: string;
+  surfaceIdentity: string;
+  ownershipEpoch: string;
+  target: string;
+  payloadDigest: string;
+  reviewDigest: string | null;
+  account: string;
+  stage:
+    | "proposed"
+    | "validated"
+    | "awaiting_review"
+    | "admitted"
+    | "dispatch_started"
+    | "effect_observed"
+    | "verified"
+    | "failed_before_effect"
+    | "outcome_uncertain";
+  detail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** A routine mutation lost a revision race (P03b). The caller must re-list
  * and confirm against currentRevision instead of overwriting it. */
 export class RoutineRevisionConflictError extends Error {
@@ -586,6 +614,23 @@ export class OpenBotDatabase {
         finished_at TEXT,
         reviewed_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS action_journal (
+        action_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        surface TEXT NOT NULL,
+        surface_identity TEXT NOT NULL,
+        ownership_epoch TEXT NOT NULL,
+        target TEXT NOT NULL,
+        payload_digest TEXT NOT NULL,
+        review_digest TEXT,
+        account TEXT NOT NULL DEFAULT '',
+        stage TEXT NOT NULL DEFAULT 'proposed',
+        detail TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS action_journal_run_stage ON action_journal(run_id, stage);
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -2713,6 +2758,133 @@ export class OpenBotDatabase {
     const result = this.db.prepare("UPDATE approved_actions SET status=?,result_summary=?,last_error=NULL,reviewed_at=?,finished_at=COALESCE(finished_at,?) WHERE id=? AND status='uncertain'")
       .run(status, outcome === "completed" ? "You confirmed this action completed." : "You confirmed this action did not complete.", now(), now(), id);
     return result.changes === 1 ? this.getApprovedAction(id) : null;
+  }
+
+  /** R02 durable action journal (renderer-independent companion to
+   * approved_actions). Every browser/visual/native dispatch admits here
+   * first: one admitted mutation can never fork a second version through
+   * another driver, and an uncertain effect requires owner reconciliation —
+   * never readmission. Rows intentionally carry no foreign keys: the journal
+   * is the recovery record of last resort and must survive referenced-row
+   * deletion. Transitions are enforced by conditional updates (changes===1
+   * wins), so concurrent processes cannot both dispatch the same action. */
+  journalActionPropose(input: {
+    actionId: string; runId: string; botId: string; surface: string;
+    surfaceIdentity: string; ownershipEpoch: string; target: string;
+    payloadDigest: string; reviewDigest?: string | null; account?: string;
+    detail?: string | null;
+  }): ActionJournalRecord {
+    const at = now();
+    try {
+      this.db.prepare(`INSERT INTO action_journal
+        (action_id,run_id,bot_id,surface,surface_identity,ownership_epoch,target,payload_digest,review_digest,account,stage,detail,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,?,?)`).run(
+        input.actionId, input.runId, input.botId, input.surface, input.surfaceIdentity,
+        input.ownershipEpoch, input.target, input.payloadDigest, input.reviewDigest ?? null,
+        input.account ?? "", "proposed", input.detail ?? null, at, at,
+      );
+      return this.journalActionGet(input.actionId)!;
+    } catch {
+      const existing = this.journalActionGet(input.actionId);
+      if (!existing) throw new Error("That action is already being processed. Check its result instead of sending it again.");
+      // Reusing an action ID with a different identity is a conflict, never
+      // a silent adoption of the new payload/bot/run.
+      const same =
+        existing.runId === input.runId &&
+        existing.botId === input.botId &&
+        existing.surface === input.surface &&
+        existing.surfaceIdentity === input.surfaceIdentity &&
+        existing.ownershipEpoch === input.ownershipEpoch &&
+        existing.target === input.target &&
+        existing.payloadDigest === input.payloadDigest &&
+        (existing.reviewDigest ?? null) === (input.reviewDigest ?? null) &&
+        (existing.account ?? "") === (input.account ?? "");
+      if (!same) throw new Error("That action ID is already bound to a different run, teammate, target or payload. Use a new action for new work.");
+      return existing;
+    }
+  }
+
+  journalActionGet(actionId: string): ActionJournalRecord | null {
+    const row = this.db.prepare("SELECT * FROM action_journal WHERE action_id=?").get(actionId) as Row | undefined;
+    return row ? this.journalActionFromRow(row) : null;
+  }
+
+  private journalActionFromRow(row: Row): ActionJournalRecord {
+    return {
+      actionId: String(row.action_id),
+      runId: String(row.run_id),
+      botId: String(row.bot_id),
+      surface: String(row.surface),
+      surfaceIdentity: String(row.surface_identity),
+      ownershipEpoch: String(row.ownership_epoch),
+      target: String(row.target),
+      payloadDigest: String(row.payload_digest),
+      reviewDigest: row.review_digest == null ? null : String(row.review_digest),
+      account: String(row.account ?? ""),
+      stage: String(row.stage) as ActionJournalRecord["stage"],
+      detail: row.detail == null ? null : String(row.detail),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+    };
+  }
+
+  /** Admit exactly once from a pre-dispatch stage. Refuses verified,
+   * failed, already-admitted/in-flight and uncertain actions: uncertainty
+   * requires reconciliation, never readmission through another driver. */
+  journalActionAdmit(actionId: string): boolean {
+    const result = this.db.prepare(
+      "UPDATE action_journal SET stage='admitted',updated_at=? WHERE action_id=? AND stage IN ('proposed','validated','awaiting_review')",
+    ).run(now(), actionId);
+    return result.changes === 1;
+  }
+
+  /** Enforced stage machine. outcome_uncertain is terminal here: leaving it
+   * requires journalActionReconcile with owner-checked evidence. */
+  journalActionTransition(actionId: string, stage: ActionJournalRecord["stage"], detail: string | null = null): ActionJournalRecord | null {
+    const allowed: Record<ActionJournalRecord["stage"], ActionJournalRecord["stage"][]> = {
+      proposed: ["validated", "failed_before_effect"],
+      validated: ["awaiting_review", "admitted", "failed_before_effect"],
+      awaiting_review: ["admitted", "failed_before_effect"],
+      admitted: ["dispatch_started", "failed_before_effect"],
+      dispatch_started: ["effect_observed", "failed_before_effect", "outcome_uncertain"],
+      effect_observed: ["verified", "failed_before_effect", "outcome_uncertain"],
+      verified: [],
+      failed_before_effect: [],
+      outcome_uncertain: [],
+    };
+    const current = this.journalActionGet(actionId);
+    if (!current || !allowed[current.stage].includes(stage)) return null;
+    this.db.prepare("UPDATE action_journal SET stage=?,detail=COALESCE(?,detail),updated_at=? WHERE action_id=? AND stage=?")
+      .run(stage, detail, now(), actionId, current.stage);
+    return this.journalActionGet(actionId);
+  }
+
+  /** Owner reconciliation of an uncertain effect after an allowed read-back.
+   * Never returns the action to an admittable stage: a confirmed effect is
+   * verified without re-dispatch; a confirmed miss is failed and any still-
+   * needed work requires a new action with a new identity. */
+  journalActionReconcile(actionId: string, outcome: "verified" | "failed_before_effect", evidence: string): ActionJournalRecord | null {
+    const result = this.db.prepare(
+      "UPDATE action_journal SET stage=?,detail=?,updated_at=? WHERE action_id=? AND stage='outcome_uncertain'",
+    ).run(outcome, evidence.slice(0, 1_000), now(), actionId);
+    return result.changes === 1 ? this.journalActionGet(actionId) : null;
+  }
+
+  listUncertainJournalActions(): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE stage='outcome_uncertain' OR stage='dispatch_started' OR stage='effect_observed' ORDER BY updated_at ASC").all() as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
+  /** Startup recovery mirroring recoverInterruptedApprovedActions: anything
+   * that may have dispatched but never observed an outcome becomes
+   * uncertain. It will not be repeated until the owner reconciles it. */
+  recoverInterruptedJournalActions(): ActionJournalRecord[] {
+    const rows = this.db.prepare("SELECT * FROM action_journal WHERE stage IN ('dispatch_started','effect_observed') ORDER BY updated_at ASC").all() as Row[];
+    if (!rows.length) return [];
+    const at = now();
+    this.db.prepare("UPDATE action_journal SET stage='outcome_uncertain',detail=?,updated_at=? WHERE stage IN ('dispatch_started','effect_observed')")
+      .run("OpenBot restarted while the action may have taken effect. It will not be repeated until you confirm what happened.", at);
+    return rows.map((row) => this.journalActionGet(String(row.action_id))!).filter(Boolean);
   }
 
   listApprovals(): Approval[] {

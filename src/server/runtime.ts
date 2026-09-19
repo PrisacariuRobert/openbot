@@ -1134,7 +1134,7 @@ export class BrowserManager {
       selectorHint: input.selector,
     });
     const actionId = `sem_${issued.fingerprint}`;
-    journalPropose({
+    journalPropose(this.db, {
       actionId,
       runId,
       botId,
@@ -1145,14 +1145,14 @@ export class BrowserManager {
       reviewDigest: null,
       target: input.label,
     });
-    if (!admitOnce(actionId)) throw new Error("This action was already admitted. Check its result instead of sending it again.");
-    journalTransition(actionId, "dispatch_started");
+    if (!admitOnce(this.db, actionId)) throw new Error("This action was already admitted. Check its result instead of sending it again.");
+    journalTransition(this.db, actionId, "dispatch_started");
     try {
       const result = input.kind === "click" ? await this.click(botId, input.selector) : await this.type(botId, input.selector, input.value ?? "");
-      journalTransition(actionId, "effect_observed");
+      journalTransition(this.db, actionId, "effect_observed");
       return result;
     } catch (error) {
-      journalTransition(actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -1236,7 +1236,7 @@ export class BrowserManager {
       throw new Error(`${reason}: the screenshot changed after observation. Observe again before acting.`);
     }
     const actionId = `vis_${input.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}`;
-    journalPropose({
+    journalPropose(this.db, {
       actionId,
       runId,
       botId,
@@ -1247,21 +1247,21 @@ export class BrowserManager {
       reviewDigest: null,
       target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
     });
-    if (!admitOnce(actionId)) throw new Error("This visual action was already admitted.");
+    if (!admitOnce(this.db, actionId)) throw new Error("This visual action was already admitted.");
     if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
       throw new Error("Another task holds the input lease. Wait for it to finish.");
     }
-    journalTransition(actionId, "dispatch_started");
+    journalTransition(this.db, actionId, "dispatch_started");
     try {
       await page.mouse.click(validated.cssX, validated.cssY);
       await page.waitForTimeout(180);
       this.assertPageAccess(botId, page);
-      journalTransition(actionId, "effect_observed");
+      journalTransition(this.db, actionId, "effect_observed");
       releaseDesktopLease(runId);
       return { url: page.url(), title: await page.title() };
     } catch (error) {
       releaseDesktopLease(runId);
-      journalTransition(actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
