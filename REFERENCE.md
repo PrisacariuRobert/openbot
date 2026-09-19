@@ -1,5 +1,7 @@
 # OpenBot 0.37.0-beta.1
 
+> Current architecture: one shared React interface in `src/studio/`, Electron desktop in `desktop/`, and responsive phone browsers. SwiftUI source/builds were retired on 2026-09-19. Versioned native notes below are historical, not current setup instructions. See [desktop and phone setup](desktop/README.md).
+
 ### Your AI team. Your models. Your computer.
 
 Give specialists real work. They research, build, review and coordinate with each other — while you control their models, tools, permissions and data. Every substantial job ends with evidence of what actually happened: sources, checks, approvals, usage and what — if anything — is still uncertain.
@@ -23,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-Open [OpenBot](http://127.0.0.1:4310/), create a teammate and choose its provider and model. Install the selected execution runtime when needed; no subscription or model allowance is supplied by OpenBot. Browser work needs Chrome/Chromium; isolated computer/code checks need Docker. These are capability-specific dependencies, not requirements for opening the interface. [Full setup](#start) · [Build the native Mac app](macos/README.md) · [iPhone preview](ios/README.md).
+Open [OpenBot](http://127.0.0.1:4310/), create a teammate and choose its provider and model. Install the selected execution runtime when needed; no subscription or model allowance is supplied by OpenBot. Browser work needs Chrome/Chromium; isolated computer/code checks need Docker. These are capability-specific dependencies, not requirements for opening the interface. [Full setup](#start) · [Build the native Mac app](desktop/README.md) · [iPhone preview](desktop/README.md#phones).
 
 ## What's new in 0.37.0-beta.1
 
@@ -109,7 +111,7 @@ This development version improves finished work, installation, open extensions, 
 
 - **Useful skills, already included:** seven methods are ready for existing and new teammates: meeting actions, document actions, weekly planning, grounded research, systematic debugging, checked spreadsheets, and private team review. Five are reviewed Hermes adaptations with pinned sources and MIT attribution. No manual import or extra account is needed for the method itself. Skills load on demand; disabling one persists across restart, and account/file permissions remain unchanged. Find them in Skill Library on desktop/web or Tools, skills & memory on iPhone.
 - **Code-security guidance without another model call:** shared-project writes and replacements return a bounded advisory check for selected injection, deserialization, YAML, encryption and TLS patterns. This is a TypeScript adaptation of selected Hermes/Anthropic security-guidance concepts, not the full Python plugin or a security certification. Source and license notices ship in the desktop package.
-- **Physical iPhone personal preview:** a development build can be signed with a free Personal Team using the documented preview entitlement override. Chat and in-app attachments remain available; push notifications and shared Share-sheet delivery are explicitly unavailable in this build. The normal release entitlements remain intact. [Setup and test checklist](ios/README.md#personal-team-device-preview).
+- **Physical iPhone personal preview:** a development build can be signed with a free Personal Team using the documented preview entitlement override. Chat and in-app attachments remain available; push notifications and shared Share-sheet delivery are explicitly unavailable in this build. The normal release entitlements remain intact. [Setup and test checklist](desktop/README.md#phones#personal-team-device-preview).
 - **Local Mac pairing no longer gets stuck saving an unnecessary key:** the desktop client keeps automatically paired loopback keys in memory and fetches them again from the local runner on launch. Remote-host keys still require secure Keychain storage.
 
 - **Connect tools beyond our built-ins:** web, native Mac, and iPhone share a custom MCP connection manager. Connect an independently accessible HTTPS service or an explicitly allowed, already-running local HTTP service. Tokens stay encrypted on the host. Discover tools, then grant each teammate only the tools it needs; nothing is enabled automatically. This first version supports public/token-authenticated Streamable HTTP, not OAuth-only services or command-based servers.
@@ -310,7 +312,7 @@ npm ci
 npm run dev
 ```
 
-Open [OpenBot](http://127.0.0.1:4310/). Older `/studio.html` links open the same interface; settings no longer return to a separate old application. For the native Mac build/package path, see [macos/README.md](macos/README.md). Start with a read-only task and enable tools only as needed.
+Open [OpenBot](http://127.0.0.1:4310/). Older `/studio.html` links open the same interface; settings no longer return to a separate old application. For the native Mac build/package path, see [desktop/README.md](desktop/README.md). Start with a read-only task and enable tools only as needed.
 
 Settings and their subpages share a consistent drawer with a way back; phone settings use the full screen. Providers, apps, teammates, routines, permissions, projects, skills, files, results and recovery are directly accessible from Settings. Expanded forms share the same neutral palette and controls. The Skills page uses one teammate selector for both included skills and teaching.
 
@@ -425,7 +427,7 @@ Installed web apps served from a secure HTTPS address can enable background noti
 
 The native iPhone app can register directly with APNs and receives short result and approval notifications with deep links. Release maintainers must create an Apple APNs `.p8` key and set `OPENBOT_APNS_TEAM_ID`, `OPENBOT_APNS_KEY_ID`, and `OPENBOT_APNS_PRIVATE_KEY_PATH` on the Mac host; the private key never enters the iPhone app or model context. The app and Share extension also require the `group.app.openbot.shared` App Group on the selected Apple development team. These Apple-owned signing and credential steps are required for a physical-device build; the checked-in simulator build verifies compilation and embedding but cannot prove production push delivery.
 
-The native SwiftUI app lives in [`ios/`](ios/README.md). Generate its Xcode project with XcodeGen, select your Apple development team, and run it on iOS 17 or newer. It uses native conversation, teammate, progress, approval, Quick Look artifact, sharing, and settings views—not a web view. The access key is stored only in the iPhone Keychain and is never placed in a deep link. The installable web experience remains available when a native build is not installed.
+Phones now use the shared responsive web client through authenticated HTTPS. See [phone access](desktop/README.md#phones). Native SwiftUI builds, Keychain pairing and share extensions described in older version notes are retired.
 
 Voice typing uses the browser or operating system speech-recognition service. OpenBot does not upload or store the audio itself, but the browser vendor may process it under its own policy.
 

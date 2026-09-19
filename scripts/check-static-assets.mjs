@@ -36,19 +36,12 @@ for (const entry of ["index.html", "studio.html"]) {
   }
 }
 
-// Xcode resolves images through Contents.json and asset names, not file imports.
-for (const filename of walk("ios").filter(p => p.endsWith("/Contents.json"))) {
-  const catalog = JSON.parse(text(filename));
-  for (const image of catalog.images || []) {
-    if (image.filename) requireAsset(path.posix.join(path.posix.dirname(filename), image.filename), filename);
-  }
-}
 const desktop = JSON.parse(text("desktop/package.json"));
 for (const platform of ["mac", "win", "linux"]) {
   const icon = desktop.build?.[platform]?.icon;
   if (icon) requireAsset(`desktop/${icon}`, `desktop ${platform} packaging`);
 }
-requireAsset("ios/OpenBotMobile/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png", "native Mac package");
+requireAsset("desktop/build/icon.png", "Electron desktop package");
 
 // Next/Vite public URLs include a computed team/day/build screenshot selector.
 const page = text("marketing/website/app/page.tsx");

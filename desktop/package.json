@@ -2,7 +2,7 @@
   "name": "openbot-desktop",
   "productName": "OpenBot",
   "version": "0.37.0-beta.1",
-  "description": "OpenBot desktop shell — your AI team, on the computer you own.",
+  "description": "OpenBot desktop shell \u2014 your AI team, on the computer you own.",
   "author": "Robert Prisacariu",
   "license": "MIT",
   "private": true,
@@ -66,17 +66,27 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "dir",
+          "target": "dmg",
           "arch": [
-            "arm64"
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
           ]
         }
-      ]
+      ],
+      "identity": null
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "artifactName": "OpenBot-${version}-${os}-${arch}.${ext}"
   },
   "allowScripts": {
     "electron@38.8.6": true

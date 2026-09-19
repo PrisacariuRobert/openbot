@@ -68,6 +68,9 @@
   --bubble-outgoing: #2b2b30;
   --bubble-outgoing-label: #ffffff;
   --bubble-incoming: #e9e9eb;
+  --surface-pixel-message: #fcf2f6;
+  --surface-pixel-paper: #f0dde5;
+  --paper-top: #fffbfb;
   --bubble-incoming-label: var(--label-primary);
 
   /* Type scale (HIG text styles, web-adapted). */
@@ -83,7 +86,7 @@
   --text-caption-2: 11px;
 
   --font-system:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro",
+    "Inter Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro",
     system-ui, -system-ui, "Helvetica Neue", "Segoe UI", sans-serif, "Open Sans";
   --font-mono:
     "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Mono", Menlo,
@@ -156,6 +159,9 @@
     --bubble-outgoing: #ececf0;
     --bubble-outgoing-label: #1d1d1f;
     --bubble-incoming: #2c2c2e;
+    --surface-pixel-message: #30252c;
+    --surface-pixel-paper: #47353e;
+    --paper-top: #282226;
     --bubble-incoming-label: var(--label-primary);
     --selection: #3a3a3c;
     --hover: #2c2c2e;
@@ -217,6 +223,9 @@
   --bubble-outgoing: #ececf0;
   --bubble-outgoing-label: #1d1d1f;
   --bubble-incoming: #2c2c2e;
+    --surface-pixel-message: #30252c;
+    --surface-pixel-paper: #47353e;
+    --paper-top: #282226;
   --bubble-incoming-label: var(--label-primary);
   --selection: #3a3a3c;
   --hover: #2c2c2e;
@@ -245,7 +254,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 .workspace {
-  background: var(--canvas);
+  background: var(--system-background);
 }
 .sidebar,
 .conversation-context {

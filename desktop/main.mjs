@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, shell } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -14,6 +15,9 @@ import { installNavigationGuards } from "./navigation.mjs";
 const PORT = Number(process.env.OPENBOT_PORT || 4311);
 const DEV_URL = process.env.OPENBOT_DEV_URL || "";
 const BASE = DEV_URL || `http://127.0.0.1:${PORT}`;
+
+// Isolated QA profiles never share cookies, cache, or the owner app lock.
+if (process.env.OPENBOT_DESKTOP_USER_DATA) app.setPath("userData", path.resolve(process.env.OPENBOT_DESKTOP_USER_DATA));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -82,7 +86,7 @@ function main() {
     logFd = openSync(path.join(logDir, "runner.log"), "a");
     runner = spawn(node, [runnerScript], {
       cwd: appRoot,
-      env: { ...process.env, OPENBOT_PORT: String(PORT), OPENBOT_DATA_DIR: dataDir, NODE_ENV: "production" },
+      env: { ...process.env, PATH: [path.join(bundle, "bin"), process.env.PATH || ""].join(path.delimiter), OPENBOT_PORT: String(PORT), OPENBOT_DATA_DIR: dataDir, NODE_ENV: "production" },
       detached: true,
       stdio: ["ignore", logFd, logFd],
     });
@@ -93,9 +97,10 @@ function main() {
     const started = Date.now();
     return new Promise((resolve, reject) => {
       const attempt = () => {
-        const request = http.get(`${BASE}/api/healthz`, (response) => {
+        const healthURL = new URL("/api/healthz", BASE);
+        const request = (healthURL.protocol === "https:" ? https : http).get(healthURL, (response) => {
           response.resume();
-          if (response.statusCode && response.statusCode < 500) resolve();
+          if (response.statusCode === 200) resolve();
           else retry();
         });
         request.on("error", retry);
@@ -111,12 +116,15 @@ function main() {
 
   function createWindow() {
     const window = new BrowserWindow({
-      width: 1_280,
-      height: 820,
+      width: Number(process.env.OPENBOT_QA_WIDTH) || 1_280,
+      height: Number(process.env.OPENBOT_QA_HEIGHT) || 820,
+      useContentSize: true,
+      // Borderless QA window measures app content, excluding OS titlebar pixels.
+      frame: !process.env.OPENBOT_QA_HEIGHT,
       minWidth: 980,
       minHeight: 640,
       title: "OpenBot",
-      backgroundColor: "#f7f6f3",
+      backgroundColor: "#f5f5f7",
       autoHideMenuBar: true,
       show: false,
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },

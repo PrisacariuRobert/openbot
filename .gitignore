@@ -42,3 +42,7 @@ scripts/com.openbot.*.plist
 # Finder archive metadata, never application assets.
 __MACOSX/
 ._*
+
+# Generated platform runtimes and local QA logs
+dist-release/
+qa/figma-implementation/logs/

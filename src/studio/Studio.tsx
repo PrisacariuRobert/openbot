@@ -187,56 +187,6 @@ function FaceGroup({ bots, size = 50 }: { bots: Bot[]; size?: number }) {
     </div>
   );
 }
-// Pinned teammates live above the list as large avatars —glanceable like a
-// pinned chat, unpinned with one tap. The scrolling list never duplicates them.
-function PinnedZone({ items, bots, onOpen, onUnpin }: {
-  items: Thread[];
-  bots: Bot[];
-  onOpen: (threadId: string) => void;
-  onUnpin: (item: Thread) => void;
-}) {
-  if (!items.length) return null;
-  return (
-    <div className="pinned-zone">
-      <span className="pinned-label">Pinned</span>
-      <div className="pinned-avatars">
-        {items.map((item) => {
-          const bot = bots.find((b) => b.threadId === item.id);
-          return (
-            <div key={item.id} className="pinned-avatar">
-              <button
-                type="button"
-                className="pinned-open"
-                aria-label={`Open ${item.title}`}
-                title={item.title}
-                onClick={() => onOpen(item.id)}
-              >
-                {bot ? (
-                  <Face bot={bot} size={52} />
-                ) : (
-                  <span className="room-mark">
-                    <MessageCircle size={26} strokeWidth={1.3} />
-                  </span>
-                )}
-                <span className="pinned-name">{item.title}</span>
-                {item.needsYou && <i className="pinned-dot" aria-label="Needs you" />}
-              </button>
-              <button
-                type="button"
-                className="pinned-unpin"
-                aria-label={`Unpin ${item.title}`}
-                title="Unpin"
-                onClick={() => onUnpin(item)}
-              >
-                <X size={11} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="empty">
@@ -824,6 +774,7 @@ export function Studio() {
   const [libraryTab, setLibraryTab] = useState<"apps" | "skills">("apps"),
     [query, setQuery] = useState("");
   const [conversationQuery, setConversationQuery] = useState("");
+  const [needsYouOnly, setNeedsYouOnly] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [takeoverBot, setTakeoverBot] = useState<Bot | null>(null);
   const [signInPane, setSignInPane] = useState<string | null>(null);
@@ -1228,7 +1179,7 @@ export function Studio() {
           !composerDraft.ready
             ? "Restoring your draft…"
             : conversationBot
-            ? `Message ${conversationBot.name}…`
+            ? `What’s next, ${conversationBot.name}?`
             : page === "chat"
               ? "Message your team…"
               : "Ask anything. Make a plan. Get something done."
@@ -1285,6 +1236,7 @@ export function Studio() {
         </div>
       )}
       <div className="composer-bar">
+        <details className="composer-options" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}><summary aria-label="Message options"><Plus size={18} /></summary><div className="composer-options-content">
         <button
           type="button"
           className={`composer-mode ${yoloMode ? "yolo" : ""}`}
@@ -1326,6 +1278,7 @@ export function Studio() {
               }
             }}
           />
+        </div></details>
         <span className="composer-hint">
           {sending ? "Sending…" : !composerDraft.ready ? "Restoring draft…" : "Enter to send"}
         </span>
@@ -1555,7 +1508,7 @@ export function Studio() {
     }).catch(() => {});
     setRefresh((n) => n + 1);
   }
-  const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned);
+  const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned && (!needsYouOnly || item.needsYou) && conversationMatches(item, allBots, conversationQuery));
   const archivedThreads = (state?.threads || []).filter((item) => item.hidden);
   const isGroupThread = (item: Thread) =>
     (item.botIds?.length ?? 0) > 1 ||
@@ -1564,7 +1517,7 @@ export function Studio() {
   const visibleThreads = (state?.threads || []).filter(
     (item) =>
       !item.hidden &&
-      !item.pinned &&
+      !item.pinned && (!needsYouOnly || item.needsYou) &&
       conversationMatches(item, allBots, conversationQuery),
   );
   const groupThreads = visibleThreads.filter(isGroupThread);
@@ -1854,6 +1807,7 @@ export function Studio() {
     };
   const conversationRows = (
     <>
+      {dmThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
       {dmThreads.map(threadRow)}
       <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
         <summary>Project rooms</summary>
@@ -1894,16 +1848,14 @@ export function Studio() {
     >
       <aside className="sidebar">
         <a className="wordmark" href="/">
-          <span className="wordmark-symbol">
-            o<span />
-          </span>
+          <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
           openbot
         </a>
         <label className="conversation-search">
           <Search size={16} />
           <input
             aria-label="Find a conversation"
-            placeholder="Search"
+            placeholder="Find a conversation"
             value={conversationQuery}
             onChange={(event) => setConversationQuery(event.target.value)}
           />
@@ -1922,6 +1874,10 @@ export function Studio() {
               </button>
             </span>
           </header>
+          <div className="conversation-filters" aria-label="Filter conversations">
+            <button aria-pressed={!needsYouOnly} onClick={() => setNeedsYouOnly(false)}>All</button>
+            <button aria-pressed={needsYouOnly} onClick={() => setNeedsYouOnly(true)}>Needs you {attentionCount || ""}</button>
+          </div>
           {activeNow.length > 0 && (
             <div className="active-now" aria-label="Working right now">
               {activeNow.map((bot) => (
@@ -1933,7 +1889,7 @@ export function Studio() {
               ))}
             </div>
           )}
-          <PinnedZone items={pinnedThreads} bots={allBots} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
+          {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
@@ -1979,7 +1935,7 @@ export function Studio() {
                   aria-hidden="true"
                   onClick={() => setDetail({ kind: "teammate", bot: conversationBot })}
                 >
-                  <Face bot={conversationBot} size={76} />
+                  <Face bot={conversationBot} size={44} />
                 </span>
                 <button
                   className="identity-pill"
@@ -1988,7 +1944,7 @@ export function Studio() {
                     setDetail({ kind: "teammate", bot: conversationBot })
                   }
                 >
-                  <span className="conversation-name">{title}</span>
+                  <span className="conversation-title-copy"><span className="conversation-name">{title}</span><small>{conversationBot.role}</small></span>
                   <ChevronDown size={13} />
                 </button>
               </>
@@ -2128,7 +2084,7 @@ export function Studio() {
                   ))}
                 </div>
                 <div className="inbox-conversations">
-          <PinnedZone items={pinnedThreads} bots={allBots} onOpen={openThread} onUnpin={(item) => setPin(item, false)} />
+          {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
                   {conversationRows}
                 </div>
                 {!state.bots.length && (
@@ -2502,6 +2458,7 @@ export function Studio() {
                   }}
                 >
                   <div className="chat-messages">
+                    {state.activeThreadId === thread && state.messages[0] && <div className="conversation-date">{dayKey(state.messages[0].createdAt) === dayKey(new Date()) ? "Today" : dateText(state.messages[0].createdAt)} · {timeText(state.messages[0].createdAt)}</div>}
                     {!state.bots.length ? (
                       <div className="first-teammate">
                         <span className="first-teammate-mark">
@@ -2627,6 +2584,7 @@ export function Studio() {
                         }
                         return (
                           <Fragment key={message.id}><article
+                            style={{ "--message-tint": message.senderColor || "#d86889" } as CSSProperties}
                             className={`chat-message ${message.senderType === "user" ? "from-you" : "from-team"} ${startsGroup ? "" : "continues"}`}
 
                           >
@@ -2897,7 +2855,7 @@ export function Studio() {
                 <ArrowRight size={15} />
               </button>
               <AppearanceEditor key={detail.bot.id} bot={detail.bot} onSaved={(bot) => { setDetail({ kind: "teammate", bot }); setRefresh((n) => n + 1); }}/>
-              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
+              <a className="text-action" href={`/?thread=${encodeURIComponent(detail.bot.threadId)}&panel=bot`} onClick={(event) => { event.preventDefault(); openCapability("bot", detail.bot.threadId); }}><Settings2 size={14}/> Edit & manage teammate <ArrowRight size={14}/></a>
             </div>
           )}
           {detail.kind === "search" && (

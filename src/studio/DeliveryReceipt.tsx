@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Check, ShieldCheck, Download, ChevronRight, MessageSquare, CircleAlert } from "lucide-react";
+import { Check, ShieldCheck, Download, ChevronRight, MessageSquare, CircleAlert, FileText, ArrowUpRight } from "lucide-react";
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
 import { deliveryReview, deliveryReviewSummary } from "./delivery-review";
 import ReactMarkdown from "react-markdown";
 import { newerDeliveredVersion } from "./artifact-versions";
 import { isUnverifiedTextFallback } from "./delivery-fallback";
+import { Character } from "./Character";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
 
 /** A finished result: files as tappable file cards with a type tile, name,
@@ -31,29 +32,7 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
   ].filter(Boolean).join(" · ");
   return (
     <div className="delivery-result" aria-label={`Delivered result. ${provenance}`}>
-      {message.attachments.map((file) => {
-        const newer = newerDeliveredVersion(file, visibleFiles);
-        const meta = `${Math.max(1, Math.ceil(file.size / 1000))} KB · ${file.kind}${file.revision > 1 ? ` · v${file.revision}` : ""}`;
-        return (
-          <div className="delivery-version" key={file.id}>
-            <a className="file-card" href={file.url} target="_blank" rel="noreferrer" aria-label={`${file.name}, ${meta}`}>
-              {file.kind === "image" && file.previewUrl ? (
-                <img src={file.previewUrl} alt="" className="file-card-thumb" loading="lazy" />
-              ) : (
-                <span className={fileSiglaClass(file)} aria-hidden="true">{fileLabel(file)}</span>
-              )}
-              <span className="file-card-meta">
-                <strong>{file.name}</strong>
-                <small>{meta}</small>
-              </span>
-              <ChevronRight size={14} className="file-card-chevron" aria-hidden="true" />
-            </a>
-            {newer && <p className="delivery-newer">A newer version is ready. <a href={newer.url} target="_blank" rel="noreferrer">Open v{newer.revision}<ChevronRight size={13} aria-hidden="true" /></a></p>}
-          </div>
-        );
-      })}
-      <div className="delivery-summary">
-      {reviews.length > 0 && <details className="delivery-reviews"><summary><MessageSquare size={14} /><span>{deliveryReviewSummary(kids)}</span><ChevronRight size={13} /></summary>
+      {reviews.length > 0 && <details className="delivery-reviews"><summary><span className="review-faces" aria-hidden="true"><Character name={run.botName} color={run.botColor} variant={run.botMascot} size={30}/><Character name={reviews[0]!.run.botName} color={reviews[0]!.run.botColor} variant={reviews[0]!.run.botMascot} size={30}/></span><span><strong>{reviews.length === 1 ? reviews[0]!.label : deliveryReviewSummary(kids)}</strong><small>See their finding and the version reviewed</small></span><ChevronRight size={13} /></summary>
       {reviews.map((review) => <section className="delivery-finding" key={review.run.id} aria-label={review.label}>
         <strong>{review.label}</strong>
         {!review.bound && <p className="delivery-review-note">Earlier review · file version not recorded.</p>}
@@ -63,6 +42,16 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
           <div className="delivery-finding-full"><ReactMarkdown skipHtml disallowedElements={["a", "img"]} unwrapDisallowed>{review.detail}</ReactMarkdown></div>
         </details>}
       </section>)}</details>}
+      {message.attachments.map((file) => {
+        const newer = newerDeliveredVersion(file, visibleFiles);
+        return (
+          <div className="delivery-version" key={file.id}>
+            <DeliveredFile file={file} artifact author={teammates?.find(bot => bot.id === run.botId)} />
+            {newer && <p className="delivery-newer">A newer version is ready. <a href={newer.url} target="_blank" rel="noreferrer">Open v{newer.revision}<ChevronRight size={13} aria-hidden="true" /></a></p>}
+          </div>
+        );
+      })}
+      <div className="delivery-summary">
       <DeliveryReceipt run={run} teammates={teammates} reviews={kids} hasDeliveredArtifacts={message.attachments.length > 0} />
       </div>
     </div>
@@ -145,7 +134,7 @@ export function DeliveryReceipt({ run, teammates, reviews = [], hasDeliveredArti
  * content on a sheet of paper, not a generic icon row. Quick Look, not a
  * file manager: you see the first lines before you decide to open it.
  * Plain uploads keep the compact row (artifact={false}). */
-export function DeliveredFile({ file, artifact = false }: { file: Attachment; artifact?: boolean }) {
+export function DeliveredFile({ file, artifact = false, author }: { file: Attachment; artifact?: boolean; author?: Bot }) {
   const size = `${Math.max(1, Math.ceil(file.size / 1000))} KB`;
   const meta = [size, file.kind, file.source === "artifact" ? "Result" : null, file.revision > 1 ? `v${file.revision}` : null].filter(Boolean).join(" · ");
   if (!artifact) {
@@ -167,30 +156,19 @@ export function DeliveredFile({ file, artifact = false }: { file: Attachment; ar
     .map((line) => line.replace(/[#*_`>]/g, " ").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .slice(0, 5);
-  const rows = lines.map((line) => {
-    const match = /^(.{1,34}?)\s*[:—·]\s+(.+)$/.exec(line);
-    return match ? { label: match[1], value: match[2].slice(0, 26) } : { label: line.slice(0, 40), value: "" };
-  });
   const image = file.kind === "image" && file.previewUrl;
-  const stamp = new Date(file.createdAt).toISOString().slice(0, 10);
-  return <section className="delivered-file" aria-label={`File: ${file.name}`}>
-    <a className="ledger" href={file.url} target="_blank" rel="noreferrer">
-      <span className="ledger-head"><span>Result</span><span>{stamp}{file.revision > 1 ? ` · rev ${file.revision}` : ""}</span></span>
-      <span className="ledger-body">
-        {image
-          ? <span className="ledger-image"><img src={file.previewUrl!} alt="" loading="lazy" /></span>
-          : rows.length > 0
-            ? rows.map((row, index) => <span className={`ledger-line${index === 0 ? " is-lead" : ""}`} key={index}><span className="ledger-label">{row.label}</span>{row.value && <span className="ledger-value">{row.value}</span>}</span>)
-            : <span className={fileSiglaClass(file)}>{fileLabel(file)}</span>}
-      </span>
-      <span className="ledger-foot">
-        <span className="ledger-name">{file.name}</span>
-        <span className="ledger-meta">{meta}</span>
-        <span className="ledger-open" aria-hidden="true"><Download size={14} /></span>
-      </span>
+  return <section className="delivered-file delivered-paper" aria-label={`File: ${file.name}`}>
+    <a className="document-paper" href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}, revision ${file.revision}`}>
+      {author && <span className="document-author" aria-hidden="true"><Character name={author.name} color={author.color} variant={author.mascot} size={58} mood="happy" /></span>}
+      <span className="document-identity"><FileText size={14}/><span>{file.name}</span><small>REVISION / {String(file.revision).padStart(2, "0")}</small></span>
+      {image ? <img className="document-preview-image" src={file.previewUrl!} alt="" /> : <>
+        <strong className="document-title">{lines[0] || file.name}</strong>
+        <span className="document-excerpt">{lines.slice(1, 4).join("\n") || file.summary || "Open the original file to read the result."}</span>
+      </>}
+      <span className="document-actions"><strong>Open document</strong><ArrowUpRight size={15}/><small>{size} · {file.kind}</small></span>
     </a>
     {file.summary && lines.length === 0 && <p>{file.summary}</p>}
-    {file.previewText && <details><summary>Read full text</summary><pre>{file.previewText}</pre></details>}
+
     {file.processingStatus === "partial" && <small>Partial preview. Download the original for the complete file.</small>}
     {["failed", "unsupported"].includes(file.processingStatus) && <small>Preview unavailable. Your original file is still available.</small>}
   </section>;

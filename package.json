@@ -53,16 +53,15 @@
     "soak:routines": "tsx scripts/soak-routines.ts",
     "check": "tsc --noEmit",
     "check:acceptance": "tsc --noEmit -p tsconfig.acceptance.json",
-    "check:ios": "node scripts/check-ios.mjs",
-    "check:macos": "node scripts/check-macos.mjs",
-    "package:macos": "node scripts/package-macos-app.mjs",
-    "test:macos-package": "node scripts/test-macos-package.mjs",
     "test:packaging": "node --test scripts/test-staged-app-package.mjs scripts/test-release-version.mjs scripts/test-release-workflow.mjs scripts/test-macos-dmg.mjs",
     "test:desktop": "node --test desktop/*.test.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "verify": "npm run check:release && npm run check:ios && npm run check:macos && npm run test:packaging && npm run test:desktop && npm run build && npm test && npm run check && npm run check:acceptance"
+    "verify": "npm run check:release && npm run test:packaging && npm run test:desktop && npm run build && npm test && npm run check && npm run check:acceptance",
+    "package:desktop": "node scripts/package-desktop.mjs",
+    "test:figma-conversation": "tsx scripts/test-figma-conversation.ts"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/open-sans": "^5.3.0",
     "@js-temporal/polyfill": "0.5.1",
