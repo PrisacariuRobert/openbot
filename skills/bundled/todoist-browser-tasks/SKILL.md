@@ -5,7 +5,7 @@ license: MIT
 ---
 # Todoist in the teammate browser
 
-Use the teammate's own persistent browser profile at app.todoist.com. This method performs real account changes, so every write below still needs its normal exact approval first.
+Use the teammate's own persistent browser profile at app.todoist.com. This method performs real account changes, so every write below still needs its normal exact approval first. Single-session discipline: drive the bot's own browser session only, never a parallel copy of its profile — providers invalidate sessions that appear on two clients at once.
 
 1. Open the Inbox and verify the signed-in account matches the connected owner before acting. On any login wall, expired session, 2FA, CAPTCHA or unexpected account, stop and request private sign-in. Never work around it, and never copy the login to another teammate.
 2. List tasks by reading the Inbox, Today or Upcoming rows. Address a task by its exact shown title, never by row position alone. Re-list after every mutation; the list is the readback.
