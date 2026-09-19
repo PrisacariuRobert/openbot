@@ -1,8 +1,12 @@
 // Local-browser integration fixtures for the computer-use candidate.
 // Real headless Chrome (system install) + disposable data dir + local HTTP
 // fixture server. No model, no paid allowance, no live accounts, no network
-// beyond 127.0.0.1. Distinguish this from actual-model performance: it proves
-// the host/executor/journal/transform mechanics, not autonomous task success.
+// beyond 127.0.0.1. Every case asserts its effect oracle AND its no-effect
+// counterpart (zero input on stale/denied targets, no duplicate submits).
+// The harness drives only opaque host-issued IDs into the action methods;
+// registry reads below are the independent oracle, not action input.
+// This proves host/executor/journal/transform mechanics, not autonomous
+// model performance.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -11,52 +15,48 @@ import { tmpdir } from "node:os";
 import { OpenBotDatabase } from "../src/server/testing/database.js";
 import { BrowserManager } from "../src/server/runtime.js";
 import { BrowserNavigationGrants } from "../src/server/browser-navigation-grants.js";
-import { revokeAllLeases, clearLeasesForTests, listUncertain } from "../src/server/action-journal.js";
-import { reresolveSemanticTarget, issueSemanticTarget, clearSemanticTargetsForTests } from "../src/server/semantic-targets.js";
+import { clearLeasesForTests } from "../src/server/action-journal.js";
+import { getObservation } from "../src/server/observation-registry.js";
 import { redactSecretsForProvider } from "../src/server/observation-envelope.js";
 
 const root = mkdtempSync(path.join(tmpdir(), "openbot-cu-integration-"));
-const db = new OpenBotDatabase(root, { dataDir: path.join(root, "data") });
-const browser = new BrowserManager(db, { headlessTeaching: true });
+let db = new OpenBotDatabase(root, { dataDir: path.join(root, "data") });
+let browser = new BrowserManager(db, { headlessTeaching: true });
 const grants = new BrowserNavigationGrants();
 
-let receivedSubmit: string | null = null;
-const server = createServer((req, res) => {
-  const url = new URL(req.url || "/", "http://fixture");
-  res.setHeader("Cache-Control", "no-store");
-  if (url.pathname === "/submit" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
-      receivedSubmit = body;
-      res.setHeader("content-type", "text/html; charset=utf-8");
-      res.end(`<!doctype html><title>Done</title><main><h1>Received</h1><p>submission accepted</p></main>`);
-    });
-    return;
-  }
-  if (url.pathname === "/relabeled") {
-    res.setHeader("content-type", "text/html; charset=utf-8");
-    res.end(`<!doctype html><title>Changed</title><main><form action="/submit" method="post"><input name="field" value=""><button type="submit" id="go">Send it now</button></form></main>`);
-    return;
-  }
-  res.setHeader("content-type", "text/html; charset=utf-8");
-  res.end(`<!doctype html><title>Fixture form</title><main>
+type ClickEvent = { kind: "click"; id: string | null; x: number; y: number };
+type CanvasEvent = { kind: "canvas"; x: number; y: number };
+type ScrollEvent = { kind: "scroll"; id: string; top: number };
+type FixtureEvent = ClickEvent | CanvasEvent | ScrollEvent;
+const events: FixtureEvent[] = [];
+let submits: string[] = [];
+const clicks = () => events.filter((event) => event.kind === "click") as ClickEvent[];
+const canvasHits = () => events.filter((event) => event.kind === "canvas") as CanvasEvent[];
+const scrollTops = (id: string) => (events.filter((event) => event.kind === "scroll" && event.id === id) as ScrollEvent[]).map((event) => event.top);
+
+const FORM = `<!doctype html><title>Fixture form</title><main>
 <h1>Fixture form</h1>
 <form action="/submit" method="post">
 <input type="text" name="field" aria-label="Task name" value="">
 <input type="password" name="pw" aria-label="Password" value="s3cret-initial">
 <input type="text" name="otp" aria-label="One-time code" autocomplete="one-time-code" value="482910">
-<button type="submit" id="go">Submit</button>
+<button type="submit" id="go">Submit form</button>
 <button type="button" id="decoy" aria-label="Submit">Submit</button>
+<button type="button" id="dup-a">Duplicate</button>
+<button type="button" id="dup-b">Duplicate</button>
 </form>
 <input type="file" id="upload" aria-label="Attach file">
-<canvas id="pad" width="400" height="200"></canvas>
+<canvas id="pad" style="position:fixed;left:100px;top:100px;width:400px;height:200px;" width="400" height="200"></canvas>
+<div style="display:flex;gap:16px;margin-top:8px;">
+<div id="intended" aria-label="Results pane" style="height:200px;overflow-y:auto;border:1px solid #999;"><div style="height:1200px;">intended lane</div></div>
+<div id="decoy-pane" aria-label="Archive pane" style="height:200px;overflow-y:auto;border:1px solid #999;"><div style="height:1200px;">decoy lane</div></div>
+</div>
+<iframe id="sub" src="/sub" style="width:300px;height:150px;border:1px solid #999;"></iframe>
 <script>
-window.__clicks = [];
+const send = (payload) => { try { navigator.sendBeacon("/events", JSON.stringify(payload)); } catch {} };
 document.addEventListener("click", (event) => {
   const target = event.target;
-  window.__clicks.push({ x: event.clientX, y: event.clientY, id: target && target.id ? target.id : null });
-  if (target && target.id === "decoy") window.__decoyClicked = true;
+  send({ kind: "click", id: target && target.id ? target.id : null, x: event.clientX, y: event.clientY });
 });
 const canvas = document.getElementById("pad");
 if (canvas) {
@@ -64,13 +64,62 @@ if (canvas) {
   if (context) { context.fillStyle = "#123456"; context.fillRect(0, 0, 400, 200); }
   canvas.addEventListener("click", (event) => {
     const rect = canvas.getBoundingClientRect();
-    window.__canvasClick = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    send({ kind: "canvas", x: event.clientX - rect.left, y: event.clientY - rect.top });
   });
 }
-const upload = document.getElementById("upload");
-if (upload) upload.addEventListener("change", () => { window.__uploadName = upload.files && upload.files[0] ? upload.files[0].name : null; });
+for (const id of ["intended", "decoy-pane"]) {
+  const pane = document.getElementById(id);
+  if (pane) pane.addEventListener("scroll", () => send({ kind: "scroll", id, top: pane.scrollTop }), { passive: true });
+}
 </script>
-</main>`);
+</main>`;
+
+const SUB = `<!doctype html><title>Sub frame</title><main>
+<div id="inner" aria-label="Frame lane" style="height:120px;overflow-y:auto;border:1px solid #999;"><div style="height:900px;">frame lane</div></div>
+<script>
+const send = (payload) => { try { navigator.sendBeacon("/events", JSON.stringify(payload)); } catch {} };
+const inner = document.getElementById("inner");
+if (inner) inner.addEventListener("scroll", () => send({ kind: "scroll", id: "sub-inner", top: inner.scrollTop }), { passive: true });
+</script>
+</main>`;
+
+const LOGIN = `<!doctype html><title>Sign in</title><main><h1>Sign in to continue</h1>
+<input type="password" name="pw" aria-label="Password" value=""><button id="login-go">Continue</button>
+</main>`;
+
+const server = createServer((req, res) => {
+  const url = new URL(req.url || "/", "http://fixture");
+  res.setHeader("Cache-Control", "no-store");
+  if (url.pathname === "/submit" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      submits.push(body);
+      res.setHeader("content-type", "text/html; charset=utf-8");
+      res.end(`<!doctype html><title>Done</title><main><h1>Received</h1></main>`);
+    });
+    return;
+  }
+  if (url.pathname === "/events" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        events.push(JSON.parse(body) as FixtureEvent);
+      } catch {
+        // Malformed beacons never fail the fixture server.
+      }
+      res.statusCode = 204;
+      res.end();
+    });
+    return;
+  }
+  res.setHeader("content-type", "text/html; charset=utf-8");
+  if (url.pathname === "/sub") res.end(SUB);
+  else if (url.pathname === "/login") res.end(LOGIN);
+  else if (url.pathname === "/relabeled") {
+    res.end(`<!doctype html><title>Changed</title><main><form action="/submit" method="post"><input name="field" value=""><button type="submit" id="go">Send it now</button></form></main>`);
+  } else res.end(FORM);
 });
 await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -79,94 +128,126 @@ const record = (id: string, pass: boolean, detail: string) => {
   results.push({ id, pass, detail });
   console.log(`${pass ? "PASS" : "FAIL"} ${id}: ${detail}`);
 };
+const SESSION = "sess-fixture-1";
 
 try {
   clearLeasesForTests();
-  clearSemanticTargetsForTests();
+  const run = db.createRun({ threadId: "team-room", botId: "nova", prompt: "fixture task", status: "running" });
+  browser.registerVisualAdapter("fixture-visual", "visual-supported");
 
-  // F1 — real semantic action with independent oracle (server-side receipt).
+  // F1 — real semantic action through opaque IDs with a server-side oracle.
   await browser.open("nova", `${base}/form`);
-  const target = await browser.describeTarget("nova", "#go");
-  assert.match(target.label, /Submit/);
-  await browser.click("nova", "#go", target.fingerprint);
-  assert.ok(receivedSubmit !== null && receivedSubmit.includes("field="), "server received the form body");
-  record("F1-real-action", true, `server oracle saw submit body (${(receivedSubmit || "").length} bytes); unique selector #go, decoy #decoy never addressed`);
+  const observed = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+  const registry = getObservation(observed.observationId)!;
+  assert.ok(registry, "observation stored by the host");
+  const go = registry.targets.find((target) => target.label === "Submit form" && target.selector === "#go");
+  assert.ok(go, "host observed the submit control");
+  const submitsBefore = submits.length;
+  const clicksBefore = clicks().length;
+  await browser.semanticAct("nova", run.id, { targetId: go.targetId, sessionId: SESSION, kind: "click" });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(submits.length, submitsBefore + 1, "exactly one submit reached the server");
+  assert.ok(submits[submits.length - 1]!.includes("field="), "server received the form body");
+  const goClicks = clicks().slice(clicksBefore).filter((event) => event.id === "go");
+  assert.equal(goClicks.length, 1, "one real click landed on #go");
+  assert.ok(!clicks().slice(clicksBefore).some((event) => event.id === "decoy"), "decoy never clicked");
+  record("F1-real-action", true, "semanticAct via opaque ID submitted once; server oracle + click beacon agree");
 
-  // F2 — stale target: relabeled control rejects the old fingerprint.
+  // F2 — relabeled control: STALE refusal with zero new submits.
   await browser.open("nova", `${base}/form`);
-  const before = await browser.describeTarget("nova", "#go");
+  const relabeled = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+  const relabeledGo = getObservation(relabeled.observationId)!.targets.find((target) => target.selector === "#go")!;
   await browser.open("nova", `${base}/relabeled`);
-  let staleRejected = false;
+  const submitsBeforeRelabel = submits.length;
+  let staleError: unknown = null;
   try {
-    await browser.click("nova", "#go", before.fingerprint);
+    await browser.semanticAct("nova", run.id, { targetId: relabeledGo.targetId, sessionId: SESSION, kind: "click" });
   } catch (error) {
-    staleRejected = /changed after review/i.test(error instanceof Error ? error.message : "");
+    staleError = error;
   }
-  assert.equal(staleRejected, true, "old fingerprint rejected after relabel");
-  record("F2-stale-target", true, "fingerprint mismatch refused dispatch");
+  assert.ok(staleError instanceof Error && /STALE_OBSERVATION|TARGET_DESTROYED|AMBIGUOUS_TARGET/.test(staleError.message), "relabel refused");
+  assert.equal(submits.length, submitsBeforeRelabel, "zero submits on stale target");
+  record("F2-stale-target", true, `relabel refused (${(staleError as Error).message.slice(0, 60)}…), no input dispatched`);
 
-  // F3 — ambiguous same-name controls never dispatch (host-issued targets).
+  // F3 — two same-label controls: AMBIGUOUS refusal with zero submits.
+  // The fixture carries a deliberate duplicate pair (#dup-a, #dup-b).
   await browser.open("nova", `${base}/form`);
-  const issued = issueSemanticTarget({
-    observationId: "obs-fixture",
-    documentEpoch: "doc-fixture",
-    framePath: "/",
-    role: "button",
-    label: "Submit",
-    bounds: null,
-    selectorHint: null,
-  });
-  const ambiguous = reresolveSemanticTarget(issued.targetId, {
-    observationId: "obs-fixture-2",
-    documentEpoch: "doc-fixture",
-    framePath: "/",
-    candidates: [
-      { role: "button", label: "Submit" },
-      { role: "button", label: "Submit" },
-    ],
-  });
-  assert.deepEqual(ambiguous, { ok: false, reason: "AMBIGUOUS_TARGET" });
-  record("F3-ambiguous", true, "two Submit buttons → AMBIGUOUS_TARGET, no click");
-
-  // F4 — canvas geometry: screenshot-relative click lands on the canvas.
-  await browser.open("nova", `${base}/form`);
-  const shot = await browser.screenshot("nova");
-  assert.ok(shot && shot.startsWith("data:image/jpeg;base64,"), "real screenshot captured");
-  const visual = await browser.visualAct("nova", "run-fixture-visual", {
-    observationId: "obs-canvas",
-    imageWidth: 1280,
-    imageHeight: 820,
-    capturedWidth: 1280,
-    capturedHeight: 820,
-    deviceScale: 1,
-    browserZoom: 100,
-    point: { x: 640, y: 700 },
-    capability: "visual-supported",
-  });
-  assert.match(visual.url, /\/form/);
-  record("F4-canvas-geometry", true, "visualAct mapped image px → CSS px and dispatched on the live page");
-  // Stale geometry refused without dispatch.
-  let zoomRejected = false;
+  const ambiguous = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+  const ambiguousDup = getObservation(ambiguous.observationId)!.targets.find((target) => target.selector === "#dup-a")!;
+  const submitsBeforeAmbiguous = submits.length;
+  let ambiguousError: unknown = null;
   try {
-    await browser.visualAct("nova", "run-fixture-visual-2", {
-      observationId: "obs-canvas-stale",
-      imageWidth: 1280,
-      imageHeight: 820,
-      capturedWidth: 1280,
-      capturedHeight: 820,
-      deviceScale: 2,
-      browserZoom: 100,
-      point: { x: 640, y: 700 },
-      capability: "visual-supported",
+    await browser.semanticAct("nova", run.id, { targetId: ambiguousDup.targetId, sessionId: SESSION, kind: "click" });
+  } catch (error) {
+    ambiguousError = error;
+  }
+  assert.ok(ambiguousError instanceof Error && /AMBIGUOUS_TARGET/.test(ambiguousError.message), "duplicate labels refused");
+  assert.equal(submits.length, submitsBeforeAmbiguous, "zero submits on ambiguous target");
+  record("F3-ambiguous", true, "duplicate Duplicate controls → AMBIGUOUS_TARGET through semanticAct, no dispatch");
+
+  // F4 — canvas click at the fixed-geometry center with a real local oracle.
+  // The canvas is position:fixed at (100,100)–(500,300); center CSS (300,200)
+  // maps 1:1 to image px at deviceScale 1. The page reports canvas-local
+  // coordinates, expected (200,100).
+  await browser.open("nova", `${base}/form`);
+  const visual = await browser.observeScoped("nova", run.id, { surface: "browser-visual", sessionId: SESSION });
+  const canvasBefore = canvasHits().length;
+  const click = await browser.visualAct("nova", run.id, {
+    observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 },
+  });
+  assert.ok(Math.abs(click.cssX - 300) < 1 && Math.abs(click.cssY - 200) < 1, `host mapped to CSS (${click.cssX},${click.cssY})`);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const hits = canvasHits().slice(canvasBefore);
+  assert.equal(hits.length, 1, "exactly one canvas hit beaconed");
+  assert.ok(Math.abs(hits[0]!.x - 200) <= 3 && Math.abs(hits[0]!.y - 100) <= 3, `canvas-local (${hits[0]!.x},${hits[0]!.y}) ≈ (200,100)`);
+  // Unknown adapter: VISION_UNAVAILABLE, zero input.
+  const clicksBeforeVision = clicks().length;
+  let visionError: unknown = null;
+  try {
+    await browser.visualAct("nova", run.id, {
+      observationId: visual.observationId, sessionId: SESSION, adapterId: "unregistered-adapter", action: "click", point: { x: 300, y: 200 },
     });
   } catch (error) {
-    zoomRejected = /STALE_OBSERVATION|changed after observation/i.test(error instanceof Error ? error.message : "");
+    visionError = error;
   }
-  // Note: deviceScale here matches the live page only if the page reports
-  // scale 2; either outcome is recorded honestly below.
-  record("F4-stale-geometry", true, zoomRejected ? "mismatched transform refused" : "live deviceScale is 2 (transform accepted on matching geometry)");
+  assert.ok(visionError instanceof Error && /VISION_UNAVAILABLE/.test(visionError.message));
+  // Stale observation ID: refusal with zero input.
+  let staleVisualError: unknown = null;
+  try {
+    await browser.visualAct("nova", run.id, {
+      observationId: "obs_no_such_observation", sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 },
+    });
+  } catch (error) {
+    staleVisualError = error;
+  }
+  assert.ok(staleVisualError instanceof Error && /STALE_OBSERVATION/.test(staleVisualError.message));
+  assert.equal(clicks().length, clicksBeforeVision, "zero clicks dispatched for refused visual actions");
+  record("F4-canvas-geometry", true, "canvas-local (200,100) ±3px; unknown adapter + stale ID refused with zero input");
 
-  // F5 — upload bound to reviewed input + origin; secret masking on snapshot.
+  // F4b — live tab/page mismatch rejects with zero input: act once more
+  // while nothing changed (must pass with a fresh action identity), then
+  // navigate away and prove the same observation refuses with zero input.
+  {
+    const stillFresh = await browser.visualAct("nova", run.id, {
+      observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 310, y: 210 },
+    });
+    assert.ok(Math.abs(stillFresh.cssX - 310) < 1 && Math.abs(stillFresh.cssY - 210) < 1, "unchanged tab/page still acts");
+    await browser.open("nova", `${base}/relabeled`);
+    const clicksBeforeNav = clicks().length;
+    let navError: unknown = null;
+    try {
+      await browser.visualAct("nova", run.id, {
+        observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 320, y: 220 },
+      });
+    } catch (error) {
+      navError = error;
+    }
+    assert.ok(navError instanceof Error && /STALE_OBSERVATION/.test(navError.message), "navigation after observation refuses");
+    assert.equal(clicks().length, clicksBeforeNav, "zero clicks dispatched after navigation");
+    record("F4b-tab-binding", true, "same page acts; post-navigation observation refuses with zero input");
+  }
+
+  // F5 — reviewed upload + origin binding; password and plain-text OTP masked.
   await browser.open("nova", `${base}/form`);
   const fileTarget = await browser.describeFileInput("nova", "#upload");
   const tmpFile = path.join(root, "grant.txt");
@@ -190,40 +271,121 @@ try {
   assert.ok(leaked.found && !leaked.redacted.includes("abcdef1234567890"));
   record("F5-upload-secrets", true, "reviewed upload selected; origin change refused; password + text-box OTP masked");
 
-  // F6 — Stop/takeover revokes leases and navigation grants; owner click works.
-  const { acquireDesktopLease } = await import("../src/server/action-journal.js");
-  assert.equal(acquireDesktopLease("run-stop-1", "nova", "browser-visual", "win-1"), true);
-  const revoked = revokeAllLeases();
-  assert.equal(revoked.desktop, true, "Stop releases the desktop lease");
-  assert.equal(acquireDesktopLease("run-stop-2", "nova", "browser-visual", "win-1"), true, "next owner can acquire after revoke");
-  revokeAllLeases();
+  // F5b — secure entry is explicit handoff state: a real sign-in handoff
+  // minimizes capture and refuses model input, including observations
+  // captured before the handoff started. A separate run keeps later cases
+  // on the unaffected first task.
+  const secureRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "secure task", status: "running" });
+  await browser.open("nova", `${base}/form`);
+  const preHandoff = await browser.observeScoped("nova", secureRun.id, { surface: "browser-dom", sessionId: SESSION });
+  const preHandoffGo = getObservation(preHandoff.observationId)!.targets.find((target) => target.selector === "#go")!;
+  const { BrowserSignIns } = await import("../src/server/browser-sign-in.js");
+  const handoff = new BrowserSignIns(db).request("nova", secureRun.id, `${base}/login`, {
+    source: "host",
+    observedUrl: `${base}/login`,
+    observedText: "Sign in",
+  });
+  assert.ok(handoff.id, "real sign-in handoff requested");
+  const walled = await browser.observeScoped("nova", secureRun.id, { surface: "browser-dom", sessionId: SESSION });
+  assert.equal(walled.reason, "SECURE_MODE", "handoff pauses model-visible capture");
+  assert.deepEqual(walled.targetIds, [], "no targets issued during handoff");
+  assert.equal(walled.textPreview, "", "no model-visible text during handoff");
+  let secureError: unknown = null;
+  try {
+    await browser.visualAct("nova", secureRun.id, {
+      observationId: walled.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 100, y: 100 },
+    });
+  } catch (error) {
+    secureError = error;
+  }
+  assert.ok(secureError instanceof Error && /SECURE_MODE/.test(secureError.message), "visual input refused in secure mode");
+  let preHandoffError: unknown = null;
+  try {
+    await browser.semanticAct("nova", secureRun.id, { targetId: preHandoffGo.targetId, sessionId: SESSION, kind: "click" });
+  } catch (error) {
+    preHandoffError = error;
+  }
+  assert.ok(preHandoffError instanceof Error && /SECURE_MODE/.test(preHandoffError.message), "pre-handoff observations die when handoff starts");
+  // The owner completes the handoff out-of-band; later cases run on a clear state.
+  db.decideApproval(handoff.id, "approved");
+  record("F5b-secure-mode", true, "real handoff → minimized capture; pre/post-handoff acts refuse SECURE_MODE");
+
+  // F6 — revocation via the same calls the Stop/takeover routes make, plus
+  // the real owner takeover input path. Pre-revocation observations die.
+  await browser.open("nova", `${base}/form`);
+  const preRevoke = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+  const preRevokeGo = getObservation(preRevoke.observationId)!.targets.find((target) => target.selector === "#go")!;
+  db.revokeBotInput("nova");
+  browser.revokeObservationsForBot("nova");
+  const submitsBeforeRevoke = submits.length;
+  let revokedError: unknown = null;
+  try {
+    await browser.semanticAct("nova", run.id, { targetId: preRevokeGo.targetId, sessionId: SESSION, kind: "click" });
+  } catch (error) {
+    revokedError = error;
+  }
+  assert.ok(revokedError instanceof Error && /STALE_OBSERVATION|USER_TAKEOVER/.test(revokedError.message), "revoked observation refused");
+  assert.equal(submits.length, submitsBeforeRevoke, "zero submits after revocation");
   grants.issue("run-grant-1", "nova", { version: 1, origin: new URL(base).origin, maxClicks: 12, expiresInMinutes: 15 });
   assert.equal(grants.revokeBot("nova"), 1, "takeover revokes teammate navigation grants");
   const owned = await browser.takeoverClick("nova", 40, 40);
   assert.match(owned.url, /\/form/);
-  record("F6-stop-takeover", true, "leases + grants revoked; owner takeover click dispatched on live page");
+  record("F6-stop-takeover", true, "revoked observations refuse with zero input; grants revoked; owner takeover dispatched");
 
-  // F7 — uncertain effect reconciles without blind retry.
+  // F7 — accepted effect, lost response, restart: no repeat without reconcile.
+  {
+    const actionId = "fix-f7-restart-action";
+    db.journalActionPropose({
+      actionId, runId: run.id, botId: "nova", surface: "browser-dom",
+      surfaceIdentity: "tab:9/doc:fixture/frame:/", ownershipEpoch: "epoch-9",
+      target: "Submit", payloadDigest: "digest-9", reviewDigest: null, account: "",
+    });
+    assert.equal(db.journalActionAdmit(actionId), true);
+    assert.ok(db.journalActionTransition(actionId, "dispatch_started"), "dispatch started before the crash");
+    // Simulate the process dying after the external effect was accepted
+    // but before any outcome was recorded: close the browser and the
+    // database, reopen the database, and run startup recovery.
+    await browser.close().catch(() => undefined);
+    db.close();
+    db = new OpenBotDatabase(root, { dataDir: path.join(root, "data") });
+    browser = new BrowserManager(db, { headlessTeaching: true });
+    const recovered = db.recoverInterruptedJournalActions();
+    const recoveredIds = new Set(recovered.map((record) => record.actionId));
+    assert.ok(recoveredIds.has(actionId), "restart recovery marks the in-flight action uncertain");
+    // Anything observed-but-never-verified also returns to uncertain: a
+    // restart always requires re-verification, never assumed success.
+    assert.ok(recovered.length >= 1, "recovery covers every unverified action");
+    assert.equal(db.journalActionGet(actionId)?.stage, "outcome_uncertain");
+    assert.equal(db.journalActionAdmit(actionId), false, "no repeat admission after restart");
+    const reconciled = db.journalActionReconcile(actionId, "verified", "owner read back the submitted fixture row");
+    assert.equal(reconciled?.stage, "verified", "owner reconciliation resolves without re-dispatch");
+    assert.equal(db.journalActionAdmit(actionId), false, "reconciled actions stay non-admittable");
+    record("F7-uncertain", true, "post-restart recovery → uncertain → reconcile, never readmitted");
+  }
+
+  // F8 — intended pane scrolls; decoy and frame panes verified independently.
   await browser.open("nova", `${base}/form`);
-  const doomed = await browser.semanticAct("nova", "run-uncertain-1", {
-    observationId: "obs-uncertain",
-    documentEpoch: "doc-uncertain",
-    framePath: "/",
-    role: "button",
-    label: "Gone",
-    selector: "#does-not-exist",
-    kind: "click",
-  }).then(() => null, (error: unknown) => error);
-  assert.ok(doomed instanceof Error, "missing target fails instead of force-clicking");
-  const uncertain = listUncertain(db).filter((record) => record.surface === "browser-dom");
-  assert.ok(uncertain.length >= 1, "journal holds the uncertain action for reconciliation");
-  record("F7-uncertain", true, "destroyed target → error surfaced; journal holds outcome_uncertain, no silent retry");
+  const scrolled = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
+  const registryAfter = getObservation(scrolled.observationId)!;
+  const intended = registryAfter.panes.find((pane) => pane.selector === "#intended");
+  const decoyPane = registryAfter.panes.find((pane) => pane.selector === "#decoy-pane");
+  assert.ok(intended && decoyPane, "host observed both scroll panes");
+  const decoyTopsBefore = scrollTops("decoy-pane").length;
+  const moved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: intended.paneToken, deltaY: 200 });
+  assert.ok(moved.moved > 0, `intended pane moved (${moved.beforeTop} → ${moved.afterTop})`);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(scrollTops("decoy-pane").length, decoyTopsBefore, "decoy pane never scrolled");
+  record("F8-scroll-pane", true, `intended pane +${moved.moved}px, decoy untouched; region resolved, not discarded`);
 } catch (error) {
   record("HARNESS", false, error instanceof Error ? error.message : String(error));
   throw error;
 } finally {
   await browser.close().catch(() => undefined);
-  db.close();
+  try {
+    db.close();
+  } catch {
+    // Already closed by the restart case; cleanup still follows.
+  }
   await new Promise<void>((resolve) => server.close(() => resolve()));
   rmSync(root, { recursive: true, force: true });
 }

@@ -1097,8 +1097,13 @@ export class BrowserManager {
     if (!bot?.browserEnabled) throw new Error("This teammate's browser access is turned off.");
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
-    const secureWall = await detectLoginWall(page);
-    const secureMode = secureWall !== null;
+    // Secure entry is explicit handoff state, not page-content inference: a
+    // password field sitting in a normal form is enumerated-but-redacted
+    // (snapshot masks values; secret entry itself goes through owner
+    // takeover). Only an active owner sign-in handoff pauses model-visible
+    // capture and input. Content walls still trigger handoff requests
+    // through the existing sign-in paths; they do not silently expand here.
+    const secureMode = this.secureHandoffActive(botId);
     const observationId = newObservationId();
     const capturedAt = Date.now();
     const expiresAtMs = capturedAt + OBSERVATION_TTL_MS;
@@ -1185,6 +1190,21 @@ export class BrowserManager {
     };
   }
 
+  /** Active owner sign-in handoff for this teammate's browser: model-visible
+   * capture and model input pause until the handoff completes. Host-owned
+   * approval state — never a caller assertion. */
+  private secureHandoffActive(botId: string): boolean {
+    try {
+      return this.db.listApprovals().some(
+        (entry) =>
+          entry.botId === botId &&
+          (this.db.getApprovalAction(entry.id) as { type?: string } | null)?.type === "browser_sign_in",
+      );
+    } catch {
+      return false;
+    }
+  }
+
   /** Host-owned owner epoch: thread identity plus the teammate's durable
    * input-revocation counter. Stop/takeover/sign-in bumps invalidate every
    * observation captured under an older epoch. */
@@ -1205,60 +1225,56 @@ export class BrowserManager {
   }
 
   /** Visible interactive controls of the live main frame, evaluated in-page.
-   * Closure-free by necessity (see detectLoginWall): no external references. */
+   * Closure-free by necessity (see detectLoginWall): only argument-position
+   * arrows and plain loops — no nested const-bound functions, which tsx
+   * rewrites with a __name helper that does not exist inside the page. */
   private async queryControls(page: Page): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string }>> {
     return page.locator("body").evaluate((body) => {
-      const pickSelector = (element: Element): string => {
-        const html = element as HTMLElement;
-        if (html.id) return `#${CSS.escape(html.id)}`;
-        const testId = html.getAttribute("data-testid");
-        if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
-        const name = html.getAttribute("name");
-        if (name) return `${html.tagName.toLowerCase()}[name="${CSS.escape(name)}"]`;
-        const aria = html.getAttribute("aria-label");
-        if (aria) return `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(aria)}"]`;
-        const parent = html.parentElement;
-        const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
-        const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
-        return `${parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : ""}${html.tagName.toLowerCase()}${suffix}`;
-      };
-      const nodes = [...body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]")];
-      const visible = nodes.filter((node) => {
-        const rect = (node as HTMLElement).getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && getComputedStyle(node).visibility !== "hidden";
-      }).slice(0, 150);
-      return visible.map((node) => {
+      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string }> = [];
+      const nodes = body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=radio],[role=option],[role=slider],[role=combobox],[contenteditable=true]");
+      for (const node of nodes) {
         const html = node as HTMLElement;
         const rect = html.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || getComputedStyle(node).visibility === "hidden") continue;
+        let selector = html.tagName.toLowerCase();
+        if (html.id) selector = `#${CSS.escape(html.id)}`;
+        else if (html.getAttribute("data-testid")) selector = `[data-testid="${CSS.escape(html.getAttribute("data-testid")!)}"]`;
+        else if (html.getAttribute("name")) selector = `${html.tagName.toLowerCase()}[name="${CSS.escape(html.getAttribute("name")!)}"]`;
+        else if (html.getAttribute("aria-label")) selector = `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(html.getAttribute("aria-label")!)}"]`;
+        else {
+          const parent = html.parentElement;
+          const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
+          const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
+          const prefix = parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : "";
+          selector = `${prefix}${html.tagName.toLowerCase()}${suffix}`;
+        }
         const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
-        return {
+        out.push({
           role: html.getAttribute("role") || html.tagName.toLowerCase(),
           label,
           bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          selector: pickSelector(node),
+          selector,
           framePath: "/",
-        };
-      });
+        });
+        if (out.length >= 150) break;
+      }
+      return out;
     });
   }
 
   /** Scrollable regions of the live page (main frame + owned same-origin
-   * iframes), evaluated in-page. Tokens are opaque; the host resolves them. */
+   * iframes), evaluated in-page under the same closure-free constraint. */
   private async queryScrollableRegions(page: Page): Promise<Array<{ selector: string; framePath: string; label: string }>> {
     const main = await page.locator("body").evaluate((body) => {
-      const pickSelector = (element: Element): string => {
-        const html = element as HTMLElement;
-        if (html.id) return `#${CSS.escape(html.id)}`;
-        const testId = html.getAttribute("data-testid");
-        if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
-        return html.tagName.toLowerCase();
-      };
       const panes: Array<{ selector: string; framePath: string; label: string }> = [];
       const candidates = [body, ...body.querySelectorAll("div,main,section,article,aside,ul,table")];
       for (const candidate of candidates) {
         const html = candidate as HTMLElement;
         if (html.scrollHeight > html.clientHeight + 4 && html.clientHeight > 40 && getComputedStyle(html).overflowY !== "visible") {
-          panes.push({ selector: pickSelector(candidate), framePath: "/", label: (html.getAttribute("aria-label") || html.id || html.tagName).toLowerCase().slice(0, 120) });
+          let selector = html.tagName.toLowerCase();
+          if (html.id) selector = `#${CSS.escape(html.id)}`;
+          else if (html.getAttribute("data-testid")) selector = `[data-testid="${CSS.escape(html.getAttribute("data-testid")!)}"]`;
+          panes.push({ selector, framePath: "/", label: (html.getAttribute("aria-label") || html.id || html.tagName).toLowerCase().slice(0, 120) });
           if (panes.length >= 20) break;
         }
       }
@@ -1375,7 +1391,7 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "control identity changed before dispatch");
       throw new Error("STALE_OBSERVATION: the page or control changed after review. Observe again.");
     }
-    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
     journalTransition(this.db, actionId, "dispatch_started");
     try {
       // Production reviewed-fingerprint path: exact approval semantics.
@@ -1413,9 +1429,8 @@ export class BrowserManager {
     runId: string,
     botId: string,
     admittedEpoch: number,
-    secureWall: string | null,
   ): void {
-    if (secureWall !== null || observation.secureMode) {
+    if (observation.secureMode || this.secureHandoffActive(botId)) {
       throw new Error("SECURE_MODE: owner sign-in is showing. Model-visible input is paused until handoff completes.");
     }
     const run = this.db.getRun(runId);
@@ -1494,6 +1509,11 @@ export class BrowserManager {
     this.assertActEligible(observation, runId, botId);
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
+    // Tab and document binding: the active tab and URL must still be the
+    // observed ones. A navigation or tab switch invalidates the screenshot.
+    if (this.tabId(botId, page) !== observation.tabId || page.url() !== observation.documentEpoch) {
+      throw new Error("STALE_OBSERVATION: tab or page changed after observation. Observe again before acting.");
+    }
     const live = await page.evaluate(() => ({
       dpr: window.devicePixelRatio || 1,
       w: window.innerWidth || 0,
@@ -1557,7 +1577,7 @@ export class BrowserManager {
       ownershipEpoch: observation.ownerEpoch, target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
       payloadDigest, reviewDigest: null, account: observation.account,
     });
-    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
     if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
       journalTransition(this.db, actionId, "failed_before_effect", "input lease held by another task");
@@ -1638,7 +1658,7 @@ export class BrowserManager {
       payloadDigest, reviewDigest: null, account: observation.account,
     });
     const page = await this.page(botId);
-    this.assertPreInput(observation, runId, botId, admittedEpoch, await detectLoginWall(page));
+    this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
     journalTransition(this.db, actionId, "dispatch_started");
     try {

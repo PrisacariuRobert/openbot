@@ -1,7 +1,13 @@
 # Backend / computer-use status — Codex UI preserved
 
-> REVIEW CANDIDATE (not a release). Branch backend/computer-use-gaps-20260919
-> awaits independent review. No merge, no release, no paid/live spend.
+> REVIEW CANDIDATE, ROUND 2 (not a release). Branch
+> backend/computer-use-gaps-20260919 awaits independent re-review against
+> review findings R1–R6. No merge, no release, no paid/live spend.
+>
+> Infrastructure-only label: model-loop exposure stays unwired by design,
+> native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
+> infrastructure with fixture proof — NOT general autonomous computer use,
+> which remains unproven (no authorized model runs).
 
 Base: origin/main 4a01381c4c79320cd5674aecc8aa8f3904922b9f (fetched 2026-09-19).
 Branch: backend/computer-use-gaps-20260919 (clean worktree, owner tree untouched).
@@ -10,34 +16,42 @@ expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
 
 ## Ticket assessment (current main, executed evidence)
 
-- R01 submission replay: PARTIAL → FIXED this slice. Base main ran the
-  replay check AFTER new-admission eligibility, so a file-bearing retry hit
-  the unclaimed-attachment 400 instead of replaying. The candidate moves the
-  replay/tombstone/pending-collision check BEFORE eligibility (after thread
-  visibility only): claimed attachments on retry prove the first admission;
-  changed budget/provider no longer block recovery of original IDs (they
-  govern new work, not receipt disclosure); thread mismatch stays 409;
-  missing thread stays 404; same-key/different-payload stays 409 with
-  nothing changed. Plus tombstone retention on prune, pending-intent staging
-  with request_in_progress collision guard, staged inbox copies, startup
-  repair. Tests: message-submissions.test.ts (existing) +
-  message-admission-replay.test.ts (6 route-order cases + source-order guard).
-- R02 action journal: PARTIAL → FIXED. Reused approved_actions; added
-  action-journal.ts (journal + admit-once + desktop/target leases +
-  revoke-on-stop/takeover) integrated into new semanticAct/visualAct paths.
-- B01 observations/privacy: CONFIRMED_GAP → FIXED. observation-envelope.ts
-  (envelope, TTL, geometry, privacy gate, secret redaction, credential-field
-  detection incl. plain-text token boxes) + BrowserManager.observeScoped().
-- B02 semantic driver: PARTIAL → FIXED. semantic-targets.ts (host-issued IDs,
-  conservative re-resolution, frame eligibility, region scroll) +
-  semanticAct()/scrollPane(). No bare model selectors; no force-click.
-- B03 visual: CONFIRMED_GAP → FIXED. visual-grounding.ts (image-relative
-  coordinates, inverse transform, crop/zoom IDs, VISION_UNAVAILABLE,
-  stale-geometry rejection) + visualAct() with lease + journal. visualAct
-  reads live devicePixelRatio/viewport before dispatch — zoom/window drift
-  since the observation is STALE_OBSERVATION, not a guessed click.
-- B04 rich/file: PARTIAL → FIXED. rich-input.ts (scoped edits, autosave vs
-  submit, granted upload handles, download verify/sanitize).
+- R01 submission replay: FIXED, then hardened per review. Replay precedes
+  eligibility (claimed attachments prove first admission; changed
+  budget/provider govern new work only; thread 404 / 409 mismatch / 409
+  payload conflict preserved). Prune and repair are atomic and fail
+  closed; staging failure refuses with 500 and nothing created; orphan
+  tombstones answer request_uncertain and never claim nothing happened.
+  Proven by scripts/run-r01-http-fixtures.ts (8/8 on the real endpoint)
+  plus message-admission-replay.test.ts (route-order cases, fail-closed
+  injection cases, source-order guard).
+- R02 action journal: DB-backed action_journal table with the same
+  conditional-update discipline as approved_actions (no FKs: the journal is
+  the recovery record of last resort). admitOnce refuses admitted,
+  in-flight, terminal and uncertain stages; propose rejects mismatched
+  identity reuse; uncertainty is terminal until owner reconcile
+  (verified-after-readback or failed, never re-admitted); startup recovery
+  marks dispatch_started/effect_observed uncertain. Proven across restart,
+  concurrent handles and ID-reuse conflicts; Stop/takeover/sign-in bump
+  the durable input epoch and drop observations.
+- B01 observations/privacy: host-captured registry (IDs only to callers);
+  secure entry is explicit handoff state (real sign-in request minimizes
+  capture and refuses pre/post-handoff acts); redaction removes every
+  token-shaped value across tool/error/diagnostic/receipt shapes with
+  per-call globals. Text redaction proven; image privacy rests on
+  minimized/blocked capture, stated as such.
+- B02/B03/B06 semantic/visual/routing: opaque host-issued targets and
+  registry transforms; unique live re-resolution with production
+  fingerprint equality; capability from the server adapter registry
+  (unknown → VISION_UNAVAILABLE); live tab/document/DPR/scroll/size
+  enforcement with assertPageAccess before and after input; final
+  value/kind bound into the journal digest; NaN/non-finite rejected.
+  Fixture-proven (F1–F4b, F8); model-loop wiring intentionally absent.
+- B04 upload/rich/download: upload live-proven with origin binding (F5);
+  download helpers unit-tested BUT no BrowserManager download-capture API
+  exists — documented follow-up, not claimed. Region scroll resolves the
+  authorized pane token and reads back movement (F8: intended +200px,
+  decoy untouched).
 - B05 native: CONFIRMED_GAP → capability interface + gates (native-control.ts,
   macOS first, separate permissions, protected apps, secure-dialog owner
   rule). No global capture; gated off by default.
@@ -63,24 +77,37 @@ expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
   paid authorization; no fabrication).
 - A00 audit: DONE (this file + branch + contract map).
 
-## Evidence (review candidate, executed 2026-09-19)
+## Evidence (review candidate round 2, executed 2026-09-19)
 
-- `tsc --noEmit`: clean. Note: a mid-task run failed on missing
-  playwright-core/react-markdown types — cause was a pruned node_modules
-  (lockfile untouched), recovered with `npm ci`; unrelated to the candidate.
-- `npm test`: 881 pass, 0 fail.
-- `npm run check:acceptance`: pass. `npm run build`: pass (pre-existing
-  chunk-size warning only). `npm run check:release`: pass.
-  `npm run test:desktop`: 5 pass. `npm run test:packaging`: 13 pass.
-- `npm run test:browser-tabs|sessions|sign-in`: all PASS (disposable data).
-- `scripts/run-browser-integration-fixtures.ts`: 8/8 PASS on real headless
-  system Chrome, disposable data dir, 127.0.0.1 fixture server only —
-  real submit oracle, stale-fingerprint refusal, ambiguous-target refusal,
-  canvas image→CSS mapping with live-geometry enforcement, reviewed upload
-  + origin-change refusal, password + plain-text-OTP masking, lease/grant
-  revocation with owner takeover click, uncertain journaling without retry.
-- Protected-client diff: zero (only src/server/*, scripts/run-browser-
-  integration-fixtures.ts, verification/*, templates/, docs/).
+- `tsc --noEmit`: clean. `npm test`: 886 pass, 0 fail.
+- `npm run check:acceptance`, `npm run build` (pre-existing chunk-size
+  warning only), `npm run check:release`, `npm run test:desktop`,
+  `npm run test:packaging`, `npm run test:browser-tabs|sessions|sign-in`:
+  all pass (disposable data).
+- `scripts/run-r01-http-fixtures.ts`: 8/8 PASS against the real server —
+  file-bearing 202→200 replay with identical IDs, 409 payload/thread
+  conflicts, one admission across ten concurrent sends and SIGKILL restart,
+  convergence after an aborted send, 500 request_not_staged with zero
+  writes under a held database lock (5.2s busy-timeout proof), working
+  cancel/takeover routes.
+- `scripts/run-browser-integration-fixtures.ts`: 10/10 PASS on real
+  headless system Chrome, disposable data dir, 127.0.0.1 fixture server —
+  opaque-ID submit with server oracle, stale/ambiguous refusal with zero
+  input, canvas-local (200,100) ±3px with unknown-adapter/stale-ID/tab-
+  change refusal and zero input, reviewed upload with origin refusal,
+  password + plain-text-OTP masking, real-handoff secure mode with
+  pre/post-handoff refusal, revocation with zero input, restart recovery
+  to uncertain with owner reconcile, intended-pane +200px scroll with
+  decoy untouched.
+- Failing-before (independent review on 26a988f, not re-fabricated here):
+  fail-open prune/repair/staging catches; Map-backed journal re-admitting
+  uncertain work, invisible across processes, reusing mismatched IDs;
+  caller-minted targets and caller-built transforms; single-replace
+  redaction leaving the second synthetic token; (640,700) canvas miss
+  with URL-only assertion; discarded scroll region. Passing-after is the
+  evidence above on the new candidate.
+- Protected-client diff: zero (only src/server/*, scripts/*, verification/*,
+  templates/, docs/).
 - NOT_RUN (no authorization, no fabrication): 120-slot model matrix, 7-day
   soak, second-Mac clean install, pilot, any paid/provider spend, CI pieces
   needing global installs/network (pinned opencode runtime, playwright
@@ -88,34 +115,40 @@ expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
 
 ## Evidence matrix (code vs reachable vs fixtures vs model vs native vs release)
 
+Round 2 — every row below was re-proven after the R1–R6 repair pass.
+
 - R01 replay/tombstone/pending (`index.ts`, `database.ts`,
-  `message-admission.ts`): reachable via POST /api/messages; proven at DB
-  layer (6 tests) + source-order guard; model NOT_RUN; release: pending review.
-- R02 journal/leases (`action-journal.ts`, `runtime.ts` semanticAct/visualAct):
-  direct-call reachable; model-loop wiring deliberately NOT added (no new
-  model authority without review); F6/F7 live-browser PASS; pending review.
-- B01 privacy (`observation-envelope.ts`, `observeScoped`): direct-call;
-  F5 live PASS; pending review.
-- B02 semantic (`semantic-targets.ts`, `semanticAct`, `scrollPane`): direct-
-  call; legacy click/type unchanged and live-proven (F1/F2 + repo scripts);
-  pending review.
-- B03 visual (`visual-grounding.ts`, `visualAct` with live DPR/geometry
-  enforcement): direct-call; F4 live PASS on real screenshots; text-only
-  configs get VISION_UNAVAILABLE; actual-model visual run NOT_RUN.
+  `message-admission.ts`): reachable via POST /api/messages; proven on the
+  real endpoint (run-r01-http-fixtures 8/8) + DB fail-closed cases +
+  source-order guard; model NOT_RUN; release: pending re-review.
+- R02 journal/leases (`action-journal.ts` DB-backed, `database.ts`
+  action_journal, `runtime.ts` acts): direct-call reachable; model-loop
+  wiring deliberately NOT added; restart/concurrent/ID-reuse unit proof +
+  F6/F7 live-browser + H7 real cancel/takeover routes; pending re-review.
+- B01 privacy (`observation-envelope.ts`, `observation-registry.ts`,
+  `observeScoped`): direct-call; multi-secret sink tests + F5/F5b live
+  PASS; pending re-review.
+- B02 semantic (`semantic-targets.ts`, registry-bound `semanticAct`,
+  `scrollPane`): direct-call; legacy click/type unchanged and live-proven
+  (F1/F2/F8 + repo scripts); pending re-review.
+- B03 visual (`visual-grounding.ts`, registry-bound `visualAct` with live
+  tab/document/DPR/scroll/size enforcement): direct-call; F4/F4b live
+  PASS on real screenshots with canvas-local oracles; unknown adapters get
+  VISION_UNAVAILABLE; actual-model visual run NOT_RUN.
 - B04 upload/rich/download (`rich-input.ts`, existing `uploadFile`):
   upload live-proven (F5); download helpers unit-tested BUT no
   BrowserManager download-capture API exists — documented follow-up, not
-  claimed; pending review.
+  claimed; pending re-review.
 - B05 native (`native-control.ts`): DISABLED (default off, no bridge wired);
   unit gates PASS; native execution NOT_RUN; blocked.
 - B06 router (`modality-router.ts` in `observeScoped`): direct-call; unit
-  PASS; pending review.
-- B07 handoff (`secure-handoff.ts` + existing revoke paths): existing
-  takeover/sign-in routes preserved and live-exercised (F6, sign-in script);
-  pending review.
+  PASS; pending re-review.
+- B07 handoff (`secure-handoff.ts` + existing revoke paths + input-epoch
+  wiring in stopRun/takeover/sign-in): existing routes preserved and
+  live-exercised (F5b real handoff, F6, H7, sign-in script); pending re-review.
 - T01/T02/T03 (`task-lifecycles.ts`, `outcome-verification.ts`,
   `adapter-parity.ts`): primitives direct-call; existing evidence/routing
-  suites green; pending review.
+  suites green; pending re-review.
 - Q01/Q02/Q03 (`mechanism-cases.json` 30, `product-cases.json` 20 with 8
   held-out, `fault-cases.json` 36, `telemetry.ts`): schema/count PASS;
   full-matrix/soak NOT_RUN (blocked on authorization).
