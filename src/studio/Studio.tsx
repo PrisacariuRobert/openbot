@@ -1835,7 +1835,7 @@ export function Studio() {
           <button
             className="workspace-link"
             aria-label="Open workspace"
-            onClick={() => openCapability("team")}
+            onClick={() => page === "chat" || page === "settings" ? openCapability("team") : setDetail({ kind: "workspace" })}
           >
             <Layers3 size={17} /> Workspace{" "}
             {attentionCount > 0 && <b>{attentionCount} need you</b>}

@@ -390,7 +390,7 @@ try {
       .waitFor();
     await capture(name + "-conversations");
     await nav(width)
-      .getByRole("button", { name: "Activity", exact: true })
+      .getByRole("button", { name: /^Activity(?: \d+ need you)?$/ })
       .click();
     await page
       .getByRole("heading", { name: "Activity", exact: true })
@@ -499,10 +499,6 @@ try {
     .getByRole("button", { name: "Nova", exact: true })
     .click();
   await page
-    .getByRole("combobox", { name: "Choose a teammate" })
-    .click();
-  await page.getByRole("option", { name: /^Nova/ }).click();
-  await page
     .getByRole("textbox", { name: "Message your team" })
     .fill("My test draft");
   const before = posts.length;
@@ -520,11 +516,8 @@ try {
   assert.equal(posts.length, before, "Clicking Send opens the chooser; it does not start an unconfigured teammate");
   await page.goto(chatUrl);
   await page.getByRole("textbox", { name: "Message your team" }).waitFor();
-  await page
-    .getByRole("combobox", { name: "Choose a teammate" })
-    .click();
   const pixelState = page.waitForResponse((response) => response.url().includes("/api/state?threadId=bot-pixel") && response.ok());
-  await page.getByRole("option", { name: /^Pixel/ }).click();
+  await page.locator(".sidebar-conversations").getByRole("button", { name: "Pixel", exact: true }).click();
   await pixelState;
   await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.disabled === false);
   await page

@@ -83,12 +83,12 @@ try {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(base + "/studio.html");
     await page
-      .getByRole("heading", { name: "Make room for a little help." })
+      .getByRole("heading", { name: "Good work starts with a conversation." })
       .waitFor();
     assert.equal(
-      await page.locator(".character").count(),
+      await page.locator(".sidebar-conversations .character").count(),
       0,
-      "No invented preset team",
+      "No invented preset teammates in the conversation list",
     );
     await page.screenshot({
       path: path.join(output, `empty-${width}.png`),
