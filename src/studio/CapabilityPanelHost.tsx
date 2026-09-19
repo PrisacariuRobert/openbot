@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
 import { ProviderPanel } from "../components/ProviderPanel";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
+import { TeamOverview, UsageOverview, WorkspaceNote } from "./WorkspaceOverview";
 import { Character } from "./Character";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { RunControls } from "./RunControls";
 import { BotPanel, ArtifactsPanel, CodeProjectsPanel, ComputerPanel, ConnectorPanel, ControlPanel, FilesPanel, LiveStudioPanel, RemotePanel, RoutinesPanel, SearchPanel, TeachPanel, WorkReceipt } from "../CapabilityPanels";
 import "./capability-panels.css";
 import "./settings-pages.css";
+import "./refined-workspace.css";
 
 import type { CapabilityPanel } from "./capability-navigation";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
@@ -23,7 +25,8 @@ const workflowKeys = createSubmissionKeys();
 
 /** Functional settings share Studio's dialog, palette and navigation. There is
  * no second app shell, separate conversation state or hidden legacy route. */
-export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, onChange }: {
+export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, onChange, onCreate, onEditBot }: {
+  onCreate: () => void; onEditBot: (thread: string) => void;
   panel: CapabilityPanel; state: AppState; threadId: string;
   onOpen: (panel: CapabilityPanel) => void; onThread: (id: string) => void; onChange: () => void;
 }) {
@@ -104,10 +107,13 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
   };
   const reviewRun = [...state.runs, ...state.studioRuns].find((run) => run.id === reviewRunId);
   return <div className={`capabilities capability-${panel}`}>
-    {error && <p className="panel-error" role="alert">{error}</p>}
+    {panel === "team" && <TeamOverview state={state} onCreate={() => onCreate()} onEdit={id => onEditBot(id)} onThread={onThread} onImport={async bundle => { await change("/api/bots/import", "POST", bundle, "Profile imported. Choose an AI connection before starting work."); }} onRestore={async id => { await change(`/api/bots/${encodeURIComponent(id)}/restore`, "POST", undefined, "Teammate restored."); }} />}
+    {panel === "usage" && <UsageOverview state={state} onEdit={id => onEditBot(id)} onThread={onThread} />}
+    {error && <section className="panel-error" role="alert"><strong>Couldn’t complete that request.</strong><p>{error}</p><small>Check the current value before retrying. Your conversation stays available.</small><button onClick={() => { onChange(); setError(""); }}>Dismiss and refresh</button></section>}
     {notice && <p className="capability-notice" role="status">{notice}</p>}
     {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role, icon: <Character name={item.name} color={item.color} variant={item.mascot} size={28} /> }))} onChange={setChosenBot} /></div>}
     {["bot", "files", "computer", "teach"].includes(panel) && !bot && <p>Create a teammate first to use this feature.</p>}
+    {panel === "control" && <><WorkspaceNote bot={bot} title="Before important actions">Ask First stays visible. Accounts, recipients, resources and versions belong in the review. Access to a browser is not permission for every website.</WorkspaceNote><div className="workspace-row-group">{state.bots.map(item => <button className="workspace-list-row" key={item.id} onClick={() => onEditBot(item.threadId)}><Character name={item.name} color={item.color} variant={item.mascot} size={36}/><span><strong>{item.name}</strong><small>Browser {item.browserEnabled ? "allowed" : "off"} · private computer {item.computerEnabled ? "allowed" : "off"} · Mac access {item.macAccessEnabled && state.settings.macAccessEnabled ? "enabled" : "off"}</small></span><span className="workspace-row-action">Review access</span></button>)}</div></>}
     {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={(model) => model.split("/").at(-1) || model} onUpdateBot={saveBot}
       connectionTests={connectionTests}
       onTestConnection={async (id) => {
@@ -132,7 +138,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {panel === "files" && bot && <FilesPanel key={bot.id} bot={bot} />}
     {panel === "artifacts" && <ArtifactsPanel onOpenThread={onThread} />}
     {panel === "computer" && bot && <ComputerPanel key={bot.id} bot={bot} onTeach={() => onOpen("teach")} />}
-    {panel === "teach" && <><p className="capability-notice">Teach through conversation: ask your teammate to “learn this workflow”, or type /learn followed by what you want to reuse. You review the instructions before they are saved.</p><ExtensionsPanel bots={state.bots} skillsOnly selectedBotId={bot?.id} />{bot && <details className="capability-disclosure"><summary>Your learned workflows</summary><TeachPanel key={bot.id} bot={bot} bots={state.bots} hideOwnerSwitcher onBotChange={setChosenBot} onNotice={setNotice} onUse={async (workflow) => {
+    {panel === "teach" && <><p className="capability-notice">Teach through conversation: ask your teammate to “learn this workflow”, or type /learn followed by what you want to reuse. You review the instructions before they are saved.</p><ExtensionsPanel bots={state.bots} initialTab="memory" selectedBotId={bot?.id} />{bot && <details className="capability-disclosure"><summary>Your learned workflows</summary><TeachPanel key={bot.id} bot={bot} bots={state.bots} hideOwnerSwitcher onBotChange={setChosenBot} onNotice={setNotice} onUse={async (workflow) => {
       const owner = state.bots.find((item) => item.id === workflow.botId) || bot;
       await workflowMessage(owner.threadId, `/${workflow.skillSlug}`, [owner.id]);
     }} /></details>}</>}

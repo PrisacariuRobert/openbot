@@ -37,8 +37,6 @@ const privateRunnerTransfer = readFileSync(new URL("../deploy/private-runner/hom
 const privateRunnerExport = readFileSync(new URL("../deploy/private-runner/export-home.sh", import.meta.url), "utf8");
 const privateRunnerImport = readFileSync(new URL("../deploy/private-runner/import-home.sh", import.meta.url), "utf8");
 const verifyWorkflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
-const nativeModels = readFileSync(new URL("../ios/OpenBotMobile/Models/StudioModels.swift", import.meta.url), "utf8");
-const nativeStudio = readFileSync(new URL("../ios/OpenBotMobile/Views/StudioContainerView.swift", import.meta.url), "utf8");
 const version = packageJson.version;
 const failures = [];
 
@@ -147,23 +145,23 @@ if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !priva
 if (!privateRunnerCaddy.includes("Strict-Transport-Security") || !privateRunnerCaddy.includes("X-Frame-Options") || !privateRunnerGuide.includes("dedicated server") || !privateRunnerGuide.includes("one authoritative data location")) {
   failures.push("The private-runner HTTPS and ownership guidance is incomplete.");
 }
-if (!app.includes("Private always-on home") || !styles.includes(".private-runner-guide") || !nativeModels.includes("StudioDeployment") || !nativeStudio.includes("PRIVATE ALWAYS-ON HOME")) {
-  failures.push("Web and native apps must share the private-runner status and data-location experience.");
+if (!app.includes("Private always-on home") || !styles.includes(".private-runner-guide")) {
+  failures.push("The shared client must expose the private-runner status and data-location experience.");
 }
 if (!server.includes('/api/runner/diagnostics') || !runnerCare.includes('statfsSync') || !runnerCare.includes('timeout: 5_000') || !runnerCare.includes('runner-maintenance.json') || !app.includes('runner-care-grid') || !app.includes('private-domain-field')) {
   failures.push("Authenticated private-home storage, backup, tool diagnostics, and guided setup are incomplete.");
 }
-if (!privateRunnerBackup.includes('lastBackupAt') || !privateRunnerBackup.includes('lastBackupBytes') || !privateRunnerBackup.includes('runner-maintenance.json') || !nativeModels.includes('StudioRunnerCare') || !nativeStudio.includes('checkRunnerCare')) {
-  failures.push("Backup health receipts and matching native private-home care are incomplete.");
+if (!privateRunnerBackup.includes('lastBackupAt') || !privateRunnerBackup.includes('lastBackupBytes') || !privateRunnerBackup.includes('runner-maintenance.json')) {
+  failures.push("Backup health receipts and shared private-home care are incomplete.");
 }
 if (!privateRunnerUpdate.includes('backup.sh') || !privateRunnerUpdate.includes('merge-base --is-ancestor') || !privateRunnerUpdate.includes('status --porcelain') || !privateRunnerUpdate.includes('previous_image') || !privateRunnerUpdate.includes('wait_for_healthy') || privateRunnerUpdate.indexOf('backup.sh') > privateRunnerUpdate.indexOf('merge --ff-only')) {
   failures.push("Private-runner updates must refuse unsafe source state, back up before advancing, verify health, and retain automatic container recovery.");
 }
-if (!server.includes('/api/runner/diagnostics/alerts') || !app.includes('runner-health-alerts') || !nativeModels.includes('StudioRunnerHealthAlerts') || !nativeStudio.includes('setRunnerHealthAlerts')) {
-  failures.push("Opt-in private-home health alerts must remain available on web and native clients.");
+if (!server.includes('/api/runner/diagnostics/alerts') || !app.includes('runner-health-alerts')) {
+  failures.push("Opt-in private-home health alerts must remain available on desktop and phone clients.");
 }
-if (!server.includes('/api/runner/diagnostics/heartbeat') || !database.includes('this.vault.encrypt(url)') || !externalHeartbeat.includes('protocol !== "https:"') || !externalHeartbeat.includes('lookup(hostname') || !app.includes('runner-external-heartbeat') || !nativeModels.includes('StudioRunnerExternalHeartbeat') || !nativeStudio.includes('setExternalHeartbeat')) {
-  failures.push("Opt-in outside-in private-home monitoring must keep encrypted storage, HTTPS/public-network validation, and matching web/native controls.");
+if (!server.includes('/api/runner/diagnostics/heartbeat') || !database.includes('this.vault.encrypt(url)') || !externalHeartbeat.includes('protocol !== "https:"') || !externalHeartbeat.includes('lookup(hostname') || !app.includes('runner-external-heartbeat')) {
+  failures.push("Opt-in outside-in private-home monitoring must keep encrypted storage, HTTPS/public-network validation, and shared client controls.");
 }
 if (!privateRunnerTransfer.includes('aes-256-gcm') || !privateRunnerTransfer.includes('scryptSync') || !privateRunnerTransfer.includes('setAAD') || !privateRunnerTransfer.includes('safeArchiveKinds') || !privateRunnerExport.includes('home-transfer.mjs export') || !privateRunnerImport.includes('backup.sh') || !privateRunnerImport.includes('wait_for_healthy') || !privateRunnerImport.includes('rollback')) {
   failures.push("Encrypted whole-home export/import must authenticate before extraction, constrain archive contents, back up before swapping, verify health, and retain rollback.");

@@ -104,8 +104,8 @@ function getSkillMeta(id: string, name: string) {
   };
 }
 
-export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId }: { bots: Bot[]; skillsOnly?: boolean; selectedBotId?: string }) {
-  const [tab, setTab] = useState<"connections" | "skills" | "memory">(skillsOnly ? "skills" : "connections");
+export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initialTab }: { bots: Bot[]; skillsOnly?: boolean; selectedBotId?: string; initialTab?: "connections" | "skills" | "memory" }) {
+  const [tab, setTab] = useState<"connections" | "skills" | "memory">(initialTab || (skillsOnly ? "skills" : "connections"));
   const [state, setState] = useState<{ connections: McpConnection[]; skills: CommunitySkill[]; oauth?: { hostOnly: boolean } }>({ connections: [], skills: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [localBotId, setBotId] = useState(bots[0]?.id || "");

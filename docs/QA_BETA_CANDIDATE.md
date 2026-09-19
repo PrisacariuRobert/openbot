@@ -1,5 +1,7 @@
 # Mac-first beta candidate — 2026-09-06
 
+> Architecture update, 2026-09-19: Electron is now the sole desktop client; phones share the web UI. Native-client results below are historical. Current candidate evidence lives in `docs/design/figma-implementation/`; clean-install gates apply to each Electron target and phone browser. No release is authorized by this update.
+
 Target chosen by the owner: **Mac-first open-source beta, with iPhone as a preview**. This evidence concerns the current 0.37.0 development checkout, not a frozen release commit. The accumulated changes have not been committed, merged, tagged or published by this release-readiness pass. No installed owner app or private studio has been replaced.
 
 ## What changed for a first-time user

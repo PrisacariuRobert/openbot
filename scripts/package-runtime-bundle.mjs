@@ -23,6 +23,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg, index, all) => a
 const PLATFORMS = {
   "linux-x64": { nodeFile: (v) => `node-v${v}-linux-x64.tar.gz`, nodeURL: (v) => `https://nodejs.org/dist/v${v}/node-v${v}-linux-x64.tar.gz`, nodeBin: ["bin", "node"], opencodeAsset: (v) => `opencode-linux-x64.tar.gz`, archive: "tar.gz" },
   "win-x64": { nodeFile: (v) => `node-v${v}-win-x64.zip`, nodeURL: (v) => `https://nodejs.org/dist/v${v}/node-v${v}-win-x64.zip`, nodeBin: ["node.exe"], opencodeAsset: (v) => `opencode-windows-x64.zip`, archive: "zip" },
+  "darwin-x64": { nodeFile: (v) => `node-v${v}-darwin-x64.tar.gz`, nodeURL: (v) => `https://nodejs.org/dist/v${v}/node-v${v}-darwin-x64.tar.gz`, nodeBin: ["bin", "node"], opencodeAsset: (v) => `opencode-darwin-x64.zip`, archive: "tar.gz" },
   "darwin-arm64": { nodeFile: (v) => `node-v${v}-darwin-arm64.tar.gz`, nodeURL: (v) => `https://nodejs.org/dist/v${v}/node-v${v}-darwin-arm64.tar.gz`, nodeBin: ["bin", "node"], opencodeAsset: (v) => `opencode-darwin-arm64.zip`, archive: "tar.gz" },
 };
 const platform = args.platform || "";
@@ -103,12 +104,12 @@ try {
     if (!existsSync(path.join(bin, "opencode.exe"))) throw new Error("The opencode archive did not contain opencode.exe.");
   } else {
     run("tar", ["-xzf", nodeArchive, "-C", work]);
-    const nodeBin = path.join(work, `node-v${nodeVersion}-${platform === "linux-x64" ? "linux-x64" : "darwin-arm64"}`, ...spec.nodeBin);
+    const nodeBin = path.join(work, `node-v${nodeVersion}-${platform}`, ...spec.nodeBin);
     copyFileSync(nodeBin, path.join(bin, "node"));
     chmodSync(path.join(bin, "node"), 0o755);
     const opencodeDir = path.join(work, "opencode-bin");
     mkdirSync(opencodeDir, { recursive: true });
-    run("tar", ["-xzf", opencodeArchive, "-C", opencodeDir]);
+    run("tar", ["-xf", opencodeArchive, "-C", opencodeDir]);
     const extracted = run("find", [opencodeDir, "-name", "opencode", "-type", "f"]).split("\n")[0];
     if (!extracted) throw new Error("The opencode archive did not contain an opencode binary.");
     copyFileSync(extracted, path.join(bin, "opencode"));
@@ -154,7 +155,7 @@ try {
   writeFileSync(path.join(stage, "runtime-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   // Probes on matching hosts.
   const hostPlatform = `${process.platform === "win32" ? "win" : process.platform}-${process.arch}`;
-  const matchesHost = (platform === "linux-x64" && hostPlatform === "linux-x64") || (platform === "win-x64" && hostPlatform === "win-x64") || (platform === "darwin-arm64" && hostPlatform === "darwin-arm64");
+  const matchesHost = (platform === "linux-x64" && hostPlatform === "linux-x64") || (platform === "win-x64" && hostPlatform === "win-x64") || (platform.startsWith("darwin-") && hostPlatform === platform);
   if (args.smoke !== "0" && matchesHost) {
     const probeBin = path.join(bin, platform === "win-x64" ? "node.exe" : "node");
     const reported = run(probeBin, ["--version"]);
@@ -166,12 +167,19 @@ try {
     console.log("Cross-platform bundle: same-host probes skipped.");
   }
   mkdirSync(outDir, { recursive: true });
+  if (args['stage-only'] === '1') {
+    const destination = path.join(outDir, bundleName);
+    rmSync(destination, { recursive: true, force: true });
+    cpSync(stage, destination, { recursive: true, verbatimSymlinks: true });
+    console.log(`Staged ${destination}`);
+  } else {
   const artifact = path.join(outDir, spec.archive === "zip" ? `${bundleName}.zip` : `${bundleName}.tar.gz`);
   rmSync(artifact, { force: true });
   if (spec.archive === "zip") run("zip", ["-qr", artifact, bundleName], { cwd: work });
   else run("tar", ["-czf", artifact, bundleName], { cwd: work });
   writeFileSync(`${artifact}.sha256`, `${sha256(artifact)}  ${path.basename(artifact)}\n`);
   console.log(`Released ${artifact}\nSHA256 ${sha256(artifact)}`);
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

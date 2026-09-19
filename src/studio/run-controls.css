@@ -225,3 +225,11 @@ button.decision-stop-btn:disabled { opacity: .5; cursor: default; }
 }
 .run-token-amount { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; min-width: 0; }
 .run-token-amount select { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; min-height: 44px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Refined review sheet: authority stays in the exact-action preview. */
+.run-controls > .decision-card { padding: 22px; border-radius: 18px; }
+.run-controls > .decision-card .decision-headline { font-size: 24px; line-height: 30px; letter-spacing: -.6px; }
+.decision-facts { font-size: 13px; }
+.decision-actions { grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: center; gap: 10px; }
+.decision-actions .decision-confirm { min-height: 44px; font-size: 13px; border-radius: 9px; }
+.decision-actions .decision-decline { width: 100%; font-size: 13px; border-radius: 9px; }
+@media(max-width:600px) { .run-controls > .decision-card { padding: 16px; } .decision-actions { grid-template-columns: minmax(0,1fr); } }

@@ -2,7 +2,7 @@ import { useId, type CSSProperties } from "react";
 import { mascotBodies } from "./mascot-catalog";
 import type { MascotKind } from "../shared/types";
 
-/** Original animated vector family; the same six identities exist in SwiftUI. */
+/** Original animated vector family; shared by desktop and phones. */
 export function Character({
   name,
   color,

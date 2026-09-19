@@ -1,10 +1,10 @@
 # Contributing to OpenBot
 
-OpenBot is an owner-operated, Mac-first development beta. Help us make a few useful workflows dependable before adding more settings or claiming competitor parity. The [first public beta checklist](docs/FIRST_PUBLIC_RELEASE.md) defines what is still missing.
+OpenBot is an owner-operated desktop and phone development beta. Help us make a few useful workflows dependable before adding more settings or claiming competitor parity. The [first public beta checklist](docs/FIRST_PUBLIC_RELEASE.md) defines what is still missing.
 
 ## Start with one reproducible problem
 
-Use an issue to describe the user outcome, current behavior, a small reproduction and expected result. Include the OpenBot version, operating system and client (web, Mac or iPhone). Redact account addresses, tokens, conversation text and file paths that are not necessary to reproduce it. Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public bug report.
+Use an issue to describe the user outcome, current behavior, a small reproduction and expected result. Include the OpenBot version, operating system and client (Electron desktop or phone/desktop browser). Redact account addresses, tokens, conversation text and file paths that are not necessary to reproduce it. Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public bug report.
 
 Discuss major dependencies, new permissions, connectors and architectural changes before implementing them. A feature is not complete because its card or tool exists: include a test of the resulting workflow, failure behavior and permission boundary.
 
@@ -17,9 +17,9 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:4310/studio.html` for the conversation-first preview. The complete existing settings interface remains at `/`. Pick a provider when creating a teammate; do not add a default paid account or credentials to the repository. OpenCode is needed for OpenCode-backed execution paths; Claude Code uses its own adapter. Chrome/Chromium and Docker are only needed for the corresponding browser and computer workflows. Some API/local-model paths still use the OpenCode adapter—an API endpoint is not itself a bundled execution engine.
+Open `http://127.0.0.1:4310/studio.html` for the conversation-first preview. Both `/` and `/studio.html` load the same shared application. Pick a provider when creating a teammate; do not add a default paid account or credentials to the repository. OpenCode is needed for OpenCode-backed execution paths; Claude Code uses its own adapter. Chrome/Chromium and Docker are only needed for the corresponding browser and computer workflows. Some API/local-model paths still use the OpenCode adapter—an API endpoint is not itself a bundled execution engine.
 
-To build the native Mac client, follow [macos/README.md](macos/README.md). The [iPhone source preview](ios/README.md) is a companion to a reachable host, not a standalone cloud service. Native compilation, signing, packaging and installation are separate steps; an Xcode build does not refresh an installed app.
+For the Electron desktop app and shared phone web client, follow [desktop/README.md](desktop/README.md). Use `npm run package:desktop` on the target platform; a web build alone does not verify the packaged runner. SwiftUI clients are retired and remain available in Git history.
 
 ## Keep tests away from personal data
 

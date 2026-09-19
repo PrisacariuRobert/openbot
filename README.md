@@ -11,10 +11,10 @@ OpenBot is a local-first, open-source home for persistent AI teammates. Give eac
 
 ![OpenBot web Studio with a team conversation, named teammates, and review controls](marketing/website/public/actual-ui/team.webp)
 
-*The web Studio, captured with a synthetic workspace. This is an interface preview, not evidence of a completed real-account task. Native clients have their own interfaces.*
+*The web Studio, captured with a synthetic workspace. This is an interface preview, not evidence of a completed real-account task. Desktop and phone browsers share this interface.*
 
 > [!IMPORTANT]
-> **Development beta—not yet a signed public installer.** The native Mac app is the primary release target; the iPhone app is a companion preview, and the web and Electron clients use the same owner-hosted service. Public distribution and independent clean-install validation remain release gates. See the [release checklist](docs/FIRST_PUBLIC_RELEASE.md) and [candidate evidence](docs/QA_BETA_CANDIDATE.md).
+> **Development beta—not yet a signed public installer.** Electron is the desktop app for macOS, Windows and Linux. Phones use the same responsive web UI against the owner-hosted service. Public distribution and independent clean-install validation remain release gates. See the [release checklist](docs/FIRST_PUBLIC_RELEASE.md) and [candidate evidence](docs/QA_BETA_CANDIDATE.md).
 
 ## Start with a conversation
 
@@ -74,12 +74,11 @@ A saved account or API key is not a successful execution test. Test the chosen c
 
 | Client | Role | Instructions |
 | :--- | :--- | :--- |
-| **Native macOS** | SwiftUI application using the authenticated backend directly; not a wrapper around the web UI. | [Build and package](macos/README.md) |
 | **Web Studio** | React client served by your local or private host. | [Source setup above](#start) |
 | **Electron desktop shell** | Desktop shell around the web client, with platform-specific packaging. | [Desktop setup](desktop/README.md) |
-| **iPhone** | Native companion to a reachable OpenBot host. | [iPhone preview](ios/README.md) |
+| **Phones** | Responsive web client connected to a reachable private host. | [Phone access](desktop/README.md#phones) |
 
-The native Mac source project targets macOS 14+, but clean minimum-version installation remains unverified. Follow the platform guide rather than treating a successful web build as native-app validation.
+There is one application UI in `src/studio/`. Electron packages it for desktop; phones open it over HTTPS. Platform installers still require independent clean-install validation.
 
 For a production-mode source run:
 
@@ -111,20 +110,20 @@ Grant only the access the task needs. A website session is not an API grant, and
 
 **Understand the boundaries.** Browser profiles are not a security sandbox. Chrome and explicitly permitted Mac app access are distinct from containerized command execution. Checks attached to a result verify specific properties, not every possible claim in that result.
 
-**Protect the data home.** Back up the database and matching vault key together with files and required session data, following the [platform recovery instructions](macos/README.md#preserve-an-existing-studio). Never commit credentials, browser profiles, runtime databases, or unredacted diagnostics.
+**Protect the data home.** Back up the database and matching vault key together with files and required session data, following the [platform recovery instructions](desktop/README.md#existing-data). Never commit credentials, browser profiles, runtime databases, or unredacted diagnostics.
 
 Read the [security model](docs/SECURITY.md) for the full threat model and limitations. Report suspected vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue containing secrets.
 
 ## What's new in 0.37.0-beta.1
 
-This beta develops the conversation-first clients, clearer task results and attention states, native controls, and the self-contained Mac development-package path. These are implementation and candidate checks—not a claim that public-release gates are complete.
+This beta develops the conversation-first clients, clearer task results and attention states, shared desktop and phone controls, and the Electron packaging path. These are implementation and candidate checks—not a claim that public-release gates are complete.
 
 See the [changelog](CHANGELOG.md), [result-flow evidence](docs/QA_RESULT_FLOW.md), and [detailed release notes](REFERENCE.md#whats-new-in-0370-beta1). Older notes remain available in the reference instead of crowding this introduction.
 
 ## Architecture
 
 ```text
-Native Mac / iPhone / Web Studio / Electron
+Electron desktop / Phone browser / Web Studio
                     |
           Authenticated OpenBot service
                     |
@@ -142,7 +141,7 @@ The service owns execution, permission checks, scheduling, recovery, and persist
 | `src/studio/` | Web conversation UI and management screens. |
 | `src/server/` | Host runtime, database, tools, connectors, and approvals. |
 | `src/shared/` | Shared types and behavior contracts. |
-| `macos/`, `ios/`, `desktop/` | Native clients and the Electron shell. |
+| `desktop/` | Electron application and platform packaging; shared UI in `src/studio/`. |
 | `skills/`, `mcp/` | Included skills and the OpenBot MCP interface. |
 | `scripts/`, `tests/` | Verification, packaging, and workflow fixtures. |
 | `deploy/` | Owner-hosted deployment and recovery tooling. |

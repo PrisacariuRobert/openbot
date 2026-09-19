@@ -83,12 +83,12 @@ try {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(base + "/studio.html");
     await page
-      .getByRole("heading", { name: "Make room for a little help." })
+      .getByRole("heading", { name: "Good work starts with a conversation." })
       .waitFor();
     assert.equal(
-      await page.locator(".character").count(),
+      await page.locator(".sidebar-conversations .character").count(),
       0,
-      "No invented preset team",
+      "No invented preset teammates in the conversation list",
     );
     await page.screenshot({
       path: path.join(output, `empty-${width}.png`),
@@ -178,10 +178,11 @@ try {
     await page.keyboard.press("Escape");
     assert.equal(
       await page
-        .getByRole("combobox", { name: "Choose a teammate" })
-        .innerText(),
+        .getByRole("button", { name: "About Remy", exact: true })
+        .innerText().then((text) => text.split("\n")[0]),
       "Remy",
     );
+    assert.equal(new URL(page.url()).searchParams.get("thread"), bot.threadId, "Creation opens the new teammate conversation");
     const state = await (
       await fetch(base + "/api/state?threadId=" + bot.threadId)
     ).json();

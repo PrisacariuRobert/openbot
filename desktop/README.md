@@ -1,41 +1,39 @@
-# OpenBot desktop shell
+# OpenBot desktop and phones
 
-One Electron shell around the same web client the browser and relay serve, so the design stays identical on every platform. The shell's job is the machine around the studio: start (or attach to) the owner's local OpenBot server, then get out of the way.
-## Run in development
+One React UI (`src/studio/`), one backend (`src/server/`). Electron is the desktop application for macOS, Windows and Linux. Phones use the responsive web client. The retired SwiftUI clients remain in Git history before this migration; historical QA documents describe those earlier candidates.
 
-With any OpenBot server already running (dev or the Mac app's background runner):
+## Develop
 
-```sh
-npm install
-npm start                        # attaches to http://127.0.0.1:4311
-OPENBOT_DEV_URL=http://127.0.0.1:4310 npm start   # or point it anywhere
-```
-
-## How the packaged app works
-
-`electron-builder` packs `main.mjs` plus the runtime bundle as `extraResources` (`runtime/openbot` → `Resources/openbot`). On launch the shell:
-
-1. Spawns the bundled runner (`bin/node scripts/background-runner.mjs`) detached, with `OPENBOT_DATA_DIR` defaulting to `~/.openbot` — the same studio the terminal bundle and relay use, so teammates, routines and history are shared, and only one server can own the data directory (the single-instance lock).
-2. Waits for `/api/healthz`, then opens the window at `http://127.0.0.1:4311`.
-3. If a server is already running for that data directory, the runner exits via the lock and the shell attaches to the existing studio instead.
-
-External sites open in the system browser; same-origin links (files, previews) open inside the shell. Closing the window keeps the detached runner alive so routines continue; reopening reattaches.
-
-## Packaging targets
-
-Configured in `package.json` (`build`): NSIS for Windows x64, AppImage + deb for Linux x64, a directory build for macOS arm64 (the signed native app remains the premium Mac tier). Populate the runtime first:
+From the repository root, install with `npm ci` and `npm --prefix desktop ci`. Run `npm run dev`, then in another terminal:
 
 ```sh
-node scripts/package-runtime-bundle.mjs --platform win-x64   # then stage into desktop/runtime/openbot
-npm run dist
+OPENBOT_DEV_URL=http://127.0.0.1:4310 npm run desktop
 ```
 
-Cross-building from one host is limited; release builds run per-platform in CI (see `.github/workflows/release.yml`).
+For a production-source preview, run `npm run build`, `npm start`, then `OPENBOT_DEV_URL=http://127.0.0.1:4311 npm run desktop`. Attach mode uses an explicitly running host. The renderer keeps context isolation and sandboxing, with no Node integration.
 
-## QA
+## Package
 
 ```sh
-OPENBOT_DEV_URL=http://127.0.0.1:4311 OPENBOT_QA_SCREENSHOT=/tmp/shell.png npm start
+npm run package:desktop
 ```
 
-QAP: the shell starts, renders the identical web client, and exits after the screenshot. Attach-mode and packaged first-run were both verified this way (screenshots in /tmp/openbot-desktop-qa/).
+This builds the shared UI, stages a platform-matched Node/OpenCode runtime with production dependencies and license notices, then runs electron-builder. Output is in `desktop/release/`: Mac DMG/ZIP, Windows NSIS, Linux AppImage/deb. Build on the matching platform and architecture; the CI matrix covers Apple silicon, Intel Mac, Windows x64 and Linux x64. `-- --dir` produces an unpacked local app for testing. Runtime versions can be explicitly selected with `OPENBOT_NODE_VERSION` and `OPENBOT_OPENCODE_VERSION`.
+
+These are unsigned development artifacts. CI only creates a draft on a release tag; signing/notarization and release require a separately reviewed setup. No credentials from the retired native signing workflow are used automatically.
+
+The packaged shell starts the bundled local runner. Closing its window keeps the detached runner alive for routines. Teammates, permissions, files and recovery use the existing authenticated backend. Optional model accounts, browsers and Docker remain separately configured capabilities.
+
+## Phones
+
+Open the same Studio URL through an authenticated HTTPS connection to your host. The existing web manifest/service worker support home-screen installation where the browser offers it. The Mac or private runner must remain online. Electron does not run on iOS or Android. App Store/Play Store wrappers, native share extensions and native push parity are not included in this consolidation; browser notification support depends on the device/browser. Backend compatibility routes for previous native installations remain intact.
+
+## Existing data
+
+This source migration never moves or deletes a data home. Keep your existing server running and use `OPENBOT_DEV_URL` to attach. For a packaged runner, set `OPENBOT_DATA_DIR` to the existing absolute data-home path; the default for a new Electron home is `~/.openbot`. An earlier native Mac package may use `~/Library/Application Support/OpenBot/Data`, while source installations may use the checkout's `.openbot` directory. Do not assume those are interchangeable.
+
+Before changing hosts or data locations, finish active work and stop the runner normally. Back up the complete database together with its WAL/SHM files, matching `keys/vault.key`, attachments and profiles. Never copy only a live database or create a new vault key for existing encrypted data. There is no automatic data migration in this change.
+
+## Check
+
+`npm run test:desktop` checks navigation isolation. `npm run verify` validates shared source and backend contracts. Test the actual packaged application separately; a browser screenshot alone does not verify desktop startup or runtime bundling. Cross-platform CI artifacts are not evidence of physical phone or Windows/Linux interactive testing.

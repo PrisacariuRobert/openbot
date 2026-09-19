@@ -1,7 +1,7 @@
-# OpenBot 0.37.0-beta.1
+# OpenBot desktop beta — unsigned candidate
 
-Owner-hosted AI teammates: persistent bots with memory, skills, routines, approvals and per-teammate security boundaries. Bring any AI connection; your data stays on your hardware.
+One shared interface now serves Electron on macOS, Windows and Linux, and phone browsers through an authenticated HTTPS host. The SwiftUI clients have been retired from the source tree; historical native QA reports are not acceptance evidence for this candidate.
 
-Highlights: revisioned artifacts, self-extending teammates, semantic memory, visible delegations with recall, teammate retire/seat caps, YOLO mode, guided setup, portable teammate and skill sharing.
+Installers embed the host runtime. Existing homes must retain their database and matching vault key; no automatic migration or native-to-Electron data import is performed. See desktop/README.md for explicit existing-host/data configuration.
 
-Beta limits: unsigned builds (Mac: right-click Open on first launch), no auto-update, no managed cloud, provider accounts and model costs are yours. See docs/RELEASE_BETA.md for install steps and rough edges.
+These artifacts are unsigned and have not been notarized. There is no automatic updater, App Store phone package, or claim of physical-device acceptance. Review the exact candidate's test evidence before publishing. Model credentials and connected accounts are not bundled.

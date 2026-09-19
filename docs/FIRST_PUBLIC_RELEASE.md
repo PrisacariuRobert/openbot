@@ -1,5 +1,7 @@
 # First public beta: Mac first, iPhone preview
 
+> Architecture update, 2026-09-19: Electron is now the sole desktop client; phones share the web UI. Native-client results below are historical. Current candidate evidence lives in `docs/design/figma-implementation/`; clean-install gates apply to each Electron target and phone browser. No release is authorized by this update.
+
 Release target: the `0.37` line, published only after a reviewed candidate commit and explicit owner approval. The repository is already public; this checklist concerns its **first deliberately supported public beta**, not making the GitHub repository public for the first time.
 
 OpenBot's promise for this beta is focused: give a teammate a job, choose the AI connection, let it work with granted tools, review sensitive actions and receive a useful result. The difference is owner-controlled source, provider choice, isolated teammate sessions and inspectable evidence—not an unverified claim of being better than every competitor.

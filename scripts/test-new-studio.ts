@@ -390,7 +390,7 @@ try {
       .waitFor();
     await capture(name + "-conversations");
     await nav(width)
-      .getByRole("button", { name: "Activity", exact: true })
+      .getByRole("button", { name: /^Activity(?: \d+ need you)?$/ })
       .click();
     await page
       .getByRole("heading", { name: "Activity", exact: true })
@@ -493,20 +493,14 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 960 });
   unconfigured = true;
-  await page.goto(base + "/studio.html");
-  await page
-    .locator(".sidebar-conversations")
-    .getByRole("button", { name: "Nova", exact: true })
-    .click();
-  await page
-    .getByRole("combobox", { name: "Choose a teammate" })
-    .click();
-  await page.getByRole("option", { name: /^Nova/ }).click();
+  await page.goto(`${base}/studio.html?thread=bot-nova`);
+  await page.getByRole("button", { name: "About Nova", exact: true }).waitFor();
   await page
     .getByRole("textbox", { name: "Message your team" })
     .fill("My test draft");
   const before = posts.length;
   const chatUrl = page.url();
+  await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')?.disabled === false);
   await page.getByRole("textbox", { name: "Message your team" }).press("Enter");
   // The provider gate navigates to the Your AI settings page (not a dialog);
   // returning to the conversation restores the draft from the server.
@@ -520,12 +514,10 @@ try {
   assert.equal(posts.length, before, "Clicking Send opens the chooser; it does not start an unconfigured teammate");
   await page.goto(chatUrl);
   await page.getByRole("textbox", { name: "Message your team" }).waitFor();
-  await page
-    .getByRole("combobox", { name: "Choose a teammate" })
-    .click();
-  const pixelState = page.waitForResponse((response) => response.url().includes("/api/state?threadId=bot-pixel") && response.ok());
-  await page.getByRole("option", { name: /^Pixel/ }).click();
-  await pixelState;
+  // Open the destination explicitly, as in the delayed-send navigation below:
+  // a polling refresh can move the sidebar row during a pointer click.
+  await page.goto(`${base}/studio.html?thread=bot-pixel`);
+  await page.getByRole("button", { name: "About Pixel", exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.disabled === false);
   await page
     .getByRole("textbox", { name: "Message your team" })

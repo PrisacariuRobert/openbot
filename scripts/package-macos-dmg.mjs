@@ -1,6 +1,6 @@
 // Website disk image for the unsigned Mac beta (D02, free Apple account).
 //
-// Takes a staged /absolute/path/to/OpenBot.app (see package-macos-app.mjs)
+// Takes a staged /absolute/path/to/OpenBot.app (built by Electron)
 // and produces OpenBot-<marketing>-macos-<arch>.dmg plus a .sha256 sidecar
 // in the output directory. Read-only compressed (UDZO), verified after
 // creation, and smoke-mounted to confirm the bundle and its version.
@@ -24,7 +24,7 @@ if (!process.argv[2] || !app.endsWith(".app")) {
   throw new Error("Usage: node scripts/package-macos-dmg.mjs /absolute/path/to/OpenBot.app [/absolute/path/to/out-dir]");
 }
 if (process.platform !== "darwin") throw new Error("Disk images can only be built on macOS.");
-if (!existsSync(path.join(app, "Contents", "Info.plist"))) throw new Error("That .app has no Contents/Info.plist. Stage it with package-macos-app.mjs first.");
+if (!existsSync(path.join(app, "Contents", "Info.plist"))) throw new Error("That .app has no Contents/Info.plist. Build it with package:desktop first.");
 const plist = spawnSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleShortVersionString", path.join(app, "Contents/Info.plist")], { encoding: "utf8" });
 const version = plist.status === 0 ? plist.stdout.trim() : "";
 if (!version) throw new Error("The app bundle has no readable CFBundleShortVersionString.");
