@@ -29,7 +29,7 @@ function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expected
   const runner = new OpenCodeRunner({
     db,
     internalToken: "fixture",
-    runtimeCheck: runtimeCheck || (() => ({ runtime: "opencode" as const, detectedVersion: "1.18.30", compatibility: "verified" as const })),
+    runtimeCheck: runtimeCheck || (() => ({ runtime: "opencode" as const, detectedVersion: "1.18.31", compatibility: "verified" as const })),
     internalUrl: "http://127.0.0.1:1",
     onChange: () => {},
     attachments: new AttachmentService(db),
