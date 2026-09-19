@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "suite": "Q03 fault matrix 36 cases",
+  "notes": "Scoped injections; disabled outside test mode.",
+  "cases": [
+    {
+      "id": "F01",
+      "point": "timeout-after-dispatch",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F02",
+      "point": "accept-before-ack",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F03",
+      "point": "cancel-during-input",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F04",
+      "point": "owner-takeover",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F05",
+      "point": "tab-destroyed",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F06",
+      "point": "window-destroyed",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F07",
+      "point": "session-changed",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F08",
+      "point": "host-restart",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F09",
+      "point": "model-restart",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F10",
+      "point": "fs-divergence",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F11",
+      "point": "db-divergence",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F12",
+      "point": "duplicate-prune",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F13",
+      "point": "tombstone-retry",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F14",
+      "point": "version-mismatch",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F15",
+      "point": "vault-recovery",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F16",
+      "point": "stop-during-drag",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F17",
+      "point": "stop-during-type",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F18",
+      "point": "revoke-grant",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F19",
+      "point": "account-changed",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F20",
+      "point": "signin-completed",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F21",
+      "point": "slow-settle",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F22",
+      "point": "never-settle",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F23",
+      "point": "popup-redirect",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F24",
+      "point": "cross-origin-frame",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F25",
+      "point": "stale-observation",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F26",
+      "point": "ambiguous-target",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F27",
+      "point": "vision-unavailable",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F28",
+      "point": "sensitive-region",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F29",
+      "point": "budget-reached",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F30",
+      "point": "uncertain-effect",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F31",
+      "point": "routine-delete-retry",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F32",
+      "point": "compact-retry",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F33",
+      "point": "schedule-miss",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F34",
+      "point": "offline-queue",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F35",
+      "point": "concurrent-desktop",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    },
+    {
+      "id": "F36",
+      "point": "sibling-write",
+      "scope": "fixture-request",
+      "expected": "uncertain-or-safe-block-no-duplicate"
+    }
+  ]
+}

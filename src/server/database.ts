@@ -3476,15 +3476,60 @@ export class OpenBotDatabase {
 
   /** Bounded retention: keep the most recent receipts so transport retries
    * inside the retry window replay instead of duplicating. Oldest rows fall
-   * off; an intentionally repeated task must use a new requestId. */
+   * off; an intentionally repeated task must use a new requestId.
+   * R01: pruning retains a minimal tombstone (request/thread/digest) via
+   * extension_records so an old retry gets an explicit expired conflict
+   * instead of silently recreating work. Full receipts compact; tombstones
+   * answer replay for the supported retention lifetime. */
   pruneMessageSubmissions(limit = 1000): number {
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM message_submissions").get() as Row;
     const over = Number(row?.count ?? 0) - Math.max(1, limit);
     if (over <= 0) return 0;
+    const evicted = this.db.prepare(`SELECT request_id,thread_id,payload_digest,created_at FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?`).all(over) as Row[];
+    for (const evictedRow of evicted) {
+      try {
+        this.saveExtensionRecord("message-submission-tombstone", String(evictedRow.request_id), {
+          requestId: String(evictedRow.request_id),
+          threadId: String(evictedRow.thread_id),
+          payloadDigest: String(evictedRow.payload_digest),
+          createdAt: String(evictedRow.created_at),
+          reason: "pruned",
+        });
+      } catch {
+        // Tombstone retention is best-effort; receipt pruning still proceeds.
+      }
+    }
     this.db.prepare(`DELETE FROM message_submissions WHERE request_id IN (
       SELECT request_id FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?
     )`).run(over);
     return over;
+  }
+
+  /** R01: startup repair for pending submission intents with no receipt.
+   * Converts orphans to tombstones (uncertain, never auto-retried) and
+   * returns the count repaired. */
+  repairPendingSubmissionIntents(): number {
+    let repaired = 0;
+    for (const { id, value } of this.extensionRecords<{ requestId: string; threadId: string; payloadDigest: string }>("message-submission-pending")) {
+      if (this.getMessageSubmission(id)) {
+        this.deleteExtensionRecord("message-submission-pending", id);
+        continue;
+      }
+      try {
+        this.saveExtensionRecord("message-submission-tombstone", id, {
+          requestId: String(value.requestId ?? id),
+          threadId: String(value.threadId ?? ""),
+          payloadDigest: String(value.payloadDigest ?? ""),
+          createdAt: now(),
+          reason: "orphan-repaired",
+        });
+      } catch {
+        // Best-effort tombstone; pending marker still clears below.
+      }
+      this.deleteExtensionRecord("message-submission-pending", id);
+      repaired += 1;
+    }
+    return repaired;
   }
 
   /** Scoped external-object identity (P04a). One row per connector resource

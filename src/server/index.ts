@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
 import { intervalSchedule, routineScheduleInput, nextRoutineOccurrence, schedulePreview } from "../shared/calendar-schedule.js";
 import { OpenBotDatabase, RoutineRevisionConflictError, messageSubmissionDigest } from "./database.js";
+import { classifyTombstoneRetry, validateReplayDisclosure } from "./message-admission.js";
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
@@ -275,6 +276,13 @@ for (const receipt of interruptedApprovedActions) {
   const detail = `${receipt.actionLabel} may or may not have completed before OpenBot restarted. It has not been repeated.`;
   db.updateRun(receipt.runId, { status: "failed", error: detail, finishedAt: new Date().toISOString(), taskStage: "blocked" });
   db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Check what happened before retrying", detail });
+}
+// R01: repair pending submission intents with no receipt as uncertain tombstones (never blind retry).
+try {
+  const repaired = db.repairPendingSubmissionIntents();
+  if (repaired > 0) console.log(`[R01] repaired ${repaired} pending submission intent(s) as uncertain`);
+} catch (error) {
+  console.warn("[R01] pending submission repair failed:", error instanceof Error ? error.message : error);
 }
 for (const receipt of db.listPreparedApprovedActions()) {
   // The in-memory review binding cannot survive restart. Do not silently
@@ -1356,13 +1364,41 @@ function submissionDigestFor(data: {
   });
 }
 
-function replaySubmission(response: express.Response, requestId: string, digest: string) {
+function replaySubmission(response: express.Response, requestId: string, digest: string, threadId: string) {
   const existing = db.getMessageSubmission(requestId);
-  if (!existing) return null;
-  if (existing.payloadDigest !== digest) {
-    response.status(409).json({
+  if (!existing) {
+    // R01: bounded full receipts compact; retained tombstones answer replay
+    // with an explicit expired conflict instead of silently recreating work.
+    const tombstone = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; createdAt: string; reason: string }>(
+      "message-submission-tombstone",
+      requestId,
+    );
+    if (tombstone) {
+      const classified = classifyTombstoneRetry(
+        { requestId: tombstone.requestId, threadId: tombstone.threadId, payloadDigest: tombstone.payloadDigest, createdAt: tombstone.createdAt, reason: "pruned" },
+        digest,
+      );
+      if (classified) {
+        response.status(classified.status).json({
+          error:
+            classified.code === "request_expired"
+              ? "This request is too old to retry safely. Nothing was changed — send it again with a new request."
+              : "This retry does not match the original request. Nothing was changed — send it again with a new request.",
+          code: classified.code,
+          requestId,
+        });
+        return true as const;
+      }
+    }
+    return null;
+  }
+  // R01: thread-match disclosure — a replay must never leak another
+  // conversation's receipt. Mismatch is a conflict, not a replay.
+  const disclosure = validateReplayDisclosure(existing, threadId, digest);
+  if (!disclosure.ok) {
+    response.status(disclosure.status).json({
       error: "This retry does not match the original request. Nothing was changed — send it again with a new request.",
-      code: "request_conflict",
+      code: disclosure.code,
       requestId,
     });
     return true as const;
@@ -1388,6 +1424,47 @@ app.post("/api/messages", (request, response) => {
   if (!parsed.success) return response.status(400).json({ error: "Please write a message first." });
   const thread = db.getThread(parsed.data.threadId);
   if (!thread) return response.status(404).json({ error: "Conversation not found." });
+  // R01: durable replay runs before any new-admission eligibility check
+  // (targets, provider, budget, unclaimed attachments, reply target) but
+  // after thread visibility is established. A replay creates nothing, so
+  // changed budget/provider/attachment-claim state must not block recovery
+  // of the original IDs — and a claimed attachment on retry is proof of the
+  // first admission, not a 400. Thread mismatch stays a 409 conflict (no
+  // cross-thread disclosure); revoked thread access still 404s above.
+  const submissionDigest = parsed.data.requestId ? submissionDigestFor({
+    threadId: thread.id,
+    body: parsed.data.body,
+    attachmentIds: parsed.data.attachmentIds,
+    replyToId: parsed.data.replyToId ?? null,
+    targetBotIds: parsed.data.targetBotIds,
+    timeZone: parsed.data.timeZone,
+    expectedWorkKind: parsed.data.expectedWorkKind,
+  }) : null;
+  if (parsed.data.requestId && submissionDigest) {
+    const replayed = replaySubmission(response, parsed.data.requestId, submissionDigest, thread.id);
+    if (replayed) return;
+    // R01: a pending intent with no receipt means the first attempt may
+    // still be creating work (or died mid-dispatch). Never fork a second
+    // message/run history: same digest waits, different digest conflicts.
+    const pending = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; startedAt: string }>(
+      "message-submission-pending",
+      parsed.data.requestId,
+    );
+    if (pending && pending.threadId === thread.id) {
+      if (pending.payloadDigest !== submissionDigest) {
+        return response.status(409).json({
+          error: "This retry does not match the original request. Nothing was changed — send it again with a new request.",
+          code: "request_conflict",
+          requestId: parsed.data.requestId,
+        });
+      }
+      return response.status(409).json({
+        error: "This request is already being processed. Wait for its result instead of sending it again.",
+        code: "request_in_progress",
+        requestId: parsed.data.requestId,
+      });
+    }
+  }
   const candidates = db.getThreadBots(thread.id);
   const invoked = invokedWorkflow(parsed.data.body, db.listWorkflows());
   const workflow = invoked && candidates.some((bot) => bot.id === invoked.botId) ? invoked : null;
@@ -1423,20 +1500,24 @@ app.post("/api/messages", (request, response) => {
     const reply = db.getMessage(parsed.data.replyToId);
     if (!reply || reply.threadId !== thread.id) return response.status(400).json({ error: "That message is no longer available to reply to." });
   }
-  // Durable replay check runs after read-only validation but before any
-  // message, attachment claim, routine or run is created.
-  const submissionDigest = parsed.data.requestId ? submissionDigestFor({
-    threadId: thread.id,
-    body: parsed.data.body,
-    attachmentIds: parsed.data.attachmentIds,
-    replyToId: parsed.data.replyToId ?? null,
-    targetBotIds: parsed.data.targetBotIds,
-    timeZone: parsed.data.timeZone,
-    expectedWorkKind: parsed.data.expectedWorkKind,
-  }) : null;
+  // Durable admission: the replay check above already ran before any
+  // eligibility validation. Stage the pending intent here — after all
+  // read-only validation, before any message, attachment claim, routine or
+  // run is created — so a crash in the window below repairs as uncertain.
   if (parsed.data.requestId && submissionDigest) {
-    const replayed = replaySubmission(response, parsed.data.requestId, submissionDigest);
-    if (replayed) return;
+    // R01: stage a pending intent before any runnable dispatch so a crash
+    // between message/run creation and receipt persistence repairs as
+    // uncertain (never blind retry). Cleared after durable admission commits.
+    try {
+      db.saveExtensionRecord("message-submission-pending", parsed.data.requestId, {
+        requestId: parsed.data.requestId,
+        threadId: thread.id,
+        payloadDigest: submissionDigest,
+        startedAt: new Date().toISOString(),
+      });
+    } catch {
+      // Best-effort marker; admission still proceeds.
+    }
   }
   const body = parsed.data.body || `Shared ${parsed.data.attachmentIds.length} file${parsed.data.attachmentIds.length === 1 ? "" : "s"}.`;
   const userMessage = db.addMessage({ threadId: thread.id, senderType: "user", senderId: null, body, replyToId: parsed.data.replyToId });
@@ -1445,9 +1526,14 @@ app.post("/api/messages", (request, response) => {
     const file = db.attachmentFile(attachment.id)!;
     const workspaceName = `${attachment.id.slice(0, 8)}-${attachment.name}`;
     for (const bot of requested) {
+      // R01: stage inbox copies to temp then rename so a crash cannot leave
+      // a half-copied workspace that a retry would double-count.
       const inbox = path.join(db.workspacesDir, bot.id, "inbox", userMessage.id);
       mkdirSync(inbox, { recursive: true });
-      copyFileSync(file.storagePath, path.join(inbox, workspaceName));
+      const tmpPath = path.join(inbox, `.${workspaceName}.part`);
+      const finalPath = path.join(inbox, workspaceName);
+      copyFileSync(file.storagePath, tmpPath);
+      renameSync(tmpPath, finalPath);
     }
     return attachmentPromptBlock(attachment, db.attachmentText(attachment.id)).replace("{{WORKSPACE_PATH}}", `inbox/${userMessage.id}/${workspaceName}`);
   });
@@ -1470,6 +1556,13 @@ app.post("/api/messages", (request, response) => {
         attachmentIds: attachments.map((attachment) => attachment.id),
         responseStatus: 201,
       });
+      // R01: durable admission committed — clear the pending intent so
+      // startup repair does not mistake this for an orphan.
+      try {
+        db.deleteExtensionRecord("message-submission-pending", parsed.data.requestId);
+      } catch {
+        // Best-effort cleanup.
+      }
     }
     broadcast();
     return response.status(201).json({ routines, routineIds: routines.map((routine) => routine.id), messageId: userMessage.id, routedTo, attachments, ...(parsed.data.requestId ? { requestId: parsed.data.requestId } : {}) });
@@ -1516,6 +1609,12 @@ app.post("/api/messages", (request, response) => {
       attachmentIds: attachments.map((attachment) => attachment.id),
       responseStatus: 202,
     });
+    // R01: durable admission committed — clear the pending intent.
+    try {
+      db.deleteExtensionRecord("message-submission-pending", parsed.data.requestId);
+    } catch {
+      // Best-effort cleanup.
+    }
   }
   response.status(202).json({ runs, redirected, ...messageResult, ...(parsed.data.requestId ? { requestId: parsed.data.requestId } : {}) });
 });

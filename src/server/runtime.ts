@@ -13,6 +13,11 @@ import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTempla
 import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
 import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
+import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
+import { issueSemanticTarget, scrollRegionForTarget } from "./semantic-targets.js";
+import { visualToCss, validateVisualAction } from "./visual-grounding.js";
+import { journalPropose, journalTransition, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
+import { selectModality } from "./modality-router.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
@@ -1069,6 +1074,207 @@ export class BrowserManager {
       const page = await this.page(botId);
       return `data:image/jpeg;base64,${(await page.screenshot({ type: "jpeg", quality: 62 })).toString("base64")}`;
     } catch { return null; }
+  }
+
+  /**
+   * B01/B02/B03/B06 — Scoped observation with privacy gating + host-issued
+   * semantic targets + visual capability routing. Additive; existing
+   * snapshot()/screenshot()/click()/type() behavior unchanged.
+   *
+   * Returns a bounded observation envelope metadata + redacted text preview
+   * without exposing raw secrets to the model. Freshness TTL 15s; geometry
+   * changes invalidate visual observations.
+   */
+  async observeScoped(
+    botId: string,
+    runId: string,
+    input: { surface: "browser-dom" | "browser-visual"; secureMode: boolean; scopeAllowed: boolean; sessionId: string; ownerEpoch: string },
+  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string }> {
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    const observationId = newObservationId();
+    const expiresAt = new Date(Date.now() + OBSERVATION_TTL_MS).toISOString();
+    // Privacy gate applies to the whole capture, not just a preview.
+    const gate = gateObservationCapture({ secureMode: input.secureMode, scopeAllowed: input.scopeAllowed, fieldName: "", fieldType: "", autocomplete: "", opaqueSensitive: false });
+    if (!gate.allowed) {
+      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE" };
+    }
+    const snapshot = await this.snapshot(botId);
+    const { redacted } = redactSecretsForProvider(snapshot.text.slice(0, 8000));
+    // Capability routing: canvas/opaque pages go visual immediately when supported.
+    const looksCanvas = /canvas|diagram|visual editor|chart/i.test(snapshot.text.slice(0, 2000));
+    const route = selectModality({
+      canvasPrimary: looksCanvas,
+      semanticCount: Math.min(250, snapshot.text.split("\n").length),
+      opaqueWidgets: looksCanvas ? 1 : 0,
+      visualCapability: "visual-supported",
+      nativeGranted: false,
+    });
+    return { observationId, expiresAt, textPreview: redacted.slice(0, 4000), modality: route.modality, reason: route.reason };
+  }
+
+  /**
+   * B02 — Host-issued semantic action: the model proposes an opaque targetId
+   * bound to observation/document/frame epoch; the host re-resolves
+   * conservatively before dispatch. Journals admission (R02) so double
+   * invocation / renderer switching cannot fork the mutation.
+   */
+  async semanticAct(
+    botId: string,
+    runId: string,
+    input: { observationId: string; documentEpoch: string; framePath: string; role: string; label: string; selector: string; kind: "click" | "type"; value?: string },
+  ): Promise<{ url: string; title: string }> {
+    const issued = issueSemanticTarget({
+      observationId: input.observationId,
+      documentEpoch: input.documentEpoch,
+      framePath: input.framePath,
+      role: input.role,
+      label: input.label,
+      bounds: null,
+      selectorHint: input.selector,
+    });
+    const actionId = `sem_${issued.fingerprint}`;
+    journalPropose({
+      actionId,
+      runId,
+      botId,
+      surface: "browser-dom",
+      surfaceIdentity: `tab:${botId}/doc:${input.documentEpoch}/frame:${input.framePath}`,
+      ownershipEpoch: input.documentEpoch,
+      payloadDigest: issued.fingerprint,
+      reviewDigest: null,
+      target: input.label,
+    });
+    if (!admitOnce(actionId)) throw new Error("This action was already admitted. Check its result instead of sending it again.");
+    journalTransition(actionId, "dispatch_started");
+    try {
+      const result = input.kind === "click" ? await this.click(botId, input.selector) : await this.type(botId, input.selector, input.value ?? "");
+      journalTransition(actionId, "effect_observed");
+      return result;
+    } catch (error) {
+      journalTransition(actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * B03 — Visual action with exact coordinate transform. Model coordinates
+   * refer to the exact delivered image; the host maps to CSS px and validates
+   * scope + geometry freshness before input. Text-only configs get
+   * VISION_UNAVAILABLE instead of guessed coordinates.
+   */
+  async visualAct(
+    botId: string,
+    runId: string,
+    input: {
+      observationId: string;
+      imageWidth: number;
+      imageHeight: number;
+      capturedWidth: number;
+      capturedHeight: number;
+      deviceScale: number;
+      browserZoom: number;
+      point: { x: number; y: number };
+      capability: "visual-supported" | "text-only";
+    },
+  ): Promise<{ url: string; title: string }> {
+    const transform = {
+      observationId: input.observationId,
+      capturedX: 0,
+      capturedY: 0,
+      capturedWidth: input.capturedWidth,
+      capturedHeight: input.capturedHeight,
+      cropX: 0,
+      cropY: 0,
+      cropWidth: input.capturedWidth * input.deviceScale,
+      cropHeight: input.capturedHeight * input.deviceScale,
+      imageWidth: input.imageWidth,
+      imageHeight: input.imageHeight,
+      deviceScale: input.deviceScale,
+      browserZoom: input.browserZoom,
+    };
+    const page = await this.page(botId);
+    // B03: read live geometry before validating — a layout/zoom/window
+    // change since the observation invalidates the transform. Browser zoom
+    // multiplies devicePixelRatio, so the live product must match the
+    // observation's deviceScale * browserZoom/100 exactly.
+    const live = await page.evaluate(() => ({ dpr: window.devicePixelRatio, w: window.innerWidth, h: window.innerHeight }));
+    const viewport = page.viewportSize();
+    const validated = validateVisualAction(
+      {
+        observationId: input.observationId,
+        transform,
+        action: "click",
+        point: input.point,
+        currentGeometry: {
+          cssWidth: live.w || viewport?.width || input.capturedWidth,
+          cssHeight: live.h || viewport?.height || input.capturedHeight,
+          deviceScale: live.dpr || input.deviceScale,
+          browserZoom: input.browserZoom,
+          scrollX: 0,
+          scrollY: 0,
+        },
+      },
+      input.capability,
+    );
+    // The shared validator compares deviceScale/browserZoom fields; enforce
+    // the live product match here since zoom folds into devicePixelRatio.
+    const expectedDpr = (transform.deviceScale * transform.browserZoom) / 100;
+    const liveDpr = live.dpr || 0;
+    if (validated.ok && Math.abs(liveDpr - expectedDpr) > 0.01) {
+      throw new Error("STALE_OBSERVATION: the screenshot changed after observation (zoom/scale drift). Observe again before acting.");
+    }
+    if (
+      validated.ok &&
+      (Math.abs((live.w || 0) - transform.capturedWidth) > 2 || Math.abs((live.h || 0) - transform.capturedHeight) > 2)
+    ) {
+      throw new Error("STALE_OBSERVATION: the window changed after observation. Observe again before acting.");
+    }
+    if (!validated.ok) {
+      const reason = validated.reason;
+      if (reason === "VISION_UNAVAILABLE") throw new Error("VISION_UNAVAILABLE: this configuration cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+      throw new Error(`${reason}: the screenshot changed after observation. Observe again before acting.`);
+    }
+    const actionId = `vis_${input.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}`;
+    journalPropose({
+      actionId,
+      runId,
+      botId,
+      surface: "browser-visual",
+      surfaceIdentity: `tab:${botId}/obs:${input.observationId}`,
+      ownershipEpoch: input.observationId,
+      payloadDigest: actionId,
+      reviewDigest: null,
+      target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
+    });
+    if (!admitOnce(actionId)) throw new Error("This visual action was already admitted.");
+    if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
+      throw new Error("Another task holds the input lease. Wait for it to finish.");
+    }
+    journalTransition(actionId, "dispatch_started");
+    try {
+      await page.mouse.click(validated.cssX, validated.cssY);
+      await page.waitForTimeout(180);
+      this.assertPageAccess(botId, page);
+      journalTransition(actionId, "effect_observed");
+      releaseDesktopLease(runId);
+      return { url: page.url(), title: await page.title() };
+    } catch (error) {
+      releaseDesktopLease(runId);
+      journalTransition(actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /** B02 — Region-specific scroll of the intended pane (bounded). */
+  async scrollPane(botId: string, framePath: string, paneId: string | null, deltaY: number): Promise<{ url: string; title: string }> {
+    const page = await this.page(botId);
+    this.assertPageAccess(botId, page);
+    const region = scrollRegionForTarget({ framePath, paneId, deltaY });
+    void region;
+    await page.mouse.wheel(0, Math.max(-3000, Math.min(3000, deltaY)));
+    await page.waitForTimeout(140);
+    return { url: page.url(), title: await page.title() };
   }
 
   async status(botId: string, computer: ComputerManager): Promise<ComputerStatus> {
