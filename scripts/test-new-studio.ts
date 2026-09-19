@@ -516,9 +516,10 @@ try {
   assert.equal(posts.length, before, "Clicking Send opens the chooser; it does not start an unconfigured teammate");
   await page.goto(chatUrl);
   await page.getByRole("textbox", { name: "Message your team" }).waitFor();
-  const pixelState = page.waitForResponse((response) => response.url().includes("/api/state?threadId=bot-pixel") && response.ok());
-  await page.locator(".sidebar-conversations").getByRole("button", { name: "Pixel", exact: true }).click();
-  await pixelState;
+  // Open the destination explicitly, as in the delayed-send navigation below:
+  // a polling refresh can move the sidebar row during a pointer click.
+  await page.goto(`${base}/studio.html?thread=bot-pixel`);
+  await page.getByRole("button", { name: "About Pixel", exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.disabled === false);
   await page
     .getByRole("textbox", { name: "Message your team" })
