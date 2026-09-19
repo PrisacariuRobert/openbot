@@ -178,10 +178,11 @@ try {
     await page.keyboard.press("Escape");
     assert.equal(
       await page
-        .getByRole("combobox", { name: "Choose a teammate" })
-        .innerText(),
+        .getByRole("button", { name: "About Remy", exact: true })
+        .innerText().then((text) => text.split("\n")[0]),
       "Remy",
     );
+    assert.equal(new URL(page.url()).searchParams.get("thread"), bot.threadId, "Creation opens the new teammate conversation");
     const state = await (
       await fetch(base + "/api/state?threadId=" + bot.threadId)
     ).json();
