@@ -279,6 +279,69 @@ try {
     assert.ok([200, 400].includes(takeover.status), `takeover route answers (got ${takeover.status})`);
     record("H7-stop-takeover", true, `cancel → ${cancel.status}, run ${run.status}; takeover route → ${takeover.status}`);
   }
+
+  // H9 — pending-only cross-thread collision: a durable unresolved marker
+  // for request R in thread A, with no receipt or tombstone. Reuse from an
+  // otherwise-valid thread B must 409, preserve A's marker byte-for-byte,
+  // and create nothing in B — including across a restart (where repair
+  // converts the marker to an orphan tombstone that still names A).
+  {
+    const { OpenBotDatabase } = await import("../src/server/database.js");
+    const { messageSubmissionDigest } = await import("../src/server/database.js");
+    const requestId = requestFile(9);
+    const bodyA = "H9 pending marker payload";
+    const digestA = messageSubmissionDigest({ threadId: "team-room", body: bodyA, attachmentIds: [], targetBotIds: ["nova"] });
+    {
+      const direct = new OpenBotDatabase(root, { dataDir: data });
+      try {
+        direct.saveExtensionRecord("message-submission-pending", requestId, {
+          requestId, threadId: "team-room", payloadDigest: digestA, startedAt: new Date().toISOString(),
+        });
+      } finally {
+        direct.close();
+      }
+    }
+    const foreign = await postMessages({ threadId: "bot-nova", body: "H9 foreign payload", targetBotIds: ["nova"], requestId });
+    assert.equal(foreign.status, 409, "foreign thread reuse of a pending ID conflicts");
+    assert.equal(foreign.json.code, "request_conflict");
+    {
+      const direct = new OpenBotDatabase(root, { dataDir: data });
+      try {
+        const marker = direct.extensionRecord("message-submission-pending", requestId) as { threadId: string; payloadDigest: string } | null;
+        assert.ok(marker, "original pending marker preserved");
+        assert.equal(marker.threadId, "team-room", "marker still names thread A");
+        assert.equal(marker.payloadDigest, digestA, "marker digest unchanged");
+      } finally {
+        direct.close();
+      }
+    }
+    const foreignMessages = await (await fetch(`${base}/api/threads/bot-nova/messages?limit=200`)).json() as Array<{ body: string }>;
+    assert.ok(!foreignMessages.some((message) => message.body === "H9 foreign payload"), "no message created in thread B");
+    const matching = await postMessages({ threadId: "team-room", body: bodyA, targetBotIds: ["nova"], requestId });
+    assert.equal(matching.status, 409, "matching retry waits instead of forking");
+    assert.equal(matching.json.code, "request_in_progress");
+    await killServer();
+    spawnServer();
+    await waitForHealth();
+    const afterRestart = await postMessages({ threadId: "bot-nova", body: "H9 foreign payload", targetBotIds: ["nova"], requestId });
+    assert.equal(afterRestart.status, 409, "foreign reuse still refused after restart");
+    assert.equal(afterRestart.json.code, "request_conflict", "unmatched payload conflicts without creating work");
+    const sameAfterRestart = await postMessages({ threadId: "team-room", body: bodyA, targetBotIds: ["nova"], requestId });
+    assert.equal(sameAfterRestart.status, 409, "matching retry after repair still refused");
+    assert.equal(sameAfterRestart.json.code, "request_uncertain", "unresolved outcome stays uncertain, never green-lit");
+    {
+      const direct = new OpenBotDatabase(root, { dataDir: data });
+      try {
+        const tomb = direct.extensionRecord("message-submission-tombstone", requestId) as { threadId: string; reason: string } | null;
+        assert.ok(tomb, "orphan tombstone retained");
+        assert.equal(tomb.threadId, "team-room", "tombstone still names thread A");
+        assert.equal(tomb.reason, "orphan-repaired");
+      } finally {
+        direct.close();
+      }
+    }
+    record("H9-pending-collision", true, "foreign pending reuse 409s pre/post-restart; marker/tombstone preserve thread A; B empty");
+  }
 } catch (error) {
   record("HARNESS", false, error instanceof Error ? error.message : String(error));
   throw error;

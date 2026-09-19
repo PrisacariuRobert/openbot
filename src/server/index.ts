@@ -1480,15 +1480,19 @@ app.post("/api/messages", (request, response) => {
   if (parsed.data.requestId && submissionDigest) {
     const replayed = replaySubmission(response, parsed.data.requestId, submissionDigest, thread.id);
     if (replayed) return;
-    // R01: a pending intent with no receipt means the first attempt may
-    // still be creating work (or died mid-dispatch). Never fork a second
-    // message/run history: same digest waits, different digest conflicts.
+    // R01: ANY existing pending intent for this request ID is handled here,
+    // before eligibility and staging — regardless of thread. A different
+    // thread or payload digest is a conflict that preserves the original
+    // marker byte-for-byte and creates no message, run, routine, claim or
+    // inbox copy. Only a matching thread+digest takes the in-progress path.
+    // (Staging below upserts the same key, so without this branch a foreign
+    // retry could replace thread A's unresolved marker.)
     const pending = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; startedAt: string }>(
       "message-submission-pending",
       parsed.data.requestId,
     );
-    if (pending && pending.threadId === thread.id) {
-      if (pending.payloadDigest !== submissionDigest) {
+    if (pending) {
+      if (pending.threadId !== thread.id || pending.payloadDigest !== submissionDigest) {
         return response.status(409).json({
           error: "This retry does not match the original request. Nothing was changed — send it again with a new request.",
           code: "request_conflict",
