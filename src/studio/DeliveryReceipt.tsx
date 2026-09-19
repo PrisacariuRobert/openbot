@@ -3,7 +3,9 @@ import { Check, ShieldCheck, Download, ChevronRight, MessageSquare, CircleAlert,
 import type { Attachment, Bot, Message, Run } from "../shared/types";
 import "./delivery-receipt.css";
 import { deliveryReview, deliveryReviewSummary } from "./delivery-review";
+import type { CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { newerDeliveredVersion } from "./artifact-versions";
 import { isUnverifiedTextFallback } from "./delivery-fallback";
 import { Character } from "./Character";
@@ -39,7 +41,7 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
         {review.finding && <p>{review.finding}</p>}
         {review.detail && <details><summary>Read review</summary>
           <p>{review.bound ? "A teammate’s assessment—not a guarantee that every claim is correct." : "This earlier review was not linked to an exact file version. Ask for a new review before relying on it."}</p>
-          <div className="delivery-finding-full"><ReactMarkdown skipHtml disallowedElements={["a", "img"]} unwrapDisallowed>{review.detail}</ReactMarkdown></div>
+          <div className="delivery-finding-full"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml disallowedElements={["a", "img"]} unwrapDisallowed>{review.detail}</ReactMarkdown></div>
         </details>}
       </section>)}</details>}
       {message.attachments.map((file) => {
@@ -157,7 +159,7 @@ export function DeliveredFile({ file, artifact = false, author, onOpenDocument }
     .filter(Boolean)
     .slice(0, 5);
   const image = file.kind === "image" && file.previewUrl;
-  return <section className="delivered-file delivered-paper" aria-label={`File: ${file.name}`}>
+  return <section style={author ? { "--mascot-color": author.color } as CSSProperties : undefined} className="delivered-file delivered-paper" aria-label={`File: ${file.name}`}>
     <a className="document-paper" onClick={onOpenDocument ? (event) => { event.preventDefault(); onOpenDocument(file); } : undefined} href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}, revision ${file.revision}`}>
       {author && <span className="document-author" aria-hidden="true"><Character name={author.name} color={author.color} variant={author.mascot} size={58} mood="happy" /></span>}
       <span className="document-identity"><FileText size={14}/><span>{file.name}</span><small>REVISION / {String(file.revision).padStart(2, "0")}</small></span>

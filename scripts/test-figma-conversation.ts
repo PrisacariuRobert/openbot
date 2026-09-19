@@ -35,7 +35,7 @@ db.addMessage({threadId,senderType:'user',senderId:null,body:'Give this launch n
 db.addMessage({threadId,senderType:'bot',senderId:pixel.id,body:'On it. I’ll ask Scout to keep me honest.'});
 const run=db.createRun({threadId,botId:pixel.id,prompt:'Prepare a launch note',status:'completed'});
 const message=db.addMessage({threadId,senderType:'bot',senderId:pixel.id,runId:run.id,body:''});
-const text='# A little more you.\n\nI’m building a little team. Not another inbox.\nA few good ideas, and someone to help carry them.\n';
+const text='# A little more you.\n\nI’m building a little team. Not another inbox.\nA few good ideas, and someone to help carry them.\n\n## Usage snapshot\n\n| Category | Value | Reporting |\n| --- | ---: | --- |\n| Input tokens | 15348 | Reported |\n| Output tokens | 37 | Reported |\n\n- [x] Stored result\n- [ ] Owner review\n\n```text\nA code sample stays readable.\n```\n';
 const filePath=path.join(data,'attachments','figma-launch-note','Meet OpenBot.md');
 mkdirSync(path.dirname(filePath),{recursive:true});writeFileSync(filePath,text);
 const file=db.createAttachment({threadId,messageId:message.id,name:'Meet OpenBot.md',mime:'text/markdown',size:Buffer.byteLength(text),storagePath:filePath,source:'artifact',artifactKey:'launch-note',revision:2,analysis:{detectedMime:'text/markdown',kind:'text',processingStatus:'ready',summary:null,extractedText:text,metadata:{classification:'deliverable'},previewable:false}});
@@ -54,7 +54,7 @@ let log='';server.stdout?.on('data',c=>log+=c);server.stderr?.on('data',c=>log+=
 let electron:Awaited<ReturnType<typeof _electron.launch>>|undefined;
 let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;
 try {
- let ready=false;for(let i=0;i<100;i++){try{if((await fetch(base+'/api/healthz')).ok){ready=true;break}}catch{}await delay(150)}assert.ok(ready,log);
+ let ready=false;for(let i=0;i<600;i++){try{if((await fetch(base+'/api/healthz')).ok){ready=true;break}}catch{}await delay(150)}assert.ok(ready,log);
  const mcp=new Client({name:'figma-conversation-qa',version:'1.0.0'});
  const transport=new StdioClientTransport({command:process.execPath,args:['--import','tsx','mcp/openbot.ts'],env:{...Object.fromEntries(Object.entries(process.env).filter((entry):entry is [string,string]=>typeof entry[1]==='string')),OPENBOT_URL:base,OPENBOT_DATA_DIR:data,OPENBOT_MCP_FULL:'0'},stderr:'pipe'});
  await mcp.connect(transport);
@@ -82,6 +82,8 @@ try {
  await electron.evaluate(({session},savePath)=>{session.defaultSession.once('will-download',(_event: unknown,item: {setSavePath(path: string): void; once(event: string, listener: (event: unknown, state: string) => void): void})=>{item.setSavePath(savePath);item.once('done',(_event: unknown,state: string)=>{(globalThis as any).__figmaDownload=state})})},downloadPath);
  await page.getByRole('link',{name:'Open Meet OpenBot.md, revision 2',exact:true}).click();
  await page.getByRole('complementary',{name:'Document preview'}).waitFor();
+ assert.equal(await page.locator('.document-reader table tbody tr').count(),2,'GFM table renders structured rows');
+ assert.equal(await page.locator('.document-reader input[type=checkbox]').count(),2,'GFM tasks render');
  await page.screenshot({path:path.join(output,'document-preview.png'),scale:'css'});
  await page.getByRole('link',{name:'Open original',exact:true}).click();
  let downloadState='';for(let i=0;i<60;i++){downloadState=await electron.evaluate(()=> (globalThis as any).__figmaDownload);if(downloadState)break;await delay(100)}assert.equal(downloadState,'completed','Electron saves actual delivered file');
@@ -137,6 +139,10 @@ try {
      await phone.locator('.settings-mobile-back').click();
      assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
    }
+   await page.goto(`${base}/?thread=${scout.threadId}&panel=bot`);
+   await page.locator('.bot-hero').waitFor();
+   assert.equal((await page.locator('.bot-hero').evaluate(el=>getComputedStyle(el).getPropertyValue('--mascot-color'))).trim(),scout.color,'teammate hero follows green mascot');
+   await page.screenshot({path:path.join(output,'workspace-scout.png'),scale:'css'});
    await page.goto(`${base}/?thread=${threadId}&panel=teach`);
    await page.getByLabel('Note name',{exact:true}).fill('Writing preference');
    await page.getByLabel('What should they remember?',{exact:true}).fill('Keep the launch note concise. Synthetic UI check.');

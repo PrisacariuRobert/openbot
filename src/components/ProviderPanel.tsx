@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   Check,
   ChevronRight,
@@ -307,7 +307,7 @@ export function ProviderPanel({
   };
   return (
     <div className="provider-settings">
-      <header className="ai-intro">
+      <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
         <div>
           <h3>Your AI, your choice.</h3>
           <p>

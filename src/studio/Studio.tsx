@@ -2491,7 +2491,7 @@ export function Studio() {
                         }
                         return (
                           <Fragment key={message.id}><article
-                            style={{ "--message-tint": message.senderColor || "#d86889" } as CSSProperties}
+                            style={{ "--message-tint": message.senderColor || "var(--secondary)" } as CSSProperties}
                             className={`chat-message ${message.senderType === "user" ? "from-you" : "from-team"} ${startsGroup ? "" : "continues"}`}
 
                           >
@@ -2810,7 +2810,7 @@ export function Studio() {
               </ol>
               {detail.run.summary && (
                 <div className="prose">
-                  <ReactMarkdown>{detail.run.summary}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{detail.run.summary}</ReactMarkdown>
                 </div>
               )}
               {!detail.run.summary && detail.run.partialText && <details className="message-work-updates"><summary>Latest work update</summary><div className="prose"><MarkdownMessage body={detail.run.partialText} /></div></details>}
@@ -2900,7 +2900,7 @@ export function Studio() {
               <details className="source-details">
                 <summary>Read the instructions</summary>
                 <div className="prose">
-                  <ReactMarkdown>{detail.skill.instructions}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{detail.skill.instructions}</ReactMarkdown>
                 </div>
               </details>
               <small className="boundary-note">

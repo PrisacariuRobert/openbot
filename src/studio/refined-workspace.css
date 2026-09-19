@@ -27,7 +27,7 @@
 .workspace-teammate-identity strong { font-size: 17px; line-height: 23px; }
 .workspace-teammate-identity small { margin-top: 5px; font-size: 13px; }
 .workspace-teammate-chat { display: flex; align-items: center; gap: 6px; width: fit-content; font-size: 11px; background: transparent; border: 0; padding: 4px 0; color: var(--secondary); }
-.capabilities .workspace-note { display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: 16px; background: var(--surface-pixel-message); margin-bottom: 22px; }
+.capabilities .workspace-note { display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: 16px; background: color-mix(in srgb, var(--mascot-color, var(--secondary)) 8%, var(--system-background)); margin-bottom: 22px; }
 .capabilities .workspace-note > svg { flex: none; }
 .capabilities .workspace-note strong { font-size: 17px; line-height: 23px; }
 .capabilities .workspace-note p { font-size: 13px; line-height: 19px; margin: 6px 0 0; }
@@ -71,7 +71,7 @@
 .capabilities .settings-row { padding: 18px; }
 .capabilities .settings-row-text strong { font-size: 13px; font-weight: 500; }
 .capabilities .settings-row-text small { font-size: 13px; line-height: 19px; margin-top: 5px; }
-.capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) { padding: 20px 24px; border: 0; border-radius: 16px; background: var(--surface-pixel-message); margin-bottom: 24px; }
+.capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) { padding: 20px 24px; border: 0; border-radius: 16px; background: color-mix(in srgb, var(--mascot-color, var(--secondary)) 8%, var(--system-background)); margin-bottom: 24px; }
 .capabilities .ai-intro { flex-direction: row-reverse; justify-content: flex-end; gap: 18px; }
 .capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) h3 { font-size: 17px; line-height: 23px; letter-spacing: -.4px; margin-bottom: 5px; }
 .capabilities :is(.ai-intro, .code-project-hero, .remote-hero, .teach-hero) p { font-size: 13px; line-height: 19px; margin: 0; }
@@ -80,7 +80,7 @@
 .capabilities .connector-card-category { text-transform: none; letter-spacing: 0; }
 .capabilities .connector-capability-tag { font-size: 11px; }
 .capabilities .capability-owner { border: 0; margin-bottom: 22px; padding-top: 0; }
-.capabilities .bot-hero { padding: 20px; border-radius: 16px; background: var(--surface-pixel-message); }
+.capabilities .bot-hero { --mascot-color: var(--bot-color); padding: 20px; border-radius: 16px; background: color-mix(in srgb, var(--mascot-color, var(--secondary)) 8%, var(--system-background)); }
 .capabilities .bot-hero .capability-pills { padding-top: 8px; }
 .capability-control .control-hero, .capability-control .stat-grid { display: none; }
 .capabilities .workspace-row-action { flex: none; font-size: 11px; color: var(--secondary); }
@@ -104,3 +104,33 @@
 .capabilities .settings-row:has(textarea) textarea { width: 100%; min-height: 110px; }
 .capability-teach .settings-row-text small > span { display: block; margin-top: 3px; }
 .workspace-settings :is(.mobile-search,.mobile-workspace,.conversation-back) { display: none; }
+
+/* Compact disclosures, consistent form rhythm, neutral workspace surfaces. */
+.capabilities .about-connection { border: 0; padding: 0; margin-top: 8px; background: transparent; border-radius: 0; }
+.capabilities .about-connection > summary { display: inline-flex; padding: 4px 0; min-height: 28px; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 5px; font-size: 12px; color: var(--secondary); }
+.capabilities .about-connection > p { max-width: 65ch; margin: 8px 0 0; font-size: 12px; }
+.capability-provider .settings-row:has(.about-connection) { align-items: flex-start; padding: 20px; gap: 20px; }
+.capability-provider .ai-side { align-items: center; gap: 16px; }
+.capability-provider .ai-test-state { font-size: 11px; color: var(--secondary); }
+.capabilities .settings-row-control button { min-height: 36px; font-size: 12px; border-radius: 9px; }
+.capabilities .settings-group + .settings-group { margin-top: 28px; }
+.capabilities .code-project-hero small { display: none; }
+.capabilities .code-project-hero { padding: 18px 20px; }
+.capabilities .code-empty { padding: 32px 24px; gap: 10px; border-color: var(--line); }
+.capabilities .code-empty > svg { width: 28px; height: 28px; color: var(--secondary); margin-bottom: 4px; }
+.capabilities .code-empty h3 { font-size: 18px; letter-spacing: -.3px; }
+.capabilities .code-empty p { font-size: 13px; max-width: 52ch; }
+.capabilities .code-empty button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; font-size: 13px; }
+.capabilities .code-empty button svg { width: 16px; height: 16px; color: currentColor; }
+.capabilities .code-empty .button-primary svg { fill: currentColor; }
+.capabilities .settings-row-text { min-width: 0; }
+.capabilities :is(.capability-notice,.extension-empty) { line-height: 1.6; }
+@media(max-width:768px) {
+  .capability-provider .settings-row:has(.about-connection) { gap: 12px; padding: 16px; }
+  .capability-provider .settings-row:has(.about-connection) .settings-row-control { width: 100%; justify-content: flex-start; }
+  .capability-provider .ai-side { width: 100%; justify-content: space-between; }
+  .capabilities .code-empty { padding: 24px 16px; }
+}
+.capabilities .settings-card { padding: 0; }
+.capabilities .code-empty .button-primary .connector-symbol { color: var(--on-strong); }
+.capabilities .code-empty .button-primary .connector-symbol path { fill: currentColor; }

@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, ChevronRight, Plus, Upload } from "lucide-react";
 import type { AppState, Bot } from "../shared/types";
 import { Character } from "./Character";
 
 export function WorkspaceNote({ bot, title, children }: { bot?: Bot; title: string; children: React.ReactNode }) {
-  return <aside className="workspace-note">{bot && <Character name={bot.name} color={bot.color} variant={bot.mascot} size={52} />}<div><strong>{title}</strong><p>{children}</p></div></aside>;
+  return <aside className="workspace-note" style={bot ? { "--mascot-color": bot.color } as CSSProperties : undefined}>{bot && <Character name={bot.name} color={bot.color} variant={bot.mascot} size={52} />}<div><strong>{title}</strong><p>{children}</p></div></aside>;
 }
 
 export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRestore }: {

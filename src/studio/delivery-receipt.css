@@ -149,9 +149,9 @@ a.file-card:active {
 
 /* Returned work, Figma 69:38: real attachment content and revision identity. */
 .delivered-file.delivered-paper { width: min(578px, 100%); max-width: 100%; margin: 12px 0 16px; border: 0; background: transparent; overflow: visible; }
-.document-paper { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 248px; padding: 20px 22px 18px; border: .7px solid var(--line); border-radius: 14px; background: linear-gradient(var(--paper-top), var(--system-background)); box-shadow: 0 1px 3px #2b26330a, 0 8px 26px #38212e14; text-decoration: none; color: var(--ink); }
-.document-paper::before { content: ""; position: absolute; z-index: -2; inset: 8px 3px -7px; border-radius: 14px; background: var(--surface-pixel-paper); transform: rotate(1.4deg); border: .5px solid var(--line); }
-.document-paper::after { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: linear-gradient(var(--paper-top), var(--system-background)); }
+.document-paper { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 248px; padding: 20px 22px 18px; border: .7px solid var(--line); border-radius: 14px; background: linear-gradient(color-mix(in srgb, var(--mascot-color, var(--secondary)) 4%, var(--system-background)), var(--system-background)); box-shadow: 0 1px 3px #2b26330a, 0 8px 26px #38212e14; text-decoration: none; color: var(--ink); }
+.document-paper::before { content: ""; position: absolute; z-index: -2; inset: 8px 3px -7px; border-radius: 14px; background: color-mix(in srgb, var(--mascot-color, var(--secondary)) 18%, var(--system-background)); transform: rotate(1.4deg); border: .5px solid var(--line); }
+.document-paper::after { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: linear-gradient(color-mix(in srgb, var(--mascot-color, var(--secondary)) 4%, var(--system-background)), var(--system-background)); }
 .document-identity { display: flex; align-items: center; gap: 7px; min-height: 22px; font-size: 11px; color: var(--secondary); }
 .document-identity > span { overflow-wrap: anywhere; }
 .document-identity small { margin-left: auto; white-space: nowrap; color: var(--muted); font-size: 10px; }
