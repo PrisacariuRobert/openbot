@@ -12,7 +12,7 @@ import path from "node:path";
 import { readFileSync } from "node:fs";
 
 import {
-  classifyTombstoneRetry,
+  tombstoneHttpMapping,
   validateReplayDisclosure,
   classifyOrphanedIntent,
   TOMBSTONE_RETENTION_MS,
@@ -55,16 +55,25 @@ import { OpenBotDatabase } from "./testing/database.js";
 // R01: tombstone + replay disclosure + orphan repair
 test("R01 tombstone retry never silently recreates work", () => {
   const tomb = { requestId: "req-old-0001", threadId: "t1", payloadDigest: "abc", createdAt: new Date().toISOString(), reason: "pruned" as const };
-  const same = classifyTombstoneRetry(tomb, "abc");
-  assert.ok(same && same.code === "request_expired", "same digest after prune is explicit expired, not new work");
-  const conflict = classifyTombstoneRetry(tomb, "different");
-  assert.ok(conflict && conflict.code === "request_conflict");
+  const same = tombstoneHttpMapping(tomb, "abc");
+  assert.equal(same.code, "request_expired", "same digest after prune is explicit expired, not new work");
+  assert.match(same.error, /original result/, "owner is pointed at the original, not told nothing happened");
+  const conflict = tombstoneHttpMapping(tomb, "different");
+  assert.equal(conflict.code, "request_conflict");
   assert.ok(TOMBSTONE_RETENTION_MS > 0);
-  const expired = classifyTombstoneRetry(
+  const expired = tombstoneHttpMapping(
     { ...tomb, createdAt: new Date(Date.now() - TOMBSTONE_RETENTION_MS - 1000).toISOString() },
     "abc",
   );
-  assert.equal(expired?.status, 410);
+  assert.equal(expired.status, 410);
+});
+
+test("R01 orphan tombstone never claims nothing happened", () => {
+  const orphan = { requestId: "req-orphan-1", threadId: "t1", payloadDigest: "abc", createdAt: new Date().toISOString(), reason: "orphan-repaired" as const };
+  const mapped = tombstoneHttpMapping(orphan, "abc");
+  assert.equal(mapped.code, "request_uncertain");
+  assert.match(mapped.error, /may already have created work/);
+  assert.doesNotMatch(mapped.error, /Nothing was changed/);
 });
 
 test("R01 replay disclosure rejects cross-thread leak", () => {

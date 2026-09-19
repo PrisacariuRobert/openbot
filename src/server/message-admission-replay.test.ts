@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { OpenBotDatabase } from "./testing/database.js";
 import { messageSubmissionDigest } from "./database.js";
-import { validateReplayDisclosure, classifyTombstoneRetry } from "./message-admission.js";
+import { validateReplayDisclosure } from "./message-admission.js";
 
 function boot() {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-r01-route-"));
@@ -254,8 +254,11 @@ test("R01 route order: replay precedes eligibility; claimed attachments do not b
     db.saveExtensionRecord("message-submission-pending", "req-r01-order-0002", {
       requestId: "req-r01-order-0002", threadId: thread.id, payloadDigest: digest, startedAt: new Date().toISOString(),
     });
-    const tombCheck = classifyTombstoneRetry(null, digest);
-    assert.equal(tombCheck, null, "no tombstone and no receipt falls through to the pending guard, not silent recreation");
+    assert.equal(db.getMessageSubmission("req-r01-order-0002"), null, "no receipt yet for the pending request");
+    assert.ok(
+      db.extensionRecord("message-submission-pending", "req-r01-order-0002"),
+      "pending marker persists until durable admission commits",
+    );
   } finally {
     db.close();
     rmSync(root, { recursive: true, force: true });
@@ -279,4 +282,85 @@ test("R01 source order guard: replay call precedes eligibility checks in POST /a
   assert.ok(replayAt < budgetAt, "replay precedes budget eligibility");
   assert.ok(replayAt < attachmentAt, "replay precedes unclaimed-attachment validation");
   assert.ok(replayAt < providerAt, "replay precedes provider eligibility");
+});
+
+test("R01 fail-closed: prune keeps originals when tombstone persistence fails", () => {
+  const { root, db, thread } = boot();
+  try {
+    const digest = messageSubmissionDigest({ threadId: thread.id, body: "keep me", attachmentIds: [] });
+    db.saveMessageSubmission({
+      requestId: "req-r01-atomic-0001",
+      threadId: thread.id,
+      payloadDigest: digest,
+      messageId: null,
+      runIds: [],
+      routineIds: [],
+      routedTo: [],
+      attachmentIds: [],
+      responseStatus: 202,
+    });
+    db.saveMessageSubmission({
+      requestId: "req-r01-atomic-0002",
+      threadId: thread.id,
+      payloadDigest: messageSubmissionDigest({ threadId: thread.id, body: "keep me too", attachmentIds: [] }),
+      messageId: null,
+      runIds: [],
+      routineIds: [],
+      routedTo: [],
+      attachmentIds: [],
+      responseStatus: 202,
+    });
+    // Inject a tombstone-write failure: the prune must abort and retain
+    // both original receipts instead of deleting what it cannot replace.
+    const originalSave = db.saveExtensionRecord.bind(db);
+    db.saveExtensionRecord = ((kind: string, id: string, value: unknown) => {
+      if (kind === "message-submission-tombstone") throw new Error("injected persistence failure");
+      return originalSave(kind, id, value);
+    }) as typeof db.saveExtensionRecord;
+    try {
+      assert.equal(db.pruneMessageSubmissions(1), 0, "failed compaction prunes nothing");
+    } finally {
+      db.saveExtensionRecord = originalSave;
+    }
+    assert.ok(db.getMessageSubmission("req-r01-atomic-0001"), "original receipt retained after failed prune");
+    assert.ok(db.getMessageSubmission("req-r01-atomic-0002"), "newest receipt retained after failed prune");
+    assert.equal(db.extensionRecord("message-submission-tombstone", "req-r01-atomic-0001"), null, "no partial tombstone left behind");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("R01 fail-closed: repair keeps the pending marker when its tombstone cannot persist", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r01-repair-fail-"));
+  let db = new OpenBotDatabase(root);
+  try {
+    db.saveExtensionRecord("message-submission-pending", "req-r01-repair-fail-0001", {
+      requestId: "req-r01-repair-fail-0001",
+      threadId: "team-room",
+      payloadDigest: "d",
+      startedAt: new Date().toISOString(),
+    });
+    const originalSave = db.saveExtensionRecord.bind(db);
+    db.saveExtensionRecord = ((kind: string, id: string, value: unknown) => {
+      if (kind === "message-submission-tombstone") throw new Error("injected persistence failure");
+      return originalSave(kind, id, value);
+    }) as typeof db.saveExtensionRecord;
+    try {
+      assert.equal(db.repairPendingSubmissionIntents(), 0, "nothing repaired while tombstones cannot persist");
+    } finally {
+      db.saveExtensionRecord = originalSave;
+    }
+    assert.ok(
+      db.extensionRecord("message-submission-pending", "req-r01-repair-fail-0001"),
+      "pending marker kept for the next startup instead of being forgotten",
+    );
+    // Next startup with a healthy store repairs it as uncertain.
+    assert.equal(db.repairPendingSubmissionIntents(), 1);
+    const tomb = db.extensionRecord("message-submission-tombstone", "req-r01-repair-fail-0001") as { reason: string } | null;
+    assert.equal(tomb?.reason, "orphan-repaired");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 });

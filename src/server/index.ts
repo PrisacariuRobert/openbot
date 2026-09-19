@@ -9,7 +9,7 @@ import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
 import { intervalSchedule, routineScheduleInput, nextRoutineOccurrence, schedulePreview } from "../shared/calendar-schedule.js";
 import { OpenBotDatabase, RoutineRevisionConflictError, messageSubmissionDigest } from "./database.js";
-import { classifyTombstoneRetry, validateReplayDisclosure } from "./message-admission.js";
+import { tombstoneHttpMapping, validateReplayDisclosure } from "./message-admission.js";
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
@@ -1368,27 +1368,31 @@ function replaySubmission(response: express.Response, requestId: string, digest:
   const existing = db.getMessageSubmission(requestId);
   if (!existing) {
     // R01: bounded full receipts compact; retained tombstones answer replay
-    // with an explicit expired conflict instead of silently recreating work.
-    const tombstone = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; createdAt: string; reason: string }>(
+    // with an explicit expired/uncertain conflict instead of silently
+    // recreating work. The stored reason is preserved: an orphaned first
+    // attempt has an UNKNOWN outcome and must never be described as
+    // "nothing happened".
+    const tombstone = db.extensionRecord<{ requestId: string; threadId: string; payloadDigest: string; createdAt: string; reason: "pruned" | "orphan-repaired" }>(
       "message-submission-tombstone",
       requestId,
     );
+    if (tombstone && (tombstone.reason === "pruned" || tombstone.reason === "orphan-repaired")) {
+      const mapped = tombstoneHttpMapping(
+        { requestId: tombstone.requestId, threadId: tombstone.threadId, payloadDigest: tombstone.payloadDigest, createdAt: tombstone.createdAt, reason: tombstone.reason },
+        digest,
+      );
+      response.status(mapped.status).json({ error: mapped.error, code: mapped.code, requestId });
+      return true as const;
+    }
+    // Legacy tombstones without a reason predate reason preservation;
+    // treat them as compacted receipts, never as proof of no work.
     if (tombstone) {
-      const classified = classifyTombstoneRetry(
+      const mapped = tombstoneHttpMapping(
         { requestId: tombstone.requestId, threadId: tombstone.threadId, payloadDigest: tombstone.payloadDigest, createdAt: tombstone.createdAt, reason: "pruned" },
         digest,
       );
-      if (classified) {
-        response.status(classified.status).json({
-          error:
-            classified.code === "request_expired"
-              ? "This request is too old to retry safely. Nothing was changed — send it again with a new request."
-              : "This retry does not match the original request. Nothing was changed — send it again with a new request.",
-          code: classified.code,
-          requestId,
-        });
-        return true as const;
-      }
+      response.status(mapped.status).json({ error: mapped.error, code: mapped.code, requestId });
+      return true as const;
     }
     return null;
   }
@@ -1505,9 +1509,11 @@ app.post("/api/messages", (request, response) => {
   // read-only validation, before any message, attachment claim, routine or
   // run is created — so a crash in the window below repairs as uncertain.
   if (parsed.data.requestId && submissionDigest) {
-    // R01: stage a pending intent before any runnable dispatch so a crash
-    // between message/run creation and receipt persistence repairs as
-    // uncertain (never blind retry). Cleared after durable admission commits.
+    // R01 fail-closed: the pending marker must be durably staged before any
+    // work object exists. If staging fails, the request is refused with
+    // nothing created — the client keeps the exact draft and retries with
+    // the SAME requestId. Proceeding without the marker would allow a crash
+    // to fork an untracked duplicate history.
     try {
       db.saveExtensionRecord("message-submission-pending", parsed.data.requestId, {
         requestId: parsed.data.requestId,
@@ -1516,7 +1522,11 @@ app.post("/api/messages", (request, response) => {
         startedAt: new Date().toISOString(),
       });
     } catch {
-      // Best-effort marker; admission still proceeds.
+      return response.status(500).json({
+        error: "OpenBot could not stage this request safely, so nothing was started and your uploads are still available. Retry with the same request.",
+        code: "request_not_staged",
+        requestId: parsed.data.requestId,
+      });
     }
   }
   const body = parsed.data.body || `Shared ${parsed.data.attachmentIds.length} file${parsed.data.attachmentIds.length === 1 ? "" : "s"}.`;
