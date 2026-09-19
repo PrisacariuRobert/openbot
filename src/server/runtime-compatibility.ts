@@ -3,8 +3,17 @@ import { safeHostEnvironment } from "./runtime.js";
 
 /** Gate 1a: pin the verified OpenCode runtime. The runtime version is part of
  * the security boundary, so an unverified version fails closed for model
- * execution without disabling the rest of OpenBot. */
-export const VERIFIED_OPENCODE_VERSION = "1.18.30";
+ * execution without disabling the rest of OpenBot.
+ *
+ * Verified 1.18.31 (2026-09-19) against the 1.18.30 baseline: upstream
+ * changelog is ACP session-option restore, TUI auth-error display, Copilot
+ * thinking summarization, console batch endpoints and a gateway dep bump —
+ * no permission-model, tool-dispatch, agent-allowlist, MCP-config or CLI
+ * flag-surface change affecting OpenBot's boundary. `opencode run` flags
+ * OpenBot uses (--auto, --format, --model, --dir, --agent, --file,
+ * --session, --title) verified present on the installed 1.18.31 binary,
+ * plus a live routine run on this host. */
+export const VERIFIED_OPENCODE_VERSION = "1.18.31";
 
 export interface RuntimeCompatibility {
   runtime: "opencode";
@@ -13,7 +22,7 @@ export interface RuntimeCompatibility {
 }
 
 export const RUNTIME_INCOMPATIBLE_MESSAGE =
-  "OpenCode runtime not verified. OpenBot detected an unsupported OpenCode version; this release is verified with 1.18.30. Teammate execution is paused because runtime permission behavior may have changed. Update OpenBot or use the supported runtime. Files, results, settings and receipts remain available.";
+  "OpenCode runtime not verified. OpenBot detected an unsupported OpenCode version; this release is verified with 1.18.31. Teammate execution is paused because runtime permission behavior may have changed. Update OpenBot or use the supported runtime. Files, results, settings and receipts remain available.";
 
 let cached: RuntimeCompatibility | null = null;
 

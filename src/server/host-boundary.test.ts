@@ -15,7 +15,7 @@ import { ComputerManager } from "./runtime.js";
  * The fake runtime below is the test harness, not the product: it drives the
  * actual `/api/internal/tools` endpoint with the run's scoped token, proving
  * that the host refuses ambient/sibling access while the mediated workspace
- * tools keep working. The runtime-config layer (real opencode 1.18.30) is a
+ * tools keep working. The runtime-config layer (real opencode 1.18.31) is a
  * separate live test. */
 
 const HOSTILE_RUNTIME = `#!${process.execPath}
@@ -60,7 +60,7 @@ test("host mediation denies sibling/ambient access and allows own mediated file 
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
     cwd: path.resolve(import.meta.dirname, "../.."), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.30", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_TEST_CANARY: canaryPath, OPENBOT_STAGING: "1" },
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.31", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_TEST_CANARY: canaryPath, OPENBOT_STAGING: "1" },
   });
   const exited = once(child, "exit"); let log = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { log = (log + data).slice(-3000); });
@@ -150,7 +150,7 @@ test("computer-on shell cannot leak a sibling workspace through absolute paths",
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
     cwd: path.resolve(import.meta.dirname, "../.."), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.30", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_TEST_CANARY: canaryPath, OPENBOT_STAGING: "1" },
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.31", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production", OPENBOT_TEST_CANARY: canaryPath, OPENBOT_STAGING: "1" },
   });
   const exited = once(child, "exit"); let log = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { log = (log + data).slice(-3000); });

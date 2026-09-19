@@ -60,15 +60,15 @@ test("readiness reports the three setup steps and tracks teammates", { timeout: 
 });
 
 test("readiness steps tell saved apart from runnable", () => {
-  const base = { cliAvailable: true, compatibility: "verified" as const, detectedVersion: "1.18.30", connectedNames: ["My OpenCode"], readyTeammates: 1, totalTeammates: 1 };
+  const base = { cliAvailable: true, compatibility: "verified" as const, detectedVersion: "1.18.31", connectedNames: ["My OpenCode"], readyTeammates: 1, totalTeammates: 1 };
   const steps = buildReadinessSteps(base);
   assert.deepEqual(steps.map((step) => step.ready), [true, true, true]);
-  assert.match(steps[0]!.detail, /1\.18\.30 is ready/);
+  assert.match(steps[0]!.detail, /1\.18\.31 is ready/);
 
   const unsupported = buildReadinessSteps({ ...base, compatibility: "unsupported", detectedVersion: "9.9.9" });
   assert.equal(unsupported[0]!.ready, false, "an unverified runtime is never reported ready");
   assert.match(unsupported[0]!.detail, /9\.9\.9 is not verified/);
-  assert.match(unsupported[0]!.detail, /1\.18\.30/);
+  assert.match(unsupported[0]!.detail, /1\.18\.31/);
 
   const unknown = buildReadinessSteps({ ...base, cliAvailable: true, compatibility: "unknown", detectedVersion: null });
   assert.equal(unknown[0]!.ready, false);
