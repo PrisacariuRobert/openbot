@@ -366,7 +366,7 @@
 }
 /* Apple rule: hover never reveals — swipe (touch/mouse-drag) or keyboard
  * focus opens the actions. */
-.conversation-cell:has(:focus-visible) .row-actions,
+.conversation-cell:has(.row-actions :focus-visible) .row-actions,
 .conversation-cell.swiped .row-actions {
   opacity: 1;
   pointer-events: auto;
@@ -399,22 +399,22 @@
   color: #fff;
   cursor: pointer;
   padding: 0;
-  transform: scale(.6);
+  transform: scale(.94);
   transition:
-    transform 200ms cubic-bezier(.34,1.45,.44,1),
+    transform 160ms cubic-bezier(.2,0,.2,1),
     opacity 140ms ease,
     background 120ms ease;
 }
-.conversation-cell:has(:focus-visible) .row-action,
+.conversation-cell:has(.row-actions :focus-visible) .row-action,
 .conversation-cell.swiped .row-action {
   transform: none;
 }
 .conversation-cell.swiped .row-action:nth-child(2),
-.conversation-cell:has(:focus-visible) .row-action:nth-child(2) {
+.conversation-cell:has(.row-actions :focus-visible) .row-action:nth-child(2) {
   transition-delay: 35ms;
 }
 .conversation-cell.swiped .row-action:nth-child(3),
-.conversation-cell:has(:focus-visible) .row-action:nth-child(3) {
+.conversation-cell:has(.row-actions :focus-visible) .row-action:nth-child(3) {
   transition-delay: 70ms;
 }
 .row-action-pin { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
@@ -2026,8 +2026,8 @@ a.message-file:hover {
     transform: scale(0.9);
   }
   .conversation-cell.swiped .row-action:active,
-  .conversation-cell:has(:focus-visible) .row-action:active {
-    transform: scale(0.85);
+  .conversation-cell:has(.row-actions :focus-visible) .row-action:active {
+    transform: scale(0.96);
   }
   .pinned-open:active {
     transform: scale(0.94);
@@ -2192,3 +2192,34 @@ a.message-file:hover {
 .rendered-markdown .markdown-table table { display: table; margin: 0; }
 .rendered-markdown .contains-task-list { list-style: none; padding-left: 0; }
 .rendered-markdown .task-list-item input { margin-right: 6px; }
+
+/* Actions remain hit-testable from pointer-down through click. */
+.conversation-cell:has(.row-actions:focus-within) .row-actions { opacity: 1; pointer-events: auto; }
+.conversation-cell:has(.row-actions:focus-within) .row-action { transform: none; transition-delay: 0ms; }
+@media (hover: hover) {
+  .conversation-cell:hover .row-action-toggle { opacity: 1; }
+}
+.row-action:disabled { opacity: .5; cursor: progress; }
+.archived-chats { margin: 12px 0; }
+.archived-chats > summary, .project-rooms > summary { padding: 10px 12px; font-size: 12px; line-height: 18px; color: var(--secondary); cursor: pointer; }
+.archived-chats .archived-cell { display: grid; grid-template-columns: minmax(0,1fr) 36px; align-items: center; gap: 8px; padding: 4px 8px; min-height: 52px; }
+.archived-chats .archived-cell > .conversation-row { display: flex; min-height: 44px; height: auto; padding: 10px 8px; margin: 0; width: 100%; border-radius: 10px; }
+.archived-chats .conversation-title { font-size: 13px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archived-chats .row-action-unhide { width: 36px; height: 36px; transform: none; color: var(--secondary); }
+@media (prefers-reduced-motion: no-preference) {
+  .capabilities { animation: workspace-arrive 180ms ease-out; }
+  .workspace-teammate, .settings-nav-button, .workspace-list-row { transition: background-color 140ms ease, border-color 140ms ease; }
+  .workspace-page-actions > button, .workspace-return, .document-pane > footer button { transition: transform 120ms ease-out, background-color 140ms ease; }
+  .workspace-page-actions > button:active:not(:disabled), .workspace-return:active, .document-pane > footer button:active:not(:disabled) { transform: scale(.98); }
+  .document-pane { animation: workspace-arrive 180ms ease-out; }
+}
+@keyframes workspace-arrive { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .capabilities, .document-pane { animation: none; }
+  .row-action, .row-actions, .workspace-teammate, .settings-nav-button, .workspace-list-row, .workspace-page-actions > button, .workspace-return { transition: none; }
+}
+
+.row-action-toggle { position: absolute; right: 8px; top: 50%; translate: 0 -50%; width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--secondary); opacity: 0; }
+.row-action-toggle:focus-visible { opacity: 1; }
+.conversation-cell.swiped .row-action-toggle { visibility: hidden; }
+@media(hover:none) { .row-action-toggle { opacity: 1; } }

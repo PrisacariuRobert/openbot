@@ -68,6 +68,30 @@ try {
  await page.screenshot({path:path.join(output,'electron-1440x940.png'),scale:'css'});
  console.log('CAPTURE',await page.evaluate(()=>({width:innerWidth,height:innerHeight,scale:devicePixelRatio})),root);
  if(process.env.OPENBOT_FIGMA_CAPTURE_ONLY==='1'){console.log('Capture only');}else{
+ const novaRow=()=>page.getByRole('button',{name:'Nova',exact:true}).locator('..');
+ await novaRow().hover();await page.getByRole('button',{name:'Conversation actions for Nova',exact:true}).click();await page.getByRole('button',{name:'Pin Nova to the top',exact:true}).click();
+ await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).waitFor();
+ await page.reload();await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Unpin Nova',exact:true}).focus();await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>![...document.querySelectorAll('.pinned-zone button')].some(el=>el.getAttribute('aria-label')==='Nova'));
+ await novaRow().hover();await page.getByRole('button',{name:'Conversation actions for Nova',exact:true}).click();await page.getByRole('button',{name:'Archive Nova',exact:true}).click();
+ await page.getByRole('button',{name:'Tap again to archive Nova',exact:true}).click();
+ await page.locator('.archived-chats > summary').click();
+ await page.getByRole('button',{name:'Unhide Nova',exact:true}).click();await page.getByRole('button',{name:'Archive Nova',exact:true}).waitFor();
+ const failedPin='**/api/threads/'+bots[2]!.threadId;
+ await page.route(failedPin,route=>route.request().method()==='PATCH' ? route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic save failure'})}) : route.continue());
+ await novaRow().hover();await page.getByRole('button',{name:'Conversation actions for Nova',exact:true}).click();await page.getByRole('button',{name:'Pin Nova to the top',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'Synthetic save failure'}).waitFor();
+ assert.equal(await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).count(),0);
+ await page.unroute(failedPin);await page.getByRole('button',{name:'Dismiss',exact:true}).click();
+ console.log('PASS conversation actions: pointer pin, reload persistence, keyboard unpin, archive/restore through real host; injected failed save stays visible');
+ const archiveFixture=new OpenBotDatabase(root,{dataDir:data});
+ for(let i=1;i<=7;i++){const room=archiveFixture.createGroupThread(`Archived project ${i}`, [pixel.id,scout.id]);archiveFixture.updateThread(room.id,{hidden:true});}archiveFixture.close();
+ await page.reload();await page.locator('.archived-chats > summary').click();
+ const archiveRows=await page.locator('.archived-cell').evaluateAll(rows=>rows.map(row=>row.getBoundingClientRect().height));
+ assert.equal(archiveRows.length,7);assert.ok(archiveRows.every(height=>height<=64),'archived rows stay compact');
+ await page.locator('.archived-chats').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'archived-chats.png'),scale:'css'});
+ await page.locator('.archived-chats > summary').click();
  const input=page.locator('#studio-message');await input.fill('Pixel draft retained');await delay(700);
  await page.getByRole('button',{name:'Scout',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#studio-message')?.getAttribute('placeholder')==='What’s next, Scout?');await input.fill('Scout has a different draft');await delay(700);
  await page.getByRole('button',{name:'Pixel',exact:true}).click();await page.waitForFunction(()=> (document.querySelector('#studio-message') as HTMLTextAreaElement)?.value==='Pixel draft retained');
@@ -129,6 +153,9 @@ try {
      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: desktop overflow`);
      await page.mouse.move(1400,900);
      await page.screenshot({path:path.join(output,`workspace-${panel}.png`),scale:'css'});
+     assert.ok(await page.locator('.capabilities').evaluate(el=>el.scrollWidth<=el.clientWidth+1), `${panel}: desktop content clipping`);
+     const scrollable=page.locator('.settings-page-content');
+     if(await scrollable.evaluate(el=>el.scrollHeight>el.clientHeight+40)){await scrollable.evaluate(el=>el.scrollTop=el.scrollHeight);await page.screenshot({path:path.join(output,`workspace-${panel}-bottom.png`),scale:'css'});}
      await phone.setViewportSize({width:390,height:844});
      await phone.goto(`${base}/?thread=${threadId}&panel=${panel}`);
      await phone.locator(`.capability-${panel}`).waitFor(); await delay(250);
@@ -136,9 +163,14 @@ try {
      await phone.screenshot({path:path.join(output,`phone-${panel}.png`)});
      await phone.setViewportSize({width:320,height:844});
      assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: 320px phone overflow`);
+     assert.ok(await phone.locator('.capabilities').evaluate(el=>el.scrollWidth<=el.clientWidth+1), `${panel}: 320px content clipping`);
      await phone.locator('.settings-mobile-back').click();
      assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
    }
+   await page.emulateMedia({reducedMotion:'no-preference'});
+   assert.equal(await page.locator('.capabilities').evaluate(el=>getComputedStyle(el).animationName),'workspace-arrive');
+   await page.emulateMedia({reducedMotion:'reduce'});
+   assert.equal(await page.locator('.capabilities').evaluate(el=>getComputedStyle(el).animationName),'none');
    await page.goto(`${base}/?thread=${scout.threadId}&panel=bot`);
    await page.locator('.bot-hero').waitFor();
    assert.equal((await page.locator('.bot-hero').evaluate(el=>getComputedStyle(el).getPropertyValue('--mascot-color'))).trim(),scout.color,'teammate hero follows green mascot');

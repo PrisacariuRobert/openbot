@@ -39,6 +39,7 @@ import {
   LoaderCircle,
   MessageCircle,
   Monitor,
+  MoreHorizontal,
   Pencil,
   Pin,
   Plus,
@@ -1336,14 +1337,34 @@ export function Studio() {
           .map((id) => allBots.find((bot) => bot.id === id))
           .filter((member): member is Bot => Boolean(member))
           .slice(0, 2)
-      : [];  const setPin = (item: { id: string; title: string; pinned: boolean }, pinned: boolean) =>
-    void (async () => {
-      await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinned }),
-      }).catch(() => {});
-      setRefresh((n) => n + 1);
-    })();
+      : [];
+  const [threadActionError, setThreadActionError] = useState("");
+  const [pendingThreads, setPendingThreads] = useState<string[]>([]);
+  const threadChanges = useRef(new Set<string>());
+  async function changeThread(item: { id: string; title: string }, patch: { pinned?: boolean; hidden?: boolean }) {
+    if (threadChanges.current.has(item.id)) return false;
+    threadChanges.current.add(item.id);
+    setPendingThreads([...threadChanges.current]);
+    setThreadActionError("");
+    try {
+      const response = await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "The host could not save this conversation change.");
+      setState(current => current ? { ...current, threads: current.threads.map(thread => thread.id === item.id ? { ...thread, ...result } : thread) } : current);
+      setRefresh(n => n + 1);
+      return true;
+    } catch (error) {
+      setThreadActionError(`Couldn’t update ${item.title}. ${error instanceof Error ? error.message : "Check your connection and try again."}`);
+      setRefresh(n => n + 1);
+      return false;
+    } finally {
+      threadChanges.current.delete(item.id);
+      setPendingThreads([...threadChanges.current]);
+    }
+  }
+  const setPin = (item: Thread, pinned: boolean) => void changeThread(item, { pinned });
   // Row quick actions: hover reveals on desktop, swipe reveals on touch.
   // Archiving is a two-tap reversible hide: the server keeps everything and
   // the Archived section below can bring the chat back. There is no hard
@@ -1417,19 +1438,10 @@ export function Studio() {
     setArchiveArmed(null);
     setSwipedRow(null);
     try { navigator.vibrate?.(10); } catch { /* haptics unavailable */ }
-    await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hidden: true }),
-    }).catch(() => {});
-    if (thread === item.id) openThread("team-room");
-    setRefresh((n) => n + 1);
+    if (await changeThread(item, { hidden: true }) && thread === item.id) openThread("team-room");
   }
   async function unhideThread(item: Thread) {
-    await fetch(`/api/threads/${encodeURIComponent(item.id)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hidden: false }),
-    }).catch(() => {});
-    setRefresh((n) => n + 1);
+    await changeThread(item, { hidden: false });
   }
   const pinnedThreads = (state?.threads || []).filter((item) => !item.hidden && item.pinned && (!needsYouOnly || item.needsYou) && conversationMatches(item, allBots, conversationQuery));
   const archivedThreads = (state?.threads || []).filter((item) => item.hidden);
@@ -1481,7 +1493,7 @@ export function Studio() {
         : bot && !isGroupThread(item)
           ? () => openCapability("bot", bot.threadId)
           : undefined;
-      const actionCount = 1 + (editRow ? 1 : 0) + (item.id !== "team-room" ? 1 : 0);
+      const actionCount = (item.id !== "team-room" ? 1 : 0) + (editRow ? 1 : 0) + (item.id !== "team-room" ? 1 : 0);
       const shiftPx = actionCount * 48 + 4;
       const rowParts = (cell: HTMLElement) => ({
         row: cell.querySelector<HTMLElement>(".conversation-row"),
@@ -1547,7 +1559,7 @@ export function Studio() {
           style={{ "--shift": `${shiftPx}px` } as CSSProperties}
           onPointerDown={(event) => {
             if (event.button > 0) return;
-            if ((event.target as HTMLElement).closest(".row-actions")) return;
+            if ((event.target as HTMLElement).closest(".row-actions, .row-action-toggle")) return;
             const cell = event.currentTarget;
             if (flight.current && flight.current.itemId !== item.id)
               finishFlight(true);
@@ -1691,17 +1703,19 @@ export function Studio() {
             )}
           </span>
         </button>
+        {actionCount > 0 && <button type="button" className="row-action-toggle" aria-label={`Conversation actions for ${item.title}`} aria-expanded={swipedRow === item.id} onClick={() => setSwipedRow(swipedRow === item.id ? null : item.id)}><MoreHorizontal size={16}/></button>}
         <span className="row-actions" aria-label={`Actions for ${item.title}`}>
-          <button
+          {item.id !== "team-room" && <button
             type="button"
             className="row-action row-action-pin"
+            disabled={pendingThreads.includes(item.id)}
             aria-label={item.pinned ? `Unpin ${item.title}` : `Pin ${item.title} to the top`}
             aria-pressed={item.pinned}
             title={item.pinned ? "Unpin" : "Pin to the top"}
             onClick={() => { setSwipedRow(null); setPin(item, !item.pinned); }}
           >
             <Pin size={15} />
-          </button>
+          </button>}
           {editRow && (
             <button
               type="button"
@@ -1716,6 +1730,7 @@ export function Studio() {
           {item.id !== "team-room" && (
             <button
               type="button"
+              disabled={pendingThreads.includes(item.id)}
               className={`row-action row-action-archive${archiveArmed === item.id ? " armed" : ""}`}
               aria-label={archiveArmed === item.id ? `Tap again to archive ${item.title}` : `Archive ${item.title}`}
               title={archiveArmed === item.id ? "Tap again to confirm" : "Archive"}
@@ -1753,6 +1768,7 @@ export function Studio() {
               <button
                 type="button"
                 className="row-action row-action-unhide"
+                disabled={pendingThreads.includes(item.id)}
                 aria-label={`Unhide ${item.title}`}
                 title="Unhide"
                 onClick={() => void unhideThread(item)}
@@ -1944,6 +1960,7 @@ export function Studio() {
             )}
           </div>
         </header>
+        {threadActionError && <div className="error-banner" role="alert"><span>{threadActionError}</span><button onClick={() => setThreadActionError("")}>Dismiss</button></div>}
         {error && (
           <div className="error-banner" role="alert">
             <span>{error}</span>

@@ -134,3 +134,20 @@
 .capabilities .settings-card { padding: 0; }
 .capabilities .code-empty .button-primary .connector-symbol { color: var(--on-strong); }
 .capabilities .code-empty .button-primary .connector-symbol path { fill: currentColor; }
+
+/* Consistent vertical rhythm between notices, section titles and forms. */
+.capabilities > .capability-notice { margin: 0 0 24px; max-width: none; width: 100%; }
+.capabilities .capability-owner { margin: 0 0 20px; padding: 0; min-height: 42px; }
+.capabilities .extensions-panel > header { margin: 0 0 24px; gap: 16px; }
+.capabilities .extensions-panel > header h3 { margin: 0 0 8px; }
+.capabilities .extensions-panel > header p { margin: 0; max-width: 68ch; }
+.capabilities .extensions-panel > .apple-segmented-control { margin: 0 0 24px; }
+.capabilities .settings-group { margin-bottom: 24px; }
+.capabilities .settings-group-header { margin-bottom: 12px; }
+.capabilities .panel-section-heading { gap: 16px; margin-bottom: 16px; }
+.capabilities .settings-row-full { margin-top: 12px; }
+@media(max-width:768px) {
+  .capabilities > .capability-notice { margin-bottom: 20px; padding: 14px 16px; }
+  .capabilities .extensions-panel > header { margin-bottom: 20px; }
+  .capabilities .extensions-panel .apple-segmented-item { padding-inline: 8px; white-space: normal; }
+}
