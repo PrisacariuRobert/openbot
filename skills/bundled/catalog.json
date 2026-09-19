@@ -38,5 +38,9 @@
   {
     "id": "google-calendar-browser-tasks",
     "source": "OpenBot maintained built-in method"
+  },
+  {
+    "id": "google-drive-browser-tasks",
+    "source": "OpenBot maintained built-in method"
   }
 ]
