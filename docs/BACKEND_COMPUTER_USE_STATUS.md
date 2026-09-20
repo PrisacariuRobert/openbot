@@ -16,6 +16,9 @@
 > Full-effect digest patch (candidate): 7ab90059817ec0f054874071738da480224f4660
 > — exact target identity, drag endpoints, normalized scroll delta in
 > pre-bound digests. Still draft, no merge/release.
+> Resource-identity patch (candidate): e076d8d23f1a21e12042d43248dbce54cefbf0e9
+> — observed reviewDigest, observation identity, pane selector+document
+> in pre-bound digests. Still draft, no merge/release.
 > Infrastructure-only label: model-loop exposure stays unwired by design,
 > native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
 > infrastructure with fixture proof — NOT general autonomous computer use,
@@ -180,6 +183,36 @@ Evidence (executed sequentially on candidate 7ab9005):
 - `npm run check:release`: pass. `npm run test:desktop`: 5/5.
   `npm run test:packaging`: 13/13.
 - Protected-client diff on candidate 7ab9005: ZERO.
+
+## Ticket assessment (resource-identity patch, candidate e076d8d)
+
+Narrow identity-only patch — canonical digest inputs and their
+mint/dispatch callers; DB token/effect/approval matching unchanged; no
+model/native/Jev/downloads, no paid/live spend:
+
+- Semantic digest binds the host-observed canonical reviewDigest.
+  Dispatch uses the live re-observed digest before admission (falling
+  back to the minted state only when the control is unresolvable, so
+  destroyed/ambiguous targets keep their dedicated gates); mint uses
+  the stored observed digest. The approval targetFingerprint check
+  stays independent.
+- Visual digest binds the exact observation identity the coordinates
+  were grounded against. Drag-end binding preserved.
+- Scroll digest binds pane selector + document identity, not only the
+  label. Normalized-delta binding preserved.
+
+Evidence (executed sequentially on candidate e076d8d):
+
+- `npm run check` (tsc --noEmit): clean.
+- `npm run check:acceptance`: clean.
+- `npm test`: 890 pass, 0 fail (incl. resource-identity units).
+- `npm run test:computer-use-fixtures`: 27/27 PASS (24 preserved +
+  F13 resource state, F13b observation identity, F13c pane identity;
+  F2/R4 refuse at the token check with no row).
+- `npm run test:r01-http-fixtures`: 9/9 PASS.
+- `npm run check:release`: pass. `npm run test:desktop`: 5/5.
+  `npm run test:packaging`: 13/13.
+- Protected-client diff on candidate e076d8d: ZERO.
 
 ## Ticket assessment (round 3: authority and recovery repair)
 
