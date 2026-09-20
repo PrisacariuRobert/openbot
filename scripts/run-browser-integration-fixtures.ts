@@ -76,6 +76,7 @@ const FORM = `<!doctype html><title>Fixture form</title><main>
 <div style="display:flex;gap:16px;margin-top:8px;">
 <div id="intended" aria-label="Results pane" style="height:200px;overflow-y:auto;border:1px solid #999;"><div style="height:1200px;">intended lane</div></div>
 <div id="decoy-pane" aria-label="Archive pane" style="height:200px;overflow-y:auto;border:1px solid #999;"><div style="height:1200px;">decoy lane</div></div>
+<div id="twin-pane" aria-label="Results pane" style="height:200px;overflow-y:auto;border:1px solid #999;"><div style="height:1200px;">twin lane</div></div>
 </div>
 <iframe id="sub" src="/sub" style="width:300px;height:150px;border:1px solid #999;"></iframe>
 <script>
@@ -93,7 +94,7 @@ if (canvas) {
     send({ kind: "canvas", x: event.clientX - rect.left, y: event.clientY - rect.top });
   });
 }
-for (const id of ["intended", "decoy-pane"]) {
+for (const id of ["intended", "decoy-pane", "twin-pane"]) {
   const pane = document.getElementById(id);
   if (pane) pane.addEventListener("scroll", () => send({ kind: "scroll", id, top: pane.scrollTop }), { passive: true });
 }
@@ -228,20 +229,24 @@ try {
   assert.ok(!clicks().slice(clicksBefore).some((event) => event.id === "decoy"), "decoy never clicked");
   record("F1-real-action", true, "semanticAct via opaque ID submitted once; server oracle + click beacon agree");
 
-  // F2 — relabeled control: STALE refusal with zero new submits.
+  // F2 — relabeled control: the live review state no longer matches the
+  // pre-bound token effect, so the exact-match verification refuses
+  // before admission with zero new submits.
   await browser.open("nova", `${base}/form`);
   const relabeled = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
   const relabeledGo = getObservation(relabeled.observationId)!.targets.find((target) => target.selector === "#go")!;
   await browser.open("nova", `${base}/relabeled`);
   const submitsBeforeRelabel = submits.length;
+  const relabelToken = mutT(run.id, relabeledGo.targetId, "click");
   let staleError: unknown = null;
   try {
-    await browser.semanticAct("nova", run.id, { targetId: relabeledGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(run.id, relabeledGo.targetId, "click") });
+    await browser.semanticAct("nova", run.id, { targetId: relabeledGo.targetId, sessionId: SESSION, kind: "click", mutationKey: relabelToken });
   } catch (error) {
     staleError = error;
   }
-  assert.ok(staleError instanceof Error && /STALE_OBSERVATION|TARGET_DESTROYED|AMBIGUOUS_TARGET/.test(staleError.message), "relabel refused");
+  assert.ok(staleError instanceof Error && /STALE_OBSERVATION|TARGET_DESTROYED|AMBIGUOUS_TARGET|already bound to a different effect/.test(staleError.message), "relabel refused");
   assert.equal(submits.length, submitsBeforeRelabel, "zero submits on stale target");
+  assert.equal(db.journalActionFindByMutation(relabelToken, run.id, "nova").length, 0, "token refusal leaves no journal row");
   record("F2-stale-target", true, `relabel refused (${(staleError as Error).message.slice(0, 60)}…), no input dispatched`);
 
   // F3 — two same-label controls: AMBIGUOUS refusal with zero submits.
@@ -480,8 +485,10 @@ try {
     record("R3-destination", true, "form /submit→/save-b refuses at token check; no dispatch, no row");
   }
 
-  // R4a — a 25th field invalidates the old review; R4b — observing an
-  // already-25-field form refuses as incomplete coverage from the start.
+  // R4a — a 25th field changes the canonical review state, so the
+  // pre-bound token no longer matches: refuses at the token check with
+  // zero submits and no row. R4b — observing an already-25-field form
+  // refuses as incomplete coverage from the start.
   {
     const r4run = db.createRun({ threadId: "team-room", botId: "nova", prompt: "field task", status: "running" });
     await browser.open("nova", `${base}/form`);
@@ -497,7 +504,7 @@ try {
     } catch (error) {
       r4Error = error;
     }
-    assert.ok(r4Error instanceof Error && /STALE_OBSERVATION|INCOMPLETE_REVIEW/.test(r4Error.message), `25th field refuses (got: ${(r4Error as Error)?.message.slice(0, 80)})`);
+    assert.ok(r4Error instanceof Error && /already bound to a different effect/.test(r4Error.message), `25th field refuses at token check (got: ${(r4Error as Error)?.message.slice(0, 100)})`);
     assert.equal(submits.length, submitsBeforeR4, "zero submits after field-count change");
     const oR4b = await browser.observeScoped("nova", r4run.id, { surface: "browser-dom", sessionId: SESSION });
     const saveTargetB = getObservation(oR4b.observationId)!.targets.find((target) => target.selector === "#go")!;
@@ -509,7 +516,7 @@ try {
     }
     assert.ok(r4bError instanceof Error && /INCOMPLETE_REVIEW/.test(r4bError.message), `truncated coverage refuses explicitly (got: ${(r4bError as Error)?.message.slice(0, 80)})`);
     assert.equal(submits.length, submitsBeforeR4, "zero submits on incomplete review");
-    record("R4-field-coverage", true, "25th field invalidates old review; incomplete review refuses explicitly");
+    record("R4-field-coverage", true, "25th field refuses at token check; incomplete review refuses explicitly");
   }
 
   // F11 — approval records bind the exact proposed effect. Exact
@@ -782,6 +789,113 @@ try {
     });
     assert.ok(moved.moved > 0, "the same token scrolls once for its own delta");
     record("F12c-scroll-delta", true, "+200 token refuses -200/+3000 with zero input; own delta scrolls once");
+  }
+
+  // F13 — the token binds the observed RESOURCE state, not only the
+  // operation parameters. Observe #go with amount=10, mint, flip to 999,
+  // take a NEW observation of the same #go (same selector, role, label,
+  // frame and destination): first-use of the old token with the new
+  // target refuses at the token check before admission. Zero submit, no
+  // journal row. The approval fingerprint gate stays independent.
+  {
+    const resRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "resource task", status: "running" });
+    await browser.open("nova", `${base}/form`);
+    const flip = async () => {
+      const obs = await browser.observeScoped("nova", resRun.id, { surface: "browser-dom", sessionId: SESSION });
+      const toggle = getObservation(obs.observationId)!.targets.find((target) => target.selector === "#set-amount")!;
+      await browser.semanticAct("nova", resRun.id, { targetId: toggle.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(resRun.id, toggle.targetId, "click") });
+    };
+    // Ensure amount=10 (toggle starts at 10; a fresh page is already 10).
+    const oRes10 = await browser.observeScoped("nova", resRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const resGo10 = getObservation(oRes10.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const resToken = mutT(resRun.id, resGo10.targetId, "click");
+    await flip();
+    const oRes999 = await browser.observeScoped("nova", resRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const resGo999 = getObservation(oRes999.observationId)!.targets.find((target) => target.selector === "#go")!;
+    assert.equal(resGo999.selector, resGo10.selector, "same selector");
+    assert.equal(resGo999.role, resGo10.role, "same role");
+    assert.equal(resGo999.label, resGo10.label, "same label");
+    assert.equal(resGo999.framePath, resGo10.framePath, "same frame");
+    assert.equal(resGo999.effectiveDestination, resGo10.effectiveDestination, "same destination");
+    assert.notEqual(resGo999.reviewDigest, resGo10.reviewDigest, "different observed resource state");
+    const submitsBeforeRes = submits.length;
+    let resError: unknown = null;
+    try {
+      await browser.semanticAct("nova", resRun.id, { targetId: resGo999.targetId, sessionId: SESSION, kind: "click", mutationKey: resToken });
+    } catch (error) {
+      resError = error;
+    }
+    assert.ok(resError instanceof Error && /already bound to a different effect/.test(resError.message), `old token refuses changed resource state (got: ${(resError as Error)?.message.slice(0, 100)})`);
+    assert.equal(submits.length, submitsBeforeRes, "zero submits on resource-state mismatch");
+    assert.equal(db.journalActionFindByMutation(resToken, resRun.id, "nova").length, 0, "refused resource state leaves no journal row");
+    await flip();
+    record("F13-resource-state", true, "10-token cannot first-use 999-state target; refuses before admission");
+  }
+
+  // F13b — visual coordinates bind the exact observation identity.
+  // Mint a click token for observation A, then observe a different
+  // document with identical window geometry and attempt the same
+  // coordinates/action on B with A's token: refuses before admission
+  // with zero input. Drag-end binding is preserved (see F12b).
+  {
+    const obsRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "obs task", status: "running" });
+    await browser.open("nova", `${base}/form`);
+    const oA = await browser.observeScoped("nova", obsRun.id, { surface: "browser-visual", sessionId: SESSION });
+    const tokenObsA = await mutV(obsRun.id, oA.observationId, "click", { x: 300, y: 200 });
+    await browser.open("nova", `${base}/relabeled`);
+    const oB = await browser.observeScoped("nova", obsRun.id, { surface: "browser-visual", sessionId: SESSION });
+    const clicksBeforeObs = clicks().length;
+    const canvasBeforeObs = canvasHits().length;
+    let obsError: unknown = null;
+    try {
+      await browser.visualAct("nova", obsRun.id, {
+        observationId: oB.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: tokenObsA,
+      });
+    } catch (error) {
+      obsError = error;
+    }
+    assert.ok(obsError instanceof Error && /already bound to a different effect/.test(obsError.message), `foreign observation refuses (got: ${(obsError as Error)?.message.slice(0, 100)})`);
+    assert.equal(clicks().length, clicksBeforeObs, "zero clicks on observation mismatch");
+    assert.equal(canvasHits().length, canvasBeforeObs, "zero canvas input on observation mismatch");
+    assert.equal(db.journalActionFindByMutation(tokenObsA, obsRun.id, "nova").length, 0, "refused observation leaves no journal row");
+    record("F13b-observation-identity", true, "A-token cannot act on B; refuses before admission with zero input");
+  }
+
+  // F13c — scroll binds the exact pane, not only its label. Two panes
+  // share the label "results pane" in one frame: mint +200 for pane A,
+  // first-use it on pane B. Refuses before admission; neither pane
+  // moves. The same token still works once on pane A (delta binding
+  // preserved).
+  {
+    const paneRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "pane task", status: "running" });
+    await browser.open("nova", `${base}/form`);
+    const oPane = await browser.observeScoped("nova", paneRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const regPane = getObservation(oPane.observationId)!;
+    const paneA = regPane.panes.find((pane) => pane.selector === "#intended")!;
+    const paneB = regPane.panes.find((pane) => pane.selector === "#twin-pane")!;
+    assert.equal(paneA.label, paneB.label, "twins share their label");
+    assert.equal(paneA.framePath, paneB.framePath, "twins share their frame");
+    assert.notEqual(paneA.paneToken, paneB.paneToken, "twins differ in host identity");
+    const tokenPaneA = mutS(paneRun.id, oPane.observationId, paneA.paneToken, 200);
+    const intendedBefore = scrollTops("intended").length;
+    const twinBefore = scrollTops("twin-pane").length;
+    let paneError: unknown = null;
+    try {
+      await browser.scrollPane("nova", paneRun.id, {
+        observationId: oPane.observationId, sessionId: SESSION, paneToken: paneB.paneToken, deltaY: 200, mutationKey: tokenPaneA,
+      });
+    } catch (error) {
+      paneError = error;
+    }
+    assert.ok(paneError instanceof Error && /already bound to a different effect/.test(paneError.message), `twin pane refuses another identity (got: ${(paneError as Error)?.message.slice(0, 100)})`);
+    assert.equal(scrollTops("intended").length, intendedBefore, "pane A never moved");
+    assert.equal(scrollTops("twin-pane").length, twinBefore, "pane B never moved");
+    assert.equal(db.journalActionFindByMutation(tokenPaneA, paneRun.id, "nova").length, 0, "refused pane leaves no journal row");
+    const ownMove = await browser.scrollPane("nova", paneRun.id, {
+      observationId: oPane.observationId, sessionId: SESSION, paneToken: paneA.paneToken, deltaY: 200, mutationKey: tokenPaneA,
+    });
+    assert.ok(ownMove.moved > 0, "the same token scrolls once on its own pane");
+    record("F13c-pane-identity", true, "twin pane refuses another identity; own pane scrolls once");
   }
   await browser.open("nova", `${base}/form`);
   const scrolled = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });

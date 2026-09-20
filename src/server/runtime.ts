@@ -347,22 +347,26 @@ function sameDestination(url: string): string {
  * digest from host-resolved state before dispatch. Same inputs, same
  * bytes — a token minted for effect A can never first-use effect B.
  *
- * Each shape describes the FULL dispatched effect:
+ * Each shape describes the FULL dispatched effect, including the exact
+ * observed RESOURCE — not only operation parameters:
  * - semantic: exact host target identity (selector+frame+role+label),
+ *   the host-observed canonical review digest of that target's state,
  *   live effective destination for clicks, final value for typing;
- * - visual: resolved start AND resolved end coordinates (drag binds both);
- * - scroll: normalized (bounded) delta with the resolved pane.
+ * - visual: the exact visual-observation identity the coordinates were
+ *   grounded against, resolved start AND resolved end coordinates;
+ * - scroll: the exact pane (selector + document identity), normalized
+ *   (bounded) delta with the resolved pane.
  * Shapes are versioned by their content: changing them orphans durable
  * fence rows minted under older shapes, which then fail closed. */
-export function semanticEffectDigest(args: { kind: "click" | "type"; selector: string; frame: string; role: string; label: string; destination: string | null; value: string | null; runId: string; botId: string }): string {
+export function semanticEffectDigest(args: { kind: "click" | "type"; selector: string; frame: string; role: string; label: string; reviewDigest: string; destination: string | null; value: string | null; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: `semantic-${args.kind}`, selector: args.selector, frame: args.frame, role: args.role, label: args.label, destination: args.destination, value: args.value, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: `semantic-${args.kind}`, selector: args.selector, frame: args.frame, role: args.role, label: args.label, reviewDigest: args.reviewDigest, destination: args.destination, value: args.value, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
-export function visualEffectDigest(args: { action: string; cssX: number; cssY: number; endX: number | null; endY: number | null; key: string | null; runId: string; botId: string }): string {
+export function visualEffectDigest(args: { action: string; observationId: string; cssX: number; cssY: number; endX: number | null; endY: number | null; key: string | null; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: `visual-${args.action}`, cssX: args.cssX, cssY: args.cssY, endX: args.endX, endY: args.endY, key: args.key, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: `visual-${args.action}`, observationId: args.observationId, cssX: args.cssX, cssY: args.cssY, endX: args.endX, endY: args.endY, key: args.key, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
@@ -372,9 +376,9 @@ export function normalizeScrollDelta(deltaY: number): number {
   return Math.max(-3000, Math.min(3000, Math.round(deltaY)));
 }
 
-export function scrollEffectDigest(args: { paneLabel: string; frame: string; deltaY: number; runId: string; botId: string }): string {
+export function scrollEffectDigest(args: { paneLabel: string; frame: string; paneSelector: string; documentEpoch: string; deltaY: number; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: "scroll", paneLabel: args.paneLabel, frame: args.frame, deltaY: args.deltaY, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: "scroll", paneLabel: args.paneLabel, frame: args.frame, paneSelector: args.paneSelector, documentEpoch: args.documentEpoch, deltaY: args.deltaY, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
@@ -1798,21 +1802,22 @@ export class BrowserManager {
     if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
       throw new Error("A bounded typed value is required.");
     }
-    // Canonical effect, bound by the host AT MINT TIME. The destination
-    // below is the LIVE re-observed effective target — not the registry
-    // copy — so a retarget (path or query) between mint and dispatch
-    // refuses at the token check with no journal row. Unresolvable
+    // Canonical effect, bound by the host AT MINT TIME. The resource
+    // state below is the LIVE re-observed canonical review digest — not
+    // the registry copy — so acting on a changed control under an old
+    // token refuses at the token check with no journal row. Unresolvable
     // controls (destroyed/ambiguous/closed page) fall back to the minted
-    // destination and refuse at their dedicated gates below. Typing binds
-    // the final value instead of a destination.
+    // state and refuse at their dedicated gates below. Typing binds the
+    // final value instead of a destination.
+    const liveRow = await this.controlReviewDigest(observation.page, target.selector);
+    const liveReviewDigest = liveRow?.digest ?? target.reviewDigest;
     let liveDestination: string | null = null;
     if (input.kind === "click") {
-      liveDestination = (await this.controlReviewDigest(observation.page, target.selector))?.destination
-        ?? target.effectiveDestination;
+      liveDestination = liveRow?.destination ?? target.effectiveDestination;
     }
     const effectDigest = semanticEffectDigest({
       kind: input.kind, selector: target.selector, frame: target.framePath,
-      role: target.role, label: target.label,
+      role: target.role, label: target.label, reviewDigest: liveReviewDigest,
       destination: input.kind === "click" ? liveDestination : null,
       value: input.kind === "type" ? input.value ?? null : null, runId, botId,
     });
@@ -2073,7 +2078,7 @@ export class BrowserManager {
       botId,
       semanticEffectDigest({
         kind: input.kind, selector: target.selector, frame: target.framePath,
-        role: target.role, label: target.label,
+        role: target.role, label: target.label, reviewDigest: target.reviewDigest,
         destination: input.kind === "click" ? target.effectiveDestination : null,
         value: input.kind === "type" ? input.value ?? null : null, runId, botId,
       }),
@@ -2102,7 +2107,7 @@ export class BrowserManager {
     if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     return this.db.mintMutationToken(
       runId, botId,
-      scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, deltaY: bounded, runId, botId }),
+      scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, paneSelector: pane.selector, documentEpoch: observation.documentEpoch, deltaY: bounded, runId, botId }),
       input.approvalId ?? null,
     );
   }
@@ -2294,6 +2299,7 @@ export class BrowserManager {
       botId,
       visualEffectDigest({
         action: input.action,
+        observationId: resolved.observation.observationId,
         cssX: Math.round(resolved.cssX), cssY: Math.round(resolved.cssY),
         endX: dragEnd ? Math.round(dragEnd.cssX) : null,
         endY: dragEnd ? Math.round(dragEnd.cssY) : null,
@@ -2350,6 +2356,7 @@ export class BrowserManager {
     const dragEnd = input.action === "drag" && input.endPoint ? this.resolveDragEnd(resolved, input.endPoint) : null;
     const effectDigest = visualEffectDigest({
       action: input.action,
+      observationId: observation.observationId,
       cssX: Math.round(validated.cssX), cssY: Math.round(validated.cssY),
       endX: dragEnd ? Math.round(dragEnd.cssX) : null,
       endY: dragEnd ? Math.round(dragEnd.cssY) : null,
@@ -2502,7 +2509,7 @@ export class BrowserManager {
     if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     // Canonical scroll effect, pre-bound by the host at mint time: the
     // token below was minted for exactly this digest.
-    const effectDigest = scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, deltaY: bounded, runId, botId });
+    const effectDigest = scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, paneSelector: pane.selector, documentEpoch: observation.documentEpoch, deltaY: bounded, runId, botId });
     // Exact pre-bound match (token/run/teammate/effect). Scroll carries
     // no approval type, so approval-backed tokens never apply here.
     const mutationKey = this.requireMutationToken(input.mutationKey, {

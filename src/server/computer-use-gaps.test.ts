@@ -688,26 +688,33 @@ test("mutation tokens are pre-bound to one exact effect", () => {
 });
 
 // Trust-boundary review: canonical digests describe the FULL dispatched
-// effect — exact target identity, query-significant destination, both
-// drag endpoints, normalized scroll delta.
-test("canonical digests bind identity, query, drag end and scroll delta", () => {
-  const base = { kind: "click" as const, selector: "#go", frame: "/", role: "button", label: "Submit form", runId: "r", botId: "b" };
+// effect — exact target identity plus observed resource state,
+// query-significant destination, observation-bound coordinates with both
+// drag endpoints, pane-bound normalized scroll delta.
+test("canonical digests bind identity, resource state, query, drag end and scroll delta", () => {
+  const base = { kind: "click" as const, selector: "#go", frame: "/", role: "button", label: "Submit form", reviewDigest: "d10", runId: "r", botId: "b" };
   const a = semanticEffectDigest({ ...base, destination: "http://x/submit", value: null });
   assert.equal(semanticEffectDigest({ ...base, destination: "http://x/submit", value: null }), a, "same effect retries under the same identity");
   assert.notEqual(semanticEffectDigest({ ...base, selector: "#go2", destination: "http://x/submit", value: null }), a, "twin selector is a different effect");
+  assert.notEqual(semanticEffectDigest({ ...base, reviewDigest: "d999", destination: "http://x/submit", value: null }), a, "changed resource state is a different effect");
   assert.notEqual(semanticEffectDigest({ ...base, destination: "http://x/submit?account=A", value: null }), a, "query is a different destination");
   assert.notEqual(semanticEffectDigest({ ...base, destination: "http://x/save-b", value: null }), a, "retarget is a different effect");
   assert.notEqual(semanticEffectDigest({ ...base, kind: "type", destination: null, value: "v" }), a, "kind change is a different effect");
-  const dragAB = { action: "drag", cssX: 300, cssY: 200, endX: 350 as number | null, endY: 250 as number | null, key: null, runId: "r", botId: "b" };
+  const dragAB = { action: "drag", observationId: "obsA", cssX: 300, cssY: 200, endX: 350 as number | null, endY: 250 as number | null, key: null, runId: "r", botId: "b" };
   const d = visualEffectDigest(dragAB);
   assert.equal(visualEffectDigest(dragAB), d, "same drag retries under the same identity");
   assert.notEqual(visualEffectDigest({ ...dragAB, endX: 100, endY: 100 }), d, "A→C differs from A→B");
   assert.notEqual(visualEffectDigest({ ...dragAB, endX: null, endY: null }), d, "missing end differs from bound end");
+  assert.notEqual(visualEffectDigest({ ...dragAB, observationId: "obsB" }), d, "another observation is a different effect");
+  const clickA = { action: "click", observationId: "obsA", cssX: 300, cssY: 200, endX: null as number | null, endY: null as number | null, key: null, runId: "r", botId: "b" };
+  assert.notEqual(visualEffectDigest({ ...clickA, observationId: "obsB" }), visualEffectDigest(clickA), "same coords on another screenshot differ");
   assert.equal(normalizeScrollDelta(200), 200, "in-range deltas pass through");
   assert.equal(normalizeScrollDelta(5000), 3000, "mint and dispatch clamp identically");
   assert.equal(normalizeScrollDelta(-5000), -3000, "negative clamp is symmetric");
-  const s = scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 200, runId: "r", botId: "b" });
-  assert.equal(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 200, runId: "r", botId: "b" }), s, "same scroll retries under the same identity");
-  assert.notEqual(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: -200, runId: "r", botId: "b" }), s, "-200 differs from +200");
-  assert.notEqual(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 3000, runId: "r", botId: "b" }), s, "+3000 differs from +200");
+  const pane = { paneLabel: "results pane", frame: "/", paneSelector: "#intended", documentEpoch: "1:2:hash", runId: "r", botId: "b" };
+  const s = scrollEffectDigest({ ...pane, deltaY: 200 });
+  assert.equal(scrollEffectDigest({ ...pane, deltaY: 200 }), s, "same scroll retries under the same identity");
+  assert.notEqual(scrollEffectDigest({ ...pane, deltaY: -200 }), s, "-200 differs from +200");
+  assert.notEqual(scrollEffectDigest({ ...pane, deltaY: 3000 }), s, "+3000 differs from +200");
+  assert.notEqual(scrollEffectDigest({ ...pane, paneSelector: "#twin-pane", deltaY: 200 }), s, "twin pane is a different effect");
 });
