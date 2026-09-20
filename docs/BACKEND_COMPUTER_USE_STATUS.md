@@ -10,6 +10,9 @@
 > Round-4 final trust-boundary pass (candidate): d67343be75a38cfb1619db12790fc3ac5918a143
 > — exact destination binding, visual fail-closed, executor ownership,
 > host-issued tokens. Still draft, no merge/release.
+> Trust-boundary review pass (candidate): 68db6452bfad792bd2208739825a2ab5ae6bec1b
+> — pre-bound token effects, query-significant destinations,
+> reviewed-state binding. Still draft, no merge/release.
 > Infrastructure-only label: model-loop exposure stays unwired by design,
 > native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
 > infrastructure with fixture proof — NOT general autonomous computer use,
@@ -105,6 +108,44 @@ Evidence (executed sequentially on candidate d67343b):
 - `npm run check:release`: pass. `npm run test:desktop`: 5/5.
   `npm run test:packaging`: 13/13.
 - Protected-client diff on candidate d67343b: ZERO.
+
+## Ticket assessment (trust-boundary review pass, candidate 68db645)
+
+Narrow review-only pass — no engine redesign, no model/native/Jev/
+downloads, no paid/live spend:
+
+- Pre-bound mutation tokens: `mutation_tokens` carries `effect_digest`
+  bound AT MINT TIME (+`approval_id` for reviewed work).
+  `checkMutationToken` verifies the exact token/run/teammate/effect
+  (+approval when approval-backed); a first caller can never choose what
+  a minted token represents. Canonical digest helpers
+  (`semanticEffectDigest`, `visualEffectDigest`, `scrollEffectDigest`)
+  are frozen and shared by mint and dispatch. Host-side mint helpers
+  (`mintSemanticMutation`, `mintVisualMutation`, `mintScrollMutation`)
+  resolve opaque IDs/targets through the same host path as dispatch.
+  Journal propose-time effect check and the fence stay as defense in
+  depth (unresolved → UNCERTAIN_CONFLICT, verified → DUPLICATE).
+- Query-significant destinations: identity is origin+path+query, only
+  fragments ignored. `/transfer?account=A` no longer authorizes
+  `/transfer?account=B`.
+- Reviewed-state binding: `assertApprovalBinding` requires the approval's
+  stored `targetFingerprint` to equal the fresh host target, so
+  observed==live, approved==live and token==effect are all independently
+  required. Production click/type approvals already carry the
+  fingerprint via `describeTarget`.
+
+Evidence (executed sequentially on candidate 68db645):
+
+- `npm run check` (tsc --noEmit): clean.
+- `npm run check:acceptance`: clean.
+- `npm test`: 889 pass, 0 fail (incl. pre-binding + query + identity units).
+- `npm run test:computer-use-fixtures`: 21/21 PASS (20 preserved + F11b
+  999-review vs 10-state on old and current observations; F11 extended
+  with query refusal; F9c extended with repurposed-token refusal).
+- `npm run test:r01-http-fixtures`: 9/9 PASS.
+- `npm run check:release`: pass. `npm run test:desktop`: 5/5.
+  `npm run test:packaging`: 13/13.
+- Protected-client diff on candidate 68db645: ZERO.
 
 ## Ticket assessment (round 3: authority and recovery repair)
 
