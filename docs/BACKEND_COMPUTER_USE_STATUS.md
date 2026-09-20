@@ -1,9 +1,12 @@
 # Backend / computer-use status — Codex UI preserved
 
-> REVIEW CANDIDATE, ROUND 2 (not a release). Branch
-> backend/computer-use-gaps-20260919 awaits independent re-review against
-> review findings R1–R6. No merge, no release, no paid/live spend.
+> REVIEW CANDIDATE, ROUND 4 (not a release). Branch
+> backend/computer-use-gaps-20260919 awaits independent re-review.
+> No merge, no release, no paid/live spend.
 >
+> Round-4 candidate SHA: 1d18142895eaf10cd6464aca11c8ddad489f7eb3
+> Round-4 commit: 1d18142 Round 4: harden computer-use input and review boundaries
+> (includes prior local 532d955 final-input commit pushed together; no force-push).
 > Infrastructure-only label: model-loop exposure stays unwired by design,
 > native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
 > infrastructure with fixture proof — NOT general autonomous computer use,
@@ -13,6 +16,51 @@ Base: origin/main 4a01381c4c79320cd5674aecc8aa8f3904922b9f (fetched 2026-09-19).
 Branch: backend/computer-use-gaps-20260919 (clean worktree, owner tree untouched).
 Client contracts: Codex Electron + studio UI preserved; protected-source diff
 expected zero (src/studio/*, desktop/*, public/*, index.html, studio.html).
+Protected-client diff on candidate 1d18142: ZERO (verified
+`git diff --name-only BASE..HEAD` against origin/main 4a01381).
+
+## Ticket assessment (round 4: harden computer-use input and review boundaries)
+
+Round-4 hardens consequential input and review boundaries while preserving
+R01 admission and prior journal/observation fixes:
+
+- Final click/fill commits refuse after revocation (F10b final-phase
+  cancellation; revocation between readiness and commit → zero input).
+- Approvals bind the exact proposed effect: operation kind, target control,
+  final value and live destination, with freshness against the authorizing
+  observation (F11 approval-binding; borrowing across kind/selector/value/
+  visual refuses terminally, never silent adoption).
+- Incomplete/truncated review coverage refuses (INCOMPLETE_REVIEW):
+  field totals beyond the bounded window, truncated values, hidden fields
+  beyond the named window, or unknown destination.
+- Consequential acts require host-issued stable mutation identities
+  (Finding G1); mutation keys bind one logical effect per run/teammate
+  (effectDigest) and refuse cross-effect or cross-task reuse.
+- R01 admission order, journal uncertainty discipline, pinned pages,
+  generations and observation fixes preserved.
+- Effect-level regressions: destination change (R3), 25th-field /
+  truncated coverage (R4a/R4b), approval borrowing (F11 selector/kind/
+  value/freshness/visual), final-phase cancellation (F10b click + fill).
+
+Evidence (executed 2026-09-20 on candidate 1d18142, sequential to avoid
+resource contention):
+
+- `npm run check` (tsc --noEmit): clean.
+- `npm run check:acceptance`: clean.
+- `npm test`: 887 pass, 0 fail.
+- `npm run test:computer-use-fixtures`
+  (`scripts/run-browser-integration-fixtures.ts`): 18/18 PASS on real
+  headless system Chrome (F1, F2, F3, F4, F4b, F5, F5b, F6, F7, R3, R4,
+  F11, F8, F8b, F9a, F9b, F10, F10b-final-phase).
+- `npm run test:r01-http-fixtures`
+  (`scripts/run-r01-http-fixtures.ts`): 9/9 PASS on the real server
+  (H0–H7, H9).
+- `npm run check:release`: pass (docs match 0.37.0-beta.1).
+- `npm run test:desktop`: 5/5 pass.
+- `npm run test:packaging`: 13/13 pass.
+- Note: two earlier `npm run verify` failures in this environment were
+  local resource-contention flakes under parallel load; clean sequential
+  passes above followed on the same candidate with no code change.
 
 ## Ticket assessment (round 3: authority and recovery repair)
 
