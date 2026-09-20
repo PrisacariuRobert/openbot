@@ -13,6 +13,9 @@
 > Trust-boundary review pass (candidate): 68db6452bfad792bd2208739825a2ab5ae6bec1b
 > — pre-bound token effects, query-significant destinations,
 > reviewed-state binding. Still draft, no merge/release.
+> Full-effect digest patch (candidate): 7ab90059817ec0f054874071738da480224f4660
+> — exact target identity, drag endpoints, normalized scroll delta in
+> pre-bound digests. Still draft, no merge/release.
 > Infrastructure-only label: model-loop exposure stays unwired by design,
 > native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
 > infrastructure with fixture proof — NOT general autonomous computer use,
@@ -146,6 +149,37 @@ Evidence (executed sequentially on candidate 68db645):
 - `npm run check:release`: pass. `npm run test:desktop`: 5/5.
   `npm run test:packaging`: 13/13.
 - Protected-client diff on candidate 68db645: ZERO.
+
+## Ticket assessment (full-effect digest patch, candidate 7ab9005)
+
+Narrow patch only — digest shapes and their mint/dispatch callers; DB
+token/effect/approval matching unchanged; no model/native/Jev/
+downloads, no paid/live spend:
+
+- Semantic digest binds the exact host target identity
+  (selector+frame+role+label), the LIVE effective destination for
+  clicks (read pre-admission, so retargets refuse at the token check
+  with no row) and the final value for typing. Mint derives the same
+  fields from the observed target. R3 now refuses at the token check.
+- Visual digest binds resolved start AND resolved end; drag-end
+  validation moved pre-require and shared by mint and dispatch, so
+  A→B never authorizes A→C.
+- Scroll digest binds the normalized delta; mint takes deltaY and
+  normalizes with the same helper as dispatch, so +200 never
+  authorizes -200 or +3000.
+
+Evidence (executed sequentially on candidate 7ab9005):
+
+- `npm run check` (tsc --noEmit): clean.
+- `npm run check:acceptance`: clean.
+- `npm test`: 890 pass, 0 fail (incl. digest-shape units).
+- `npm run test:computer-use-fixtures`: 24/24 PASS (21 preserved +
+  F12 twin identity, F12b drag endpoint, F12c scroll delta; R3 at
+  token check).
+- `npm run test:r01-http-fixtures`: 9/9 PASS.
+- `npm run check:release`: pass. `npm run test:desktop`: 5/5.
+  `npm run test:packaging`: 13/13.
+- Protected-client diff on candidate 7ab9005: ZERO.
 
 ## Ticket assessment (round 3: authority and recovery repair)
 
