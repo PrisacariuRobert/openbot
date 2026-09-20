@@ -1,0 +1,817 @@
+{
+  "schema_version": 1,
+  "suite": "Q01 mechanism baseline",
+  "notes": "Deterministic mechanism fixtures. Verifier-only truth.",
+  "cases": [
+    {
+      "id": "M01A",
+      "definition": "M01-semantic-form",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1001
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M02A",
+      "definition": "M02-spa-rerender",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1002
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M03A",
+      "definition": "M03-iframe-frames",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1003
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M04A",
+      "definition": "M04-open-shadow",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1004
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M05A",
+      "definition": "M05-closed-canvas",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1005
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M06A",
+      "definition": "M06-virtual-table",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1006
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M07A",
+      "definition": "M07-nested-scroll",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1007
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M08A",
+      "definition": "M08-autocomplete",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1008
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M09A",
+      "definition": "M09-datepicker",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1009
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M10A",
+      "definition": "M10-dropdown",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1010
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M11A",
+      "definition": "M11-contenteditable",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1011
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M12A",
+      "definition": "M12-docs-canvas",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1012
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M13A",
+      "definition": "M13-drag-drop",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1013
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M14A",
+      "definition": "M14-slider",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1014
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M15A",
+      "definition": "M15-keyboard-widget",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1015
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M16A",
+      "definition": "M16-upload-chooser",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1016
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M17A",
+      "definition": "M17-download-export",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1017
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M18A",
+      "definition": "M18-pdf-viewer",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1018
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M19A",
+      "definition": "M19-popup-tab",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1019
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M20A",
+      "definition": "M20-app-window",
+      "surface": "semantic",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1020
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M21A",
+      "definition": "M21-login-handoff",
+      "surface": "visual",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1021
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M22A",
+      "definition": "M22-mfa-handoff",
+      "surface": "visual",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1022
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M23A",
+      "definition": "M23-captcha-handoff",
+      "surface": "visual",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1023
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M24A",
+      "definition": "M24-locale-labels",
+      "surface": "visual",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1024
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M25A",
+      "definition": "M25-zoom-scales",
+      "surface": "visual",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1025
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M26A",
+      "definition": "M26-slow-network",
+      "surface": "mixed",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1026
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M27A",
+      "definition": "M27-site-changed",
+      "surface": "mixed",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1027
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M28A",
+      "definition": "M28-decoy-buttons",
+      "surface": "mixed",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1028
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M29A",
+      "definition": "M29-replaced-nodes",
+      "surface": "mixed",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1029
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    },
+    {
+      "id": "M30A",
+      "definition": "M30-autosave-form",
+      "surface": "mixed",
+      "perturbation": "baseline",
+      "variants": [
+        "baseline",
+        "relabeled",
+        "reordered"
+      ],
+      "initial": {
+        "seed": 1030
+      },
+      "allowedEffects": [
+        "read"
+      ],
+      "account": "acme-test",
+      "decoys": {
+        "buttons": 2,
+        "frames": 1
+      },
+      "oracle": {
+        "completed": true,
+        "duplicateEffects": 0,
+        "wrongAccount": false
+      }
+    }
+  ]
+}

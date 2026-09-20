@@ -1,0 +1,367 @@
+{
+  "schema_version": 1,
+  "suite": "Q02 product outcome 120 slots",
+  "notes": "Normal chat tasks. 8 held-out families.",
+  "cases": [
+    {
+      "id": "P01",
+      "family": "todo-correct",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P02",
+      "family": "calendar-move",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P03",
+      "family": "email-draft",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P04",
+      "family": "doc-revise",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P05",
+      "family": "routine-edit",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P06",
+      "family": "data-export",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P07",
+      "family": "form-submit",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P08",
+      "family": "table-read",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P09",
+      "family": "upload-task",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P10",
+      "family": "download-verify",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P11",
+      "family": "popup-flow",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P12",
+      "family": "auth-handoff",
+      "heldOut": false,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P13",
+      "family": "heldout-1",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P14",
+      "family": "heldout-2",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P15",
+      "family": "heldout-3",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P16",
+      "family": "heldout-4",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P17",
+      "family": "heldout-5",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P18",
+      "family": "heldout-6",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P19",
+      "family": "heldout-7",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    },
+    {
+      "id": "P20",
+      "family": "heldout-8",
+      "heldOut": true,
+      "variants": [
+        "v1",
+        "v2",
+        "v3"
+      ],
+      "oracle": {
+        "verifiedCompletion": true,
+        "sameResource": true
+      },
+      "allowedEffects": [
+        "read",
+        "scoped-write"
+      ]
+    }
+  ]
+}

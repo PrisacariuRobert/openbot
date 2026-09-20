@@ -138,6 +138,44 @@ export type MessageSubmissionReceipt = {
   createdAt: string;
 };
 
+/** One durable action-journal row (R02). Renderer-independent companion to
+ * approved_actions: DOM, visual and native dispatches admit here first. */
+export type ActionJournalRecord = {
+  actionId: string;
+  runId: string;
+  botId: string;
+  surface: string;
+  surfaceIdentity: string;
+  ownershipEpoch: string;
+  target: string;
+  payloadDigest: string;
+  reviewDigest: string | null;
+  account: string;
+  /** Host-owned logical mutation identity (Finding A): the accountable
+   * outer layer assigns one key per unit of intended effect. The fence
+   * survives re-observation, renderer switches and restarts; distinct
+   * genuinely-new work uses distinct keys. Null when the caller declares
+   * no logical identity (legacy direct calls). */
+  mutationKey: string | null;
+  /** Canonical logical-effect digest (Finding G1): kind, target identity,
+   * final value and run/bot scope — stable across re-observation and
+   * renderer switches for the same intent, different for different work. */
+  effectDigest: string | null;
+  stage:
+    | "proposed"
+    | "validated"
+    | "awaiting_review"
+    | "admitted"
+    | "dispatch_started"
+    | "effect_observed"
+    | "verified"
+    | "failed_before_effect"
+    | "outcome_uncertain";
+  detail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** A routine mutation lost a revision race (P03b). The caller must re-list
  * and confirm against currentRevision instead of overwriting it. */
 export class RoutineRevisionConflictError extends Error {
@@ -586,6 +624,23 @@ export class OpenBotDatabase {
         finished_at TEXT,
         reviewed_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS action_journal (
+        action_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        surface TEXT NOT NULL,
+        surface_identity TEXT NOT NULL,
+        ownership_epoch TEXT NOT NULL,
+        target TEXT NOT NULL,
+        payload_digest TEXT NOT NULL,
+        review_digest TEXT,
+        account TEXT NOT NULL DEFAULT '',
+        stage TEXT NOT NULL DEFAULT 'proposed',
+        detail TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS action_journal_run_stage ON action_journal(run_id, stage);
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -1025,7 +1080,21 @@ export class OpenBotDatabase {
     this.addColumn("runs", "active_duration_ms INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_steps INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_override TEXT");
-    this.addColumn("bots", "retired_at TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.addColumn("bots", "retired_at TEXT");
+    this.addColumn("action_journal", "mutation_key TEXT");
+    this.addColumn("action_journal", "effect_digest TEXT");
+    // Final trust-boundary pass: host-issued mutation identities. Tokens
+    // are minted by the host (random, unguessable) with the canonical
+    // effect digest bound AT MINT TIME — a first caller can never choose
+    // what effect an already minted token represents. Reviewed
+    // consequential work also binds the approval. Executors verify the
+    // exact token/run/teammate/effect (+approval when approval-backed).
+    // Durable, so the fence survives restarts.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS mutation_tokens (
+      token TEXT PRIMARY KEY, run_id TEXT NOT NULL, bot_id TEXT NOT NULL,
+      effect_digest TEXT, approval_id TEXT, created_at TEXT NOT NULL
+    )`);
+    this.addColumn("mutation_tokens", "effect_digest TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -2715,6 +2784,227 @@ export class OpenBotDatabase {
     return result.changes === 1 ? this.getApprovedAction(id) : null;
   }
 
+  /** R02/R03 input-ownership epoch per teammate. Stop, takeover and
+   * sign-in handoff bump the epoch; in-flight action proposals admitted
+   * under an older epoch are refused dispatch. Stored durably so the
+   * revocation survives restarts; defaults to 0 (never revoked). */
+  botInputEpoch(botId: string): number {
+    const record = this.extensionRecord<{ epoch: number }>("input-epoch", botId);
+    return record?.epoch ?? 0;
+  }
+
+  revokeBotInput(botId: string): number {
+    const next = this.botInputEpoch(botId) + 1;
+    this.saveExtensionRecord("input-epoch", botId, { epoch: next });
+    return next;
+  }
+
+  /** R02 durable action journal (renderer-independent companion to
+   * approved_actions). Every browser/visual/native dispatch admits here
+   * first: one admitted mutation can never fork a second version through
+   * another driver, and an uncertain effect requires owner reconciliation —
+   * never readmission. Rows intentionally carry no foreign keys: the journal
+   * is the recovery record of last resort and must survive referenced-row
+   * deletion. Transitions are enforced by conditional updates (changes===1
+   * wins), so concurrent processes cannot both dispatch the same action. */
+  journalActionPropose(input: {
+    actionId: string; runId: string; botId: string; surface: string;
+    surfaceIdentity: string; ownershipEpoch: string; target: string;
+    payloadDigest: string; reviewDigest?: string | null; account?: string;
+    mutationKey?: string | null; effectDigest?: string | null;
+    detail?: string | null;
+  }): ActionJournalRecord {
+    const at = now();
+    // Finding G1: a mutation key is bound to one logical effect per
+    // run/teammate at first admission. The same key reused for a different
+    // effect — or a key owned by another run/teammate — refuses here,
+    // before any row is written. Retries of the same effect keep the same
+    // key AND the same effect digest, so they pass this check and meet the
+    // mutation fence instead.
+    if (input.mutationKey) {
+      const foreign = this.db.prepare(
+        "SELECT action_id FROM action_journal WHERE mutation_key=? AND (run_id<>? OR bot_id<>?) LIMIT 1",
+      ).get(input.mutationKey, input.runId, input.botId) as Row | undefined;
+      if (foreign) throw new Error("That mutation identity belongs to a different task or teammate.");
+      const sameScope = this.db.prepare(
+        "SELECT action_id,effect_digest FROM action_journal WHERE mutation_key=? AND run_id=? AND bot_id=?",
+      ).all(input.mutationKey, input.runId, input.botId) as Row[];
+      if (sameScope.some((row) => String(row.effect_digest ?? "") !== String(input.effectDigest ?? ""))) {
+        throw new Error("That mutation identity is already bound to a different effect. Use a new identity for new work.");
+      }
+    }
+    try {
+      this.db.prepare(`INSERT INTO action_journal
+        (action_id,run_id,bot_id,surface,surface_identity,ownership_epoch,target,payload_digest,review_digest,account,mutation_key,effect_digest,stage,detail,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        input.actionId, input.runId, input.botId, input.surface, input.surfaceIdentity,
+        input.ownershipEpoch, input.target, input.payloadDigest, input.reviewDigest ?? null,
+        input.account ?? "", input.mutationKey ?? null, input.effectDigest ?? null, "proposed", input.detail ?? null, at, at,
+      );
+      return this.journalActionGet(input.actionId)!;
+    } catch {
+      const existing = this.journalActionGet(input.actionId);
+      if (!existing) throw new Error("That action is already being processed. Check its result instead of sending it again.");
+      // Reusing an action ID with a different identity is a conflict, never
+      // a silent adoption of the new payload/bot/run.
+      const same =
+        existing.runId === input.runId &&
+        existing.botId === input.botId &&
+        existing.surface === input.surface &&
+        existing.surfaceIdentity === input.surfaceIdentity &&
+        existing.ownershipEpoch === input.ownershipEpoch &&
+        existing.target === input.target &&
+        existing.payloadDigest === input.payloadDigest &&
+        (existing.reviewDigest ?? null) === (input.reviewDigest ?? null) &&
+        (existing.account ?? "") === (input.account ?? "") &&
+        (existing.mutationKey ?? null) === (input.mutationKey ?? null) &&
+        (existing.effectDigest ?? null) === (input.effectDigest ?? null);
+      if (!same) throw new Error("That action ID is already bound to a different run, teammate, target or payload. Use a new action for new work.");
+      return existing;
+    }
+  }
+
+  journalActionGet(actionId: string): ActionJournalRecord | null {
+    const row = this.db.prepare("SELECT * FROM action_journal WHERE action_id=?").get(actionId) as Row | undefined;
+    return row ? this.journalActionFromRow(row) : null;
+  }
+
+  private journalActionFromRow(row: Row): ActionJournalRecord {
+    return {
+      actionId: String(row.action_id),
+      runId: String(row.run_id),
+      botId: String(row.bot_id),
+      surface: String(row.surface),
+      surfaceIdentity: String(row.surface_identity),
+      ownershipEpoch: String(row.ownership_epoch),
+      target: String(row.target),
+      payloadDigest: String(row.payload_digest),
+      reviewDigest: row.review_digest == null ? null : String(row.review_digest),
+      account: String(row.account ?? ""),
+      mutationKey: row.mutation_key == null ? null : String(row.mutation_key),
+      effectDigest: row.effect_digest == null ? null : String(row.effect_digest),
+      stage: String(row.stage) as ActionJournalRecord["stage"],
+      detail: row.detail == null ? null : String(row.detail),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+    };
+  }
+
+  /** Admit exactly once from a pre-dispatch stage. Refuses verified,
+   * failed, already-admitted/in-flight and uncertain actions: uncertainty
+   * requires reconciliation, never readmission through another driver. */
+  journalActionAdmit(actionId: string): boolean {
+    const result = this.db.prepare(
+      "UPDATE action_journal SET stage='admitted',updated_at=? WHERE action_id=? AND stage IN ('proposed','validated','awaiting_review')",
+    ).run(now(), actionId);
+    return result.changes === 1;
+  }
+
+  /** Enforced stage machine. outcome_uncertain is terminal here: leaving it
+   * requires journalActionReconcile with owner-checked evidence. */
+  journalActionTransition(actionId: string, stage: ActionJournalRecord["stage"], detail: string | null = null): ActionJournalRecord | null {
+    const allowed: Record<ActionJournalRecord["stage"], ActionJournalRecord["stage"][]> = {
+      proposed: ["validated", "failed_before_effect"],
+      validated: ["awaiting_review", "admitted", "failed_before_effect"],
+      awaiting_review: ["admitted", "failed_before_effect"],
+      admitted: ["dispatch_started", "failed_before_effect"],
+      dispatch_started: ["effect_observed", "failed_before_effect", "outcome_uncertain"],
+      effect_observed: ["verified", "failed_before_effect", "outcome_uncertain"],
+      verified: [],
+      failed_before_effect: [],
+      outcome_uncertain: [],
+    };
+    const current = this.journalActionGet(actionId);
+    if (!current || !allowed[current.stage].includes(stage)) return null;
+    this.db.prepare("UPDATE action_journal SET stage=?,detail=COALESCE(?,detail),updated_at=? WHERE action_id=? AND stage=?")
+      .run(stage, detail, now(), actionId, current.stage);
+    return this.journalActionGet(actionId);
+  }
+
+  /** Owner reconciliation of an uncertain effect after an allowed read-back.
+   * Never returns the action to an admittable stage: a confirmed effect is
+   * verified without re-dispatch; a confirmed miss is failed and any still-
+   * needed work requires a new action with a new identity. */
+  journalActionReconcile(actionId: string, outcome: "verified" | "failed_before_effect", evidence: string): ActionJournalRecord | null {
+    const result = this.db.prepare(
+      "UPDATE action_journal SET stage=?,detail=?,updated_at=? WHERE action_id=? AND stage='outcome_uncertain'",
+    ).run(outcome, evidence.slice(0, 1_000), now(), actionId);
+    return result.changes === 1 ? this.journalActionGet(actionId) : null;
+  }
+
+  listUncertainJournalActions(): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE stage='outcome_uncertain' OR stage='dispatch_started' OR stage='effect_observed' ORDER BY updated_at ASC").all() as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
+  /** Finding A: every journal row carrying one logical mutation identity,
+   * for one run and teammate. The mutation fence consults these across
+   * observation IDs, renderers, attempts and restarts. */
+  journalActionFindByMutation(mutationKey: string, runId: string, botId: string): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE mutation_key=? AND run_id=? AND bot_id=? ORDER BY created_at ASC").all(mutationKey, runId, botId) as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
+  /** Host-issued mutation identity. The host mints an opaque random token
+   * with the canonical effect digest bound AT MINT TIME (plus the approval
+   * for reviewed consequential work). Executors verify the exact
+   * token/run/teammate/effect — and the approval when approval-backed — so
+   * a caller can neither invent an ID nor repurpose a minted one for a
+   * different effect to dodge the fence. Model-loop exposure must mint at
+   * review time and hand the model only the opaque ID. */
+  mintMutationToken(runId: string, botId: string, effectDigest: string, approvalId?: string | null): string {
+    const run = this.getRun(runId);
+    if (!run || run.botId !== botId) throw new Error("Mutation identities are minted per task and teammate.");
+    if (!effectDigest || effectDigest.length !== 64) throw new Error("Mutation identities are minted for one exact effect.");
+    if (approvalId != null) {
+      const approval = this.getApproval(approvalId);
+      if (!approval || approval.runId !== runId || approval.botId !== botId) throw new Error("Mutation identities bind approvals of the same task and teammate.");
+    }
+    const token = `mut_${randomBytes(16).toString("hex")}`;
+    this.db.prepare("INSERT INTO mutation_tokens (token,run_id,bot_id,effect_digest,approval_id,created_at) VALUES (?,?,?,?,?,?)")
+      .run(token, runId, botId, effectDigest, approvalId ?? null, now());
+    return token;
+  }
+
+  /** Exact-match verification for a minted token: token, run, teammate,
+   * pre-bound effect, and approval when approval-backed must ALL match.
+   * Anything else — unknown token, foreign run/teammate, repurposed
+   * effect, wrong approval, or a legacy row without a bound effect —
+   * refuses. Fail-closed, no row is written here. */
+  checkMutationToken(token: string, runId: string, botId: string, effectDigest: string, approvalId?: string | null): void {
+    const row = this.db.prepare("SELECT token,run_id,bot_id,effect_digest,approval_id FROM mutation_tokens WHERE token=?").get(token) as Row | undefined;
+    if (!row) throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
+    if (String(row.run_id) !== runId || String(row.bot_id) !== botId) {
+      throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
+    }
+    if (row.effect_digest == null || String(row.effect_digest) !== effectDigest) {
+      if (row.effect_digest == null) throw new Error("That mutation identity predates effect binding. Mint a new identity for new work.");
+      throw new Error("That mutation identity is already bound to a different effect. Use a new identity for new work.");
+    }
+    const boundApproval = row.approval_id == null ? null : String(row.approval_id);
+    if (boundApproval !== null && (approvalId ?? null) !== boundApproval) {
+      throw new Error("That mutation identity is bound to a different approval. Use the reviewed identity for reviewed work.");
+    }
+  }
+
+  /** True only for a host-minted token bound to this run/teammate. */
+  hasMutationToken(token: string, runId: string, botId: string): boolean {
+    const row = this.db.prepare("SELECT token FROM mutation_tokens WHERE token=? AND run_id=? AND bot_id=?").get(token, runId, botId) as Row | undefined;
+    return Boolean(row);
+  }
+
+  /** Startup recovery mirroring recoverInterruptedApprovedActions: anything
+   * that may have dispatched but never observed an outcome becomes
+   * uncertain. It will not be repeated until the owner reconciles it. */
+  recoverInterruptedJournalActions(): ActionJournalRecord[] {
+    const rows = this.db.prepare("SELECT * FROM action_journal WHERE stage IN ('dispatch_started','effect_observed') ORDER BY updated_at ASC").all() as Row[];
+    if (!rows.length) return [];
+    const at = now();
+    this.db.prepare("UPDATE action_journal SET stage='outcome_uncertain',detail=?,updated_at=? WHERE stage IN ('dispatch_started','effect_observed')")
+      .run("OpenBot restarted while the action may have taken effect. It will not be repeated until you confirm what happened.", at);
+    return rows.map((row) => this.journalActionGet(String(row.action_id))!).filter(Boolean);
+  }
+
   listApprovals(): Approval[] {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.status='pending' ORDER BY a.created_at ASC").all() as Row[]).map((row) => this.approvalFromRow(row));
   }
@@ -3476,15 +3766,67 @@ export class OpenBotDatabase {
 
   /** Bounded retention: keep the most recent receipts so transport retries
    * inside the retry window replay instead of duplicating. Oldest rows fall
-   * off; an intentionally repeated task must use a new requestId. */
+   * off; an intentionally repeated task must use a new requestId.
+   * R01 fail-closed: tombstone retention and receipt deletion commit
+   * atomically. If any replacement tombstone cannot be persisted, the whole
+   * prune aborts and the original receipts are retained — a failed
+   * compaction never discards the durable record it was meant to replace. */
   pruneMessageSubmissions(limit = 1000): number {
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM message_submissions").get() as Row;
     const over = Number(row?.count ?? 0) - Math.max(1, limit);
     if (over <= 0) return 0;
-    this.db.prepare(`DELETE FROM message_submissions WHERE request_id IN (
-      SELECT request_id FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?
-    )`).run(over);
+    const evicted = this.db.prepare(`SELECT request_id,thread_id,payload_digest,created_at FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?`).all(over) as Row[];
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const evictedRow of evicted) {
+        this.saveExtensionRecord("message-submission-tombstone", String(evictedRow.request_id), {
+          requestId: String(evictedRow.request_id),
+          threadId: String(evictedRow.thread_id),
+          payloadDigest: String(evictedRow.payload_digest),
+          createdAt: String(evictedRow.created_at),
+          reason: "pruned",
+        });
+      }
+      this.db.prepare(`DELETE FROM message_submissions WHERE request_id IN (
+        SELECT request_id FROM message_submissions ORDER BY created_at ASC,rowid ASC LIMIT ?
+      )`).run(over);
+      this.db.exec("COMMIT");
+    } catch {
+      try { this.db.exec("ROLLBACK"); } catch { /* already rolled back */ }
+      return 0;
+    }
     return over;
+  }
+
+  /** R01: startup repair for pending submission intents with no receipt.
+   * Converts orphans to tombstones (uncertain, never auto-retried) and
+   * returns the count repaired. Fail-closed: a pending marker is cleared
+   * only after its replacement tombstone is durably stored. If the
+   * tombstone write fails, the marker is kept for the next startup — an
+   * unresolved earlier outcome stays unresolved and recoverable instead of
+   * being silently forgotten. */
+  repairPendingSubmissionIntents(): number {
+    let repaired = 0;
+    for (const { id, value } of this.extensionRecords<{ requestId: string; threadId: string; payloadDigest: string }>("message-submission-pending")) {
+      if (this.getMessageSubmission(id)) {
+        this.deleteExtensionRecord("message-submission-pending", id);
+        continue;
+      }
+      try {
+        this.saveExtensionRecord("message-submission-tombstone", id, {
+          requestId: String(value.requestId ?? id),
+          threadId: String(value.threadId ?? ""),
+          payloadDigest: String(value.payloadDigest ?? ""),
+          createdAt: now(),
+          reason: "orphan-repaired",
+        });
+      } catch {
+        continue;
+      }
+      this.deleteExtensionRecord("message-submission-pending", id);
+      repaired += 1;
+    }
+    return repaired;
   }
 
   /** Scoped external-object identity (P04a). One row per connector resource
