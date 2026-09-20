@@ -4,6 +4,13 @@ export const browserControlReviewSchema = z.object({
   url: z.string().max(2048).url().refine(value => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }),
   label: z.string().trim().min(1).max(240),
   control: z.string().min(1).max(80),
+  /** Host-observed effective action destination (form action with
+   * submitter overrides, anchor href, else document URL). Approvals for
+   * consequential clicks must carry the reviewed destination; the executor
+   * requires equality with the live destination and fails closed when it
+   * is missing. Optional so older approvals parse — they then refuse at
+   * the destination gate instead of authorizing a new destination. */
+  destination: z.string().max(2048).url().refine(value => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }).optional(),
   fields: z.array(z.object({ label: z.string().min(1).max(200), value: z.string().max(2000) }).strict()).max(24),
   /** Bounds which visible fields the host included. Navigation intentionally
    * excludes unrelated page editors; the approval copy states that limit. */

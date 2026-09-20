@@ -337,12 +337,25 @@ function sameOriginPath(url: string): string {
   }
 }
 
-/** Pure approval-to-effect matcher (unit-testable): the stored action's
- * operation kind, target, final value and destination must match the
- * proposal. A visual proposal needs an explicit visual approval record —
- * borrowing any browser_click/type record refuses. */
+/** Pure approval-to-effect matcher (unit-testable).
+ *
+ * Observation integrity (review-digest equality) proves the form is still
+ * submitting where it was observed. This matcher proves the SEPARATE
+ * property: the human actually reviewed and approved that destination.
+ * The two must never be confused — a fresh digest never substitutes for
+ * owner authorization.
+ *
+ * - click (consequential submit/navigation): the stored approval must name
+ *   the reviewed effective destination, and it must equal the live
+ *   effective destination. A missing reviewed destination fails closed.
+ * - type (field fill): operation kind, target and final value must match;
+ *   destination is compared when both sides know it.
+ * - visual: there is no production reviewed visual-action contract yet, so
+ *   every supplied approval refuses until the exact visual review identity
+ *   exists. Callers must not pretend an unrelated record authorizes input.
+ */
 export function approvalAuthorizesEffect(
-  action: { type?: unknown; args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown } } } | null,
+  action: { type?: unknown; args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown; destination?: unknown } } } | null,
   proposed: {
     kind: "click" | "type" | "visual";
     selector: string | null;
@@ -350,14 +363,10 @@ export function approvalAuthorizesEffect(
     destination: string | null;
   },
 ): { ok: true } | { ok: false; reason: string } {
-  const storedType = typeof action?.type === "string" ? action.type : null;
   if (proposed.kind === "visual") {
-    const visualArgs = action?.args as { kind?: unknown } | undefined;
-    if (storedType !== "browser_visual" || visualArgs?.kind !== "visual-click") {
-      return { ok: false, reason: "That approval does not authorize a visual action. Request a review for the visual effect itself." };
-    }
-    return { ok: true };
+    return { ok: false, reason: "That approval does not authorize a visual action. Visual approvals are not issued yet — request a review through a supported action." };
   }
+  const storedType = typeof action?.type === "string" ? action.type : null;
   const compatible = proposed.kind === "click" ? storedType === "browser_click" : storedType === "browser_type";
   if (!compatible) {
     return { ok: false, reason: "That approval authorizes a different operation kind. Request a new review." };
@@ -373,8 +382,24 @@ export function approvalAuthorizesEffect(
   if (proposed.value !== null && approvedValue !== proposed.value) {
     return { ok: false, reason: "That approval carries a different reviewed value. Request a new review." };
   }
-  const approvedUrl = action?.args?.targetReview && typeof action.args.targetReview.url === "string" ? action.args.targetReview.url : null;
-  if (proposed.destination && approvedUrl && sameOriginPath(approvedUrl) !== sameOriginPath(proposed.destination)) {
+  const review = action?.args?.targetReview as { url?: unknown; destination?: unknown } | undefined;
+  const approvedDestination = review && typeof review.destination === "string" ? review.destination : null;
+  if (proposed.kind === "click") {
+    // Consequential clicks bind the reviewed EFFECTIVE destination, not the
+    // page URL: an approval for /save-a can never authorize /save-b even
+    // when page URL, selector, label and other state are unchanged.
+    if (!approvedDestination) {
+      return { ok: false, reason: "That approval does not name a reviewed destination. Request a new review for the exact submission target." };
+    }
+    if (!proposed.destination) {
+      return { ok: false, reason: "The live destination is unknown. Observe again before acting." };
+    }
+    if (sameOriginPath(approvedDestination) !== sameOriginPath(proposed.destination)) {
+      return { ok: false, reason: "That approval names a different destination. Request a new review." };
+    }
+    return { ok: true };
+  }
+  if (proposed.destination && approvedDestination && sameOriginPath(approvedDestination) !== sameOriginPath(proposed.destination)) {
     return { ok: false, reason: "That approval names a different destination. Request a new review." };
   }
   return { ok: true };
@@ -1041,6 +1066,24 @@ export class BrowserManager {
       const contextScope = form ? "form" as const : dialog ? "dialog" as const : navigation ? "navigation" as const : "page" as const;
       const controls = [...scope.querySelectorAll<HTMLElement>('input:not([type="hidden"]),textarea,select,[contenteditable="true"]')].filter(el => el.getClientRects().length > 0);
       let complete = controls.length <= 24;
+      // Effective action destination, same rule as the observation review
+      // routine: submitter formaction wins over the form action; anchors use
+      // href; otherwise the document URL. Approval binding compares this
+      // reviewed destination against the live one — never the bare page URL.
+      let rawDestination = location.href;
+      if (node instanceof HTMLAnchorElement) rawDestination = (node as HTMLAnchorElement).href;
+      else {
+        const formAction = (node as HTMLElement).getAttribute("formaction");
+        if (formAction) rawDestination = formAction;
+        else if (form) rawDestination = (form as HTMLFormElement).action || location.href;
+      }
+      let destination = "";
+      try {
+        destination = new URL(rawDestination, location.href).href;
+      } catch {
+        destination = "";
+      }
+      if (!destination) complete = false;
       const fields = controls.slice(0, 24).map((el, index) => {
         const associatedLabel = [...((el as HTMLInputElement).labels || [])].map(item => {
           const clone = item.cloneNode(true) as Element;
@@ -1061,7 +1104,7 @@ export class BrowserManager {
         formMethod: form?.method.toLowerCase() || "",
         searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
         stateful,
-        review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), fields, contextScope, disclosure, complete },
+        review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), destination: destination || location.href, fields, contextScope, disclosure, complete },
       };
     }, undefined, { timeout: 12_000 });
     this.assertPageAccess(botId, page);
@@ -1187,6 +1230,10 @@ export class BrowserManager {
     if (!(await locator.isEditable().catch(() => false))) {
       throw new Error("The field stopped being editable before typing. Observe again.");
     }
+    // The editability check above awaits; a revocation landing inside that
+    // await must not allow the first keystroke. Re-check synchronously
+    // immediately before typing.
+    this.assertNotRevoked(botId, runId, admittedEpoch);
     // Keystroke insertion performs no readiness waits: revocation is
     // checked before the first keystroke, and ownership afterwards.
     await page.keyboard.type(value, { delay: 0 });
@@ -1385,6 +1432,7 @@ export class BrowserManager {
         fingerprint,
         reviewDigest: control.reviewDigest,
         reviewComplete: control.reviewComplete,
+        effectiveDestination: control.effectiveDestination,
       };
     });
     const panes: RegistryPane[] = (await this.queryScrollableRegions(page)).map((pane, index) => ({
@@ -1467,9 +1515,9 @@ export class BrowserManager {
    * executor re-runs the SAME routine for the acted-upon selector and
    * requires byte equality: a changed form value, destination or attribute
    * changes the digest and forces a new review instead of dispatch. */
-  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean }>> {
+  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean; effectiveDestination: string }>> {
     return page.locator("body").evaluate(async (body, selectorArg) => {
-      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean }> = [];
+      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean; effectiveDestination: string }> = [];
       let candidates: Element[] = [];
       if (selectorArg) {
         const single = body.querySelectorAll(selectorArg);
@@ -1568,6 +1616,7 @@ export class BrowserManager {
           framePath: "/",
           reviewDigest,
           reviewComplete: complete,
+          effectiveDestination: destination,
         });
         if (out.length >= 150) break;
       }
@@ -1576,14 +1625,15 @@ export class BrowserManager {
   }
 
   /** Re-run the observation-time review routine for one selector and return
-   * its canonical digest. Same routine, same bytes: equality with the
-   * stored digest means the bounded target/form/destination state is
-   * unchanged since review. Null when the selector no longer resolves
-   * uniquely (destroyed or ambiguous — both refuse). */
-  private async controlReviewDigest(page: Page, selector: string): Promise<{ digest: string; complete: boolean } | null> {
+   * its canonical digest plus the live effective destination. Same routine,
+   * same bytes: equality with the stored digest means the bounded
+   * target/form/destination state is unchanged since review. Null when the
+   * selector no longer resolves uniquely (destroyed or ambiguous — both
+   * refuse). */
+  private async controlReviewDigest(page: Page, selector: string): Promise<{ digest: string; complete: boolean; destination: string } | null> {
     try {
       const rows = await this.queryControls(page, selector);
-      return rows.length === 1 ? { digest: rows[0]!.reviewDigest, complete: rows[0]!.reviewComplete } : null;
+      return rows.length === 1 ? { digest: rows[0]!.reviewDigest, complete: rows[0]!.reviewComplete, destination: rows[0]!.effectiveDestination } : null;
     } catch {
       return null;
     }
@@ -1689,10 +1739,9 @@ export class BrowserManager {
     if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
       throw new Error("A bounded typed value is required.");
     }
-    // Finding G1: consequential dispatch requires the caller's stable
-    // mutation identity; the fence below enforces it across observations,
-    // renderers and restarts.
-    const mutationKey = this.requireMutationKey(input.mutationKey);
+    // Host-issued mutation identity; the fence below enforces it across
+    // observations, renderers and restarts.
+    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
     // Eligibility before admission: refusals leave no journal row behind.
     // (Explicit approvals validate after admission against the pinned live
     // page, with terminal transitions on refusal — see below.)
@@ -1754,9 +1803,11 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "incomplete review coverage");
       throw new Error("INCOMPLETE_REVIEW: the review did not cover every relevant field. Narrow the scope and observe again.");
     }
-    // Round-4 I3: an explicitly supplied approval must authorize THIS
-    // proposed effect — operation kind, target, final value and live
-    // destination against the stored host review. Refusals are terminal
+    // Round-4 I3 + final pass: an explicitly supplied approval must
+    // authorize THIS proposed effect — operation kind, target, final value
+    // and the LIVE effective destination against the stored host review.
+    // The destination compared here is the re-observed effective
+    // submission target, never the bare page URL. Refusals are terminal
     // (failed_before_effect), never silent adoption.
     if (input.approvalId) {
       try {
@@ -1765,7 +1816,7 @@ export class BrowserManager {
           kind: input.kind,
           selector: target.selector,
           value: input.kind === "type" ? input.value ?? null : null,
-          destination: page.url(),
+          destination: liveDigest.destination,
           observedAt: observation.capturedAt,
         });
       } catch (error) {
@@ -1827,7 +1878,7 @@ export class BrowserManager {
     }
     const action = this.db.getApprovalAction(approvalId) as {
       type?: unknown;
-      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown } };
+      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown; destination?: unknown } };
     } | null;
     const matched = approvalAuthorizesEffect(action, {
       kind: proposed.kind,
@@ -1908,23 +1959,28 @@ export class BrowserManager {
     return this.db.botInputEpoch(input.botId);
   }
 
-  /** Finding G1: consequential dispatch requires a stable mutation
-   * identity. The key is assigned per unit of intended effect by the
-   * accountable outer layer (a future approval flow will mint and bind
-   * these at review time); omitting it refuses. Read-only observation
-   * stays on the separate observe path, which never dispatches input. */
-  private requireMutationKey(mutationKey: string | null | undefined): string {
-    if (!mutationKey || mutationKey.length < 8 || mutationKey.length > 128) {
-      throw new Error("A stable mutation identity is required for consequential input. Observe again through an authorized task.");
+  /** Host-issued mutation identity gate. The token must be minted by the
+   * host for this run/teammate (see mintMutationToken) — a caller-supplied
+   * string, however well-formed, is refused. The journal's effect binding
+   * then refuses cross-effect reuse, and the fence refuses unresolved or
+   * completed repeats. Read-only observation stays on the separate observe
+   * path, which never dispatches input. Model-loop exposure must mint at
+   * review time and hand the model only the opaque ID. */
+  private requireMutationKey(mutationKey: string | null | undefined, runId: string, botId: string): string {
+    if (!mutationKey || typeof mutationKey !== "string" || !mutationKey.startsWith("mut_") || mutationKey.length < 12 || mutationKey.length > 128) {
+      throw new Error("A host-issued mutation identity is required for consequential input. The host mints it at review time.");
+    }
+    if (!this.db.hasMutationToken(mutationKey, runId, botId)) {
+      throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
     }
     return mutationKey;
   }
 
-  /** Finding A: refuse when the same logical mutation is already unresolved
+  /** Refuse when the same logical mutation is already unresolved
    * (or already completed) under any observation, renderer or attempt. The
-   * mutation key is assigned by the accountable outer layer per unit of
-   * intended effect; distinct genuinely-new work uses distinct keys, so the
-   * fence never bans unrelated actions. */
+   * mutation token is minted by the host per unit of intended effect;
+   * distinct genuinely-new work uses distinct tokens, so the fence never
+   * bans unrelated actions. */
   private assertMutationFence(mutationKey: string, runId: string, botId: string, actionId: string): void {
     const clashes = this.db.journalActionFindByMutation(mutationKey, runId, botId).filter((row) => row.actionId !== actionId);
     const unresolved = clashes.filter((row) => row.stage !== "verified" && row.stage !== "failed_before_effect");
@@ -1973,6 +2029,7 @@ export class BrowserManager {
       key?: string;
       approvalId?: string | null;
       mutationKey?: string | null;
+      __testBarrier?: { beforeCommit?: () => Promise<void>; afterDispatch?: () => Promise<void> };
     },
   ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
     const capability = this.visualCapabilityForAdapter(input.adapterId);
@@ -1983,9 +2040,8 @@ export class BrowserManager {
     if (capability !== "visual-supported") {
       throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
     }
-    // Finding G1: consequential dispatch requires the caller's stable
-    // mutation identity (see semanticAct).
-    const mutationKey = this.requireMutationKey(input.mutationKey);
+    // Host-issued mutation identity (see semanticAct).
+    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
     // Eligibility before admission: refusals leave no journal row behind.
     // (Explicit approvals validate after admission against the pinned live
     // page, with terminal transitions on refusal — see below.)
@@ -2071,25 +2127,20 @@ export class BrowserManager {
     });
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
-    // Round-4 I3: a supplied approval must authorize THIS visual effect.
-    // No production visual approval type exists today, so any supplied
-    // record refuses here until a reviewed visual identity lands in the
-    // approval contracts. Terminal, never silent adoption.
+    // No production reviewed visual-action contract exists yet: ANY
+    // supplied approvalId fails closed here, even a browser_visual record.
+    // Visual input stays usable only through its currently authorized
+    // internal path (host-observed, host-grounded, mutation-fenced) without
+    // pretending an unrelated approval authorizes it. Terminal, never
+    // silent adoption.
     if (input.approvalId) {
-      try {
-        this.assertApprovalBinding(input.approvalId, {
-          runId, botId,
-          kind: "visual",
-          selector: null,
-          value: input.key ?? null,
-          destination: page.url(),
-          observedAt: observation.capturedAt,
-        });
-      } catch (error) {
-        journalTransition(this.db, actionId, "failed_before_effect", "approval does not authorize this visual action");
-        throw error;
-      }
+      journalTransition(this.db, actionId, "failed_before_effect", "visual approvals are not issued yet");
+      throw new Error("That approval does not authorize a visual action. Visual approvals are not issued yet — request a review through a supported action.");
     }
+    // Test-only barrier: lets a fixture deterministically interleave
+    // revocation between readiness and commit. Never passed by production
+    // callers.
+    if (input.__testBarrier?.beforeCommit) await input.__testBarrier.beforeCommit();
     if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
       journalTransition(this.db, actionId, "failed_before_effect", "input lease held by another task");
       throw new Error("Another task holds the input lease. Wait for it to finish.");
@@ -2105,13 +2156,19 @@ export class BrowserManager {
         throw new Error(`${error instanceof Error ? error.message : String(error)} (before ${phase})`);
       }
     };
+    // Once any input primitive has been issued, a later revocation races
+    // an effect that may already have occurred: uncertain, never a clean
+    // retry. Before the first primitive, refusals prove zero input.
+    let crossed = false;
     try {
       if (input.action === "click") {
         checkPhase("click");
         await page.mouse.click(validated.cssX, validated.cssY);
+        crossed = true;
       } else if (input.action === "double-click") {
         checkPhase("double-click");
         await page.mouse.dblclick(validated.cssX, validated.cssY);
+        crossed = true;
       } else if (input.action === "drag" && input.endPoint) {
         const end = validateVisualAction(
           {
@@ -2125,6 +2182,7 @@ export class BrowserManager {
         checkPhase("drag-press");
         await page.mouse.move(validated.cssX, validated.cssY);
         await page.mouse.down();
+        crossed = true;
         try {
           checkPhase("drag-move");
           await page.mouse.move(end.cssX, end.cssY, { steps: 12 });
@@ -2135,9 +2193,11 @@ export class BrowserManager {
         checkPhase("scroll");
         await page.mouse.move(validated.cssX, validated.cssY);
         await page.mouse.wheel(0, 400);
+        crossed = true;
       } else if (input.action === "key" && input.key) {
         checkPhase("focus-click");
         await page.mouse.click(validated.cssX, validated.cssY);
+        crossed = true;
         checkPhase("key-press");
         await page.keyboard.press(input.key);
       } else {
@@ -2145,13 +2205,32 @@ export class BrowserManager {
       }
       await page.waitForTimeout(180);
       this.assertPageAccess(botId, page);
+      // Test-only barrier: lets a fixture deterministically interleave
+      // revocation after input crossed the dispatch boundary. Never passed
+      // by production callers.
+      if (input.__testBarrier?.afterDispatch) await input.__testBarrier.afterDispatch();
+      // Post-dispatch ownership (same rule as semantic commit): input may
+      // already have taken effect, so a changed epoch is uncertainty that
+      // reconciles through readback — never ordinary success.
+      try {
+        this.assertStillOwned(botId, runId, admittedEpoch);
+      } catch (ownershipError) {
+        throw new Error(`Ownership changed during input (${ownershipError instanceof Error ? ownershipError.message : String(ownershipError)}). The effect may have occurred — verify before retrying.`);
+      }
       journalTransition(this.db, actionId, "effect_observed");
       releaseDesktopLease(runId);
       return { url: page.url(), title: await page.title(), cssX: validated.cssX, cssY: validated.cssY };
     } catch (error) {
       await page.mouse.up().catch(() => undefined);
       releaseDesktopLease(runId);
-      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      // Before the first input primitive nothing was sent (phase guards
+      // refuse first; drag validation and argument checks run before any
+      // input): retryable. At or after the boundary the effect may be
+      // partial: uncertain and reconciled through readback.
+      const nothingSent = !crossed &&
+        !/Ownership changed during input/i.test(message);
+      journalTransition(this.db, actionId, nothingSent ? "failed_before_effect" : "outcome_uncertain", message);
       throw error;
     }
   }
@@ -2165,7 +2244,7 @@ export class BrowserManager {
   async scrollPane(
     botId: string,
     runId: string,
-    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number; approvalId?: string | null; mutationKey?: string | null },
+    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number; approvalId?: string | null; mutationKey?: string | null; __testBarrier?: { beforeCommit?: () => Promise<void>; afterDispatch?: () => Promise<void> } },
   ): Promise<{ url: string; title: string; moved: number; beforeTop: number; afterTop: number }> {
     const observation = getObservation(input.observationId);
     if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
@@ -2173,9 +2252,9 @@ export class BrowserManager {
     }
     const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
-    // Finding G1: scroll dispatches input, so it carries a mutation
+    // Scroll dispatches input, so it carries a host-issued mutation
     // identity like every other executor call.
-    const mutationKey = this.requireMutationKey(input.mutationKey);
+    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
     // Eligibility before admission: refusals leave no journal row behind.
     // (Explicit approvals validate after admission against the pinned live
     // page, with terminal transitions on refusal — see below.)
@@ -2214,7 +2293,14 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "no scroll approval type exists");
       throw new Error("That approval does not authorize scrolling. Request a review through a supported action.");
     }
+    // Test-only barrier: lets a fixture deterministically interleave
+    // revocation between readiness and commit. Never passed by production
+    // callers.
+    if (input.__testBarrier?.beforeCommit) await input.__testBarrier.beforeCommit();
     journalTransition(this.db, actionId, "dispatch_started");
+    // Once the scroll is issued, a later revocation races an effect that
+    // may already have occurred: uncertain, never a clean retry.
+    let crossed = false;
     try {
       // Unique resolution: an ambiguous or vanished pane refuses instead
       // of scrolling an arbitrary first match.
@@ -2235,13 +2321,28 @@ export class BrowserManager {
         if (html.tagName === "HTML") document.documentElement.scrollBy(0, dy);
         else html.scrollBy(0, dy);
       }, bounded);
+      crossed = true;
       await page.waitForTimeout(140);
       const afterTop = await readTop();
       this.assertPageAccess(botId, page);
+      // Test-only barrier: lets a fixture deterministically interleave
+      // revocation after input crossed the dispatch boundary. Never passed
+      // by production callers.
+      if (input.__testBarrier?.afterDispatch) await input.__testBarrier.afterDispatch();
+      // Post-dispatch ownership (same rule as semantic commit): the scroll
+      // may already have taken effect, so a changed epoch is uncertainty
+      // that reconciles through readback — never ordinary success.
+      try {
+        this.assertStillOwned(botId, runId, admittedEpoch);
+      } catch (ownershipError) {
+        throw new Error(`Ownership changed during input (${ownershipError instanceof Error ? ownershipError.message : String(ownershipError)}). The effect may have occurred — verify before retrying.`);
+      }
       journalTransition(this.db, actionId, "effect_observed");
       return { url: page.url(), title: await page.title(), moved: afterTop - beforeTop, beforeTop, afterTop };
     } catch (error) {
-      journalTransition(this.db, actionId, "outcome_uncertain", error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      const nothingSent = !crossed && !/Ownership changed during input/i.test(message);
+      journalTransition(this.db, actionId, nothingSent ? "failed_before_effect" : "outcome_uncertain", message);
       throw error;
     }
   }

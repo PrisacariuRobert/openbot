@@ -41,6 +41,11 @@ export type RegistryTarget = {
    * every relevant field, values untruncated, destination known). An
    * incomplete review can never authorize a consequential dispatch. */
   reviewComplete: boolean;
+  /** Host-observed effective action destination for this target
+   * (submitter formaction > form action > anchor href > document URL,
+   * resolved absolute). Approval binding compares the reviewed
+   * destination against the live destination — never the bare page URL. */
+  effectiveDestination: string;
 };
 
 export type RegistryPane = {

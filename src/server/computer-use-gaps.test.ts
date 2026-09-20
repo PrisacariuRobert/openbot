@@ -52,6 +52,7 @@ import { verifyOutcome, reviewBindingValid } from "./outcome-verification.js";
 import { adapterParityPass, capabilityForAdapter, mediatedToolAllowed, runtimeVersionAccepted } from "./adapter-parity.js";
 import { jevAllowed, jevSurfaceCovered, jevPromotable } from "./jev-experiment.js";
 import { OpenBotDatabase } from "./testing/database.js";
+import { approvalAuthorizesEffect } from "./runtime.js";
 
 // R01: tombstone + replay disclosure + orphan repair
 test("R01 tombstone retry never silently recreates work", () => {
@@ -575,4 +576,74 @@ test("Q01/Q02/Q03 fixture catalogues have required sizes", () => {
   assert.equal(prod.cases.filter((c) => c.heldOut).length, 8, "8 held-out families");
   assert.equal(faults.cases.length, 36, "36 fault cases");
   assert.equal(20 * 3 * 2, 120, "120 execution slots");
+});
+
+// Final trust-boundary pass: approval binds the REVIEWED effective
+// destination (never the page URL); visual approvals always refuse.
+test("approval binds reviewed effective destination, visual always refuses", () => {
+  const click = (destination?: string | null) => ({
+    type: "browser_click",
+    args: {
+      selector: "#go",
+      ...(destination === null || destination === undefined ? {} : { targetReview: { url: "http://127.0.0.1/form", destination } }),
+    },
+  });
+  const live = "http://127.0.0.1/submit";
+  // Exact reviewed destination authorizes.
+  assert.equal(approvalAuthorizesEffect(click(live), { kind: "click", selector: "#go", value: null, destination: live }).ok, true);
+  // Same page URL, selector and label — different effective destination —
+  // refuses. Observation-digest equality never substitutes for this check.
+  const wrong = approvalAuthorizesEffect(click("http://127.0.0.1/save-a"), { kind: "click", selector: "#go", value: null, destination: live });
+  assert.equal(wrong.ok, false);
+  assert.match(wrong.ok === false ? wrong.reason : "", /different destination/);
+  // Missing reviewed destination fails closed for consequential clicks.
+  const bare = approvalAuthorizesEffect({ type: "browser_click", args: { selector: "#go" } }, { kind: "click", selector: "#go", value: null, destination: live });
+  assert.equal(bare.ok, false);
+  assert.match(bare.ok === false ? bare.reason : "", /reviewed destination/);
+  // Query/fragment differences do not change the submission target.
+  assert.equal(approvalAuthorizesEffect(click(`${live}?draft=1#top`), { kind: "click", selector: "#go", value: null, destination: live }).ok, true);
+  // Typing still binds kind/target/value; destination compares when known.
+  assert.equal(approvalAuthorizesEffect(
+    { type: "browser_type", args: { selector: 'input[name="field"]', value: "reviewed-value" } },
+    { kind: "type", selector: 'input[name="field"]', value: "other-value", destination: live },
+  ).ok, false);
+  // Visual: every supplied approval refuses until the exact visual review
+  // identity exists — including a well-formed browser_visual record.
+  const visualClick = approvalAuthorizesEffect(
+    { type: "browser_visual", args: { kind: "visual-click" } },
+    { kind: "visual", selector: null, value: null, destination: live },
+  );
+  assert.equal(visualClick.ok, false);
+  assert.match(visualClick.ok === false ? visualClick.reason : "", /Visual approvals are not issued yet/);
+  const borrowed = approvalAuthorizesEffect(
+    { type: "browser_type", args: { selector: "#go", value: "x" } },
+    { kind: "visual", selector: null, value: null, destination: live },
+  );
+  assert.equal(borrowed.ok, false);
+});
+
+// Final trust-boundary pass: mutation identities are host-issued.
+test("mutation tokens are minted by the host, never invented", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-mutation-tokens-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const runA = db.createRun({ threadId: "team-room", botId: "nova", prompt: "a", status: "running" });
+    const runB = db.createRun({ threadId: "team-room", botId: "nova", prompt: "b", status: "running" });
+    const token = db.mintMutationToken(runA.id, "nova");
+    assert.ok(token.startsWith("mut_"), "opaque host token");
+    assert.equal(db.hasMutationToken(token, runA.id, "nova"), true, "minted token verifies for its run");
+    assert.equal(db.hasMutationToken(token, runB.id, "nova"), false, "another task's token refuses here");
+    assert.equal(db.hasMutationToken("mut-invented-by-caller-12345", runA.id, "nova"), false, "invented IDs refuse");
+    assert.throws(() => db.mintMutationToken("run-no-such-run", "nova"), /per task and teammate/);
+    // Durable across restart: the fence survives on rows, not memory.
+    db.close();
+    const reopened = new OpenBotDatabase(root);
+    try {
+      assert.equal(reopened.hasMutationToken(token, runA.id, "nova"), true, "mint survives restart");
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

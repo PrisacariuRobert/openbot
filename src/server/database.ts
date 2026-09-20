@@ -1082,7 +1082,16 @@ export class OpenBotDatabase {
     this.addColumn("runs", "model_override TEXT");
     this.addColumn("bots", "retired_at TEXT");
     this.addColumn("action_journal", "mutation_key TEXT");
-    this.addColumn("action_journal", "effect_digest TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.addColumn("action_journal", "effect_digest TEXT");
+    // Final trust-boundary pass: host-issued mutation identities. Tokens
+    // are minted by the host (random, unguessable) and bound to one
+    // run/teammate; executors accept only minted tokens, so a caller can
+    // never invent a replacement ID to dodge the fence. Durable, so the
+    // fence survives restarts.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS mutation_tokens (
+      token TEXT PRIMARY KEY, run_id TEXT NOT NULL, bot_id TEXT NOT NULL,
+      approval_id TEXT, created_at TEXT NOT NULL
+    )`);    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -2931,6 +2940,28 @@ export class OpenBotDatabase {
   journalActionFindByMutation(mutationKey: string, runId: string, botId: string): ActionJournalRecord[] {
     return (this.db.prepare("SELECT * FROM action_journal WHERE mutation_key=? AND run_id=? AND bot_id=? ORDER BY created_at ASC").all(mutationKey, runId, botId) as Row[])
       .map((row) => this.journalActionFromRow(row));
+  }
+
+  /** Host-issued mutation identity. The host mints an opaque random token
+   * bound to one run/teammate (optionally to the approval that reviewed
+   * the intended effect); executors accept only minted tokens. A caller
+   * holding a token for one effect cannot invent another to dodge the
+   * fence — minting is a host act, and the journal's effect binding
+   * refuses cross-effect reuse. Model-loop exposure must mint at review
+   * time and hand the model only the opaque ID. */
+  mintMutationToken(runId: string, botId: string, approvalId?: string | null): string {
+    const run = this.getRun(runId);
+    if (!run || run.botId !== botId) throw new Error("Mutation identities are minted per task and teammate.");
+    const token = `mut_${randomBytes(16).toString("hex")}`;
+    this.db.prepare("INSERT INTO mutation_tokens (token,run_id,bot_id,approval_id,created_at) VALUES (?,?,?,?,?)")
+      .run(token, runId, botId, approvalId ?? null, now());
+    return token;
+  }
+
+  /** True only for a host-minted token bound to this run/teammate. */
+  hasMutationToken(token: string, runId: string, botId: string): boolean {
+    const row = this.db.prepare("SELECT token FROM mutation_tokens WHERE token=? AND run_id=? AND bot_id=?").get(token, runId, botId) as Row | undefined;
+    return Boolean(row);
   }
 
   /** Startup recovery mirroring recoverInterruptedApprovedActions: anything

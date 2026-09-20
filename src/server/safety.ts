@@ -83,6 +83,10 @@ export interface BrowserTarget {
     url: string;
     label: string;
     control: string;
+    /** Host-observed effective action destination. Present on fresh
+     * reviews; absent on older proposals, which consequential clicks
+     * must then refuse as unreviewed. */
+    destination?: string;
     fields: Array<{ label: string; value: string }>;
     contextScope?: "form" | "dialog" | "navigation" | "page";
     disclosure?: { expanded: false; controls: string[] } | null;
