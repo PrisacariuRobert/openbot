@@ -326,6 +326,60 @@ function safeUrl(raw: string): URL {
   return url;
 }
 
+/** Origin + path equality for destination comparison (query/fragment
+ * excluded: they do not change the submission target). */
+function sameOriginPath(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+/** Pure approval-to-effect matcher (unit-testable): the stored action's
+ * operation kind, target, final value and destination must match the
+ * proposal. A visual proposal needs an explicit visual approval record —
+ * borrowing any browser_click/type record refuses. */
+export function approvalAuthorizesEffect(
+  action: { type?: unknown; args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown } } } | null,
+  proposed: {
+    kind: "click" | "type" | "visual";
+    selector: string | null;
+    value: string | null;
+    destination: string | null;
+  },
+): { ok: true } | { ok: false; reason: string } {
+  const storedType = typeof action?.type === "string" ? action.type : null;
+  if (proposed.kind === "visual") {
+    const visualArgs = action?.args as { kind?: unknown } | undefined;
+    if (storedType !== "browser_visual" || visualArgs?.kind !== "visual-click") {
+      return { ok: false, reason: "That approval does not authorize a visual action. Request a review for the visual effect itself." };
+    }
+    return { ok: true };
+  }
+  const compatible = proposed.kind === "click" ? storedType === "browser_click" : storedType === "browser_type";
+  if (!compatible) {
+    return { ok: false, reason: "That approval authorizes a different operation kind. Request a new review." };
+  }
+  const approvedSelector = typeof action?.args?.selector === "string" ? action.args.selector : null;
+  if (proposed.selector && approvedSelector && approvedSelector !== proposed.selector) {
+    return { ok: false, reason: "That approval names a different control. Request a new review." };
+  }
+  if (proposed.selector && !approvedSelector) {
+    return { ok: false, reason: "That approval does not name a reviewed control. Request a new review." };
+  }
+  const approvedValue = typeof action?.args?.value === "string" ? action.args.value : null;
+  if (proposed.value !== null && approvedValue !== proposed.value) {
+    return { ok: false, reason: "That approval carries a different reviewed value. Request a new review." };
+  }
+  const approvedUrl = action?.args?.targetReview && typeof action.args.targetReview.url === "string" ? action.args.targetReview.url : null;
+  if (proposed.destination && approvedUrl && sameOriginPath(approvedUrl) !== sameOriginPath(proposed.destination)) {
+    return { ok: false, reason: "That approval names a different destination. Request a new review." };
+  }
+  return { ok: true };
+}
+
 function compactSelector(element: Element): string {
   const html = element as HTMLElement;
   if (html.id) return `#${CSS.escape(html.id)}`;
@@ -1330,6 +1384,7 @@ export class BrowserManager {
         framePath: control.framePath,
         fingerprint,
         reviewDigest: control.reviewDigest,
+        reviewComplete: control.reviewComplete,
       };
     });
     const panes: RegistryPane[] = (await this.queryScrollableRegions(page)).map((pane, index) => ({
@@ -1412,9 +1467,9 @@ export class BrowserManager {
    * executor re-runs the SAME routine for the acted-upon selector and
    * requires byte equality: a changed form value, destination or attribute
    * changes the digest and forces a new review instead of dispatch. */
-  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }>> {
+  private async queryControls(page: Page, onlySelector: string | null = null): Promise<Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean }>> {
     return page.locator("body").evaluate(async (body, selectorArg) => {
-      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string }> = [];
+      const out: Array<{ role: string; label: string; bounds: { x: number; y: number; width: number; height: number } | null; selector: string; framePath: string; reviewDigest: string; reviewComplete: boolean }> = [];
       let candidates: Element[] = [];
       if (selectorArg) {
         const single = body.querySelectorAll(selectorArg);
@@ -1446,15 +1501,44 @@ export class BrowserManager {
         const navigation = !form && !dialog && node.matches("button,a,[role=button],[role=link]") ? node.closest("nav,aside,[role=navigation],[role=menu]") : null;
         const scope = form || dialog || navigation || document.body;
         const stateful = node.matches("input,textarea,select,[contenteditable=true],[role=checkbox],[role=switch],[role=radio],[role=option],[role=slider],[role=spinbutton],[role=textbox],[role=combobox]") ? "1" : "0";
-        const scopeControls = [...scope.querySelectorAll("input:not([type=hidden]),textarea,select,[contenteditable=true]")].filter((el) => (el as HTMLElement).getClientRects().length > 0).slice(0, 24);
+        const scopeControls = [...scope.querySelectorAll("input:not([type=hidden]),textarea,select,[contenteditable=true]")].filter((el) => (el as HTMLElement).getClientRects().length > 0);
+        const hiddenControls = [...scope.querySelectorAll("input[type=hidden]")];
+        const hiddenNames: string[] = [];
+        for (const el of hiddenControls) {
+          const name = (el as HTMLElement).getAttribute("name") || "";
+          if (name) hiddenNames.push(name.slice(0, 200));
+          if (hiddenNames.length >= 32) break;
+        }
+        hiddenNames.sort();
         const fields: Array<{ label: string; value: string }> = [];
-        for (const el of scopeControls) {
+        let truncatedValues = false;
+        for (const el of scopeControls.slice(0, 24)) {
           const field = el as HTMLElement;
           const name = (field.getAttribute("aria-label") || field.getAttribute("placeholder") || field.getAttribute("name") || "field").slice(0, 200);
           const raw = field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio") ? String(field.checked) : field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement ? field.value : field.textContent || "";
+          if (raw.length > 2000) truncatedValues = true;
           const secret = /password|passcode|one-time-code|cc-|secret|token|verification/i.test(`${field.getAttribute("type") || ""} ${field.getAttribute("autocomplete") || ""} ${name}`);
           fields.push({ label: name, value: secret ? "[Private field hidden]" : raw.slice(0, 2000) });
         }
+        // Effective destination (Finding I2): submitter overrides win over
+        // the form action; anchors use href; otherwise the document URL.
+        // A changed destination is a different effect even when every
+        // label, selector and URL prefix looks the same.
+        const rawDestination = node instanceof HTMLAnchorElement ? (node as HTMLAnchorElement).href : (node as HTMLElement).getAttribute("formaction") || (form ? (form as HTMLFormElement).action : "") || location.href;
+        let destination = "";
+        try {
+          destination = new URL(rawDestination, location.href).href;
+        } catch {
+          destination = "";
+        }
+        // Completeness is explicit, never silent (mirrors the production
+        // complete:true approval gate): counts beyond the bounded window,
+        // truncated values, hidden fields beyond the named window, or an
+        // unknown destination refuse consequential dispatch until a
+        // narrower review re-observes. Secret-valued fields stay
+        // enumerable-but-redacted (deterministic on both sides) rather
+        // than marking every credential-adjacent form unobservable.
+        const complete = scopeControls.length <= 24 && !truncatedValues && hiddenControls.length <= 32 && destination !== "";
         const canonical = JSON.stringify({
           tag: node.tagName.toLowerCase(),
           role: node.getAttribute("role") || "",
@@ -1463,8 +1547,13 @@ export class BrowserManager {
           autocomplete: node.getAttribute("autocomplete") || "",
           href: node instanceof HTMLAnchorElement ? (node as HTMLAnchorElement).href : "",
           formMethod: form ? (form as HTMLFormElement).method.toLowerCase() : "",
+          destination,
           stateful,
+          fieldTotal: scopeControls.length,
           fields,
+          hiddenTotal: hiddenControls.length,
+          hiddenNames: hiddenNames.slice(0, 32),
+          complete,
           url: location.href,
         });
         const digestBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
@@ -1478,6 +1567,7 @@ export class BrowserManager {
           selector,
           framePath: "/",
           reviewDigest,
+          reviewComplete: complete,
         });
         if (out.length >= 150) break;
       }
@@ -1490,10 +1580,10 @@ export class BrowserManager {
    * stored digest means the bounded target/form/destination state is
    * unchanged since review. Null when the selector no longer resolves
    * uniquely (destroyed or ambiguous — both refuse). */
-  private async controlReviewDigest(page: Page, selector: string): Promise<string | null> {
+  private async controlReviewDigest(page: Page, selector: string): Promise<{ digest: string; complete: boolean } | null> {
     try {
       const rows = await this.queryControls(page, selector);
-      return rows.length === 1 ? rows[0]!.reviewDigest : null;
+      return rows.length === 1 ? { digest: rows[0]!.reviewDigest, complete: rows[0]!.reviewComplete } : null;
     } catch {
       return null;
     }
@@ -1599,23 +1689,30 @@ export class BrowserManager {
     if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
       throw new Error("A bounded typed value is required.");
     }
+    // Finding G1: consequential dispatch requires the caller's stable
+    // mutation identity; the fence below enforces it across observations,
+    // renderers and restarts.
+    const mutationKey = this.requireMutationKey(input.mutationKey);
     // Eligibility before admission: refusals leave no journal row behind.
+    // (Explicit approvals validate after admission against the pinned live
+    // page, with terminal transitions on refusal — see below.)
     this.assertActEligible(observation, runId, botId);
-    // Finding C: an explicitly supplied approval must be a real,
-    // host-owned, approved record for this run and teammate — a free-form
-    // digest string is identity only, never authorization. When the
-    // approval names a selector it must name this target's selector.
-    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, target.selector);
     const payloadDigest = createHash("sha256")
       .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `sem_${target.fingerprint}_${payloadDigest.slice(0, 12)}`;
+    // Logical-effect binding (Finding G1): the same intent keeps the same
+    // digest across re-observation; a different control, value or kind
+    // under one key refuses at propose time.
+    const effectDigest = createHash("sha256")
+      .update(JSON.stringify({ kind: `semantic-${input.kind}`, role: target.role, label: target.label, frame: target.framePath, value: input.kind === "type" ? input.value : null, runId, botId }))
+      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-dom",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: target.label,
       payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
-      mutationKey: input.mutationKey ?? null,
+      mutationKey, effectDigest,
     });
     // Pin the observed page (Finding D): the pinned object must still be
     // open and must still be the active tab. A tab switch, no matter the
@@ -1641,14 +1738,40 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "ambiguous target at dispatch");
       throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
     }
-    // Finding C: re-run the observation-time review routine and require
-    // byte equality with the stored digest. A changed form value,
-    // destination or attribute forces a new review — the fresh state is
-    // never substituted as the approved baseline.
+    // Finding C + round-4 I2: re-run the observation-time review routine
+    // and require byte equality with the stored digest, which now binds
+    // the effective destination, submitter overrides, field totals and an
+    // explicit completeness flag. A changed destination, a new 25th field
+    // or any form change forces a new review — the fresh state is never
+    // substituted as the approved baseline. Truncated coverage refuses as
+    // incomplete even when digests would otherwise agree.
     const liveDigest = await this.controlReviewDigest(page, target.selector);
-    if (liveDigest === null || liveDigest !== target.reviewDigest) {
+    if (liveDigest === null || liveDigest.digest !== target.reviewDigest) {
       journalTransition(this.db, actionId, "failed_before_effect", "reviewed state changed before dispatch");
       throw new Error("STALE_OBSERVATION: the form or control changed after review. Request a new review.");
+    }
+    if (!target.reviewComplete || !liveDigest.complete) {
+      journalTransition(this.db, actionId, "failed_before_effect", "incomplete review coverage");
+      throw new Error("INCOMPLETE_REVIEW: the review did not cover every relevant field. Narrow the scope and observe again.");
+    }
+    // Round-4 I3: an explicitly supplied approval must authorize THIS
+    // proposed effect — operation kind, target, final value and live
+    // destination against the stored host review. Refusals are terminal
+    // (failed_before_effect), never silent adoption.
+    if (input.approvalId) {
+      try {
+        this.assertApprovalBinding(input.approvalId, {
+          runId, botId,
+          kind: input.kind,
+          selector: target.selector,
+          value: input.kind === "type" ? input.value ?? null : null,
+          destination: page.url(),
+          observedAt: observation.capturedAt,
+        });
+      } catch (error) {
+        journalTransition(this.db, actionId, "failed_before_effect", "approval does not authorize this action");
+        throw error;
+      }
     }
     const fresh = await this.describeTarget(botId, target.selector);
     this.assertPreInput(observation, runId, botId, admittedEpoch);
@@ -1679,17 +1802,40 @@ export class BrowserManager {
     }
   }
 
-  /** Validate an explicitly supplied approval against host records. */
-  private assertApprovalBinding(approvalId: string, runId: string, botId: string, selector: string | null): void {
+  /** Record-level gate around the pure matcher: the approval must be a
+   * completed host decision for this run/teammate, newer than the
+   * observation it authorizes. The effect comparison itself delegates to
+   * approvalAuthorizesEffect so unit tests cover the exact logic. */
+  private assertApprovalBinding(
+    approvalId: string,
+    proposed: {
+      runId: string;
+      botId: string;
+      kind: "click" | "type" | "visual";
+      selector: string | null;
+      value: string | null;
+      destination: string | null;
+      observedAt: number;
+    },
+  ): void {
     const approval = this.db.getApproval(approvalId);
-    if (!approval || approval.status !== "approved" || approval.runId !== runId || approval.botId !== botId) {
+    if (!approval || approval.status !== "approved" || approval.runId !== proposed.runId || approval.botId !== proposed.botId) {
       throw new Error("That approval is not a completed host review for this task and teammate.");
     }
-    const action = this.db.getApprovalAction(approvalId) as { args?: { selector?: unknown } } | null;
-    const approvedSelector = action?.args && typeof action.args.selector === "string" ? action.args.selector : null;
-    if (approvedSelector && selector && approvedSelector !== selector) {
-      throw new Error("That approval names a different control. Request a new review.");
+    if (approval.decidedAt && new Date(approval.decidedAt).getTime() < proposed.observedAt) {
+      throw new Error("That approval predates the current observation. Request a new review.");
     }
+    const action = this.db.getApprovalAction(approvalId) as {
+      type?: unknown;
+      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown } };
+    } | null;
+    const matched = approvalAuthorizesEffect(action, {
+      kind: proposed.kind,
+      selector: proposed.selector,
+      value: proposed.value,
+      destination: proposed.destination,
+    });
+    if (!matched.ok) throw new Error(matched.reason);
   }
 
   /** Eligibility checked BEFORE journal admission so refused work leaves
@@ -1752,7 +1898,7 @@ export class BrowserManager {
     actionId: string; runId: string; botId: string; surface: "browser-dom" | "browser-visual" | "native";
     surfaceIdentity: string; ownershipEpoch: string; target: string;
     payloadDigest: string; reviewDigest: string | null; account: string;
-    mutationKey?: string | null;
+    mutationKey?: string | null; effectDigest?: string | null;
   }): number {
     journalPropose(this.db, { ...input });
     if (input.mutationKey) this.assertMutationFence(input.mutationKey, input.runId, input.botId, input.actionId);
@@ -1760,6 +1906,18 @@ export class BrowserManager {
       throw new Error("This action was already admitted. Check its result instead of sending it again.");
     }
     return this.db.botInputEpoch(input.botId);
+  }
+
+  /** Finding G1: consequential dispatch requires a stable mutation
+   * identity. The key is assigned per unit of intended effect by the
+   * accountable outer layer (a future approval flow will mint and bind
+   * these at review time); omitting it refuses. Read-only observation
+   * stays on the separate observe path, which never dispatches input. */
+  private requireMutationKey(mutationKey: string | null | undefined): string {
+    if (!mutationKey || mutationKey.length < 8 || mutationKey.length > 128) {
+      throw new Error("A stable mutation identity is required for consequential input. Observe again through an authorized task.");
+    }
+    return mutationKey;
   }
 
   /** Finding A: refuse when the same logical mutation is already unresolved
@@ -1825,9 +1983,13 @@ export class BrowserManager {
     if (capability !== "visual-supported") {
       throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
     }
+    // Finding G1: consequential dispatch requires the caller's stable
+    // mutation identity (see semanticAct).
+    const mutationKey = this.requireMutationKey(input.mutationKey);
     // Eligibility before admission: refusals leave no journal row behind.
+    // (Explicit approvals validate after admission against the pinned live
+    // page, with terminal transitions on refusal — see below.)
     this.assertActEligible(observation, runId, botId);
-    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, null);
     // Pin the observed page (Finding D): it must still be open and active.
     const page = observation.page;
     if (page.isClosed() || this.activePage(botId) !== page) {
@@ -1897,15 +2059,37 @@ export class BrowserManager {
       .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `vis_${observation.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}_${payloadDigest.slice(0, 8)}`;
+    const effectDigest = createHash("sha256")
+      .update(JSON.stringify({ kind: `visual-${input.action}`, cssX: Math.round(validated.cssX), cssY: Math.round(validated.cssY), key: input.key ?? null, runId, botId }))
+      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-visual",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/obs:${observation.observationId}`,
       ownershipEpoch: observation.ownerEpoch, target: `${Math.round(validated.cssX)},${Math.round(validated.cssY)}`,
       payloadDigest, reviewDigest: null, account: observation.account,
-      mutationKey: input.mutationKey ?? null,
+      mutationKey, effectDigest,
     });
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
+    // Round-4 I3: a supplied approval must authorize THIS visual effect.
+    // No production visual approval type exists today, so any supplied
+    // record refuses here until a reviewed visual identity lands in the
+    // approval contracts. Terminal, never silent adoption.
+    if (input.approvalId) {
+      try {
+        this.assertApprovalBinding(input.approvalId, {
+          runId, botId,
+          kind: "visual",
+          selector: null,
+          value: input.key ?? null,
+          destination: page.url(),
+          observedAt: observation.capturedAt,
+        });
+      } catch (error) {
+        journalTransition(this.db, actionId, "failed_before_effect", "approval does not authorize this visual action");
+        throw error;
+      }
+    }
     if (!acquireDesktopLease(runId, botId, "browser-visual", actionId)) {
       journalTransition(this.db, actionId, "failed_before_effect", "input lease held by another task");
       throw new Error("Another task holds the input lease. Wait for it to finish.");
@@ -1989,21 +2173,28 @@ export class BrowserManager {
     }
     const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    // Finding G1: scroll dispatches input, so it carries a mutation
+    // identity like every other executor call.
+    const mutationKey = this.requireMutationKey(input.mutationKey);
     // Eligibility before admission: refusals leave no journal row behind.
+    // (Explicit approvals validate after admission against the pinned live
+    // page, with terminal transitions on refusal — see below.)
     this.assertActEligible(observation, runId, botId);
-    if (input.approvalId) this.assertApprovalBinding(input.approvalId, runId, botId, pane.selector);
     const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
     if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     const payloadDigest = createHash("sha256")
       .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `scr_${observation.observationId}_${pane.paneToken}_${payloadDigest.slice(0, 8)}`;
+    const effectDigest = createHash("sha256")
+      .update(JSON.stringify({ kind: "scroll", paneLabel: pane.label, frame: pane.framePath, runId, botId }))
+      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-dom",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${pane.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: `scroll ${pane.label}`,
       payloadDigest, reviewDigest: null, account: observation.account,
-      mutationKey: input.mutationKey ?? null,
+      mutationKey, effectDigest,
     });
     // Pin the observed page and revalidate its document generation: a
     // replacement document at the same URL refuses instead of scrolling
@@ -2016,6 +2207,13 @@ export class BrowserManager {
     await this.assertDocumentEpoch(botId, page, observation, actionId);
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     this.assertPageAccess(botId, page);
+    // Scrolling carries no mutating payload and no production scroll
+    // approval type exists: a supplied approval refuses rather than
+    // borrowing an unrelated click/type record.
+    if (input.approvalId) {
+      journalTransition(this.db, actionId, "failed_before_effect", "no scroll approval type exists");
+      throw new Error("That approval does not authorize scrolling. Request a review through a supported action.");
+    }
     journalTransition(this.db, actionId, "dispatch_started");
     try {
       // Unique resolution: an ambiguous or vanished pane refuses instead

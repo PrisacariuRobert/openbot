@@ -37,6 +37,10 @@ export type RegistryTarget = {
    * routine the executor re-runs at action time. A changed form value,
    * destination or control attribute changes the digest. */
   reviewDigest: string;
+  /** Whether the observed review was complete (bounded window covered
+   * every relevant field, values untruncated, destination known). An
+   * incomplete review can never authorize a consequential dispatch. */
+  reviewComplete: boolean;
 };
 
 export type RegistryPane = {
