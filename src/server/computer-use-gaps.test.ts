@@ -578,68 +578,107 @@ test("Q01/Q02/Q03 fixture catalogues have required sizes", () => {
   assert.equal(20 * 3 * 2, 120, "120 execution slots");
 });
 
-// Final trust-boundary pass: approval binds the REVIEWED effective
-// destination (never the page URL); visual approvals always refuse.
-test("approval binds reviewed effective destination, visual always refuses", () => {
-  const click = (destination?: string | null) => ({
+// Trust-boundary review: approval binds the REVIEWED effective
+// destination (query included, never the page URL), the reviewed target
+// identity, and the exact effect; visual approvals always refuse.
+test("approval binds reviewed destination, target identity and effect", () => {
+  const FP = "a".repeat(64);
+  const click = (destination?: string | null, fingerprint: string | null = FP) => ({
     type: "browser_click",
     args: {
       selector: "#go",
+      ...(fingerprint === null ? {} : { targetFingerprint: fingerprint }),
       ...(destination === null || destination === undefined ? {} : { targetReview: { url: "http://127.0.0.1/form", destination } }),
     },
   });
   const live = "http://127.0.0.1/submit";
-  // Exact reviewed destination authorizes.
-  assert.equal(approvalAuthorizesEffect(click(live), { kind: "click", selector: "#go", value: null, destination: live }).ok, true);
+  const proposed = (destination: string | null, fingerprint: string | null = FP, value: string | null = null) =>
+    ({ kind: "click" as const, selector: "#go", value, destination, targetFingerprint: fingerprint });
+  // Exact reviewed destination + identity authorizes.
+  assert.equal(approvalAuthorizesEffect(click(live), proposed(live)).ok, true);
   // Same page URL, selector and label — different effective destination —
   // refuses. Observation-digest equality never substitutes for this check.
-  const wrong = approvalAuthorizesEffect(click("http://127.0.0.1/save-a"), { kind: "click", selector: "#go", value: null, destination: live });
+  const wrong = approvalAuthorizesEffect(click("http://127.0.0.1/save-a"), proposed(live));
   assert.equal(wrong.ok, false);
   assert.match(wrong.ok === false ? wrong.reason : "", /different destination/);
+  // Query strings are significant: /transfer?account=A is a different
+  // destination from /transfer?account=B. Only fragments are ignored.
+  const queryLive = "http://127.0.0.1/transfer?account=B";
+  const queryWrong = approvalAuthorizesEffect(click("http://127.0.0.1/transfer?account=A"), proposed(queryLive));
+  assert.equal(queryWrong.ok, false);
+  assert.match(queryWrong.ok === false ? queryWrong.reason : "", /different destination/);
+  assert.equal(approvalAuthorizesEffect(click(`${live}#section`), proposed(live)).ok, true, "fragments do not change the destination");
+  assert.equal(approvalAuthorizesEffect(click(`${live}?draft=1`), proposed(`${live}?draft=1`)).ok, true, "identical queries authorize");
   // Missing reviewed destination fails closed for consequential clicks.
-  const bare = approvalAuthorizesEffect({ type: "browser_click", args: { selector: "#go" } }, { kind: "click", selector: "#go", value: null, destination: live });
+  const bare = approvalAuthorizesEffect(click(undefined), proposed(live));
   assert.equal(bare.ok, false);
   assert.match(bare.ok === false ? bare.reason : "", /reviewed destination/);
-  // Query/fragment differences do not change the submission target.
-  assert.equal(approvalAuthorizesEffect(click(`${live}?draft=1#top`), { kind: "click", selector: "#go", value: null, destination: live }).ok, true);
-  // Typing still binds kind/target/value; destination compares when known.
+  // Missing reviewed target identity fails closed.
+  const noFp = approvalAuthorizesEffect(click(live, null), proposed(live));
+  assert.equal(noFp.ok, false);
+  assert.match(noFp.ok === false ? noFp.reason : "", /reviewed target identity/);
+  // Approved state != live state refuses even when selector and
+  // destination match (amount=999 review cannot authorize amount=10).
+  const stale = approvalAuthorizesEffect(click(live, "b".repeat(64)), proposed(live));
+  assert.equal(stale.ok, false);
+  assert.match(stale.ok === false ? stale.reason : "", /reviewed control state changed/);
+  // Typing still binds kind/target/identity/value; destination compares
+  // when known.
   assert.equal(approvalAuthorizesEffect(
-    { type: "browser_type", args: { selector: 'input[name="field"]', value: "reviewed-value" } },
-    { kind: "type", selector: 'input[name="field"]', value: "other-value", destination: live },
+    { type: "browser_type", args: { selector: 'input[name="field"]', targetFingerprint: FP, value: "reviewed-value" } },
+    { kind: "type", selector: 'input[name="field"]', value: "other-value", destination: live, targetFingerprint: FP },
   ).ok, false);
   // Visual: every supplied approval refuses until the exact visual review
   // identity exists — including a well-formed browser_visual record.
   const visualClick = approvalAuthorizesEffect(
     { type: "browser_visual", args: { kind: "visual-click" } },
-    { kind: "visual", selector: null, value: null, destination: live },
+    { kind: "visual", selector: null, value: null, destination: live, targetFingerprint: null },
   );
   assert.equal(visualClick.ok, false);
   assert.match(visualClick.ok === false ? visualClick.reason : "", /Visual approvals are not issued yet/);
   const borrowed = approvalAuthorizesEffect(
     { type: "browser_type", args: { selector: "#go", value: "x" } },
-    { kind: "visual", selector: null, value: null, destination: live },
+    { kind: "visual", selector: null, value: null, destination: live, targetFingerprint: null },
   );
   assert.equal(borrowed.ok, false);
 });
 
-// Final trust-boundary pass: mutation identities are host-issued.
-test("mutation tokens are minted by the host, never invented", () => {
+// Trust-boundary review: mutation identities are minted pre-bound to one
+// exact effect (+approval for reviewed work). A first caller can never
+// choose what a minted token represents.
+test("mutation tokens are pre-bound to one exact effect", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-mutation-tokens-"));
   const db = new OpenBotDatabase(root);
   try {
     const runA = db.createRun({ threadId: "team-room", botId: "nova", prompt: "a", status: "running" });
     const runB = db.createRun({ threadId: "team-room", botId: "nova", prompt: "b", status: "running" });
-    const token = db.mintMutationToken(runA.id, "nova");
+    const effectA = "e".repeat(64);
+    const effectB = "f".repeat(64);
+    const token = db.mintMutationToken(runA.id, "nova", effectA);
     assert.ok(token.startsWith("mut_"), "opaque host token");
-    assert.equal(db.hasMutationToken(token, runA.id, "nova"), true, "minted token verifies for its run");
-    assert.equal(db.hasMutationToken(token, runB.id, "nova"), false, "another task's token refuses here");
-    assert.equal(db.hasMutationToken("mut-invented-by-caller-12345", runA.id, "nova"), false, "invented IDs refuse");
-    assert.throws(() => db.mintMutationToken("run-no-such-run", "nova"), /per task and teammate/);
-    // Durable across restart: the fence survives on rows, not memory.
+    // Exact match verifies.
+    db.checkMutationToken(token, runA.id, "nova", effectA);
+    // A token minted for effect A cannot first-use effect B.
+    assert.throws(() => db.checkMutationToken(token, runA.id, "nova", effectB), /already bound to a different effect/);
+    // Foreign run/teammate refuses; invented token refuses.
+    assert.throws(() => db.checkMutationToken(token, runB.id, "nova", effectA), /Unknown mutation identity/);
+    assert.throws(() => db.checkMutationToken(token, runA.id, "scout", effectA), /Unknown mutation identity/);
+    assert.throws(() => db.checkMutationToken("mut_" + "0".repeat(32), runA.id, "nova", effectA), /Unknown mutation identity/);
+    // Same effect retry verifies again under the same identity.
+    db.checkMutationToken(token, runA.id, "nova", effectA);
+    // Approval-backed tokens require the same approval.
+    const approval = db.createApproval({ runId: runA.id, botId: "nova", kind: "browser", reason: "review", actionLabel: "act", action: { type: "browser_click" } });
+    const bound = db.mintMutationToken(runA.id, "nova", effectA, approval.id);
+    db.checkMutationToken(bound, runA.id, "nova", effectA, approval.id);
+    assert.throws(() => db.checkMutationToken(bound, runA.id, "nova", effectA, null), /bound to a different approval/);
+    assert.throws(() => db.checkMutationToken(bound, runA.id, "nova", effectA, "other"), /bound to a different approval/);
+    assert.throws(() => db.mintMutationToken("run-no-such-run", "nova", effectA), /per task and teammate/);
+    // Durable across restart: pre-binding survives on rows, not memory.
     db.close();
     const reopened = new OpenBotDatabase(root);
     try {
-      assert.equal(reopened.hasMutationToken(token, runA.id, "nova"), true, "mint survives restart");
+      reopened.checkMutationToken(token, runA.id, "nova", effectA);
+      assert.throws(() => reopened.checkMutationToken(token, runA.id, "nova", effectB), /already bound to a different effect/);
     } finally {
       reopened.close();
     }

@@ -68,7 +68,8 @@ const FORM = `<!doctype html><title>Fixture form</title><main>
 <input type="text" aria-label="Filler 18" value="f18">
 <input type="text" aria-label="Filler 19" value="f19">
 <input type="text" aria-label="Filler 20" value="f20">
-<input type="text" aria-label="Filler 21" value="f21">
+<input type="text" name="amount" aria-label="Amount" value="10">
+<button type="button" id="set-amount">Toggle amount</button>
 </form>
 <input type="file" id="upload" aria-label="Attach file">
 <canvas id="pad" style="position:fixed;left:100px;top:100px;width:400px;height:200px;" width="400" height="200"></canvas>
@@ -117,6 +118,11 @@ if (grow) grow.addEventListener("click", () => {
     extra.value = "x";
     form.appendChild(extra);
   }
+});
+const setAmount = document.getElementById("set-amount");
+if (setAmount) setAmount.addEventListener("click", () => {
+  const amount = document.querySelector('input[name="amount"]');
+  if (amount) amount.value = amount.value === "10" ? "999" : "10";
 });
 </script>
 </main>`;
@@ -183,10 +189,16 @@ const record = (id: string, pass: boolean, detail: string) => {
 const SESSION = "sess-fixture-1";
 const FIELD_INPUT_BEACON = "field-input";
 const fieldInputs = () => events.filter((event) => event.kind === FIELD_INPUT_BEACON);
-// Host-issued mutation identities: every consequential executor call takes
-// a token the host minted for that run/teammate. Fixture setup mints
-// directly (standing in for the review-time host); invented strings refuse.
-const mut = (runId: string) => db.mintMutationToken(runId, "nova");
+// Host-side mint helpers: fixture setup stands in for the review-time host,
+// resolving opaque IDs and pre-binding the canonical effect digest
+// (+approval for reviewed work) into each token. Visual mints are async:
+// the host re-runs its own resolution to derive the effect coordinates.
+const mutT = (runId: string, targetId: string, kind: "click" | "type", value?: string, approvalId?: string | null) =>
+  browser.mintSemanticMutation("nova", runId, { targetId, sessionId: SESSION, kind, ...(value !== undefined ? { value } : {}), ...(approvalId ? { approvalId } : {}) });
+const mutV = (runId: string, observationId: string, action: "click" | "double-click" | "drag" | "scroll" | "key", point: { x: number; y: number }, key?: string) =>
+  browser.mintVisualMutation("nova", runId, { observationId, sessionId: SESSION, adapterId: "fixture-visual", action, point, ...(key !== undefined ? { key } : {}) });
+const mutS = (runId: string, observationId: string, paneToken: string) =>
+  browser.mintScrollMutation("nova", runId, { observationId, sessionId: SESSION, paneToken });
 
 try {
   clearLeasesForTests();
@@ -202,7 +214,7 @@ try {
   assert.ok(go, "host observed the submit control");
   const submitsBefore = submits.length;
   const clicksBefore = clicks().length;
-  await browser.semanticAct("nova", run.id, { targetId: go.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(run.id) });
+  await browser.semanticAct("nova", run.id, { targetId: go.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(run.id, go.targetId, "click") });
   await new Promise((resolve) => setTimeout(resolve, 400));
   assert.equal(submits.length, submitsBefore + 1, "exactly one submit reached the server");
   assert.ok(submits[submits.length - 1]!.includes("field="), "server received the form body");
@@ -219,7 +231,7 @@ try {
   const submitsBeforeRelabel = submits.length;
   let staleError: unknown = null;
   try {
-    await browser.semanticAct("nova", run.id, { targetId: relabeledGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(run.id) });
+    await browser.semanticAct("nova", run.id, { targetId: relabeledGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(run.id, relabeledGo.targetId, "click") });
   } catch (error) {
     staleError = error;
   }
@@ -236,7 +248,7 @@ try {
   const clicksBeforeAmbiguous = clicks().length;
   let ambiguousError: unknown = null;
   try {
-    await browser.semanticAct("nova", run.id, { targetId: ambiguousDup.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(run.id) });
+    await browser.semanticAct("nova", run.id, { targetId: ambiguousDup.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(run.id, ambiguousDup.targetId, "click") });
   } catch (error) {
     ambiguousError = error;
   }
@@ -252,8 +264,9 @@ try {
   await browser.open("nova", `${base}/form`);
   const visual = await browser.observeScoped("nova", run.id, { surface: "browser-visual", sessionId: SESSION });
   const canvasBefore = canvasHits().length;
+  const clickToken = await mutV(run.id, visual.observationId, "click", { x: 300, y: 200 });
   const click = await browser.visualAct("nova", run.id, {
-    observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: mut(run.id),
+    observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: clickToken,
   });
   assert.ok(Math.abs(click.cssX - 300) < 1 && Math.abs(click.cssY - 200) < 1, `host mapped to CSS (${click.cssX},${click.cssY})`);
   await new Promise((resolve) => setTimeout(resolve, 400));
@@ -262,20 +275,22 @@ try {
   assert.ok(Math.abs(hits[0]!.x - 200) <= 3 && Math.abs(hits[0]!.y - 100) <= 3, `canvas-local (${hits[0]!.x},${hits[0]!.y}) ≈ (200,100)`);
   // Unknown adapter: VISION_UNAVAILABLE, zero input.
   const clicksBeforeVision = clicks().length;
+  const novisionToken = await mutV(run.id, visual.observationId, "click", { x: 300, y: 200 });
   let visionError: unknown = null;
   try {
     await browser.visualAct("nova", run.id, {
-      observationId: visual.observationId, sessionId: SESSION, adapterId: "unregistered-adapter", action: "click", point: { x: 300, y: 200 }, mutationKey: mut(run.id),
+      observationId: visual.observationId, sessionId: SESSION, adapterId: "unregistered-adapter", action: "click", point: { x: 300, y: 200 }, mutationKey: novisionToken,
     });
   } catch (error) {
     visionError = error;
   }
   assert.ok(visionError instanceof Error && /VISION_UNAVAILABLE/.test(visionError.message));
   // Stale observation ID: refusal with zero input.
+  const staleVisToken = await mutV(run.id, visual.observationId, "click", { x: 300, y: 200 });
   let staleVisualError: unknown = null;
   try {
     await browser.visualAct("nova", run.id, {
-      observationId: "obs_no_such_observation", sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: mut(run.id),
+      observationId: "obs_no_such_observation", sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: staleVisToken,
     });
   } catch (error) {
     staleVisualError = error;
@@ -288,16 +303,18 @@ try {
   // while nothing changed (must pass with a fresh action identity), then
   // navigate away and prove the same observation refuses with zero input.
   {
+    const freshToken = await mutV(run.id, visual.observationId, "click", { x: 310, y: 210 });
     const stillFresh = await browser.visualAct("nova", run.id, {
-      observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 310, y: 210 }, mutationKey: mut(run.id),
+      observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 310, y: 210 }, mutationKey: freshToken,
     });
     assert.ok(Math.abs(stillFresh.cssX - 310) < 1 && Math.abs(stillFresh.cssY - 210) < 1, "unchanged tab/page still acts");
+    const navToken = await mutV(run.id, visual.observationId, "click", { x: 320, y: 220 });
     await browser.open("nova", `${base}/relabeled`);
     const clicksBeforeNav = clicks().length;
     let navError: unknown = null;
     try {
       await browser.visualAct("nova", run.id, {
-        observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 320, y: 220 }, mutationKey: mut(run.id),
+        observationId: visual.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 320, y: 220 }, mutationKey: navToken,
       });
     } catch (error) {
       navError = error;
@@ -339,6 +356,10 @@ try {
   await browser.open("nova", `${base}/form`);
   const preHandoff = await browser.observeScoped("nova", secureRun.id, { surface: "browser-dom", sessionId: SESSION });
   const preHandoffGo = getObservation(preHandoff.observationId)!.targets.find((target) => target.selector === "#go")!;
+  // Mint the walled-attempt token before the handoff: minting is host
+  // bookkeeping (no eligibility gate), enforcement happens at dispatch.
+  const oVisSecure = await browser.observeScoped("nova", secureRun.id, { surface: "browser-visual", sessionId: SESSION });
+  const walledAttemptToken = await mutV(secureRun.id, oVisSecure.observationId, "click", { x: 100, y: 100 });
   const { BrowserSignIns } = await import("../src/server/browser-sign-in.js");
   const handoff = new BrowserSignIns(db).request("nova", secureRun.id, `${base}/login`, {
     source: "host",
@@ -353,7 +374,7 @@ try {
   let secureError: unknown = null;
   try {
     await browser.visualAct("nova", secureRun.id, {
-      observationId: walled.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 100, y: 100 }, mutationKey: mut(secureRun.id),
+      observationId: walled.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 100, y: 100 }, mutationKey: walledAttemptToken,
     });
   } catch (error) {
     secureError = error;
@@ -361,7 +382,7 @@ try {
   assert.ok(secureError instanceof Error && /SECURE_MODE/.test(secureError.message), "visual input refused in secure mode");
   let preHandoffError: unknown = null;
   try {
-    await browser.semanticAct("nova", secureRun.id, { targetId: preHandoffGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(secureRun.id) });
+    await browser.semanticAct("nova", secureRun.id, { targetId: preHandoffGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(secureRun.id, preHandoffGo.targetId, "click") });
   } catch (error) {
     preHandoffError = error;
   }
@@ -375,12 +396,13 @@ try {
   await browser.open("nova", `${base}/form`);
   const preRevoke = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
   const preRevokeGo = getObservation(preRevoke.observationId)!.targets.find((target) => target.selector === "#go")!;
+  const preRevokeToken = mutT(run.id, preRevokeGo.targetId, "click");
   db.revokeBotInput("nova");
   browser.revokeObservationsForBot("nova");
   const submitsBeforeRevoke = submits.length;
   let revokedError: unknown = null;
   try {
-    await browser.semanticAct("nova", run.id, { targetId: preRevokeGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(run.id) });
+    await browser.semanticAct("nova", run.id, { targetId: preRevokeGo.targetId, sessionId: SESSION, kind: "click", mutationKey: preRevokeToken });
   } catch (error) {
     revokedError = error;
   }
@@ -438,11 +460,11 @@ try {
     const regR3 = getObservation(oR3.observationId)!;
     const retargetTarget = regR3.targets.find((target) => target.selector === "#retarget")!;
     const saveTarget = regR3.targets.find((target) => target.selector === "#go")!;
-    await browser.semanticAct("nova", r3run.id, { targetId: retargetTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(r3run.id) });
+    await browser.semanticAct("nova", r3run.id, { targetId: retargetTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(r3run.id, retargetTarget.targetId, "click") });
     const submitsBeforeR3 = submits.length;
     let r3Error: unknown = null;
     try {
-      await browser.semanticAct("nova", r3run.id, { targetId: saveTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(r3run.id) });
+      await browser.semanticAct("nova", r3run.id, { targetId: saveTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(r3run.id, saveTarget.targetId, "click") });
     } catch (error) {
       r3Error = error;
     }
@@ -460,11 +482,11 @@ try {
     const regR4 = getObservation(oR4.observationId)!;
     const growTarget = regR4.targets.find((target) => target.selector === "#grow")!;
     const saveTarget = regR4.targets.find((target) => target.selector === "#go")!;
-    await browser.semanticAct("nova", r4run.id, { targetId: growTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(r4run.id) });
+    await browser.semanticAct("nova", r4run.id, { targetId: growTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(r4run.id, growTarget.targetId, "click") });
     const submitsBeforeR4 = submits.length;
     let r4Error: unknown = null;
     try {
-      await browser.semanticAct("nova", r4run.id, { targetId: saveTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(r4run.id) });
+      await browser.semanticAct("nova", r4run.id, { targetId: saveTarget.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(r4run.id, saveTarget.targetId, "click") });
     } catch (error) {
       r4Error = error;
     }
@@ -474,7 +496,7 @@ try {
     const saveTargetB = getObservation(oR4b.observationId)!.targets.find((target) => target.selector === "#go")!;
     let r4bError: unknown = null;
     try {
-      await browser.semanticAct("nova", r4run.id, { targetId: saveTargetB.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(r4run.id) });
+      await browser.semanticAct("nova", r4run.id, { targetId: saveTargetB.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(r4run.id, saveTargetB.targetId, "click") });
     } catch (error) {
       r4bError = error;
     }
@@ -484,34 +506,41 @@ try {
   }
 
   // F11 — approval records bind the exact proposed effect. Exact
-  // operation/target/value/REVIEWED-destination/freshness passes; mismatched
-  // selector, wrong kind, changed value, wrong or missing destination,
-  // stale decision and any visual approval all refuse before any input.
-  // Observation-digest equality never substitutes for owner authorization.
+  // operation/target-identity/value/REVIEWED-destination/freshness passes;
+  // mismatched selector, wrong kind, changed value, wrong or missing
+  // destination, changed query, stale reviewed state, stale decision and
+  // any visual approval all refuse before any input. Observation-digest
+  // equality never substitutes for owner authorization, and every token
+  // below is pre-bound by the host to its exact effect and approval.
   {
     const approveRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "approval task", status: "running" });
     const approve = (action: unknown) => {
       const approval = db.createApproval({ runId: approveRun.id, botId: "nova", kind: "browser", reason: "fixture review", actionLabel: "fixture", action });
       return db.decideApproval(approval.id, "approved")!;
     };
+    const fp = async (selector: string) => (await browser.describeTarget("nova", selector)).fingerprint;
     await browser.open("nova", `${base}/form`);
     // Exact match passes and submits once. The approval carries the
-    // host-observed effective destination — page URL alone never suffices.
+    // host-observed effective destination AND the reviewed target
+    // identity — page URL alone never suffices.
     const oExact = await browser.observeScoped("nova", approveRun.id, { surface: "browser-dom", sessionId: SESSION });
     const exactGo = getObservation(oExact.observationId)!.targets.find((target) => target.selector === "#go")!;
-    const exactApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetReview: { url: `${base}/form`, destination: exactGo.effectiveDestination } } });
+    const submitDest = exactGo.effectiveDestination;
+    const exactFp = await fp("#go");
+    const exactApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetFingerprint: exactFp, targetReview: { url: `${base}/form`, destination: submitDest } } });
     const submitsBeforeExact = submits.length;
-    await browser.semanticAct("nova", approveRun.id, { targetId: exactGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: exactApproval.id });
+    await browser.semanticAct("nova", approveRun.id, { targetId: exactGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, exactGo.targetId, "click", undefined, exactApproval.id), approvalId: exactApproval.id });
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(submits.length, submitsBeforeExact + 1, "exact approved operation dispatches once");
     // Mismatched selector refuses.
     await browser.open("nova", `${base}/form`);
     const oMis = await browser.observeScoped("nova", approveRun.id, { surface: "browser-dom", sessionId: SESSION });
     const misGo = getObservation(oMis.observationId)!.targets.find((target) => target.selector === "#go")!;
-    const misApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#dup-a", targetReview: { url: `${base}/form`, destination: misGo.effectiveDestination } } });
+    const misFp = await fp("#go");
+    const misApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#dup-a", targetFingerprint: await fp("#dup-a"), targetReview: { url: `${base}/form`, destination: misGo.effectiveDestination } } });
     let misError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: misApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, misGo.targetId, "click", undefined, misApproval.id), approvalId: misApproval.id });
     } catch (error) {
       misError = error;
     }
@@ -520,7 +549,7 @@ try {
     const kindApproval = approve({ type: "browser_type", botId: "nova", args: { selector: "#go", value: "x" } });
     let kindError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: kindApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, misGo.targetId, "click"), approvalId: kindApproval.id });
     } catch (error) {
       kindError = error;
     }
@@ -528,33 +557,46 @@ try {
     // Wrong reviewed destination refuses even when page URL, selector,
     // label and every other state are unchanged: an approval for /save-a
     // can never authorize the live /submit target.
-    const destApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetReview: { url: `${base}/form`, destination: `${base}/save-a` } } });
+    const destApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetFingerprint: misFp, targetReview: { url: `${base}/form`, destination: `${base}/save-a` } } });
     let destError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: destApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, misGo.targetId, "click", undefined, destApproval.id), approvalId: destApproval.id });
     } catch (error) {
       destError = error;
     }
     assert.ok(destError instanceof Error && /different destination/.test(destError.message), `approval for another destination refuses (got: ${(destError as Error)?.message.slice(0, 120)})`);
     assert.equal(submits.length, submitsBeforeExact + 1, "zero submits on destination mismatch");
+    // Changed query is a changed destination: /submit?account=A cannot
+    // authorize /submit?account=B (or a bare /submit).
+    const queryApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetFingerprint: misFp, targetReview: { url: `${base}/form`, destination: `${submitDest}?account=A` } } });
+    let queryError: unknown = null;
+    try {
+      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, misGo.targetId, "click", undefined, queryApproval.id), approvalId: queryApproval.id });
+    } catch (error) {
+      queryError = error;
+    }
+    assert.ok(queryError instanceof Error && /different destination/.test(queryError.message), `changed query refuses (got: ${(queryError as Error)?.message.slice(0, 120)})`);
+    assert.equal(submits.length, submitsBeforeExact + 1, "zero submits on query change");
     // Missing reviewed destination fails closed for consequential clicks.
-    const bareApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go" } });
+    const bareApproval = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetFingerprint: misFp } });
     let bareError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: bareApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: misGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, misGo.targetId, "click", undefined, bareApproval.id), approvalId: bareApproval.id });
     } catch (error) {
       bareError = error;
     }
     assert.ok(bareError instanceof Error && /reviewed destination/.test(bareError.message), `destination-less approval fails closed (got: ${(bareError as Error)?.message.slice(0, 120)})`);
     assert.equal(submits.length, submitsBeforeExact + 1, "zero submits without a reviewed destination");
-    // Changed typed value refuses.
+    // Changed typed value refuses (approval carries the reviewed target
+    // identity, so the refusal lands on the value, not the identity).
     await browser.open("nova", `${base}/form`);
     const oVal = await browser.observeScoped("nova", approveRun.id, { surface: "browser-dom", sessionId: SESSION });
-    const valueApproval = approve({ type: "browser_type", botId: "nova", args: { selector: 'input[name="field"]', value: "reviewed-value" } });
+    const valFp = await fp('input[name="field"]');
+    const valueApproval = approve({ type: "browser_type", botId: "nova", args: { selector: 'input[name="field"]', targetFingerprint: valFp, value: "reviewed-value" } });
     const valField = getObservation(oVal.observationId)!.targets.find((target) => target.selector === 'input[name="field"]')!;
     let valueError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: valField.targetId, sessionId: SESSION, kind: "type", value: "other-value", mutationKey: mut(approveRun.id), approvalId: valueApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: valField.targetId, sessionId: SESSION, kind: "type", value: "other-value", mutationKey: mutT(approveRun.id, valField.targetId, "type", "other-value", valueApproval.id), approvalId: valueApproval.id });
     } catch (error) {
       valueError = error;
     }
@@ -566,7 +608,7 @@ try {
     const staleGo = getObservation(oStale.observationId)!.targets.find((target) => target.selector === "#go")!;
     let staleApprovalError: unknown = null;
     try {
-      await browser.semanticAct("nova", approveRun.id, { targetId: staleGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(approveRun.id), approvalId: staleApproval.id });
+      await browser.semanticAct("nova", approveRun.id, { targetId: staleGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, staleGo.targetId, "click"), approvalId: staleApproval.id });
     } catch (error) {
       staleApprovalError = error;
     }
@@ -578,7 +620,7 @@ try {
     const visualApproval = approve({ type: "browser_type", botId: "nova", args: { selector: 'input[name="field"]', value: "reviewed-value" } });
     let visualApprovalError: unknown = null;
     try {
-      await browser.visualAct("nova", approveRun.id, { observationId: oVis.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: mut(approveRun.id), approvalId: visualApproval.id });
+      await browser.visualAct("nova", approveRun.id, { observationId: oVis.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: await mutV(approveRun.id, oVis.observationId, "click", { x: 300, y: 200 }), approvalId: visualApproval.id });
     } catch (error) {
       visualApprovalError = error;
     }
@@ -587,14 +629,68 @@ try {
     const visualRecord = approve({ type: "browser_visual", botId: "nova", args: { kind: "visual-click" } });
     let visualRecordError: unknown = null;
     try {
-      await browser.visualAct("nova", approveRun.id, { observationId: oVis.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: mut(approveRun.id), approvalId: visualRecord.id });
+      await browser.visualAct("nova", approveRun.id, { observationId: oVis.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "click", point: { x: 300, y: 200 }, mutationKey: await mutV(approveRun.id, oVis.observationId, "click", { x: 300, y: 200 }), approvalId: visualRecord.id });
     } catch (error) {
       visualRecordError = error;
     }
     assert.ok(visualRecordError instanceof Error && /Visual approvals are not issued yet/.test(visualRecordError.message), "even a browser_visual record cannot authorize visual input yet");
     assert.equal(canvasHits().length, canvasBeforeVisual, "zero visual input across refused approvals");
     assert.equal(submits.length, submitsBeforeExact + 1, "only the exact approved operation submitted");
-    record("F11-approval-binding", true, "exact passes once; selector/kind/value/destination/freshness/visual mismatches refuse");
+    record("F11-approval-binding", true, "exact passes once; selector/kind/value/destination/query/identity/freshness/visual mismatches refuse");
+  }
+
+  // F11b — approved state == live state, independently of observed state ==
+  // live state. Observe amount=10, flip to 999 through a real executor
+  // click, review the 999 state, flip back to 10 the same way: neither the
+  // old nor the current 10-observation is authorized by the 999 approval.
+  // Zero external effect.
+  {
+    const stateRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "reviewed-state task", status: "running" });
+    const approve = (action: unknown) => {
+      const approval = db.createApproval({ runId: stateRun.id, botId: "nova", kind: "browser", reason: "fixture review", actionLabel: "fixture", action });
+      return db.decideApproval(approval.id, "approved")!;
+    };
+    const stateFp = async (selector: string) => (await browser.describeTarget("nova", selector)).fingerprint;
+    const flipAmount = async () => {
+      const obs = await browser.observeScoped("nova", stateRun.id, { surface: "browser-dom", sessionId: SESSION });
+      const toggle = getObservation(obs.observationId)!.targets.find((target) => target.selector === "#set-amount")!;
+      await browser.semanticAct("nova", stateRun.id, { targetId: toggle.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(stateRun.id, toggle.targetId, "click") });
+    };
+    await browser.open("nova", `${base}/form`);
+    const oTen = await browser.observeScoped("nova", stateRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const tenGo = getObservation(oTen.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const destTen = tenGo.effectiveDestination;
+    await flipAmount();
+    // Capture the 999 reviewed identity while 999 is live.
+    const fp999 = await stateFp("#go");
+    await flipAmount();
+    const submitsBeforeState = submits.length;
+    // Current observation (amount=10 live).
+    const oFinal = await browser.observeScoped("nova", stateRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const finalGo = getObservation(oFinal.observationId)!.targets.find((target) => target.selector === "#go")!;
+    // Review the 999 state only now: same selector, same destination,
+    // different reviewed target identity — and newer than the
+    // 10-observations, so freshness cannot decide for us. Refused below
+    // proves approved state == live state is required independently.
+    const approval999 = approve({ type: "browser_click", botId: "nova", args: { selector: "#go", targetFingerprint: fp999, targetReview: { url: `${base}/form`, destination: destTen } } });
+    // Refused — approved 999 != live 10.
+    let finalError: unknown = null;
+    try {
+      await browser.semanticAct("nova", stateRun.id, { targetId: finalGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(stateRun.id, finalGo.targetId, "click"), approvalId: approval999.id });
+    } catch (error) {
+      finalError = error;
+    }
+    assert.ok(finalError instanceof Error && /reviewed control state changed/.test(finalError.message), `current 10-observation not authorized by 999 approval (got: ${(finalError as Error)?.message.slice(0, 120)})`);
+    // Old observation (also amount=10): refused the same way.
+    let oldError: unknown = null;
+    try {
+      await browser.semanticAct("nova", stateRun.id, { targetId: tenGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(stateRun.id, tenGo.targetId, "click"), approvalId: approval999.id });
+    } catch (error) {
+      oldError = error;
+    }
+    assert.ok(oldError instanceof Error && /reviewed control state changed/.test(oldError.message), `old 10-observation not authorized by 999 approval either (got: ${(oldError as Error)?.message.slice(0, 160)})`);
+    assert.equal(submits.length, submitsBeforeState, "zero submits across reviewed-state mismatches");
+    record("F11b-reviewed-state", true, "999 review cannot authorize 10 state on old or current observation");
   }
   await browser.open("nova", `${base}/form`);
   const scrolled = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
@@ -603,7 +699,7 @@ try {
   const decoyPane = registryAfter.panes.find((pane) => pane.selector === "#decoy-pane");
   assert.ok(intended && decoyPane, "host observed both scroll panes");
   const decoyTopsBefore = scrollTops("decoy-pane").length;
-  const moved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: intended.paneToken, deltaY: 200, mutationKey: mut(run.id) });
+  const moved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: intended.paneToken, deltaY: 200, mutationKey: mutS(run.id, scrolled.observationId, intended.paneToken) });
   assert.ok(moved.moved > 0, `intended pane moved (${moved.beforeTop} → ${moved.afterTop})`);
   await new Promise((resolve) => setTimeout(resolve, 400));
   assert.equal(scrollTops("decoy-pane").length, decoyTopsBefore, "decoy pane never scrolled");
@@ -614,7 +710,7 @@ try {
     const framePane = registryAfter.panes.find((pane) => pane.framePath === "#sub");
     assert.ok(framePane, "host observed the owned iframe pane");
     const subBefore = scrollTops("sub-doc").length;
-    const frameMoved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: framePane.paneToken, deltaY: 200, mutationKey: mut(run.id) });
+    const frameMoved = await browser.scrollPane("nova", run.id, { observationId: scrolled.observationId, sessionId: SESSION, paneToken: framePane.paneToken, deltaY: 200, mutationKey: mutS(run.id, scrolled.observationId, framePane.paneToken) });
     assert.ok(frameMoved.moved > 0, `iframe pane moved (${frameMoved.beforeTop} → ${frameMoved.afterTop})`);
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.ok(scrollTops("sub-doc").length > subBefore, "iframe scroll beaconed from the owned frame document");
@@ -632,11 +728,11 @@ try {
   const readCounts = async (): Promise<{ submits: number; clicks: number; canvas: number }> =>
     (await (await fetch(`${base}/counts`)).json()) as { submits: number; clicks: number; canvas: number };
   {
-    const keyA = mut(run.id);
     await browser.open("nova", `${base}/form`);
     const before = await readCounts();
     const o1 = await browser.observeScoped("nova", run.id, { surface: "browser-dom", sessionId: SESSION });
     const go1 = getObservation(o1.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const keyA = mutT(run.id, go1.targetId, "click");
     await browser.semanticAct("nova", run.id, { targetId: go1.targetId, sessionId: SESSION, kind: "click", mutationKey: keyA });
     await new Promise((resolve) => setTimeout(resolve, 400));
     const afterFirst = await readCounts();
@@ -708,7 +804,7 @@ try {
     assert.ok(duplicateError instanceof Error && /DUPLICATE_MUTATION/.test(duplicateError.message), "completed mutation refuses duplicates");
     // Distinct genuinely-new work with a new key still proceeds: no blanket ban.
     const afterDuplicateCheck = await readCounts();
-    await browser.semanticAct("nova", run.id, { targetId: go3.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(run.id) });
+    await browser.semanticAct("nova", run.id, { targetId: go3.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(run.id, go3.targetId, "click") });
     await new Promise((resolve) => setTimeout(resolve, 400));
     const afterNewKey = await readCounts();
     assert.equal(afterNewKey.submits, afterDuplicateCheck.submits + 1, "new mutation key performs new work");
@@ -719,10 +815,10 @@ try {
   // key commit fails, leaving an uncertain row with a genuine accepted
   // effect and no silent success.
   {
-    const keyB = mut(run.id);
     await browser.open("nova", `${base}/form`);
     const before = await readCounts();
     const ob = await browser.observeScoped("nova", run.id, { surface: "browser-visual", sessionId: SESSION });
+    const keyB = await mutV(run.id, ob.observationId, "key", { x: 300, y: 200 }, "NotARealKey123");
     let keyError: unknown = null;
     try {
       await browser.visualAct("nova", run.id, { observationId: ob.observationId, sessionId: SESSION, adapterId: "fixture-visual", action: "key", point: { x: 300, y: 200 }, key: "NotARealKey123", mutationKey: keyB });
@@ -748,7 +844,7 @@ try {
     const obs = await browser.observeScoped("nova", stopRun.id, { surface: "browser-dom", sessionId: SESSION });
     const late = getObservation(obs.observationId)!.targets.find((target) => target.selector === "#late-save")!;
     const clicksBeforeStop = clicks().length;
-    const pendingAct = browser.semanticAct("nova", stopRun.id, { targetId: late.targetId, sessionId: SESSION, kind: "click", mutationKey: mut(stopRun.id) });
+    const pendingAct = browser.semanticAct("nova", stopRun.id, { targetId: late.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(stopRun.id, late.targetId, "click") });
     await new Promise((resolve) => setTimeout(resolve, 600));
     assert.equal(clicks().length, clicksBeforeStop, "no input while the control is still disabled");
     db.updateRun(stopRun.id, { status: "cancelled" });
@@ -783,7 +879,7 @@ try {
         targetId: clickTarget.targetId,
         sessionId: SESSION,
         kind: "click",
-        mutationKey: mut(finalRun.id),
+        mutationKey: mutT(finalRun.id, clickTarget.targetId, "click"),
         __testBarrier: {
           beforeCommit: async () => {
             db.updateRun(finalRun.id, { status: "cancelled" });
@@ -808,7 +904,7 @@ try {
         sessionId: SESSION,
         kind: "type",
         value: "changed",
-        mutationKey: mut(fillRun.id),
+        mutationKey: mutT(fillRun.id, fillTarget.targetId, "type", "changed"),
         __testBarrier: {
           beforeCommit: async () => {
             db.updateRun(fillRun.id, { status: "cancelled" });
@@ -852,7 +948,11 @@ try {
       malformedError = error;
     }
     assert.ok(malformedError instanceof Error && /host-issued mutation identity is required/.test(malformedError.message), "malformed identity refuses at the format gate");
-    const foreignToken = mut(foreignRun.id);
+    // A token minted for another task's effect refuses here: exact
+    // token/run/teammate/effect match, all four.
+    const oForeign = await browser.observeScoped("nova", foreignRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const foreignGo = getObservation(oForeign.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const foreignToken = mutT(foreignRun.id, foreignGo.targetId, "click");
     let foreignError: unknown = null;
     try {
       await browser.semanticAct("nova", tokenRun.id, { targetId: tokenGo.targetId, sessionId: SESSION, kind: "click", mutationKey: foreignToken });
@@ -861,7 +961,21 @@ try {
     }
     assert.ok(foreignError instanceof Error && /Unknown mutation identity/.test(foreignError.message), "another task's token refuses here");
     assert.equal(submits.length, submitsBeforeToken, "zero submits on foreign token");
-    record("F9c-host-issued-tokens", true, "invented and foreign mutation identities refuse before admission");
+    // A token minted for effect A cannot first-use effect B, even on the
+    // same run: the host bound A at mint time.
+    const oDup = await browser.observeScoped("nova", tokenRun.id, { surface: "browser-dom", sessionId: SESSION });
+    const dupGo = getObservation(oDup.observationId)!.targets.find((target) => target.selector === "#go")!;
+    const dupField = getObservation(oDup.observationId)!.targets.find((target) => target.selector === 'input[name="field"]')!;
+    const repurposed = mutT(tokenRun.id, dupField.targetId, "type", "hello");
+    let repurposeError: unknown = null;
+    try {
+      await browser.semanticAct("nova", tokenRun.id, { targetId: dupGo.targetId, sessionId: SESSION, kind: "click", mutationKey: repurposed });
+    } catch (error) {
+      repurposeError = error;
+    }
+    assert.ok(repurposeError instanceof Error && /already bound to a different effect/.test(repurposeError.message), `minted-for-B cannot first-use A (got: ${(repurposeError as Error)?.message.slice(0, 100)})`);
+    assert.equal(submits.length, submitsBeforeToken, "zero submits on repurposed token");
+    record("F9c-host-issued-tokens", true, "invented/foreign/repurposed mutation identities refuse before admission");
   }
 
   // F10c — post-dispatch ownership for visual and scroll executors (same
@@ -875,7 +989,7 @@ try {
     const visPreRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "visual pre task", status: "running" });
     await browser.open("nova", `${base}/form`);
     const oVisPre = await browser.observeScoped("nova", visPreRun.id, { surface: "browser-visual", sessionId: SESSION });
-    const visPreToken = mut(visPreRun.id);
+    const visPreToken = await mutV(visPreRun.id, oVisPre.observationId, "click", { x: 300, y: 200 });
     const canvasBeforePre = canvasHits().length;
     let visPreError: unknown = null;
     try {
@@ -894,7 +1008,7 @@ try {
     const visPostRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "visual post task", status: "running" });
     await browser.open("nova", `${base}/form`);
     const oVisPost = await browser.observeScoped("nova", visPostRun.id, { surface: "browser-visual", sessionId: SESSION });
-    const visPostToken = mut(visPostRun.id);
+    const visPostToken = await mutV(visPostRun.id, oVisPost.observationId, "click", { x: 300, y: 200 });
     let visPostError: unknown = null;
     try {
       await browser.visualAct("nova", visPostRun.id, {
@@ -912,7 +1026,7 @@ try {
     await browser.open("nova", `${base}/form`);
     const oScrPre = await browser.observeScoped("nova", scrPreRun.id, { surface: "browser-dom", sessionId: SESSION });
     const scrPrePane = getObservation(oScrPre.observationId)!.panes.find((pane) => pane.selector === "#intended")!;
-    const scrPreToken = mut(scrPreRun.id);
+    const scrPreToken = mutS(scrPreRun.id, oScrPre.observationId, scrPrePane.paneToken);
     const topsBeforePre = scrollTops("intended").length;
     let scrPreError: unknown = null;
     try {
@@ -932,7 +1046,7 @@ try {
     await browser.open("nova", `${base}/form`);
     const oScrPost = await browser.observeScoped("nova", scrPostRun.id, { surface: "browser-dom", sessionId: SESSION });
     const scrPostPane = getObservation(oScrPost.observationId)!.panes.find((pane) => pane.selector === "#intended")!;
-    const scrPostToken = mut(scrPostRun.id);
+    const scrPostToken = mutS(scrPostRun.id, oScrPost.observationId, scrPostPane.paneToken);
     let scrPostError: unknown = null;
     try {
       await browser.scrollPane("nova", scrPostRun.id, {

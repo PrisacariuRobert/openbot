@@ -1084,14 +1084,17 @@ export class OpenBotDatabase {
     this.addColumn("action_journal", "mutation_key TEXT");
     this.addColumn("action_journal", "effect_digest TEXT");
     // Final trust-boundary pass: host-issued mutation identities. Tokens
-    // are minted by the host (random, unguessable) and bound to one
-    // run/teammate; executors accept only minted tokens, so a caller can
-    // never invent a replacement ID to dodge the fence. Durable, so the
-    // fence survives restarts.
+    // are minted by the host (random, unguessable) with the canonical
+    // effect digest bound AT MINT TIME — a first caller can never choose
+    // what effect an already minted token represents. Reviewed
+    // consequential work also binds the approval. Executors verify the
+    // exact token/run/teammate/effect (+approval when approval-backed).
+    // Durable, so the fence survives restarts.
     this.db.exec(`CREATE TABLE IF NOT EXISTS mutation_tokens (
       token TEXT PRIMARY KEY, run_id TEXT NOT NULL, bot_id TEXT NOT NULL,
-      approval_id TEXT, created_at TEXT NOT NULL
-    )`);    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+      effect_digest TEXT, approval_id TEXT, created_at TEXT NOT NULL
+    )`);
+    this.addColumn("mutation_tokens", "effect_digest TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -2943,19 +2946,45 @@ export class OpenBotDatabase {
   }
 
   /** Host-issued mutation identity. The host mints an opaque random token
-   * bound to one run/teammate (optionally to the approval that reviewed
-   * the intended effect); executors accept only minted tokens. A caller
-   * holding a token for one effect cannot invent another to dodge the
-   * fence — minting is a host act, and the journal's effect binding
-   * refuses cross-effect reuse. Model-loop exposure must mint at review
-   * time and hand the model only the opaque ID. */
-  mintMutationToken(runId: string, botId: string, approvalId?: string | null): string {
+   * with the canonical effect digest bound AT MINT TIME (plus the approval
+   * for reviewed consequential work). Executors verify the exact
+   * token/run/teammate/effect — and the approval when approval-backed — so
+   * a caller can neither invent an ID nor repurpose a minted one for a
+   * different effect to dodge the fence. Model-loop exposure must mint at
+   * review time and hand the model only the opaque ID. */
+  mintMutationToken(runId: string, botId: string, effectDigest: string, approvalId?: string | null): string {
     const run = this.getRun(runId);
     if (!run || run.botId !== botId) throw new Error("Mutation identities are minted per task and teammate.");
+    if (!effectDigest || effectDigest.length !== 64) throw new Error("Mutation identities are minted for one exact effect.");
+    if (approvalId != null) {
+      const approval = this.getApproval(approvalId);
+      if (!approval || approval.runId !== runId || approval.botId !== botId) throw new Error("Mutation identities bind approvals of the same task and teammate.");
+    }
     const token = `mut_${randomBytes(16).toString("hex")}`;
-    this.db.prepare("INSERT INTO mutation_tokens (token,run_id,bot_id,approval_id,created_at) VALUES (?,?,?,?,?)")
-      .run(token, runId, botId, approvalId ?? null, now());
+    this.db.prepare("INSERT INTO mutation_tokens (token,run_id,bot_id,effect_digest,approval_id,created_at) VALUES (?,?,?,?,?,?)")
+      .run(token, runId, botId, effectDigest, approvalId ?? null, now());
     return token;
+  }
+
+  /** Exact-match verification for a minted token: token, run, teammate,
+   * pre-bound effect, and approval when approval-backed must ALL match.
+   * Anything else — unknown token, foreign run/teammate, repurposed
+   * effect, wrong approval, or a legacy row without a bound effect —
+   * refuses. Fail-closed, no row is written here. */
+  checkMutationToken(token: string, runId: string, botId: string, effectDigest: string, approvalId?: string | null): void {
+    const row = this.db.prepare("SELECT token,run_id,bot_id,effect_digest,approval_id FROM mutation_tokens WHERE token=?").get(token) as Row | undefined;
+    if (!row) throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
+    if (String(row.run_id) !== runId || String(row.bot_id) !== botId) {
+      throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
+    }
+    if (row.effect_digest == null || String(row.effect_digest) !== effectDigest) {
+      if (row.effect_digest == null) throw new Error("That mutation identity predates effect binding. Mint a new identity for new work.");
+      throw new Error("That mutation identity is already bound to a different effect. Use a new identity for new work.");
+    }
+    const boundApproval = row.approval_id == null ? null : String(row.approval_id);
+    if (boundApproval !== null && (approvalId ?? null) !== boundApproval) {
+      throw new Error("That mutation identity is bound to a different approval. Use the reviewed identity for reviewed work.");
+    }
   }
 
   /** True only for a host-minted token bound to this run/teammate. */

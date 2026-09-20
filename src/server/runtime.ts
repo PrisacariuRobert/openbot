@@ -326,15 +326,43 @@ function safeUrl(raw: string): URL {
   return url;
 }
 
-/** Origin + path equality for destination comparison (query/fragment
- * excluded: they do not change the submission target). */
-function sameOriginPath(url: string): string {
+/** Destination identity for reviewed-effect equality. Origin, path AND
+ * query are significant — /transfer?account=A and /transfer?account=B
+ * are different destinations. Only the fragment is ignored (client-side
+ * scroll position, never the submission target). Unparseable values fall
+ * back to the raw string so unknown destinations never compare equal to
+ * known ones by accident. */
+function sameDestination(url: string): string {
   try {
     const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`;
+    parsed.hash = "";
+    return `${parsed.origin}${parsed.pathname}${parsed.search}`;
   } catch {
     return url;
   }
+}
+
+/** Canonical effect digests. The host binds one of these to every minted
+ * mutation token AT MINT TIME, and every executor recomputes the same
+ * digest from host-resolved state before dispatch. Same inputs, same
+ * bytes — a token minted for effect A can never first-use effect B.
+ * Shapes are frozen: changing them would orphan durable fence rows. */
+export function semanticEffectDigest(args: { kind: "click" | "type"; role: string; label: string; frame: string; value: string | null; runId: string; botId: string }): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ kind: `semantic-${args.kind}`, role: args.role, label: args.label, frame: args.frame, value: args.value, runId: args.runId, botId: args.botId }))
+    .digest("hex");
+}
+
+export function visualEffectDigest(args: { action: string; cssX: number; cssY: number; key: string | null; runId: string; botId: string }): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ kind: `visual-${args.action}`, cssX: args.cssX, cssY: args.cssY, key: args.key, runId: args.runId, botId: args.botId }))
+    .digest("hex");
+}
+
+export function scrollEffectDigest(args: { paneLabel: string; frame: string; runId: string; botId: string }): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ kind: "scroll", paneLabel: args.paneLabel, frame: args.frame, runId: args.runId, botId: args.botId }))
+    .digest("hex");
 }
 
 /** Pure approval-to-effect matcher (unit-testable).
@@ -346,21 +374,24 @@ function sameOriginPath(url: string): string {
  * owner authorization.
  *
  * - click (consequential submit/navigation): the stored approval must name
- *   the reviewed effective destination, and it must equal the live
- *   effective destination. A missing reviewed destination fails closed.
- * - type (field fill): operation kind, target and final value must match;
- *   destination is compared when both sides know it.
+ *   the reviewed effective destination (query included), it must equal the
+ *   live effective destination, and the stored reviewed target fingerprint
+ *   must equal the fresh host target. A missing reviewed destination or
+ *   identity fails closed.
+ * - type (field fill): operation kind, target identity, final value must
+ *   match; destination is compared when both sides know it.
  * - visual: there is no production reviewed visual-action contract yet, so
  *   every supplied approval refuses until the exact visual review identity
  *   exists. Callers must not pretend an unrelated record authorizes input.
  */
 export function approvalAuthorizesEffect(
-  action: { type?: unknown; args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown; destination?: unknown } } } | null,
+  action: { type?: unknown; args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown } } } | null,
   proposed: {
     kind: "click" | "type" | "visual";
     selector: string | null;
     value: string | null;
     destination: string | null;
+    targetFingerprint: string | null;
   },
 ): { ok: true } | { ok: false; reason: string } {
   if (proposed.kind === "visual") {
@@ -378,6 +409,20 @@ export function approvalAuthorizesEffect(
   if (proposed.selector && !approvedSelector) {
     return { ok: false, reason: "That approval does not name a reviewed control. Request a new review." };
   }
+  // Reviewed-target binding: the approval's stored target identity must
+  // equal the fresh host target. Approved state == live state is required
+  // independently of observed state == live state (review-digest check)
+  // and token == intended effect (mutation-token check).
+  const approvedFingerprint = typeof action?.args?.targetFingerprint === "string" ? action.args.targetFingerprint : null;
+  if (!approvedFingerprint) {
+    return { ok: false, reason: "That approval does not carry a reviewed target identity. Request a new review for the exact control state." };
+  }
+  if (!proposed.targetFingerprint) {
+    return { ok: false, reason: "The live target identity is unknown. Observe again before acting." };
+  }
+  if (approvedFingerprint !== proposed.targetFingerprint) {
+    return { ok: false, reason: "The reviewed control state changed after approval. Request a new review." };
+  }
   const approvedValue = typeof action?.args?.value === "string" ? action.args.value : null;
   if (proposed.value !== null && approvedValue !== proposed.value) {
     return { ok: false, reason: "That approval carries a different reviewed value. Request a new review." };
@@ -387,19 +432,20 @@ export function approvalAuthorizesEffect(
   if (proposed.kind === "click") {
     // Consequential clicks bind the reviewed EFFECTIVE destination, not the
     // page URL: an approval for /save-a can never authorize /save-b even
-    // when page URL, selector, label and other state are unchanged.
+    // when page URL, selector, label and other state are unchanged. Query
+    // strings are significant; only fragments are ignored.
     if (!approvedDestination) {
       return { ok: false, reason: "That approval does not name a reviewed destination. Request a new review for the exact submission target." };
     }
     if (!proposed.destination) {
       return { ok: false, reason: "The live destination is unknown. Observe again before acting." };
     }
-    if (sameOriginPath(approvedDestination) !== sameOriginPath(proposed.destination)) {
+    if (sameDestination(approvedDestination) !== sameDestination(proposed.destination)) {
       return { ok: false, reason: "That approval names a different destination. Request a new review." };
     }
     return { ok: true };
   }
-  if (proposed.destination && approvedDestination && sameOriginPath(approvedDestination) !== sameOriginPath(proposed.destination)) {
+  if (proposed.destination && approvedDestination && sameDestination(approvedDestination) !== sameDestination(proposed.destination)) {
     return { ok: false, reason: "That approval names a different destination. Request a new review." };
   }
   return { ok: true };
@@ -1739,9 +1785,20 @@ export class BrowserManager {
     if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
       throw new Error("A bounded typed value is required.");
     }
-    // Host-issued mutation identity; the fence below enforces it across
-    // observations, renderers and restarts.
-    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
+    // Canonical effect, bound by the host AT MINT TIME: the same intent
+    // keeps the same digest across re-observation; the token below was
+    // minted for exactly this digest, so a first caller can never choose
+    // what a minted token represents.
+    const effectDigest = semanticEffectDigest({
+      kind: input.kind, role: target.role, label: target.label, frame: target.framePath,
+      value: input.kind === "type" ? input.value ?? null : null, runId, botId,
+    });
+    // Host-issued mutation identity with exact effect (+approval) match;
+    // the fence below enforces it across observations, renderers and
+    // restarts.
+    const mutationKey = this.requireMutationToken(input.mutationKey, {
+      runId, botId, effectDigest, approvalId: input.approvalId ?? null,
+    });
     // Eligibility before admission: refusals leave no journal row behind.
     // (Explicit approvals validate after admission against the pinned live
     // page, with terminal transitions on refusal — see below.)
@@ -1750,12 +1807,6 @@ export class BrowserManager {
       .update(JSON.stringify({ targetId: target.targetId, kind: input.kind, value: input.kind === "type" ? input.value : null, reviewDigest: input.reviewDigest ?? null, observationId: observation.observationId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `sem_${target.fingerprint}_${payloadDigest.slice(0, 12)}`;
-    // Logical-effect binding (Finding G1): the same intent keeps the same
-    // digest across re-observation; a different control, value or kind
-    // under one key refuses at propose time.
-    const effectDigest = createHash("sha256")
-      .update(JSON.stringify({ kind: `semantic-${input.kind}`, role: target.role, label: target.label, frame: target.framePath, value: input.kind === "type" ? input.value : null, runId, botId }))
-      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-dom",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
@@ -1803,12 +1854,13 @@ export class BrowserManager {
       journalTransition(this.db, actionId, "failed_before_effect", "incomplete review coverage");
       throw new Error("INCOMPLETE_REVIEW: the review did not cover every relevant field. Narrow the scope and observe again.");
     }
-    // Round-4 I3 + final pass: an explicitly supplied approval must
-    // authorize THIS proposed effect — operation kind, target, final value
-    // and the LIVE effective destination against the stored host review.
-    // The destination compared here is the re-observed effective
-    // submission target, never the bare page URL. Refusals are terminal
-    // (failed_before_effect), never silent adoption.
+    // Approved state == live state, checked independently of observed
+    // state == live state (digest above) and token == intended effect
+    // (requirement at admission). The fresh host target carries the live
+    // reviewed identity; the approval must carry the same one plus the
+    // operation kind, final value and LIVE effective destination. Refusals
+    // are terminal (failed_before_effect), never silent adoption.
+    const fresh = await this.describeTarget(botId, target.selector);
     if (input.approvalId) {
       try {
         this.assertApprovalBinding(input.approvalId, {
@@ -1817,6 +1869,7 @@ export class BrowserManager {
           selector: target.selector,
           value: input.kind === "type" ? input.value ?? null : null,
           destination: liveDigest.destination,
+          targetFingerprint: fresh.fingerprint,
           observedAt: observation.capturedAt,
         });
       } catch (error) {
@@ -1824,7 +1877,6 @@ export class BrowserManager {
         throw error;
       }
     }
-    const fresh = await this.describeTarget(botId, target.selector);
     this.assertPreInput(observation, runId, botId, admittedEpoch);
     journalTransition(this.db, actionId, "dispatch_started");
     try {
@@ -1866,6 +1918,7 @@ export class BrowserManager {
       selector: string | null;
       value: string | null;
       destination: string | null;
+      targetFingerprint: string | null;
       observedAt: number;
     },
   ): void {
@@ -1878,13 +1931,14 @@ export class BrowserManager {
     }
     const action = this.db.getApprovalAction(approvalId) as {
       type?: unknown;
-      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetReview?: { url?: unknown; destination?: unknown } };
+      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown } };
     } | null;
     const matched = approvalAuthorizesEffect(action, {
       kind: proposed.kind,
       selector: proposed.selector,
       value: proposed.value,
       destination: proposed.destination,
+      targetFingerprint: proposed.targetFingerprint,
     });
     if (!matched.ok) throw new Error(matched.reason);
   }
@@ -1959,21 +2013,67 @@ export class BrowserManager {
     return this.db.botInputEpoch(input.botId);
   }
 
-  /** Host-issued mutation identity gate. The token must be minted by the
-   * host for this run/teammate (see mintMutationToken) — a caller-supplied
-   * string, however well-formed, is refused. The journal's effect binding
-   * then refuses cross-effect reuse, and the fence refuses unresolved or
-   * completed repeats. Read-only observation stays on the separate observe
-   * path, which never dispatches input. Model-loop exposure must mint at
-   * review time and hand the model only the opaque ID. */
-  private requireMutationKey(mutationKey: string | null | undefined, runId: string, botId: string): string {
+  /** Host-issued mutation identity gate with exact pre-bound matching.
+   * The token must be minted by the host for this run/teammate AND for
+   * exactly this canonical effect digest — and, when approval-backed, for
+   * exactly the supplied approval. A caller-supplied string, a foreign
+   * token, or a minted token repurposed for a different effect all refuse
+   * before admission, so no journal row is written. The journal's own
+   * effect check and the fence then refuse repeats across observations,
+   * renderers and restarts. Read-only observation stays on the separate
+   * observe path, which never dispatches input. Model-loop exposure must
+   * mint at review time and hand the model only the opaque ID. */
+  private requireMutationToken(
+    mutationKey: string | null | undefined,
+    expected: { runId: string; botId: string; effectDigest: string; approvalId?: string | null },
+  ): string {
     if (!mutationKey || typeof mutationKey !== "string" || !mutationKey.startsWith("mut_") || mutationKey.length < 12 || mutationKey.length > 128) {
       throw new Error("A host-issued mutation identity is required for consequential input. The host mints it at review time.");
     }
-    if (!this.db.hasMutationToken(mutationKey, runId, botId)) {
-      throw new Error("Unknown mutation identity for this task and teammate. The host must issue it at review time — invented IDs are refused.");
-    }
+    this.db.checkMutationToken(mutationKey, expected.runId, expected.botId, expected.effectDigest, expected.approvalId ?? null);
     return mutationKey;
+  }
+
+  /** Host-side mint for one reviewed semantic effect. Resolves the opaque
+   * target (never caller labels), binds the canonical effect digest — and
+   * the approval for reviewed work — into a fresh opaque token. */
+  mintSemanticMutation(
+    botId: string,
+    runId: string,
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string; approvalId?: string | null },
+  ): string {
+    const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    return this.db.mintMutationToken(
+      runId,
+      botId,
+      semanticEffectDigest({
+        kind: input.kind, role: target.role, label: target.label, frame: target.framePath,
+        value: input.kind === "type" ? input.value ?? null : null, runId, botId,
+      }),
+      input.approvalId ?? null,
+    );
+  }
+
+  /** Host-side mint for one scroll effect. Resolves the opaque pane token
+   * (never caller geometry) and binds the canonical scroll digest. */
+  mintScrollMutation(
+    botId: string,
+    runId: string,
+    input: { observationId: string; sessionId: string; paneToken: string; approvalId?: string | null },
+  ): string {
+    const observation = getObservation(input.observationId);
+    if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
+    if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    return this.db.mintMutationToken(
+      runId, botId,
+      scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, runId, botId }),
+      input.approvalId ?? null,
+    );
   }
 
   /** Refuse when the same logical mutation is already unresolved
@@ -2007,16 +2107,17 @@ export class BrowserManager {
   }
 
   /**
-   * R03 — Registry-bound visual action. The caller supplies an observation
-   * ID, an adapter ID, and image-relative coordinates. The transform comes
-   * from the host-captured observation — never caller geometry. Capability
-   * is derived from the server-owned adapter registry. Freshness (TTL, tab,
-   * document, account, owner epoch), live geometry (viewport, DPR product,
-   * scroll), secure mode, run authorization and input ownership are all
-   * checked immediately before input; assertPageAccess runs before AND
-   * after. Held buttons/modifiers release on every exit path.
+   * Shared host-side visual resolution: observation binding, capability,
+   * page pinning, document generation, live geometry and the host
+   * transform. Read-only — no journal row, no lease, no dispatch, no
+   * eligibility gate (minting is host bookkeeping; dispatch enforces
+   * eligibility, tokens, leases and ownership).
+   * Both mintVisualMutation (bind the effect before any token exists) and
+   * visualAct (recompute the same effect for exact-match verification) run
+   * this same path, so a minted effect and a dispatched effect agree
+   * exactly or the token refuses.
    */
-  async visualAct(
+  private async resolveVisualEffect(
     botId: string,
     runId: string,
     input: {
@@ -2027,11 +2128,17 @@ export class BrowserManager {
       point: { x: number; y: number };
       endPoint?: { x: number; y: number };
       key?: string;
-      approvalId?: string | null;
-      mutationKey?: string | null;
-      __testBarrier?: { beforeCommit?: () => Promise<void>; afterDispatch?: () => Promise<void> };
     },
-  ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
+  ): Promise<{
+    observation: CapturedObservation; page: Page; cssX: number; cssY: number;
+    live: { dpr: number; w: number; h: number; sx: number; sy: number };
+    transform: {
+      observationId: string; capturedX: number; capturedY: number; capturedWidth: number; capturedHeight: number;
+      cropX: number; cropY: number; cropWidth: number; cropHeight: number;
+      imageWidth: number; imageHeight: number; deviceScale: number; browserZoom: number;
+    };
+    capability: "visual-supported" | "text-only";
+  }> {
     const capability = this.visualCapabilityForAdapter(input.adapterId);
     const observation = getObservation(input.observationId);
     if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
@@ -2040,12 +2147,6 @@ export class BrowserManager {
     if (capability !== "visual-supported") {
       throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
     }
-    // Host-issued mutation identity (see semanticAct).
-    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
-    // Eligibility before admission: refusals leave no journal row behind.
-    // (Explicit approvals validate after admission against the pinned live
-    // page, with terminal transitions on refusal — see below.)
-    this.assertActEligible(observation, runId, botId);
     // Pin the observed page (Finding D): it must still be open and active.
     const page = observation.page;
     if (page.isClosed() || this.activePage(botId) !== page) {
@@ -2111,13 +2212,97 @@ export class BrowserManager {
       if (validated.reason === "VISION_UNAVAILABLE") throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
       throw new Error(`${validated.reason}: the screenshot changed after observation. Observe again before acting.`);
     }
+    return { observation, page, cssX: validated.cssX, cssY: validated.cssY, live, transform, capability };
+  }
+
+  /** Host-side mint for one visual effect. Runs the same host resolution
+   * as dispatch (never caller geometry) and binds the canonical effect —
+   * and the approval for reviewed work — into a fresh opaque token. */
+  async mintVisualMutation(
+    botId: string,
+    runId: string,
+    input: {
+      observationId: string;
+      sessionId: string;
+      adapterId: string;
+      action: "click" | "double-click" | "drag" | "scroll" | "key";
+      point: { x: number; y: number };
+      endPoint?: { x: number; y: number };
+      key?: string;
+      approvalId?: string | null;
+    },
+  ): Promise<string> {
+    const resolved = await this.resolveVisualEffect(botId, runId, input);
+    return this.db.mintMutationToken(
+      runId,
+      botId,
+      visualEffectDigest({
+        action: input.action,
+        cssX: Math.round(resolved.cssX), cssY: Math.round(resolved.cssY),
+        key: input.key ?? null, runId, botId,
+      }),
+      input.approvalId ?? null,
+    );
+  }
+
+  /**
+   * R03 — Registry-bound visual action. The caller supplies an observation
+   * ID, an adapter ID, and image-relative coordinates. The transform comes
+   * from the host-captured observation — never caller geometry. Capability
+   * is derived from the server-owned adapter registry. Freshness (TTL, tab,
+   * document, account, owner epoch), live geometry (viewport, DPR product,
+   * scroll), secure mode, run authorization and input ownership are all
+   * checked immediately before input; assertPageAccess runs before AND
+   * after. Held buttons/modifiers release on every exit path.
+   */
+  async visualAct(
+    botId: string,
+    runId: string,
+    input: {
+      observationId: string;
+      sessionId: string;
+      adapterId: string;
+      action: "click" | "double-click" | "drag" | "scroll" | "key";
+      point: { x: number; y: number };
+      endPoint?: { x: number; y: number };
+      key?: string;
+      approvalId?: string | null;
+      mutationKey?: string | null;
+      __testBarrier?: { beforeCommit?: () => Promise<void>; afterDispatch?: () => Promise<void> };
+    },
+  ): Promise<{ url: string; title: string; cssX: number; cssY: number }> {
+    // Binding + eligibility first, before admission and before any page
+    // reads: unknown/foreign observation, capability, runnable task and
+    // secure mode refuse here with deterministic precedence and no row.
+    const preObservation = getObservation(input.observationId);
+    if (!preObservation || preObservation.runId !== runId || preObservation.botId !== botId || preObservation.sessionId !== input.sessionId) {
+      throw new Error("STALE_OBSERVATION: unknown, expired, or foreign observation. Observe again.");
+    }
+    if (this.visualCapabilityForAdapter(input.adapterId) !== "visual-supported") {
+      throw new Error("VISION_UNAVAILABLE: this adapter cannot ground visual targets. Hand back the task instead of guessing coordinates.");
+    }
+    this.assertActEligible(preObservation, runId, botId);
+    // Same host resolution as mint: the dispatched effect digest recomputed
+    // here must exactly equal the pre-bound digest or the token refuses.
+    const resolved = await this.resolveVisualEffect(botId, runId, input);
+    const { observation, page, live, transform, capability } = resolved;
+    const validated = { cssX: resolved.cssX, cssY: resolved.cssY };
+    const effectDigest = visualEffectDigest({
+      action: input.action,
+      cssX: Math.round(validated.cssX), cssY: Math.round(validated.cssY),
+      key: input.key ?? null, runId, botId,
+    });
+    // Exact pre-bound match (token/run/teammate/effect, +approval when
+    // approval-backed). Repurposed tokens refuse before admission.
+    const mutationKey = this.requireMutationToken(input.mutationKey, {
+      runId, botId, effectDigest, approvalId: input.approvalId ?? null,
+    });
+    // Eligibility before admission: refusals leave no journal row behind.
+    this.assertActEligible(observation, runId, botId);
     const payloadDigest = createHash("sha256")
       .update(JSON.stringify({ observationId: observation.observationId, action: input.action, point: input.point, endPoint: input.endPoint ?? null, key: input.key ?? null, adapterId: input.adapterId, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `vis_${observation.observationId}_${Math.round(validated.cssX)}_${Math.round(validated.cssY)}_${payloadDigest.slice(0, 8)}`;
-    const effectDigest = createHash("sha256")
-      .update(JSON.stringify({ kind: `visual-${input.action}`, cssX: Math.round(validated.cssX), cssY: Math.round(validated.cssY), key: input.key ?? null, runId, botId }))
-      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-visual",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/obs:${observation.observationId}`,
@@ -2252,9 +2437,14 @@ export class BrowserManager {
     }
     const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
-    // Scroll dispatches input, so it carries a host-issued mutation
-    // identity like every other executor call.
-    const mutationKey = this.requireMutationKey(input.mutationKey, runId, botId);
+    // Canonical scroll effect, pre-bound by the host at mint time: the
+    // token below was minted for exactly this digest.
+    const effectDigest = scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, runId, botId });
+    // Exact pre-bound match (token/run/teammate/effect). Scroll carries
+    // no approval type, so approval-backed tokens never apply here.
+    const mutationKey = this.requireMutationToken(input.mutationKey, {
+      runId, botId, effectDigest, approvalId: null,
+    });
     // Eligibility before admission: refusals leave no journal row behind.
     // (Explicit approvals validate after admission against the pinned live
     // page, with terminal transitions on refusal — see below.)
@@ -2265,9 +2455,6 @@ export class BrowserManager {
       .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
     const actionId = `scr_${observation.observationId}_${pane.paneToken}_${payloadDigest.slice(0, 8)}`;
-    const effectDigest = createHash("sha256")
-      .update(JSON.stringify({ kind: "scroll", paneLabel: pane.label, frame: pane.framePath, runId, botId }))
-      .digest("hex");
     const admittedEpoch = this.admitAction({
       actionId, runId, botId, surface: "browser-dom",
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${pane.framePath}`,
