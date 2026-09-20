@@ -52,7 +52,7 @@ import { verifyOutcome, reviewBindingValid } from "./outcome-verification.js";
 import { adapterParityPass, capabilityForAdapter, mediatedToolAllowed, runtimeVersionAccepted } from "./adapter-parity.js";
 import { jevAllowed, jevSurfaceCovered, jevPromotable } from "./jev-experiment.js";
 import { OpenBotDatabase } from "./testing/database.js";
-import { approvalAuthorizesEffect } from "./runtime.js";
+import { approvalAuthorizesEffect, semanticEffectDigest, visualEffectDigest, scrollEffectDigest, normalizeScrollDelta } from "./runtime.js";
 
 // R01: tombstone + replay disclosure + orphan repair
 test("R01 tombstone retry never silently recreates work", () => {
@@ -685,4 +685,29 @@ test("mutation tokens are pre-bound to one exact effect", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// Trust-boundary review: canonical digests describe the FULL dispatched
+// effect — exact target identity, query-significant destination, both
+// drag endpoints, normalized scroll delta.
+test("canonical digests bind identity, query, drag end and scroll delta", () => {
+  const base = { kind: "click" as const, selector: "#go", frame: "/", role: "button", label: "Submit form", runId: "r", botId: "b" };
+  const a = semanticEffectDigest({ ...base, destination: "http://x/submit", value: null });
+  assert.equal(semanticEffectDigest({ ...base, destination: "http://x/submit", value: null }), a, "same effect retries under the same identity");
+  assert.notEqual(semanticEffectDigest({ ...base, selector: "#go2", destination: "http://x/submit", value: null }), a, "twin selector is a different effect");
+  assert.notEqual(semanticEffectDigest({ ...base, destination: "http://x/submit?account=A", value: null }), a, "query is a different destination");
+  assert.notEqual(semanticEffectDigest({ ...base, destination: "http://x/save-b", value: null }), a, "retarget is a different effect");
+  assert.notEqual(semanticEffectDigest({ ...base, kind: "type", destination: null, value: "v" }), a, "kind change is a different effect");
+  const dragAB = { action: "drag", cssX: 300, cssY: 200, endX: 350 as number | null, endY: 250 as number | null, key: null, runId: "r", botId: "b" };
+  const d = visualEffectDigest(dragAB);
+  assert.equal(visualEffectDigest(dragAB), d, "same drag retries under the same identity");
+  assert.notEqual(visualEffectDigest({ ...dragAB, endX: 100, endY: 100 }), d, "A→C differs from A→B");
+  assert.notEqual(visualEffectDigest({ ...dragAB, endX: null, endY: null }), d, "missing end differs from bound end");
+  assert.equal(normalizeScrollDelta(200), 200, "in-range deltas pass through");
+  assert.equal(normalizeScrollDelta(5000), 3000, "mint and dispatch clamp identically");
+  assert.equal(normalizeScrollDelta(-5000), -3000, "negative clamp is symmetric");
+  const s = scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 200, runId: "r", botId: "b" });
+  assert.equal(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 200, runId: "r", botId: "b" }), s, "same scroll retries under the same identity");
+  assert.notEqual(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: -200, runId: "r", botId: "b" }), s, "-200 differs from +200");
+  assert.notEqual(scrollEffectDigest({ paneLabel: "p", frame: "/", deltaY: 3000, runId: "r", botId: "b" }), s, "+3000 differs from +200");
 });

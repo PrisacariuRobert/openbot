@@ -346,22 +346,35 @@ function sameDestination(url: string): string {
  * mutation token AT MINT TIME, and every executor recomputes the same
  * digest from host-resolved state before dispatch. Same inputs, same
  * bytes — a token minted for effect A can never first-use effect B.
- * Shapes are frozen: changing them would orphan durable fence rows. */
-export function semanticEffectDigest(args: { kind: "click" | "type"; role: string; label: string; frame: string; value: string | null; runId: string; botId: string }): string {
+ *
+ * Each shape describes the FULL dispatched effect:
+ * - semantic: exact host target identity (selector+frame+role+label),
+ *   live effective destination for clicks, final value for typing;
+ * - visual: resolved start AND resolved end coordinates (drag binds both);
+ * - scroll: normalized (bounded) delta with the resolved pane.
+ * Shapes are versioned by their content: changing them orphans durable
+ * fence rows minted under older shapes, which then fail closed. */
+export function semanticEffectDigest(args: { kind: "click" | "type"; selector: string; frame: string; role: string; label: string; destination: string | null; value: string | null; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: `semantic-${args.kind}`, role: args.role, label: args.label, frame: args.frame, value: args.value, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: `semantic-${args.kind}`, selector: args.selector, frame: args.frame, role: args.role, label: args.label, destination: args.destination, value: args.value, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
-export function visualEffectDigest(args: { action: string; cssX: number; cssY: number; key: string | null; runId: string; botId: string }): string {
+export function visualEffectDigest(args: { action: string; cssX: number; cssY: number; endX: number | null; endY: number | null; key: string | null; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: `visual-${args.action}`, cssX: args.cssX, cssY: args.cssY, key: args.key, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: `visual-${args.action}`, cssX: args.cssX, cssY: args.cssY, endX: args.endX, endY: args.endY, key: args.key, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
-export function scrollEffectDigest(args: { paneLabel: string; frame: string; runId: string; botId: string }): string {
+/** Single normalization for scroll deltas, shared by mint and dispatch
+ * so both sides bind the identical bounded value. */
+export function normalizeScrollDelta(deltaY: number): number {
+  return Math.max(-3000, Math.min(3000, Math.round(deltaY)));
+}
+
+export function scrollEffectDigest(args: { paneLabel: string; frame: string; deltaY: number; runId: string; botId: string }): string {
   return createHash("sha256")
-    .update(JSON.stringify({ kind: "scroll", paneLabel: args.paneLabel, frame: args.frame, runId: args.runId, botId: args.botId }))
+    .update(JSON.stringify({ kind: "scroll", paneLabel: args.paneLabel, frame: args.frame, deltaY: args.deltaY, runId: args.runId, botId: args.botId }))
     .digest("hex");
 }
 
@@ -1785,12 +1798,22 @@ export class BrowserManager {
     if (input.kind === "type" && (typeof input.value !== "string" || input.value.length > 20_000)) {
       throw new Error("A bounded typed value is required.");
     }
-    // Canonical effect, bound by the host AT MINT TIME: the same intent
-    // keeps the same digest across re-observation; the token below was
-    // minted for exactly this digest, so a first caller can never choose
-    // what a minted token represents.
+    // Canonical effect, bound by the host AT MINT TIME. The destination
+    // below is the LIVE re-observed effective target — not the registry
+    // copy — so a retarget (path or query) between mint and dispatch
+    // refuses at the token check with no journal row. Unresolvable
+    // controls (destroyed/ambiguous/closed page) fall back to the minted
+    // destination and refuse at their dedicated gates below. Typing binds
+    // the final value instead of a destination.
+    let liveDestination: string | null = null;
+    if (input.kind === "click") {
+      liveDestination = (await this.controlReviewDigest(observation.page, target.selector))?.destination
+        ?? target.effectiveDestination;
+    }
     const effectDigest = semanticEffectDigest({
-      kind: input.kind, role: target.role, label: target.label, frame: target.framePath,
+      kind: input.kind, selector: target.selector, frame: target.framePath,
+      role: target.role, label: target.label,
+      destination: input.kind === "click" ? liveDestination : null,
       value: input.kind === "type" ? input.value ?? null : null, runId, botId,
     });
     // Host-issued mutation identity with exact effect (+approval) match;
@@ -2049,7 +2072,9 @@ export class BrowserManager {
       runId,
       botId,
       semanticEffectDigest({
-        kind: input.kind, role: target.role, label: target.label, frame: target.framePath,
+        kind: input.kind, selector: target.selector, frame: target.framePath,
+        role: target.role, label: target.label,
+        destination: input.kind === "click" ? target.effectiveDestination : null,
         value: input.kind === "type" ? input.value ?? null : null, runId, botId,
       }),
       input.approvalId ?? null,
@@ -2057,11 +2082,13 @@ export class BrowserManager {
   }
 
   /** Host-side mint for one scroll effect. Resolves the opaque pane token
-   * (never caller geometry) and binds the canonical scroll digest. */
+   * (never caller geometry), normalizes the delta exactly as dispatch
+   * does, and binds the canonical scroll digest. A token for +200 can
+   * never authorize -200 or +3000. */
   mintScrollMutation(
     botId: string,
     runId: string,
-    input: { observationId: string; sessionId: string; paneToken: string; approvalId?: string | null },
+    input: { observationId: string; sessionId: string; paneToken: string; deltaY: number; approvalId?: string | null },
   ): string {
     const observation = getObservation(input.observationId);
     if (!observation || observation.runId !== runId || observation.botId !== botId || observation.sessionId !== input.sessionId) {
@@ -2069,9 +2096,13 @@ export class BrowserManager {
     }
     const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    // Same normalization + validation as dispatch: the bound value is the
+    // dispatched value, bit for bit.
+    const bounded = normalizeScrollDelta(input.deltaY);
+    if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     return this.db.mintMutationToken(
       runId, botId,
-      scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, runId, botId }),
+      scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, deltaY: bounded, runId, botId }),
       input.approvalId ?? null,
     );
   }
@@ -2215,6 +2246,30 @@ export class BrowserManager {
     return { observation, page, cssX: validated.cssX, cssY: validated.cssY, live, transform, capability };
   }
 
+  /** Resolve + validate a drag end point against the same live geometry
+   * as the start. Shared by mint (bind the end before any token exists)
+   * and dispatch (recompute the identical end for exact-match), so a
+   * token for drag A→B can never authorize A→C. */
+  private resolveDragEnd(
+    resolved: Awaited<ReturnType<BrowserManager["resolveVisualEffect"]>>,
+    endPoint: { x: number; y: number },
+  ): { cssX: number; cssY: number } {
+    const end = validateVisualAction(
+      {
+        observationId: resolved.observation.observationId, transform: resolved.transform, action: "drag",
+        point: endPoint,
+        currentGeometry: {
+          cssWidth: resolved.live.w, cssHeight: resolved.live.h, deviceScale: resolved.live.dpr,
+          browserZoom: resolved.observation.browserZoom, scrollX: resolved.live.sx, scrollY: resolved.live.sy,
+        },
+        capturedScroll: resolved.observation.scroll,
+      },
+      resolved.capability,
+    );
+    if (!end.ok) throw new Error(`${end.reason}: drag end point invalid. Observe again.`);
+    return { cssX: end.cssX, cssY: end.cssY };
+  }
+
   /** Host-side mint for one visual effect. Runs the same host resolution
    * as dispatch (never caller geometry) and binds the canonical effect —
    * and the approval for reviewed work — into a fresh opaque token. */
@@ -2233,12 +2288,15 @@ export class BrowserManager {
     },
   ): Promise<string> {
     const resolved = await this.resolveVisualEffect(botId, runId, input);
+    const dragEnd = input.action === "drag" && input.endPoint ? this.resolveDragEnd(resolved, input.endPoint) : null;
     return this.db.mintMutationToken(
       runId,
       botId,
       visualEffectDigest({
         action: input.action,
         cssX: Math.round(resolved.cssX), cssY: Math.round(resolved.cssY),
+        endX: dragEnd ? Math.round(dragEnd.cssX) : null,
+        endY: dragEnd ? Math.round(dragEnd.cssY) : null,
         key: input.key ?? null, runId, botId,
       }),
       input.approvalId ?? null,
@@ -2285,11 +2343,16 @@ export class BrowserManager {
     // Same host resolution as mint: the dispatched effect digest recomputed
     // here must exactly equal the pre-bound digest or the token refuses.
     const resolved = await this.resolveVisualEffect(botId, runId, input);
-    const { observation, page, live, transform, capability } = resolved;
+    const { observation, page } = resolved;
     const validated = { cssX: resolved.cssX, cssY: resolved.cssY };
+    // Drag end resolves BEFORE the token check (pre-admission, no row):
+    // a token for A→B refuses A→C here with zero input.
+    const dragEnd = input.action === "drag" && input.endPoint ? this.resolveDragEnd(resolved, input.endPoint) : null;
     const effectDigest = visualEffectDigest({
       action: input.action,
       cssX: Math.round(validated.cssX), cssY: Math.round(validated.cssY),
+      endX: dragEnd ? Math.round(dragEnd.cssX) : null,
+      endY: dragEnd ? Math.round(dragEnd.cssY) : null,
       key: input.key ?? null, runId, botId,
     });
     // Exact pre-bound match (token/run/teammate/effect, +approval when
@@ -2355,22 +2418,14 @@ export class BrowserManager {
         await page.mouse.dblclick(validated.cssX, validated.cssY);
         crossed = true;
       } else if (input.action === "drag" && input.endPoint) {
-        const end = validateVisualAction(
-          {
-            observationId: observation.observationId, transform, action: "drag",
-            point: input.endPoint, currentGeometry: { cssWidth: live.w, cssHeight: live.h, deviceScale: live.dpr, browserZoom: observation.browserZoom, scrollX: live.sx, scrollY: live.sy },
-            capturedScroll: observation.scroll,
-          },
-          capability,
-        );
-        if (!end.ok) throw new Error(`${end.reason}: drag end point invalid. Observe again.`);
+        if (!dragEnd) throw new Error("That visual action is not supported with these arguments.");
         checkPhase("drag-press");
         await page.mouse.move(validated.cssX, validated.cssY);
         await page.mouse.down();
         crossed = true;
         try {
           checkPhase("drag-move");
-          await page.mouse.move(end.cssX, end.cssY, { steps: 12 });
+          await page.mouse.move(dragEnd.cssX, dragEnd.cssY, { steps: 12 });
         } finally {
           await page.mouse.up().catch(() => undefined);
         }
@@ -2437,20 +2492,22 @@ export class BrowserManager {
     }
     const pane = observation.panes.find((candidate) => candidate.paneToken === input.paneToken);
     if (!pane) throw new Error("That scroll region was not observed. Observe again.");
+    // Eligibility before admission: refusals leave no journal row behind.
+    // (Explicit approvals validate after admission against the pinned live
+    // page, with terminal transitions on refusal — see below.)
+    this.assertActEligible(observation, runId, botId);
+    // Normalized with the same function as mint: the bound value is the
+    // dispatched value, so +200 can never authorize -200 or +3000.
+    const bounded = normalizeScrollDelta(input.deltaY);
+    if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     // Canonical scroll effect, pre-bound by the host at mint time: the
     // token below was minted for exactly this digest.
-    const effectDigest = scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, runId, botId });
+    const effectDigest = scrollEffectDigest({ paneLabel: pane.label, frame: pane.framePath, deltaY: bounded, runId, botId });
     // Exact pre-bound match (token/run/teammate/effect). Scroll carries
     // no approval type, so approval-backed tokens never apply here.
     const mutationKey = this.requireMutationToken(input.mutationKey, {
       runId, botId, effectDigest, approvalId: null,
     });
-    // Eligibility before admission: refusals leave no journal row behind.
-    // (Explicit approvals validate after admission against the pinned live
-    // page, with terminal transitions on refusal — see below.)
-    this.assertActEligible(observation, runId, botId);
-    const bounded = Math.max(-3000, Math.min(3000, Math.round(input.deltaY)));
-    if (!Number.isFinite(bounded) || bounded === 0) throw new Error("A non-zero bounded scroll amount is required.");
     const payloadDigest = createHash("sha256")
       .update(JSON.stringify({ observationId: observation.observationId, paneToken: pane.paneToken, deltaY: bounded, mutationKey: input.mutationKey ?? null }))
       .digest("hex");
