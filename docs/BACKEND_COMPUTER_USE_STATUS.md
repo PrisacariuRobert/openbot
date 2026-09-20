@@ -7,6 +7,9 @@
 > Round-4 candidate SHA: 1d18142895eaf10cd6464aca11c8ddad489f7eb3
 > Round-4 commit: 1d18142 Round 4: harden computer-use input and review boundaries
 > (includes prior local 532d955 final-input commit pushed together; no force-push).
+> Round-4 final trust-boundary pass (candidate): d67343be75a38cfb1619db12790fc3ac5918a143
+> — exact destination binding, visual fail-closed, executor ownership,
+> host-issued tokens. Still draft, no merge/release.
 > Infrastructure-only label: model-loop exposure stays unwired by design,
 > native mode and Jev stay disabled. B02/B03/B06 are trust-boundary
 > infrastructure with fixture proof — NOT general autonomous computer use,
@@ -61,6 +64,47 @@ resource contention):
 - Note: two earlier `npm run verify` failures in this environment were
   local resource-contention flakes under parallel load; clean sequential
   passes above followed on the same candidate with no code change.
+
+## Ticket assessment (round-4 final trust-boundary pass, candidate d67343b)
+
+Narrow pass only — no engine redesign, no model/native/Jev/downloads,
+no paid/live spend:
+
+- Exact approval destination binding: consequential clicks compare the
+  reviewed EFFECTIVE destination (submitter formaction > form action >
+  anchor href > document URL) against the live re-observed destination.
+  Missing reviewed destination fails closed; observation-digest equality
+  never substitutes for owner authorization. Carried in the host-owned
+  target (`effectiveDestination`), the approval review schema
+  (`targetReview.destination`, optional so older approvals parse then
+  refuse at the gate), and `describeTarget`.
+- Visual approvals: every supplied `approvalId` for `visualAct` refuses
+  (`Visual approvals are not issued yet`), including well-formed
+  `browser_visual` records. `scrollPane` already refused; unchanged.
+- Post-dispatch ownership on all executors: visual click/double-click/
+  drag/scroll/key and `scrollPane` apply the semantic `assertStillOwned`
+  rule — pre-dispatch cancel means zero input (`failed_before_effect`),
+  post-dispatch race means `outcome_uncertain` reconciled through
+  readback, never ordinary success. `commitType` re-checks revocation
+  immediately after the final editability await, before `keyboard.type`.
+- Host-issued mutation identities (implemented, option A): `mutation_tokens`
+  table, `mintMutationToken` per run/teammate (optionally approval-bound),
+  executors accept only minted tokens. Invented or foreign IDs refuse
+  before admission with no journal row. Model-loop exposure must mint at
+  review time and hand the model only the opaque ID.
+
+Evidence (executed sequentially on candidate d67343b):
+
+- `npm run check` (tsc --noEmit): clean.
+- `npm run check:acceptance`: clean.
+- `npm test`: 889 pass, 0 fail (887 baseline + 2 new matcher/token units).
+- `npm run test:computer-use-fixtures`: 20/20 PASS (18 Round-4 cases
+  preserved + F9c host-issued tokens + F10c visual/scroll ownership;
+  F11 now proves wrong/missing-destination refusal and visual fail-closed).
+- `npm run test:r01-http-fixtures`: 9/9 PASS.
+- `npm run check:release`: pass. `npm run test:desktop`: 5/5.
+  `npm run test:packaging`: 13/13.
+- Protected-client diff on candidate d67343b: ZERO.
 
 ## Ticket assessment (round 3: authority and recovery repair)
 
