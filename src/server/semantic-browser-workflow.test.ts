@@ -86,7 +86,7 @@ main().catch(e=>{console.error(e);process.exitCode=1});`;
     await f.until(() => f!.db.getRun(runId)?.status === "completed");
     assert.ok(reads > 0);
     assert.equal(f.db.listApprovals().filter((approval) => approval.runId === runId).length, 0, "reading must not require owner approval");
-    assert.ok(f.db.listMessages("bot-pixel").some((message) => message.body.includes(`Acme renewal 2026 is ${expectedDue}`)));
+    await f.until(() => f!.db.listMessages("bot-pixel").some((message) => message.body.includes(`Acme renewal 2026 is ${expectedDue}`)));
   } finally {
     await f?.close();
     portal.closeAllConnections();
@@ -207,7 +207,7 @@ main().catch(e=>{console.error(e.stack||e);process.exitCode=1});`;
     assert.equal(records.get("acme-support")?.due, "2026-11-01");
     const state = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "pixel", `.semantic-phase-${runId}.json`), "utf8")) as { staleSelectorStatus: number };
     assert.equal(state.staleSelectorStatus, 403, "a stale offered selector tool must fail at dispatch");
-    if (outcome !== "denied") assert.ok(f.db.listMessages("bot-pixel").some((message) => message.body.includes(outcome === "approved" ? "read back the same record" : "could not be independently read back")));
+    if (outcome !== "denied") await f.until(() => f!.db.listMessages("bot-pixel").some((message) => message.body.includes(outcome === "approved" ? "read back the same record" : "could not be independently read back")));
   } finally {
     await f?.close();
     portal.closeAllConnections();
