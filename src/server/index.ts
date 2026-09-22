@@ -3833,6 +3833,7 @@ app.post("/api/internal/tools", async (request, response) => {
         const value = requested.value ?? "";
         const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target), browserApprovalReason(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target));
         const mustReviewChange = requested.kind === "click" && (/\b(save|submit|send|confirm|delete|remove|purchase|publish|update)\b/i.test(target.label) || Boolean(target.formMethod && target.formMethod !== "get"));
+        if (mustReviewChange) browser.assertNoPriorReviewedSemanticEffect(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind });
         const reviewReason = mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason;
         const requiredByRule = decision.matched?.effect === "require_approval";
         const grantClaimed = requested.kind === "click" && !mustReviewChange && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
@@ -4399,7 +4400,7 @@ app.post("/api/internal/tools", async (request, response) => {
     const connectorId = action.startsWith("slack_") ? "slack" : action.startsWith("notion_") ? "notion" : action.startsWith("todoist_") ? "todoist" : action.startsWith("dropbox_") ? "dropbox" : action.startsWith("github_") ? "github-cli" : action.startsWith("gmail_") || action.startsWith("google_") ? "google-workspace" : null;
     if (connectorId) { db.addConnectorEvent({ connectorId, botId, action, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
     const userMessage = connectorId === "slack" || connectorId === "notion" || connectorId === "todoist" || connectorId === "dropbox" ? friendlyConnectorError(connectorId, message) : message;
-    return response.status(500).json({ error: userMessage });
+    return response.status(/^(UNCERTAIN_CONFLICT|DUPLICATE_MUTATION):/.test(message) ? 409 : 500).json({ error: userMessage });
   }
 });
 

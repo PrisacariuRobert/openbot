@@ -1864,7 +1864,7 @@ export class BrowserManager {
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: target.label,
       payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
-      mutationKey, effectDigest,
+      mutationKey, effectDigest, fenceReviewedEffect: Boolean(input.approvalId),
     });
     // Pin the observed page (Finding D): the pinned object must still be
     // open and must still be the active tab. A tab switch, no matter the
@@ -2059,10 +2059,24 @@ export class BrowserManager {
     surfaceIdentity: string; ownershipEpoch: string; target: string;
     payloadDigest: string; reviewDigest: string | null; account: string;
     mutationKey?: string | null; effectDigest?: string | null;
+    fenceReviewedEffect?: boolean;
   }): number {
     journalPropose(this.db, { ...input });
     if (input.mutationKey) this.assertMutationFence(input.mutationKey, input.runId, input.botId, input.actionId);
-    if (!admitOnce(this.db, input.actionId)) {
+    const admitted = input.fenceReviewedEffect
+      ? this.db.journalActionAdmitEffectOnce(input.actionId)
+      : admitOnce(this.db, input.actionId);
+    if (!admitted) {
+      if (input.fenceReviewedEffect && input.effectDigest) {
+        const prior = this.db.journalActionFindByEffect(input.effectDigest, input.runId, input.botId)
+          .filter((row) => row.actionId !== input.actionId);
+        if (prior.length > 0) {
+          journalTransition(this.db, input.actionId, "failed_before_effect", "reviewed effect already admitted under another mutation");
+          throw new Error(prior.some((row) => row.stage === "verified")
+            ? "DUPLICATE_MUTATION: this reviewed effect already completed. Check its result instead of sending it again."
+            : "UNCERTAIN_CONFLICT: this reviewed effect may already have happened. Read back its result before proposing another change.");
+        }
+      }
       throw new Error("This action was already admitted. Check its result instead of sending it again.");
     }
     return this.db.botInputEpoch(input.botId);
@@ -2100,17 +2114,36 @@ export class BrowserManager {
     const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
     const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
     if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
-    return this.db.mintMutationToken(
-      runId,
-      botId,
-      semanticEffectDigest({
-        kind: input.kind, selector: target.selector, frame: target.framePath,
-        role: target.role, label: target.label, reviewDigest: target.reviewDigest,
-        destination: input.kind === "click" ? target.effectiveDestination : null,
-        value: input.kind === "type" ? input.value ?? null : null, runId, botId,
-      }),
-      input.approvalId ?? null,
-    );
+    return this.db.mintMutationToken(runId, botId, this.observedSemanticEffectDigest(target, runId, botId, input.kind, input.value), input.approvalId ?? null);
+  }
+
+  /** Before requesting another approval, surface a previous admitted save
+   * for the same observed effect. The atomic admission gate still decides
+   * races after the owner acts. */
+  assertNoPriorReviewedSemanticEffect(
+    botId: string, runId: string,
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string },
+  ): void {
+    const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    const digest = this.observedSemanticEffectDigest(target, runId, botId, input.kind, input.value);
+    const prior = this.db.journalActionFindByEffect(digest, runId, botId);
+    if (prior.length > 0) throw new Error(prior.some((row) => row.stage === "verified")
+      ? "DUPLICATE_MUTATION: this reviewed effect already completed. Check its result instead of sending it again."
+      : "UNCERTAIN_CONFLICT: this reviewed effect may already have happened. Read back its result before proposing another change.");
+  }
+
+  private observedSemanticEffectDigest(
+    target: CapturedObservation["targets"][number], runId: string, botId: string,
+    kind: "click" | "type", value?: string,
+  ): string {
+    return semanticEffectDigest({
+      kind, selector: target.selector, frame: target.framePath,
+      role: target.role, label: target.label, reviewDigest: target.reviewDigest,
+      destination: kind === "click" ? target.effectiveDestination : null,
+      value: kind === "type" ? value ?? null : null, runId, botId,
+    });
   }
 
   /** Host-side mint for one scroll effect. Resolves the opaque pane token

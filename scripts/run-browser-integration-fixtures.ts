@@ -527,7 +527,7 @@ try {
   // equality never substitutes for owner authorization, and every token
   // below is pre-bound by the host to its exact effect and approval.
   {
-    const approveRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "approval task", status: "running" });
+    let approveRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "approval task", status: "running" });
     const approve = (action: unknown) => {
       const approval = db.createApproval({ runId: approveRun.id, botId: "nova", kind: "browser", reason: "fixture review", actionLabel: "fixture", action });
       return db.decideApproval(approval.id, "approved")!;
@@ -546,6 +546,10 @@ try {
     await browser.semanticAct("nova", approveRun.id, { targetId: exactGo.targetId, sessionId: SESSION, kind: "click", mutationKey: mutT(approveRun.id, exactGo.targetId, "click", undefined, exactApproval.id), approvalId: exactApproval.id });
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(submits.length, submitsBeforeExact + 1, "exact approved operation dispatches once");
+    // Approval-mismatch cases are a new task. The successful submit above
+    // must remain fenced inside its own task, without masking the distinct
+    // approval-binding errors exercised below.
+    approveRun = db.createRun({ threadId: "team-room", botId: "nova", prompt: "approval mismatch task", status: "running" });
     // Mismatched selector refuses.
     await browser.open("nova", `${base}/form`);
     const oMis = await browser.observeScoped("nova", approveRun.id, { surface: "browser-dom", sessionId: SESSION });

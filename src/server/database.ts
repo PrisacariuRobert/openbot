@@ -2902,6 +2902,31 @@ export class OpenBotDatabase {
     return result.changes === 1;
   }
 
+  /** Atomically claim a reviewed effect, regardless of which fresh mutation
+   * token the caller obtained. SQLite serializes the conditional update, so
+   * two approvals or processes cannot both pass a read-then-write fence. */
+  journalActionAdmitEffectOnce(actionId: string): boolean {
+    const result = this.db.prepare(`
+      UPDATE action_journal SET stage='admitted',updated_at=?
+      WHERE action_id=? AND stage IN ('proposed','validated','awaiting_review')
+        AND effect_digest IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM action_journal prior
+          WHERE prior.run_id=action_journal.run_id
+            AND prior.bot_id=action_journal.bot_id
+            AND prior.effect_digest=action_journal.effect_digest
+            AND prior.action_id<>action_journal.action_id
+            AND prior.stage IN ('admitted','dispatch_started','effect_observed','outcome_uncertain','verified')
+        )
+    `).run(now(), actionId);
+    return result.changes === 1;
+  }
+
+  journalActionFindByEffect(effectDigest: string, runId: string, botId: string): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE effect_digest=? AND run_id=? AND bot_id=? AND stage IN ('admitted','dispatch_started','effect_observed','outcome_uncertain','verified') ORDER BY created_at ASC").all(effectDigest, runId, botId) as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
   /** Enforced stage machine. outcome_uncertain is terminal here: leaving it
    * requires journalActionReconcile with owner-checked evidence. */
   journalActionTransition(actionId: string, stage: ActionJournalRecord["stage"], detail: string | null = null): ActionJournalRecord | null {

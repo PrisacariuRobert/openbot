@@ -158,6 +158,16 @@ async function main(){
     if(state.phase===4)held=await act(page,'click','Save renewal');
     state.phase++;save();if(held){setInterval(()=>{},1000);return}
   }
+  if(${outcome === "approved"}){
+    // Simulate a lost confirmation: the approved click ran, but the peer
+    // disregards that response and tries the same Save under a new token.
+    const page=await observe();
+    const saves=page.targets.filter(x=>x.label.includes('Save renewal'));
+    if(saves.length!==1)throw Error('Save control disappeared before replay check');
+    const replay=await tool('browser_semantic_act',{targetId:saves[0].targetId,kind:'click'});
+    state.replayStatus=replay.status;state.replayBody=replay.body;save();
+    if(replay.status!==409||!String(replay.body.error||'').includes('UNCERTAIN_CONFLICT'))throw Error('A fresh token escaped the effect fence: '+JSON.stringify(replay));
+  }
   for(let n=0;n<30;n++){const page=await observe();if(page.textPreview.includes('Due 2026-10-14')&&page.textPreview.includes('Saved record Acme renewal 2026')){console.log(JSON.stringify({type:'text',text:'Acme renewal 2026 was saved with due date 14 Oct 2026. I read back the same record in the support portal.'}));return}await new Promise(r=>setTimeout(r,100))}
   console.log(JSON.stringify({type:'text',text:'The save result could not be independently read back; do not claim completion.'}));
 }
@@ -205,8 +215,13 @@ main().catch(e=>{console.error(e.stack||e);process.exitCode=1});`;
     else assert.equal(f.db.getApprovedAction(saveApprovalId)?.status, stale ? "failed" : "completed");
     assert.equal(records.get("acme-2025")?.due, "2025-10-14");
     assert.equal(records.get("acme-support")?.due, "2026-11-01");
-    const state = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "pixel", `.semantic-phase-${runId}.json`), "utf8")) as { staleSelectorStatus: number };
+    const state = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "pixel", `.semantic-phase-${runId}.json`), "utf8")) as { staleSelectorStatus: number; replayStatus?: number; replayBody?: { error?: string } };
     assert.equal(state.staleSelectorStatus, 403, "a stale offered selector tool must fail at dispatch");
+    if (outcome === "approved") {
+      assert.equal(state.replayStatus, 409, "fresh-token replay must refuse before opening a second approval");
+      assert.match(state.replayBody?.error || "", /UNCERTAIN_CONFLICT/);
+      assert.equal(f.db.listRunApprovals(runId).filter((approval) => /Save renewal/.test(approval.actionLabel)).length, 1);
+    }
     if (outcome !== "denied") await f.until(() => f!.db.listMessages("bot-pixel").some((message) => message.body.includes(outcome === "approved" ? "read back the same record" : "could not be independently read back")));
   } finally {
     await f?.close();
