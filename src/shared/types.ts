@@ -1067,6 +1067,7 @@ export interface WorkspaceFile {
 
 export interface StudioSettings {
   macAccessEnabled: boolean;
+  semanticBrowserEnabled: boolean;
   selfExtendEnabled: boolean;
   codingModel: string | null;
   embeddingsProviderInstanceId: string | null;

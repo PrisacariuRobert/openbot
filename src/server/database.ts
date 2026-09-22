@@ -1116,6 +1116,7 @@ export class OpenBotDatabase {
     insertSetting.run("runner_external_heartbeat_last_success_at", "", settingsAt);
     insertSetting.run("runner_external_heartbeat_last_error", "", settingsAt);
     insertSetting.run("self_extend_enabled", "1", settingsAt);
+    insertSetting.run("semantic_browser_enabled", "0", settingsAt);
     insertSetting.run("coding_model", "", settingsAt);
     insertSetting.run("embeddings_provider", "", settingsAt);
     insertSetting.run("embeddings_model", "", settingsAt);
@@ -1250,10 +1251,10 @@ export class OpenBotDatabase {
   }
 
   getStudioSettings(): StudioSettings {
-    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('mac_access_enabled','self_extend_enabled','coding_model','embeddings_provider','embeddings_model','max_teammates','yolo_mode')").all() as Row[];
+    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('mac_access_enabled','semantic_browser_enabled','self_extend_enabled','coding_model','embeddings_provider','embeddings_model','max_teammates','yolo_mode')").all() as Row[];
     const value = (key: string) => String((rows.find((row) => row.setting_key === key) as Row | undefined)?.setting_value ?? "");
     const maxTeammates = Math.max(1, Math.min(100, Number.parseInt(value("max_teammates") || "12", 10) || 12));
-    return { macAccessEnabled: asBoolean(value("mac_access_enabled")), selfExtendEnabled: asBoolean(value("self_extend_enabled") || "1"), codingModel: value("coding_model") || null, embeddingsProviderInstanceId: value("embeddings_provider") || null, embeddingsModel: value("embeddings_model") || null, maxTeammates, yoloMode: asBoolean(value("yolo_mode")) };
+    return { macAccessEnabled: asBoolean(value("mac_access_enabled")), semanticBrowserEnabled: asBoolean(value("semantic_browser_enabled")), selfExtendEnabled: asBoolean(value("self_extend_enabled") || "1"), codingModel: value("coding_model") || null, embeddingsProviderInstanceId: value("embeddings_provider") || null, embeddingsModel: value("embeddings_model") || null, maxTeammates, yoloMode: asBoolean(value("yolo_mode")) };
   }
 
   updateStudioSettings(patch: Partial<StudioSettings>): StudioSettings {
@@ -1263,6 +1264,7 @@ export class OpenBotDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='mac_access_enabled'").run(next.macAccessEnabled ? "1" : "0", now());
+      this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='semantic_browser_enabled'").run(next.semanticBrowserEnabled ? "1" : "0", now());
       this.db.prepare("UPDATE bots SET mac_access_enabled=?").run(next.macAccessEnabled ? 1 : 0);
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='self_extend_enabled'").run(next.selfExtendEnabled ? "1" : "0", now());
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='coding_model'").run(next.codingModel || "", now());

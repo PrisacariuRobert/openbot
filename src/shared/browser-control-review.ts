@@ -42,4 +42,13 @@ export const browserControlApprovalSchema = z.object({
   /** Host-authored offer shown beside an exact click approval. Its presence
    * never grants access; only the owner's separate decision flag can do so. */
   navigationAllowanceOffer: browserNavigationAllowanceOfferSchema.optional(),
-}).strict();
+  // Host-only binding for the feature-flagged semantic path. These fields
+  // are created after resolving an opaque observed target, never accepted as
+  // model input. They let the approved effect rebind to an equivalent fresh
+  // observation after the original 15-second target expires.
+  semanticBound: z.literal(true).optional(),
+  semanticSessionId: z.string().min(1).max(160).optional(),
+  semanticRole: z.string().min(1).max(80).optional(),
+  semanticLabel: z.string().min(1).max(240).optional(),
+  semanticReviewDigest: z.string().min(1).max(128).optional(),
+}).strict().refine((value) => !value.semanticBound || Boolean(value.semanticSessionId && value.semanticRole && value.semanticLabel && value.semanticReviewDigest), "A semantic browser review needs its complete host binding.");

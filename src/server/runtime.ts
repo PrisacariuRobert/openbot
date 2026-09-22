@@ -1293,13 +1293,15 @@ export class BrowserManager {
     if (!(await locator.isEditable().catch(() => false))) {
       throw new Error("The field stopped being editable before typing. Observe again.");
     }
-    // The editability check above awaits; a revocation landing inside that
-    // await must not allow the first keystroke. Re-check synchronously
-    // immediately before typing.
+    // Semantic type means replace the current field value, matching the
+    // legacy fill tool and the reviewed final value. Selecting the existing
+    // text is not a write; recheck ownership before the first keystroke.
+    await page.keyboard.press("ControlOrMeta+A");
     this.assertNotRevoked(botId, runId, admittedEpoch);
     // Keystroke insertion performs no readiness waits: revocation is
     // checked before the first keystroke, and ownership afterwards.
-    await page.keyboard.type(value, { delay: 0 });
+    if (value) await page.keyboard.type(value, { delay: 0 });
+    else await page.keyboard.press("Backspace");
   }
 
   /** Ownership check after input crossed the dispatch boundary. A change
@@ -1415,13 +1417,14 @@ export class BrowserManager {
    * secure-entry state (live login-wall probe), scope permission, owner
    * epoch (revocation-bound), visual capability (server registry, never a
    * caller assertion), and the opaque control/pane targets issued from the
-   * actually rendered page. Callers receive IDs only.
+   * actually rendered page. Callers receive bounded labels and opaque IDs,
+   * never selectors, geometry, form digests or minted effects.
    */
   async observeScoped(
     botId: string,
     runId: string,
     input: { surface: "browser-dom" | "browser-visual"; sessionId: string },
-  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; paneTokens: string[] }> {
+  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; targets: Array<{ targetId: string; role: string; label: string }>; paneTokens: string[] }> {
     const run = this.db.getRun(runId);
     if (!run || run.botId !== botId) throw new Error("That task is not available to this teammate.");
     if (["completed", "failed", "cancelled"].includes(run.status)) throw new Error("That task has already finished.");
@@ -1454,7 +1457,7 @@ export class BrowserManager {
         targets: [], panes: [],
         page,
       });
-      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], paneTokens: [] };
+      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], targets: [], paneTokens: [] };
     }
     const snapshot = await this.snapshot(botId);
     const { redacted } = redactSecretsForProvider(snapshot.text.slice(0, 8000));
@@ -1528,8 +1531,29 @@ export class BrowserManager {
       observationId, expiresAt, textPreview: redacted.slice(0, 4000),
       modality: route.modality, reason: route.reason,
       targetIds: targets.map((target) => target.targetId),
+      targets: targets.map(({ targetId, role, label }) => ({ targetId, role, label })),
       paneTokens: panes.map((pane) => pane.paneToken),
     };
+  }
+
+  /** Host-only resolution for the normal teammate tool. The model receives
+   * labels and opaque IDs, never selectors or reviewed effect metadata. */
+  scopedTarget(botId: string, runId: string, sessionId: string, targetId: string): RegistryTarget {
+    const observation = this.requireActionObservation(targetId, runId, botId, sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: observe the control again.");
+    return target;
+  }
+
+  /** An approval may outlive a 15-second observation. Reobserve the live
+   * page, then bind only the same uniquely identified reviewed control. */
+  async reobserveApprovedTarget(botId: string, runId: string, sessionId: string, reviewed: Pick<RegistryTarget, "selector" | "role" | "label" | "reviewDigest">): Promise<string> {
+    const fresh = await this.observeScoped(botId, runId, { surface: "browser-dom", sessionId });
+    const observation = getObservation(fresh.observationId);
+    if (!observation) throw new Error("STALE_OBSERVATION: the page could not be reobserved.");
+    const matches = observation.targets.filter((target) => target.selector === reviewed.selector && target.role === reviewed.role && target.label === reviewed.label && target.reviewDigest === reviewed.reviewDigest);
+    if (matches.length !== 1) throw new Error("The reviewed control or form changed after approval. Request a fresh review.");
+    return matches[0]!.targetId;
   }
 
   /** Active owner sign-in handoff for this teammate's browser: model-visible
@@ -1899,6 +1923,7 @@ export class BrowserManager {
           destination: liveDigest.destination,
           targetFingerprint: fresh.fingerprint,
           observedAt: observation.capturedAt,
+          reviewDigest: target.reviewDigest,
         });
       } catch (error) {
         journalTransition(this.db, actionId, "failed_before_effect", "approval does not authorize this action");
@@ -1948,19 +1973,21 @@ export class BrowserManager {
       destination: string | null;
       targetFingerprint: string | null;
       observedAt: number;
+      reviewDigest?: string | null;
     },
   ): void {
     const approval = this.db.getApproval(approvalId);
     if (!approval || approval.status !== "approved" || approval.runId !== proposed.runId || approval.botId !== proposed.botId) {
       throw new Error("That approval is not a completed host review for this task and teammate.");
     }
-    if (approval.decidedAt && new Date(approval.decidedAt).getTime() < proposed.observedAt) {
-      throw new Error("That approval predates the current observation. Request a new review.");
-    }
     const action = this.db.getApprovalAction(approvalId) as {
       type?: unknown;
-      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown } };
+      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown }; semanticBound?: unknown; semanticReviewDigest?: unknown };
     } | null;
+    const reboundSemanticReview = action?.args?.semanticBound === true && typeof action.args.semanticReviewDigest === "string" && action.args.semanticReviewDigest === proposed.reviewDigest;
+    if (!reboundSemanticReview && approval.decidedAt && new Date(approval.decidedAt).getTime() < proposed.observedAt) {
+      throw new Error("That approval predates the current observation. Request a new review.");
+    }
     const matched = approvalAuthorizesEffect(action, {
       kind: proposed.kind,
       selector: proposed.selector,
