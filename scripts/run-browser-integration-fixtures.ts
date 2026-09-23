@@ -1286,5 +1286,5 @@ try {
 
 const failed = results.filter((result) => !result.pass);
 console.log(`\nIntegration fixtures: ${results.length - failed.length}/${results.length} passed (headless Chrome, disposable data, 127.0.0.1 only).`);
-console.log("Note: download capture has no BrowserManager API yet — lifecycle helpers are unit-tested; browser-level capture is a documented follow-up, not claimed here.");
+console.log("Note: this fixture set covers semantic actions. Browser download capture is exercised separately by the real-browser HTTP/blob and ordinary-conversation tests.");
 if (failed.length) process.exit(1);

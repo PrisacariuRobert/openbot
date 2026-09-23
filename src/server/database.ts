@@ -1772,6 +1772,30 @@ export class OpenBotDatabase {
     return this.getAttachment(id)!;
   }
 
+  /** A browser result must never leave a chat message claiming a saved file
+   * without its attachment row. Both records commit or neither does. */
+  createBrowserResult(input: { threadId: string; botId: string; runId: string; body: string; name: string; mime: string; size: number; storagePath: string; analysis: AttachmentAnalysis; artifactKey: string }): Attachment {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const message = this.addMessage({ threadId: input.threadId, senderType: "bot", senderId: input.botId, runId: input.runId, body: input.body });
+      const attachment = this.createAttachment({ threadId: input.threadId, messageId: message.id, name: input.name, mime: input.mime, size: input.size, storagePath: input.storagePath, analysis: input.analysis, source: "artifact", artifactKey: input.artifactKey });
+      this.db.exec("COMMIT");
+      return attachment;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  findBrowserResult(runId: string, name: string, size: number, resource: string, sha256: string): Attachment | null {
+    const rows = this.db.prepare("SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE a.source='artifact' AND m.run_id=? AND a.name=? AND a.size=? ORDER BY a.created_at DESC LIMIT 24").all(runId, name, size) as Row[];
+    for (const row of rows) {
+      const attachment = this.attachmentFromRow(row);
+      if (attachment.metadata?.browserResource === resource && attachment.metadata?.sha256 === sha256) return attachment;
+    }
+    return null;
+  }
+
   private attachmentFromRow(row: Row): Attachment {
     const id = String(row.id);
     return {

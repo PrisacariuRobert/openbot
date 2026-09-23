@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { BrowserTarget } from "./safety.js";
-import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright-core";
+import { chromium, type BrowserContext, type CDPSession, type Download, type Page } from "playwright-core";
 import sharp from "sharp";
 import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
@@ -13,6 +13,7 @@ import { createCodeCheckView } from "./code-check-view.js";
 import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTemplate, type SkillDefinition } from "./skill-library.js";
 import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
 import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
+import { AttachmentService } from "./attachments.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
 import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
 import { issueSemanticTarget, reresolveSemanticTarget } from "./semantic-targets.js";
@@ -23,6 +24,12 @@ import { storeObservation, getObservation, findObservationWithTarget, invalidate
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
+type DownloadCaptureItem = { id: string; status: "pending" | "completed" | "failed"; name: string; attachmentId?: string; size?: number; sha256?: string; error?: string };
+type DownloadCapture = {
+  id: string; runId: string; botId: string; page: Page; ownerEpoch: number; active: boolean; expiresAt: number;
+  items: DownloadCaptureItem[]; overflowCount: number; pages: Set<Page>; downloads: Set<Download>;
+  timer: ReturnType<typeof setTimeout>; onDownload: (download: Download) => void; onPopup: (popup: Page) => void; onClose: () => void;
+};
 export class BrowserUploadUncertainError extends Error {}
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
@@ -491,8 +498,9 @@ export class BrowserManager {
   private readonly contextArgsVersions = new Map<string, string>();
   private readonly navigationServices = new WeakMap<Page, string[]>();
   private readonly teaching = new Map<string, { name: string; startUrl: string; steps: TeachStep[] }>();
+  private readonly downloadCaptures = new Map<string, DownloadCapture>();
 
-  constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean } = {}) {}
+  constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean; onDownloadSaved?: () => void } = {}) {}
 
   private writeTaughtSkill(botId: string, slug: string, name: string, description: string, instructions: string, startUrl: string, steps: SkillStep[]): string {
     const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
@@ -592,7 +600,7 @@ export class BrowserManager {
     mkdirSync(profile, { recursive: true });
     const containerArgs = process.env.OPENBOT_CHROME_NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
     const context = await chromium.launchPersistentContext(profile, {
-      executablePath, headless: headless || this.options.headlessTeaching === true, viewport: { width: 1280, height: 820 },
+      executablePath, headless: headless || this.options.headlessTeaching === true, viewport: { width: 1280, height: 820 }, acceptDownloads: true,
       serviceWorkers: "block",
       // Providers like Google refuse sign-in when Chromium advertises
       // automation ("This browser or app may not be secure"). This flag keeps
@@ -636,6 +644,85 @@ export class BrowserManager {
     this.activePages.set(botId, fresh);
     this.trackDocumentGenerations(fresh);
     return fresh;
+  }
+
+  /** Arm before the website action that starts a download. Capture is scoped
+   * to this page and its popups, and cannot accept a caller-provided path. */
+  async armDownloads(botId: string, runId: string) {
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || !["running", "queued"].includes(run.status)) throw new Error("A running teammate task is required to capture browser downloads.");
+    if (this.secureHandoffActive(botId)) throw new Error("Browser downloads are unavailable during private sign-in.");
+    const page = await this.page(botId);
+    safeUrl(page.url());
+    const existing = this.downloadCaptures.get(botId);
+    if (existing?.active && existing.runId === runId && existing.page === page && Date.now() < existing.expiresAt) return this.downloadCaptureStatus(existing);
+    this.cancelDownloadsForBot(botId);
+    const capture: DownloadCapture = {
+      id: randomUUID(), runId, botId, page, ownerEpoch: this.db.botInputEpoch(botId), active: true, expiresAt: Date.now() + 120_000,
+      items: [], overflowCount: 0, pages: new Set<Page>(), downloads: new Set<Download>(),
+      timer: undefined as unknown as ReturnType<typeof setTimeout>,
+      onDownload: () => undefined, onPopup: () => undefined, onClose: () => undefined,
+    };
+    capture.onDownload = (download: Download) => {
+      if (!capture.active || capture.items.length >= 6) {
+        if (capture.active) capture.overflowCount += 1;
+        void download.cancel().catch(() => undefined);
+        return;
+      }
+      const item: DownloadCaptureItem = { id: randomUUID(), status: "pending", name: download.suggestedFilename() };
+      const pageUrl = download.page().url();
+      capture.items.push(item);
+      capture.downloads.add(download);
+      void (async () => {
+        try {
+          let timeout: ReturnType<typeof setTimeout> | undefined;
+          const source = await Promise.race([
+            download.path(),
+            new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("The browser download did not finish within two minutes.")), 120_000); timeout.unref(); }),
+          ]).finally(() => { if (timeout) clearTimeout(timeout); });
+          const current = this.db.getRun(runId);
+          if (!source || !capture.active || Date.now() >= capture.expiresAt || !current || ["cancelled", "failed"].includes(current.status) || this.db.botInputEpoch(botId) !== capture.ownerEpoch || this.secureHandoffActive(botId)) throw new Error("The download was cancelled or browser ownership changed.");
+          if (browserWebsiteBlock(this.db, botId, download.url())) throw new Error("This download website is blocked for the teammate.");
+          const saved = await new AttachmentService(this.db).captureBrowserDownload({ botId, runId, ownerEpoch: capture.ownerEpoch, sourcePath: source, suggestedName: download.suggestedFilename(), resourceUrl: download.url(), pageUrl, capturedAt: new Date().toISOString() });
+          item.status = "completed"; item.name = saved.name; item.attachmentId = saved.id; item.size = saved.size; item.sha256 = String(saved.metadata?.sha256 || "");
+          try { this.options.onDownloadSaved?.(); } catch { /* Saved bytes stay delivered even if a live UI signal fails. */ }
+        } catch (error) { item.status = "failed"; item.error = error instanceof Error ? error.message : "The download could not be saved."; }
+        finally { capture.downloads.delete(download); }
+      })();
+    };
+    capture.onPopup = (popup: Page) => { if (capture.active) { capture.pages.add(popup); popup.on("download", capture.onDownload); } };
+    capture.onClose = () => this.cancelDownloadsForBot(botId);
+    capture.pages.add(page); page.on("download", capture.onDownload); page.on("popup", capture.onPopup); page.on("close", capture.onClose);
+    capture.timer = setTimeout(() => this.cancelDownloadsForBot(botId), 120_000);
+    capture.timer.unref();
+    this.downloadCaptures.set(botId, capture);
+    return this.downloadCaptureStatus(capture);
+  }
+
+  downloadResults(botId: string, runId: string) {
+    const capture = this.downloadCaptures.get(botId);
+    if (!capture || capture.runId !== runId) throw new Error("No download capture is armed for this task. Arm it before clicking the download control.");
+    return this.downloadCaptureStatus(capture);
+  }
+
+  private downloadCaptureStatus(capture: DownloadCapture) {
+    return { captureId: capture.id, armed: capture.active, expiresAt: new Date(capture.expiresAt).toISOString(), overflowCount: capture.overflowCount, items: capture.items.map(item => ({ ...item })) };
+  }
+
+  cancelDownloadsForBot(botId: string): void {
+    const capture = this.downloadCaptures.get(botId);
+    if (!capture || !capture.active) return;
+    capture.active = false; clearTimeout(capture.timer);
+    capture.page.off("popup", capture.onPopup);
+    capture.page.off("close", capture.onClose);
+    for (const page of capture.pages) page.off("download", capture.onDownload);
+    for (const download of capture.downloads) void download.cancel().catch(() => undefined);
+    for (const item of capture.items) if (item.status === "pending") { item.status = "failed"; item.error = "Capture stopped before the download completed."; }
+  }
+
+  cancelDownloadsUnlessRun(botId: string, runId: string): void {
+    const capture = this.downloadCaptures.get(botId);
+    if (capture && capture.runId !== runId) this.cancelDownloadsForBot(botId);
   }
 
   /** Tabs: the owner and the agent share one explicit active tab, like a real
@@ -1676,13 +1763,22 @@ export class BrowserManager {
         else if (html.getAttribute("name")) selector = `${html.tagName.toLowerCase()}[name="${CSS.escape(html.getAttribute("name")!)}"]`;
         else if (html.getAttribute("aria-label")) selector = `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(html.getAttribute("aria-label")!)}"]`;
         else {
-          const parent = html.parentElement;
-          const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
-          const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
-          const prefix = parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : "";
-          selector = `${prefix}${html.tagName.toLowerCase()}${suffix}`;
+          // Include ancestors so identically shaped controls cannot resolve to a decoy.
+          const segments: string[] = [];
+          let cursor: Element | null = html;
+          while (cursor && cursor !== document.body) {
+            if ((cursor as HTMLElement).id) { segments.unshift(`#${CSS.escape((cursor as HTMLElement).id)}`); break; }
+            const parent: Element | null = cursor.parentElement;
+            if (!parent) break;
+            const siblings = [...parent.children].filter((child) => child.tagName === cursor!.tagName);
+            segments.unshift(`${cursor.tagName.toLowerCase()}:nth-of-type(${siblings.indexOf(cursor) + 1})`);
+            cursor = parent;
+          }
+          selector = segments.join(" > ");
         }
-        const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
+        const associatedLabel = node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement
+          ? [...(node.labels || [])].map((item) => item.textContent || "").join(" ") : "";
+        const label = (html.getAttribute("aria-label") || associatedLabel || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
         const input = node as HTMLInputElement;
         const form = input.form || node.closest("form");
         const dialog = node.closest("dialog,[role=dialog]");
@@ -1830,6 +1926,7 @@ export class BrowserManager {
    * (checked in assertPreInput) makes pre-revocation observations unusable
    * even if an ID is replayed. */
   revokeObservationsForBot(botId: string): number {
+    this.cancelDownloadsForBot(botId);
     return invalidateObservationsForBot(botId);
   }
 
@@ -2941,6 +3038,7 @@ export class BrowserManager {
   }
 
   async close() {
+    for (const botId of this.downloadCaptures.keys()) this.cancelDownloadsForBot(botId);
     await Promise.all([...this.contexts.values()].map((context) => context.close().catch(() => undefined)));
     this.contexts.clear();
   }
