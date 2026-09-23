@@ -4191,6 +4191,17 @@ export class OpenBotDatabase {
     return rows.map((row) => this.runFromRow(row));
   }
 
+  /** True while any task is queued, running or waiting on a teammate. */
+  hasActiveWork(): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM runs WHERE status IN ('queued','running','waiting_for_teammate') LIMIT 1").get());
+  }
+
+  /** The earliest upcoming run time of an enabled clock routine, if any. */
+  nextScheduledRoutineAt(): string | null {
+    const row = this.db.prepare("SELECT MIN(next_run_at) AS next FROM routines WHERE enabled=1 AND trigger_type='schedule' AND next_run_at IS NOT NULL").get() as { next: string | null } | undefined;
+    return row?.next || null;
+  }
+
   dueRoutines(): Routine[] {
     return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.enabled=1 AND r.trigger_type='schedule' AND r.next_run_at IS NOT NULL AND r.next_run_at<=?").all(now()) as Row[]).map((row) => this.routineFromRow(row));
   }

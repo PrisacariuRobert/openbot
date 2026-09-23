@@ -89,6 +89,7 @@ import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentC
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
 import { TelegramChannel } from "./telegram-channel.js";
+import { AwakeGuard } from "./awake-guard.js";
 import { syncedFolderProvider, syncedFolderWarning } from "./synced-folder.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
@@ -327,6 +328,7 @@ for (const receipt of db.listPreparedApprovedActions()) {
 
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
 const notifications = new NotificationService(db, () => runner.isLeader());
+const awakeGuard = new AwakeGuard({ db, enabled: () => runner.isLeader() });
 const telegram = new TelegramChannel({
   db, appUrl, isLeader: () => runner.isLeader(),
   // Telegram messages enter through the studio's own message API so every
@@ -4632,6 +4634,7 @@ if (existsSync(distDir)) {
 const server = app.listen(port, host, () => {
   relay?.start();
   if (telegram.status().configured) telegram.start();
+  awakeGuard.start();
   console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
   if (deployment.mode === "private_runner") console.log("Private runner mode is active with HTTPS, durable storage, and proxy-aware secure cookies.");
   if (host !== "127.0.0.1" && host !== "localhost") console.log(`Remote access is enabled. The private access key is stored at ${path.join(db.dataDir, "access.token")}`);
@@ -4650,6 +4653,7 @@ async function shutdown() {
   externalHeartbeat.stop();
   notifications.stop();
   telegram.stop();
+  awakeGuard.stop();
   await runner.stop();
   providerConnections.stop();
   liveViews.close();
