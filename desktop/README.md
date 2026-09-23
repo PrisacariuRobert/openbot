@@ -22,7 +22,13 @@ This builds the shared UI, stages a platform-matched Node/OpenCode runtime with 
 
 The pinned Electron 44 shell requires macOS 13 or newer. The current local packaged-app smoke was run on Apple silicon with macOS 27; other macOS versions and architectures still need independent install evidence before they are advertised as supported for this beta.
 
-These are unsigned development artifacts. CI only creates a draft on a release tag; signing/notarization and release require a separately reviewed setup. No credentials from the retired native signing workflow are used automatically.
+The ordinary package command and cross-platform CI produce unsigned development artifacts. They are not a public Mac installer. No credentials from the retired native signing workflow are used automatically.
+
+## Signed Mac candidate
+
+Public distribution needs an active Apple Developer Program membership, a **Developer ID Application** certificate and Apple notarization credentials. On a Mac, set `CSC_LINK` to the exported `.p12` path or its base64 content, `CSC_KEY_PASSWORD` to its password, and `CSC_NAME` to the exact Developer ID Application identity. Supply one complete notarization credential set: `APPLE_API_KEY` (path to `.p8`), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`; or `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`; or a `notarytool` keychain profile via `APPLE_KEYCHAIN` and `APPLE_KEYCHAIN_PROFILE`. Keep all credentials outside the repository and logs.
+
+After `npm ci`, run `npm run package:desktop:signed`. The signed path fails before packaging when credentials are missing, overrides the ordinary unsigned identity, enables hardened runtime and notarization, then requires `codesign --verify`, Gatekeeper assessment and stapled-ticket validation on the generated app. The manually triggered `Signed Mac candidate` workflow uses repository secrets with the `OPENBOT_` prefix, uploads only review artifacts and checksums, and never creates a release. A passing build still needs clean-install and recovery testing on a second physical Mac using the **exact** DMG/ZIP before public release. This signing path has not produced a verified artifact until real credentials are provided and the workflow passes.
 
 The packaged shell starts the bundled local runner. Closing its window keeps the detached runner alive for routines. Teammates, permissions, files and recovery use the existing authenticated backend. Optional model accounts, browsers and Docker remain separately configured capabilities.
 

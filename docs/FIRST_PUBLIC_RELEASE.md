@@ -10,11 +10,11 @@ OpenBot's promise for this beta is focused: give a teammate a job, choose the AI
 
 | Surface | First-beta scope | Not promised |
 | --- | --- | --- |
-| macOS Apple silicon | Primary Electron client with bundled runner; an unsigned, checksum-verified DMG/ZIP only after exact-artifact testing on two independent physical Macs | Signed/notarized distribution or unattended auto-updates |
+| macOS Apple silicon | Primary Electron client with bundled runner; a Developer ID-signed, notarized app inside a checksum-verified DMG/ZIP, after exact-artifact testing on two independent physical Macs | Unattended auto-updates |
 | Phone | Responsive shared web UI on the same network or an explicitly configured private HTTPS host | Native iPhone app, App Store distribution or an OpenBot-operated public relay |
 | Intel Mac, Windows, Linux | Source and package-build targets | Supported installers until each has independent physical clean-install and recovery evidence |
 
-Node and OpenCode included in a Mac package do not include a paid account, every model provider, Chrome, Docker or provider consent. The Mac must remain powered on and awake for local jobs. The public away-access relay remains deferred. An unsigned installer must be labeled plainly; its checksum verifies bytes, not publisher identity.
+Node and OpenCode included in a Mac package do not include a paid account, every model provider, Chrome, Docker or provider consent. The Mac must remain powered on and awake for local jobs. The public away-access relay remains deferred. Unsigned packages remain development artifacts; a checksum verifies bytes, not publisher identity.
 
 ## Gates, owners and evidence
 
@@ -36,11 +36,12 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 
 ### 2. Install and recover — engineering plus a second tester
 
-- [ ] On two independent physical Apple-silicon Macs, install the exact unsigned DMG/ZIP and compare its SHA-256 checksum. Follow the included setup without relying on a development checkout, PATH or preexisting accounts. Choose a provider explicitly and complete a useful sample task.
+- [ ] With an active Apple Developer Program membership, build the exact candidate using a Developer ID Application certificate and Apple notarization credentials. Confirm `codesign --verify --deep --strict`, Gatekeeper acceptance and stapled-ticket validation. Do not count the ordinary unsigned CI installer as a public candidate.
+- [ ] On two independent physical Apple-silicon Macs, install the exact DMG/ZIP containing the signed and notarized app, and compare its SHA-256 checksum. Follow the included setup without relying on a development checkout, PATH or preexisting accounts. Choose a provider explicitly and complete a useful sample task.
 - [ ] Package from the frozen candidate; run the package smoke test against the final copied artifact, inspect checksums and ensure Electron/runner versions agree. Do not reuse an old embedded runtime.
 - [ ] With the exact release artifact, quit/reopen, restart the runner and reconnect without creating a second studio or losing messages, drafts, pending approvals, files or grants.
 - [ ] Make a consistent backup including the matching database and vault key; demonstrate restoration in disposable storage. Never test destructive recovery against the owner's only copy.
-- [ ] Explain the unsigned status and normal macOS one-time Open action without telling users to disable OS security globally. Recheck Gatekeeper behavior on the second Mac. Signing/notarization is a later product decision, not silently assumed.
+- [ ] Recheck Gatekeeper behavior on the second Mac without bypassing its protections. If signing/notarization cannot be completed, keep the installer in internal testing and hold the public Mac beta.
 
 ### 3. Useful jobs — engineering with explicitly authorized test accounts
 
@@ -71,11 +72,11 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 Engineering can continue with source tests, disposable data, browser fixtures, simulator builds and package checks. Wider distribution additionally needs:
 
 1. A working private vulnerability-reporting route and confirmation of repository merge rules.
-2. For the planned unsigned Mac beta, verify the exact `.dmg`/`.zip` and
-   publish a matching `.sha256` sidecar only after the two-Mac gate passes.
-   Tell users macOS will warn because the binary is unsigned and document
-   the normal one-time right-click Open flow. Never ask them to disable
-   Gatekeeper globally or present a checksum as a substitute for signing.
+2. An active Apple Developer Program membership, a Developer ID Application
+   certificate and notarization credentials. Build the signed candidate through
+   the isolated packaging path, verify the exact `.dmg`/`.zip` and its SHA-256
+   sidecar, and hold publication until the two-Mac gate passes. Do not treat an
+   unsigned installer or checksum as a substitute for publisher identity.
 3. A clean second Mac/tester and a small pilot; the development machine is not an independent installation test.
 4. Explicitly authorized real service accounts for advertised integrations and the allowed model test budget. Fixture tests cannot supply that evidence.
 5. Only if promoting away access: owner-operated HTTPS/relay hosting and a verified phone-to-host route. Native-device signing/APNs are outside this shared-web beta.
