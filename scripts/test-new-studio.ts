@@ -592,6 +592,9 @@ try {
     await page.getByRole("textbox", { name: "Message your team" }).inputValue(),
     "Keep this for tomorrow.",
   );
+  // The thread URL is committed in a React effect. Reload the exact Pixel
+  // route, not the previous conversation if navigation is still settling.
+  await page.waitForFunction(() => new URL(location.href).searchParams.get("thread") === "bot-pixel");
   await page.reload();
   await page
     .locator(".sidebar-conversations")
@@ -601,7 +604,10 @@ try {
     () =>
       document.querySelector<HTMLTextAreaElement>(".composer textarea")
         ?.value === "Keep this for tomorrow.",
-  );
+  ).catch(async (error) => {
+    console.error("Synthetic draft revisit diagnostics", await page.evaluate(async () => ({ url: location.href, value: document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value, draft: (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft })));
+    throw error;
+  });
   await page
     .getByRole("button", { name: "Conversation details", exact: true })
     .click();
