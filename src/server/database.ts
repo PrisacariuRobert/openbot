@@ -464,7 +464,7 @@ export class OpenBotDatabase {
         computer_enabled INTEGER NOT NULL DEFAULT 1,
         browser_enabled INTEGER NOT NULL DEFAULT 1,
         mac_access_enabled INTEGER NOT NULL DEFAULT 0,
-        weekly_token_budget INTEGER NOT NULL DEFAULT 250000
+        weekly_token_budget INTEGER NOT NULL DEFAULT 2000000
       );
       CREATE TABLE IF NOT EXISTS threads (
         id TEXT PRIMARY KEY,
@@ -1406,7 +1406,8 @@ export class OpenBotDatabase {
       id, DEFAULT_OWNER, input.providerInstanceId || null, input.name, input.emoji, input.mascot || "orbit",
       input.color, input.role, input.instructions, input.model || "", input.computerEnabled === false ? 0 : 1,
       input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
-      input.weeklyTokenBudget ?? 250000, createdAt,
+      // A guard against runaway API bills, not a wall: ~100+ ordinary tasks a week.
+      input.weeklyTokenBudget ?? 2_000_000, createdAt,
     );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);

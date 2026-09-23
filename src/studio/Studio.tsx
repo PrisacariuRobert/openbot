@@ -28,6 +28,7 @@ import {
   ArrowRightLeft,
   ArrowUp,
   Archive,
+  AudioLines,
   CalendarDays,
   Check,
   ChevronDown,
@@ -75,6 +76,7 @@ import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
 import { WeeklyRecapEntry } from "./WeeklyRecap";
+import { VoiceMode, voiceModeSupported } from "./VoiceMode";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -1073,6 +1075,7 @@ export function Studio() {
     () => foldTalkingPills(state?.messages || []),
     [state?.messages],
   );
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const conversationBot =
     page === "chat"
       ? state?.bots.find((bot) => bot.threadId === thread)
@@ -2004,6 +2007,11 @@ export function Studio() {
           </span>
           <div className="topbar-right">
             {page === "settings" && <button className="workspace-return" onClick={() => openThread(thread)}>Back to conversation</button>}
+            {page === "chat" && conversationBot && botReady && voiceModeSupported() && (
+              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name}`} onClick={() => setVoiceOpen(true)}>
+                <AudioLines size={19} strokeWidth={1.5} />
+              </button>
+            )}
             {page === "chat" && state?.bots.length ? (
               <button
                 className="topbar-control"
@@ -3060,6 +3068,26 @@ export function Studio() {
             </>
           )}
         </Drawer>
+      )}
+      {voiceOpen && conversationBot && state && (
+        <VoiceMode
+          bot={conversationBot}
+          messages={state.messages.filter((message) => message.threadId === conversationBot.threadId)}
+          runs={[...state.runs, ...state.studioRuns]}
+          onClose={() => setVoiceOpen(false)}
+          onSend={async (text) => {
+            await api("/api/messages", {
+              threadId: conversationBot.threadId,
+              body: text,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              targetBotIds: [],
+              attachmentIds: [],
+              replyToId: null,
+              requestId: `voice-${conversationBot.id}-${Date.now()}`,
+            });
+            setRefresh((n) => n + 1);
+          }}
+        />
       )}
       {takeoverBot && (
         <ComputerTakeover bot={takeoverBot} onClose={() => setTakeoverBot(null)} />

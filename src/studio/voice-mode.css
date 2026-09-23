@@ -1,0 +1,22 @@
+/* Voice mode: a calm, full-screen conversation with one teammate. */
+.voice-mode { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: calc(24px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom)); background: var(--system-background); color: var(--label-primary); text-align: center; animation: voice-mode-in .35s ease; }
+@keyframes voice-mode-in { from { opacity: 0; } to { opacity: 1; } }
+.voice-mode-stage { position: relative; display: grid; place-items: center; width: 280px; height: 280px; }
+.voice-mode-halo { position: absolute; inset: 30px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--voice-color) 22%, transparent) 0%, transparent 68%); transition: transform .5s ease, opacity .5s ease; opacity: .7; }
+.voice-mode.is-listening .voice-mode-halo { animation: voice-breathe 2.4s ease-in-out infinite; }
+.voice-mode.is-speaking .voice-mode-halo { animation: voice-speak .9s ease-in-out infinite; opacity: 1; }
+.voice-mode.is-thinking .voice-mode-halo, .voice-mode.is-sending .voice-mode-halo { animation: voice-breathe 1.4s ease-in-out infinite; opacity: .5; }
+.voice-mode.is-paused .voice-mode-halo, .voice-mode.is-waiting .voice-mode-halo { transform: scale(.85); opacity: .25; }
+@keyframes voice-breathe { 0%, 100% { transform: scale(.92); } 50% { transform: scale(1.06); } }
+@keyframes voice-speak { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+.voice-mode-stage > .character { position: relative; }
+.voice-mode-status { margin: 6px 0 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em; }
+.voice-mode-transcript { min-height: 3em; max-width: 34ch; margin: 0; font-size: 17px; line-height: 1.45; color: var(--label-secondary); }
+.voice-mode-controls { display: flex; gap: 28px; margin-top: 18px; }
+.voice-mode-button { display: grid; place-items: center; width: 68px; height: 68px; border: 0; border-radius: 50%; background: var(--secondary-system-background); color: var(--label-primary); cursor: pointer; transition: transform .12s ease, background-color .18s ease; }
+.voice-mode-button:active { transform: scale(.94); }
+.voice-mode-button:focus-visible { outline: 2px solid var(--focus, var(--label-primary)); outline-offset: 3px; }
+.voice-mode-button.end { background: var(--strong, #1d1d1f); color: var(--on-strong, #fff); }
+.voice-mode-foot { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 24px; right: 24px; margin: 0; font-size: 12.5px; color: var(--label-tertiary); }
+@media (prefers-reduced-motion: reduce) { .voice-mode, .voice-mode-halo { animation: none !important; } }
+.voice-mode.is-speaking .voice-mode-transcript { color: var(--label-primary); max-width: 42ch; max-height: 9.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to top, transparent 0, #000 1.6em); mask-image: linear-gradient(to top, transparent 0, #000 1.6em); }

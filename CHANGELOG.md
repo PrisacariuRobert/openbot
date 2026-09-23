@@ -4,6 +4,8 @@
 
 Not released: the next public release waits until the competitive plan is complete.
 
+- Talk with a teammate: the waveform button in a one-to-one chat opens a calm, full-screen voice conversation — it listens, sends when you pause, reads the answer aloud with captions, then listens again. Everything lands in the chat; approvals still happen in the app. Uses the browser's own speech (Safari, Chrome).
+- New teammates get a 2,000,000-token weekly guard (was 250,000, which ordinary daily use could hit in a day or two). Existing teammates keep the budget they have.
 - Your week with your team: a quiet “Your week · 7 things done” row tops the chat list and opens a warm look back — things done, time worked so you didn't have to, who helped most, and the biggest tasks. Built only from tasks that really finished (greetings aren't highlights). Sunday evening it arrives once as a notification.
 - Connecting an AI takes a minute, not a terminal: Your AI opens with one Recommended card — OpenCode Go (~$10/month), “Open opencode.ai”, paste the key, Connect. The key goes straight into OpenCode's own credential store and is tested with a short real reply; a key that fails its test says so and the card stays for a corrected one. Ollama moved to API Keys & Local Models.
 - Your phone in one scan: Settings → Your phone shows a QR code the phone's own camera opens — no app to download. The studio pairs that browser as a revocable device (one-time ticket kept out of logs, HttpOnly secure cookie), then a welcome sheet shows how to add OpenBot to the Home Screen and offers notifications at the right moment (on iPhone, once it runs from the Home Screen). Shared relays still pair only through the app.
