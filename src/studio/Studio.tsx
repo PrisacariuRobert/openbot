@@ -331,6 +331,9 @@ function eventDetail(message: Message): string {
       return String(data.task ?? message.body).replace(/\s+/g, " ").trim();
     case "teammate_message":
       return data.expectsReply === "true" ? "Reply requested" : "Update shared";
+    case "action_completed":
+      // The face shows who; the task view keeps the full record with links.
+      return message.body.replace(/^[^:.]{1,40}:\s*/, "").replace(/\s*\(https?:\/\/[^)\s]+\)/g, "").trim();
     default:
       return message.body;
   }

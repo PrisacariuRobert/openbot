@@ -6,7 +6,7 @@ import type { Attachment } from "./shared/types";
 function highlightMentions(children: ReactNode) {
   return Children.map(children, (child) => {
     if (typeof child !== "string") return child;
-    return child.split(/(@[\p{L}\p{N}_-]+)/gu).map((part, index) => part.startsWith("@") ? <mark key={`${part}-${index}`}>{part}</mark> : part);
+    return child.split(/(@[\p{L}\p{N}_-]+)/gu).map((part, index) => part.startsWith("@") ? <mark className="mention" key={`${part}-${index}`}>{part}</mark> : part);
   });
 }
 

@@ -2330,3 +2330,5 @@ a.message-file:hover {
 .conversation-row > .group-stack .character { position: absolute; flex: none; }
 .conversation-row > .group-stack .character:first-child { top: 0; left: 0; }
 .conversation-row > .group-stack .character + .character { right: 0; bottom: 0; margin: 0; }
+/* Mentions read like Messages: the name in semibold, no highlighter. */
+mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
