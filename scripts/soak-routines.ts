@@ -215,7 +215,7 @@ try {
     fragileRuns: fragileState.runCount, fragilePaused: !fragileState.enabled, dailyRuns: 0, approvals: 0, occurrences: byOccurrence.size, fixtureCalls: SOAK_MODE === "fixture" ? fixtureCalls : null };
   writeFileSync(path.join(evidenceDir, "soak-summary.json"), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary));
-  console.log("Scheduler-level soak only: occurrence dedupe, restart recovery, failure auto-pause. A fixture is not model-quality evidence; elapsed duration never substitutes for the 48-hour real-model release soak.");
+  console.log(`Scheduler-level soak only: occurrence dedupe and restart recovery. Failure auto-pause ${fragileState.runCount >= 3 && !fragileState.enabled ? "was observed after three failures" : "was not observed in this interval"}. A fixture is not model-quality evidence; elapsed duration never substitutes for the 48-hour real-model release soak.`);
 } catch (error) {
   writeFileSync(path.join(evidenceDir, "soak-failure.json"), JSON.stringify({ candidateSha, mode: SOAK_MODE, startedAt, failedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) }, null, 2));
   throw error;
