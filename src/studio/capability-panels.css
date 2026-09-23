@@ -169,6 +169,100 @@
   padding: 6px 12px;
 }
 
+.capabilities .browser-app-onramp {
+  padding: 24px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.capabilities .browser-app-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.capabilities .browser-app-onramp h3 { margin-bottom: 6px; font-size: 21px; }
+.capabilities .browser-app-onramp > p { max-width: 65ch; margin: 0 0 20px; font-size: 13px; }
+.capabilities .browser-app-examples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.capabilities .browser-app-examples article {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 100px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.capabilities .browser-app-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-muted);
+}
+.capabilities .browser-app-icon .connector-symbol { width: 21px; height: 21px; flex-basis: 21px; }
+.capabilities .browser-app-examples strong { display: block; margin-bottom: 3px; font-size: 13px; font-weight: 600; }
+.capabilities .browser-app-examples small { font-size: 12px; line-height: 1.4; }
+.capabilities .browser-app-next-step {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 18px;
+}
+.capabilities .browser-app-next-step button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.capabilities .browser-app-next-step button:hover { opacity: .88; }
+.capabilities .browser-app-next-step button:active { transform: scale(.98); }
+.capabilities .browser-app-next-step button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.capabilities .browser-app-next-step small { flex: 1 1 260px; max-width: 66ch; }
+.capabilities .direct-connections > summary em { color: var(--secondary); font-size: 12px; font-style: normal; white-space: nowrap; }
+.capabilities .direct-connections-body,
+.capabilities .direct-connection-settings-body { padding: 20px; }
+.capabilities .direct-connections-body .connector-catalog { margin-bottom: 0; }
+.capabilities .direct-connection-settings-body > .purpose-disclosure:last-child { margin-bottom: 0 !important; }
+@media (max-width: 900px) {
+  .capabilities .browser-app-examples { grid-template-columns: 1fr; }
+  .capabilities .browser-app-examples article { min-height: 0; }
+}
+@media (max-width: 600px) {
+  .capabilities .browser-app-onramp { padding: 18px; }
+  .capabilities .browser-app-onramp h3 { font-size: 20px; }
+  .capabilities .browser-app-next-step button { width: 100%; }
+  .capabilities .direct-connections-body,
+  .capabilities .direct-connection-settings-body { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capabilities .browser-app-next-step button { transition: none; }
+}
+
 /* Purpose Accordion Disclosures */
 .capabilities details.purpose-disclosure,
 .capabilities .purpose-disclosure {

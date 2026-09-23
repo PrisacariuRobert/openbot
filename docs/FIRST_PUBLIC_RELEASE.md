@@ -16,6 +16,12 @@ OpenBot's promise for this beta is focused: give a teammate a job, choose the AI
 
 Node and OpenCode included in a Mac package do not include a paid account, every model provider, Chrome, Docker or provider consent. The Mac must remain powered on and awake for local jobs. The public away-access relay remains deferred. Unsigned packages remain development artifacts; a checksum verifies bytes, not publisher identity.
 
+### No-cost development and pilot path
+
+We can continue without buying an Apple membership or registering an OpenBot Google OAuth client. Run the shared UI from source, use the local Electron development package, and test with consenting people on known machines. A teammate can use a separately permitted browser session; the owner signs in to a website privately, and no OpenBot API connector is needed. Direct API connectors remain optional and dormant in the default path. A working model and any service account used by a tester still have their own terms and possible costs. The [local-model smoke](../qa/no-oauth-beta/README.md) shows why a connection test alone does not qualify a model for a pilot: both installed Ollama models failed a simple full conversation check.
+
+An unsigned Mac package can support a clearly labeled, limited development pilot after exact-artifact install and recovery checks. macOS may require a manual Privacy & Security override, so this is not the low-friction, trusted public Mac download promised above. Keep the signed/notarized public installer gate open until funding and credentials exist. Phone-web access on the same network is a separate test; away access still needs a verified private HTTPS host.
+
 ## Gates, owners and evidence
 
 Unchecked means open, even when the feature exists or a local test passed before. Record exact candidate commit, platform, command and retained artifact when closing a gate. Start with the [latest candidate evidence](QA_BETA_CANDIDATE.md). [App polish QA](QA_APP_POLISH.md), [conversation QA](QA_CONVERSATION_WORKFLOW.md), [0.37 evidence](QA_0.37.md) and [competitive execution plan](COMPETITIVE_EXECUTION_PLAN.md) are inputs, not automatic sign-off for a newer candidate.
@@ -72,11 +78,13 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 Engineering can continue with source tests, disposable data, browser fixtures, simulator builds and package checks. Wider distribution additionally needs:
 
 1. A non-owner check of the private vulnerability-reporting route and confirmation of repository merge rules.
-2. An active Apple Developer Program membership, a Developer ID Application
-   certificate and notarization credentials. Build the signed candidate through
-   the isolated packaging path, verify the exact `.dmg`/`.zip` and its SHA-256
+2. **Only for the trusted public Mac download:** an active Apple Developer
+   Program membership, a Developer ID Application certificate and notarization
+   credentials. These are not needed for source development or a limited,
+   clearly labeled unsigned pilot. Build the signed candidate through the
+   isolated packaging path, verify the exact `.dmg`/`.zip` and its SHA-256
    sidecar, and hold publication until the two-Mac gate passes. Do not treat an
    unsigned installer or checksum as a substitute for publisher identity.
 3. A clean second Mac/tester and a small pilot; the development machine is not an independent installation test.
-4. Explicitly authorized real service accounts for advertised integrations and the allowed model test budget. Fixture tests cannot supply that evidence.
+4. Consent to use real accounts for any advertised browser or API workflow and a declared model test budget. An OpenBot Google OAuth client is not required for the browser path. Fixture tests cannot supply real-account evidence.
 5. Only if promoting away access: owner-operated HTTPS/relay hosting and a verified phone-to-host route. Native-device signing/APNs are outside this shared-web beta.

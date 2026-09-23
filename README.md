@@ -64,7 +64,8 @@ Opening the interface does not require every optional tool. Install the dependen
 | Use websites | Google Chrome or Chromium, plus explicit browser access. |
 | Run isolated computer or code checks | Docker and the relevant project dependencies. |
 | Work with GitHub | GitHub CLI and your authorized account. |
-| Use connected services | Service-specific setup and per-teammate permissions. |
+| Use a website through a teammate | Sign in yourself in that teammate's browser; no OpenBot OAuth client is needed. |
+| Use direct API connections (optional) | Service-specific setup and per-teammate permissions. |
 
 A saved account or API key is not a successful execution test. Test the chosen connection before depending on it. OpenBot does not provide model allowance or resell tokens; provider terms, supported authentication paths, and usage limits still apply.
 
@@ -91,9 +92,13 @@ The service normally listens on `127.0.0.1:4311`. A local routine cannot run whi
 
 ## Your models and connected tools
 
-Assign supported accounts, API connections, or compatible local models per teammate. Connection availability depends on the execution adapter and provider; OpenBot does not promise that every subscription works with every integration.
+Choose a supported subscription, API connection, or compatible local model for each teammate. OpenBot does not silently choose or switch a model when it discovers an account or when you browse another connection; changing a teammate requires your explicit model selection. Connection availability depends on the execution adapter and provider; OpenBot does not promise that every subscription works with every integration.
 
-Built-in service paths include **GitHub, Google Workspace, Slack, Notion, Todoist, and Dropbox**. Operations and permissions differ by service. For example, Dropbox is read-only, and a connector that can create an object may not support every later edit or deletion.
+The no-cost first-run path is a teammate conversation with optional access to its own browser. You can sign in to websites yourself when needed; OpenBot does not require a Google Cloud project, a public OAuth client, or any developer account to use that path. Browser work needs Chrome or Chromium, a working model, and your explicit teammate permission. Sites may ask for a new sign-in or refuse automation, so verify the actual result.
+
+For a model without API billing, open **Your AI → Set up Ollama** and enter a model already downloaded on the host Mac. Keep Ollama running while OpenBot works. The connection test checks a real reply; qualify the model with a full teammate conversation before relying on it. Our [local beta check](qa/no-oauth-beta/README.md) found that the two models already on the development Mac did not pass a simple conversation acceptance test.
+
+Direct API connections for **GitHub, Google Workspace, Slack, Notion, Todoist, and Dropbox** remain optional for owners who already use them or choose to configure them. They are not required for the first conversation, browser work, local files, or project tasks. Operations and permissions differ by service; a website session is not an API grant.
 
 - [Google Workspace setup](REFERENCE.md#connect-google-workspace)
 - [Slack, Notion, Todoist, and Dropbox](REFERENCE.md#connect-slack-notion-todoist-and-dropbox)

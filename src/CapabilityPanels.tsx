@@ -3119,26 +3119,43 @@ export function ConnectorPanel({
   onRefresh,
   onNotice,
   onStartWorkflow,
+  onOpenThread,
+  onCreateTeammate,
+  onReviewTeammate,
 }: {
   status: ConnectorStatus | null;
   bots: Bot[];
   onRefresh: () => Promise<void>;
   onNotice: (message: string) => void;
   onStartWorkflow: (prompt: string, expectedWorkKind?: "morning" | "inbox" | "meeting" | "weekly", botId?: string) => Promise<void>;
+  onOpenThread: (threadId: string) => void;
+  onCreateTeammate: () => void;
+  onReviewTeammate: (threadId: string) => void;
 }) {
   const [appSearch, setAppSearch] = useState("");
+  const [showDirectConnections, setShowDirectConnections] = useState(false);
+  const connectedDirectCount = status?.catalog.filter((entry) => entry.connected).length || 0;
+  const connectedApiCount = status?.catalog.filter((entry) => entry.id !== "github" && entry.connected).length || 0;
+  const browserTeammate = bots.find((bot) => bot.browserEnabled) || bots[0];
+  useEffect(() => {
+    if (connectedApiCount > 0) setShowDirectConnections(true);
+  }, [connectedApiCount]);
   const openApp = (id: string) => {
     const group = ["gmail", "google-drive", "google-calendar"].includes(id) ? "google" : id;
     const section = document.getElementById(`connector-settings-${group}`) as HTMLDetailsElement | null;
     if (section) {
+      const settingsArea = document.getElementById("direct-connection-settings") as HTMLDetailsElement | null;
+      if (settingsArea) settingsArea.open = true;
       section.open = true;
-      section.scrollIntoView({
-        block: "start",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      requestAnimationFrame(() => {
+        section.scrollIntoView({
+          block: "start",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+        });
+        section.querySelector("summary")?.focus();
       });
       section.classList.add("connector-target-highlight");
       setTimeout(() => section.classList.remove("connector-target-highlight"), 1800);
-      section.querySelector("summary")?.focus();
     }
   };
   const [clientId, setClientId] = useState(""),
@@ -3381,11 +3398,42 @@ export function ConnectorPanel({
   };
   return (
     <div className="connector-panel">
+      <section className="browser-app-onramp">
+        <span className="browser-app-eyebrow"><Globe2 size={15} /> No app developer account needed</span>
+        <h3>Use the apps you already have</h3>
+        <p>Give a teammate browser access, then sign in yourself when a website asks. That browser session stays with the teammate on this Mac. No Google Cloud or OpenBot OAuth setup is needed for this path.</p>
+        <div className="browser-app-examples">
+          {([
+            { id: "gmail", name: "Gmail", description: "Find a message or prepare a reply draft. Sending still needs your approval." },
+            { id: "google-drive", name: "Drive", description: "Find a document and bring its visible content into a conversation." },
+            { id: "google-calendar", name: "Calendar", description: "Check a meeting and prepare a brief before making changes." },
+          ] as const).map((item) => (
+            <article key={item.id}>
+              <span className="browser-app-icon"><ConnectorIcon id={item.id} /></span>
+              <div><strong>{item.name}</strong><small>{item.description}</small></div>
+            </article>
+          ))}
+        </div>
+        <div className="browser-app-next-step">
+          <button type="button" onClick={() => {
+            if (!browserTeammate) onCreateTeammate();
+            else if (!browserTeammate.browserEnabled) onReviewTeammate(browserTeammate.threadId);
+            else onOpenThread(browserTeammate.threadId);
+          }}>
+            {!browserTeammate ? "Create a teammate" : !browserTeammate.browserEnabled ? `Review ${browserTeammate.name}'s browser access` : `Open ${browserTeammate.name}'s chat`}
+            <ArrowRight size={15} />
+          </button>
+          <small>{!browserTeammate ? "Choose an AI before starting a task." : !browserTeammate.browserEnabled ? "Browser access starts off. Enable it only for teammates you choose." : "Ask for a small task first; websites can still request sign-in or refuse automation."} Chrome or Chromium is needed for browser work.</small>
+        </div>
+      </section>
+      <details className="purpose-disclosure direct-connections" open={showDirectConnections} onToggle={(event) => setShowDirectConnections(event.currentTarget.open)}>
+        <summary><Layers3 size={18} /><span>Direct API connections<small>Optional setup for existing accounts and advanced integrations</small></span>{connectedDirectCount > 0 && <em>{connectedDirectCount} connected</em>}<ChevronDown size={16} /></summary>
+        <div className="direct-connections-body">
       <section>
         <div className="panel-section-heading">
           <div>
-            <h3>Your apps</h3>
-            <p>Connect one app when you need it. You choose which teammates can use it.</p>
+            <h3>Direct connections</h3>
+            <p>Use these only if you want API access. Some require your own developer credentials; the browser path above works without them.</p>
           </div>
           {connected && (
             <span className="connector-ready">
@@ -3460,6 +3508,8 @@ export function ConnectorPanel({
         </div>
         {status && !status.catalog.some((entry) => `${entry.name} ${entry.description}`.toLowerCase().includes(appSearch.toLowerCase())) && <p className="empty-search">No matching apps. Try another name.</p>}
       </section>
+        </div>
+      </details>
 
           <details className="purpose-disclosure daily-work-disclosure">
             <summary><CalendarDays size={18} /><span>Daily work<small>Briefs, recipes and follow-ups</small></span><ChevronDown size={16} /></summary>
@@ -3472,8 +3522,11 @@ export function ConnectorPanel({
               <div>
                 <h3>Ready-made jobs</h3>
                 <p>
-                  Useful starting points. Briefs and inbox follow-ups save their
-                  sources and show what could—and couldn’t—be checked. Enabled Mac access can try Mail or Calendar on your host when Google is unavailable; macOS may ask for Automation permission.
+                  These one-click jobs use configured direct or Mac sources. For
+                  the no-OAuth path, ask a teammate in chat to use its browser;
+                  results depend on its signed-in session and the website. Enabled
+                  Mac access can also try Mail or Calendar on your host, with
+                  macOS Automation permission when needed.
                 </p>
               </div>
             </div>
@@ -3545,6 +3598,9 @@ export function ConnectorPanel({
           </section>
             </div>
           </details>
+      <details className="purpose-disclosure direct-connection-settings" id="direct-connection-settings" open={Boolean(error || serviceRecoveries.length || connection?.status === "needs_attention" || status?.slack.lastError || status?.notion.lastError || status?.todoist.lastError || status?.dropbox.lastError) || undefined}>
+        <summary><Settings2 size={18} /><span>Direct connection settings<small>Optional account setup, permissions and recovery</small></span><ChevronDown size={16} /></summary>
+        <div className="direct-connection-settings-body">
       <details className="purpose-disclosure" id="connector-settings-google" open={Boolean(error || serviceRecoveries.length || connection?.status === "needs_attention") || undefined}>
         <summary><ConnectorIcon id="gmail" /><span>Google Workspace<small>Mail, files and calendar access</small></span><ChevronDown size={16} /></summary>
         <div className="purpose-disclosure-body">
@@ -4106,6 +4162,8 @@ export function ConnectorPanel({
         <summary><ConnectorIcon id={kind} /><span>{({ slack: "Slack", notion: "Notion", todoist: "Todoist", dropbox: "Dropbox" })[kind]}<small>Connection and teammate access</small></span><ChevronDown size={16} /></summary>
         <div className="purpose-disclosure-body"><OAuthConnectorPanel kind={kind} status={status} bots={bots} onRefresh={onRefresh} onNotice={onNotice} /></div>
       </details>)}
+        </div>
+      </details>
       <details className="purpose-disclosure"><summary><Layers3 size={18} /><span>More tools<small>Custom connections and extensions</small></span><ChevronDown size={16} /></summary><div className="purpose-disclosure-body"><ExtensionsPanel bots={bots} /></div></details>
       {(slackReady || notionReady || todoistReady || dropboxReady) && (
         <section>

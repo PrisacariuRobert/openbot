@@ -6,6 +6,13 @@ import { signedMacBuilderArgs } from './lib/mac-signing.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const platform = `${process.platform === 'win32' ? 'win' : process.platform}-${process.arch}`;
 if (!['darwin-arm64', 'darwin-x64', 'linux-x64', 'win-x64'].includes(platform)) throw new Error(`Unsupported packaging host: ${platform}`);
+// The staged Node/OpenCode runtime matches this host. Target-level `arch`
+// overrides would make electron-builder silently emit another architecture
+// with the wrong runtime inside it.
+const desktopConfig = JSON.parse(readFileSync(path.join(root, 'desktop/package.json'), 'utf8'));
+for (const target of desktopConfig.build?.[process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'win' : 'linux']?.target || []) {
+  if (target.arch) throw new Error('Desktop targets must inherit the host architecture so their bundled runtime matches.');
+}
 const signed = process.argv.includes('--signed');
 const signedArgs = signed ? signedMacBuilderArgs(process.env) : [];
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';

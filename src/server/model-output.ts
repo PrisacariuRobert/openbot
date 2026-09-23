@@ -5,6 +5,18 @@ function record(value: unknown): Event | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Event : undefined;
 }
 
+function unexecutedToolCall(text: string): boolean {
+  // Some OpenAI-compatible local models print a tool request as their entire
+  // answer. It is not a tool event and must not be delivered as completed work.
+  if (!text.startsWith("{") || text.length > 20_000) return false;
+  try {
+    const value = record(JSON.parse(text));
+    const name = value?.name;
+    const args = record(value?.arguments);
+    return Boolean(args && typeof name === "string" && (safeTool(name) || name.startsWith("mcp__openbot__")));
+  } catch { return false; }
+}
+
 export function eventText(event: Event): string | null {
   // Only assistant text is public progress. Reasoning/tool payloads are not.
   if (event.type === "text") {
@@ -88,7 +100,8 @@ export class ModelOutput {
       const data = record(error?.data);
       const message = String(data?.message ?? error?.message ?? "").slice(0, 4000);
       const status = data?.statusCode;
-      if (status === 429 || /rate.limit|quota|usage.limit|insufficient.credit/i.test(message)) this.failureDescription = "Your AI provider reached a usage or rate limit. Your progress is saved. Wait for its allowance to reset or choose another connected model in Settings.";
+      if (status === 403 && /free tier can only be used from within OpenCode/i.test(message)) this.failureDescription = "This OpenCode free-tier model is restricted to use inside OpenCode and could not run this OpenBot teammate. Your work is saved. Choose another model available to your connection.";
+      else if (status === 429 || /rate.limit|quota|usage.limit|insufficient.credit/i.test(message)) this.failureDescription = "Your AI provider reached a usage or rate limit. Your progress is saved. Wait for its allowance to reset or choose another connected model in Settings.";
       else if (status === 401 || status === 403) this.failureDescription = "Your AI provider rejected its sign-in or access. Reconnect that provider in Settings, then try again. Your saved work is kept.";
       else if (/MessageContent|json_parse_error|unsupported.*(file|media|image|document)/i.test(message)) this.failureDescription = "Your selected AI provider could not read this message or file format. Try a fresh task with the extracted text, or choose a model that supports the attachment. Your files are kept.";
       else if (typeof status === "number" && status >= 500) this.failureDescription = "Your AI provider is temporarily unavailable. Your progress is saved. Try again later or choose another connected model.";
@@ -154,10 +167,14 @@ export class ModelOutput {
   }
 
   drainProgress(): string[] { return this.pendingUpdates.splice(0); }
-  get finalText(): string { return this.failed || this.needsAnswer || this.exceededLimit ? "" : (this.result ?? this.currentText).trim(); }
+  get finalText(): string {
+    const text = (this.result ?? this.currentText).trim();
+    return this.failed || this.needsAnswer || this.exceededLimit || unexecutedToolCall(text) ? "" : text;
+  }
   get canContinueIntermediate(): boolean { return !this.failed && !this.continuationBlocked && this.pendingSafeTools.size === 0 && this.needsAnswer && !this.exceededLimit && this.lastToolCompletedSafely; }
   get failure(): string | null {
     return this.failed ? this.failureDescription ?? "The AI runtime reported that it could not finish this task. Review its work before trying again."
+      : unexecutedToolCall((this.result ?? this.currentText).trim()) ? "The selected model wrote a tool request as text instead of using the tool. Nothing was marked finished. Choose a model with working tool support and try again."
       : this.needsAnswer ? "The teammate stopped after an intermediate step without returning a finished answer. Its progress has been kept."
       : null;
   }

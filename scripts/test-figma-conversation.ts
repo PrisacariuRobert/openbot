@@ -179,6 +179,11 @@ try {
      await page.goto(`${base}/?thread=${threadId}&panel=${panel}`);
      await page.locator(`.capability-${panel}`).waitFor();
      if (panel === 'provider') await page.getByText('Checking your connections…',{exact:true}).waitFor({state:'hidden',timeout:90000});
+     if (panel === 'connectors') {
+       await page.getByText('Use the apps you already have',{exact:true}).waitFor();
+       assert.equal(await page.locator('#direct-connection-settings[open]').count(),0,'a fresh studio does not lead with OAuth setup');
+       assert.equal(await page.getByRole('button',{name:'Connect Gmail',exact:true}).isVisible(),false,'direct connectors start behind an optional disclosure');
+     }
      await delay(600);
      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: desktop overflow`);
      await page.mouse.move(1400,900);
@@ -196,18 +201,41 @@ try {
      assert.ok(await phone.locator('.capabilities').evaluate(el=>el.scrollWidth<=el.clientWidth+1), `${panel}: 320px content clipping`);
    await phone.locator('.settings-mobile-back').click();
    assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
-  }
+   }
+   await page.goto(`${base}/?thread=${threadId}&panel=provider`);
+   await page.getByRole('button',{name:'Set up Ollama',exact:true}).click();
+   assert.equal(await page.getByRole('combobox',{name:'Provider',exact:true}).inputValue(),'ollama');
+   assert.equal(await page.getByRole('textbox',{name:'API address',exact:true}).inputValue(),'http://127.0.0.1:11434/v1');
+   await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Model IDs');
+   await page.screenshot({path:path.join(output,'workspace-local-model-setup.png'),scale:'css'});
    await page.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   await page.getByRole('button',{name:"Review Pixel's browser access",exact:true}).click();
+   await page.locator('.capability-bot').waitFor();
+   await page.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   await page.locator('#direct-connection-settings').waitFor();
+   if (await page.locator('.direct-connections[open]').count() === 0) await page.locator('.direct-connections > summary').click();
    await page.getByRole('button',{name:'Connect Gmail',exact:true}).click();
+   await page.locator('#direct-connection-settings[open]').waitFor();
    await page.locator('#connector-settings-google[open]').waitFor();
    await delay(600);
    await page.screenshot({path:path.join(output,'workspace-connect-gmail.png'),scale:'css'});
    await phone.setViewportSize({width:390,height:844});
    await phone.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   if (await phone.locator('.direct-connections[open]').count() === 0) await phone.locator('.direct-connections > summary').click();
    await phone.getByRole('button',{name:'Connect Gmail',exact:true}).click();
+   await phone.locator('#direct-connection-settings[open]').waitFor();
    await phone.locator('#connector-settings-google[open]').waitFor();
    await delay(600);
    await phone.screenshot({path:path.join(output,'phone-connect-gmail.png')});
+   const browserAccessFixture=new OpenBotDatabase(root,{dataDir:data});
+   browserAccessFixture.updateBot(pixel.id,{browserEnabled:true});browserAccessFixture.close();
+   await page.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   await page.getByRole('button',{name:"Open Pixel's chat",exact:true}).click();
+   await page.locator('#studio-message').waitFor();
+   assert.equal(new URL(page.url()).searchParams.get('thread'),threadId);
+   const browserAccessReset=new OpenBotDatabase(root,{dataDir:data});
+   browserAccessReset.updateBot(pixel.id,{browserEnabled:false});browserAccessReset.close();
+   await page.goto(`${base}/?thread=${threadId}&panel=connectors`);
    await page.emulateMedia({reducedMotion:'no-preference'});
    assert.equal(await page.locator('.capabilities').evaluate(el=>getComputedStyle(el).animationName),'workspace-arrive');
    await page.emulateMedia({reducedMotion:'reduce'});
@@ -242,6 +270,22 @@ try {
    await page.getByRole('button',{name:'Back to conversation',exact:true}).click();await page.locator('#studio-message').waitFor();
    console.log('PASS all workspace screens: 14 desktop and phone routes, single focus ring, mobile return navigation, teammate edit, back to conversation');
  }
+ const choiceFixture=new OpenBotDatabase(root,{dataDir:data});
+ const originalChoice=choiceFixture.getBot(pixel.id)!;
+ const optionalConnection=choiceFixture.upsertProvider({name:'Local choice fixture',authMode:'api_key',apiConfig:{baseUrl:'http://127.0.0.1:11434/v1',protocol:'openai-compatible',modelIds:['fixture-model']}});
+ choiceFixture.close();
+ await page.goto(`${base}/?thread=${threadId}&panel=provider`);
+ await page.getByRole('combobox',{name:'Pixel connection',exact:true}).selectOption(optionalConnection.id);
+ assert.equal(await page.getByRole('combobox',{name:'Pixel model',exact:true}).inputValue(),'','switching a connection still requires an explicit model');
+ await page.getByRole('combobox',{name:'Pixel model',exact:true}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:path.join(output,'workspace-model-choice.png'),scale:'css'});
+ const beforeChoice=await page.evaluate(async()=> (await (await fetch('/api/state')).json()).bots.find((bot:any)=>bot.name==='Pixel'));
+ assert.equal(beforeChoice.providerInstanceId,originalChoice.providerInstanceId,'the current subscription stays active before model selection');
+ await page.getByRole('combobox',{name:'Pixel model',exact:true}).selectOption(`openbot-${optionalConnection.id}/fixture-model`);
+ await page.waitForFunction(async id => (await (await fetch('/api/state')).json()).bots.some((bot:any)=>bot.name==='Pixel' && bot.providerInstanceId===id),optionalConnection.id);
+ const restoreChoice=new OpenBotDatabase(root,{dataDir:data});
+ restoreChoice.updateBot(pixel.id,{providerInstanceId:originalChoice.providerInstanceId,model:originalChoice.model});restoreChoice.close();
+ console.log('PASS model choice: connection selection alone changes nothing; explicit model selection saves the new pair');
  const expanded=new OpenBotDatabase(root,{dataDir:data});expanded.updateStudioSettings({maxTeammates:40});
  for(let i=1;i<=24;i++) expanded.createBot({name:`Synthetic teammate ${String(i).padStart(2,'0')} with a deliberately long name`,emoji:'',mascot:'blob',color:'#8780bf',role:'Layout stress fixture',instructions:'No external work',computerEnabled:false,browserEnabled:false});expanded.close();
  await page.reload();await page.getByLabel('Find a conversation').waitFor();await page.getByLabel('Find a conversation').fill('Synthetic teammate 24');await page.getByRole('button',{name:'Synthetic teammate 24 with a deliberately long name',exact:true}).waitFor();
@@ -253,8 +297,14 @@ try {
    await page.screenshot({path:path.join(output,'welcome.png'),scale:'css'});
    await page.getByRole('button',{name:'Create your first teammate',exact:false}).click();
    await page.getByRole('dialog',{name:'Create a teammate',exact:true}).waitFor();
+   await page.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="AI connection"]')?.textContent?.includes('Choose your AI service'));
+   assert.equal(await page.getByRole('combobox',{name:'Model',exact:true}).count(),0,'new teammate does not inherit a model before choosing a connection');
    await page.screenshot({path:path.join(output,'create-teammate.png'),scale:'css'});
    await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);
+   await page.goto(`${base}/?thread=team-room&panel=connectors`);
+   await page.getByRole('button',{name:'Create a teammate',exact:true}).click();
+   await page.getByRole('dialog',{name:'Create a teammate',exact:true}).waitFor();
+   await page.keyboard.press('Escape');
    await phone.goto(`${base}/?thread=team-room`);await phone.locator('.refined-welcome').waitFor();
    await phone.screenshot({path:path.join(output,'phone-welcome.png')});
    console.log('PASS empty-team welcome and creation dialog: real retired roster, Escape restores conversation, no teammate automatically created');

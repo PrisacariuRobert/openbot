@@ -14,6 +14,15 @@ test("provider failures explain the recovery path without leaking payloads", () 
   }
 });
 
+test("OpenCode free-tier agent restriction explains model choice without suggesting a sign-in retry", () => {
+  const output = new ModelOutput("opencode");
+  output.add({ type: "error", error: { data: { statusCode: 403, message: "Error from provider (Console): OpenCode's free tier can only be used from within OpenCode secret-private-payload" } } });
+  assert.equal(output.finalText, "");
+  assert.match(output.failure!, /restricted to use inside OpenCode/);
+  assert.match(output.failure!, /Choose another model/);
+  assert.doesNotMatch(output.failure!, /Reconnect|secret|private-payload/);
+});
+
 test("OpenCode separates turns, keeps final multipart output and ignores replays", () => {
   const output = new ModelOutput("opencode");
   output.add({ type: "step_start", part: { messageID: "first" } });
@@ -67,6 +76,16 @@ test("a tool-only last turn cannot reuse an earlier answer as success", () => {
     assert.equal(output.finalText, "");
     assert.match(output.failure || "", /intermediate step/);
   }
+});
+
+test("a tool request printed as text cannot become a completed answer", () => {
+  const output = new ModelOutput("opencode");
+  output.add(text("last", "one", JSON.stringify({ name: "task_plan", arguments: { goal: "Answer the user" } })));
+  assert.equal(output.finalText, "");
+  assert.match(output.failure || "", /tool request as text/);
+  const legitimateJson = new ModelOutput("opencode");
+  legitimateJson.add(text("last", "one", JSON.stringify({ answer: 4 })));
+  assert.equal(legitimateJson.finalText, '{"answer":4}');
 });
 
 test("runtime error results never become completed replies", () => {

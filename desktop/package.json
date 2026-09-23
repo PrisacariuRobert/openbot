@@ -38,10 +38,7 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "target": "nsis"
         }
       ]
     },
@@ -49,16 +46,10 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
+          "target": "AppImage"
         },
         {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
+          "target": "deb"
         }
       ],
       "category": "Utility"
@@ -67,18 +58,10 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "dmg"
         },
         {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "zip"
         }
       ],
       "identity": null
