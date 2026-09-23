@@ -4214,7 +4214,7 @@ app.post("/api/internal/tools", async (request, response) => {
       const routines = db.listRoutines(sourceRun.threadId)
         .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
         .slice(0, 50)
-        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
+        .map((routine) => ({ id: routine.id, name: routine.name, prompt: routine.prompt, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
       return response.json({ routines, count: routines.length, scope: "conversation" });
     }
     if (action === "routine_update" || action === "routine_pause" || action === "routine_resume" || action === "routine_delete") {
