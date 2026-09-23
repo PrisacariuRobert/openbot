@@ -1,0 +1,29 @@
+/* Phone welcome: an iOS-style sheet that rises from the bottom. */
+.phone-welcome { width: min(440px, 100vw); max-width: 100vw; max-height: 92dvh; margin: auto auto 0; padding: 10px 24px calc(22px + env(safe-area-inset-bottom)); border: 0; border-radius: 28px 28px 0 0; background: var(--system-background); color: var(--label-primary); box-shadow: 0 -12px 40px rgba(0,0,0,.18); overflow: auto; animation: phone-welcome-rise .42s cubic-bezier(.2,.9,.25,1); }
+.phone-welcome::backdrop { background: rgba(0,0,0,.32); animation: phone-welcome-fade .3s ease; }
+@media (min-width: 821px) { .phone-welcome { margin: auto; border-radius: 24px; padding-bottom: 24px; } }
+@keyframes phone-welcome-rise { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes phone-welcome-fade { from { opacity: 0; } to { opacity: 1; } }
+.phone-welcome-grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--separator-strong); margin: 0 auto 18px; }
+.phone-welcome-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: var(--secondary-system-background); margin-bottom: 14px; }
+:root[data-appearance="dark"] .phone-welcome-mark img { filter: invert(1); }
+@media (prefers-color-scheme: dark) { :root:not([data-appearance="light"]) .phone-welcome-mark img { filter: invert(1); } }
+.phone-welcome h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.phone-welcome-lead { margin: 6px 0 18px; font-size: 15px; line-height: 1.45; color: var(--label-secondary); }
+.phone-welcome-steps { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 2px; border-radius: 16px; overflow: hidden; background: var(--secondary-system-background); }
+.phone-welcome-steps li { display: flex; gap: 12px; padding: 14px 16px; background: var(--secondary-system-background); }
+.phone-welcome-steps li + li { border-top: 1px solid var(--separator); }
+.phone-welcome-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--system-background); color: var(--label-primary); }
+.phone-welcome-steps div { display: grid; gap: 4px; min-width: 0; }
+.phone-welcome-steps strong { font-size: 15px; font-weight: 600; }
+.phone-welcome-steps small { font-size: 13px; line-height: 1.45; color: var(--label-secondary); }
+.phone-welcome-steps b { font-weight: 600; color: var(--label-primary); }
+.phone-welcome .inline-icon { vertical-align: -2px; margin-right: 1px; color: var(--accent); }
+.phone-welcome-action { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform .12s ease, opacity .18s ease; }
+.phone-welcome-action:active:not(:disabled) { transform: scale(.96); }
+.phone-welcome-action:disabled { opacity: .6; }
+.phone-welcome-done { display: inline-flex; align-items: center; gap: 4px; color: var(--success) !important; font-weight: 500; }
+.phone-welcome-note { color: var(--label-secondary); }
+.phone-welcome-close { height: 50px; border-radius: 14px; font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .phone-welcome, .phone-welcome::backdrop { animation: none; } }
+.phone-welcome h2:focus { outline: none; }

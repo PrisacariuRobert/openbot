@@ -5,7 +5,7 @@ import "./away-access-panel.css";
 
 type Device = { id: string; name: string; revokedAt: number | null; lastUsedAt: number };
 type Status = { ready: boolean; url?: string | null; detail: string; checkedAt: number; devices: Device[] };
-type Invitation = { qr: string; expiresAt: number };
+type Invitation = { qr: string; expiresAt: number; browser?: boolean };
 async function request<T>(path: string, method = "GET"): Promise<T> {
   const response = await fetch(`/api/access${path}`, { method, credentials: "same-origin" });
   const value = await response.json();
@@ -51,7 +51,7 @@ export function AwayAccessPanel() {
   return <section className="away-pairing" aria-label="Away access">
     <div className="away-pairing-heading"><span className="away-pairing-icon"><Globe2 size={23} /></span><div>
       <h3>{status?.ready ? "Away access is ready" : "Your studio, wherever you are"}</h3>
-      <p>Your team on your iPhone. No VPN app needed.</p>
+      <p>Your team on your phone. No app store, no VPN.</p>
     </div></div>
     <SettingsGroup title="Your phone">
       <SettingsCard>
@@ -61,15 +61,15 @@ export function AwayAccessPanel() {
           control={busy ? <LoaderCircle className="spinner" size={19} /> : status?.ready ? <CheckCircle2 size={19} /> : <Globe2 size={19} />}
         />
         {status?.ready && <SettingsRow
-          title={invitation && seconds > 0 ? "Scan. Connect. You’re in." : "Connect my iPhone"}
+          title={invitation && seconds > 0 ? "Scan. Connect. You’re in." : "Connect my phone"}
           description={invitation && seconds > 0
-            ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.<span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
-            : <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</>}
+            ? <>{invitation.browser === false ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</> : <>Point your phone’s camera at the code and tap the link. No app to download.</>}<span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
+            : <>Scan one code with your phone’s camera. OpenBot opens, signed in, ready to add to your Home Screen.</>}
           control={invitation && seconds > 0
             ? <button onClick={() => void (async () => { setBusy(true); setError(""); try { await request("/pairing", "DELETE"); setInvitation(null); } catch (error) { setError(error instanceof Error ? error.message : "That code could not be cancelled."); } finally { setBusy(false); } })()} disabled={busy}>Hide and cancel code</button>
-            : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my iPhone"}</button>}
+            : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my phone"}</button>}
         >
-          {invitation && seconds > 0 && <img src={invitation.qr} width="240" height="240" alt="Scan this code with OpenBot on your iPhone to pair it with this studio" />}
+          {invitation && seconds > 0 && <img src={invitation.qr} width="240" height="240" alt="Scan this code with your phone’s camera to connect it to this studio" />}
         </SettingsRow>}
         <SettingsRow
           title="Check again"

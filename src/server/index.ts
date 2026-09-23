@@ -266,10 +266,15 @@ app.post("/api/auth/login", (request, response) => {
   response.setHeader("Set-Cookie", `openbot_access=${encodeURIComponent(parsed.data.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000${secureCookie ? "; Secure" : ""}`);
   response.json({ ok: true });
 });
+/** A paired phone browser stays signed in for a year; revoke it any time. */
+function deviceSessionCookie(request: express.Request, key: string) {
+  const secureCookie = useSecureSessionCookie(appUrl, request.secure, request.headers["x-openbot-relay"] === "1");
+  return `openbot_access=${encodeURIComponent(key)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=31536000${secureCookie ? "; Secure" : ""}`;
+}
 
 app.use("/api", (request, response, next) => {
   if (request.method === "GET" && request.path === "/extensions/oauth/callback") return next();
-  if (request.path === "/auth/login" || request.path === "/auth/pair" || request.path === "/auth/pairing-probe" || request.path.startsWith("/automation-hooks/") || request.path.startsWith("/connector-hooks/") || loopback(request)) return next();
+  if (request.path === "/auth/login" || request.path === "/auth/pair" || request.path === "/auth/pair-browser" || request.path === "/auth/pairing-probe" || request.path.startsWith("/automation-hooks/") || request.path.startsWith("/connector-hooks/") || loopback(request)) return next();
   const bearer = request.headers.authorization?.replace(/^Bearer\s+/i, "");
   const credential = acceptedAccessToken(bearer) ? bearer : cookie(request, "openbot_access");
   if (acceptedAccessToken(credential)) {
@@ -285,7 +290,7 @@ function broadcast(event: Record<string, unknown> = { type: "state", at: Date.no
 
 registerPairingRoutes(app, pairedDevices, awayAccess, (deviceId) => {
   for (const client of eventClients) if (client.locals.deviceId === deviceId) { client.end(); eventClients.delete(client); }
-});
+}, deviceSessionCookie);
 
 const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callback: deploymentCallbackUrl(deployment, "/api/extensions/oauth/callback"), app: appUrl });
 registerRecipeRoutes(app, db, () => broadcast());

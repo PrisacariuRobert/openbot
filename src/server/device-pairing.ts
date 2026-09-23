@@ -70,3 +70,15 @@ export function pairingLink(server: string, ticket: string): string {
   // Fragments aren't sent in HTTP requests, access logs or referrers.
   return `openbot://pair?server=${encodeURIComponent(base)}#${ticket}`;
 }
+
+/** Same single-use ticket, opened by the phone's camera in its browser.
+ * The ticket stays in the fragment, so it never reaches logs or referrers. */
+export function webPairingLink(server: string, ticket: string): string {
+  const base = secureStudioBase(server);
+  if (!base || !ticketPattern.test(ticket)) throw new Error("Pairing requires a secure studio address.");
+  return `${base}/pair#${ticket}`;
+}
+
+/** A browser has no keychain: the studio mints its device key and keeps it
+ * in an HttpOnly cookie, revocable like any paired phone. */
+export function newBrowserDeviceKey() { return `obd_${randomBytes(32).toString("base64url")}`; }

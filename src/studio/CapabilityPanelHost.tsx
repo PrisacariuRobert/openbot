@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { enablePushNotifications } from "./push";
 import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
 import { ProviderPanel } from "../components/ProviderPanel";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
@@ -94,19 +95,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     }
   }
   const saveBot = async (id: string, patch: Partial<Bot>) => { await change(`/api/bots/${encodeURIComponent(id)}`, "PATCH", patch); await loadProvider(); };
-  const notifications = async () => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotice("Background notifications are unavailable in this browser."); return false; }
-    if (await Notification.requestPermission() !== "granted") { setNotice("Notifications stayed off."); return false; }
-    const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
-    const { publicKey } = await request<{ publicKey: string }>("/api/notifications/key");
-    const encoded = publicKey.replace(/-/g, "+").replace(/_/g, "/");
-    const key = Uint8Array.from(atob(encoded + "=".repeat((4 - encoded.length % 4) % 4)), (c) => c.charCodeAt(0));
-    const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-    const saved = subscription.toJSON();
-    if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error("This browser did not finish notification setup.");
-    await request("/api/notifications/subscriptions", "POST", { endpoint: saved.endpoint, keys: saved.keys });
-    localStorage.setItem("openbot_push_enabled", "1"); setNotice("Background notifications are on."); return true;
-  };
+  const notifications = async () => { const result = await enablePushNotifications(); setNotice(result.message); return result.ok; };
   const reviewRun = [...state.runs, ...state.studioRuns].find((run) => run.id === reviewRunId);
   return <div className={`capabilities capability-${panel}`}>
     {panel === "team" && <TeamOverview state={state} onCreate={() => onCreate()} onEdit={id => onEditBot(id)} onThread={onThread} onImport={async bundle => { await change("/api/bots/import", "POST", bundle, "Profile imported. Choose an AI connection before starting work."); }} onRestore={async id => { await change(`/api/bots/${encodeURIComponent(id)}/restore`, "POST", undefined, "Teammate restored."); }} />}
