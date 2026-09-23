@@ -12,6 +12,7 @@ import "./settings-pages.css";
 import "./refined-workspace.css";
 
 import type { CapabilityPanel } from "./capability-navigation";
+import { TelegramPanel } from "../components/TelegramPanel";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 async function request<T = unknown>(url: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -130,6 +131,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
       await workflowMessage("team-room", prompt, botId ? [botId] : [], expectedWorkKind);
     }} />}
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}
+    {panel === "telegram" && <TelegramPanel bots={state.bots} />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
     {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} onSave={saveBot}
       onUpdateThread={async (patch) => { await change(`/api/threads/${encodeURIComponent(bot.threadId)}`, "PATCH", patch); }}

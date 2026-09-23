@@ -88,6 +88,7 @@ import { validToolToken } from "./tool-auth.js";
 import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
+import { TelegramChannel } from "./telegram-channel.js";
 import { syncedFolderProvider, syncedFolderWarning } from "./synced-folder.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
@@ -326,6 +327,15 @@ for (const receipt of db.listPreparedApprovedActions()) {
 
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
 const notifications = new NotificationService(db, () => runner.isLeader());
+const telegram = new TelegramChannel({
+  db, appUrl, isLeader: () => runner.isLeader(),
+  // Telegram messages enter through the studio's own message API so every
+  // admission, budget and replay rule applies unchanged.
+  localApi: async (method, apiPath, body) => {
+    const response = await fetch(`http://127.0.0.1:${port}${apiPath}`, { method, headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body) });
+    return { status: response.status, body: await response.json().catch(() => ({})) as Record<string, unknown> };
+  },
+});
 const inspectPrivateHome = () => inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
 const runnerCareMonitor = new RunnerCareMonitor({
   db,
@@ -4596,6 +4606,23 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
   if (error instanceof WorkflowCheckError) return response.status(409).json({ error: error.message, code: "workflow_check_required" });
   next(error);
 });
+app.get("/api/channels/telegram", (_request, response) => response.json(telegram.status()));
+app.post("/api/channels/telegram", async (request, response) => {
+  const parsed = z.object({ token: z.string().trim().min(20).max(200) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Paste the bot token from @BotFather." });
+  try { response.json(await telegram.connect(parsed.data.token)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "Telegram did not accept this token." }); }
+});
+app.post("/api/channels/telegram/pairing-code", (_request, response) => {
+  try { response.json(telegram.newPairingCode()); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "Connect a Telegram bot first." }); }
+});
+app.post("/api/channels/telegram/default-teammate", (request, response) => {
+  const parsed = z.object({ botId: z.string().trim().min(1).max(200).nullable() }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate." });
+  try { response.json(telegram.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
+});
+app.delete("/api/channels/telegram", (_request, response) => { telegram.disconnect(); response.json(telegram.status()); });
+
 app.use("/api", (_request, response) => response.status(404).json({ error: "This API is not available on this host. Check that OpenBot is up to date." }));
 if (existsSync(distDir)) {
   app.use(express.static(distDir));
@@ -4604,6 +4631,7 @@ if (existsSync(distDir)) {
 
 const server = app.listen(port, host, () => {
   relay?.start();
+  if (telegram.status().configured) telegram.start();
   console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
   if (deployment.mode === "private_runner") console.log("Private runner mode is active with HTTPS, durable storage, and proxy-aware secure cookies.");
   if (host !== "127.0.0.1" && host !== "localhost") console.log(`Remote access is enabled. The private access key is stored at ${path.join(db.dataDir, "access.token")}`);
@@ -4621,6 +4649,7 @@ async function shutdown() {
   runnerCareMonitor.stop();
   externalHeartbeat.stop();
   notifications.stop();
+  telegram.stop();
   await runner.stop();
   providerConnections.stop();
   liveViews.close();
