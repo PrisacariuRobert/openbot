@@ -1222,7 +1222,7 @@ export class BrowserManager {
       });
       const label = (node.getAttribute("aria-label") || labelTexts.slice(0, -1).join(" ") || labelTexts.at(-1) || node.getAttribute("name") || "").trim().slice(0, 240);
       const controlledIds = (node.getAttribute("aria-controls") || "").trim().split(/\s+/).filter(Boolean);
-      const disclosure = node.matches('button,[role="button"]') && node.getAttribute("aria-expanded") === "false" && controlledIds.length > 0 && controlledIds.length <= 3 && controlledIds.every(id => id.length <= 200)
+      const disclosure = node.matches('button,[role="button"]') && node.getAttribute("aria-expanded") === "false" && controlledIds.length > 0 && controlledIds.length <= 3 && controlledIds.every(id => id.length <= 200 && document.getElementById(id) !== null)
         ? { expanded: false as const, controls: controlledIds }
         : null;
       const stateful = node.matches('input,textarea,select,[contenteditable="true"],[role="checkbox"],[role="switch"],[role="radio"],[role="option"],[role="slider"],[role="spinbutton"],[role="textbox"],[role="combobox"]')

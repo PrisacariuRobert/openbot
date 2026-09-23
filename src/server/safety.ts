@@ -24,7 +24,7 @@ export function approvalReason(prompt: string): string | null {
     const actions = clause.replace(/^(?:do\s+not|don't|never)\s+/i, "");
     if (!/\s+or\s+/i.test(actions) || /\b(?:but|then|instead|however|also|actually|afterwards|except)\b/i.test(actions)) return clause;
     const parts = actions.split(/,\s*(?:or\s+)?|\s+or\s+|\s*\/\s*(?=[a-z])/i);
-    const excludedVerb = /^(?:create|complete|edit|invite|touch|delete|remove|erase|wipe|drop|truncate|git\s+push|push|publish|deploy|release|merge|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|install|access|change|modify|overwrite|share|contact)\b/i;
+    const excludedVerb = /^(?:create|complete|edit|invite|touch|delete|remove|erase|wipe|drop|truncate|git\s+push|push|publish|deploy|release|merge|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|install|access|change|modify|overwrite|share|contact|sign\s+(?:in|up)|log\s+in|register|join|follow|comment)\b/i;
     return parts.length >= 2 && parts.every((part) => excludedVerb.test(part.trim())) ? "[actions explicitly excluded]" : clause;
   });
   const actionable = withoutExcludedLists.replace(/\b(?:do\s+not|don't|never)\s+(?:try\s+to\s+|attempt\s+to\s+)?(?:delete|remove|erase|wipe|drop|truncate|git\s+push|publish|deploy|release|merge\s+(?:the\s+)?pr|send|post|message|email|reply|submit|buy|purchase|pay|subscribe|order|checkout|transfer|execute|process|issue|use\s+(?:an?\s+)?(?:password|passcode|api[ _-]?key|secret|credit\s+card|bank\s+account))\b[^,.;]*?(?=\s+\b(?:but|then)\b|[,.;]|$)/gi, "[action explicitly excluded]");
@@ -94,10 +94,36 @@ export interface BrowserTarget {
   };
 }
 
+/** Labels that name a consequential effect, and controls that handle secrets. */
+export const FINAL_ACTION_LABEL = /\b(?:create|new|add|save|send|submit|delete|remove|complete|finish|share|invite|buy|purchase|pay|checkout|order|subscribe|publish|post|upload|deploy|merge|confirm|approve|accept|apply|book|reserve|cancel|archive|sign[ -]?out|log[ -]?out)\b/i;
+export const SENSITIVE_CONTROL = /password|passcode|secret|token|credit.?card|checkout|payment|one.time.code|verification|cc-/i;
+
+/** A host-observed, collapsed show/hide control: a native button (no link,
+ * form, dialog or held state) whose aria-controls names panels that exist on
+ * the page. Expanding one only reveals content, so it runs without review.
+ * Page-authored attributes are untrusted, hence every other condition and
+ * the action-label check; anything short of this stays reviewed. */
+export function isCollapsedDisclosure(target?: BrowserTarget): boolean {
+  const review = target?.review;
+  if (!target || !review?.disclosure || review.disclosure.expanded !== false || review.disclosure.controls.length === 0) return false;
+  // A button's type is "submit" even outside a form; with no form owner
+  // (form attribute included) there is nothing for it to submit.
+  if (target.stateful !== false || target.href || target.formMethod) return false;
+  if (!(target.tag === "button" && target.role === "") && target.role !== "button") return false;
+  if (review.contextScope === "form" || review.contextScope === "dialog" || review.fields.length > 0 || !review.complete) return false;
+  const text = `${target.label} ${target.inputType} ${target.autocomplete}`;
+  return target.label.trim().length > 0 && !FINAL_ACTION_LABEL.test(target.label) && !SENSITIVE_CONTROL.test(text);
+}
+
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
-  const description = `${value} ${target?.label || ""} ${target?.inputType || ""} ${target?.autocomplete || ""}`;
+  // A formless button reports type "submit" by default; that type is only
+  // evidence of a submission when a form owns the button.
+  const inputType = target?.inputType === "submit" && !target.formMethod ? "" : target?.inputType || "";
+  const description = `${value} ${target?.label || ""} ${inputType} ${target?.autocomplete || ""}`;
   if (action === "type" && /password|passcode|secret|token|credit.?card|checkout|payment|one-time-code|cc-/i.test(description)) return "This browser action may enter private or payment information.";
   if (action === "click") {
+    // Checked before the type scan: a formless button reports type "submit".
+    if (isCollapsedDisclosure(target) && !/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(`${value} ${target!.label}`)) return null;
     if (/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(description)) return "This click may create an external or irreversible action.";
     // A CSS selector is not evidence of intent: #primary can mean Send.
     // Permit observed navigation/search; review other controls by default.

@@ -37,6 +37,9 @@ test("coordinated prohibitions do not turn safe work into a publishing request",
   assert.equal(approvalReason("Prepare the drafts. Don't send emails or post to the team."), null);
   assert.equal(approvalReason("Never delete, overwrite, or publish the originals."), null);
   assert.equal(approvalReason("Read-only: do not create, complete, edit, send, post, invite or buy anything."), null);
+  assert.equal(approvalReason("Research two foldable laptop stands on Amazon Belgium and recommend one. Do not sign in or buy anything."), null);
+  assert.equal(approvalReason("Find a public community. Do not join, follow, comment or post anything."), null);
+  assert.equal(approvalReason("Do not log in or buy. Then buy the cheaper stand."), "This may spend money or start a subscription.");
   assert.equal(approvalReason("Do not create another task, complete/delete anything, share it or contact anyone."), null);
   assert.equal(approvalReason("Create one private Todoist task. Do not complete or delete it, touch unrelated tasks, change settings, or create a report file."), null);
   assert.ok(approvalReason("Do not delete files or publish the preview, then deploy the approved release."));
@@ -115,4 +118,31 @@ test("spending warnings follow actions, not money words or grammar", () => {
     approvalReason("Buy the premium plan"),
     "This may spend money or start a subscription.",
   );
+});
+
+test("expanding a collapsed show/hide control needs no review; look-alikes still do", () => {
+  const toggle: BrowserTarget = {
+    url: "https://app.todoist.com/app/today", tag: "button", role: "", label: "Toggle list of My Projects", inputType: "submit", autocomplete: "", href: "", formMethod: "", searchForm: false, stateful: false,
+    review: { url: "https://app.todoist.com/app/today", label: "Toggle list of My Projects", control: "button", destination: "https://app.todoist.com/app/today", fields: [], contextScope: "navigation", disclosure: { expanded: false, controls: ["projects-list"] }, complete: true },
+  };
+  assert.equal(browserApprovalReason("click", "#projects-toggle", toggle), null);
+  assert.equal(browserApprovalReason("click", "#more", { ...toggle, tag: "div", role: "button", label: "More options", review: { ...toggle.review!, label: "More options", contextScope: "page" } }), null);
+
+  const reviewed = (change: Partial<BrowserTarget>, review: Partial<NonNullable<BrowserTarget["review"]>> = {}) =>
+    browserApprovalReason("click", "#x", { ...toggle, ...change, review: { ...toggle.review!, ...review } });
+  assert.ok(reviewed({ label: "Delete project" }, { label: "Delete project" }), "an action label is never a harmless toggle");
+  assert.ok(reviewed({ label: "Archive" }), "archive is an effect, not a disclosure");
+  assert.ok(reviewed({}, { disclosure: null }), "no host-observed disclosure");
+  assert.ok(reviewed({}, { disclosure: { expanded: false, controls: [] } }), "controls nothing");
+  assert.ok(reviewed({ stateful: true }), "held state (pressed/selected/checked)");
+  assert.ok(reviewed({ stateful: undefined }), "state not observed");
+  assert.ok(reviewed({ formMethod: "post" }), "inside a form");
+  assert.ok(reviewed({}, { contextScope: "dialog" }), "inside a dialog");
+  assert.ok(reviewed({}, { fields: [{ label: "Name", value: "x" }] }), "editable fields in scope");
+  assert.ok(reviewed({}, { complete: false }), "incomplete observation");
+  assert.ok(reviewed({ tag: "a", href: "javascript:go()" }), "links follow link rules");
+  assert.ok(reviewed({ tag: "div", role: "" }), "not a button");
+  assert.ok(reviewed({ role: "tab" }), "tabs hold selection state");
+  assert.ok(reviewed({ label: "" }, { label: "" }), "unlabelled control");
+  assert.ok(browserApprovalReason("click", "#confirm-toggle", toggle), "a risky selector word still reviews");
 });
