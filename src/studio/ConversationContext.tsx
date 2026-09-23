@@ -74,7 +74,7 @@ export function ConversationContext({
         <div className="context-group">
           <span>{group.botIds?.map((id) => state.bots.find((bot) => bot.id === id)?.name).filter(Boolean).join(" · ")}</span>
           <button className="text-action" onClick={onEditGroup}>
-            Edit group <ArrowRight size={13} />
+            Manage participants <ArrowRight size={13} />
           </button>
         </div>
       )}

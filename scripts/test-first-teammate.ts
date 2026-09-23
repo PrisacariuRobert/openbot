@@ -129,7 +129,6 @@ try {
       .getByRole("combobox", { name: /^Model/ })
       .click();
     await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
-    await sheet.getByText("Manage AI connections", { exact: true }).click();
     available = false;
     await sheet.getByRole("button", { name: "Refresh connections" }).click();
     await sheet.getByText("This connection or model is no longer available.", { exact: false }).waitFor();

@@ -99,7 +99,6 @@ import { useAppearance, type Appearance } from "./useAppearance";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
 import { foldTalkingPills } from "./talk-folds";
 import "./character-context.css";
-import "./project-rooms.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
@@ -107,7 +106,7 @@ type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
   | { kind: "new" }
   | { kind: "create" }
-  | { kind: "group"; threadId?: string }
+  | { kind: "group"; threadId: string }
   | { kind: "workspace" }
   | { kind: "context" }
   | { kind: "teammate"; bot: Bot }
@@ -1378,7 +1377,7 @@ export function Studio() {
   // after a drag belongs to the gesture and is ignored; a sticky boolean
   // would stay set forever when pointer capture retargets that click away
   // from the row button, silently eating a later, deliberate tap.
-  const dragEndAt = useRef(0);
+  const lastRowDrag = useRef<{ id: string; at: number } | null>(null);
   const dragEngaged = useRef(false);
   const dragBase = useRef(0);
   const dragX = useRef(0);
@@ -1457,8 +1456,6 @@ export function Studio() {
       (item.id !== "team-room" || Boolean(item.lastMessage || item.needsYou)) &&
       conversationMatches(item, allBots, conversationQuery),
   );
-  const groupThreads = visibleThreads.filter(isGroupThread);
-  const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
   const filteredConversationCount = pinnedThreads.length + visibleThreads.length;
   const threadRow = (item: Thread) => {
       const bot = allBots.find((bot) => bot.threadId === item.id);
@@ -1521,7 +1518,7 @@ export function Studio() {
             : x < -shiftPx / 2
               ? -shiftPx
               : 0;
-        dragEndAt.current = performance.now();
+        lastRowDrag.current = { id: item.id, at: performance.now() };
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           cell.classList.remove("dragging");
           setSwipedRow(target < 0 ? item.id : null);
@@ -1646,7 +1643,7 @@ export function Studio() {
           onClick={() => {
             // A click landing right after a drag release belongs to the
             // gesture, not to a tap — ignore it, then forget it happened.
-            if (performance.now() - dragEndAt.current < 350) return;
+            if (lastRowDrag.current?.id === item.id && performance.now() - lastRowDrag.current.at < 350) return;
             if (swipedRow === item.id) { setSwipedRow(null); return; }
             openThread(item.id);
           }}
@@ -1748,14 +1745,8 @@ export function Studio() {
     };
   const conversationRows = (
     <>
-      {dmThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
-      {dmThreads.map(threadRow)}
-      {groupThreads.length > 0 && (
-        <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
-          <summary>Shared chats</summary>
-          {groupThreads.map(threadRow)}
-        </details>
-      )}
+      {visibleThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
+      {visibleThreads.map(threadRow)}
       {filteredConversationCount === 0 && (needsYouOnly || conversationQuery || Boolean(state?.bots.length)) && (
         <div className="conversation-list-empty" role="status">
           <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
@@ -2663,7 +2654,7 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? detail.threadId ? "Shared chat members" : "New shared chat"
+                ? "Conversation participants"
               : detail.kind === "workspace"
                 ? "Your workspace"
                 : detail.kind === "new"
@@ -2729,7 +2720,6 @@ export function Studio() {
               </div>
               <div className="new-chat-options">
                 <button type="button" onClick={() => setDetail({ kind: "create" })}><Plus size={18} /> Create a teammate</button>
-                {state.bots.length > 1 && <button type="button" onClick={() => setDetail({ kind: "group" })}><UsersRound size={18} /> Start a shared chat</button>}
               </div>
             </div>
           )}

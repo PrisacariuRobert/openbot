@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowRight, LoaderCircle, Plus } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
 import { isFreeTierModel } from "../shared/provider-config";
 import { Character } from "./Character";
@@ -112,6 +112,7 @@ export function CreateTeammate({
     (item) => item.id === providerId,
   );
   const validSelection = Boolean(connection?.connected && connection.models?.includes(model));
+  const hasConnectedAI = Boolean(providers?.instances.some((item) => item.connected));
   async function create(event: FormEvent) {
     event.preventDefault();
     if (submitting.current || !validSelection) return;
@@ -283,12 +284,24 @@ export function CreateTeammate({
       {connection && isFreeTierModel(model) && (
         <p className="boundary-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
       )}
-      {!validSelection && <p className="boundary-note required-selection">Choose a connected AI service and model before creating this teammate.</p>}
+      {providers && !hasConnectedAI && (
+        <div className="connection-onramp" role="status">
+          <strong>Connect an AI to start chatting</strong>
+          <p>Setup opens in another window. Your teammate’s name and job stay here while you connect.</p>
+          <div className="connection-onramp-actions">
+            <a href="/?panel=provider" target="_blank" rel="noreferrer">Connect an AI service <ArrowRight size={15} /></a>
+            <button type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Refresh connections</button>
+          </div>
+        </div>
+      )}
+      {!providers && error && <button className="connection-retry" type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Retry loading AI connections</button>}
+      {hasConnectedAI && !validSelection && <p className="boundary-note required-selection">Choose an AI service and model to finish creating this teammate.</p>}
+      {hasConnectedAI && <div className="connection-secondary-actions"><a className="connection-manage-link" href="/?panel=provider" target="_blank" rel="noreferrer">Manage AI connections <ArrowRight size={13} /></a><button type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Refresh connections</button></div>}
       <div className="teammate-section teammate-appearance">
         <span className="section-label">Appearance</span>
         <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
       </div>
-      <Advanced title="Advanced" summary="Instructions, connections & ready-made teams">
+      <Advanced title="Advanced" summary="Instructions & starter teammates">
       <div className="teammate-section">
         <label>
           Additional instructions
@@ -301,36 +314,14 @@ export function CreateTeammate({
           />
         </label>
       </div>
-      <details className="connection-management" open={providers && !providers.instances.some((item) => item.connected) ? true : undefined}>
-      <summary>Manage AI connections</summary>
-      <a
-        className="text-action"
-        href="/?panel=provider"
-        target="_blank"
-        rel="noreferrer"
-      >
-        <Plus size={14} /> {providers?.instances.some((item) => item.connected) ? "Connect another AI service" : "Set up an AI connection"}
-      </a>
-      <p className="boundary-note">Setup opens separately so you won’t lose this draft. Return here afterward; your connections refresh automatically.</p>
-      <button
-        className="text-action"
-        type="button"
-        onClick={() => {
-          setError("");
-          setReload((value) => value + 1);
-        }}
-      >
-        Refresh connections
-      </button>
-      </details>
       <p className="boundary-note">
         No task starts yet. Existing Google-account permissions aren’t shared
         with this new teammate. Studio-wide Mac access, if enabled, still
         applies. Browser and private-computer access start off.
       </p>
       <details className="character-customize profile-import">
-        <summary>Start with a ready-made team</summary>
-        <small className="panel-note">Three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
+        <summary>Add starter teammates</summary>
+        <small className="panel-note">Add three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
         {teamTemplates && (
           <div className="team-template-list">
             {teamTemplates.map((template) => (

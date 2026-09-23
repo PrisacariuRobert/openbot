@@ -3132,7 +3132,10 @@ export function ConnectorPanel({
     const section = document.getElementById(`connector-settings-${group}`) as HTMLDetailsElement | null;
     if (section) {
       section.open = true;
-      section.scrollIntoView({ block: "start", behavior: "smooth" });
+      section.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      });
       section.classList.add("connector-target-highlight");
       setTimeout(() => section.classList.remove("connector-target-highlight"), 1800);
       section.querySelector("summary")?.focus();
@@ -3382,7 +3385,7 @@ export function ConnectorPanel({
         <div className="panel-section-heading">
           <div>
             <h3>Your apps</h3>
-            <p>Choose which apps your teammates can use.</p>
+            <p>Connect one app when you need it. You choose which teammates can use it.</p>
           </div>
           {connected && (
             <span className="connector-ready">
@@ -3423,7 +3426,7 @@ export function ConnectorPanel({
                     </div>
                     <span className={`connector-status-badge ${entry.connected ? "connected" : ""}`}>
                       {entry.connected && <span className="connector-status-dot" aria-hidden="true" />}
-                      {entry.connected ? "Connected" : entry.badge || "Available"}
+                      {entry.connected ? "Connected" : entry.badge === "Available now" ? "Not connected" : entry.badge || "Not connected"}
                     </span>
                   </div>
                   <p className="connector-card-body">{entry.description}</p>
@@ -3438,9 +3441,9 @@ export function ConnectorPanel({
                         type="button"
                         className={`connector-manage ${entry.connected ? "is-connected" : ""}`}
                         onClick={() => openApp(entry.id)}
-                        aria-label={`${entry.connected ? "Configure" : "Set up"} ${entry.name}`}
+                        aria-label={`${entry.connected ? "Manage" : "Connect"} ${entry.name}`}
                       >
-                        <span>{entry.connected ? "Configure connection" : "Set up connection"}</span>
+                        <span>{entry.connected ? `Manage ${entry.name}` : `Connect ${entry.name}`}</span>
                         <ChevronRight size={14} />
                       </button>
                     ) : (
@@ -3550,8 +3553,12 @@ export function ConnectorPanel({
           <SettingsCard>
             <SettingsRow
               title="Connect Google Workspace"
-              description="The release build supports one-click Google sign-in. Self-hosters can get the same flow by choosing one Desktop OAuth credentials file."
+              description="This build needs a Google Desktop app credentials file before sign-in. Set it up once, then Gmail, Drive and Calendar share one connection."
             >
+              <div className="google-connection-intro">
+                <span>1</span><p>Turn on the Google apps and create a Desktop OAuth client in Google Cloud. Add your account as a test user.</p>
+                <span>2</span><p>Choose its downloaded JSON file below. OpenBot then opens Google sign-in.</p>
+              </div>
               <input
                 ref={credentialsFile}
                 className="visually-hidden"
@@ -3566,32 +3573,19 @@ export function ConnectorPanel({
                 onClick={() => credentialsFile.current?.click()}
                 disabled={busy === "import"}
               >
-                <span className="credential-icons">
-                  <i>
-                    <ConnectorIcon id="gmail" />
-                  </i>
-                  <i>
-                    <ConnectorIcon id="google-drive" />
-                  </i>
-                  <i>
-                    <ConnectorIcon id="google-calendar" />
-                  </i>
-                </span>
+                <ConnectorIcon id="gmail" />
                 <span>
                   <strong>
                     {busy === "import"
                       ? "Reading your Google file…"
                       : "Choose Google credentials file"}
                   </strong>
-                  <small>
-                    Then Google sign-in opens automatically—no copying IDs or
-                    callback addresses
-                  </small>
+                  <small>Google sign-in opens after you choose the file</small>
                 </span>
                 {busy === "import" ? (
                   <LoaderCircle className="spinner" size={17} />
                 ) : (
-                  <ArrowUp size={17} />
+                  <ChevronRight size={17} />
                 )}
               </button>
             </SettingsRow>
@@ -3618,7 +3612,7 @@ export function ConnectorPanel({
                 </div>
               </div>
             </SettingsRow>
-            <SettingsRow title="Setup steps">
+            <Advanced title="Detailed setup steps" summary="How to create a Desktop OAuth client">
               <div className="setup-steps setup-steps-simple">
                 <div>
                   <b>1</b>
@@ -3648,7 +3642,7 @@ export function ConnectorPanel({
                   </span>
                 </div>
               </div>
-            </SettingsRow>
+            </Advanced>
             <Advanced title="Manual client credentials" summary="Enter client ID and secret directly instead of uploading credentials JSON">
               <form className="connector-form" onSubmit={save} style={{ padding: "8px 0" }}>
                 <label className="field">
@@ -3698,8 +3692,8 @@ export function ConnectorPanel({
                 <ShieldCheck size={16} />
                 <p>
                   <strong>Your files and tokens stay on this Mac.</strong> For
-                  public distribution, the release maintainer adds a verified Google
-                  client so everyone sees a single Connect Google button.
+                  a future release can include a verified Google client for a
+                  single Connect Google button.
                 </p>
               </div>
             </SettingsRow>

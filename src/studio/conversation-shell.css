@@ -1726,7 +1726,6 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
 .detail-group .drawer-intro { margin: 0 0 8px; }
 .detail-group .group-name { min-height: 44px; border-radius: 12px; }
 .detail-group .group-member { min-height: 72px; border-radius: 12px; }
-.group-members-hint { margin: -6px 0 2px; color: var(--secondary); font-size: 12px; }
 .context-group {
   display: flex;
   align-items: center;
@@ -2107,7 +2106,7 @@ a.message-file:hover {
 .inbox-conversations .conversation-list-empty { margin-inline: auto; }
 .new-chat-chooser { display: grid; gap: 18px; }
 .new-chat-chooser > p { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.55; }
-.new-chat-list { display: grid; gap: 4px; max-height: min(45vh, 350px); overflow-y: auto; }
+.new-chat-list { display: grid; gap: 4px; max-height: min(50vh, 400px); overflow-y: auto; }
 .new-chat-list > button {
   display: flex;
   align-items: center;
@@ -2269,7 +2268,7 @@ a.message-file:hover {
 }
 .row-action:disabled { opacity: .5; cursor: progress; }
 .archived-chats { margin: 12px 0; }
-.archived-chats > summary, .project-rooms > summary { padding: 10px 12px; font-size: 12px; line-height: 18px; color: var(--secondary); cursor: pointer; }
+.archived-chats > summary { padding: 10px 12px; font-size: 12px; line-height: 18px; color: var(--secondary); cursor: pointer; }
 .archived-chats .archived-cell { display: grid; grid-template-columns: minmax(0,1fr) 36px; align-items: center; gap: 8px; padding: 4px 8px; min-height: 52px; }
 .archived-chats .archived-cell > .conversation-row { display: flex; min-height: 44px; height: auto; padding: 10px 8px; margin: 0; width: 100%; border-radius: 10px; }
 .archived-chats .conversation-title { font-size: 13px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import type { AppState } from "../shared/types";
 
-/** Create or edit an optional shared chat. Mentions and the usual approvals
- * still decide what happens; bot-to-bot help does not require a shared chat. */
+/** Existing multi-teammate conversations remain editable for recovery. New
+ * work starts in a direct chat; teammates can coordinate there privately. */
 export function GroupEditor({
   state,
   threadId,
@@ -11,11 +11,11 @@ export function GroupEditor({
   onOpen,
 }: {
   state: AppState;
-  threadId?: string;
+  threadId: string;
   onDone?: () => void;
   onOpen: (threadId: string) => void;
 }) {
-  const editing = threadId ? state.threads.find((thread) => thread.id === threadId) : undefined;
+  const editing = state.threads.find((thread) => thread.id === threadId);
   const [title, setTitle] = useState(editing?.title || "");
   const [members, setMembers] = useState<string[]>(editing?.botIds || []);
   const [busy, setBusy] = useState(false);
@@ -24,17 +24,17 @@ export function GroupEditor({
     setMembers((current) => (current.includes(id) ? current.filter((member) => member !== id) : current.length >= 6 ? current : [...current, id]));
   };
   const save = async () => {
-    if (busy) return;
+    if (busy || !editing) return;
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(editing ? `/api/threads/${encodeURIComponent(threadId!)}/group` : "/api/threads", {
-        method: editing ? "PATCH" : "POST",
+      const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}/group`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editing ? { ...(title ? { title } : {}), botIds: members } : { title, botIds: members }),
+        body: JSON.stringify({ title, botIds: members }),
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That shared chat could not be saved.");
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That conversation could not be saved.");
       onOpen((data as { id: string }).id);
       onDone?.();
     } catch (saveError) {
@@ -45,12 +45,9 @@ export function GroupEditor({
   };
   return (
     <div className="group-editor">
-      {editing && <h2 className="detail-title">{editing.title}</h2>}
-      <p className="drawer-intro">
-        {editing
-          ? "Rename this chat or change who's here. Changes affect future tasks; work already running keeps going."
-          : "Keep a project conversation, its files, and several teammates together. Teammates can ask each other for help in any chat."}
-      </p>
+      {!editing ? <><p className="drawer-intro">This conversation is no longer available.</p><button onClick={onDone}>Back to chats</button></> : <>
+      <h2 className="detail-title">{editing.title}</h2>
+      <p className="drawer-intro">Rename this existing conversation or change who can join future work. Work already running keeps its current participants.</p>
       <label className="group-name">
         <UsersRound size={15} />
         <input
@@ -77,15 +74,15 @@ export function GroupEditor({
           </button>
         ))}
       </div>
-      {!editing && <p className="group-members-hint">Choose at least two teammates.</p>}
       {error && <p className="extension-error" role="alert">{error}</p>}
       <button
         className="primary full-width"
-        disabled={busy || !title.trim() || members.length < (editing ? 1 : 2)}
+        disabled={busy || !title.trim() || members.length < 1}
         onClick={() => void save()}
       >
-        {editing ? "Save changes" : "Create shared chat"} <ArrowRight size={15} />
+        Save conversation <ArrowRight size={15} />
       </button>
+      </>}
     </div>
   );
 }

@@ -72,8 +72,10 @@ try {
  await novaRow().hover();await page.getByRole('button',{name:'Conversation actions for Nova',exact:true}).click();await page.getByRole('button',{name:'Pin Nova to the top',exact:true}).click();
  await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).waitFor();
  await page.reload();await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).waitFor();
- await page.getByRole('button',{name:'Unpin Nova',exact:true}).focus();await page.keyboard.press('Enter');
- await page.waitForFunction(()=>![...document.querySelectorAll('.pinned-zone button')].some(el=>el.getAttribute('aria-label')==='Nova'));
+ const unpinResponse=page.waitForResponse(response=>response.url().endsWith('/api/threads/'+bots[2]!.threadId)&&response.request().method()==='PATCH');
+ await page.getByRole('button',{name:'Unpin Nova',exact:true}).press('Enter');
+ assert.equal((await unpinResponse).status(),200,'keyboard unpin reaches the host');
+ await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).waitFor({state:'detached'});
  await novaRow().hover();await page.getByRole('button',{name:'Conversation actions for Nova',exact:true}).click();await page.getByRole('button',{name:'Archive Nova',exact:true}).click();
  await page.getByRole('button',{name:'Tap again to archive Nova',exact:true}).click();
  await page.locator('.archived-chats > summary').click();
@@ -85,6 +87,29 @@ try {
  assert.equal(await page.locator('.pinned-zone').getByRole('button',{name:'Nova',exact:true}).count(),0);
  await page.unroute(failedPin);await page.getByRole('button',{name:'Dismiss',exact:true}).click();
  console.log('PASS conversation actions: pointer pin, reload persistence, keyboard unpin, archive/restore through real host; injected failed save stays visible');
+ const legacyFixture=new OpenBotDatabase(root,{dataDir:data});
+ const legacy=legacyFixture.createGroupThread('Older launch chat',[pixel.id,scout.id]);
+ legacyFixture.addMessage({threadId:legacy.id,senderType:'user',senderId:null,body:'Keep this conversation for the record.'});
+ legacyFixture.close();
+ await page.reload();
+ await page.getByRole('button',{name:'Older launch chat',exact:true}).waitFor();
+ assert.equal(await page.locator('.project-rooms').count(),0,'past multi-teammate chats use the regular Recent list');
+ await page.getByRole('button',{name:'New conversation',exact:true}).click();
+ assert.equal(await page.getByRole('button',{name:'Start a shared chat'}).count(),0,'new conversations start with one teammate');
+ await page.keyboard.press('Escape');
+ await page.getByRole('dialog',{name:'New conversation'}).waitFor({state:'detached'});
+ await page.getByRole('button',{name:'Older launch chat',exact:true}).click();
+ await page.waitForFunction(id=>new URL(location.href).searchParams.get('thread')===id,legacy.id);
+ await page.getByRole('button',{name:'About Older launch chat',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Conversation details',exact:true}).click();
+ await page.getByRole('button',{name:'Manage participants',exact:true}).click();
+ const legacyEditor=page.getByRole('dialog',{name:'Conversation participants'});
+ await legacyEditor.getByRole('textbox',{name:'Chat name'}).fill('Launch archive');
+ await legacyEditor.getByRole('button',{name:'Save conversation'}).click();
+ await page.getByRole('button',{name:'Launch archive',exact:true}).waitFor();
+ await page.goto(`${base}/?thread=${threadId}`);
+ await page.getByRole('button',{name:'About Pixel',exact:true}).waitFor();
+ console.log('PASS chat simplification: no new group flow; older multi-teammate chat stays available and editable');
  const archiveFixture=new OpenBotDatabase(root,{dataDir:data});
  for(let i=1;i<=7;i++){const room=archiveFixture.createGroupThread(`Archived project ${i}`, [pixel.id,scout.id]);archiveFixture.updateThread(room.id,{hidden:true});}archiveFixture.close();
  await page.reload();await page.locator('.archived-chats > summary').click();
@@ -119,6 +144,11 @@ try {
  const original=await page.evaluate(async url=>(await fetch(url)).text(),file.url);assert.equal(original,text,'document uses actual stored bytes');
  await page.getByLabel('Find a conversation').fill('Scout');assert.equal(await page.getByRole('button',{name:'Pixel',exact:true}).count(),0);await page.getByLabel('Find a conversation').fill('');
  await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});await page.screenshot({path:path.join(output,'electron-dark.png'),scale:'css'});await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
+ await page.getByRole('button',{name:'New conversation',exact:true}).click();
+ await page.setViewportSize({width:1154,height:768});
+ await page.screenshot({path:path.resolve('qa/sidebar-polish/new-conversation-1154x768.png'),scale:'css'});
+ await page.setViewportSize({width:1440,height:940});
+ await page.keyboard.press('Escape');
  assert.deepEqual(errors,[]);
  console.log('PASS Electron: 1440x940, real backend, draft switching/reload, options, reaction persistence, search, stored artifact bytes');
  }
@@ -164,9 +194,20 @@ try {
      await phone.setViewportSize({width:320,height:844});
      assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `${panel}: 320px phone overflow`);
      assert.ok(await phone.locator('.capabilities').evaluate(el=>el.scrollWidth<=el.clientWidth+1), `${panel}: 320px content clipping`);
-     await phone.locator('.settings-mobile-back').click();
-     assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
-   }
+   await phone.locator('.settings-mobile-back').click();
+   assert.ok(await phone.locator('.settings-page-sidebar').isVisible(), `${panel}: phone returns to menu`);
+  }
+   await page.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   await page.getByRole('button',{name:'Connect Gmail',exact:true}).click();
+   await page.locator('#connector-settings-google[open]').waitFor();
+   await delay(600);
+   await page.screenshot({path:path.join(output,'workspace-connect-gmail.png'),scale:'css'});
+   await phone.setViewportSize({width:390,height:844});
+   await phone.goto(`${base}/?thread=${threadId}&panel=connectors`);
+   await phone.getByRole('button',{name:'Connect Gmail',exact:true}).click();
+   await phone.locator('#connector-settings-google[open]').waitFor();
+   await delay(600);
+   await phone.screenshot({path:path.join(output,'phone-connect-gmail.png')});
    await page.emulateMedia({reducedMotion:'no-preference'});
    assert.equal(await page.locator('.capabilities').evaluate(el=>getComputedStyle(el).animationName),'workspace-arrive');
    await page.emulateMedia({reducedMotion:'reduce'});

@@ -91,8 +91,14 @@ try {
   await creation.locator("summary", { hasText: "Advanced" }).click();
   await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
+  await creation.getByText("Connect an AI to start chatting", { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(output, "connect-ai-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Connection step fits a phone");
+  await page.screenshot({ path: path.join(output, "connect-ai-mobile.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
   const popup = page.waitForEvent("popup");
-  await creation.getByRole("link", { name: /^(Set up an AI connection|Connect another AI service)$/ }).click();
+  await creation.getByRole("link", { name: "Connect an AI service" }).click();
   const settings = await popup;
   settings.setDefaultTimeout(45_000);
   // The provider setup renders as a full panel in the separate tab now.
