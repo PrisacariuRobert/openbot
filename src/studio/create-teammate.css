@@ -270,3 +270,7 @@
 .creation-toggle strong { font-size: 14px; font-weight: 600; color: var(--label-primary); }
 .creation-toggle small { font-size: 12.5px; line-height: 1.4; color: var(--label-secondary); }
 .creation-toggle .switch { flex: none; }
+/* With the paste-a-key card inside, the onramp itself steps back. */
+.connection-onramp:has(.ai-recommended) { padding: 0; border: 0; background: none; }
+.connection-onramp:has(.ai-recommended) .connection-onramp-actions { gap: 16px; margin: 2px 0 0; }
+.connection-onramp:has(.ai-recommended) .connection-onramp-actions :is(a, button) { min-height: 36px; padding: 6px 0; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; }

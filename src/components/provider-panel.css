@@ -616,3 +616,12 @@
 .provider-settings .ai-recommended .ai-recommended-badge { background: var(--accent-soft) !important; color: var(--accent) !important; }
 .provider-settings .ai-recommended .ai-recommended-link, .provider-settings .ai-recommended .ai-recommended-link:visited, .provider-settings .ai-recommended .ai-recommended-link svg { color: #fff !important; }
 @media (max-width: 560px) { .ai-recommended li > div { flex: 1 1 calc(100% - 40px); } .provider-settings .ai-recommended .ai-recommended-link { margin-left: 40px; } }
+.ai-recommended.is-compact { margin: 8px 0 4px; padding: 16px; border-radius: 16px; gap: 8px; animation: none; }
+.ai-recommended.is-compact h3 { font-size: 18px; }
+.ai-recommended.is-compact > p { font-size: 13px; }
+.ai-recommended.is-compact li { flex-wrap: wrap; padding: 10px 12px; }
+.ai-recommended.is-compact li > div { flex: 1 1 calc(100% - 40px); }
+.ai-recommended.is-compact .ai-recommended-link { margin-left: 40px; }
+.ai-recommended.is-compact form { flex-direction: column; }
+.ai-recommended form .button-primary { border: 0; background: var(--strong, #1d1d1f); color: var(--on-strong, #fff); font-weight: 600; justify-content: center; }
+.ai-recommended form .button-primary:disabled { opacity: .4; }

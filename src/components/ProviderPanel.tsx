@@ -80,7 +80,7 @@ const presets: Record<
 };
 
 /** The one-minute path for most people: a $10/month key, pasted once. */
-function RecommendedAI({ onConnected }: { onConnected: (connectionId: string) => Promise<void> }) {
+export function RecommendedAI({ onConnected, compact = false }: { onConnected: (connectionId: string) => Promise<void>; compact?: boolean }) {
   const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -96,7 +96,7 @@ function RecommendedAI({ onConnected }: { onConnected: (connectionId: string) =>
     finally { setBusy(false); }
   };
   return (
-    <section className="ai-recommended" aria-labelledby="ai-recommended-title">
+    <section className={`ai-recommended${compact ? " is-compact" : ""}`} aria-labelledby="ai-recommended-title">
       <span className="ai-recommended-badge">Recommended</span>
       <h3 id="ai-recommended-title">OpenCode Go</h3>
       <p>One subscription for your whole team — about $10 a month, with fast, capable models. Set up once, in about a minute.</p>

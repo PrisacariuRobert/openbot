@@ -8,6 +8,8 @@ import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { createTeammatePayload } from "./create-teammate-payload";
 import { Switch } from "./Settings";
+import { RecommendedAI } from "../components/ProviderPanel";
+import "../components/provider-panel.css";
 import "./create-teammate.css";
 
 interface ImportPlan {
@@ -275,9 +277,9 @@ export function CreateTeammate({
       {providers && !hasConnectedAI && (
         <div className="connection-onramp" role="status">
           <strong>Connect an AI to start chatting</strong>
-          <p>Setup opens in another window. Your teammate’s name and job stay here while you connect.</p>
+          <RecommendedAI compact onConnected={async () => { setError(""); setReload((value) => value + 1); }} />
           <div className="connection-onramp-actions">
-            <a href="/?panel=provider" target="_blank" rel="noreferrer">Connect an AI service <ArrowRight size={15} /></a>
+            <a href="/?panel=provider" target="_blank" rel="noreferrer">Use Claude, ChatGPT or another service <ArrowRight size={15} /></a>
             <button type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Refresh connections</button>
           </div>
         </div>
