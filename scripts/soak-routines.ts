@@ -10,9 +10,8 @@
 // Bounds: SOAK_MINUTES (default 30, min 15). The 7-day gate (SOAK_MINUTES=10080)
 // runs on an always-on host; this script polls incrementally into a local JSONL log
 // so long soaks do not depend on server-side list limits.
-// Live model spend: healthy + one-time routine runs use SOAK_MODEL
-// (default opencode-go/deepseek-v4.1-flash) via this Mac's OpenCode sign-in.
-// Set SOAK_MODE=fixture for a local, deterministic OpenAI-compatible peer.
+// Live model spend: only SOAK_MODE=live with an explicit SOAK_MODEL uses this
+// Mac's OpenCode sign-in. The default is a local deterministic protocol peer.
 // That exercises the production host/runner but is not model qualification.
 // No real connectors, mail, or external writes are used.
 import assert from "node:assert/strict";
@@ -27,9 +26,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { AppState, ProviderStatus, Routine } from "../src/shared/types.js";
 
 const SOAK_MINUTES = Math.max(15, Number(process.env.SOAK_MINUTES || 30));
-const SOAK_MODEL = process.env.SOAK_MODEL || "opencode-go/deepseek-v4.1-flash";
+const SOAK_MODEL = process.env.SOAK_MODEL || "";
 const INTERVAL = Math.max(5, Number(process.env.SOAK_INTERVAL || 5));
-const SOAK_MODE = process.env.SOAK_MODE || "live";
+const SOAK_MODE = process.env.SOAK_MODE || "fixture";
 assert.ok(Number.isFinite(SOAK_MINUTES) && Number.isFinite(INTERVAL), "Use finite soak minutes and interval.");
 assert.ok(SOAK_MODE === "live" || SOAK_MODE === "fixture", "SOAK_MODE must be live or fixture.");
 if (SOAK_MODE === "live") assert.ok(SOAK_MODEL.startsWith("opencode/") || SOAK_MODEL.startsWith("opencode-go/"), "Set SOAK_MODEL to an explicitly authorized OpenCode model. No fallback is selected.");
