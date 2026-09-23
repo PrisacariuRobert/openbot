@@ -89,7 +89,7 @@ import { ConversationProgress } from "./ConversationProgress";
 import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
 import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
-import { groupConsecutiveActionEvents } from "./action-event-groups";
+import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Advanced } from "./Advanced";
@@ -311,10 +311,11 @@ function eventDetail(message: Message): string {
   switch (message.eventType) {
     case "run_stopped": {
       // The pill carries title + action on one line. The server paragraph
-      // only shows when the title itself says nothing ("Task update").
+      // only shows when the title itself says nothing ("Work stopped").
       const rawTitle = String(message.eventData?.title || "");
-      if (rawTitle && !/^(Task update|Studio event)$/.test(rawTitle)) return "";
-      const sentence = message.body.split(". ")[0]!.trim();
+      if (rawTitle && !/^(Task update|Studio event|Work stopped)$/.test(rawTitle)) return "";
+      // The body leads with "<Bot>: " — the face already says who.
+      const sentence = message.body.replace(/^[^:.]{1,40}:\s*/, "").split(". ")[0]!.trim();
       const line = sentence.endsWith(".") ? sentence : `${sentence}.`;
       return line.length > 140 ? `${line.slice(0, 137)}…` : line;
     }
@@ -997,6 +998,9 @@ export function Studio() {
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
+  const routineGroups = groupConsecutiveRoutineRuns(state?.messages || []);
+  const routineGroupByFirstId = new Map(routineGroups.map((group) => [group[0]!.id, group]));
+  const routineGroupMemberIds = new Set(routineGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
   // Fold consecutive talking pills between the same pair — Apple groups
   // repeated system lines instead of stacking five identical pills.
   const talkFold = useMemo(
@@ -2432,6 +2436,15 @@ export function Studio() {
                       state.messages.map((message, index) => {
                         if (actionGroupMemberIds.has(message.id)) return null;
                         const actionGroup = actionGroupByFirstId.get(message.id);
+                        if (routineGroupMemberIds.has(message.id)) return null;
+                        const routineGroup = routineGroupByFirstId.get(message.id);
+                        if (routineGroup) {
+                          const runs = routineGroup.filter((item) => item.eventType === "routine_run");
+                          const replyFor = (item: Message) => routineGroup.find((reply) => reply.runId === item.runId && reply.id !== item.id);
+                          return <div key={message.id} className="chat-event action-completed-group routine-run-group" role="status" data-event="routine_run">
+                            <details><summary><Zap size={14} aria-hidden="true" /><span>{eventTitle(message).replace(/ started$/, "")} · ran {runs.length} times · last {timeText(runs[runs.length - 1]!.createdAt)}</span><ChevronDown size={14} aria-hidden="true" /></summary><div className="action-completed-records">{runs.map((item) => { const reply = replyFor(item); return <p key={item.id}><strong>{timeText(item.createdAt)}</strong><small>{eventDetail(item)}{reply ? ` · ${machineMarkerText(reply.body)}` : ""}</small></p>; })}</div></details>
+                          </div>;
+                        }
                         const cancelledOutcome = cancelledRunForTrigger(state.runs, state.messages, message.id);
                         // Event pills carry both teammates' mascots when the
                         // event names them — talking feels two-sided.

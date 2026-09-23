@@ -2520,7 +2520,7 @@ export class OpenBotDatabase {
     );
     if (outcome === "failed" && !run.parentRunId && !this.db.prepare("SELECT 1 FROM messages WHERE run_id=? AND event_type='run_stopped'").get(id)) {
       const reason = detail || run.error || "The task stopped before it finished.";
-      const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : "Work stopped";
+      const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : /runtime not verified|could not check the installed OpenCode/i.test(reason) ? "Runtime update needed" : "Work stopped";
       this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId } });
     }
     return this.getRun(id)!.task;

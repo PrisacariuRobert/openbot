@@ -88,6 +88,7 @@ import { validToolToken } from "./tool-auth.js";
 import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
+import { syncedFolderProvider, syncedFolderWarning } from "./synced-folder.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
 import { RunnerExternalHeartbeatMonitor } from "./external-heartbeat.js";
 import { providerEventAttempt, slackEventIsFromApp, verifyNotionEventRequest, verifySlackEventRequest } from "./connector-events.js";
@@ -111,6 +112,8 @@ const deployment = readDeploymentConfig(process.env, { port, production: process
 // Production hosts start empty: onboarding creates the first teammate.
 // Test hosts opt into the classic starter roster explicitly.
 const db = new OpenBotDatabase(rootDir, { seedStarterBots: process.env.OPENBOT_SEED_STARTER_BOTS === "1" });
+const syncedDataProvider = syncedFolderProvider(db.dataDir);
+if (syncedDataProvider) console.warn(`\n⚠️  ${syncedFolderWarning(db.dataDir, syncedDataProvider)}\n`);
 const savedFiles = new SavedFileLibrary(db);
 const studioLock = acquireStudioLock(db.dataDir, port);
 if (!studioLock.acquired) {

@@ -153,7 +153,9 @@ export function run(command: string, args: string[], timeoutMs = 30_000, extraEn
 
 export function safeHostEnvironment(extra: Record<string, string> = {}, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const allowed = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM", "SHELL", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "SSH_AUTH_SOCK"];
-  const env: NodeJS.ProcessEnv = { NO_COLOR: "1" };
+  // OpenBot pins the runtime it verified; a self-update mid-studio would
+  // swap the binary under running teammates.
+  const env: NodeJS.ProcessEnv = { NO_COLOR: "1", OPENCODE_DISABLE_AUTOUPDATE: "true" };
   for (const key of allowed) if (source[key]) env[key] = source[key];
   // GUI/background services do not inherit a login shell's PATH. Discover
   // standard user installs without running a shell or reading shell profiles.

@@ -18,7 +18,7 @@ import { CommunitySkills } from "./community-skills.js";
 import { UsageEvidenceAccumulator, type UsageAttempt } from "./usage-ledger.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { ExecutionMeter, executionLimits, executionStopMessage, WEEKLY_BUDGET_STEP_RESERVE, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
-import { opencodeCompatibility, RUNTIME_INCOMPATIBLE_MESSAGE, type RuntimeCompatibility } from "./runtime-compatibility.js";
+import { opencodeCompatibility, runtimeMayExecute, RUNTIME_INCOMPATIBLE_MESSAGE, type RuntimeCompatibility } from "./runtime-compatibility.js";
 import { ModelOutput } from "./model-output.js";
 import { conversationBridge, MAX_REUSED_CONTEXT, reportedContextSize } from "./conversation-context.js";
 export { eventText, appendModelText } from "./model-output.js";
@@ -462,7 +462,7 @@ export class OpenCodeRunner {
     // Gate 1a: an unverified runtime fails closed for model execution only.
     if (!useClaude) {
       const compatibility = (this.options.runtimeCheck || opencodeCompatibility)();
-      if (compatibility.compatibility !== "verified") {
+      if (!runtimeMayExecute(compatibility.compatibility)) {
         const reason = compatibility.compatibility === "unknown"
           ? "OpenBot could not check the installed OpenCode version. The check may have timed out or the runtime may be unavailable. No model was started. Try again; if this repeats, check the runtime installation."
           : `${RUNTIME_INCOMPATIBLE_MESSAGE} Detected: ${compatibility.detectedVersion} (${compatibility.compatibility}).`;
