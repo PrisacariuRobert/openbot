@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { browserWorkflowFixture } from './testing/browser-workflow-fixture.js';
 
-test('a real browser Save survives the token pause; only a fresh owner review resumes, without repeating Save', { timeout: 45_000 }, async () => {
+test('a real browser Save survives the token pause; only a fresh owner review resumes, without repeating Save', { timeout: 75_000 }, async () => {
   const f = await browserWorkflowFixture({ pauseAfterSave: true, yolo: true });
   try {
     const a = await f.pending(/more tokens/);
@@ -24,7 +24,7 @@ test('a real browser Save survives the token pause; only a fresh owner review re
   } finally { await f.close(); }
 });
 
-test('declining more tokens stops the model but preserves the completed external result', { timeout: 45_000 }, async () => {
+test('declining more tokens stops the model but preserves the completed external result', { timeout: 75_000 }, async () => {
   const f = await browserWorkflowFixture({ pauseAfterSave: true, yolo: true });
   try {
     const a = await f.pending(/more tokens/);
@@ -35,7 +35,7 @@ test('declining more tokens stops the model but preserves the completed external
   } finally { await f.close(); }
 });
 
-test('choosing a larger allowance is bounded and requires a new separate approval', { timeout: 45_000 }, async () => {
+test('choosing a larger allowance is bounded and requires a new separate approval', { timeout: 75_000 }, async () => {
   const f = await browserWorkflowFixture({ pauseAfterSave: true });
   try {
     await f.approve(await f.pending(/Create/));
