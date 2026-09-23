@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, MessageCircleReply, SmilePlus, X } from "lucide-react";
+import { ReadAloudButton } from "../components/Dictation";
 
 /** Per-message contextual actions (U02c): reply, copy and the five
  * host-supported reactions. No message delete exists on this path by
@@ -9,8 +10,10 @@ import { Check, Copy, MessageCircleReply, SmilePlus, X } from "lucide-react";
 export const MESSAGE_EMOJIS = ["👍", "❤️", "✅", "👀", "🎉"] as const;
 export type MessageEmoji = (typeof MESSAGE_EMOJIS)[number];
 
-export function MessageControls({ messageId, reactions, onReply, onReacted }: {
+export function MessageControls({ messageId, reactions, onReply, onReacted, readAloud }: {
   messageId: string;
+  /** A teammate reply that can be read aloud. */
+  readAloud?: string;
   reactions: Array<{ emoji: string; count: number; reactedByYou: boolean }>;
   onReply: () => void;
   onReacted: () => void;
@@ -50,6 +53,7 @@ export function MessageControls({ messageId, reactions, onReply, onReacted }: {
       <button type="button" className="message-control" aria-label={copied ? "Copied" : "Copy message text"} title={copied ? "Copied" : "Copy"} onClick={() => void copy()}>
         {copied ? <Check size={15} /> : <Copy size={15} />}
       </button>
+      {readAloud && <ReadAloudButton text={readAloud} className="message-control" />}
       <button type="button" className="message-control" aria-label="React to this message" title="React" aria-expanded={reacting} onClick={() => { setReacting((open) => !open); setError(""); }}>
         {reacting ? <X size={15} /> : <SmilePlus size={15} />}
       </button>

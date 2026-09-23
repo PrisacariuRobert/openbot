@@ -92,6 +92,7 @@ import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
+import { DictationButton } from "../components/Dictation";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Advanced } from "./Advanced";
@@ -1214,6 +1215,7 @@ export function Studio() {
         <span className="composer-hint">
           {sending ? "Sending…" : !composerDraft.ready ? "Restoring draft…" : "Enter to send"}
         </span>
+        <DictationButton draft={draft} setDraft={setDraft} disabled={!composerDraft.ready || sending} />
         <button
           className="send"
           aria-label="Send message"
@@ -2565,6 +2567,7 @@ export function Studio() {
                               reactions={message.reactions || []}
                               onReply={() => setReplyTo({ id: message.id, senderName: message.senderName, body: message.body })}
                               onReacted={() => setRefresh((n) => n + 1)}
+                              readAloud={message.senderType === "bot" ? message.body : undefined}
                             />
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard onOpenDocument={file => { setContextOpen(false); setDocumentFile(file); }} message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />

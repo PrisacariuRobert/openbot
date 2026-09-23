@@ -53,9 +53,12 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
           </div>
         );
       })}
-      <div className="delivery-summary">
+      {/* A short chat reply that used no tools has nothing to check or open;
+          "not independently checked" under "Hi!" only adds doubt. The run's
+          details stay available from the task view. */}
+      {!(isUnverifiedTextFallback(run, kids.length > 0, message.attachments.length > 0) && !run.activities.some((activity) => activity.kind === "tool") && message.body.length < 400) && <div className="delivery-summary">
       <DeliveryReceipt run={run} teammates={teammates} reviews={kids} hasDeliveredArtifacts={message.attachments.length > 0} />
-      </div>
+      </div>}
     </div>
   );
 }

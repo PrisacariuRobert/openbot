@@ -2293,3 +2293,13 @@ a.message-file:hover {
 
 /* Results retain a readable document width; ordinary bubbles fit their text. */
 .from-team:has(.delivered-file) { min-width: min(489px, 88%); }
+.composer-bar .dictation {
+  width: 32px; height: 32px; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: transparent; color: var(--secondary);
+}
+.composer-bar .dictation:hover:not(:disabled) { color: var(--ink); background: var(--surface-muted); }
+.composer-bar .dictation:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.composer-bar .dictation.is-listening { color: var(--on-strong); background: var(--strong); }
+.composer-bar .dictation:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: no-preference) { .composer-bar .dictation.is-listening { animation: dictation-pulse 1.6s ease-in-out infinite; } }
+@keyframes dictation-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--strong) 18%, transparent); } }
