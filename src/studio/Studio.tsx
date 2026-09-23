@@ -92,7 +92,7 @@ import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
-import { DictationButton } from "../components/Dictation";
+import { DictationButton, dictationSupported } from "../components/Dictation";
 import { tasksNeedingOwner } from "./attention";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
@@ -693,6 +693,8 @@ export function Studio() {
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
+  const [dictating, setDictating] = useState(false);
+  const showsMic = dictating || (!draft.trim() && !attached.files.length && !sending && dictationSupported());
   const pickStarter = (text: string) => {
     setDraft(text);
     window.setTimeout(() => { const box = document.getElementById("studio-message") as HTMLTextAreaElement | null; box?.focus(); box?.setSelectionRange(box.value.length, box.value.length); }, 0);
@@ -1243,9 +1245,14 @@ export function Studio() {
         <span className="composer-hint">
           {sending ? "Sending…" : !composerDraft.ready ? "Restoring draft…" : "Enter to send"}
         </span>
-        <DictationButton draft={draft} setDraft={setDraft} disabled={!composerDraft.ready || sending} />
+        {/* One action slot, as in Messages: the microphone while the box is
+            empty (or while dictating), Send once there is something to send. */}
+        <span className={`composer-action ${showsMic ? "shows-mic" : "shows-send"}`}>
+        <DictationButton draft={draft} setDraft={setDraft} disabled={!composerDraft.ready || sending} onListening={setDictating} concealed={!showsMic} />
         <button
           className="send"
+          tabIndex={showsMic ? -1 : undefined}
+          aria-hidden={showsMic || undefined}
           aria-label="Send message"
           disabled={
             (!draft.trim() && !attached.files.length) ||
@@ -1263,6 +1270,7 @@ export function Studio() {
             <ArrowUp size={20} />
           )}
         </button>
+        </span>
       </div>
       {!botReady && state && (
         <a className="provider-needed" href="/?panel=provider">

@@ -13,16 +13,19 @@ function recognitionConstructor(): (new () => Recognition) | null {
   return scope.SpeechRecognition || scope.webkitSpeechRecognition || null;
 }
 
+export const dictationSupported = () => typeof window !== "undefined" && recognitionConstructor() !== null;
+
 /** Speak instead of typing. Uses the browser's own speech recognition
  * (Safari and Chrome); hidden where the browser has none. Words appear in
  * the message box as you speak and nothing is sent until you press Send. */
-export function DictationButton({ draft, setDraft, disabled }: { draft: string; setDraft: (value: string) => void; disabled?: boolean }) {
+export function DictationButton({ draft, setDraft, disabled, onListening, className = "", concealed = false }: { draft: string; setDraft: (value: string) => void; disabled?: boolean; onListening?: (listening: boolean) => void; className?: string; concealed?: boolean }) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState("");
   const recognition = useRef<Recognition | null>(null);
   const base = useRef("");
   const Constructor = typeof window === "undefined" ? null : recognitionConstructor();
   useEffect(() => () => recognition.current?.stop(), []);
+  useEffect(() => { onListening?.(listening); }, [listening, onListening]);
   if (!Constructor) return null;
   function start() {
     setError("");
@@ -48,8 +51,8 @@ export function DictationButton({ draft, setDraft, disabled }: { draft: string; 
     setListening(true);
   }
   return <>
-    <button type="button" className={`dictation${listening ? " is-listening" : ""}`} aria-label={listening ? "Stop dictation" : "Dictate a message"} aria-pressed={listening}
-      title={error || (listening ? "Stop dictation" : "Dictate")} disabled={disabled} onClick={() => listening ? recognition.current?.stop() : start()}>
+    <button type="button" className={`dictation${listening ? " is-listening" : ""} ${className}`.trim()} aria-label={listening ? "Stop dictation" : "Dictate a message"} aria-pressed={listening}
+      title={error || (listening ? "Stop dictation" : "Dictate")} disabled={disabled} tabIndex={concealed ? -1 : undefined} aria-hidden={concealed || undefined} onClick={() => listening ? recognition.current?.stop() : start()}>
       {listening ? <Square size={15} /> : <Mic size={17} />}
     </button>
     {error && <span className="sr-only" role="status">{error}</span>}
