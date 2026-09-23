@@ -2,7 +2,8 @@
 .settings-page-sidebar { width: 202px; flex-basis: 202px; border: 0; background: var(--system-background); }
 .settings-sidebar-scroll { padding: 15px; gap: 4px; }
 .settings-sidebar-group { gap: 4px; }
-.settings-sidebar-group-title { display: none; }
+.settings-sidebar-group + .settings-sidebar-group { margin-top: 12px; }
+.settings-sidebar-group-title { display: block; padding: 4px 10px 2px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); }
 .settings-sidebar-search { padding: 15px 15px 0; }
 .settings-search-bar:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .settings-search-bar input:focus-visible { outline: none; }

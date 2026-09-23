@@ -729,6 +729,10 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
   margin-left: 8px;
   font-size: 12px;
 }
+.chat-event strong + .text-action,
+.chat-event small + .text-action {
+  margin-left: 8px;
+}
 .chat-event-mark {
   align-self: center;
   display: inline-flex;
@@ -2303,3 +2307,10 @@ a.message-file:hover {
 .composer-bar .dictation:disabled { opacity: .45; cursor: default; }
 @media (prefers-reduced-motion: no-preference) { .composer-bar .dictation.is-listening { animation: dictation-pulse 1.6s ease-in-out infinite; } }
 @keyframes dictation-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--strong) 18%, transparent); } }
+.chat-starters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; width: min(560px, 100%); margin: 20px auto 0; }
+.chat-starter { display: grid; gap: 4px; text-align: left; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+.chat-starter strong { font-size: 14px; font-weight: 600; }
+.chat-starter span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.chat-starter:hover { background: var(--surface-muted); }
+.chat-starter:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) { .chat-starter { transition: background .15s ease, transform .15s ease; } .chat-starter:active { transform: scale(.98); } }

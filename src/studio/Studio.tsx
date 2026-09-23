@@ -338,6 +338,25 @@ function eventDetail(message: Message): string {
 
 
 
+const STARTER_PROMPTS = [
+  { label: "Plan my week", hint: "Three things that matter most", text: "Help me plan my week: ask what's on my plate, then pick the three things that matter most." },
+  { label: "Make sense of something", hint: "A document, notes or a long message", text: "Summarize this and tell me what I need to do: " },
+  { label: "Look something up", hint: "With sources you can check", text: "Research this and bring back a short answer with sources: " },
+] as const;
+
+/** Starters fill the message box without sending, so a blank page never
+ * has to be solved alone. Shown until the owner sends a first message. */
+function ChatStarters({ onPick }: { onPick: (text: string) => void }) {
+  return <div className="chat-starters" aria-label="Ideas to start with">
+    {STARTER_PROMPTS.map((starter) => (
+      <button key={starter.label} type="button" className="chat-starter" onClick={() => onPick(starter.text)}>
+        <strong>{starter.label}</strong>
+        <span>{starter.hint}</span>
+      </button>
+    ))}
+  </div>;
+}
+
 const SETTINGS_CATEGORIES: ReadonlyArray<{
   title: string;
   items: ReadonlyArray<{
@@ -349,22 +368,29 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
     badgeVariant?: (state: AppState) => "neutral" | "success" | "warning";
     keywords: ReadonlyArray<string>;
   }>;
-}> = [{ title: "Workspace", items: [
+}> = [
+{ title: "Team", items: [
 { id: "team", title: "Your team", description: "A few useful personalities. One familiar place to work.", icon: UsersRound, keywords: ["teammates", "import", "restore"] },
+{ id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
+{ id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
+{ id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] }
+]},
+{ title: "Connections", items: [
 { id: "provider", title: "Your AI", description: "Choose the connection. Keep the conversation.", icon: Sparkles, keywords: ["models", "provider", "api key", "account", "local"] },
 { id: "connectors", title: "Apps & tools", description: "Familiar tools. Clear boundaries.", icon: Boxes, keywords: ["google", "slack", "notion", "github", "connectors", "mcp"] },
-{ id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] },
+{ id: "telegram", title: "Chat apps", description: "Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
+{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] }
+]},
+{ title: "Work", items: [
 { id: "projects", title: "Projects", description: "Real changes, with room to review.", icon: FolderGit2, keywords: ["git", "code", "worktree"] },
 { id: "artifacts", title: "Files & results", description: "What came back, and the source it came from.", icon: FileText, keywords: ["documents", "deliverables", "revisions"] },
-{ id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
-{ id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
-{ id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
-{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] },
-{ id: "telegram", title: "Chat apps", description: "Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
-{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] },
-{ id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
 { id: "files", title: "Private files", description: "Inspect their workspace without widening access.", icon: Files, keywords: ["scratchpad", "files"] },
 { id: "computer", title: "Computer", description: "A private workspace with visible boundaries.", icon: Monitor, keywords: ["browser", "container", "desktop"] }
+]},
+{ title: "Trust & usage", items: [
+{ id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
+{ id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
+{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] }
 ]}];
 
 function SettingsWorkspacePage({
@@ -667,6 +693,10 @@ export function Studio() {
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
+  const pickStarter = (text: string) => {
+    setDraft(text);
+    window.setTimeout(() => { const box = document.getElementById("studio-message") as HTMLTextAreaElement | null; box?.focus(); box?.setSelectionRange(box.value.length, box.value.length); }, 0);
+  };
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null),
     [mentionAt, setMentionAt] = useState(0);
   const mentionChoices = useMemo(() => {
@@ -2435,8 +2465,9 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
+                        <ChatStarters onPick={pickStarter} />
                       </div>
-                    ) : (
+                    ) : (<>{
                       state.messages.map((message, index) => {
                         if (actionGroupMemberIds.has(message.id)) return null;
                         const actionGroup = actionGroupByFirstId.get(message.id);
@@ -2572,8 +2603,9 @@ export function Studio() {
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
-                      })
-                    )}
+                      })}
+                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} />}
+                    </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);
                       return fallback ? <CancelledRunOutcome run={fallback} dated onReview={() => setDetail({ kind: "run", run: fallback })} /> : null;
