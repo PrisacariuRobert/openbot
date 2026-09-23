@@ -12,11 +12,15 @@
 // so long soaks do not depend on server-side list limits.
 // Live model spend: healthy + one-time routine runs use SOAK_MODEL
 // (default opencode-go/deepseek-v4.1-flash) via this Mac's OpenCode sign-in.
+// Set SOAK_MODE=fixture for a local, deterministic OpenAI-compatible peer.
+// That exercises the production host/runner but is not model qualification.
 // No real connectors, mail, or external writes are used.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -25,16 +29,59 @@ import type { AppState, ProviderStatus, Routine } from "../src/shared/types.js";
 const SOAK_MINUTES = Math.max(15, Number(process.env.SOAK_MINUTES || 30));
 const SOAK_MODEL = process.env.SOAK_MODEL || "opencode-go/deepseek-v4.1-flash";
 const INTERVAL = Math.max(5, Number(process.env.SOAK_INTERVAL || 5));
-assert.ok(SOAK_MODEL.startsWith("opencode/") || SOAK_MODEL.startsWith("opencode-go/"), "Set SOAK_MODEL to an explicitly authorized OpenCode model. No fallback is selected.");
+const SOAK_MODE = process.env.SOAK_MODE || "live";
+assert.ok(Number.isFinite(SOAK_MINUTES) && Number.isFinite(INTERVAL), "Use finite soak minutes and interval.");
+assert.ok(SOAK_MODE === "live" || SOAK_MODE === "fixture", "SOAK_MODE must be live or fixture.");
+if (SOAK_MODE === "live") assert.ok(SOAK_MODEL.startsWith("opencode/") || SOAK_MODEL.startsWith("opencode-go/"), "Set SOAK_MODEL to an explicitly authorized OpenCode model. No fallback is selected.");
 
+const repoRoot = path.resolve(import.meta.dirname, "..");
+assert.equal(execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: repoRoot, encoding: "utf8" }).trim(), "", "Soak evidence requires a clean, committed candidate.");
 const data = mkdtempSync(path.join(tmpdir(), "openbot-soak-"));
-const logPath = path.join(data, "soak-observed-runs.jsonl");
+const evidenceDir = process.env.SOAK_EVIDENCE_DIR || mkdtempSync(path.join(tmpdir(), "openbot-soak-evidence-"));
+assert.ok(!existsSync(evidenceDir) || readdirSync(evidenceDir).length === 0, "Use a fresh evidence directory; never overwrite a prior soak.");
+mkdirSync(evidenceDir, { recursive: true });
+const logPath = path.join(evidenceDir, "soak-observed-runs.jsonl");
+const tickPath = path.join(evidenceDir, "soak-ticks.jsonl");
+const startedAt = new Date().toISOString();
+const candidateSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
+writeFileSync(path.join(evidenceDir, "soak-run.json"), JSON.stringify({ candidateSha, mode: SOAK_MODE, startedAt, plannedMinutes: SOAK_MINUTES, intervalMinutes: INTERVAL, evidenceDir }, null, 2));
+console.log(JSON.stringify({ result: "START", mode: SOAK_MODE, candidateSha, evidenceDir, startedAt }));
 const socket = createServer();
 await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
 const port = (socket.address() as { port: number }).port;
 await new Promise<void>((resolve) => socket.close(() => resolve()));
 const base = `http://127.0.0.1:${port}`;
 let child: ChildProcess | undefined;
+let fixtureServer: ReturnType<typeof createHttpServer> | undefined;
+let fixtureCalls = 0;
+async function startFixturePeer(): Promise<string> {
+  fixtureServer = createHttpServer(async (request, response) => {
+    if (request.method !== "POST" || request.url !== "/v1/chat/completions") { response.writeHead(404).end(); return; }
+    let raw = "";
+    for await (const chunk of request) {
+      raw += String(chunk);
+      if (raw.length > 1_000_000) { response.writeHead(413).end(); return; }
+    }
+    let body: { model?: string; stream?: boolean };
+    try { body = JSON.parse(raw); } catch { response.writeHead(400).end(); return; }
+    fixtureCalls += 1;
+    const answer = "SOAK_OK";
+    const completion = { id: `soak-${fixtureCalls}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: body.model,
+      choices: [{ index: 0, message: { role: "assistant", content: answer }, finish_reason: "stop" }], usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 } };
+    if (!body.stream) { response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(completion)); return; }
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.write(`data: ${JSON.stringify({ ...completion, object: "chat.completion.chunk", usage: undefined, choices: [{ index: 0, delta: { role: "assistant", content: answer }, finish_reason: null }] })}\n\n`);
+    response.write(`data: ${JSON.stringify({ ...completion, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+    response.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>((resolve) => fixtureServer!.listen(0, "127.0.0.1", resolve));
+  return `http://127.0.0.1:${(fixtureServer.address() as { port: number }).port}/v1`;
+}
+function hostRssKb(): number | null {
+  if (!child?.pid) return null;
+  try { const value = Number(execFileSync("ps", ["-o", "rss=", "-p", String(child.pid)], { encoding: "utf8" }).trim()); return Number.isFinite(value) ? value : null; }
+  catch { return null; }
+}
 
 async function request(route: string, body?: unknown, method = "POST"): Promise<Response> {
   return fetch(base + route, { method: body === undefined ? "GET" : method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000) });
@@ -71,11 +118,23 @@ const restartAt = Date.now() + SOAK_MINUTES * 60_000 * 0.4;
 let restarted = false, stopAt = 0, startAt2 = 0;
 try {
   await start();
-  const providerState = await (await request("/api/provider")).json() as ProviderStatus;
-  const local = providerState.instances.find((instance) => instance.id === "local-opencode");
-  assert.ok(local?.connected, "This soak uses the Mac's real OpenCode sign-in for the healthy path; connect OpenCode first.");
-  assert.ok(local.models.includes(SOAK_MODEL), `The selected soak model ${SOAK_MODEL} is not available to the local OpenCode connection.`);
-  assert.equal((await request("/api/bots/nova", { providerInstanceId: "local-opencode", model: SOAK_MODEL }, "PATCH")).status, 200);
+  let healthyProviderId: string, healthyModel: string;
+  if (SOAK_MODE === "fixture") {
+    const endpoint = await startFixturePeer();
+    const created = await request("/api/providers", { name: "Local soak protocol peer", provider: "custom", authMode: "api_key", runtime: "opencode", secret: "fixture-only-key",
+      apiConfig: { baseUrl: endpoint, protocol: "openai-compatible", modelIds: ["soak-fixture"] } });
+    assert.equal(created.status, 201, "Local protocol peer must register through the production API");
+    healthyProviderId = ((await created.json()) as { id: string }).id;
+    healthyModel = `openbot-${healthyProviderId}/soak-fixture`;
+  } else {
+    const providerState = await (await request("/api/provider")).json() as ProviderStatus;
+    const local = providerState.instances.find((instance) => instance.id === "local-opencode");
+    assert.ok(local?.connected, "This soak uses the Mac's real OpenCode sign-in for the healthy path; connect OpenCode first.");
+    assert.ok(local.models.includes(SOAK_MODEL), `The selected soak model ${SOAK_MODEL} is not available to the local OpenCode connection.`);
+    healthyProviderId = "local-opencode";
+    healthyModel = SOAK_MODEL;
+  }
+  assert.equal((await request("/api/bots/nova", { providerInstanceId: healthyProviderId, model: healthyModel }, "PATCH")).status, 200);
   const dead = await (await request("/api/providers", { name: "Soak dead endpoint", authMode: "api_key", apiConfig: { baseUrl: "http://127.0.0.1:1/v1", protocol: "openai-compatible", modelIds: ["unreachable"] } })).json() as { id: string };
   assert.equal((await request("/api/bots/pixel", { providerInstanceId: dead.id, model: `openbot-${dead.id}/unreachable` }, "PATCH")).status, 200);
 
@@ -103,7 +162,9 @@ try {
       recordRuns(id, runs);
     }
     const counts = Object.fromEntries(state.routines.filter((routine) => Object.values(ids).includes(routine.id)).map((routine) => [routine.name, { runs: routine.runCount, failures: routine.consecutiveFailures, enabled: routine.enabled, status: routine.lastStatus }]));
-    console.log(JSON.stringify({ result: "TICK", at: new Date().toISOString(), ...counts }));
+    const tick = { result: "TICK", at: new Date().toISOString(), hostRssKb: hostRssKb(), fixtureCalls: SOAK_MODE === "fixture" ? fixtureCalls : null, ...counts };
+    appendFileSync(tickPath, JSON.stringify(tick) + "\n");
+    console.log(JSON.stringify(tick));
     await delay(20_000);
   }
 
@@ -148,10 +209,21 @@ try {
     const during = healthyRuns.filter((run) => new Date(run.createdAt).getTime() >= stopAt - 1_000 && new Date(run.createdAt).getTime() <= startAt2 + 120_000).length;
     assert.ok(during <= 2, `Restart window must not burst-dispatch; saw ${during} healthy runs around the restart`);
   }
-  writeFileSync(path.join(data, "soak-summary.json"), JSON.stringify({ minutes: SOAK_MINUTES, intervalMinutes: INTERVAL, model: SOAK_MODEL, restarted, healthyRuns: healthyRuns.length, onceRuns: onceRuns.length, fragileRuns: fragileState.runCount, fragilePaused: !fragileState.enabled, dailyRuns: 0, approvals: 0, occurrences: byOccurrence.size }, null, 2));
-  console.log(JSON.stringify({ result: "PASS", minutes: SOAK_MINUTES, model: SOAK_MODEL, healthyRuns: healthyRuns.length, onceRuns: onceRuns.length, fragileRuns: fragileState.runCount, fragilePaused: !fragileState.enabled, occurrences: byOccurrence.size, restarts: restarted ? 1 : 0 }));
-  console.log("Scheduler-level soak only: occurrence dedupe, restart recovery, failure auto-pause. Not a model-quality benchmark or a 7-day elapsed proof unless SOAK_MINUTES=10080 on an always-on host.");
+  const finishedAt = new Date().toISOString();
+  const summary = { result: "PASS", candidateSha, mode: SOAK_MODE, startedAt, finishedAt, elapsedMinutes: (Date.parse(finishedAt) - Date.parse(startedAt)) / 60_000,
+    plannedMinutes: SOAK_MINUTES, intervalMinutes: INTERVAL, model: healthyModel, restarted, healthyRuns: healthyRuns.length, onceRuns: onceRuns.length,
+    fragileRuns: fragileState.runCount, fragilePaused: !fragileState.enabled, dailyRuns: 0, approvals: 0, occurrences: byOccurrence.size, fixtureCalls: SOAK_MODE === "fixture" ? fixtureCalls : null };
+  writeFileSync(path.join(evidenceDir, "soak-summary.json"), JSON.stringify(summary, null, 2));
+  console.log(JSON.stringify(summary));
+  console.log("Scheduler-level soak only: occurrence dedupe, restart recovery, failure auto-pause. A fixture is not model-quality evidence; elapsed duration never substitutes for the 48-hour real-model release soak.");
+} catch (error) {
+  writeFileSync(path.join(evidenceDir, "soak-failure.json"), JSON.stringify({ candidateSha, mode: SOAK_MODE, startedAt, failedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) }, null, 2));
+  throw error;
 } finally {
   await stop();
+  if (fixtureServer) {
+    fixtureServer.closeAllConnections();
+    await new Promise<void>((resolve) => fixtureServer!.close(() => resolve()));
+  }
   rmSync(data, { recursive: true, force: true });
 }
