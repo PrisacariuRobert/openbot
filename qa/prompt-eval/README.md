@@ -20,6 +20,8 @@ Context per model step (input + cache reads ÷ steps) is the stable comparison: 
 
 | `muse-current` | 014c57d all fixes to date, 8 cases | muse-spark-1.3-contributor | **16/16** | — | 29.6s | 14,106 chars |
 
+| `muse-final` | ef1c4db, 11 cases incl. browser, decline and Hermes import | muse-spark-1.3-contributor | **22/22** | — | 20.6s | 14,106 chars |
+
 The 8-case set adds `teammate-help` (ask Scout; exactly one consultation; answer relayed) and `learn-skill` (/learn ends in a skill proposal waiting for review). Before this session's fixes, `learn-skill` was 0/2 and `teammate-help` took ~100s with repeated asks.
 
 A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The default model is `opencode-go/muse-spark-1.3-contributor`. The free-tier `opencode/…-free` models return 403 for OpenBot's restricted tool configuration and cannot be evaluated.

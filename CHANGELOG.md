@@ -15,7 +15,11 @@ Not released: the next public release waits until the competitive plan is comple
 - First run: a recommended model is preselected, model names are readable, and OpenCode's app-only free tier is no longer offered; the welcome screen names a detected Hermes team
 - Quieter conversations: repeated automation runs fold into one line, and stops say what to fix ("Runtime update needed")
 - Safer data home: a warning when the data folder is inside iCloud Drive, Dropbox or OneDrive
-- `scripts/prompt-eval.ts`: a live eight-case teammate eval on a throwaway studio (16/16 on Muse Spark)
+- Message your team from Discord too (direct messages only); Telegram and Discord share one channel core under Settings → Chat apps
+- Voice: dictate messages and have replies read aloud, using the browser's own speech
+- Calmer chat: short replies without tool work no longer say "not independently checked", and "Needs you" counts only what needs you now (a stale studio went from 30 to 1)
+- Teammates answer questions in chat instead of saving unrequested files
+- `scripts/prompt-eval.ts`: a live eleven-case teammate eval on a throwaway studio — greeting, spreadsheet totals, routine, memory, no false "sent", file, teammate help, /learn, web reading, honest decline, and a real Hermes import (22/22 on Muse Spark)
 
 ## 0.37.0-beta.1 — 2026-09-07
 
