@@ -1,0 +1,29 @@
+/* Discover: public skills under the owner's own, in the Library's row style. */
+.skill-discover { margin-top: 36px; }
+.skill-discover-head h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.skill-discover-head p { margin: 6px 0 4px; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 520px; }
+.skill-discover-note { font-size: 13px; color: var(--muted); }
+.skill-discover-row { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); }
+.skill-discover-open { display: flex; align-items: center; gap: 20px; flex: 1; min-width: 0; padding: 22px 0; text-align: left; background: none; border: 0; color: inherit; cursor: pointer; }
+.skill-discover-open:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.skill-discover-open > span:nth-child(2) { display: grid; gap: 5px; min-width: 0; }
+.skill-discover-open strong { font-size: 14px; font-weight: 500; line-height: 1.5; }
+.skill-discover-open small { font-size: 12px; line-height: 1.55; color: var(--muted); max-width: 490px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.skill-get { flex: none; min-width: 62px; height: 28px; padding: 0 15px; border: 0; border-radius: 999px; background: var(--tertiary-system-background); color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .01em; cursor: pointer; transition: background-color .18s ease, transform .12s ease; }
+.skill-get:hover { background: var(--accent-soft); }
+.skill-get:active { transform: scale(.95); }
+.skill-get:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.skill-discover-added { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.skill-discover-skeleton { height: 72px; margin: 10px 0; border-radius: 12px; background: linear-gradient(90deg, var(--secondary-system-background) 0%, var(--tertiary-system-background) 50%, var(--secondary-system-background) 100%); background-size: 200% 100%; animation: skill-discover-shimmer 1.4s ease-in-out infinite; }
+@keyframes skill-discover-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.skill-discover-unavailable { margin-top: 14px; font-size: 13px; color: var(--muted); }
+.skill-discover-unavailable summary { cursor: pointer; }
+.skill-discover-unavailable ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.5; }
+.skill-discover-unavailable strong { color: var(--label-primary); font-weight: 500; }
+.skill-discover-people { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.skill-discover-people button { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border-radius: 999px; border: 1px solid var(--line); background: none; color: inherit; font-size: 13px; cursor: pointer; opacity: .55; transition: opacity .18s ease, border-color .18s ease, background-color .18s ease; }
+.skill-discover-people button[aria-pressed="true"] { opacity: 1; border-color: var(--separator-strong); background: var(--secondary-system-background); }
+.skill-discover-people button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.skill-discover-tick { color: var(--accent); }
+.skill-discover-warnings { margin: 14px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--muted); display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .skill-discover-skeleton { animation: none; } }

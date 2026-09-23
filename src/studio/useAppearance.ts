@@ -8,9 +8,15 @@ export function savedAppearance(): Appearance {
     return "system";
   }
 }
+const BAR = { light: "#ffffff", dark: "#1c1c1e" } as const;
 export function applyAppearance(value: Appearance) {
   if (value === "system") delete document.documentElement.dataset.appearance;
   else document.documentElement.dataset.appearance = value;
+  // Keep the phone's status bar and browser chrome in the chosen appearance.
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+    const scheme = meta.media.includes("dark") ? "dark" : "light";
+    meta.content = BAR[value === "system" ? scheme : value];
+  });
 }
 export function useAppearance() {
   const [appearance, setAppearance] = useState(savedAppearance);

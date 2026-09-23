@@ -596,3 +596,39 @@
   line-height: 1.45;
   color: var(--secondary, #6b7280);
 }
+
+/* Discover: public skills, App Store-style rows with a "Get" capsule. */
+.skills-discover { margin-top: 28px; display: grid; gap: 14px; }
+.skills-discover > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.skills-discover h4 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--label-primary); }
+.skills-discover header p { margin: 4px 0 0; max-width: 60ch; font-size: 13px; line-height: 1.45; color: var(--label-secondary); }
+.skills-discover-note { margin: 0; font-size: 13px; color: var(--label-secondary); }
+.skills-discover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0 20px; }
+.discover-card { display: flex; align-items: center; gap: 14px; min-height: 76px; padding: 12px 0; border-bottom: 1px solid var(--separator); }
+.discover-card-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.discover-card h5 { margin: 0; font-size: 15px; font-weight: 600; color: var(--label-primary); }
+.discover-card p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--label-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.discover-card small { font-size: 11.5px; color: var(--label-tertiary); }
+.discover-get { flex: none; min-width: 64px; height: 30px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--tertiary-system-background); color: var(--accent); font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background-color .18s ease, transform .12s ease; }
+.discover-get:hover:not(:disabled) { background: var(--accent-soft); }
+.discover-get:active:not(:disabled) { transform: scale(.96); }
+.discover-get:disabled { opacity: .55; cursor: default; }
+.discover-get:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.discover-added { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--label-tertiary); }
+.discover-card.skeleton { border-bottom-color: transparent; margin: 6px 0; min-height: 64px; border-radius: 12px; background: linear-gradient(90deg, var(--secondary-system-background) 0%, var(--tertiary-system-background) 50%, var(--secondary-system-background) 100%); background-size: 200% 100%; animation: discover-shimmer 1.4s ease-in-out infinite; }
+@keyframes discover-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.skills-discover-unavailable { font-size: 13px; color: var(--label-secondary); }
+.skills-discover-unavailable summary { cursor: pointer; color: var(--label-secondary); }
+.skills-discover-unavailable ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.skills-discover-unavailable strong { color: var(--label-primary); font-weight: 600; }
+.skills-discover .extension-review { margin-top: 4px; animation: discover-reveal .28s cubic-bezier(.2,.8,.2,1); }
+@keyframes discover-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .discover-card.skeleton, .skills-discover .extension-review { animation: none; } }
+@media (max-width: 520px) { .skills-discover-grid { grid-template-columns: 1fr; } .skills-discover > header { flex-direction: column; align-items: stretch; } }
+/* Win over the panel's generic article/button/details styling. */
+.extensions-panel .skills-discover .discover-card { border: 0; border-bottom: 1px solid var(--separator); border-radius: 0; background: none; box-shadow: none; padding: 12px 0; margin: 0; }
+.extensions-panel .skills-discover .discover-card.skeleton { border: 0; border-radius: 12px; margin: 6px 0; background: linear-gradient(90deg, var(--secondary-system-background) 0%, var(--tertiary-system-background) 50%, var(--secondary-system-background) 100%); background-size: 200% 100%; }
+.extensions-panel .skills-discover .discover-get { border: 0; border-radius: 999px; background: var(--tertiary-system-background); color: var(--accent); min-height: 0; height: 30px; padding: 0 16px; box-shadow: none; font-weight: 700; }
+.extensions-panel .skills-discover .discover-get:hover:not(:disabled) { background: var(--accent-soft); }
+.extensions-panel .skills-discover .skills-discover-unavailable { border: 0; border-radius: 0; background: none; padding: 4px 0; margin: 0; box-shadow: none; }
+.extensions-panel .skills-discover .skills-discover-unavailable summary { padding: 0; font-weight: 500; font-size: 13px; }

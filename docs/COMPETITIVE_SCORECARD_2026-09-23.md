@@ -26,7 +26,7 @@ Where OpenBot stands against the four products people compare it with, after the
 | Isolation between teammates | ❌ shared computer | — | ✅ profiles | 🟡 | ✅ own workspace, browser profile, repo |
 | Browser work | ✅ cloud VM | ✅ secure VM | ✅ | ✅ | ✅ own browser per teammate (live eval: read + honest decline) |
 | Reviewed actions / approvals | ✅ allow/deny/always | 🟡 | 🟡 config | ❌ history | ✅ exact review, host-verified; harmless navigation no longer asks; decline → finish honestly |
-| Learning / skills | ✅ show once | 🟡 | ✅ self-learning | ✅ 5,400 marketplace | ✅ /learn → reviewed skill (fixed); 11 bundled methods + imports |
+| Learning / skills | ✅ show once | 🟡 | ✅ self-learning | ✅ 5,400 marketplace | ✅ /learn → reviewed skill; 11 bundled methods + Discover (public Agent Skills, reviewed one-tap add) + GitHub-link import |
 | Scheduled work | ✅ | ✅ | ✅ cron | ✅ heartbeat | ✅ routines; Mac stays awake when due |
 | Works while laptop is off | ✅ | ✅ | 🟡 needs VPS | 🟡 needs VPS | 🟡 Linux runner exists; no one-click hosted option — **owner decision** |
 | Chat-app reach | 🟡 Slack | ❌ | ✅ many | ✅ most | 🟡 Telegram + Discord (owner-only) |
@@ -50,7 +50,7 @@ Where OpenBot stands against the four products people compare it with, after the
 | No always-on without your Mac | Grok Bot and Muse's core promise | A server the owner rents or owns; the Linux runner exists |
 | Native iPhone app | Grok Bot and Muse are phone-first | Rebuild or revive the native client; the web app works meanwhile |
 | WhatsApp / iMessage / Slack chat | OpenClaw and Hermes reach more apps | WhatsApp needs a Meta business account; iMessage needs Full Disk Access |
-| Skills marketplace breadth | OpenClaw's 5,400 skills | Curated import of AgentSkills-format catalogs |
+| Skills marketplace breadth | OpenClaw's 5,400 skills | Discover ships with Anthropic's collection; add more vetted Agent Skills collections to `SKILL_CATALOGS` |
 | Signed installer | Zero-friction install | Final phase, after the plan (owner decision) |
 
 Sources: [Grok Bot](https://x.ai/news/introducing-grok-bot), [Grok Bot overview](https://www.digitalapplied.com/blog/grok-bot-ai-teammates-launch-cloud-computer-2026), [Meta Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [Muse adoption](https://www.cnbc.com/2026/09/21/meta-muse-personal-ai-agent-downloads.html), [Hermes Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode), [Hermes releases](https://releasebot.io/updates/nousresearch/hermes-agent), [OpenClaw 2.0](https://www.infoq.com/news/2026/09/openclaw-2-release/), [OpenClaw 2026.9.5](https://www.marktechpost.com/2026/09/19/openclaw-releases-2026-9-5/), [Grok Bot vs Hermes vs OpenClaw](https://dervity.com/blog/grok-bot-vs-hermes-agent-vs-openclaw-2026).

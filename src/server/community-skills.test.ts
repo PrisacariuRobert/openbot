@@ -91,3 +91,14 @@ test("unprompted method suggestions need a real match, not a shared letter pair"
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("skill links: GitHub folder and file pages become the raw SKILL.md address", async () => {
+  const { skillSourceURL } = await import("./community-skills.js");
+  const raw = "https://raw.githubusercontent.com/anthropics/skills/main/skills/brand-guidelines/SKILL.md";
+  assert.equal(skillSourceURL("https://github.com/anthropics/skills/tree/main/skills/brand-guidelines"), raw);
+  assert.equal(skillSourceURL("https://github.com/anthropics/skills/blob/main/skills/brand-guidelines/SKILL.md?plain=1#L3"), raw);
+  assert.equal(skillSourceURL("https://raw.githubusercontent.com/anthropics/skills/main/skills/brand-guidelines/"), raw);
+  assert.equal(skillSourceURL(raw), raw);
+  assert.equal(skillSourceURL("https://example.com/skills/x/SKILL.md"), "https://example.com/skills/x/SKILL.md");
+  assert.throws(() => skillSourceURL("not a link"), /skill's folder/);
+});

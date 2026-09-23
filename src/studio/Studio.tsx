@@ -74,6 +74,7 @@ import type { CommunitySkill } from "../shared/extensions";
 import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
+import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
 import { ComputerTakeover } from "./LiveComputer";
@@ -117,6 +118,7 @@ type Detail =
   | { kind: "run"; run: Run }
   | { kind: "app"; app: ConnectorCatalogEntry }
   | { kind: "skill"; skill: CommunitySkill }
+  | { kind: "discover"; entry: CatalogEntry }
   | { kind: "settings" }
   | { kind: "search" };
 const activeStates = ["running", "queued", "waiting_for_teammate"];
@@ -2462,6 +2464,9 @@ export function Studio() {
                     </a>
                   </div>
                 )}
+                {libraryTab === "skills" && (
+                  <SkillDiscover query={query} refreshKey={refresh} onOpen={(entry) => setDetail({ kind: "discover", entry })} />
+                )}
                 <a className="text-action" href="/?panel=artifacts">
                   <FileText size={15} /> Browse artifacts your team delivered
                 </a>
@@ -3005,6 +3010,15 @@ export function Studio() {
                   : "Choose how this app connects to your studio."}
               </p>
             </>
+          )}
+          {detail.kind === "discover" && (
+            <SkillDiscoverDetail
+              key={detail.entry.url}
+              entry={detail.entry}
+              bots={state?.bots || []}
+              face={(bot) => <Face bot={bot} size={30} />}
+              onAdded={() => { setDetail(null); setRefresh((value) => value + 1); }}
+            />
           )}
           {detail.kind === "skill" && (
             <>
