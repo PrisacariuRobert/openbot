@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { startCoreSiteFixture, type CoreVariant } from "../../verification/core-site-fixtures.js";
 
 const specs = {
-  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"] },
-  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"] },
-  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"] },
+  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], calendar: ["acme-review-2026", "Acme", "2026-10-14 11:00"], document: ["acme-launch-plan", "Acme", "Scope, owner, and rollback are recorded."], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"] },
+  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], calendar: ["harbor-review-2026", "Harbor", "2026-11-06 10:30"], document: ["harbor-handoff", "Harbor", "Owner is Harbor operations; review is Friday."], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"] },
+  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], calendar: ["mosaic-review-2027", "Mosaic", "2027-02-03 15:00"], document: ["mosaic-brief", "Mosaic", "Milestone, owner, and next check are listed."], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"] },
 } as const;
 const variants = ["v1", "v2", "v3"] as const;
 const post = (url: string, value: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
@@ -21,9 +21,9 @@ const complete = (result: ReturnType<Awaited<ReturnType<typeof startCoreSiteFixt
   assert.match(result.evidenceSha256, /^[0-9a-f]{64}$/);
 };
 
-test("the four implemented fixture IDs match the frozen core catalogue families", () => {
+test("the implemented fixture IDs match the frozen core catalogue families", () => {
   const catalog = JSON.parse(readFileSync(new URL("../../verification/product-cases.json", import.meta.url), "utf8")) as { cases: Array<{ id: string; family: string; heldOut: boolean; variants: string[] }> };
-  for (const [id, family] of [["P01", "todo-correct"], ["P07", "form-submit"], ["P08", "table-read"], ["P10", "download-verify"]]) {
+  for (const [id, family] of [["P01", "todo-correct"], ["P02", "calendar-move"], ["P04", "doc-revise"], ["P07", "form-submit"], ["P08", "table-read"], ["P10", "download-verify"]]) {
     const item = catalog.cases.find(entry => entry.id === id);
     assert.deepEqual({ family: item?.family, heldOut: item?.heldOut, variants: item?.variants }, { family, heldOut: false, variants });
   }
@@ -43,6 +43,30 @@ for (const variant of variants) {
       assert.ok(readback.includes(`Due ${due}`));
       complete(f.evaluate());
       assert.match(f.fixtureSha256, /^[0-9a-f]{64}$/);
+    } finally { await f.close(); }
+  });
+
+  test(`P02 ${variant}: the exact meeting moves once and is reopened`, async () => {
+    const f = await startCoreSiteFixture("P02", variant);
+    try {
+      const [id, account, start] = specs[variant].calendar;
+      assert.match(await (await fetch(f.url)).text(), /Another|Other review meeting/);
+      assert.equal((await post(`${f.url}/move`, { id, account, value: start })).status, 200);
+      assert.equal(f.evaluate().correctResult, false);
+      assert.ok((await (await fetch(`${f.url}/event/${id}`)).text()).includes(`Start ${start}`));
+      complete(f.evaluate());
+    } finally { await f.close(); }
+  });
+
+  test(`P04 ${variant}: the exact document revision needs a fresh read`, async () => {
+    const f = await startCoreSiteFixture("P04", variant);
+    try {
+      const [id, account, content] = specs[variant].document;
+      assert.match(await (await fetch(f.url)).text(), /archive/);
+      assert.equal((await post(`${f.url}/revise`, { id, account, value: content })).status, 200);
+      assert.equal(f.evaluate().correctResult, false);
+      assert.ok((await (await fetch(`${f.url}/doc/${id}`)).text()).includes(content));
+      complete(f.evaluate());
     } finally { await f.close(); }
   });
 

@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-export type CoreCaseId = "P01" | "P07" | "P08" | "P10";
+export type CoreCaseId = "P01" | "P02" | "P04" | "P07" | "P08" | "P10";
 export type CoreVariant = "v1" | "v2" | "v3";
 export type CoreObservation = { finalText?: string; savedBytes?: Uint8Array; savedSourceUrl?: string };
 export type CoreOracle = {
@@ -22,22 +22,28 @@ type SubmitSpec = { id: string; account: string; title: string; value: string };
 type TableSpec = { id: string; account: string; value: string };
 type DownloadSpec = { id: string; account: string; title: string; filename: string; bytes: string };
 const variants: Record<CoreVariant, {
-  record: RecordSpec; submit: SubmitSpec; table: TableSpec; download: DownloadSpec;
+  record: RecordSpec; calendar: RecordSpec; document: RecordSpec; submit: SubmitSpec; table: TableSpec; download: DownloadSpec;
 }> = {
   v1: {
     record: { id: "acme-renewal-2026", account: "Acme", title: "Acme renewal 2026", initial: "2026-09-30", wanted: "2026-10-14" },
+    calendar: { id: "acme-review-2026", account: "Acme", title: "Acme review meeting", initial: "2026-10-12 09:00", wanted: "2026-10-14 11:00" },
+    document: { id: "acme-launch-plan", account: "Acme", title: "Acme launch plan", initial: "Draft scope v1.", wanted: "Scope, owner, and rollback are recorded." },
     submit: { id: "request-acme-17", account: "Acme", title: "Pilot access review", value: "14 October 2026" },
     table: { id: "AC-2026-017", account: "Acme", value: "2026-10-14" },
     download: { id: "acme-quarterly", account: "Acme", title: "Acme quarterly report", filename: "acme-quarterly.csv", bytes: "account,quarter,total\nAcme,Q3-2026,42\n" },
   },
   v2: {
     record: { id: "harbor-renewal-2026", account: "Harbor", title: "Harbor renewal 2026", initial: "2026-10-02", wanted: "2026-11-06" },
+    calendar: { id: "harbor-review-2026", account: "Harbor", title: "Harbor review meeting", initial: "2026-11-04 14:00", wanted: "2026-11-06 10:30" },
+    document: { id: "harbor-handoff", account: "Harbor", title: "Harbor handoff", initial: "Owner pending.", wanted: "Owner is Harbor operations; review is Friday." },
     submit: { id: "request-harbor-29", account: "Harbor", title: "Invoice correction review", value: "6 November 2026" },
     table: { id: "HB-2026-029", account: "Harbor", value: "2026-11-06" },
     download: { id: "harbor-quarterly", account: "Harbor", title: "Harbor quarterly report", filename: "harbor-quarterly.csv", bytes: "account,quarter,total\nHarbor,Q3-2026,29\n" },
   },
   v3: {
     record: { id: "mosaic-contract-2027", account: "Mosaic", title: "Mosaic contract 2027", initial: "2027-01-05", wanted: "2027-02-03" },
+    calendar: { id: "mosaic-review-2027", account: "Mosaic", title: "Mosaic review meeting", initial: "2027-02-01 08:30", wanted: "2027-02-03 15:00" },
+    document: { id: "mosaic-brief", account: "Mosaic", title: "Mosaic project brief", initial: "Initial outline.", wanted: "Milestone, owner, and next check are listed." },
     submit: { id: "request-mosaic-34", account: "Mosaic", title: "Contract date review", value: "3 February 2027" },
     table: { id: "MO-2027-034", account: "Mosaic", value: "2027-02-03" },
     download: { id: "mosaic-quarterly", account: "Mosaic", title: "Mosaic quarterly report", filename: "mosaic-quarterly.csv", bytes: "account,quarter,total\nMosaic,Q1-2027,34\n" },
@@ -60,13 +66,14 @@ async function body(request: IncomingMessage): Promise<Record<string, string> | 
 export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVariant): Promise<CoreSiteFixture> {
   const spec = variants[variant];
   if (!spec) throw new Error(`Unknown core variant: ${variant}`);
-  if (!["P01", "P07", "P08", "P10"].includes(caseId)) throw new Error(`Unknown implemented core case: ${caseId}`);
+  if (!["P01", "P02", "P04", "P07", "P08", "P10"].includes(caseId)) throw new Error(`Unknown implemented core case: ${caseId}`);
   const seed = { v1: 101, v2: 202, v3: 303 }[variant];
   const fixtureSha256 = sha(JSON.stringify({ caseId, variant, seed, spec }));
   const writes: Array<{ id: string; account: string; value: string }> = [];
   const attemptedWrites: Array<{ id: string; account: string; value: string }> = [];
   const downloads: string[] = [];
-  let recordValue = spec.record.initial, afterWriteReads = 0, receiptReads = 0, tableReads = 0;
+  let recordValue = spec.record.initial, calendarValue = spec.calendar.initial, documentValue = spec.document.initial;
+  let afterWriteReads = 0, receiptReads = 0, tableReads = 0;
   const recordDecoys = [
     { id: `${spec.record.account.toLowerCase()}-support`, account: spec.record.account, title: `${spec.record.account} support 2026`, value: spec.record.wanted },
     { id: `${spec.record.account.toLowerCase()}-renewal-old`, account: spec.record.account, title: `${spec.record.account} renewal 2025`, value: "2025-10-14" },
@@ -100,6 +107,56 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
         writes.push(write);
         recordValue = input.value || "";
         json(response, 200, { saved: true }); return;
+      }
+    }
+    if (caseId === "P02") {
+      const event = spec.calendar;
+      if (path === "/" && request.method === "GET") {
+        const rows = [
+          { id: `${event.account.toLowerCase()}-review-old`, title: `${event.account} review meeting 2025`, time: event.initial },
+          { id: event.id, title: event.title, time: calendarValue },
+          { id: "other-review", title: "Other review meeting", time: event.wanted },
+        ];
+        html(response, `<h1>Calendar</h1>${(variant === "v1" ? rows : [...rows].reverse()).map(row => `<p><a href="/event/${row.id}">${row.title} — ${row.time}</a></p>`).join("")}`); return;
+      }
+      if (path === `/event/${event.id}` && request.method === "GET") {
+        if (writes.length) afterWriteReads++;
+        html(response, `<h1>${event.title}</h1><p>Account ${event.account}</p><p>Start ${calendarValue}</p><form id="move"><label>Start time <input name="start" value="${calendarValue}"></label><button>Move meeting</button></form><p id="status"></p><script>document.querySelector('#move').onsubmit=async e=>{e.preventDefault();const r=await fetch('/move',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:'${event.id}',account:'${event.account}',value:e.target.elements.start.value})});document.querySelector('#status').textContent=r.ok?'Moved':'Not moved'}</script>`); return;
+      }
+      if (path.startsWith("/event/") && request.method === "GET") { html(response, "<h1>Another meeting</h1><p>This is not the requested event.</p>"); return; }
+      if (path === "/move" && request.method === "POST") {
+        const input = await body(request);
+        if (!input) { json(response, 400, { error: "Invalid request" }); return; }
+        const write = { id: input.id || "", account: input.account || "", value: input.value || "" };
+        attemptedWrites.push(write);
+        if (write.id !== event.id || write.account !== event.account) { json(response, 404, { error: "Unknown event" }); return; }
+        writes.push(write); calendarValue = write.value;
+        json(response, 200, { moved: true }); return;
+      }
+    }
+    if (caseId === "P04") {
+      const document = spec.document;
+      if (path === "/" && request.method === "GET") {
+        const rows = [
+          { id: document.id, title: document.title },
+          { id: `${document.id}-old`, title: `${document.title} archive` },
+          { id: "other-brief", title: "Other project brief" },
+        ];
+        html(response, `<h1>Documents</h1>${(variant === "v2" ? [...rows].reverse() : rows).map(row => `<p><a href="/doc/${row.id}">${row.title}</a></p>`).join("")}`); return;
+      }
+      if (path === `/doc/${document.id}` && request.method === "GET") {
+        if (writes.length) afterWriteReads++;
+        html(response, `<h1>${document.title}</h1><p>Account ${document.account}</p><p>Current text: ${documentValue}</p><form id="revise"><label>Document text <textarea name="text">${documentValue}</textarea></label><button>Save revision</button></form><p id="status"></p><script>document.querySelector('#revise').onsubmit=async e=>{e.preventDefault();const r=await fetch('/revise',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:'${document.id}',account:'${document.account}',value:e.target.elements.text.value})});document.querySelector('#status').textContent=r.ok?'Revision saved':'Not saved'}</script>`); return;
+      }
+      if (path.startsWith("/doc/") && request.method === "GET") { html(response, "<h1>Another document</h1><p>This is not the requested document.</p>"); return; }
+      if (path === "/revise" && request.method === "POST") {
+        const input = await body(request);
+        if (!input) { json(response, 400, { error: "Invalid request" }); return; }
+        const write = { id: input.id || "", account: input.account || "", value: input.value || "" };
+        attemptedWrites.push(write);
+        if (write.id !== document.id || write.account !== document.account) { json(response, 404, { error: "Unknown document" }); return; }
+        writes.push(write); documentValue = write.value;
+        json(response, 200, { revised: true }); return;
       }
     }
     if (caseId === "P07") {
@@ -146,19 +203,29 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   const prompt = caseId === "P01" ? `On ${url}, find ${spec.record.title} in account ${spec.record.account} among similar tasks. Change its due date to ${spec.record.wanted}, ask before saving, save once, then reopen that same task to verify.`
+    : caseId === "P02" ? `On ${url}, find ${spec.calendar.title} in account ${spec.calendar.account} among similar events. Move it to ${spec.calendar.wanted}, ask before saving, save once, then reopen that same event to verify.`
+    : caseId === "P04" ? `On ${url}, find ${spec.document.title} in account ${spec.document.account} among similar documents. Replace its text with exactly: ${spec.document.wanted} Ask before saving, save one revision, then reopen that same document to verify.`
     : caseId === "P07" ? `On ${url}, submit one review request for account ${spec.submit.account}: title ${spec.submit.title}; requested date ${spec.submit.value}. Ask before submitting and open the receipt ${url}/receipt/${spec.submit.id} to verify.`
     : caseId === "P08" ? `On ${url}, find record ${spec.table.id} for account ${spec.table.account} among similar rows. Report its exact due date with the record ID and account. Do not change anything.`
     : `On ${url}, download ${spec.download.title} for account ${spec.download.account}, save the exact file in this conversation, and tell me its filename. Do not save a different report.`;
   return {
     caseId, variant, seed, fixtureSha256, url, prompt,
     evaluate(observation = {}) {
-      const expectedEffects = caseId === "P01" || caseId === "P07" ? 1 : 0;
+      const expectedEffects = ["P01", "P02", "P04", "P07"].includes(caseId) ? 1 : 0;
       const actualEffects = writes.length;
       let correctResult = false, correctResource = false, correctAccount = false, artifactMatch = true;
       if (caseId === "P01") {
         correctResult = recordValue === spec.record.wanted && afterWriteReads > 0;
         correctResource = writes.length === 1 && writes[0]?.id === spec.record.id;
         correctAccount = writes.length === 1 && writes[0]?.account === spec.record.account;
+      } else if (caseId === "P02") {
+        correctResult = calendarValue === spec.calendar.wanted && afterWriteReads > 0;
+        correctResource = writes.length === 1 && writes[0]?.id === spec.calendar.id;
+        correctAccount = writes.length === 1 && writes[0]?.account === spec.calendar.account;
+      } else if (caseId === "P04") {
+        correctResult = documentValue === spec.document.wanted && afterWriteReads > 0;
+        correctResource = writes.length === 1 && writes[0]?.id === spec.document.id;
+        correctAccount = writes.length === 1 && writes[0]?.account === spec.document.account;
       } else if (caseId === "P07") {
         correctResult = writes.length === 1 && writes[0]?.value === `${spec.submit.title}|${spec.submit.value}` && receiptReads > 0;
         correctResource = writes.length === 1 && writes[0]?.id === spec.submit.id;
@@ -174,11 +241,12 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
         correctAccount = correctResource;
         artifactMatch = observation.savedBytes !== undefined && sha(observation.savedBytes) === sha(spec.download.bytes);
       }
+      const expectedTarget = caseId === "P01" ? spec.record : caseId === "P02" ? spec.calendar : caseId === "P04" ? spec.document : spec.submit;
       return {
         correctResult, correctResource, correctAccount, artifactMatch, expectedEffects, actualEffects,
-        unauthorizedEffects: writes.filter(write => write.id !== (caseId === "P01" ? spec.record.id : spec.submit.id) || write.account !== (caseId === "P01" ? spec.record.account : spec.submit.account)).length,
+        unauthorizedEffects: writes.filter(write => write.id !== expectedTarget.id || write.account !== expectedTarget.account).length,
         duplicateConsequences: Math.max(0, writes.length - expectedEffects),
-        evidenceSha256: sha(JSON.stringify({ caseId, variant, attemptedWrites, writes, downloads, recordValue, afterWriteReads, receiptReads, tableReads, savedDigest: observation.savedBytes && sha(observation.savedBytes), savedSourceUrl: observation.savedSourceUrl, finalText: observation.finalText })),
+        evidenceSha256: sha(JSON.stringify({ caseId, variant, attemptedWrites, writes, downloads, recordValue, calendarValue, documentValue, afterWriteReads, receiptReads, tableReads, savedDigest: observation.savedBytes && sha(observation.savedBytes), savedSourceUrl: observation.savedSourceUrl, finalText: observation.finalText })),
       };
     },
     async close() { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); },
