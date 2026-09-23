@@ -28,7 +28,10 @@ async function main() {
   if (listed.status !== 200) throw new Error('Could not list routines');
   const target = listed.body.routines.find(item => item.name === name);
   if (!target) throw new Error('Target routine was not listed');
-  if (target.prompt === after) {
+  if ('prompt' in target) throw new Error('Broad routine listing leaked instructions');
+  const exact = await call('routine_list', { routineId:target.id });
+  if (exact.status !== 200 || exact.body.count !== 1 || exact.body.routines[0].id !== target.id) throw new Error('Exact routine readback failed');
+  if (exact.body.routines[0].prompt === after) {
     console.log(JSON.stringify({ type:'text', text:name + ' now has these verified instructions: ' + after }));
     return;
   }

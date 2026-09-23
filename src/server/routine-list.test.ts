@@ -23,6 +23,7 @@ async function main() {
   const base = { botId: process.env.OPENBOT_BOT_ID, runId };
   const call = (action, args, h = headers) => fetch(endpoint + '/api/internal/tools', { method: 'POST', headers: h, body: JSON.stringify({ ...base, action, args }) }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
   const list = await call('routine_list', {});
+  const exact = await call('routine_list', { routineId: list.body.routines.find(r => r.name === 'Monday review')?.id });
   const filtered = await call('routine_list', { query: 'monday' });
   const badQuery = await call('routine_list', { query: 42 });
   const badToken = await call('routine_list', {}, { ...headers, 'x-openbot-token': 'invalid' });
@@ -30,7 +31,7 @@ async function main() {
     const r = await fetch(endpoint + '/api/internal/tools', { method: 'POST', headers, body: JSON.stringify({ botId: 'pixel', runId, action: 'routine_list', args: {} }) });
     return { status: r.status, text: (await r.text()).slice(0, 200) };
   })();
-  fs.writeFileSync(record, JSON.stringify({ list, filtered, badQuery, badToken: badToken.status, wrongBot }));
+  fs.writeFileSync(record, JSON.stringify({ list, exact, filtered, badQuery, badToken: badToken.status, wrongBot }));
   console.log(JSON.stringify({ type: 'text', text: 'Listed the routines of this conversation. Nothing was changed.' }));
 }
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });
@@ -53,6 +54,7 @@ test("routine_list exposes exactly this conversation's routines through the scop
     assert.ok(completed);
     const record = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "nova", `.routine-list-${runId}.json`), "utf8")) as {
       list: { status: number; body: { routines: Array<{ id: string; name: string; enabled: boolean }>; count: number; scope: string } };
+      exact: { status: number; body: { routines: Array<{ id: string; name: string; prompt: string }>; count: number; scope: string } };
       filtered: { status: number; body: { routines: Array<{ name: string }>; count: number } };
       badQuery: { status: number };
       badToken: number;
@@ -65,6 +67,10 @@ test("routine_list exposes exactly this conversation's routines through the scop
     assert.deepEqual(names, ["Monday review", "Paused digest"]);
     assert.ok(record.list.body.routines.every((routine) => typeof routine.id === "string" && routine.id.length > 0), "summaries carry stable ids for follow-ups");
     assert.ok(!("prompt" in (record.list.body.routines[0] as Record<string, unknown>)), "listing never exposes routine instructions");
+    assert.equal(record.exact.status, 200);
+    assert.equal(record.exact.body.count, 1);
+    assert.equal(record.exact.body.routines[0]?.name, "Monday review");
+    assert.equal(record.exact.body.routines[0]?.prompt, "Review the inbox.", "exact-id readback exposes only the selected routine's instructions");
     assert.equal(record.list.body.routines.find((routine) => routine.name === "Paused digest")?.enabled, false);
     assert.equal(record.filtered.status, 200);
     assert.deepEqual(record.filtered.body.routines.map((routine) => routine.name), ["Monday review"]);

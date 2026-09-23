@@ -4208,13 +4208,18 @@ app.post("/api/internal/tools", async (request, response) => {
       // conversation are visible, never other threads. Summaries carry ids
       // for exact follow-ups, never prompts or secrets.
       const sourceRun = db.getRun(runId)!;
-      const input = z.object({ query: z.string().trim().max(200).default("") }).safeParse(args);
-      if (!input.success) return response.status(400).json({ error: "Give routine_list at most a short name filter." });
+      const input = z.object({ query: z.string().trim().max(200).default(""), routineId: z.string().uuid().optional() }).refine(value => !(value.query && value.routineId)).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_list a short name filter or one exact routine id." });
+      if (input.data.routineId) {
+        const routine = db.getRoutine(input.data.routineId);
+        if (!routine || routine.threadId !== sourceRun.threadId) return response.json({ routines: [], count: 0, scope: "conversation" });
+        return response.json({ routines: [{ id: routine.id, name: routine.name, prompt: routine.prompt, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }], count: 1, scope: "conversation" });
+      }
       const needle = input.data.query.toLocaleLowerCase();
       const routines = db.listRoutines(sourceRun.threadId)
         .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
         .slice(0, 50)
-        .map((routine) => ({ id: routine.id, name: routine.name, prompt: routine.prompt, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
+        .map((routine) => ({ id: routine.id, name: routine.name, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }));
       return response.json({ routines, count: routines.length, scope: "conversation" });
     }
     if (action === "routine_update" || action === "routine_pause" || action === "routine_resume" || action === "routine_delete") {
