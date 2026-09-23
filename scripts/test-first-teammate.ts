@@ -1,6 +1,7 @@
 // Actual creation API on a fresh, disposable host. Provider discovery is a UI
 // fixture; no model is invoked, no real credentials are read by the test.
 import assert from "node:assert/strict";
+import { friendlyModelName } from "../src/shared/provider-config.js";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
@@ -129,13 +130,13 @@ try {
     await sheet
       .getByRole("combobox", { name: /^Model/ })
       .click();
-    await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
+    await sheet.getByRole("option", { name: friendlyModelName("opencode/fixture-only"), exact: true }).click();
     assert.ok(await sheet.getByRole("button", { name: "Create teammate", exact: true }).isEnabled());
     await sheet.getByRole("combobox", { name: "AI connection" }).click();
     await sheet.getByRole("option", { name: provider.name, exact: true }).click();
     assert.equal(await sheet.getByRole("combobox", { name: /^Model/ }).innerText(), "Choose a model", "Re-picking the provider resets the model");
     await sheet.getByRole("combobox", { name: /^Model/ }).click();
-    await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
+    await sheet.getByRole("option", { name: friendlyModelName("opencode/fixture-only"), exact: true }).click();
     available = false;
     await sheet.getByRole("button", { name: "Refresh connections" }).click();
     await sheet.getByText("This connection or model is no longer available.", { exact: false }).waitFor();

@@ -3,6 +3,7 @@
 // prerequisite. Discovery may refresh its public model catalog, but no sign-in,
 // model task, credential or connected-service action is used.
 import assert from "node:assert/strict";
+import { friendlyModelName } from "../src/shared/provider-config.js";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
@@ -144,7 +145,7 @@ try {
   const model = creation.getByRole("combobox", { name: "Model", exact: true });
   assert.equal(await model.innerText(), "Choose a model");
   await model.click();
-  await creation.getByRole("option", { name: modelId, exact: true }).click();
+  await creation.getByRole("option", { name: friendlyModelName(modelId), exact: true }).click();
   assert.ok(
     await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
     "The form is ready only after explicit provider and model selection",
