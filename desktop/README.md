@@ -20,7 +20,15 @@ npm run package:desktop
 
 This builds the shared UI, stages a platform-matched Node/OpenCode runtime with production dependencies and license notices, then runs electron-builder. Output is in `desktop/release/`: Mac DMG/ZIP, Windows NSIS, Linux AppImage/deb. Build on the matching platform and architecture; the CI matrix covers Apple silicon, Intel Mac, Windows x64 and Linux x64. `-- --dir` produces an unpacked local app for testing. Runtime versions can be explicitly selected with `OPENBOT_NODE_VERSION` and `OPENBOT_OPENCODE_VERSION`.
 
-These are unsigned development artifacts. CI only creates a draft on a release tag; signing/notarization and release require a separately reviewed setup. No credentials from the retired native signing workflow are used automatically.
+The pinned Electron 44 shell requires macOS 13 or newer. The current local packaged-app smoke was run on Apple silicon with macOS 27; other macOS versions and architectures still need independent install evidence before they are advertised as supported for this beta.
+
+The ordinary package command and cross-platform CI produce unsigned development artifacts. They are not a public Mac installer. No credentials from the retired native signing workflow are used automatically.
+
+## Signed Mac candidate
+
+Public distribution needs an active Apple Developer Program membership, a **Developer ID Application** certificate and Apple notarization credentials. On a Mac, set `CSC_LINK` to the exported `.p12` path or its base64 content, `CSC_KEY_PASSWORD` to its password, and `CSC_NAME` to the exact Developer ID Application identity. Supply one complete notarization credential set: `APPLE_API_KEY` (path to `.p8`), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`; or `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`; or a `notarytool` keychain profile via `APPLE_KEYCHAIN` and `APPLE_KEYCHAIN_PROFILE`. Keep all credentials outside the repository and logs.
+
+After `npm ci`, run `npm run package:desktop:signed`. The signed path fails before packaging when credentials are missing, overrides the ordinary unsigned identity, enables hardened runtime and notarization, then requires `codesign --verify`, Gatekeeper assessment and stapled-ticket validation on the generated app. The manually triggered `Signed Mac candidate` workflow accepts either a raw `.p8` secret (`OPENBOT_APPLE_API_KEY_P8`, plus key ID and issuer) or the three Apple ID secrets; it writes an API key only to a temporary runner file. It uploads review artifacts and checksums and never creates a release. A passing build still needs clean-install and recovery testing on a second physical Mac using the **exact** DMG/ZIP before public release. This signing path has not produced a verified artifact until real credentials are provided and the workflow passes.
 
 The packaged shell starts the bundled local runner. Closing its window keeps the detached runner alive for routines. Teammates, permissions, files and recovery use the existing authenticated backend. Optional model accounts, browsers and Docker remain separately configured capabilities.
 
@@ -32,7 +40,7 @@ Open the same Studio URL through an authenticated HTTPS connection to your host.
 
 This source migration never moves or deletes a data home. Keep your existing server running and use `OPENBOT_DEV_URL` to attach. For a packaged runner, set `OPENBOT_DATA_DIR` to the existing absolute data-home path; the default for a new Electron home is `~/.openbot`. An earlier native Mac package may use `~/Library/Application Support/OpenBot/Data`, while source installations may use the checkout's `.openbot` directory. Do not assume those are interchangeable.
 
-Before changing hosts or data locations, finish active work and stop the runner normally. Back up the complete database together with its WAL/SHM files, matching `keys/vault.key`, attachments and profiles. Never copy only a live database or create a new vault key for existing encrypted data. There is no automatic data migration in this change.
+Before changing hosts or data locations, finish active work and stop the runner normally. Back up the complete data home, including the database with its WAL/SHM files, matching `keys/vault.key`, attachments, profiles and `.desktop-instance-id`. Restore into a separate folder and check it before replacing an existing home. Never copy only a live database or create a new vault key for existing encrypted data. There is no automatic data migration in this change.
 
 ## Check
 

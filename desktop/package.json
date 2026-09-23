@@ -3,7 +3,11 @@
   "productName": "OpenBot",
   "version": "0.37.0-beta.1",
   "description": "OpenBot desktop shell \u2014 your AI team, on the computer you own.",
-  "author": "Robert Prisacariu",
+  "author": {
+    "name": "Robert Prisacariu",
+    "email": "145539911+PrisacariuRobert@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/PrisacariuRobert/openbot",
   "license": "MIT",
   "private": true,
   "main": "main.mjs",
@@ -13,7 +17,7 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^38.2.0",
+    "electron": "44.4.4",
     "electron-builder": "^26.0.12"
   },
   "build": {
@@ -25,6 +29,7 @@
     "files": [
       "main.mjs",
       "navigation.mjs",
+      "studio-identity.mjs",
       "package.json"
     ],
     "extraResources": [
@@ -37,10 +42,7 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "target": "nsis"
         }
       ]
     },
@@ -48,16 +50,10 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
+          "target": "AppImage"
         },
         {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
+          "target": "deb"
         }
       ],
       "category": "Utility"
@@ -66,18 +62,10 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "dmg"
         },
         {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "zip"
         }
       ],
       "identity": null
@@ -89,6 +77,6 @@
     "artifactName": "OpenBot-${version}-${os}-${arch}.${ext}"
   },
   "allowScripts": {
-    "electron@38.8.6": true
+    "electron@44.4.4": true
   }
 }

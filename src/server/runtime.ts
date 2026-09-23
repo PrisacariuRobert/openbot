@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { BrowserTarget } from "./safety.js";
-import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright-core";
+import { chromium, type BrowserContext, type CDPSession, type Download, type Page } from "playwright-core";
+import sharp from "sharp";
 import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { skillSlug } from "../shared/skills.js";
@@ -11,7 +12,8 @@ import type { LiveViewEvent, LiveViewSource } from "./live-view.js";
 import { createCodeCheckView } from "./code-check-view.js";
 import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTemplate, type SkillDefinition } from "./skill-library.js";
 import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
-import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
+import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock, qaBrowserScopeBlock } from "./browser-access.js";
+import { AttachmentService } from "./attachments.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
 import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
 import { issueSemanticTarget, reresolveSemanticTarget } from "./semantic-targets.js";
@@ -22,6 +24,12 @@ import { storeObservation, getObservation, findObservationWithTarget, invalidate
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
+type DownloadCaptureItem = { id: string; status: "pending" | "completed" | "failed"; name: string; attachmentId?: string; size?: number; sha256?: string; error?: string };
+type DownloadCapture = {
+  id: string; runId: string; botId: string; page: Page; ownerEpoch: number; active: boolean; expiresAt: number;
+  items: DownloadCaptureItem[]; overflowCount: number; pages: Set<Page>; downloads: Set<Download>;
+  timer: ReturnType<typeof setTimeout>; onDownload: (download: Download) => void; onPopup: (popup: Page) => void; onClose: () => void;
+};
 export class BrowserUploadUncertainError extends Error {}
 const PROJECT_SCAN_SKIP = new Set(["node_modules", "vendor"]);
 
@@ -490,8 +498,25 @@ export class BrowserManager {
   private readonly contextArgsVersions = new Map<string, string>();
   private readonly navigationServices = new WeakMap<Page, string[]>();
   private readonly teaching = new Map<string, { name: string; startUrl: string; steps: TeachStep[] }>();
+  private readonly downloadCaptures = new Map<string, DownloadCapture>();
 
-  constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean } = {}) {}
+  constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean; onDownloadSaved?: () => void } = {}) {}
+
+  private async installBrowserRoutes(context: BrowserContext, botId: string) {
+    await context.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (browserWebsiteBlock(this.db, botId, url) || qaBrowserScopeBlock(url)) { await route.abort("blockedbyclient"); return; }
+      if (!process.env.OPENBOT_QA_BROWSER_ORIGIN) { await route.continue(); return; }
+      // Playwright's continue() does not intercept every redirect hop. In a
+      // synthetic campaign fetch one allowed request without following any
+      // redirect, then fulfill it. A redirect is refused before Chrome sees it.
+      try {
+        const response = await route.fetch({ maxRedirects: 0 });
+        if (response.status() >= 300 && response.status() < 400) { await route.abort("blockedbyclient"); return; }
+        await route.fulfill({ response });
+      } catch { await route.abort("blockedbyclient").catch(() => undefined); }
+    });
+  }
 
   private writeTaughtSkill(botId: string, slug: string, name: string, description: string, instructions: string, startUrl: string, steps: SkillStep[]): string {
     const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
@@ -591,7 +616,7 @@ export class BrowserManager {
     mkdirSync(profile, { recursive: true });
     const containerArgs = process.env.OPENBOT_CHROME_NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
     const context = await chromium.launchPersistentContext(profile, {
-      executablePath, headless: headless || this.options.headlessTeaching === true, viewport: { width: 1280, height: 820 },
+      executablePath, headless: headless || this.options.headlessTeaching === true, viewport: { width: 1280, height: 820 }, acceptDownloads: true,
       serviceWorkers: "block",
       // Providers like Google refuse sign-in when Chromium advertises
       // automation ("This browser or app may not be secure"). This flag keeps
@@ -602,7 +627,7 @@ export class BrowserManager {
     // Known-service request filtering is not a general egress sandbox. Playwright
     // may only intercept the first request of a redirect; check the full chain
     // before returning page content too. Denials are always read from current DB.
-    await context.route("**/*", (route) => browserWebsiteBlock(this.db, botId, route.request().url()) ? route.abort("blockedbyclient") : route.continue());
+    await this.installBrowserRoutes(context, botId);
     const trackNavigation = (page: Page) => {
       page.on("response", (response) => {
         const request = response.request();
@@ -635,6 +660,85 @@ export class BrowserManager {
     this.activePages.set(botId, fresh);
     this.trackDocumentGenerations(fresh);
     return fresh;
+  }
+
+  /** Arm before the website action that starts a download. Capture is scoped
+   * to this page and its popups, and cannot accept a caller-provided path. */
+  async armDownloads(botId: string, runId: string) {
+    const run = this.db.getRun(runId);
+    if (!run || run.botId !== botId || !["running", "queued"].includes(run.status)) throw new Error("A running teammate task is required to capture browser downloads.");
+    if (this.secureHandoffActive(botId)) throw new Error("Browser downloads are unavailable during private sign-in.");
+    const page = await this.page(botId);
+    safeUrl(page.url());
+    const existing = this.downloadCaptures.get(botId);
+    if (existing?.active && existing.runId === runId && existing.page === page && Date.now() < existing.expiresAt) return this.downloadCaptureStatus(existing);
+    this.cancelDownloadsForBot(botId);
+    const capture: DownloadCapture = {
+      id: randomUUID(), runId, botId, page, ownerEpoch: this.db.botInputEpoch(botId), active: true, expiresAt: Date.now() + 120_000,
+      items: [], overflowCount: 0, pages: new Set<Page>(), downloads: new Set<Download>(),
+      timer: undefined as unknown as ReturnType<typeof setTimeout>,
+      onDownload: () => undefined, onPopup: () => undefined, onClose: () => undefined,
+    };
+    capture.onDownload = (download: Download) => {
+      if (!capture.active || capture.items.length >= 6) {
+        if (capture.active) capture.overflowCount += 1;
+        void download.cancel().catch(() => undefined);
+        return;
+      }
+      const item: DownloadCaptureItem = { id: randomUUID(), status: "pending", name: download.suggestedFilename() };
+      const pageUrl = download.page().url();
+      capture.items.push(item);
+      capture.downloads.add(download);
+      void (async () => {
+        try {
+          let timeout: ReturnType<typeof setTimeout> | undefined;
+          const source = await Promise.race([
+            download.path(),
+            new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("The browser download did not finish within two minutes.")), 120_000); timeout.unref(); }),
+          ]).finally(() => { if (timeout) clearTimeout(timeout); });
+          const current = this.db.getRun(runId);
+          if (!source || !capture.active || Date.now() >= capture.expiresAt || !current || ["cancelled", "failed"].includes(current.status) || this.db.botInputEpoch(botId) !== capture.ownerEpoch || this.secureHandoffActive(botId)) throw new Error("The download was cancelled or browser ownership changed.");
+          if (browserWebsiteBlock(this.db, botId, download.url())) throw new Error("This download website is blocked for the teammate.");
+          const saved = await new AttachmentService(this.db).captureBrowserDownload({ botId, runId, ownerEpoch: capture.ownerEpoch, sourcePath: source, suggestedName: download.suggestedFilename(), resourceUrl: download.url(), pageUrl, capturedAt: new Date().toISOString() });
+          item.status = "completed"; item.name = saved.name; item.attachmentId = saved.id; item.size = saved.size; item.sha256 = String(saved.metadata?.sha256 || "");
+          try { this.options.onDownloadSaved?.(); } catch { /* Saved bytes stay delivered even if a live UI signal fails. */ }
+        } catch (error) { item.status = "failed"; item.error = error instanceof Error ? error.message : "The download could not be saved."; }
+        finally { capture.downloads.delete(download); }
+      })();
+    };
+    capture.onPopup = (popup: Page) => { if (capture.active) { capture.pages.add(popup); popup.on("download", capture.onDownload); } };
+    capture.onClose = () => this.cancelDownloadsForBot(botId);
+    capture.pages.add(page); page.on("download", capture.onDownload); page.on("popup", capture.onPopup); page.on("close", capture.onClose);
+    capture.timer = setTimeout(() => this.cancelDownloadsForBot(botId), 120_000);
+    capture.timer.unref();
+    this.downloadCaptures.set(botId, capture);
+    return this.downloadCaptureStatus(capture);
+  }
+
+  downloadResults(botId: string, runId: string) {
+    const capture = this.downloadCaptures.get(botId);
+    if (!capture || capture.runId !== runId) throw new Error("No download capture is armed for this task. Arm it before clicking the download control.");
+    return this.downloadCaptureStatus(capture);
+  }
+
+  private downloadCaptureStatus(capture: DownloadCapture) {
+    return { captureId: capture.id, armed: capture.active, expiresAt: new Date(capture.expiresAt).toISOString(), overflowCount: capture.overflowCount, items: capture.items.map(item => ({ ...item })) };
+  }
+
+  cancelDownloadsForBot(botId: string): void {
+    const capture = this.downloadCaptures.get(botId);
+    if (!capture || !capture.active) return;
+    capture.active = false; clearTimeout(capture.timer);
+    capture.page.off("popup", capture.onPopup);
+    capture.page.off("close", capture.onClose);
+    for (const page of capture.pages) page.off("download", capture.onDownload);
+    for (const download of capture.downloads) void download.cancel().catch(() => undefined);
+    for (const item of capture.items) if (item.status === "pending") { item.status = "failed"; item.error = "Capture stopped before the download completed."; }
+  }
+
+  cancelDownloadsUnlessRun(botId: string, runId: string): void {
+    const capture = this.downloadCaptures.get(botId);
+    if (capture && capture.runId !== runId) this.cancelDownloadsForBot(botId);
   }
 
   /** Tabs: the owner and the agent share one explicit active tab, like a real
@@ -673,7 +777,10 @@ export class BrowserManager {
     try {
       return await page.evaluate(() => {
         const root = document.documentElement;
-        const html = root ? root.outerHTML : "";
+        // Chromium's screenshot path may leave an empty style attribute on
+        // controls after temporarily hiding the caret. It has no visual or
+        // behavioral effect and must not invalidate the captured document.
+        const html = root ? root.outerHTML.replace(/ style=""/g, "") : "";
         const sample = `${document.title}|${html.length}|${html.slice(0, 2000)}|${html.slice(-2000)}`;
         let hash = 0x811c9dc5;
         for (let index = 0; index < sample.length; index += 1) {
@@ -823,7 +930,7 @@ export class BrowserManager {
     } catch (error) {
       throw new Error(`A visible window needs a display on the Mac running OpenBot. ${error instanceof Error ? error.message : String(error)}`.slice(0, 300));
     }
-    await context.route("**/*", (route) => browserWebsiteBlock(this.db, botId, route.request().url()) ? route.abort("blockedbyclient") : route.continue());
+    await this.installBrowserRoutes(context, botId);
     context.on("close", () => { if (this.contexts.get(botId) === context) { this.contexts.delete(botId); this.contextHeadless.delete(botId); this.contextArgsVersions.delete(botId); } });
     this.contextHeadless.set(botId, false);
     this.contextArgsVersions.set(botId, BrowserManager.contextArgsVersion);
@@ -1191,12 +1298,12 @@ export class BrowserManager {
   }
 
   private assertWebsiteAccess(botId: string, url: string) {
-    const reason = browserWebsiteBlock(this.db, botId, url);
+    const reason = browserWebsiteBlock(this.db, botId, url) || qaBrowserScopeBlock(url);
     if (reason) throw new Error(reason);
   }
 
   private assertPageAccess(botId: string, page: Page) {
-    const reason = browserNavigationBlock(this.db, botId, [page.url(), ...(this.navigationServices.get(page) || [])]);
+    const reason = browserNavigationBlock(this.db, botId, [page.url(), ...(this.navigationServices.get(page) || [])]) || qaBrowserScopeBlock(page.url());
     if (reason) throw new Error(reason);
   }
 
@@ -1293,13 +1400,15 @@ export class BrowserManager {
     if (!(await locator.isEditable().catch(() => false))) {
       throw new Error("The field stopped being editable before typing. Observe again.");
     }
-    // The editability check above awaits; a revocation landing inside that
-    // await must not allow the first keystroke. Re-check synchronously
-    // immediately before typing.
+    // Semantic type means replace the current field value, matching the
+    // legacy fill tool and the reviewed final value. Selecting the existing
+    // text is not a write; recheck ownership before the first keystroke.
+    await page.keyboard.press("ControlOrMeta+A");
     this.assertNotRevoked(botId, runId, admittedEpoch);
     // Keystroke insertion performs no readiness waits: revocation is
     // checked before the first keystroke, and ownership afterwards.
-    await page.keyboard.type(value, { delay: 0 });
+    if (value) await page.keyboard.type(value, { delay: 0 });
+    else await page.keyboard.press("Backspace");
   }
 
   /** Ownership check after input crossed the dispatch boundary. A change
@@ -1409,19 +1518,69 @@ export class BrowserManager {
     } catch { return null; }
   }
 
+  /** Read-only model image. The pixel bytes are returned only to the trusted
+   * adapter, which emits an actual image result instead of base64 prose. */
+  async visualObserve(botId: string, runId: string, sessionId: string) {
+    const observed = await this.observeScoped(botId, runId, { surface: "browser-visual", sessionId });
+    const capture = getObservation(observed.observationId);
+    if (!capture || capture.secureMode || this.secureHandoffActive(botId)) throw new Error("The owner is using a private browser handoff. No image was captured.");
+    const page = await this.page(botId);
+    if (capture.page !== page) throw new Error("The browser tab changed. Observe it again.");
+    this.assertPageAccess(botId, page);
+    const before = this.documentEpochFor(botId, page, (await this.contentGeneration(page)).hash);
+    if (before !== capture.documentEpoch) throw new Error("The page changed before capture. Observe it again.");
+    const run = this.db.getRun(runId);
+    if (!run || run.status !== "running" || capture.ownerEpoch !== this.ownerEpochFor(run.threadId, botId)) throw new Error("Browser control changed before capture.");
+    // Collect CSS-pixel bounds in the current viewport. Playwright's mask
+    // option mutates inline styles during capture, which changes the document
+    // identity we must bind to; redact host-side after the screenshot instead.
+    const privateRects = await page.evaluate(() => {
+      const nodes = new Set<Element>(document.querySelectorAll('input, textarea, select, [contenteditable], [role="textbox"], [data-openbot-private], iframe'));
+      // Closed shadow roots cannot be inspected from the page. Mask whole
+      // custom elements so a credential control inside one cannot leak.
+      for (const node of document.querySelectorAll("*")) if (node.tagName.includes("-")) nodes.add(node);
+      return [...nodes].map((node) => {
+      const rect = node.getBoundingClientRect();
+      if (![rect.x, rect.y, rect.right, rect.bottom].every(Number.isFinite)) throw new Error("Private browser region could not be bounded.");
+      return { x: Math.max(0, rect.x), y: Math.max(0, rect.y), width: Math.max(0, Math.min(innerWidth, rect.right) - Math.max(0, rect.x)), height: Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.y)) };
+      }).filter((rect) => rect.width > 0 && rect.height > 0);
+    });
+    const rawBytes = await page.screenshot({ type: "jpeg", quality: 60, fullPage: false, scale: "css", timeout: 8_000 });
+    const after = this.documentEpochFor(botId, page, (await this.contentGeneration(page)).hash);
+    const current = this.db.getRun(runId);
+    if (after !== before || this.secureHandoffActive(botId) || !current || current.status !== "running" || capture.ownerEpoch !== this.ownerEpochFor(current.threadId, botId)) throw new Error("Browser control or page content changed during capture. Image discarded.");
+    const rawMetadata = await sharp(rawBytes).metadata();
+    if (!rawMetadata.width || !rawMetadata.height || rawMetadata.width > 1280 || rawMetadata.height > 820) throw new Error("The browser image exceeded the safe viewport limit.");
+    const overlay = Buffer.from(`<svg width="${rawMetadata.width}" height="${rawMetadata.height}" xmlns="http://www.w3.org/2000/svg">${privateRects.map((rect) => `<rect x="${Math.floor(rect.x)}" y="${Math.floor(rect.y)}" width="${Math.ceil(rect.width)}" height="${Math.ceil(rect.height)}" fill="#20242d"/>`).join("")}</svg>`);
+    const bytes = await sharp(rawBytes).composite([{ input: overlay }]).jpeg({ quality: 60 }).toBuffer();
+    if (bytes.length > 1_500_000) throw new Error("The browser image exceeded the safe size limit.");
+    const metadata = await sharp(bytes).metadata();
+    if (!metadata.width || !metadata.height || metadata.width > 1280 || metadata.height > 820) throw new Error("The browser image exceeded the safe viewport limit.");
+    return {
+      observationId: observed.observationId, tabId: capture.tabId,
+      capturedAt: new Date(capture.capturedAt).toISOString(),
+      mimeType: "image/jpeg" as const, width: metadata.width, height: metadata.height,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      viewport: capture.viewport, crop: { x: 0, y: 0, width: metadata.width, height: metadata.height },
+      transform: { scale: 1, deviceScale: capture.deviceScale, scroll: capture.scroll },
+      imageBase64: bytes.toString("base64"),
+    };
+  }
+
   /**
    * R03 — Host-captured scoped observation. Everything authoritative is
    * derived by the host: tab/document identity, viewport/scroll/DPR,
    * secure-entry state (live login-wall probe), scope permission, owner
    * epoch (revocation-bound), visual capability (server registry, never a
    * caller assertion), and the opaque control/pane targets issued from the
-   * actually rendered page. Callers receive IDs only.
+   * actually rendered page. Callers receive bounded labels and opaque IDs,
+   * never selectors, geometry, form digests or minted effects.
    */
   async observeScoped(
     botId: string,
     runId: string,
-    input: { surface: "browser-dom" | "browser-visual"; sessionId: string },
-  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; paneTokens: string[] }> {
+    input: { surface: "browser-dom" | "browser-visual"; sessionId: string; visualCapability?: "visual-supported" | "text-only" },
+  ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; targets: Array<{ targetId: string; role: string; label: string }>; paneTokens: string[] }> {
     const run = this.db.getRun(runId);
     if (!run || run.botId !== botId) throw new Error("That task is not available to this teammate.");
     if (["completed", "failed", "cancelled"].includes(run.status)) throw new Error("That task has already finished.");
@@ -1454,7 +1613,7 @@ export class BrowserManager {
         targets: [], panes: [],
         page,
       });
-      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], paneTokens: [] };
+      return { observationId, expiresAt, textPreview: "", modality: "semantic", reason: "SECURE_MODE", targetIds: [], targets: [], paneTokens: [] };
     }
     const snapshot = await this.snapshot(botId);
     const { redacted } = redactSecretsForProvider(snapshot.text.slice(0, 8000));
@@ -1521,15 +1680,36 @@ export class BrowserManager {
       canvasPrimary: looksCanvas,
       semanticCount: Math.min(250, snapshot.text.split("\n").length),
       opaqueWidgets: looksCanvas ? 1 : 0,
-      visualCapability: this.defaultVisualCapability(),
+      visualCapability: input.visualCapability ?? this.defaultVisualCapability(),
       nativeGranted: false,
     });
     return {
       observationId, expiresAt, textPreview: redacted.slice(0, 4000),
       modality: route.modality, reason: route.reason,
       targetIds: targets.map((target) => target.targetId),
+      targets: targets.map(({ targetId, role, label }) => ({ targetId, role, label })),
       paneTokens: panes.map((pane) => pane.paneToken),
     };
+  }
+
+  /** Host-only resolution for the normal teammate tool. The model receives
+   * labels and opaque IDs, never selectors or reviewed effect metadata. */
+  scopedTarget(botId: string, runId: string, sessionId: string, targetId: string): RegistryTarget {
+    const observation = this.requireActionObservation(targetId, runId, botId, sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: observe the control again.");
+    return target;
+  }
+
+  /** An approval may outlive a 15-second observation. Reobserve the live
+   * page, then bind only the same uniquely identified reviewed control. */
+  async reobserveApprovedTarget(botId: string, runId: string, sessionId: string, reviewed: Pick<RegistryTarget, "selector" | "role" | "label" | "reviewDigest">): Promise<string> {
+    const fresh = await this.observeScoped(botId, runId, { surface: "browser-dom", sessionId });
+    const observation = getObservation(fresh.observationId);
+    if (!observation) throw new Error("STALE_OBSERVATION: the page could not be reobserved.");
+    const matches = observation.targets.filter((target) => target.selector === reviewed.selector && target.role === reviewed.role && target.label === reviewed.label && target.reviewDigest === reviewed.reviewDigest);
+    if (matches.length !== 1) throw new Error("The reviewed control or form changed after approval. Request a fresh review.");
+    return matches[0]!.targetId;
   }
 
   /** Active owner sign-in handoff for this teammate's browser: model-visible
@@ -1599,13 +1779,22 @@ export class BrowserManager {
         else if (html.getAttribute("name")) selector = `${html.tagName.toLowerCase()}[name="${CSS.escape(html.getAttribute("name")!)}"]`;
         else if (html.getAttribute("aria-label")) selector = `${html.tagName.toLowerCase()}[aria-label="${CSS.escape(html.getAttribute("aria-label")!)}"]`;
         else {
-          const parent = html.parentElement;
-          const siblings = parent ? [...parent.children].filter((child) => child.tagName === html.tagName) : [];
-          const suffix = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(html) + 1})` : "";
-          const prefix = parent && (parent as HTMLElement).id ? `#${CSS.escape((parent as HTMLElement).id)} > ` : "";
-          selector = `${prefix}${html.tagName.toLowerCase()}${suffix}`;
+          // Include ancestors so identically shaped controls cannot resolve to a decoy.
+          const segments: string[] = [];
+          let cursor: Element | null = html;
+          while (cursor && cursor !== document.body) {
+            if ((cursor as HTMLElement).id) { segments.unshift(`#${CSS.escape((cursor as HTMLElement).id)}`); break; }
+            const parent: Element | null = cursor.parentElement;
+            if (!parent) break;
+            const siblings = [...parent.children].filter((child) => child.tagName === cursor!.tagName);
+            segments.unshift(`${cursor.tagName.toLowerCase()}:nth-of-type(${siblings.indexOf(cursor) + 1})`);
+            cursor = parent;
+          }
+          selector = segments.join(" > ");
         }
-        const label = (html.getAttribute("aria-label") || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
+        const associatedLabel = node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement
+          ? [...(node.labels || [])].map((item) => item.textContent || "").join(" ") : "";
+        const label = (html.getAttribute("aria-label") || associatedLabel || html.textContent || html.getAttribute("name") || html.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 240);
         const input = node as HTMLInputElement;
         const form = input.form || node.closest("form");
         const dialog = node.closest("dialog,[role=dialog]");
@@ -1753,6 +1942,7 @@ export class BrowserManager {
    * (checked in assertPreInput) makes pre-revocation observations unusable
    * even if an ID is replayed. */
   revokeObservationsForBot(botId: string): number {
+    this.cancelDownloadsForBot(botId);
     return invalidateObservationsForBot(botId);
   }
 
@@ -1840,7 +2030,7 @@ export class BrowserManager {
       surfaceIdentity: `tab:${observation.tabId}/doc:${observation.documentEpoch}/frame:${target.framePath}`,
       ownershipEpoch: observation.ownerEpoch, target: target.label,
       payloadDigest, reviewDigest: input.reviewDigest ?? null, account: observation.account,
-      mutationKey, effectDigest,
+      mutationKey, effectDigest, fenceReviewedEffect: Boolean(input.approvalId),
     });
     // Pin the observed page (Finding D): the pinned object must still be
     // open and must still be the active tab. A tab switch, no matter the
@@ -1899,6 +2089,7 @@ export class BrowserManager {
           destination: liveDigest.destination,
           targetFingerprint: fresh.fingerprint,
           observedAt: observation.capturedAt,
+          reviewDigest: target.reviewDigest,
         });
       } catch (error) {
         journalTransition(this.db, actionId, "failed_before_effect", "approval does not authorize this action");
@@ -1948,19 +2139,21 @@ export class BrowserManager {
       destination: string | null;
       targetFingerprint: string | null;
       observedAt: number;
+      reviewDigest?: string | null;
     },
   ): void {
     const approval = this.db.getApproval(approvalId);
     if (!approval || approval.status !== "approved" || approval.runId !== proposed.runId || approval.botId !== proposed.botId) {
       throw new Error("That approval is not a completed host review for this task and teammate.");
     }
-    if (approval.decidedAt && new Date(approval.decidedAt).getTime() < proposed.observedAt) {
-      throw new Error("That approval predates the current observation. Request a new review.");
-    }
     const action = this.db.getApprovalAction(approvalId) as {
       type?: unknown;
-      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown } };
+      args?: { selector?: unknown; value?: unknown; kind?: unknown; targetFingerprint?: unknown; targetReview?: { url?: unknown; destination?: unknown }; semanticBound?: unknown; semanticReviewDigest?: unknown };
     } | null;
+    const reboundSemanticReview = action?.args?.semanticBound === true && typeof action.args.semanticReviewDigest === "string" && action.args.semanticReviewDigest === proposed.reviewDigest;
+    if (!reboundSemanticReview && approval.decidedAt && new Date(approval.decidedAt).getTime() < proposed.observedAt) {
+      throw new Error("That approval predates the current observation. Request a new review.");
+    }
     const matched = approvalAuthorizesEffect(action, {
       kind: proposed.kind,
       selector: proposed.selector,
@@ -2032,10 +2225,24 @@ export class BrowserManager {
     surfaceIdentity: string; ownershipEpoch: string; target: string;
     payloadDigest: string; reviewDigest: string | null; account: string;
     mutationKey?: string | null; effectDigest?: string | null;
+    fenceReviewedEffect?: boolean;
   }): number {
     journalPropose(this.db, { ...input });
     if (input.mutationKey) this.assertMutationFence(input.mutationKey, input.runId, input.botId, input.actionId);
-    if (!admitOnce(this.db, input.actionId)) {
+    const admitted = input.fenceReviewedEffect
+      ? this.db.journalActionAdmitEffectOnce(input.actionId)
+      : admitOnce(this.db, input.actionId);
+    if (!admitted) {
+      if (input.fenceReviewedEffect && input.effectDigest) {
+        const prior = this.db.journalActionFindByEffect(input.effectDigest, input.runId, input.botId)
+          .filter((row) => row.actionId !== input.actionId);
+        if (prior.length > 0) {
+          journalTransition(this.db, input.actionId, "failed_before_effect", "reviewed effect already admitted under another mutation");
+          throw new Error(prior.some((row) => row.stage === "verified")
+            ? "DUPLICATE_MUTATION: this reviewed effect already completed. Check its result instead of sending it again."
+            : "UNCERTAIN_CONFLICT: this reviewed effect may already have happened. Read back its result before proposing another change.");
+        }
+      }
       throw new Error("This action was already admitted. Check its result instead of sending it again.");
     }
     return this.db.botInputEpoch(input.botId);
@@ -2073,17 +2280,36 @@ export class BrowserManager {
     const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
     const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
     if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
-    return this.db.mintMutationToken(
-      runId,
-      botId,
-      semanticEffectDigest({
-        kind: input.kind, selector: target.selector, frame: target.framePath,
-        role: target.role, label: target.label, reviewDigest: target.reviewDigest,
-        destination: input.kind === "click" ? target.effectiveDestination : null,
-        value: input.kind === "type" ? input.value ?? null : null, runId, botId,
-      }),
-      input.approvalId ?? null,
-    );
+    return this.db.mintMutationToken(runId, botId, this.observedSemanticEffectDigest(target, runId, botId, input.kind, input.value), input.approvalId ?? null);
+  }
+
+  /** Before requesting another approval, surface a previous admitted save
+   * for the same observed effect. The atomic admission gate still decides
+   * races after the owner acts. */
+  assertNoPriorReviewedSemanticEffect(
+    botId: string, runId: string,
+    input: { targetId: string; sessionId: string; kind: "click" | "type"; value?: string },
+  ): void {
+    const observation = this.requireActionObservation(input.targetId, runId, botId, input.sessionId);
+    const target = observation.targets.find((candidate) => candidate.targetId === input.targetId);
+    if (!target) throw new Error("AMBIGUOUS_TARGET: that control is not uniquely observable right now. Observe again.");
+    const digest = this.observedSemanticEffectDigest(target, runId, botId, input.kind, input.value);
+    const prior = this.db.journalActionFindByEffect(digest, runId, botId);
+    if (prior.length > 0) throw new Error(prior.some((row) => row.stage === "verified")
+      ? "DUPLICATE_MUTATION: this reviewed effect already completed. Check its result instead of sending it again."
+      : "UNCERTAIN_CONFLICT: this reviewed effect may already have happened. Read back its result before proposing another change.");
+  }
+
+  private observedSemanticEffectDigest(
+    target: CapturedObservation["targets"][number], runId: string, botId: string,
+    kind: "click" | "type", value?: string,
+  ): string {
+    return semanticEffectDigest({
+      kind, selector: target.selector, frame: target.framePath,
+      role: target.role, label: target.label, reviewDigest: target.reviewDigest,
+      destination: kind === "click" ? target.effectiveDestination : null,
+      value: kind === "type" ? value ?? null : null, runId, botId,
+    });
   }
 
   /** Host-side mint for one scroll effect. Resolves the opaque pane token
@@ -2828,6 +3054,7 @@ export class BrowserManager {
   }
 
   async close() {
+    for (const botId of this.downloadCaptures.keys()) this.cancelDownloadsForBot(botId);
     await Promise.all([...this.contexts.values()].map((context) => context.close().catch(() => undefined)));
     this.contexts.clear();
   }

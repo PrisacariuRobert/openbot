@@ -107,6 +107,23 @@ export function browserWebsiteBlock(
   return null;
 }
 
+/** Optional localhost browser boundary for synthetic QA campaigns. This only
+ * scopes the teammate's browser, not a provider process or the whole host. */
+export function qaBrowserScopeBlock(rawUrl: string, configuredOrigin = process.env.OPENBOT_QA_BROWSER_ORIGIN): string | null {
+  if (!configuredOrigin) return null;
+  let allowed: URL;
+  try { allowed = new URL(configuredOrigin); }
+  catch { return "The QA browser origin is invalid; browser navigation is blocked."; }
+  if (allowed.protocol !== "http:" || allowed.hostname !== "127.0.0.1" || !allowed.port || allowed.username || allowed.password || allowed.pathname !== "/" || allowed.search || allowed.hash) {
+    return "The QA browser origin must be an exact http://127.0.0.1:<port> origin; browser navigation is blocked.";
+  }
+  if (rawUrl === "about:blank") return null;
+  try {
+    if (new URL(rawUrl).origin === allowed.origin) return null;
+  } catch { /* Invalid or opaque destinations fail closed. */ }
+  return `This synthetic QA browser is restricted to ${allowed.origin}.`;
+}
+
 export function browserNavigationBlock(
   db: OpenBotDatabase,
   botId: string,

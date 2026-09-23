@@ -105,6 +105,7 @@ export function ProviderPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [initialConnection, setInitialConnection] = useState("");
   const [initialModel, setInitialModel] = useState("");
+  const [pendingConnections, setPendingConnections] = useState<Record<string, string>>({});
   const needsChoice = bots.some((bot) => !bot.providerInstanceId && !bot.model);
   const initial = provider?.instances.find((entry) => entry.id === initialConnection);
   // Polling refreshes the shared status. Never keep showing an old waiting
@@ -117,6 +118,7 @@ export function ProviderPanel({
   );
   const savedApis =
     provider?.instances.filter((entry) => entry.authMode === "api_key") || [];
+  const hasLocalModel = savedApis.some((entry) => entry.apiConfig && isLocalModelUrl(entry.apiConfig.baseUrl));
   const act = async (key: string, action: () => Promise<void>) => {
     setBusy(key);
     setError(null);
@@ -311,8 +313,8 @@ export function ProviderPanel({
         <div>
           <h3>Your AI, your choice.</h3>
           <p>
-            Use an account you already have, an API key, or a model running on
-            your computer.
+            Choose an account or local model for each teammate. Nothing switches
+            until you choose the model too.
           </p>
         </div>
         {bots[0] && (
@@ -345,7 +347,7 @@ export function ProviderPanel({
               }
             >
               {isFreeTierModel(initialModel) && (
-                <p className="settings-row-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+                <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
               )}
             </SettingsRow>
             <SettingsRow
@@ -370,6 +372,20 @@ export function ProviderPanel({
         <div className="ai-feedback" role="status">
           <Check size={17} />
           <p>{notice}</p>
+        </div>
+      )}
+      {!hasLocalModel && (
+        <div className="ai-local-path">
+          <div>
+            <strong>Local model, if you want one</strong>
+            <p>Ollama can run a downloaded model without an API bill. Keep Ollama running here, then choose its exact model name. Speed and tool support depend on the model and this Mac.</p>
+          </div>
+          <button type="button" onClick={() => {
+            choosePreset("ollama"); setAdding(true); setMode("api");
+            requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.provider-settings textarea[aria-label="Model IDs"]')?.focus());
+          }}>
+            Set up Ollama <ChevronRight size={15} />
+          </button>
         </div>
       )}
       <div className="provider-mode-wrapper">
@@ -638,14 +654,16 @@ export function ProviderPanel({
         </SettingsGroup>
       )}
       <SettingsGroup title="Choose for each teammate">
-        <p>Mix models to suit the work. Changes apply to their next task.</p>
+        <p>Mix subscriptions and models to suit the work. Your current choice stays active until you select a different model.</p>
         <SettingsCard>
           {bots.map((bot) => {
+            const selectedConnectionId = pendingConnections[bot.id] ?? bot.providerInstanceId ?? "";
+            const changingConnection = selectedConnectionId !== (bot.providerInstanceId ?? "");
             const connection = provider?.instances.find(
-              (entry) => entry.id === bot.providerInstanceId,
+              (entry) => entry.id === selectedConnectionId,
             );
             const models = [
-              ...new Set([bot.model, ...(connection?.models || [])].filter(Boolean)),
+              ...new Set([...(changingConnection ? [] : [bot.model]), ...(connection?.models || [])].filter(Boolean)),
             ];
             return (
               <div key={bot.id} className="ai-teammate">
@@ -659,20 +677,9 @@ export function ProviderPanel({
                   control={
                     <select
                       aria-label={`${bot.name} connection`}
-                      value={bot.providerInstanceId || ""}
+                      value={selectedConnectionId}
                       disabled={busy !== null || !provider}
-                      onChange={(event) => {
-                        const next = provider?.instances.find(
-                          (entry) => entry.id === event.target.value,
-                        );
-                        if (next?.defaultModel)
-                          void act(bot.id, () =>
-                            onUpdateBot(bot.id, {
-                              providerInstanceId: next.id,
-                              model: next.defaultModel,
-                            }),
-                          );
-                      }}
+                      onChange={(event) => setPendingConnections((previous) => ({ ...previous, [bot.id]: event.target.value }))}
                     >
                       {!connection && (
                         <option value="">Choose a connection</option>
@@ -681,7 +688,7 @@ export function ProviderPanel({
                         <option
                           key={entry.id}
                           value={entry.id}
-                          disabled={!entry.defaultModel}
+                          disabled={!entry.connected || !entry.models?.length}
                         >
                           {entry.name}
                           {!entry.connected ? " · setup needed" : ""}
@@ -689,21 +696,30 @@ export function ProviderPanel({
                       ))}
                     </select>
                   }
-                />
+                >
+                  {changingConnection && <p className="settings-row-note">Choose a model below to switch {bot.name}. Their current connection is still active.</p>}
+                </SettingsRow>
                 <SettingsRow
                   title="Model"
                   control={
                     <select
                       aria-label={`${bot.name} model`}
-                      value={bot.model}
+                      value={changingConnection ? "" : bot.model}
                       disabled={busy !== null || !connection?.connected}
-                      onChange={(event) =>
-                        void act(bot.id, () =>
-                          onUpdateBot(bot.id, { model: event.target.value }),
-                        )
-                      }
+                      onChange={(event) => {
+                        const model = event.target.value;
+                        if (!model) return;
+                        void act(bot.id, async () => {
+                          await onUpdateBot(bot.id, { providerInstanceId: selectedConnectionId, model });
+                          setPendingConnections((previous) => {
+                            const next = { ...previous };
+                            delete next[bot.id];
+                            return next;
+                          });
+                        });
+                      }}
                     >
-                      {!bot.model && <option value="">Choose a model</option>}
+                      {(changingConnection || !bot.model) && <option value="">Choose a model</option>}
                       {models.map((model) => (
                         <option key={model} value={model}>
                           {modelLabel(model)}
@@ -716,7 +732,7 @@ export function ProviderPanel({
                   }
                 >
                   {isFreeTierModel(bot.model) && (
-                    <p className="settings-row-note">Free-tier models often stall on multi-step work in our tests — tasks fail honestly, but nothing gets done. For real jobs, pick a full model.</p>
+                    <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
                   )}
                 </SettingsRow>
               </div>

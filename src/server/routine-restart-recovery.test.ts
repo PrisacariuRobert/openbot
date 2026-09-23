@@ -107,3 +107,22 @@ test("a claimed scheduled run survives runner shutdown and database restart exac
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("stopping one routine run leaves its future schedule enabled", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-routine-stop-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const routine = db.createRoutine({ name: "Daily brief", botId: "nova", threadId: "bot-nova", prompt: "Prepare a brief.", intervalMinutes: 1440 });
+    const nextRunAt = routine.nextRunAt;
+    const run = db.createRun({ threadId: routine.threadId, botId: routine.botId, prompt: routine.prompt, status: "queued", routineId: routine.id });
+    assert.equal(db.cancelRun(run.id)?.status, "cancelled");
+    const scheduled = db.getRoutine(routine.id)!;
+    assert.equal(scheduled.enabled, true);
+    assert.equal(scheduled.nextRunAt, nextRunAt);
+    assert.equal(scheduled.revision, routine.revision);
+    assert.equal(db.listRoutineRuns(routine.id).length, 1);
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

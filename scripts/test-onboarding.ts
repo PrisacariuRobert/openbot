@@ -91,8 +91,14 @@ try {
   await creation.locator("summary", { hasText: "Advanced" }).click();
   await creation.getByLabel("Additional instructions", { exact: true }).fill(instructions);
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
+  await creation.getByText("Connect an AI to start chatting", { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(output, "connect-ai-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Connection step fits a phone");
+  await page.screenshot({ path: path.join(output, "connect-ai-mobile.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
   const popup = page.waitForEvent("popup");
-  await creation.getByRole("link", { name: /^(Set up an AI connection|Connect another AI service)$/ }).click();
+  await creation.getByRole("link", { name: "Connect an AI service" }).click();
   const settings = await popup;
   settings.setDefaultTimeout(45_000);
   // The provider setup renders as a full panel in the separate tab now.
@@ -130,11 +136,18 @@ try {
   assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
   assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
-  assert.equal(await service.innerText(), "Local beta test", "A sole saved connection preselects itself");
+  assert.equal(await service.innerText(), "Choose your AI service", "A sole saved connection still needs the owner's choice");
   const modelId = "openbot-" + saved.id + "/chosen-model";
+  assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(), "No teammate can start before choosing a model");
+  await service.click();
+  await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
+  const model = creation.getByRole("combobox", { name: "Model", exact: true });
+  assert.equal(await model.innerText(), "Choose a model");
+  await model.click();
+  await creation.getByRole("option", { name: modelId, exact: true }).click();
   assert.ok(
     await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
-    "A sole provider and model preselect, so the form is ready to submit",
+    "The form is ready only after explicit provider and model selection",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));
@@ -163,7 +176,7 @@ try {
   assert.equal(final.messages.filter((message) => message.senderType === "bot").length, 0, "Setup never fabricates a reply");
   assert.deepEqual(unexpected, []);
   assert.deepEqual(errors, []);
-  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → sole provider/model preselection → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
+  console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → explicit provider/model choice → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

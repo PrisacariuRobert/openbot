@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, chmodSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, chmodSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { OpenBotDatabase } from "./database.js";
 
@@ -37,6 +37,8 @@ export async function mediateHandoffArtifacts(
   db: OpenBotDatabase,
   input: { originBotId: string; originRunId: string; recipientBotId: string; specs: HandoffArtifactSpec[] },
 ): Promise<{ records: HandoffRecord[]; promptBlock: string }> {
+  const run = db.getRun(input.originRunId);
+  if (!run || run.botId !== input.originBotId) throw new Error("The handoff source task no longer belongs to this teammate.");
   const originWorkspaceRaw = path.join(db.workspacesDir, input.originBotId);
   if (!existsSync(originWorkspaceRaw) || lstatSync(originWorkspaceRaw).isSymbolicLink()) throw new Error("The origin workspace is unavailable.");
   const originWorkspace = realpathSync(originWorkspaceRaw);
@@ -45,14 +47,27 @@ export async function mediateHandoffArtifacts(
   if (lstatSync(recipientRaw).isSymbolicLink()) throw new Error("The recipient workspace cannot be a symbolic link.");
   const recipientWorkspace = realpathSync(recipientRaw);
   const records: HandoffRecord[] = [];
+  const prepared: { bytes: Buffer; name: string; artifactId: string | null; revision: number | null; sha256: string }[] = [];
 
   for (const spec of (input.specs || []).slice(0, 6)) {
+    if (Boolean(spec.artifactId) === Boolean(spec.path)) throw new Error("Name exactly one handoff artifact or workspace file.");
     let sourcePath: string, name: string, artifactId: string | null = null, revision: number | null = null;
     if (spec.artifactId) {
       const attachment = db.getAttachment(String(spec.artifactId));
       if (!attachment) throw new Error("A named handoff artifact does not exist.");
+      const message = attachment.messageId ? db.getMessage(attachment.messageId) : null;
+      const ownResult = attachment.source === "artifact" && message?.senderType === "bot" && message.senderId === input.originBotId;
+      const grantedInput = run.attachmentIds.includes(attachment.id);
+      if (attachment.threadId !== run.threadId || (!ownResult && !grantedInput)) throw new Error("That artifact is not an original input or this teammate's result in this conversation.");
+      if (ownResult) {
+        const found = db.findArtifact(attachment.id);
+        const current = found?.key && found.key !== "null" ? db.latestArtifact(run.threadId, found.key) : null;
+        if (current && current.id !== attachment.id) throw new Error("A newer revision of that result exists. Share its current artifact instead.");
+      }
       const file = db.attachmentFile(attachment.id);
       if (!file) throw new Error("A named handoff artifact has no stored file.");
+      const root = realpathSync(db.attachmentsDir);
+      if (lstatSync(file.storagePath).isSymbolicLink() || !lstatSync(file.storagePath).isFile() || !realpathSync(file.storagePath).startsWith(root + path.sep)) throw new Error("A named handoff artifact is not a regular stored file.");
       sourcePath = file.storagePath;
       name = attachment.name;
       artifactId = attachment.id;
@@ -72,13 +87,20 @@ export async function mediateHandoffArtifacts(
     const bytes = readFileSync(sourcePath);
     if (bytes.length <= 0 || bytes.length > MAX_BYTES) throw new Error("A handoff artifact is empty or too large.");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
+    prepared.push({ bytes, name, artifactId, revision, sha256 });
+  }
 
+  // Validate every input before copying or recording any of them. A failed
+  // second file must not leave a visible partial handoff for the first.
+  const handoffRoot = path.join(recipientWorkspace, "handoff");
+  if (existsSync(handoffRoot) && (lstatSync(handoffRoot).isSymbolicLink() || !lstatSync(handoffRoot).isDirectory() || realpathSync(handoffRoot) !== handoffRoot)) throw new Error("The handoff folder is not a regular workspace folder.");
+  for (const { bytes, name, artifactId, revision, sha256 } of prepared) {
     const handoffId = randomUUID();
     const directory = path.join(recipientWorkspace, "handoff", handoffId);
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     if (lstatSync(directory).isSymbolicLink() || !realpathSync(directory).startsWith(`${recipientWorkspace}${path.sep}`)) throw new Error("The handoff folder is not a regular workspace folder.");
     const target = path.join(directory, name);
-    copyFileSync(sourcePath, target, constants.COPYFILE_EXCL);
+    writeFileSync(target, bytes, { flag: "wx", mode: 0o400 });
     try { chmodSync(target, 0o400); } catch { /* read-only is best-effort on some filesystems; the host refuses writes regardless */ }
     const recipientPath = path.relative(recipientWorkspace, target);
     const record: HandoffRecord = {

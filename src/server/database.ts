@@ -1116,6 +1116,7 @@ export class OpenBotDatabase {
     insertSetting.run("runner_external_heartbeat_last_success_at", "", settingsAt);
     insertSetting.run("runner_external_heartbeat_last_error", "", settingsAt);
     insertSetting.run("self_extend_enabled", "1", settingsAt);
+    insertSetting.run("semantic_browser_enabled", "0", settingsAt);
     insertSetting.run("coding_model", "", settingsAt);
     insertSetting.run("embeddings_provider", "", settingsAt);
     insertSetting.run("embeddings_model", "", settingsAt);
@@ -1250,10 +1251,10 @@ export class OpenBotDatabase {
   }
 
   getStudioSettings(): StudioSettings {
-    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('mac_access_enabled','self_extend_enabled','coding_model','embeddings_provider','embeddings_model','max_teammates','yolo_mode')").all() as Row[];
+    const rows = this.db.prepare("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('mac_access_enabled','semantic_browser_enabled','self_extend_enabled','coding_model','embeddings_provider','embeddings_model','max_teammates','yolo_mode')").all() as Row[];
     const value = (key: string) => String((rows.find((row) => row.setting_key === key) as Row | undefined)?.setting_value ?? "");
     const maxTeammates = Math.max(1, Math.min(100, Number.parseInt(value("max_teammates") || "12", 10) || 12));
-    return { macAccessEnabled: asBoolean(value("mac_access_enabled")), selfExtendEnabled: asBoolean(value("self_extend_enabled") || "1"), codingModel: value("coding_model") || null, embeddingsProviderInstanceId: value("embeddings_provider") || null, embeddingsModel: value("embeddings_model") || null, maxTeammates, yoloMode: asBoolean(value("yolo_mode")) };
+    return { macAccessEnabled: asBoolean(value("mac_access_enabled")), semanticBrowserEnabled: asBoolean(value("semantic_browser_enabled")), selfExtendEnabled: asBoolean(value("self_extend_enabled") || "1"), codingModel: value("coding_model") || null, embeddingsProviderInstanceId: value("embeddings_provider") || null, embeddingsModel: value("embeddings_model") || null, maxTeammates, yoloMode: asBoolean(value("yolo_mode")) };
   }
 
   updateStudioSettings(patch: Partial<StudioSettings>): StudioSettings {
@@ -1263,6 +1264,7 @@ export class OpenBotDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='mac_access_enabled'").run(next.macAccessEnabled ? "1" : "0", now());
+      this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='semantic_browser_enabled'").run(next.semanticBrowserEnabled ? "1" : "0", now());
       this.db.prepare("UPDATE bots SET mac_access_enabled=?").run(next.macAccessEnabled ? 1 : 0);
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='self_extend_enabled'").run(next.selfExtendEnabled ? "1" : "0", now());
       this.db.prepare("UPDATE app_settings SET setting_value=?, updated_at=? WHERE setting_key='coding_model'").run(next.codingModel || "", now());
@@ -1768,6 +1770,30 @@ export class OpenBotDatabase {
       input.revision || 1, input.replacesAttachmentId ?? null, input.size, input.storagePath, createdAt,
     );
     return this.getAttachment(id)!;
+  }
+
+  /** A browser result must never leave a chat message claiming a saved file
+   * without its attachment row. Both records commit or neither does. */
+  createBrowserResult(input: { threadId: string; botId: string; runId: string; body: string; name: string; mime: string; size: number; storagePath: string; analysis: AttachmentAnalysis; artifactKey: string }): Attachment {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const message = this.addMessage({ threadId: input.threadId, senderType: "bot", senderId: input.botId, runId: input.runId, body: input.body });
+      const attachment = this.createAttachment({ threadId: input.threadId, messageId: message.id, name: input.name, mime: input.mime, size: input.size, storagePath: input.storagePath, analysis: input.analysis, source: "artifact", artifactKey: input.artifactKey });
+      this.db.exec("COMMIT");
+      return attachment;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  findBrowserResult(runId: string, name: string, size: number, resource: string, sha256: string): Attachment | null {
+    const rows = this.db.prepare("SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE a.source='artifact' AND m.run_id=? AND a.name=? AND a.size=? ORDER BY a.created_at DESC LIMIT 24").all(runId, name, size) as Row[];
+    for (const row of rows) {
+      const attachment = this.attachmentFromRow(row);
+      if (attachment.metadata?.browserResource === resource && attachment.metadata?.sha256 === sha256) return attachment;
+    }
+    return null;
   }
 
   private attachmentFromRow(row: Row): Attachment {
@@ -2900,6 +2926,31 @@ export class OpenBotDatabase {
     return result.changes === 1;
   }
 
+  /** Atomically claim a reviewed effect, regardless of which fresh mutation
+   * token the caller obtained. SQLite serializes the conditional update, so
+   * two approvals or processes cannot both pass a read-then-write fence. */
+  journalActionAdmitEffectOnce(actionId: string): boolean {
+    const result = this.db.prepare(`
+      UPDATE action_journal SET stage='admitted',updated_at=?
+      WHERE action_id=? AND stage IN ('proposed','validated','awaiting_review')
+        AND effect_digest IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM action_journal prior
+          WHERE prior.run_id=action_journal.run_id
+            AND prior.bot_id=action_journal.bot_id
+            AND prior.effect_digest=action_journal.effect_digest
+            AND prior.action_id<>action_journal.action_id
+            AND prior.stage IN ('admitted','dispatch_started','effect_observed','outcome_uncertain','verified')
+        )
+    `).run(now(), actionId);
+    return result.changes === 1;
+  }
+
+  journalActionFindByEffect(effectDigest: string, runId: string, botId: string): ActionJournalRecord[] {
+    return (this.db.prepare("SELECT * FROM action_journal WHERE effect_digest=? AND run_id=? AND bot_id=? AND stage IN ('admitted','dispatch_started','effect_observed','outcome_uncertain','verified') ORDER BY created_at ASC").all(effectDigest, runId, botId) as Row[])
+      .map((row) => this.journalActionFromRow(row));
+  }
+
   /** Enforced stage machine. outcome_uncertain is terminal here: leaving it
    * requires journalActionReconcile with owner-checked evidence. */
   journalActionTransition(actionId: string, stage: ActionJournalRecord["stage"], detail: string | null = null): ActionJournalRecord | null {
@@ -3716,6 +3767,10 @@ export class OpenBotDatabase {
     try { this.db.prepare("INSERT INTO dedupe_keys (dedupe_key,created_at) VALUES (?,?)").run(key, now()); return true; } catch { return false; }
   }
 
+  releaseDedupe(key: string): void {
+    this.db.prepare("DELETE FROM dedupe_keys WHERE dedupe_key=?").run(key);
+  }
+
   /** Durable POST /api/messages submission receipt (P01). First writer wins;
    * a retried requestId with the same digest replays stored IDs instead of
    * creating a second message/routine/run. Same requestId with a different
@@ -3929,6 +3984,11 @@ export class OpenBotDatabase {
   getAgentMessage(id: string): AgentMessage | null {
     const row = this.db.prepare(this.agentMessageSelect("WHERE am.id=?")).get(id) as Row | undefined;
     return row ? this.agentMessageFromRow(row) : null;
+  }
+
+  hasAgentMessageDedupeKey(key: string): boolean {
+    const row = this.db.prepare("SELECT EXISTS(SELECT 1 FROM agent_messages WHERE dedupe_key=?) present").get(key) as Row | undefined;
+    return asBoolean(row?.present);
   }
 
   listAgentMessages(threadId?: string, limit = 40): AgentMessage[] {

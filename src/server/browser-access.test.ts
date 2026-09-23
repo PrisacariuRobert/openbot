@@ -11,6 +11,7 @@ import {
   browserNavigationBlock,
   browserServiceForUrl,
   browserWebsiteBlock,
+  qaBrowserScopeBlock,
 } from "./browser-access.js";
 import { BrowserManager } from "./runtime.js";
 import { prepareWorkspace } from "./workspace.js";
@@ -28,6 +29,18 @@ function fixture() {
     },
   };
 }
+
+test("synthetic QA browser scope allows only one exact local fixture origin", () => {
+  const scope = "http://127.0.0.1:45101";
+  assert.equal(qaBrowserScopeBlock("http://127.0.0.1:45101/record/17", scope), null);
+  assert.equal(qaBrowserScopeBlock("about:blank", scope), null);
+  assert.match(qaBrowserScopeBlock("http://127.0.0.1:45102/record/17", scope) || "", /restricted/);
+  assert.match(qaBrowserScopeBlock("http://localhost:45101/record/17", scope) || "", /restricted/);
+  assert.match(qaBrowserScopeBlock("https://example.com/", scope) || "", /restricted/);
+  assert.match(qaBrowserScopeBlock("data:text/html,wrong", scope) || "", /restricted/);
+  assert.match(qaBrowserScopeBlock("http://127.0.0.1:45101/", "https://example.com") || "", /must be an exact/);
+  assert.equal(qaBrowserScopeBlock("https://example.com/", ""), null, "Normal product browser access is unchanged without the QA scope");
+});
 
 test("missing connectors offer an enabled browser without inventing a login or enabling tools", () => {
   const { db, close } = fixture();

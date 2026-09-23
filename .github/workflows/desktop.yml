@@ -1,6 +1,11 @@
 name: Desktop installers
 on:
   workflow_dispatch:
+    inputs:
+      upload_artifacts:
+        description: Upload installers after a manual validation run
+        type: boolean
+        default: false
   workflow_call:
 permissions:
   contents: read
@@ -31,6 +36,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ github.event_name == 'workflow_call' || inputs.upload_artifacts }}
         with:
           name: openbot-desktop-${{ matrix.platform }}
           if-no-files-found: error

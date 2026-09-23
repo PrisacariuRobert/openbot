@@ -19,9 +19,23 @@
   overflow-wrap: anywhere;
 }
 .teammate-appearance { gap: 0; }
-.connection-management { display: grid; gap: 12px; }
-.connection-management > summary { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--secondary); font-size: 12px; padding: 8px 0; }
-.connection-management > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.connection-onramp { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--secondary-system-background); }
+.connection-onramp strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.connection-onramp p { margin: 0; color: var(--secondary); font-size: 12px; line-height: 1.5; }
+.connection-onramp-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.connection-onramp-actions a, .connection-onramp-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 9px 13px; border-radius: 10px; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.connection-onramp-actions a { background: var(--ink); color: var(--system-background); }
+.connection-onramp-actions button { border: 1px solid var(--line); background: var(--system-background); color: var(--ink); }
+.connection-onramp-actions a:hover { opacity: .88; }
+.connection-onramp-actions button:hover { background: var(--tertiary-system-background); }
+.connection-onramp-actions :is(a, button):focus-visible, .connection-manage-link:focus-visible, .connection-retry:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.connection-manage-link { display: inline-flex; align-items: center; gap: 5px; width: fit-content; min-height: 32px; color: var(--secondary); font-size: 12px; text-decoration: none; }
+.connection-manage-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.connection-secondary-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.connection-secondary-actions button { min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--secondary); font-size: 12px; cursor: pointer; }
+.connection-secondary-actions button:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.connection-retry { width: fit-content; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--system-background); color: var(--ink); font-size: 12px; cursor: pointer; }
+@media (prefers-reduced-motion: no-preference) { .connection-onramp-actions a, .connection-onramp-actions button { transition: opacity 150ms ease, background-color 150ms ease, transform 150ms ease; } .connection-onramp-actions :is(a, button):active { transform: scale(.985); } }
 .topbar > span { min-width: 0; overflow: hidden; }
 .topbar > div { flex-shrink: 0; }
 .topbar .topbar-control.conversation-identity { display: flex; width: 100%; gap: 8px; padding-inline: 4px; font-size: 14px; }

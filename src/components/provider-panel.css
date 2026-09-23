@@ -49,6 +49,43 @@
   place-items: center;
   padding: 8px;
 }
+.ai-local-path {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--ai-line);
+  border-radius: 16px;
+  background: var(--surface, white);
+}
+.ai-local-path > div { min-width: 0; flex: 1; }
+.ai-local-path strong { font-size: 14px; font-weight: 650; }
+.ai-local-path p { margin-top: 4px; color: var(--ai-muted); font-size: 12px; }
+.ai-local-path button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--ai-line);
+  border-radius: 9px;
+  background: var(--surface-muted, #f4f4f4);
+  color: var(--ai-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+.ai-local-path button:hover { background: var(--surface-hover, #eee); }
+.ai-local-path button:active { transform: scale(.98); }
+@media (max-width: 600px) {
+  .ai-local-path { align-items: stretch; flex-direction: column; gap: 14px; padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-local-path button { transition: none; }
+}
 .ai-mode-switch {
   display: flex;
   padding: 4px;

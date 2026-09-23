@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
@@ -401,6 +401,55 @@ export class AttachmentService {
     await writeFile(storagePath, input.body, { flag: "wx", mode: 0o600 });
     const analysis = await inspectAttachment(storagePath, input.name, input.mime);
     return this.db.createAttachment({ threadId: input.threadId, name: input.name, mime: input.mime, size: input.body.length, storagePath, analysis, source: "upload" });
+  }
+
+  /** Preserve completed Playwright downloads outside its disposable browser
+   * profile. The source path comes only from Download.path(), never a model or
+   * website field; bytes are bounded, copied exclusively, and rehashed. */
+  async captureBrowserDownload(input: { botId: string; runId: string; ownerEpoch: number; sourcePath: string; suggestedName: string; resourceUrl: string; pageUrl: string; capturedAt: string }): Promise<Attachment> {
+    const run = this.db.getRun(input.runId), bot = this.db.getBot(input.botId);
+    if (!run || !bot || run.botId !== bot.id || ["cancelled", "failed"].includes(run.status)) throw new Error("The browser task is no longer allowed to deliver this download.");
+    const sourceInfo = await lstat(input.sourcePath);
+    if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink() || sourceInfo.size <= 0 || sourceInfo.size > MAX_FILE_BYTES) throw new Error("The download is empty, unsafe, or exceeds the 25 MB result limit.");
+    const name = path.basename(input.suggestedName.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/^\.+/, "").slice(0, 120) || "download.bin";
+    const bytes = await readFile(input.sourcePath);
+    if (bytes.length !== sourceInfo.size) throw new Error("The download changed while OpenBot copied it.");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const id = randomBytes(16).toString("hex"), directory = path.join(this.db.attachmentsDir, id), destination = path.join(directory, name);
+    await mkdir(directory, { recursive: true });
+    try {
+      await writeFile(destination, bytes, { flag: "wx", mode: 0o600 });
+      const storedBytes = await readFile(destination);
+      if (storedBytes.length !== bytes.length || createHash("sha256").update(storedBytes).digest("hex") !== sha256) throw new Error("The saved download did not match the completed browser bytes.");
+      const suppliedMime = extensionMime[path.extname(name).toLowerCase()] || "application/octet-stream";
+      const analysis = await inspectAttachment(destination, name, suppliedMime);
+      const resource = new URL(input.resourceUrl);
+      const page = new URL(input.pageUrl);
+      if (!["http:", "https:"].includes(page.protocol)) throw new Error("The download page has no safe website origin.");
+      const resourceIdentity = resource.protocol === "blob:" ? "blob:" : ["http:", "https:"].includes(resource.protocol) ? resource.origin + resource.pathname : resource.protocol;
+      const metadata = { ...analysis.metadata, browserRunId: run.id, browserBotId: bot.id, browserPage: page.origin + page.pathname, browserResource: resourceIdentity.slice(0, 500), browserCapturedAt: input.capturedAt, sha256 };
+      const current = this.db.getRun(run.id);
+      if (!current || ["cancelled", "failed"].includes(current.status) || this.db.botInputEpoch(bot.id) !== input.ownerEpoch) throw new Error("The task was stopped or browser ownership changed before delivery.");
+      const existing = this.db.findBrowserResult(run.id, name, bytes.length, metadata.browserResource, sha256);
+      if (existing) {
+        const stored = this.db.attachmentFile(existing.id);
+        if (stored) {
+          const savedBytes = await readFile(stored.storagePath).catch(() => null);
+          if (savedBytes?.length === bytes.length && createHash("sha256").update(savedBytes).digest("hex") === sha256) {
+            await rm(directory, { recursive: true, force: true });
+            return existing;
+          }
+        }
+      }
+      const beforeCommit = this.db.getRun(run.id);
+      if (!beforeCommit || ["cancelled", "failed"].includes(beforeCommit.status) || this.db.botInputEpoch(bot.id) !== input.ownerEpoch) throw new Error("The task was stopped or browser ownership changed before delivery.");
+      const attachment = this.db.createBrowserResult({ threadId: run.threadId, botId: bot.id, runId: run.id, body: "Browser result saved: " + JSON.stringify(name) + " (" + bytes.length + " bytes, SHA-256 " + sha256 + ").", name, mime: analysis.detectedMime, size: bytes.length, storagePath: destination, analysis: withClassification({ ...analysis, metadata }, "deliverable"), artifactKey: bot.id + ":browser:" + run.id + ":" + id });
+      try { this.db.addActivity({ runId: run.id, botId: bot.id, kind: "file", label: "Saved browser result", detail: name + " · " + bytes.length + " bytes · sha256 " + sha256 }); } catch { /* Attachment and chat record already committed. */ }
+      return attachment;
+    } catch (error) {
+      await rm(directory, { recursive: true, force: true });
+      throw error;
+    }
   }
 
   async captureArtifacts(bot: Bot, message: Message, summary: string): Promise<Attachment[]> {

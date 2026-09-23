@@ -283,6 +283,43 @@ test("R02 concurrent processes cannot both dispatch the same action", () => {
   }
 });
 
+test("R02 reviewed effect survives lost confirmation, fresh token, and restart", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-r02-effect-"));
+  let db1 = new OpenBotDatabase(root);
+  let db2 = new OpenBotDatabase(root);
+  let db2Open = true;
+  const effectDigest = "e".repeat(64);
+  const propose = (db: OpenBotDatabase, actionId: string, mutationKey: string, effect = effectDigest) => db.journalActionPropose({
+    actionId, runId: "run-1", botId: "bot-1", surface: "browser-dom",
+    surfaceIdentity: "tab:t1/doc:e1/frame:/", ownershipEpoch: "epoch-1",
+    target: "Save renewal", payloadDigest: `payload-${actionId}`, reviewDigest: "review-1",
+    account: "", mutationKey, effectDigest: effect,
+  });
+  try {
+    propose(db1, "save-1", "mut_first");
+    propose(db2, "save-2", "mut_fresh");
+    assert.equal(db1.journalActionAdmitEffectOnce("save-1"), true);
+    assert.equal(db2.journalActionAdmitEffectOnce("save-2"), false, "a second process cannot claim the same reviewed effect");
+    assert.ok(db1.journalActionTransition("save-1", "dispatch_started"));
+    db1.close(); db2.close(); db2Open = false;
+    db1 = new OpenBotDatabase(root);
+    assert.equal(db1.recoverInterruptedJournalActions().length, 1);
+    assert.equal(db1.journalActionGet("save-1")?.stage, "outcome_uncertain");
+    propose(db1, "save-3", "mut_after_restart");
+    assert.equal(db1.journalActionAdmitEffectOnce("save-3"), false, "a restart and newly minted token cannot repeat a possibly accepted save");
+    assert.equal(db1.journalActionFindByEffect(effectDigest, "run-1", "bot-1").length, 1);
+    assert.equal(db1.journalActionReconcile("save-1", "verified", "readback confirms the new due date")?.stage, "verified");
+    propose(db1, "save-4", "mut_after_readback");
+    assert.equal(db1.journalActionAdmitEffectOnce("save-4"), false, "confirmed effects remain non-repeatable within this task");
+    propose(db1, "other-change", "mut_distinct", "f".repeat(64));
+    assert.equal(db1.journalActionAdmitEffectOnce("other-change"), true, "a different reviewed change remains available");
+    assert.equal(db1.journalActionFindByEffect(effectDigest, "other-run", "bot-1").length, 0, "the fence does not leak across tasks");
+  } finally {
+    db1.close(); if (db2Open) db2.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("R02 desktop lease is exclusive; takeover revokes", () => {
   clearLeasesForTests();
   assert.equal(acquireDesktopLease("run-a", "bot-a", "browser-visual", "win-1"), true);

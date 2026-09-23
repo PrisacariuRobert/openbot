@@ -70,8 +70,10 @@ function sha256(file) {
 }
 
 function run(command, commandArgs, options = {}) {
-  const result = spawnSync(command, commandArgs, { encoding: "utf8", timeout: 600_000, ...options });
-  if (result.status !== 0) throw new Error(`${command} ${commandArgs.join(" ")} failed: ${(result.stderr || result.stdout || "").slice(-2_000)}`);
+  const windowsNpm = process.platform === "win32" && command === "npm";
+  const executable = windowsNpm ? "npm.cmd" : command;
+  const result = spawnSync(executable, commandArgs, { encoding: "utf8", timeout: 600_000, ...(windowsNpm ? { shell: true } : {}), ...options });
+  if (result.status !== 0) throw new Error(`${executable} ${commandArgs.join(" ")} failed: ${(result.stderr || result.stdout || result.error?.message || "").slice(-2_000)}`);
   return result.stdout.trim();
 }
 

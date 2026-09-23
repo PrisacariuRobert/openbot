@@ -36,6 +36,7 @@ import { approvalReason, browserApprovalReason, commandApprovalReason } from "./
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
 import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
 import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
+import { modelCanReceiveBrowserImage } from "./browser-image-capability.js";
 import { TesterBrowser } from "./tester-browser.js";
 import { LiveViewHub, type LiveViewEvent } from "./live-view.js";
 import { buildRawEmail, connectorCatalog, GoogleWorkspaceConnector } from "./google-workspace.js";
@@ -127,7 +128,7 @@ const internalUrl = `http://127.0.0.1:${port}`;
 const internalToken = randomBytes(32).toString("base64url");
 const approvedConnectorDispatch = new ApprovedConnectorDispatch();
 const computer = new ComputerManager(db);
-const browser = new BrowserManager(db);
+const browser = new BrowserManager(db, { onDownloadSaved: () => broadcast() });
 const browserNavigationGrants = new BrowserNavigationGrants();
 db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus(runId, status));
 // The tester browser always starts at the studio itself (loopback), never at
@@ -225,9 +226,10 @@ app.use("/api", (request, response, next) => {
   next();
 });
 
-app.get("/api/healthz", (_request, response) => {
+app.get("/api/healthz", (request, response) => {
   const health = runnerPayload(db.getRunnerHealth());
   response.setHeader("Cache-Control", "no-store");
+  if (process.env.OPENBOT_DESKTOP_INSTANCE_ID && request.get("x-openbot-desktop-identity") === process.env.OPENBOT_DESKTOP_INSTANCE_ID) response.setHeader("X-OpenBot-Desktop-Match", "1");
   response.status(health.status === "online" ? 200 : 503).json({ ok: health.status === "online", runner: health.status, deployment: health.deployment?.mode, version: appVersion });
 });
 
@@ -612,7 +614,7 @@ app.delete("/api/drafts/:threadId/attachments/:id", (request, response) => {
 });
 
 app.patch("/api/settings", async (request, response) => {
-  const parsed = z.object({ macAccessEnabled: z.boolean().optional(), selfExtendEnabled: z.boolean().optional(), codingModel: z.string().max(300).nullable().optional(), embeddingsProviderInstanceId: z.string().max(80).nullable().optional(), embeddingsModel: z.string().max(200).nullable().optional(), maxTeammates: z.number().int().min(1).max(100).optional(), yoloMode: z.boolean().optional() }).safeParse(request.body);
+  const parsed = z.object({ macAccessEnabled: z.boolean().optional(), semanticBrowserEnabled: z.boolean().optional(), selfExtendEnabled: z.boolean().optional(), codingModel: z.string().max(300).nullable().optional(), embeddingsProviderInstanceId: z.string().max(80).nullable().optional(), embeddingsModel: z.string().max(200).nullable().optional(), maxTeammates: z.number().int().min(1).max(100).optional(), yoloMode: z.boolean().optional() }).safeParse(request.body);
   if (!parsed.success || (!Object.keys(parsed.data).length)) return response.status(400).json({ error: "Choose a studio setting to change." });
   const previous = db.getStudioSettings();
   const settings = db.updateStudioSettings(parsed.data);
@@ -1703,18 +1705,46 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
   }
   if (parsed.data.type === "browser_click") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
+    if (args.semanticBound === true) {
+      if (!db.getStudioSettings().semanticBrowserEnabled) throw new Error("Semantic browser actions were turned off before dispatch.");
+      const reviewed = z.object({ selector: z.string(), semanticRole: z.string(), semanticLabel: z.string(), semanticReviewDigest: z.string(), semanticSessionId: z.string() }).parse(args);
+      const runId = db.getApproval(approvalID)!.runId;
+      const targetId = await browser.reobserveApprovedTarget(parsed.data.botId, runId, reviewed.semanticSessionId, { selector: reviewed.selector, role: reviewed.semanticRole, label: reviewed.semanticLabel, reviewDigest: reviewed.semanticReviewDigest });
+      const mutationKey = browser.mintSemanticMutation(parsed.data.botId, runId, { targetId, sessionId: reviewed.semanticSessionId, kind: "click", approvalId: approvalID });
+      const result = await browser.semanticAct(parsed.data.botId, runId, { targetId, sessionId: reviewed.semanticSessionId, kind: "click", approvalId: approvalID, mutationKey });
+      return `The approved click completed on ${result.title} (${result.url}). Observe the page again before claiming the change was saved.`;
+    }
+    if (db.getStudioSettings().semanticBrowserEnabled) throw new Error("Legacy selector actions are unavailable while semantic browser actions are enabled.");
     if (typeof args.targetFingerprint !== "string") throw new Error("This browser approval needs a fresh page inspection. Ask the teammate to try again.");
     const result = await browser.click(parsed.data.botId, String(args.selector || ""), args.targetFingerprint);
     return `The approved click completed on ${result.title} (${result.url}).`;
   }
   if (parsed.data.type === "browser_type") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
+    if (args.semanticBound === true) {
+      if (!db.getStudioSettings().semanticBrowserEnabled) throw new Error("Semantic browser actions were turned off before dispatch.");
+      const reviewed = z.object({ selector: z.string(), semanticRole: z.string(), semanticLabel: z.string(), semanticReviewDigest: z.string(), semanticSessionId: z.string(), value: z.string().max(20_000) }).parse(args);
+      const runId = db.getApproval(approvalID)!.runId;
+      const targetId = await browser.reobserveApprovedTarget(parsed.data.botId, runId, reviewed.semanticSessionId, { selector: reviewed.selector, role: reviewed.semanticRole, label: reviewed.semanticLabel, reviewDigest: reviewed.semanticReviewDigest });
+      const mutationKey = browser.mintSemanticMutation(parsed.data.botId, runId, { targetId, sessionId: reviewed.semanticSessionId, kind: "type", value: reviewed.value, approvalId: approvalID });
+      const result = await browser.semanticAct(parsed.data.botId, runId, { targetId, sessionId: reviewed.semanticSessionId, kind: "type", value: reviewed.value, approvalId: approvalID, mutationKey });
+      return `The approved field entry completed on ${result.title} (${result.url}).`;
+    }
+    if (db.getStudioSettings().semanticBrowserEnabled) throw new Error("Legacy selector actions are unavailable while semantic browser actions are enabled.");
     if (typeof args.targetFingerprint !== "string") throw new Error("This browser approval needs a fresh page inspection. Ask the teammate to try again.");
     const result = await browser.type(parsed.data.botId, String(args.selector || ""), String(args.value || ""), args.targetFingerprint);
     return `The approved field entry completed on ${result.title} (${result.url}).`;
   }
   if (parsed.data.type === "browser_upload_saved_file") {
     if (!db.getBot(parsed.data.botId)?.browserEnabled) throw new Error("This teammate’s browser access is turned off.");
+    if (args.semanticBound === true) {
+      if (!db.getStudioSettings().semanticBrowserEnabled) throw new Error("Semantic browser actions were turned off before file selection.");
+      const reviewed = z.object({ selector: z.string(), semanticRole: z.string(), semanticLabel: z.string(), semanticReviewDigest: z.string(), semanticSessionId: z.string() }).parse(args);
+      const runId = db.getApproval(approvalID)!.runId;
+      const targetId = await browser.reobserveApprovedTarget(parsed.data.botId, runId, reviewed.semanticSessionId, { selector: reviewed.selector, role: reviewed.semanticRole, label: reviewed.semanticLabel, reviewDigest: reviewed.semanticReviewDigest });
+      const target = browser.scopedTarget(parsed.data.botId, runId, reviewed.semanticSessionId, targetId);
+      await browser.describeFileInput(parsed.data.botId, target.selector);
+    } else if (db.getStudioSettings().semanticBrowserEnabled) throw new Error("Selector-based file upload is unavailable while semantic browser actions are enabled.");
     const frozen = browserSavedFileUploadSchema.parse(args);
     const file = savedFiles.verified(parsed.data.botId, frozen.savedFileId);
     if (file.name !== frozen.name || file.size !== frozen.size || file.detectedMime !== frozen.mime || file.sha256 !== frozen.sha256) throw new Error("The saved file changed after review. Request a new approval.");
@@ -2163,6 +2193,7 @@ function autoApproveIfYolo(approvalId: string) {
   if (!db.getStudioSettings().yoloMode) return;
   // Persistent instructions can affect later tasks. They always need human review.
   if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "skill_propose") return;
+  if ((db.getApprovalAction(approvalId) as { args?: { semanticBound?: boolean } } | null)?.args?.semanticBound === true) return;
   if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "browser_upload_saved_file") return;
   void (async () => {
     try {
@@ -3484,7 +3515,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3496,12 +3527,12 @@ app.post("/api/internal/tools", async (request, response) => {
     return response.status(403).json({ error: "This report job only reads its bounded source snapshot and saves a local result. Start a separate request for other work or changes." });
   }
   const bot = db.getBot(botId)!;
-  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args) => {
-    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: action, botId, args: savedArgs } });
+  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action) => {
+    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs } });
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not
     // let its eventual shutdown cancel the approved action or replacement.
-    const yolo = action !== "skill_propose" && action !== "browser_upload_saved_file" && db.getStudioSettings().yoloMode;
+    const yolo = action !== "skill_propose" && action !== "browser_upload_saved_file" && action !== "browser_semantic_upload" && action !== "browser_semantic_act" && db.getStudioSettings().yoloMode;
     if (yolo) autoApproveIfYolo(approval.id);
     broadcast();
     return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by YOLO mode. OpenBot is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
@@ -3756,6 +3787,10 @@ app.post("/api/internal/tools", async (request, response) => {
       return response.json(result);
     }
     if (action.startsWith("browser_") && !bot.browserEnabled) return response.status(403).json({ error: "Your browser access is turned off. The user can enable it in your settings." });
+    if (action.startsWith("browser_")) browser.cancelDownloadsUnlessRun(botId, runId);
+    const semanticBrowserEnabled = db.getStudioSettings().semanticBrowserEnabled;
+    if (action.startsWith("browser_") && semanticBrowserEnabled && ["browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file"].includes(action)) return response.status(403).json({ error: "This selector-based browser tool is unavailable while semantic browser actions are enabled. Observe the page and use an opaque targetId." });
+    if (["browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload"].includes(action) && !semanticBrowserEnabled) return response.status(403).json({ error: "Semantic browser actions are off for this studio." });
     if (action.startsWith("browser_")) return await browserSignIns.withProfile(botId, async () => {
       browserSignIns.assertAgentAccess(botId);
       if (db.getRun(runId)?.status !== "running") return response.status(409).json({ error: "This task is no longer active." });
@@ -3789,8 +3824,67 @@ app.post("/api/internal/tools", async (request, response) => {
       if (gate.needsSignIn) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: gate.siteOrigin, observedText: gate.evidence || undefined });
       // While the owner is signing in on this browser, the page is theirs:
       // no model-visible snapshot or interaction until they continue.
-      if (["browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
+      if (["browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "browser_open"].includes(action) && browserSignIns.pending(botId)) {
         return response.status(409).json({ error: "The owner is signing in on this browser right now. The page is private until they hand it back." });
+      }
+      const semanticSessionId = `teammate:${runId}`;
+      if (action === "browser_arm_downloads") return response.json(await browser.armDownloads(botId, runId));
+      if (action === "browser_download_results") return response.json(browser.downloadResults(botId, runId));
+      if (action === "browser_observe") {
+        const provider = db.providerForBot(botId);
+        const canSee = provider ? await modelCanReceiveBrowserImage(toolRun.modelOverride || bot.model, provider.runtime) : false;
+        const observation = await browser.observeScoped(botId, runId, { surface: "browser-dom", sessionId: semanticSessionId, visualCapability: canSee ? "visual-supported" : "text-only" });
+        return response.json(observation);
+      }
+      if (action === "browser_see") {
+        const provider = db.providerForBot(botId);
+        const model = toolRun.modelOverride || bot.model;
+        if (!provider || !(await modelCanReceiveBrowserImage(model, provider.runtime))) return response.status(409).json({ error: "This model has no verified image-input capability. Use browser_observe for text and controls; no image was captured." });
+        const image = await browser.visualObserve(botId, runId, semanticSessionId);
+        return response.json(image);
+      }
+      if (action === "browser_semantic_upload") {
+        const requested = z.object({ savedFileId: z.string().min(1).max(128), targetId: z.string().min(1).max(160) }).strict().parse(args);
+        const observed = browser.scopedTarget(botId, runId, semanticSessionId, requested.targetId);
+        if (!observed.label) return response.status(409).json({ error: "The file input has no visible label. Ask the owner to identify the correct field before sending saved-file bytes." });
+        const target = await browser.describeFileInput(botId, observed.selector);
+        const file = savedFiles.verified(botId, requested.savedFileId);
+        const origin = new URL(target.url).origin;
+        return holdForApproval("browser", `Uploading sends the exact saved file bytes to ${new URL(origin).hostname}. Review the file and destination before continuing.`, `Upload “${file.name}” to ${new URL(origin).hostname}`, {
+          savedFileId: requested.savedFileId, selector: observed.selector,
+          name: file.name, size: file.size, mime: file.detectedMime, sha256: file.sha256,
+          origin, targetFingerprint: target.fingerprint, targetReview: target.review,
+          semanticBound: true, semanticSessionId, semanticRole: observed.role,
+          semanticLabel: observed.label, semanticReviewDigest: observed.reviewDigest,
+        }, "browser_upload_saved_file");
+      }
+      if (action === "browser_semantic_act") {
+        const requested = z.object({ targetId: z.string().min(1).max(160), kind: z.enum(["click", "type"]), value: z.string().max(10_000).optional() }).strict().parse(args);
+        if (requested.kind === "type" && requested.value === undefined) return response.status(400).json({ error: "A value is required for field entry." });
+        if (requested.kind === "click" && requested.value !== undefined) return response.status(400).json({ error: "A click cannot include a typed value." });
+        const observed = browser.scopedTarget(botId, runId, semanticSessionId, requested.targetId);
+        const target = await browser.describeTarget(botId, observed.selector);
+        if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
+        const selector = observed.selector;
+        const value = requested.value ?? "";
+        const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target), browserApprovalReason(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target));
+        const mustReviewChange = requested.kind === "click" && (/\b(save|submit|send|confirm|delete|remove|purchase|publish|update)\b/i.test(target.label) || Boolean(target.formMethod && target.formMethod !== "get"));
+        if (mustReviewChange) browser.assertNoPriorReviewedSemanticEffect(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind });
+        const reviewReason = mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason;
+        const requiredByRule = decision.matched?.effect === "require_approval";
+        const grantClaimed = requested.kind === "click" && !mustReviewChange && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
+        if (reviewReason && !grantClaimed) {
+          const offer = requested.kind === "click" && !mustReviewChange ? browserNavigationAllowanceOffer(target, requiredByRule) : null;
+          return holdForApproval("browser", reviewReason, requested.kind === "click" ? `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}` : `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, {
+            selector, ...(requested.kind === "type" ? { value } : {}), targetFingerprint: target.fingerprint, targetReview: target.review,
+            semanticBound: true, semanticSessionId, semanticRole: observed.role, semanticLabel: observed.label, semanticReviewDigest: observed.reviewDigest,
+            ...(offer ? { navigationAllowanceOffer: offer } : {}),
+          }, requested.kind === "click" ? "browser_click" : "browser_type");
+        }
+        const mutationKey = browser.mintSemanticMutation(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}) });
+        const result = await browser.semanticAct(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}), mutationKey });
+        const next = await browser.signInState(botId);
+        return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
       }
       if (action === "browser_snapshot") return response.json(await browser.snapshot(botId));
       if (action === "browser_upload_saved_file") {
@@ -3812,7 +3906,7 @@ app.post("/api/internal/tools", async (request, response) => {
             return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
           }
           const offer = browserNavigationAllowanceOffer(target, requiredByRule);
-          return holdForApproval("browser", decision.reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined });
+          return holdForApproval("browser", decision.reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined });
         }
         const result = await browser.click(botId, selector, target.fingerprint);
         const next = await browser.signInState(botId);
@@ -3822,7 +3916,7 @@ app.post("/api/internal/tools", async (request, response) => {
         const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
         if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential field ${target.label || target.tag}`.slice(0, 160) });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("type", `${selector} ${value}`, target), browserApprovalReason("type", `${selector} ${value}`, target)).reason;
-        if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { ...args, targetFingerprint: target.fingerprint, targetReview: target.review });
+        if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, value, targetFingerprint: target.fingerprint, targetReview: target.review });
         return response.json(await browser.type(botId, selector, value, target.fingerprint));
       }
       return response.status(400).json({ error: "Unknown browser action." });
@@ -4114,8 +4208,13 @@ app.post("/api/internal/tools", async (request, response) => {
       // conversation are visible, never other threads. Summaries carry ids
       // for exact follow-ups, never prompts or secrets.
       const sourceRun = db.getRun(runId)!;
-      const input = z.object({ query: z.string().trim().max(200).default("") }).safeParse(args);
-      if (!input.success) return response.status(400).json({ error: "Give routine_list at most a short name filter." });
+      const input = z.object({ query: z.string().trim().max(200).default(""), routineId: z.string().uuid().optional() }).refine(value => !(value.query && value.routineId)).safeParse(args);
+      if (!input.success) return response.status(400).json({ error: "Give routine_list a short name filter or one exact routine id." });
+      if (input.data.routineId) {
+        const routine = db.getRoutine(input.data.routineId);
+        if (!routine || routine.threadId !== sourceRun.threadId) return response.json({ routines: [], count: 0, scope: "conversation" });
+        return response.json({ routines: [{ id: routine.id, name: routine.name, prompt: routine.prompt, triggerType: routine.triggerType, scheduleLabel: routine.scheduleLabel ?? null, enabled: routine.enabled, nextRunAt: routine.nextRunAt, botId: routine.botId, revision: routine.revision }], count: 1, scope: "conversation" });
+      }
       const needle = input.data.query.toLocaleLowerCase();
       const routines = db.listRoutines(sourceRun.threadId)
         .filter((routine) => !needle || routine.name.toLocaleLowerCase().includes(needle))
@@ -4254,17 +4353,19 @@ app.post("/api/internal/tools", async (request, response) => {
       if (target.id === botId) return response.status(400).json({ error: "Choose a different teammate for a handoff." });
       const depth = db.runDepth(runId), descendantCount = db.descendantRunCount(runId);
       if (depth >= 3 || descendantCount >= 8) return response.status(409).json({ error: "Teamwork limit reached for this task. Share the current result with the user before starting more work." });
+      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() }).strict()).max(6).safeParse(args.artifacts ?? []);
+      if (!artifactSpecs.success) return response.status(400).json({ error: "Choose up to six specific read-only artifacts to share." });
       const dedupeKey = `${runId}:${String(args.dedupeKey || args.task || "handoff")}`;
       if (!db.claimDedupe(dedupeKey)) return response.json({ ok: true, status: `${target.name} is already taking a look.` });
       const sourceRun = db.getRun(runId)!;
       // Gate 1: explicit, host-mediated artifact sharing. The recipient gets a
       // read-only snapshot with provenance, never access to this workspace.
-      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() })).max(6).safeParse(args.artifacts ?? []);
       let handoffPrompt = "";
-      if (artifactSpecs.success && artifactSpecs.data.length) {
+      if (artifactSpecs.data.length) {
         try {
           handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
         } catch (error) {
+          db.releaseDedupe(dedupeKey);
           return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
         }
       }
@@ -4292,6 +4393,18 @@ app.post("/api/internal/tools", async (request, response) => {
       const body = String(args.message || "").trim().slice(0, 4_000);
       if (!body) return response.status(400).json({ error: "Write a useful message for the teammate." });
       const dedupeKey = `agent:${runId}:${String(args.dedupeKey || body)}`;
+      if (db.hasAgentMessageDedupeKey(dedupeKey)) return response.json({ ok: true, status: `${target.name} already has this.` });
+      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() }).strict()).max(6).safeParse(args.artifacts ?? []);
+      if (!artifactSpecs.success) return response.status(400).json({ error: "Choose up to six specific read-only artifacts to share." });
+      if (!expectsReply && artifactSpecs.data.length) return response.status(400).json({ error: "A shared file needs a teammate reply so OpenBot can confirm who received the exact copy." });
+      let handoffPrompt = "";
+      if (expectsReply && artifactSpecs.data.length) {
+        try {
+          handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
+        } catch (error) {
+          return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
+        }
+      }
       const message = db.addAgentMessage({
         threadId: sourceRun.threadId, fromBotId: botId, toBotId: target.id, body,
         kind: ["message", "question", "finding"].includes(String(args.kind)) ? String(args.kind) as "message" | "question" | "finding" : "message",
@@ -4299,15 +4412,6 @@ app.post("/api/internal/tools", async (request, response) => {
       });
       if (!message) return response.json({ ok: true, status: `${target.name} already has this.` });
       if (expectsReply) {
-        const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() })).max(6).safeParse(args.artifacts ?? []);
-        let handoffPrompt = "";
-        if (artifactSpecs.success && artifactSpecs.data.length) {
-          try {
-            handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
-          } catch (error) {
-            return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
-          }
-        }
         db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private teammate question from ${sourceRun.botName}: ${body}\n\nInvestigate the question and end with a concise internal finding for ${sourceRun.botName}. Do not address the user, send a second chat reply, or mention internal tool details; OpenBot will privately return your result so ${sourceRun.botName} can give one combined answer.${handoffPrompt}`, status: "queued", parentRunId: runId, attachmentIds: sourceRun.attachmentIds });
         db.markRunConsultationPending(runId);
       }
@@ -4342,7 +4446,7 @@ app.post("/api/internal/tools", async (request, response) => {
     const connectorId = action.startsWith("slack_") ? "slack" : action.startsWith("notion_") ? "notion" : action.startsWith("todoist_") ? "todoist" : action.startsWith("dropbox_") ? "dropbox" : action.startsWith("github_") ? "github-cli" : action.startsWith("gmail_") || action.startsWith("google_") ? "google-workspace" : null;
     if (connectorId) { db.addConnectorEvent({ connectorId, botId, action, status: "failed", summary: message }); broadcast({ type: "connector", at: Date.now() }); }
     const userMessage = connectorId === "slack" || connectorId === "notion" || connectorId === "todoist" || connectorId === "dropbox" ? friendlyConnectorError(connectorId, message) : message;
-    return response.status(500).json({ error: userMessage });
+    return response.status(/^(UNCERTAIN_CONFLICT|DUPLICATE_MUTATION):/.test(message) ? 409 : 500).json({ error: userMessage });
   }
 });
 

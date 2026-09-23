@@ -126,7 +126,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
       onDelete={async (id) => { await change(`/api/providers/${encodeURIComponent(id)}`, "DELETE", undefined, "Connection removed."); setConnectionTests((previous) => { const next = { ...previous }; delete next[id]; return next; }); await loadProvider(); }}
       onConnect={(providerId) => request<ProviderLoginAttempt>("/api/provider/connect", "POST", { providerId })}
       onFinish={async (id, code) => { await request(`/api/provider/connect/${encodeURIComponent(id)}/callback`, "POST", { code }); await loadProvider(); }} />}
-    {panel === "connectors" && <ConnectorPanel status={connections} bots={state.bots} onRefresh={loadConnections} onNotice={setNotice} onStartWorkflow={async (prompt, expectedWorkKind, botId) => {
+    {panel === "connectors" && <ConnectorPanel status={connections} bots={state.bots} onRefresh={loadConnections} onNotice={setNotice} onOpenThread={onThread} onCreateTeammate={onCreate} onReviewTeammate={onEditBot} onStartWorkflow={async (prompt, expectedWorkKind, botId) => {
       await workflowMessage("team-room", prompt, botId ? [botId] : [], expectedWorkKind);
     }} />}
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}

@@ -55,11 +55,13 @@
     "soak:routines": "tsx scripts/soak-routines.ts",
     "check": "tsc --noEmit",
     "check:acceptance": "tsc --noEmit -p tsconfig.acceptance.json",
-    "test:packaging": "node --test scripts/test-staged-app-package.mjs scripts/test-release-version.mjs scripts/test-release-workflow.mjs scripts/test-macos-dmg.mjs",
+    "test:packaging": "node --test scripts/test-staged-app-package.mjs scripts/test-release-version.mjs scripts/test-release-workflow.mjs scripts/test-macos-dmg.mjs scripts/test-mac-signing.mjs",
     "test:desktop": "node --test desktop/*.test.mjs",
     "check:release": "node scripts/check-release.mjs",
+    "qualify:product": "tsx scripts/qualify-product.ts",
     "verify": "npm run check:release && npm run test:packaging && npm run test:desktop && npm run build && npm test && npm run check && npm run check:acceptance",
     "package:desktop": "node scripts/package-desktop.mjs",
+    "package:desktop:signed": "node scripts/package-desktop.mjs --signed",
     "test:figma-conversation": "tsx scripts/test-figma-conversation.ts"
   },
   "dependencies": {

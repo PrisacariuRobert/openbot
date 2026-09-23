@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createConnection } from "node:net";
+import http from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -7,27 +7,33 @@ const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-function serverIsAwake() {
+function existingStudio() {
   return new Promise((resolve) => {
-    const socket = createConnection({ host: "127.0.0.1", port });
     let settled = false;
-    const deadline = setTimeout(() => finish(false), 2_000);
-    const finish = (awake) => {
+    const finish = (state) => {
       if (settled) return;
       settled = true;
-      clearTimeout(deadline);
-      socket.destroy();
-      resolve(awake);
+      resolve(state);
     };
-    socket.once("connect", () => finish(true));
-    socket.once("error", () => finish(false));
+    const identity = process.env.OPENBOT_DESKTOP_INSTANCE_ID || "";
+    const request = http.get({ hostname: "127.0.0.1", port, path: "/api/healthz", headers: identity ? { "x-openbot-desktop-identity": identity } : {} }, (response) => {
+      response.resume();
+      finish(identity && response.headers["x-openbot-desktop-match"] !== "1" ? "other" : "match");
+    });
+    request.on("error", () => finish("none"));
+    request.setTimeout(2_000, () => { request.destroy(); finish("none"); });
   });
 }
 
 let missed = 0;
 while (missed < 3) {
-  if (await serverIsAwake()) missed = 0;
-  else missed += 1;
+  const state = await existingStudio();
+  if (state === "match") process.exit(0);
+  if (state === "other") {
+    console.error(`Another studio or service is using http://127.0.0.1:${port}. Choose a free OPENBOT_PORT.`);
+    process.exit(2);
+  }
+  missed += 1;
   if (missed < 3) await wait(2_000);
 }
 

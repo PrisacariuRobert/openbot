@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import type { AppState } from "../shared/types";
 
-/** Create or edit an optional project room: the owner picks the teammates; the
- * room keeps them. Mentions and the usual approvals still decide what happens. */
+/** Existing multi-teammate conversations remain editable for recovery. New
+ * work starts in a direct chat; teammates can coordinate there privately. */
 export function GroupEditor({
   state,
   threadId,
@@ -11,11 +11,11 @@ export function GroupEditor({
   onOpen,
 }: {
   state: AppState;
-  threadId?: string;
+  threadId: string;
   onDone?: () => void;
   onOpen: (threadId: string) => void;
 }) {
-  const editing = threadId ? state.threads.find((thread) => thread.id === threadId) : undefined;
+  const editing = state.threads.find((thread) => thread.id === threadId);
   const [title, setTitle] = useState(editing?.title || "");
   const [members, setMembers] = useState<string[]>(editing?.botIds || []);
   const [busy, setBusy] = useState(false);
@@ -24,46 +24,42 @@ export function GroupEditor({
     setMembers((current) => (current.includes(id) ? current.filter((member) => member !== id) : current.length >= 6 ? current : [...current, id]));
   };
   const save = async () => {
-    if (busy) return;
+    if (busy || !editing) return;
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(editing ? `/api/threads/${encodeURIComponent(threadId!)}/group` : "/api/threads", {
-        method: editing ? "PATCH" : "POST",
+      const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}/group`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editing ? { ...(title ? { title } : {}), botIds: members } : { title, botIds: members }),
+        body: JSON.stringify({ title, botIds: members }),
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That group could not be saved.");
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That conversation could not be saved.");
       onOpen((data as { id: string }).id);
       onDone?.();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "That group could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "That shared chat could not be saved.");
     } finally {
       setBusy(false);
     }
   };
   return (
     <div className="group-editor">
-      <p className="overline">{editing ? "PROJECT ROOM" : "NEW PROJECT ROOM"}</p>
-      <h2 className="detail-title">{editing ? editing.title : "Project room"}</h2>
-      <p className="drawer-intro">
-        {editing
-          ? "Rename the project room or change its teammates. Members change affects future tasks; running work keeps going."
-          : "Project rooms are optional shared conversations for project decisions and files. No room is needed for bots to ask each other for help."}
-      </p>
+      {!editing ? <><p className="drawer-intro">This conversation is no longer available.</p><button onClick={onDone}>Back to chats</button></> : <>
+      <h2 className="detail-title">{editing.title}</h2>
+      <p className="drawer-intro">Rename this existing conversation or change who can join future work. Work already running keeps its current participants.</p>
       <label className="group-name">
         <UsersRound size={15} />
         <input
           value={title}
           maxLength={48}
           required
-          placeholder="Room name"
-          aria-label="Room name"
+          placeholder="Chat name"
+          aria-label="Chat name"
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
-      <div className="group-members" role="group" aria-label="Room teammates">
+      <div className="group-members" role="group" aria-label="Shared chat teammates">
         {state.bots.map((bot) => (
           <button
             type="button"
@@ -81,11 +77,12 @@ export function GroupEditor({
       {error && <p className="extension-error" role="alert">{error}</p>}
       <button
         className="primary full-width"
-        disabled={busy || !title.trim() || !members.length}
+        disabled={busy || !title.trim() || members.length < 1}
         onClick={() => void save()}
       >
-        {editing ? "Save changes" : "Create room"} <ArrowRight size={15} />
+        Save conversation <ArrowRight size={15} />
       </button>
+      </>}
     </div>
   );
 }

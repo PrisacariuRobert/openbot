@@ -99,14 +99,14 @@ import { useAppearance, type Appearance } from "./useAppearance";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
 import { foldTalkingPills } from "./talk-folds";
 import "./character-context.css";
-import "./project-rooms.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
 type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
+  | { kind: "new" }
   | { kind: "create" }
-  | { kind: "group"; threadId?: string }
+  | { kind: "group"; threadId: string }
   | { kind: "workspace" }
   | { kind: "context" }
   | { kind: "teammate"; bot: Bot }
@@ -1377,7 +1377,7 @@ export function Studio() {
   // after a drag belongs to the gesture and is ignored; a sticky boolean
   // would stay set forever when pointer capture retargets that click away
   // from the row button, silently eating a later, deliberate tap.
-  const dragEndAt = useRef(0);
+  const lastRowDrag = useRef<{ id: string; at: number } | null>(null);
   const dragEngaged = useRef(false);
   const dragBase = useRef(0);
   const dragX = useRef(0);
@@ -1453,10 +1453,10 @@ export function Studio() {
     (item) =>
       !item.hidden &&
       !item.pinned && (!needsYouOnly || item.needsYou) &&
+      (item.id !== "team-room" || Boolean(item.lastMessage || item.needsYou)) &&
       conversationMatches(item, allBots, conversationQuery),
   );
-  const groupThreads = visibleThreads.filter(isGroupThread);
-  const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
+  const filteredConversationCount = pinnedThreads.length + visibleThreads.length;
   const threadRow = (item: Thread) => {
       const bot = allBots.find((bot) => bot.threadId === item.id);
       const members = (item.botIds || [])
@@ -1518,7 +1518,7 @@ export function Studio() {
             : x < -shiftPx / 2
               ? -shiftPx
               : 0;
-        dragEndAt.current = performance.now();
+        lastRowDrag.current = { id: item.id, at: performance.now() };
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           cell.classList.remove("dragging");
           setSwipedRow(target < 0 ? item.id : null);
@@ -1643,7 +1643,7 @@ export function Studio() {
           onClick={() => {
             // A click landing right after a drag release belongs to the
             // gesture, not to a tap — ignore it, then forget it happened.
-            if (performance.now() - dragEndAt.current < 350) return;
+            if (lastRowDrag.current?.id === item.id && performance.now() - lastRowDrag.current.at < 350) return;
             if (swipedRow === item.id) { setSwipedRow(null); return; }
             openThread(item.id);
           }}
@@ -1745,14 +1745,17 @@ export function Studio() {
     };
   const conversationRows = (
     <>
-      {dmThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
-      {dmThreads.map(threadRow)}
-      <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
-        <summary>Project rooms</summary>
-        {groupThreads.map(threadRow)}
-        <button className="compose-secondary" onClick={() => setDetail({ kind: "group" })}><Plus size={15} /> New project room</button>
-      </details>
-      {archivedThreads.length > 0 && (
+      {visibleThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
+      {visibleThreads.map(threadRow)}
+      {filteredConversationCount === 0 && (needsYouOnly || conversationQuery || Boolean(state?.bots.length)) && (
+        <div className="conversation-list-empty" role="status">
+          <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
+          <strong>{needsYouOnly ? "All caught up" : conversationQuery ? "No chats found" : "Start a conversation"}</strong>
+          <span>{needsYouOnly ? "Your teammates will ask when they need you." : conversationQuery ? "Try another name or word." : "Choose a teammate and say hello."}</span>
+          {conversationQuery && <button type="button" onClick={() => setConversationQuery("")}>Clear search</button>}
+        </div>
+      )}
+      {archivedThreads.length > 0 && !needsYouOnly && !conversationQuery && (
         <details className="archived-chats">
           <summary>Archived ({archivedThreads.length})</summary>
           {archivedThreads.map((item) => (
@@ -1805,18 +1808,20 @@ export function Studio() {
             <span className="conversation-new">
               <button
                 className="compose-primary"
-                aria-label="New message"
-                title="New message"
-                onClick={() => setDetail({ kind: "create" })}
+                aria-label="New conversation"
+                title="New conversation"
+                onClick={() => setDetail({ kind: state?.bots.length ? "new" : "create" })}
               >
                 <Plus size={20} />
               </button>
             </span>
           </header>
-          <div className="conversation-filters" aria-label="Filter conversations">
-            <button aria-pressed={!needsYouOnly} onClick={() => setNeedsYouOnly(false)}>All</button>
-            <button aria-pressed={needsYouOnly} onClick={() => setNeedsYouOnly(true)}>Needs you {attentionCount || ""}</button>
-          </div>
+          {Boolean(state?.bots.length) && (
+            <div className="conversation-filters" aria-label="Filter conversations">
+              <button aria-pressed={!needsYouOnly} onClick={() => setNeedsYouOnly(false)}>All</button>
+              <button aria-pressed={needsYouOnly} onClick={() => setNeedsYouOnly(true)}>Needs you {attentionCount || ""}</button>
+            </div>
+          )}
           {activeNow.length > 0 && (
             <div className="active-now" aria-label="Working right now">
               {activeNow.map((bot) => (
@@ -2649,9 +2654,11 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? detail.threadId ? "Room teammates" : "New project room"
+                ? "Conversation participants"
               : detail.kind === "workspace"
                 ? "Your workspace"
+                : detail.kind === "new"
+                  ? "New conversation"
                 : detail.kind === "create"
                   ? "Create a teammate"
                   : detail.kind === "teammate"
@@ -2698,6 +2705,23 @@ export function Studio() {
                 <ChevronRight size={16} />
               </button>
             </nav>
+          )}
+          {detail.kind === "new" && state && (
+            <div className="new-chat-chooser">
+              <p>Pick a teammate and say what’s on your mind. They can ask another teammate for help when it fits.</p>
+              <div className="new-chat-list" aria-label="Your teammates">
+                {state.bots.map((bot) => (
+                  <button type="button" key={bot.id} onClick={() => openThread(bot.threadId)}>
+                    <Face bot={bot} size={36} />
+                    <span><strong>{bot.name}</strong><small>{bot.role}</small></span>
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+              </div>
+              <div className="new-chat-options">
+                <button type="button" onClick={() => setDetail({ kind: "create" })}><Plus size={18} /> Create a teammate</button>
+              </div>
+            </div>
           )}
           {detail.kind === "create" && (
             <CreateTeammate

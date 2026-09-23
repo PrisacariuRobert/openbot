@@ -64,7 +64,8 @@ main().catch(error=>{console.error(error.message);process.exitCode=1;});
   const post = (route: string, body: unknown, method = "POST") => fetch(base + route, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
   try {
     let ready = false;
-    for (let n = 0; n < 160; n++) {
+    const startupDeadline = Date.now() + 30_000;
+    while (Date.now() < startupDeadline) {
       try { ready = (await fetch(base + "/api/healthz", { signal: AbortSignal.timeout(500) })).ok; } catch { /* Starting. */ }
       if (ready || child.exitCode !== null) break;
       await delay(100);
