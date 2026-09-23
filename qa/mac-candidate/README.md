@@ -4,6 +4,8 @@ Source commit `58431e2` (`codex/w15-macos-signing`), before this evidence-only c
 
 The exact unpacked app started with a disposable data home and a local runner at `127.0.0.1:44913`. `/api/healthz` returned `{"ok":true,"runner":"online","deployment":"local","version":"0.37.0-beta.1"}`. The first-run UI was inspected in Electron and captured at 1154×768 in [packaged-first-run-1154x768.png](packaged-first-run-1154x768.png).
 
+In that disposable profile, the packaged app added the three model-free starter teammates and entered `Packaged recovery check: keep this unsent draft after the window closes.` in Draft's composer without sending it. After quitting and reopening the Electron shell, selecting Draft showed the same composer value and an enabled Send button. The detached local runner stayed online during this check, so this proves an app-window restart with an unsent draft, not a runner-crash recovery or a model-backed task.
+
 The ordinary unsigned `npm run dist -- --arm64 --publish never` also produced a DMG and ZIP. The Apple-silicon DMG passed `hdiutil verify`; a read-only mount contained `OpenBot.app` with the expected executable, `0.37.0-beta.1` bundle version, and bundled Node/OpenCode runtime manifest. These are local package-integrity checks, not independent installation or Gatekeeper acceptance. SHA-256:
 
 ```text
