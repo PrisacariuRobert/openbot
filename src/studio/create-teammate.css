@@ -263,3 +263,10 @@
 .profile-import-panel input { border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; font-size: 14px; background: var(--surface); color: inherit; max-width: 100%; min-width: 0; }
 .create-teammate .primary:disabled, .create-teammate button:disabled { opacity: .5; }
 .profile-import-panel .import-plan { border: 0; }
+
+/* Web browsing: a visible, explicit choice at creation. */
+.creation-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border-radius: 14px; background: var(--secondary-system-background); }
+.creation-toggle > span { display: grid; gap: 2px; min-width: 0; }
+.creation-toggle strong { font-size: 14px; font-weight: 600; color: var(--label-primary); }
+.creation-toggle small { font-size: 12.5px; line-height: 1.4; color: var(--label-secondary); }
+.creation-toggle .switch { flex: none; }

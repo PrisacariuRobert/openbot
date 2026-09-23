@@ -177,7 +177,7 @@ try {
     assert.equal(bot.name, "Remy");
     assert.equal(bot.mascot, "sprout");
     assert.equal(bot.color, "#299575");
-    assert.equal(bot.browserEnabled, false);
+    assert.equal(bot.browserEnabled, true, "Web browsing is a visible choice that starts on");
     assert.equal(bot.computerEnabled, false);
     await page.getByRole("heading", { name: "What’s on your mind?" }).waitFor();
     await page.getByRole("button", { name: "About Remy" }).click();

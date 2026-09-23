@@ -7,6 +7,7 @@ import { Advanced } from "./Advanced";
 import { AppearancePicker } from "./AppearancePicker";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { createTeammatePayload } from "./create-teammate-payload";
+import { Switch } from "./Settings";
 import "./create-teammate.css";
 
 interface ImportPlan {
@@ -40,6 +41,7 @@ export function CreateTeammate({
     [mascot, setMascot] = useState<MascotKind>("nova");
   const [providerId, setProviderId] = useState(""),
     [model, setModel] = useState("");
+  const [browse, setBrowse] = useState(true);
   const [reload, setReload] = useState(0);
   const [providers, setProviders] = useState<ProviderStatus | null>(null),
     [error, setError] = useState(""),
@@ -119,6 +121,7 @@ export function CreateTeammate({
           mascot,
           providerInstanceId: providerId,
           model,
+          browserEnabled: browse,
         })),
       });
       const result = await response.json();
@@ -282,6 +285,13 @@ export function CreateTeammate({
       {!providers && error && <button className="connection-retry" type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Retry loading AI connections</button>}
       {hasConnectedAI && !validSelection && <p className="boundary-note required-selection">Choose an AI service and model to finish creating this teammate.</p>}
       {hasConnectedAI && <div className="connection-secondary-actions"><a className="connection-manage-link" href="/?panel=provider" target="_blank" rel="noreferrer">Manage AI connections <ArrowRight size={13} /></a><button type="button" onClick={() => { setError(""); setReload((value) => value + 1); }}>Refresh connections</button></div>}
+      <div className="creation-toggle">
+        <span>
+          <strong>Can look things up on the web</strong>
+          <small>Uses its own private browser. Anything that sends, buys or signs in still asks you first.</small>
+        </span>
+        <Switch label="Can look things up on the web" checked={browse} onChange={setBrowse} />
+      </div>
       <div className="teammate-section teammate-appearance">
         <span className="section-label">Appearance</span>
         <AppearancePicker name={name} shape={mascot} color={color} onShape={setMascot} onColor={setColor} />
@@ -302,7 +312,7 @@ export function CreateTeammate({
       <p className="boundary-note">
         No task starts yet. Existing Google-account permissions aren’t shared
         with this new teammate. Studio-wide Mac access, if enabled, still
-        applies. Browser and private-computer access start off.
+        applies. Private-computer access starts off.
       </p>
       <details className="character-customize profile-import">
         <summary>Add starter teammates</summary>

@@ -4,6 +4,7 @@
 
 Not released: the next public release waits until the competitive plan is complete.
 
+- New teammates can look things up on the web out of the box: the create sheet shows a "Can look things up on the web" switch, on by default (their own private browser; sending, buying and signing in still ask first). The private computer still starts off.
 - Replies in seconds, not minutes: a plain "hi" went from 181s (or a stop) to ~10s. OpenCode no longer self-updates under a running studio and newer patch releases keep working; each teammate workspace is its own repository, so the runtime stops rescanning host worktrees before every reply
 - Leaner prompts: teammates receive only the rules for capabilities they have, a short teammate identity replaces the runtime's coding-assistant prompt, and per-message boilerplate is trimmed — context per model step down 31% (13.3k → 9.2k tokens on Muse Spark) with every eval check still passing
 - Teammates actually learn: `/learn` now reaches the skill review (the proposal tool was never enabled for real runs), and self-extension follows its setting

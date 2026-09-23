@@ -94,6 +94,10 @@ try {
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
   await creation.getByText("Connect an AI to start chatting", { exact: true }).waitFor();
   await page.screenshot({ path: path.join(output, "connect-ai-desktop.png") });
+  const browse = creation.getByRole("switch", { name: "Can look things up on the web" });
+  assert.equal(await browse.getAttribute("aria-checked"), "true", "Web browsing is a visible choice that starts on");
+  await browse.click();
+  assert.equal(await browse.getAttribute("aria-checked"), "false");
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Connection step fits a phone");
   await page.screenshot({ path: path.join(output, "connect-ai-mobile.png") });
@@ -161,7 +165,7 @@ try {
   assert.equal(created.name, "Remy");
   assert.equal(created.providerInstanceId, saved.id);
   assert.equal(created.model, modelId);
-  assert.equal(created.browserEnabled, false);
+  assert.equal(created.browserEnabled, false, "Turning the switch off is honored");
   assert.equal(created.computerEnabled, false);
   assert.equal(teammateWrites, 1);
   await creation.waitFor({ state: "detached" });
