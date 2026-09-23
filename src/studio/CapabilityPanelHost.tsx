@@ -13,6 +13,7 @@ import "./refined-workspace.css";
 
 import type { CapabilityPanel } from "./capability-navigation";
 import { TelegramPanel } from "../components/TelegramPanel";
+import { friendlyModelName } from "../shared/provider-config";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 async function request<T = unknown>(url: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -115,7 +116,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role, icon: <Character name={item.name} color={item.color} variant={item.mascot} size={28} /> }))} onChange={setChosenBot} /></div>}
     {["bot", "files", "computer", "teach"].includes(panel) && !bot && <p>Create a teammate first to use this feature.</p>}
     {panel === "control" && <><WorkspaceNote bot={bot} title="Before important actions">Ask First stays visible. Accounts, recipients, resources and versions belong in the review. Access to a browser is not permission for every website.</WorkspaceNote><div className="workspace-row-group">{state.bots.map(item => <button className="workspace-list-row" key={item.id} onClick={() => onEditBot(item.threadId)}><Character name={item.name} color={item.color} variant={item.mascot} size={36}/><span><strong>{item.name}</strong><small>Browser {item.browserEnabled ? "allowed" : "off"} · private computer {item.computerEnabled ? "allowed" : "off"} · Mac access {item.macAccessEnabled && state.settings.macAccessEnabled ? "enabled" : "off"}</small></span><span className="workspace-row-action">Review access</span></button>)}</div></>}
-    {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={(model) => model.split("/").at(-1) || model} onUpdateBot={saveBot}
+    {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={friendlyModelName} onUpdateBot={saveBot}
       connectionTests={connectionTests}
       onTestConnection={async (id) => {
         const receipt = await change<ProviderConnectionTest>(`/api/provider/${encodeURIComponent(id)}/test`, "POST", {});

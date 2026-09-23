@@ -10,6 +10,9 @@ import {
 import { SettingsCard, SettingsGroup, SettingsRow, SegmentedControl } from "../studio/Settings";
 import {
   isFreeTierModel,
+  isBlockedFreeTierModel,
+  defaultModelChoice,
+  modelChoices,
   isLocalModelUrl,
   providerInput,
   type ProviderInput,
@@ -342,7 +345,7 @@ export function ProviderPanel({
               control={
                 <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
                   <option value="">Choose a model</option>
-                  {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}{isFreeTierModel(model) ? " · Free tier" : ""}</option>)}
+                  {modelChoices(initial?.models || []).map((choice) => <option key={choice.value} value={choice.value} disabled={choice.disabled}>{choice.label}{choice.detail ? ` · ${choice.detail}` : ""}</option>)}
                 </select>
               }
             >
@@ -721,17 +724,19 @@ export function ProviderPanel({
                     >
                       {(changingConnection || !bot.model) && <option value="">Choose a model</option>}
                       {models.map((model) => (
-                        <option key={model} value={model}>
+                        <option key={model} value={model} disabled={isBlockedFreeTierModel(model) && model !== bot.model}>
                           {modelLabel(model)}
                           {connection?.models?.includes(model)
-                            ? isFreeTierModel(model) ? " · Free tier" : ""
+                            ? isBlockedFreeTierModel(model) ? " · works only inside OpenCode" : isFreeTierModel(model) ? " · Free tier" : model === defaultModelChoice(connection.models || []) ? " · Recommended" : ""
                             : " · unavailable"}
                         </option>
                       ))}
                     </select>
                   }
                 >
-                  {isFreeTierModel(bot.model) && (
+                  {isBlockedFreeTierModel(bot.model) ? (
+                    <p className="settings-row-note">{bot.name} can't work on this model: OpenCode's free tier only answers inside OpenCode's own app. Choose another model.</p>
+                  ) : isFreeTierModel(bot.model) && (
                     <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
                   )}
                 </SettingsRow>

@@ -187,3 +187,46 @@ export function apiRuntimeEnvironment(
     }),
   };
 }
+
+/** Models known to run OpenBot teammates well, best first. The first one a
+ * connection offers is shown first and preselected. */
+export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash"] as const;
+
+/** OpenCode's free tier only answers requests from OpenCode's own app, so it
+ * rejects teammate runs (HTTP 403). Offering it would be a first-run trap. */
+export function isBlockedFreeTierModel(model: string): boolean {
+  return model.startsWith("opencode/") && isFreeTierModel(model);
+}
+
+const MODEL_WORDS: Record<string, string> = { gpt: "GPT", glm: "GLM", ai: "AI", llm: "LLM", vl: "VL", exp: "Experimental", hy: "HY" };
+
+/** "opencode-go/gpt-5.6-luna" → "GPT 5.6 Luna". */
+export function friendlyModelName(model: string): string {
+  const tail = model.split("/").at(-1) || model;
+  // The tier is shown separately, so "space-bunny-free" reads "Space Bunny".
+  return tail.split(/[-_]/).filter(Boolean).filter((word, index, words) => !(index === words.length - 1 && index > 0 && word.toLowerCase() === "free")).map((word) => {
+    const lower = word.toLowerCase();
+    if (MODEL_WORDS[lower]) return MODEL_WORDS[lower];
+    const acronym = /^([a-z]{1,4})(\d.*)$/i.exec(word);
+    if (acronym && MODEL_WORDS[acronym[1]!.toLowerCase()]) return `${MODEL_WORDS[acronym[1]!.toLowerCase()]}${acronym[2]}`;
+    return /^\d/.test(word) ? word : word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(" ");
+}
+
+export interface ModelChoice { value: string; label: string; detail?: string; disabled?: boolean }
+
+/** Recommended first, usable models next, blocked free-tier models last. */
+export function modelChoices(models: string[]): ModelChoice[] {
+  const recommended = RECOMMENDED_MODELS.find((id) => models.includes(id));
+  const rank = (model: string) => model === recommended ? 0 : isBlockedFreeTierModel(model) ? 2 : 1;
+  return [...models].sort((a, b) => rank(a) - rank(b)).map((model) => ({
+    value: model,
+    label: friendlyModelName(model),
+    detail: model === recommended ? "Recommended" : isBlockedFreeTierModel(model) ? "Free tier · works only inside OpenCode's own app" : isFreeTierModel(model) ? "Free tier" : model.split("/")[0] === "opencode-go" ? "OpenCode Go" : undefined,
+    disabled: isBlockedFreeTierModel(model) || undefined,
+  }));
+}
+
+export function defaultModelChoice(models: string[]): string {
+  return RECOMMENDED_MODELS.find((id) => models.includes(id)) || "";
+}

@@ -43,3 +43,13 @@ export function ExistingAgentsCard({ onOpen }: { onOpen: (botId: string) => void
     {error && <p role="alert" className="panel-error">{error}</p>}
   </section>;
 }
+
+/** Agents on this Mac that haven't been brought over yet, for the welcome screen. */
+export function useAgentsToBringOver() {
+  const [found, setFound] = useState<Found[]>([]);
+  useEffect(() => {
+    void fetch("/api/imports/profile/discover", { credentials: "same-origin" }).then((response) => response.ok ? response.json() : { profiles: [] }).then((value: { profiles: Found[] }) => setFound((value.profiles || []).filter((profile) => !profile.importedBotId))).catch(() => {});
+  }, []);
+  const source = found.length && found.every((profile) => profile.kind === "hermes") ? "Hermes" : found.length && found.every((profile) => profile.kind === "openclaw") ? "OpenClaw" : "Hermes and OpenClaw";
+  return { count: found.length, source };
+}

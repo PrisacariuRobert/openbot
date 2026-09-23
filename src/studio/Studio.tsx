@@ -91,6 +91,7 @@ import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt"
 import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
+import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Advanced } from "./Advanced";
@@ -997,6 +998,7 @@ export function Studio() {
       .sort((a, b) => a.nextRunAt!.localeCompare(b.nextRunAt!)) || [];
   const threadTitle =
     state?.threads.find((item) => item.id === thread)?.title || "Conversation";
+  const agentsToBringOver = useAgentsToBringOver();
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
@@ -2415,7 +2417,7 @@ export function Studio() {
                     {!state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><h1>A small team.<br/>A familiar conversation.</h1><p>A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>Bring an existing teammate</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>

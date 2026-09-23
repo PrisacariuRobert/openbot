@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
-import { isFreeTierModel } from "../shared/provider-config";
+import { defaultModelChoice, isFreeTierModel, modelChoices } from "../shared/provider-config";
 import { Character } from "./Character";
 import { Advanced } from "./Advanced";
 import { AppearancePicker } from "./AppearancePicker";
@@ -249,7 +249,8 @@ export function CreateTeammate({
             .map((item) => ({ value: item.id, label: item.name }))}
           onChange={(value) => {
             setProviderId(value);
-            setModel("");
+            // Preselect the recommended model so a new user has one decision fewer.
+            setModel(defaultModelChoice(providers?.instances.find((item) => item.id === value)?.models || []));
           }}
         />
       </div>
@@ -260,11 +261,7 @@ export function CreateTeammate({
             label="Model"
             value={model}
             placeholder="Choose a model"
-            choices={(connection.models || []).map((item) => ({
-              value: item,
-              label: item,
-              detail: isFreeTierModel(item) ? "Free tier" : undefined,
-            }))}
+            choices={modelChoices(connection.models || [])}
             onChange={setModel}
           />
         </div>
