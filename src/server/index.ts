@@ -4347,17 +4347,19 @@ app.post("/api/internal/tools", async (request, response) => {
       if (target.id === botId) return response.status(400).json({ error: "Choose a different teammate for a handoff." });
       const depth = db.runDepth(runId), descendantCount = db.descendantRunCount(runId);
       if (depth >= 3 || descendantCount >= 8) return response.status(409).json({ error: "Teamwork limit reached for this task. Share the current result with the user before starting more work." });
+      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() }).strict()).max(6).safeParse(args.artifacts ?? []);
+      if (!artifactSpecs.success) return response.status(400).json({ error: "Choose up to six specific read-only artifacts to share." });
       const dedupeKey = `${runId}:${String(args.dedupeKey || args.task || "handoff")}`;
       if (!db.claimDedupe(dedupeKey)) return response.json({ ok: true, status: `${target.name} is already taking a look.` });
       const sourceRun = db.getRun(runId)!;
       // Gate 1: explicit, host-mediated artifact sharing. The recipient gets a
       // read-only snapshot with provenance, never access to this workspace.
-      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() })).max(6).safeParse(args.artifacts ?? []);
       let handoffPrompt = "";
-      if (artifactSpecs.success && artifactSpecs.data.length) {
+      if (artifactSpecs.data.length) {
         try {
           handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
         } catch (error) {
+          db.releaseDedupe(dedupeKey);
           return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
         }
       }
@@ -4385,6 +4387,18 @@ app.post("/api/internal/tools", async (request, response) => {
       const body = String(args.message || "").trim().slice(0, 4_000);
       if (!body) return response.status(400).json({ error: "Write a useful message for the teammate." });
       const dedupeKey = `agent:${runId}:${String(args.dedupeKey || body)}`;
+      if (db.hasAgentMessageDedupeKey(dedupeKey)) return response.json({ ok: true, status: `${target.name} already has this.` });
+      const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() }).strict()).max(6).safeParse(args.artifacts ?? []);
+      if (!artifactSpecs.success) return response.status(400).json({ error: "Choose up to six specific read-only artifacts to share." });
+      if (!expectsReply && artifactSpecs.data.length) return response.status(400).json({ error: "A shared file needs a teammate reply so OpenBot can confirm who received the exact copy." });
+      let handoffPrompt = "";
+      if (expectsReply && artifactSpecs.data.length) {
+        try {
+          handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
+        } catch (error) {
+          return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
+        }
+      }
       const message = db.addAgentMessage({
         threadId: sourceRun.threadId, fromBotId: botId, toBotId: target.id, body,
         kind: ["message", "question", "finding"].includes(String(args.kind)) ? String(args.kind) as "message" | "question" | "finding" : "message",
@@ -4392,15 +4406,6 @@ app.post("/api/internal/tools", async (request, response) => {
       });
       if (!message) return response.json({ ok: true, status: `${target.name} already has this.` });
       if (expectsReply) {
-        const artifactSpecs = z.array(z.object({ artifactId: z.string().min(1).max(120).optional(), path: z.string().min(1).max(2_048).optional(), access: z.literal("read").optional() })).max(6).safeParse(args.artifacts ?? []);
-        let handoffPrompt = "";
-        if (artifactSpecs.success && artifactSpecs.data.length) {
-          try {
-            handoffPrompt = (await mediateHandoffArtifacts(db, { originBotId: botId, originRunId: runId, recipientBotId: target.id, specs: artifactSpecs.data })).promptBlock;
-          } catch (error) {
-            return response.status(409).json({ error: error instanceof Error ? error.message : "The shared handoff inputs could not be prepared." });
-          }
-        }
         db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private teammate question from ${sourceRun.botName}: ${body}\n\nInvestigate the question and end with a concise internal finding for ${sourceRun.botName}. Do not address the user, send a second chat reply, or mention internal tool details; OpenBot will privately return your result so ${sourceRun.botName} can give one combined answer.${handoffPrompt}`, status: "queued", parentRunId: runId, attachmentIds: sourceRun.attachmentIds });
         db.markRunConsultationPending(runId);
       }

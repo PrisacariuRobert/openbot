@@ -3767,6 +3767,10 @@ export class OpenBotDatabase {
     try { this.db.prepare("INSERT INTO dedupe_keys (dedupe_key,created_at) VALUES (?,?)").run(key, now()); return true; } catch { return false; }
   }
 
+  releaseDedupe(key: string): void {
+    this.db.prepare("DELETE FROM dedupe_keys WHERE dedupe_key=?").run(key);
+  }
+
   /** Durable POST /api/messages submission receipt (P01). First writer wins;
    * a retried requestId with the same digest replays stored IDs instead of
    * creating a second message/routine/run. Same requestId with a different
@@ -3980,6 +3984,11 @@ export class OpenBotDatabase {
   getAgentMessage(id: string): AgentMessage | null {
     const row = this.db.prepare(this.agentMessageSelect("WHERE am.id=?")).get(id) as Row | undefined;
     return row ? this.agentMessageFromRow(row) : null;
+  }
+
+  hasAgentMessageDedupeKey(key: string): boolean {
+    const row = this.db.prepare("SELECT EXISTS(SELECT 1 FROM agent_messages WHERE dedupe_key=?) present").get(key) as Row | undefined;
+    return asBoolean(row?.present);
   }
 
   listAgentMessages(threadId?: string, limit = 40): AgentMessage[] {

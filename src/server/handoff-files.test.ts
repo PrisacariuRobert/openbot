@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
@@ -66,6 +66,43 @@ test("handoff refuses traversal, absolute paths, symlinks and directories", asyn
     const dir = path.join(f.originWorkspace, "folder");
     mkdirSync(dir, { recursive: true });
     await assert.rejects(() => mediateHandoffArtifacts(f.db, { ...base, specs: [{ path: "folder" }] }), /regular file|does not exist/);
+  } finally { f.close(); }
+});
+
+test("a missing second source leaves no copied first file or provenance", async () => {
+  const f = fixture();
+  try {
+    await assert.rejects(() => mediateHandoffArtifacts(f.db, {
+      originBotId: f.origin.id, originRunId: f.run.id, recipientBotId: f.recipient.id,
+      specs: [{ path: "hero-reconciliation-v2.json" }, { path: "missing.txt" }],
+    }), /does not exist/);
+    assert.equal(existsSync(path.join(f.recipientWorkspace, "handoff")), false);
+    assert.equal(f.db.extensionRecords("handoff-artifact").length, 0);
+  } finally { f.close(); }
+});
+
+test("artifact handoff accepts the current owned revision and refuses other conversations or teammates", async () => {
+  const f = fixture();
+  try {
+    const result = (threadId: string, senderId: string, body: string, revision: number, key: string) => {
+      const directory = mkdtempSync(path.join(f.db.attachmentsDir, "handoff-"));
+      const storagePath = path.join(directory, "brief.md");
+      writeFileSync(storagePath, body);
+      const message = f.db.addMessage({ threadId, senderType: "bot", senderId, runId: f.run.id, body: "Brief" });
+      return f.db.createAttachment({ threadId, messageId: message.id, name: "brief.md", mime: "text/markdown", size: Buffer.byteLength(body), storagePath, source: "artifact", artifactKey: key, revision });
+    };
+    const old = result(f.run.threadId, f.origin.id, "v1", 1, "nova:brief.md");
+    const current = result(f.run.threadId, f.origin.id, "v2", 2, "nova:brief.md");
+    const otherThread = result("team-room", f.origin.id, "secret room", 1, "nova:room.md");
+    const otherBot = result(f.run.threadId, f.recipient.id, "Pixel private result", 1, "pixel:brief.md");
+    const base = { originBotId: f.origin.id, originRunId: f.run.id, recipientBotId: f.recipient.id };
+    await assert.rejects(() => mediateHandoffArtifacts(f.db, { ...base, specs: [{ artifactId: old.id }] }), /newer revision/);
+    await assert.rejects(() => mediateHandoffArtifacts(f.db, { ...base, specs: [{ artifactId: otherThread.id }] }), /not an original input/);
+    await assert.rejects(() => mediateHandoffArtifacts(f.db, { ...base, specs: [{ artifactId: otherBot.id }] }), /not an original input/);
+    const shared = await mediateHandoffArtifacts(f.db, { ...base, specs: [{ artifactId: current.id }] });
+    assert.equal(shared.records[0]?.originArtifactId, current.id);
+    assert.equal(shared.records[0]?.originRevision, 2);
+    assert.equal(readFileSync(path.join(f.recipientWorkspace, shared.records[0]!.recipientPath), "utf8"), "v2");
   } finally { f.close(); }
 });
 
