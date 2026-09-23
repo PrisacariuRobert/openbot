@@ -625,3 +625,8 @@
 .ai-recommended.is-compact form { flex-direction: column; }
 .ai-recommended form .button-primary { border: 0; background: var(--strong, #1d1d1f); color: var(--on-strong, #fff); font-weight: 600; justify-content: center; }
 .ai-recommended form .button-primary:disabled { opacity: .4; }
+/* Monochrome system: ink for actions, neutral for the badge. */
+.provider-settings .ai-recommended .ai-recommended-badge, .ai-recommended .ai-recommended-badge { background: var(--system-background) !important; color: var(--label-primary) !important; box-shadow: inset 0 0 0 1px var(--separator); }
+.provider-settings .ai-recommended .ai-recommended-link, .ai-recommended .ai-recommended-link { background: var(--strong, #1d1d1f); }
+.provider-settings .ai-recommended .ai-recommended-link, .provider-settings .ai-recommended .ai-recommended-link:visited, .provider-settings .ai-recommended .ai-recommended-link svg, .ai-recommended .ai-recommended-link, .ai-recommended .ai-recommended-link svg { color: var(--on-strong, #fff) !important; }
+.connection-onramp:has(.ai-recommended) .connection-onramp-actions :is(a, button) { color: var(--label-primary); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--separator-strong); }

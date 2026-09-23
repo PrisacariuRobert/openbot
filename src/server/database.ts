@@ -2243,6 +2243,12 @@ export class OpenBotDatabase {
     return rows.map((row) => this.runFromRow(row));
   }
 
+  /** Finished top-level tasks since a moment, for the weekly recap. */
+  finishedRunsSince(sinceIso: string, limit = 500): Run[] {
+    const rows = this.db.prepare(this.runSelect("WHERE r.status='completed' AND r.parent_run_id IS NULL AND r.finished_at>=? ORDER BY r.finished_at DESC LIMIT ?")).all(sinceIso, limit) as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
   listStudioRuns(limit = 30): Run[] {
     const rows = this.db.prepare(this.runSelect(`WHERE r.status IN ('queued','running','awaiting_approval','waiting_for_teammate','failed') OR r.finished_at>=datetime('now','-1 day') ORDER BY CASE r.status WHEN 'awaiting_approval' THEN 0 WHEN 'waiting_for_teammate' THEN 1 WHEN 'running' THEN 2 WHEN 'queued' THEN 3 WHEN 'failed' THEN 4 ELSE 5 END,r.created_at DESC LIMIT ?`)).all(Math.max(1, Math.min(limit, 80))) as Row[];
     return rows.map((row) => this.runFromRow(row));

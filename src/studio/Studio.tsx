@@ -74,6 +74,7 @@ import type { CommunitySkill } from "../shared/extensions";
 import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
+import { WeeklyRecapEntry } from "./WeeklyRecap";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -1909,6 +1910,7 @@ export function Studio() {
               ))}
             </div>
           )}
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
           {conversationRows}
         </div>
@@ -2107,6 +2109,7 @@ export function Studio() {
                   ))}
                 </div>
                 <div className="inbox-conversations">
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
                   {conversationRows}
                 </div>

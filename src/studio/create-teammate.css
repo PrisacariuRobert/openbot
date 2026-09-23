@@ -273,4 +273,4 @@
 /* With the paste-a-key card inside, the onramp itself steps back. */
 .connection-onramp:has(.ai-recommended) { padding: 0; border: 0; background: none; }
 .connection-onramp:has(.ai-recommended) .connection-onramp-actions { gap: 16px; margin: 2px 0 0; }
-.connection-onramp:has(.ai-recommended) .connection-onramp-actions :is(a, button) { min-height: 36px; padding: 6px 0; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; }
+.connection-onramp:has(.ai-recommended) .connection-onramp-actions :is(a, button) { min-height: 36px; padding: 6px 0; border: 0; background: none; color: var(--label-primary); font-size: 13px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--separator-strong); }

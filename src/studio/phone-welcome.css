@@ -27,3 +27,5 @@
 .phone-welcome-close { height: 50px; border-radius: 14px; font-size: 16px; }
 @media (prefers-reduced-motion: reduce) { .phone-welcome, .phone-welcome::backdrop { animation: none; } }
 .phone-welcome h2:focus { outline: none; }
+.phone-welcome-action { background: var(--strong, #1d1d1f); color: var(--on-strong, #fff); }
+.phone-welcome .inline-icon { color: var(--label-primary); }

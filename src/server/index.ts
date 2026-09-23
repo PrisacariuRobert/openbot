@@ -91,6 +91,7 @@ import { inspectRunnerCare } from "./runner-care.js";
 import QRCode from "qrcode";
 import { TelegramChannel } from "./telegram-channel.js";
 import { DiscordChannel } from "./discord-channel.js";
+import { weeklyRecap } from "../shared/weekly-recap.js";
 import { AwakeGuard } from "./awake-guard.js";
 import { syncedFolderProvider, syncedFolderWarning } from "./synced-folder.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
@@ -430,7 +431,7 @@ app.delete("/api/auto-review/:id", (request, response) => {
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runner: runnerPayload(state.runner) });
+  response.json({ ...state, runner: runnerPayload(state.runner), weeklyRecap: cachedRecap() });
 });
 
 app.get("/api/runner", (_request, response) => {
@@ -4666,6 +4667,24 @@ app.post("/api/channels/telegram/test", async (_request, response) => {
   try { await telegram.sendTest(); response.json({ ok: true }); }
   catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The test message could not be sent." }); }
 });
+const recapRuns = (now = Date.now()) => db.finishedRunsSince(new Date(now - 7 * 86_400_000).toISOString()).map((run) => ({ botId: run.botId, botName: run.botName, goal: run.task?.goal || run.prompt, finishedAt: run.finishedAt, activeDurationMs: run.activeDurationMs, status: run.status, parentRunId: run.parentRunId }));
+// State is polled often; the recap only needs to be about a minute fresh.
+let recapCache: { at: number; value: ReturnType<typeof weeklyRecap> } | null = null;
+function cachedRecap() {
+  if (!recapCache || Date.now() - recapCache.at > 60_000) recapCache = { at: Date.now(), value: weeklyRecap(recapRuns()) };
+  return recapCache.value;
+}
+app.get("/api/recap/week", (_request, response) => { response.json({ recap: weeklyRecap(recapRuns()) }); });
+// Sunday evening, once: a warm, factual look back at the week.
+const recapTimer = setInterval(() => {
+  const now = new Date();
+  if (!runner.isLeader() || now.getDay() !== 0 || now.getHours() < 18) return;
+  const recap = weeklyRecap(recapRuns(now.getTime()), now.getTime());
+  if (!recap) return;
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  db.enqueueNotification({ dedupeKey: `weekly-recap:${day}`, kind: "recap", title: "Your week with your team", body: `${recap.headline} ${recap.detail}`, url: "/?recap=week" });
+}, 30 * 60_000);
+recapTimer.unref();
 app.get("/api/channels/discord", (_request, response) => response.json(discord.status()));
 app.post("/api/channels/discord", async (request, response) => {
   const parsed = z.object({ token: z.string().trim().min(50).max(120) }).strict().safeParse(request.body);

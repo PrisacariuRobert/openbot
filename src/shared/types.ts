@@ -1084,6 +1084,8 @@ export interface StudioDraft {
 }
 
 export interface AppState {
+  /** The last 7 days of finished work, when there is any (see weekly-recap). */
+  weeklyRecap?: import("./weekly-recap").WeeklyRecap | null;
   bots: Bot[];
   threads: Thread[];
   messages: Message[];
