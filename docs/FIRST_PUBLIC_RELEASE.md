@@ -1,6 +1,6 @@
-# First public beta: Mac first, iPhone preview
+# First public beta: Electron desktop and phone web
 
-> Architecture update, 2026-09-19: Electron is now the sole desktop client; phones share the web UI. Native-client results below are historical. Current candidate evidence lives in `docs/design/figma-implementation/`; clean-install gates apply to each Electron target and phone browser. No release is authorized by this update.
+> Current scope, 2026-09-23: Electron is the sole desktop client; phones use the responsive web UI. Historical SwiftUI and native-iPhone evidence does not qualify this candidate. The release execution criteria are in [issue #75](https://github.com/PrisacariuRobert/openbot/issues/75). No merge or release is authorized by this checklist.
 
 Release target: the `0.37` line, published only after a reviewed candidate commit and explicit owner approval. The repository is already public; this checklist concerns its **first deliberately supported public beta**, not making the GitHub repository public for the first time.
 
@@ -10,12 +10,11 @@ OpenBot's promise for this beta is focused: give a teammate a job, choose the AI
 
 | Surface | First-beta scope | Not promised |
 | --- | --- | --- |
-| Mac | Primary native client; source build path and a release candidate package with an embedded runner | A public signed/notarized installer until signing and clean-machine gates pass; unattended auto-updates |
-| Web | Same owner-hosted service; conversation-first `/studio.html` preview plus the existing complete setup surface | A hosted OpenBot account service or complete removal of legacy screens |
-| iPhone | Native companion preview, built with Xcode against a reachable owner host | App Store availability, production push, or cellular access before the separate prerequisites pass |
-| Linux | Optional documented self-hosted runner | A consumer desktop client or automatically managed infrastructure |
+| macOS Apple silicon | Primary Electron client with bundled runner; an unsigned, checksum-verified DMG/ZIP only after exact-artifact testing on two independent physical Macs | Signed/notarized distribution or unattended auto-updates |
+| Phone | Responsive shared web UI on the same network or an explicitly configured private HTTPS host | Native iPhone app, App Store distribution or an OpenBot-operated public relay |
+| Intel Mac, Windows, Linux | Source and package-build targets | Supported installers until each has independent physical clean-install and recovery evidence |
 
-Node and OpenCode included in a Mac package do not include a paid account, every model provider, Chrome, Docker or provider consent. The Mac must remain powered on and awake for local jobs. The public away-access relay remains deferred; QR pairing alone is not deployed internet connectivity. A source beta may ship before native public distribution, but those must be labeled separately.
+Node and OpenCode included in a Mac package do not include a paid account, every model provider, Chrome, Docker or provider consent. The Mac must remain powered on and awake for local jobs. The public away-access relay remains deferred. An unsigned installer must be labeled plainly; its checksum verifies bytes, not publisher identity.
 
 ## Gates, owners and evidence
 
@@ -37,11 +36,11 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 
 ### 2. Install and recover — engineering plus a second tester
 
-- [ ] On a clean Mac/user account, follow README without relying on the developer checkout, PATH, accounts or browser. Choose a provider explicitly and complete a read-only sample task.
-- [ ] Package from the candidate; run the package smoke test against the final copied artifact, inspect checksums and ensure native/runner versions agree. Do not reuse an old embedded runtime.
+- [ ] On two independent physical Apple-silicon Macs, install the exact unsigned DMG/ZIP and compare its SHA-256 checksum. Follow the included setup without relying on a development checkout, PATH or preexisting accounts. Choose a provider explicitly and complete a useful sample task.
+- [ ] Package from the frozen candidate; run the package smoke test against the final copied artifact, inspect checksums and ensure Electron/runner versions agree. Do not reuse an old embedded runtime.
 - [ ] With the exact release artifact, quit/reopen, restart the runner and reconnect without creating a second studio or losing messages, drafts, pending approvals, files or grants.
 - [ ] Make a consistent backup including the matching database and vault key; demonstrate restoration in disposable storage. Never test destructive recovery against the owner's only copy.
-- [ ] For public Mac binaries: Developer ID, hardened runtime, dependency notices, notarization/stapling and clean second-Mac Gatekeeper proof. If unavailable, publish source instructions only and clearly label ad-hoc packages as developer previews.
+- [ ] Explain the unsigned status and normal macOS one-time Open action without telling users to disable OS security globally. Recheck Gatekeeper behavior on the second Mac. Signing/notarization is a later product decision, not silently assumed.
 
 ### 3. Useful jobs — engineering with explicitly authorized test accounts
 
@@ -49,17 +48,17 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 - [ ] **Browser-only task:** human signs into one permitted service in a teammate's browser; the teammate reads the intended account, produces a source-linked answer, survives restart, respects a denied permission and stops for takeover when the session expires. Local fixtures are not live Gmail/Calendar certification.
 - [ ] **Daily brief:** combine at least two explicitly selected real sources, show partial/failed coverage honestly and attach the useful result. No unrequested external writes.
 - [ ] **Quiet teamwork:** coordinator consults another teammate, receives its finding and sends one user-facing result; cancellation stops the whole consultation, not unrelated jobs.
-- [ ] **Review before action:** inspect complete supported destination/content on web, Mac and iPhone; decline leaves the external service unchanged; a reviewed test action executes once; stale, masked and uncertain actions cannot be retried blindly.
-- [ ] **Schedule and recovery:** test zone/weekday behavior, restart and one-time catch-up; run a seven-day modest-load soak with pause/cancel, expired login and connection failures. Do not describe a laptop asleep as always-on.
+- [ ] **Review before action:** inspect complete supported destination/content in the Electron and phone-web clients; decline leaves the external service unchanged; a reviewed test action executes once; stale, masked and uncertain actions cannot be retried blindly.
+- [ ] **Schedule and recovery:** test zone/weekday behavior, restart and one-time catch-up. Complete a **48-hour minimum real elapsed release soak** with representative routines, restart/offline handling and resource checks. A seven-day soak remains follow-on evidence for stronger unattended claims. Do not describe a laptop asleep as always-on.
+- [ ] **Outcome qualification:** run the frozen 20-family catalogue, including eight independently generated held-out families, on two declared model configurations with three seeded variants each (120 recorded slots). For each advertised full-suite configuration require at least 33/36 core and 20/24 held-out successes, with no known critical unauthorized effect, duplicate consequence, privacy failure or data loss. A local protocol peer validates wiring only; paid/live runs need an explicit route, site/effect scope and budget.
 - [ ] **Checked project work:** reproduce a fixture bug, edit an isolated worktree, run meaningful checks, review the exact commit and stop before publishing unless separately approved. A benchmark must reject a faster broken result.
 - [ ] **Useful follow-through across work and life:** pilot a small approved meeting/task follow-through, a bounded personal-file organization and one checked project fix. Record the finished artifact/action, what the host actually confirmed, partial failures, owner intervention and usage. Reports alone cannot close these outcome gates. [Current delivery evidence](QA_WORK_DELIVERY.md).
 
 ### 4. Client quality — engineering and pilot testers
 
-- [ ] Complete the first task without a tour on a narrow web viewport and the actual native Mac window. Check keyboard-only operation, readable light/dark appearance, focus, empty/loading/error states and character motion preferences.
-- [ ] Run native unit/UI checks and the iPhone Simulator; distinguish rendered component tests from whole-screen interactions.
-- [ ] Before offering the phone preview to testers, install with the chosen Apple team, scan a fresh invitation and verify reconnect/revocation against the same studio. APNs and Share extension require their own signed-device checks.
-- [ ] Observe a small pilot completing the three main jobs without developer intervention. Record completion, time, user confusion, approval errors and model usage—not just screenshots or positive feedback. Repair any data-loss, access-boundary or duplicate-write defect before expanding the pilot.
+- [ ] Complete the first task without a tour in the actual packaged Electron window and at 390px phone-web width. Check keyboard-only operation, readable light/dark appearance, focus, empty/loading/error states and reduced-motion preference.
+- [ ] Verify a phone browser reconnects to the same owner host over the intended HTTPS route; an accessible local responsive preview alone is not away-access proof.
+- [ ] Recruit 5–10 consenting pilot testers through an owner arrangement. At least five try three supported workflows; at least four of five should finish setup and two of three tasks without developer-led operational rescue, then return to saved work in another session. Record failures, approvals/sign-in time, confusion and usage—not just positive feedback.
 
 ### 5. Publish deliberately — repository owner
 
@@ -72,15 +71,11 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 Engineering can continue with source tests, disposable data, browser fixtures, simulator builds and package checks. Wider distribution additionally needs:
 
 1. A working private vulnerability-reporting route and confirmation of repository merge rules.
-2. For a consumer Mac download there is no paid Apple Developer program, so
-   there is no Developer ID signing or notarization: the website ships an
-   unsigned `.dmg` with a `.sha256` sidecar (built by
-   `scripts/package-macos-dmg.mjs` and routed into the draft by
-   `.github/workflows/release.yml`). Never paste private keys into a chat
-   or issue. Tell users to verify the checksum, then right-click Open the
-   app once to get past Gatekeeper; document that macOS will warn because
-   the download is unsigned. If a paid membership ever exists, re-image
-   from the signed bundle and revisit this section.
+2. For the planned unsigned Mac beta, verify the exact `.dmg`/`.zip` and
+   publish a matching `.sha256` sidecar only after the two-Mac gate passes.
+   Tell users macOS will warn because the binary is unsigned and document
+   the normal one-time right-click Open flow. Never ask them to disable
+   Gatekeeper globally or present a checksum as a substitute for signing.
 3. A clean second Mac/tester and a small pilot; the development machine is not an independent installation test.
 4. Explicitly authorized real service accounts for advertised integrations and the allowed model test budget. Fixture tests cannot supply that evidence.
-5. Only if promoting away access or production iPhone notifications: relay hosting/operating ownership, signed device setup and APNs credentials. These are not blockers for a clearly labeled Mac-first local source beta.
+5. Only if promoting away access: owner-operated HTTPS/relay hosting and a verified phone-to-host route. Native-device signing/APNs are outside this shared-web beta.
