@@ -65,3 +65,17 @@ test("the runtime gets a short teammate identity instead of its coding-assistant
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("teaching and self-extension are allowed by the runtime config, not only by the host API", () => {
+  const permissions = (configure: (db: OpenBotDatabase) => void = () => {}) => {
+    const root = mkdtempSync(path.join(tmpdir(), "openbot-teach-permission-"));
+    const db = new OpenBotDatabase(root);
+    try {
+      configure(db);
+      return JSON.parse(readFileSync(path.join(prepareWorkspace(db, db.getBot("nova")!), "opencode.json"), "utf8")).permission as Record<string, string>;
+    } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+  };
+  assert.equal(permissions().skill_propose, "allow", "/learn needs skill_propose");
+  assert.equal(permissions((db) => db.updateStudioSettings({ selfExtendEnabled: true })).self_extend, "allow");
+  assert.notEqual(permissions((db) => db.updateStudioSettings({ selfExtendEnabled: false })).self_extend, "allow");
+});

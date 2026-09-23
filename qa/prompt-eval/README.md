@@ -19,3 +19,16 @@ Context per model step (input + cache reads ÷ steps) is the stable comparison: 
 | `muse-slim-v2` | 9eeeae5 teammate system prompt, trimmed per-message text | muse-spark-1.3-contributor | 12/12 | **9,183** | 31.6s | 13,999 chars |
 
 A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The default model is `opencode-go/muse-spark-1.3-contributor`. The free-tier `opencode/…-free` models return 403 for OpenBot's restricted tool configuration and cannot be evaluated.
+
+## Fixed prompt budget next to Hermes (offline, 23 Sep 2026)
+
+What a model receives before the owner's first word, in a fresh chat with the default setup:
+
+| | OpenBot (9eeeae5, fresh teammate) | Hermes Agent CLI (`hermes prompt-size`) |
+| :--- | :--- | :--- |
+| System prompt + instructions | 14,280 chars (teammate prompt + AGENTS.md) | 21,935 chars system prompt + 5,881 skills index + 616 user profile |
+| Per-message wrapper | 3,631 chars | — |
+| Tools | 24 enabled tools | 20 tools, 35,772 bytes of JSON schema |
+| Measured context for "hi" | 8,140 tokens (Muse Spark, one step) | not measured live |
+
+Limits: Hermes was measured with its own `prompt-size` command on this Mac's install (41 installed skills feed its skills index; model gpt-5.6-sol), OpenBot with a live one-step run on Muse Spark. Different tokenizers and tool sets, and no live Hermes run on the same model, so this compares fixed overhead only — not answer quality, speed, or cost.

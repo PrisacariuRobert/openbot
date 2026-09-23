@@ -37,6 +37,11 @@ export function toolAvailability(
     community_skill_read: new CommunitySkills(db).search(bot.id).length > 0,
     memory_search: true,
     conversation_search: true,
+    // Teaching and self-extension always pause for the owner's exact review
+    // (even in YOLO). They must be listed here: the runtime denies every tool
+    // that is not, so /learn silently produced a loose file instead.
+    skill_propose: true,
+    self_extend: db.getStudioSettings().selfExtendEnabled,
   };
   const set = (names: string[], available: boolean) => {
     for (const name of names) flags[name] = available;

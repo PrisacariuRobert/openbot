@@ -88,6 +88,17 @@ const CASES: Case[] = [
       return items < 5 ? `only ${items} items` : null;
     },
   },
+  {
+    id: "learn-skill",
+    prompt: "/learn Save a reusable skill for turning an expenses CSV into totals per currency. Ask for the file name each time and double-check the totals.",
+    check: ({ status, db, runId }) => {
+      if (status !== "awaiting_approval") return `status ${status} (expected a skill proposal waiting for review)`;
+      const approval = db.prepare("SELECT action_json FROM approvals WHERE run_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1").get(runId) as { action_json: string | null } | undefined;
+      const action = approval?.action_json ? JSON.parse(approval.action_json) as { type?: string; args?: { instructions?: string; name?: string } } : null;
+      if (action?.type !== "skill_propose") return `pending action is ${action?.type || "missing"}, not a skill proposal`;
+      return !/currenc/i.test(JSON.stringify(action.args || {})) ? "proposal does not mention currencies" : null;
+    },
+  },
 ].filter((item) => !ONLY || ONLY.split(",").includes(item.id));
 
 async function freePort() {
