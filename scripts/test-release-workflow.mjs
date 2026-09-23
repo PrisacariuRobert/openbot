@@ -22,6 +22,8 @@ test('each desktop target stages the host runtime and uploads the actual builder
   assert.match(upload.with.path, /desktop\/release\/\*\.dmg/);
   assert.doesNotMatch(JSON.stringify(job), /xcodebuild|desktop\/dist/);
   const desktop = JSON.parse(readFileSync(new URL('../desktop/package.json', import.meta.url), 'utf8'));
+  assert.ok(desktop.homepage?.startsWith('https://'), 'Linux debs need a project homepage');
+  assert.match(desktop.author?.email || '', /@/, 'Linux debs need an author email');
   for (const platform of ['mac', 'linux', 'win']) {
     for (const target of desktop.build[platform].target) {
       assert.equal(target.arch, undefined, `${platform}/${target.target} must inherit the matrix host architecture`);

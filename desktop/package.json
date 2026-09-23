@@ -3,7 +3,11 @@
   "productName": "OpenBot",
   "version": "0.37.0-beta.1",
   "description": "OpenBot desktop shell \u2014 your AI team, on the computer you own.",
-  "author": "Robert Prisacariu",
+  "author": {
+    "name": "Robert Prisacariu",
+    "email": "145539911+PrisacariuRobert@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/PrisacariuRobert/openbot",
   "license": "MIT",
   "private": true,
   "main": "main.mjs",
