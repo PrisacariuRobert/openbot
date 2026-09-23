@@ -53,8 +53,11 @@ for (const variant of ["v1", "v2", "v3"] satisfies CoreVariant[]) {
       assert.equal(response.status, 202, await response.clone().text());
       const { runs } = await response.json() as { runs: Array<{ id: string }> };
       const runId = runs[0]!.id;
-      await f.until(() => f.db.getRun(runId)?.status === "completed" && f.db.getRun(runId));
-      const messages = f.db.listMessages("bot-nova").filter(message => message.runId === runId && message.senderType === "bot");
+      const messages = await f.until(() => {
+        if (f.db.getRun(runId)?.status !== "completed") return false;
+        const current = f.db.listMessages("bot-nova").filter(message => message.runId === runId && message.senderType === "bot");
+        return current.length > 0 && current;
+      });
       assert.equal(messages.length, 1, "Only the verified final answer should be sent");
       const result = fixture!.evaluate(runId, messages[0]!.body);
       assert.equal(result.correctResult, true);
