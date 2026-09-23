@@ -273,6 +273,13 @@ async function main(){
     state.replayStatus=replay.status;state.replayBody=replay.body;save();
     if(replay.status!==409||!String(replay.body.error||'').includes('UNCERTAIN_CONFLICT'))throw Error('A fresh token escaped the effect fence: '+JSON.stringify(replay));
   }
+  if(${outcome === "denied"}&&prompt.includes('The owner declined this proposed action')&&state.reproposeStatus===undefined){
+    // Ignore the decline note and propose the same save again.
+    const page=await observe();
+    const saves=page.targets.filter(x=>x.label.includes('Save renewal'));
+    const again=saves.length===1?await tool('browser_semantic_act',{targetId:saves[0].targetId,kind:'click'}):{status:0,body:{}};
+    state.reproposeStatus=again.status;state.reproposeBody=again.body;save();
+  }
   for(let n=0;n<30;n++){const page=await observe();if(page.textPreview.includes('Due '+state.desiredDue)&&page.textPreview.includes('Saved record Acme renewal 2026')){console.log(JSON.stringify({type:'text',text:'Acme renewal 2026 was saved with due date '+state.desiredDue+'. I read back the same record in the support portal.'}));return}await new Promise(r=>setTimeout(r,100))}
   console.log(JSON.stringify({type:'text',text:'The save result could not be independently read back; do not claim completion.'}));
 }
@@ -310,7 +317,10 @@ main().catch(e=>{console.error(e.stack||e);process.exitCode=1});`;
       }
       await delay(100);
     }
-    assert.equal(f.db.getRun(runId)?.status, outcome === "denied" ? "cancelled" : "completed", JSON.stringify(f.db.getRun(runId)));
+    // A declined save no longer ends the task silently: the teammate
+    // finishes without it (no write, no new proposal) and says what is left.
+    assert.equal(f.db.getRun(runId)?.status, "completed", JSON.stringify(f.db.getRun(runId)));
+    if (outcome === "denied") assert.ok(f.db.getRun(runId)!.activities.some((item) => item.label === "Declined by you"));
     assert.equal(saveReviewed, true);
     assert.deepEqual(writes, outcome === "approved" ? [{ id: "acme-2026", due: "2026-10-14" }] : []);
     if (outcome === "denied") {
@@ -320,7 +330,11 @@ main().catch(e=>{console.error(e.stack||e);process.exitCode=1});`;
     else assert.equal(f.db.getApprovedAction(saveApprovalId)?.status, stale ? "failed" : "completed");
     assert.equal(records.get("acme-2025")?.due, "2025-10-14");
     assert.equal(records.get("acme-support")?.due, "2026-11-01");
-    const state = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "pixel", `.semantic-phase-${runId}.json`), "utf8")) as { staleSelectorStatus: number; replayStatus?: number; replayBody?: { error?: string } };
+    const state = JSON.parse(readFileSync(path.join(f.db.workspacesDir, "pixel", `.semantic-phase-${runId}.json`), "utf8")) as { staleSelectorStatus: number; replayStatus?: number; replayBody?: { error?: string }; reproposeStatus?: number; reproposeBody?: { error?: string } };
+    if (outcome === "denied") {
+      assert.equal(state.reproposeStatus, 409, "a declined action must not be proposed again");
+      assert.match(state.reproposeBody?.error || "", /already declined this action/);
+    }
     assert.equal(state.staleSelectorStatus, 403, "a stale offered selector tool must fail at dispatch");
     if (outcome === "approved") {
       assert.equal(state.replayStatus, 409, "fresh-token replay must refuse before opening a second approval");

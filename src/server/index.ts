@@ -2225,7 +2225,7 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
   if (action?.type === "task_tokens") return runner.decideTaskTokens(approval.id, decision);
   if (action?.type === "browser_sign_in") {
     return browserSignIns.withProfile(approval.botId, async () => {
-      if (decision === "denied") return db.decideApproval(approval.id, decision);
+      if (decision === "denied") return db.decideApproval(approval.id, decision, { continueAfterDecline: true });
       const reviewed = currentApprovalReview(approval.id);
       if (!reviewed?.preview.canApprove || !sameReviewFingerprint(reviewedFingerprint, reviewed.fingerprint)) return null;
       return browserSignIns.continue(approval.id);
@@ -2234,7 +2234,7 @@ async function decideApproval(approvalId: string, decision: "approved" | "denied
   if (decision === "approved" && action?.type && action.type !== "run") {
     db.prepareApprovedAction({ approvalId: approval.id, runId: approval.runId, botId: approval.botId, actionType: action.type, action });
   }
-  const decided = db.decideApproval(approval.id, decision);
+  const decided = db.decideApproval(approval.id, decision, { continueAfterDecline: true });
   if (!decided) return null;
   const connectorAction = action?.type ? connectorActionFor(action.type) : undefined;
   if (decision === "denied" && action?.type && connectorAction) {
@@ -3531,6 +3531,11 @@ app.post("/api/internal/tools", async (request, response) => {
   }
   const bot = db.getBot(botId)!;
   const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action) => {
+    // The owner already said no to this exact action in this task: never ask
+    // again, whatever the model decided after the decline.
+    const declined = db.listRunApprovals(runId).some((earlier) => earlier.status === "denied" && earlier.kind === kind && earlier.actionLabel === actionLabel
+      && (db.getApprovalAction(earlier.id) as { type?: string } | null)?.type === approvalAction);
+    if (declined) return response.status(409).json({ error: "The owner already declined this action in this task. Do not propose it again or try an equivalent. Finish without it and tell the user what was not done." });
     const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs } });
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not

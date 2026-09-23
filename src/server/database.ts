@@ -3066,7 +3066,11 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.run_id=? ORDER BY a.created_at ASC").all(runId) as Row[]).map((row) => this.approvalFromRow(row));
   }
 
-  decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
+  /** A declined mid-task action (terminal, browser or connector) lets the
+   * teammate finish without it and say what is left, instead of ending the
+   * whole task silently. Declining a task start, Stop, and repeated declines
+   * in one task still cancel. */
+  decideApproval(id: string, decision: "approved" | "denied", options: { continueAfterDecline?: boolean } = {}): Approval | null {
     const approval = this.getApproval(id);
     if (!approval || approval.status !== "pending" || approval.kind === "budget") return null;
     const result = this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=? AND status='pending'").run(decision, now(), id);
@@ -3077,8 +3081,19 @@ export class OpenBotDatabase {
     }
     else {
       this.db.prepare("DELETE FROM approved_actions WHERE approval_id=? AND status='prepared'").run(id);
-      this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
-      this.finishRunTask(approval.runId, "cancelled");
+      const run = this.getRun(approval.runId);
+      const declines = Number((this.db.prepare("SELECT COUNT(*) AS n FROM approvals WHERE run_id=? AND status='denied'").get(approval.runId) as { n: number }).n);
+      if (options.continueAfterDecline && approval.kind !== "prompt" && run && !["completed", "failed", "cancelled"].includes(run.status) && declines <= MAX_DECLINES_BEFORE_STOP) {
+        const original = this.extensionRecord<{ prompt: string }>("declined-original-request", run.id)?.prompt ?? run.prompt;
+        this.saveExtensionRecord("declined-original-request", run.id, { prompt: original });
+        this.setRunPrompt(run.id, declinedActionPrompt(approval.actionLabel, original));
+        this.updateRun(run.id, { status: "queued", approvalReason: null, taskStage: "working", finishedAt: null, error: null, progressAt: now() });
+        this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE run_id=? AND kind='approval' AND resolved_at IS NULL").run(now(), run.id);
+        this.addActivity({ runId: run.id, botId: run.botId, kind: "status", label: "Declined by you", detail: `${run.botName} will finish without it and tell you what is left.` });
+      } else {
+        this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
+        this.finishRunTask(approval.runId, "cancelled");
+      }
     }
     return this.getApproval(id);
   }
@@ -4627,4 +4642,11 @@ export class OpenBotDatabase {
     const activeThreadId = defaultConversation(threads, threadId);
     return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), approvedActions: this.listApprovedActions(),   agentMessages: this.listAgentMessages(activeThreadId), delegations: this.listDelegations(), retiredBots: this.listBots(true).filter((bot) => bot.retiredAt), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
+}
+
+/** After this many declined actions in one task, the next decline stops it. */
+export const MAX_DECLINES_BEFORE_STOP = 3;
+
+export function declinedActionPrompt(actionLabel: string, originalRequest: string) {
+  return `The owner declined this proposed action: ${actionLabel}. Do not retry it, do not attempt an equivalent action another way (another tool, website, app, account or teammate), and do not ask for it again. Finish the task as far as you safely can without it: give the user the useful result you already have, say plainly what was not done because of the decline, and mention a simple step the owner could take themselves if one exists.\n\nOriginal request: ${originalRequest}`;
 }
