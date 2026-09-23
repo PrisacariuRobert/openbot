@@ -2345,3 +2345,6 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .prose .code-block pre { padding: 14px 16px; }
 .prose .code-block pre code { display: block; padding: 0; border-radius: 0; background: none; font-size: 12.5px; }
 .refined-welcome .welcome-start > p, .refined-welcome .welcome-start > small { margin-left: 0; margin-right: 0; }
+/* A reply ending in a list shouldn't carry the list's margin into the bubble. */
+.prose > :last-child, .prose > :last-child > li:last-child > :last-child { margin-bottom: 0; }
+.prose > :first-child { margin-top: 0; }
