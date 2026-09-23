@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
-import { applyProfileImport, previewProfileImport } from "./profile-import.js";
+import { applyProfileImport, convertHermesSchedule, discoverAgentProfiles, previewProfileImport } from "./profile-import.js";
 
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-profile-import-")), db = new OpenBotDatabase(root);
@@ -122,5 +122,63 @@ test("junk input fails with a clear message and changes nothing", () => {
     assert.throws(() => previewProfileImport(path.join(f.root, "missing")), /does not exist/);
     assert.throws(() => previewProfileImport(""), /Give the folder/);
     assert.equal(f.db.listBots().length, 3);
+  } finally { f.close(); }
+});
+
+test("Hermes schedules convert only when OpenBot can express them exactly", () => {
+  const tz = "Europe/Brussels";
+  const label = (schedule: unknown) => { const result = convertHermesSchedule(schedule, tz); return "label" in result ? result.label : `no: ${result.reason}`; };
+  assert.equal(label({ kind: "cron", expr: "0 9 * * *" }), "Daily at 09:00");
+  assert.equal(label({ kind: "cron", expr: "30 7 * * 1-5" }), "Weekdays at 07:30");
+  assert.equal(label({ kind: "cron", expr: "0 18 * * mon,wed,fri" }), "At 18:00 on Mon, Wed, Fri");
+  assert.equal(label({ kind: "cron", expr: "0 10 * * 0" }), "At 10:00 on Sun");
+  assert.equal(label({ kind: "cron", expr: "*/15 * * * *" }), "Every 15 minutes");
+  assert.equal(label({ kind: "cron", expr: "5 * * * *" }), "Every hour");
+  assert.equal(label({ kind: "interval", minutes: 30 }), "Every 30 minutes");
+  assert.match(label({ kind: "cron", expr: "0 9 1 * *" }), /^no: .*day of the month/);
+  assert.match(label({ kind: "cron", expr: "*/2 * * * *" }), /^no: .*five minutes/);
+  assert.match(label({ kind: "cron", expr: "0 9-17 * * *" }), /^no: .*one fixed time/);
+  assert.match(label({ kind: "cron", expr: "0 9 * *" }), /^no: .*five fields/);
+  assert.match(label({ kind: "weird" }), /^no: /);
+  const weekdays = convertHermesSchedule({ kind: "cron", expr: "30 7 * * 1-5" }, tz);
+  assert.ok("schedule" in weekdays);
+  assert.deepEqual(weekdays.schedule, { kind: "calendar", timeZone: tz, time: "07:30", daysOfWeek: [1, 2, 3, 4, 5] });
+});
+
+test("Hermes cron jobs import as paused routines; the Mac's profiles are discovered once", () => {
+  const f = fixture();
+  try {
+    const home = path.join(f.root, "home");
+    const profile = path.join(home, ".hermes", "profiles", "jobhunter");
+    mkdirSync(path.join(profile, "cron"), { recursive: true });
+    writeFileSync(path.join(profile, "SOUL.md"), "# Scout for jobs\n\nFind relevant openings every morning.\n");
+    writeFileSync(path.join(profile, "config.yaml"), "model: some-model\n");
+    writeFileSync(path.join(profile, "cron", "jobs.json"), JSON.stringify({ jobs: [
+      { name: "Morning job scan", prompt: "Scan the job boards and summarize three good matches.", schedule: { kind: "cron", expr: "0 9 * * 1-5", display: "0 9 * * 1-5" }, enabled: true },
+      { name: "Monthly report", prompt: "Summarize the month.", schedule: { kind: "cron", expr: "0 9 1 * *" } },
+      { name: "Script only", prompt: "", schedule: { kind: "cron", expr: "0 9 * * *" } },
+    ] }));
+
+    const discovered = discoverAgentProfiles(f.db, home);
+    assert.equal(discovered.length, 1);
+    assert.equal(discovered[0]!.name, "Scout for jobs");
+    assert.equal(discovered[0]!.jobs, 2, "script-only jobs have nothing for a teammate to do");
+    assert.equal(discovered[0]!.importedBotId, null);
+
+    const plan = previewProfileImport(profile);
+    assert.equal(plan.jobs[0]!.scheduleDisplay, "Weekdays at 09:00");
+    assert.equal(plan.jobs[1]!.schedule, null);
+
+    const result = applyProfileImport(f.db, profile);
+    assert.equal(result.routines, 1);
+    const routines = f.db.listRoutines(f.db.getBot(result.botId)!.threadId);
+    assert.equal(routines.length, 1);
+    assert.equal(routines[0]!.name, "Morning job scan");
+    assert.equal(routines[0]!.enabled, false, "nothing runs on import");
+    assert.equal(routines[0]!.botId, result.botId);
+    assert.ok(result.warnings.some((warning) => /added paused/.test(warning)));
+    assert.ok(result.warnings.some((warning) => /Monthly report.*not converted/.test(warning)));
+
+    assert.equal(discoverAgentProfiles(f.db, home)[0]!.importedBotId, result.botId, "a second visit shows it as already imported");
   } finally { f.close(); }
 });

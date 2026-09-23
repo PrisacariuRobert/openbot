@@ -151,3 +151,12 @@
   .capabilities .extensions-panel > header { margin-bottom: 20px; }
   .capabilities .extensions-panel .apple-segmented-item { padding-inline: 8px; white-space: normal; }
 }
+.capabilities .existing-agents h3 { margin: 0 0 4px; }
+.capabilities .existing-agents > p { margin: 0 0 16px; color: var(--secondary); font-size: 14px; line-height: 1.5; }
+.capabilities .existing-agents ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.capabilities .existing-agents li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); min-width: 0; }
+.capabilities .existing-agents li > span { display: grid; gap: 4px; min-width: 0; }
+.capabilities .existing-agents small { color: var(--muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.capabilities .existing-agents .existing-agents-result { color: var(--secondary); }
+.capabilities .existing-agents button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+@media (max-width: 600px) { .capabilities .existing-agents li { flex-direction: column; align-items: stretch; } }

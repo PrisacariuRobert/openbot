@@ -67,7 +67,7 @@ import { browserAccessStatus, browserWebsiteBlock } from "./browser-access.js";
 import { BrowserSignIns } from "./browser-sign-in.js";
 import { collectOwnerSessionCookies, openInOwnersChrome } from "./own-browser-bridge.js";
 import { reviewSignInRequest } from "./sign-in-review.js";
-import { applyProfileImport, previewProfileImport } from "./profile-import.js";
+import { applyProfileImport, previewProfileImport, discoverAgentProfiles } from "./profile-import.js";
 import { proposeSkillFromRun } from "./skill-proposals.js";
 import { requestRunReview } from "./run-review.js";
 import { parseAuthoredSkill } from "./skill-authoring.js";
@@ -2791,6 +2791,10 @@ const botInput = z.object({
 // then apply. Owner-only. Secrets are never read into the plan — the import
 // detects credential-looking files and lists them as skipped.
 const profileImportInput = z.object({ path: z.string().min(1).max(1_024), name: z.string().max(40).optional() }).strict();
+app.get("/api/imports/profile/discover", (_request, response) => {
+  // Only this host's own home folder is scanned; nothing is read remotely.
+  response.json({ profiles: discoverAgentProfiles(db) });
+});
 app.post("/api/imports/profile/preview", (request, response) => {
   const parsed = profileImportInput.safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Give the profile folder to preview, e.g. ~/.hermes or ~/.openclaw." });
@@ -2805,6 +2809,7 @@ app.post("/api/imports/profile/apply", (request, response) => {
   if (!parsed.success) return response.status(400).json({ error: "Give the profile folder to import." });
   try {
     const imported = applyProfileImport(db, parsed.data.path, { name: parsed.data.name });
+    broadcast();
     return response.json({ ...imported, bot: db.getBot(imported.botId) });
   } catch (error) {
     return response.status(409).json({ error: error instanceof Error ? error.message : "The import did not finish. Nothing was changed." });
