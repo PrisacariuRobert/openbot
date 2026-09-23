@@ -188,3 +188,17 @@ test("turns internal tool names into friendly progress updates", () => {
     label: "Reading the app", detail: null, kind: "tool",
   });
 });
+
+test("a private question from a teammate gets a direct brief, not the full job ritual", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-consult-brief-")), db = new OpenBotDatabase(root);
+  try {
+    const runner = new OpenCodeRunner({ db, onChange: () => {}, internalUrl: "http://127.0.0.1:1", internalToken: "fixture", runtimeCheck: () => ({ runtime: "opencode" as const, detectedVersion: "1.18.31", compatibility: "verified" as const }), attachments: {} as never });
+    const parent = db.createRun({ threadId: "bot-nova", botId: "nova", prompt: "Is 221 prime? Ask Scout.", status: "running" });
+    const question = db.createRun({ threadId: "bot-nova", botId: "scout", prompt: "Private teammate question from Nova: Is 221 prime?\n\nInvestigate the question.", status: "queued", parentRunId: parent.id });
+    const brief = runner["buildPrompt"](question, db.getBot("scout")!, false);
+    assert.match(brief, /Answer this private question directly/);
+    assert.doesNotMatch(brief, /Completion rules:|Reviewed methods already available/);
+    const handoff = db.createRun({ threadId: "bot-nova", botId: "scout", prompt: "Private handoff from Nova: build the report", status: "queued", parentRunId: parent.id });
+    assert.match(runner["buildPrompt"](handoff, db.getBot("scout")!, false), /Completion rules:/, "handoffs may produce deliverables and keep the full rules");
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});

@@ -89,6 +89,17 @@ const CASES: Case[] = [
     },
   },
   {
+    id: "teammate-help",
+    prompt: "Ask Scout to check whether 221 is a prime number, then tell me what Scout found.",
+    check: ({ status, reply, db, runId }) => {
+      if (status !== "completed") return `status ${status}`;
+      const helper = db.prepare("SELECT bot_id, status FROM runs WHERE parent_run_id=? ORDER BY created_at LIMIT 1").get(runId) as { bot_id: string; status: string } | undefined;
+      if (!helper) return "no teammate was asked";
+      if (helper.bot_id === "nova") return "asked itself";
+      return !/13\s*[×x*]\s*17|17\s*[×x*]\s*13|not (?:a )?prime/i.test(reply) ? "final answer does not relay that 221 = 13 × 17 is not prime" : null;
+    },
+  },
+  {
     id: "learn-skill",
     prompt: "/learn Save a reusable skill for turning an expenses CSV into totals per currency. Ask for the file name each time and double-check the totals.",
     check: ({ status, db, runId }) => {
@@ -113,7 +124,7 @@ async function runCase(item: Case, attempt: number) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-prompt-eval-"));
   const setupDb = new OpenBotDatabase(root);
   const bot = setupDb.getBot("nova")!;
-  setupDb.updateBot(bot.id, { providerInstanceId: "local-opencode", model: MODEL, computerEnabled: false, browserEnabled: false });
+  for (const teammate of setupDb.listBots()) setupDb.updateBot(teammate.id, { providerInstanceId: "local-opencode", model: MODEL, computerEnabled: false, browserEnabled: false });
   const dataDir = setupDb.dataDir, threadId = bot.threadId;
   setupDb.close();
   const workspace = path.join(dataDir, "workspaces", "nova");
@@ -127,7 +138,7 @@ async function runCase(item: Case, attempt: number) {
   let log = "";
   for (const stream of [child.stdout!, child.stderr!]) stream.on("data", (chunk) => { log = (log + chunk).slice(-4000); });
   const exited = once(child, "exit");
-  const result = { case: item.id, attempt, status: "not_started", pass: false, problem: "" as string | null, seconds: 0, contextTokens: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, modelSteps: 0, agentsMdChars: 0, reply: "", error: "" };
+  const result = { case: item.id, attempt, status: "not_started", pass: false, problem: "" as string | null, seconds: 0, contextTokens: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, modelSteps: 0, agentsMdChars: 0, reply: "", error: "", tools: [] as string[] };
   try {
     let ready = false;
     for (let n = 0; n < 300 && !ready && child.exitCode === null; n++) {
@@ -141,7 +152,7 @@ async function runCase(item: Case, attempt: number) {
     let run: Record<string, unknown> | undefined;
     for (let n = 0; n < 600; n++) {
       run = db.prepare("SELECT * FROM runs WHERE parent_run_id IS NULL ORDER BY created_at LIMIT 1").get() as Record<string, unknown> | undefined;
-      if (run && !["queued", "running"].includes(String(run.status))) break;
+      if (run && !["queued", "running", "waiting_for_teammate"].includes(String(run.status))) break;
       await delay(500);
     }
     if (!run) throw new Error("no run created");
@@ -154,6 +165,7 @@ async function runCase(item: Case, attempt: number) {
     });
     result.contextTokens = result.inputTokens + result.cacheReadTokens;
     result.error = String(run.error || "").slice(0, 400);
+    result.tools = (db.prepare("SELECT r.bot_id, a.label FROM activities a JOIN runs r ON r.id=a.run_id WHERE (r.id=? OR r.parent_run_id=?) AND a.kind IN ('tool','handoff','message') ORDER BY a.created_at").all(run.id, run.id) as Array<{ bot_id: string; label: string }>).map((row) => `${row.bot_id}: ${row.label}`);
     // A run that never reached the model is an infrastructure failure, not
     // a behavior result, whatever the case's own check would say.
     result.problem = result.modelSteps === 0 ? `never reached the model: ${result.error || result.status}` : item.check({ status: result.status, reply, db, workspace, runId: String(run.id) });

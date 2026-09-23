@@ -4436,6 +4436,11 @@ app.post("/api/internal/tools", async (request, response) => {
         expectsReply, runId, replyToId: typeof args.replyToId === "string" ? args.replyToId : null, hopCount: depth + 1, dedupeKey,
       });
       if (!message) return response.json({ ok: true, status: `${target.name} already has this.` });
+      // Asked while the same teammate is still on this job's question: never
+      // start a second run for the same helper; point back at the first.
+      if (expectsReply && db.listChildRuns(runId).some((child) => child.botId === target.id && ["queued", "running", "waiting_for_teammate"].includes(child.status))) {
+        return response.json({ ok: true, status: `${target.name} is already working on your question. Don't ask again; end your turn and OpenBot will bring you the answer.` });
+      }
       if (expectsReply) {
         db.createRun({ threadId: sourceRun.threadId, botId: target.id, prompt: `Private teammate question from ${sourceRun.botName}: ${body}\n\nInvestigate the question and end with a concise internal finding for ${sourceRun.botName}. Do not address the user, send a second chat reply, or mention internal tool details; OpenBot will privately return your result so ${sourceRun.botName} can give one combined answer.${handoffPrompt}`, status: "queued", parentRunId: runId, attachmentIds: sourceRun.attachmentIds });
         db.markRunConsultationPending(runId);
@@ -4447,7 +4452,7 @@ app.post("/api/internal/tools", async (request, response) => {
         runId, kind: "event", eventType: "teammate_message",
         eventData: { fromName: sourceRun.botName, toName: target.name, kind: message.kind, expectsReply: expectsReply ? "true" : "false" },
       });
-      broadcast(); return response.json({ ok: true, status: expectsReply ? `${target.name} is taking a look.` : `${target.name} has the update.` });
+      broadcast(); return response.json({ ok: true, status: expectsReply ? `${target.name} is working on it. Don't ask again or hand this off: finish any other part of the task, then end your turn. OpenBot will bring you ${target.name}'s answer so you can give the user one final reply.` : `${target.name} has the update. You will not see a reply in this task; set expectsReply when you need their answer.` });
     }
     if (action === "self_extend") {
       const proposal = z.object({
