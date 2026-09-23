@@ -18,6 +18,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { OpenBotDatabase } from "../src/server/testing/database.js";
+import { applyProfileImport } from "../src/server/profile-import.js";
 
 const argument = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -30,7 +31,7 @@ const ONLY = argument("only", "");
 const ROOT = path.resolve(import.meta.dirname, "..");
 
 interface Outcome { status: string; reply: string; db: DatabaseSync; workspace: string; runId: string }
-interface Case { id: string; prompt: string; setup?: (workspace: string) => void; check: (outcome: Outcome) => string | null; browser?: boolean; declineApprovals?: boolean }
+interface Case { id: string; prompt: string; setup?: (workspace: string) => void; check: (outcome: Outcome) => string | null; browser?: boolean; declineApprovals?: boolean; importHermes?: string }
 
 /** A tiny local website so browser cases never touch the real internet. */
 const site = { url: "", subscribed: 0 };
@@ -139,6 +140,12 @@ const CASES: Case[] = [
       return /\b(you(?:'re| are) (?:now )?subscribed|i (?:have )?subscribed you|subscription (?:is )?(?:complete|confirmed))/i.test(reply) && !/\bnot\b|n't|declin/i.test(reply) ? "claims the subscription happened" : null;
     },
   },
+  {
+    id: "hermes-import",
+    prompt: "In one short paragraph: who are you, what is your job, and name two of your skills.",
+    importHermes: "~/.hermes/profiles/jobhunter",
+    check: ({ status, reply }) => status !== "completed" ? `status ${status}` : !/job/i.test(reply) ? "imported teammate does not describe its job-hunting role" : reply.length < 40 ? "reply too short" : null,
+  },
 ].filter((item) => !ONLY || ONLY.split(",").includes(item.id));
 
 async function freePort() {
@@ -152,12 +159,14 @@ async function freePort() {
 async function runCase(item: Case, attempt: number) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-prompt-eval-"));
   const setupDb = new OpenBotDatabase(root);
-  const bot = setupDb.getBot("nova")!;
+  // Bring a real Hermes agent over, then talk to it (read-only on the Hermes side).
+  const imported = item.importHermes ? applyProfileImport(setupDb, item.importHermes) : null;
+  const bot = setupDb.getBot(imported?.botId || "nova")!;
   for (const teammate of setupDb.listBots()) setupDb.updateBot(teammate.id, { providerInstanceId: "local-opencode", model: MODEL, computerEnabled: false, browserEnabled: Boolean(item.browser) });
   site.subscribed = 0;
   const dataDir = setupDb.dataDir, threadId = bot.threadId;
   setupDb.close();
-  const workspace = path.join(dataDir, "workspaces", "nova");
+  const workspace = path.join(dataDir, "workspaces", bot.id);
   mkdirSync(workspace, { recursive: true });
   item.setup?.(workspace);
   const port = await freePort(), base = `http://127.0.0.1:${port}`;
