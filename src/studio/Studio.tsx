@@ -93,6 +93,7 @@ import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancell
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
 import { DictationButton } from "../components/Dictation";
+import { tasksNeedingOwner } from "./attention";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Advanced } from "./Advanced";
@@ -957,10 +958,7 @@ export function Studio() {
       (run) => !run.parentRunId && activeStates.includes(run.status),
     ) || [];
   const conversationFiles = useMemo(() => state?.messages.flatMap((message) => message.attachments) || [], [state?.messages]);
-  const attention =
-    state?.studioRuns.filter((run) =>
-      ["failed", "awaiting_approval"].includes(run.status),
-    ) || [];
+  const attention = tasksNeedingOwner(state?.studioRuns || []);
   const uncertain =
     state?.approvedActions.filter((action) => action.status === "uncertain") ||
     [];
@@ -1853,7 +1851,7 @@ export function Studio() {
             onClick={() => page === "chat" || page === "settings" ? openCapability("team") : setDetail({ kind: "workspace" })}
           >
             <Layers3 size={17} /> Workspace{" "}
-            {attentionCount > 0 && <b>{attentionCount} need you</b>}
+            {attentionCount > 0 && <b>{attentionCount} {attentionCount === 1 ? "needs" : "need"} you</b>}
           </button>
           <div>
             <span className={`connection-dot ${online ? "" : "offline"}`} />
@@ -2714,7 +2712,7 @@ export function Studio() {
                   <Icon size={19} />
                   <span>{label}</span>
                   {key === "activity" && attentionCount > 0 && (
-                    <b>{attentionCount} need you</b>
+                    <b>{attentionCount} {attentionCount === 1 ? "needs" : "need"} you</b>
                   )}
                   <ChevronRight size={16} />
                 </button>
