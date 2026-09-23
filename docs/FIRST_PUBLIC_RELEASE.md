@@ -29,7 +29,7 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 - [ ] Review the accumulated work, select one release branch/commit and verify a clean tracked tree. No force push or automatic merge.
 - [ ] Stage only intended source, run `node .github/scripts/check-public-source.mjs`, and inspect the exact source archive. The guard checks indexed files and high-confidence credential patterns, not full history or every secret format.
 - [ ] Review full-history secret-scanning results and rotate any exposed credential. A deleted file can remain in history. Never publish `.openbot`, browser profiles, home-transfer archives, signing material or personal QA recordings.
-- [ ] Enable and test GitHub private vulnerability reporting; the 2026-09-06 read-only audit found it disabled. [SECURITY.md](../SECURITY.md) must point to a functioning private route before wider invitations.
+- [ ] Verify the private vulnerability-reporting link from a non-owner account and confirm the owner can receive reports. The repository API returned `{"enabled":true}` on 2026-09-23 and [SECURITY.md](../SECURITY.md) points to the private route; no test report has been submitted.
 - [ ] Confirm owner-only merge policy and required status checks using the live repository settings. `CODEOWNERS` routes review; it does not enforce merge authority by itself.
 - [ ] Require `verify` and `browser-acceptance` on the candidate. The workflow runs with read-only permissions, no persisted checkout credential and no model-account secrets. New workflow files are not proof of a passed GitHub run.
 - [ ] Review production dependency vulnerabilities and licenses against the candidate lockfile; preserve [third-party notices](../THIRD_PARTY_NOTICES.md). Dependabot configuration opens reviewable updates, not automatic merges or guaranteed fixes.
@@ -71,7 +71,7 @@ The candidate work also records four live Spark 1.3 model runs for morning brief
 
 Engineering can continue with source tests, disposable data, browser fixtures, simulator builds and package checks. Wider distribution additionally needs:
 
-1. A working private vulnerability-reporting route and confirmation of repository merge rules.
+1. A non-owner check of the private vulnerability-reporting route and confirmation of repository merge rules.
 2. An active Apple Developer Program membership, a Developer ID Application
    certificate and notarization credentials. Build the signed candidate through
    the isolated packaging path, verify the exact `.dmg`/`.zip` and its SHA-256
