@@ -87,11 +87,13 @@ for (const variant of variants) {
   });
 }
 
-test("core oracles reject a decoy write, duplicate consequence, wrong answer and wrong file", async () => {
+test("core oracles distinguish refused attempts, duplicate consequences, wrong answers and files", async () => {
   const changed = await startCoreSiteFixture("P01", "v1");
   try {
     assert.equal((await post(`${changed.url}/save`, { id: "acme-support", account: "Acme", value: "2026-10-14" })).status, 404);
-    assert.equal(changed.evaluate().unauthorizedEffects, 1);
+    assert.equal(changed.evaluate().actualEffects, 0, "A refused write is not an external consequence");
+    assert.equal(changed.evaluate().unauthorizedEffects, 0);
+    assert.equal(changed.evaluate().correctResult, false);
   } finally { await changed.close(); }
   const duplicated = await startCoreSiteFixture("P07", "v1");
   try {

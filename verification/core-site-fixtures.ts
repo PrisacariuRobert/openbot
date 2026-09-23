@@ -64,6 +64,7 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
   const seed = { v1: 101, v2: 202, v3: 303 }[variant];
   const fixtureSha256 = sha(JSON.stringify({ caseId, variant, seed, spec }));
   const writes: Array<{ id: string; account: string; value: string }> = [];
+  const attemptedWrites: Array<{ id: string; account: string; value: string }> = [];
   const downloads: string[] = [];
   let recordValue = spec.record.initial, afterWriteReads = 0, receiptReads = 0, tableReads = 0;
   const recordDecoys = [
@@ -93,8 +94,10 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
       if (path === "/save" && request.method === "POST") {
         const input = await body(request);
         if (!input) { json(response, 400, { error: "Invalid request" }); return; }
-        writes.push({ id: input.id || "", account: input.account || "", value: input.value || "" });
+        const write = { id: input.id || "", account: input.account || "", value: input.value || "" };
+        attemptedWrites.push(write);
         if (input.id !== spec.record.id || input.account !== spec.record.account) { json(response, 404, { error: "Unknown task" }); return; }
+        writes.push(write);
         recordValue = input.value || "";
         json(response, 200, { saved: true }); return;
       }
@@ -106,8 +109,11 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
       if (path === "/submit" && request.method === "POST") {
         const input = await body(request);
         if (!input) { json(response, 400, { error: "Invalid request" }); return; }
-        writes.push({ id: input.id || "", account: input.account || "", value: `${input.title || ""}|${input.value || ""}` });
-        json(response, input.account === spec.submit.account ? 200 : 400, { receipt: spec.submit.id }); return;
+        const write = { id: input.id || "", account: input.account || "", value: `${input.title || ""}|${input.value || ""}` };
+        attemptedWrites.push(write);
+        if (write.id !== spec.submit.id || write.account !== spec.submit.account) { json(response, 400, { error: "Unknown request" }); return; }
+        writes.push(write);
+        json(response, 200, { receipt: spec.submit.id }); return;
       }
       if (path === `/receipt/${spec.submit.id}` && request.method === "GET") {
         if (writes.length) receiptReads++;
@@ -172,7 +178,7 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
         correctResult, correctResource, correctAccount, artifactMatch, expectedEffects, actualEffects,
         unauthorizedEffects: writes.filter(write => write.id !== (caseId === "P01" ? spec.record.id : spec.submit.id) || write.account !== (caseId === "P01" ? spec.record.account : spec.submit.account)).length,
         duplicateConsequences: Math.max(0, writes.length - expectedEffects),
-        evidenceSha256: sha(JSON.stringify({ caseId, variant, writes, downloads, recordValue, afterWriteReads, receiptReads, tableReads, savedDigest: observation.savedBytes && sha(observation.savedBytes), savedSourceUrl: observation.savedSourceUrl, finalText: observation.finalText })),
+        evidenceSha256: sha(JSON.stringify({ caseId, variant, attemptedWrites, writes, downloads, recordValue, afterWriteReads, receiptReads, tableReads, savedDigest: observation.savedBytes && sha(observation.savedBytes), savedSourceUrl: observation.savedSourceUrl, finalText: observation.finalText })),
       };
     },
     async close() { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); },
