@@ -49,3 +49,19 @@ test("slim instructions stay well under the old size", () => {
   const text = instructions();
   assert.ok(text.length < 16_000, `instructions grew to ${text.length} characters`);
 });
+
+test("the runtime gets a short teammate identity instead of its coding-assistant prompt", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-agent-prompt-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const config = JSON.parse(readFileSync(path.join(prepareWorkspace(db, db.getBot("nova")!), "opencode.json"), "utf8"));
+    const prompt = config.agent.openbot.prompt as string;
+    assert.match(prompt, /You are Nova, a persistent OpenBot teammate/);
+    assert.match(prompt, /never claim an action happened unless a tool confirmed it/);
+    assert.ok(prompt.length < 400);
+    assert.deepEqual(config.instructions, ["AGENTS.md"], "the full instructions still load");
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

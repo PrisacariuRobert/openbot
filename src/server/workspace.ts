@@ -46,7 +46,7 @@ export function connectedAppsText(db: OpenBotDatabase, bot: Bot) {
   const gmailText = googleCapability.gmail.read && gmail?.canRead && !unavailable.has("gmail")
     ? `- Gmail search and reading are available now.${gmail.canSend && googleCapability.gmail.write ? " Use gmail_reply for a reply in an existing conversation (read the original first), and gmail_send only for new mail. Both use the normal exact-action review. When a reply needs a meeting link, create the owner-approved event first, use the confirmed link, then propose the reply. Do not claim an invitation means the reply was sent." : " Sending is turned off or needs a Google reconnect."}`
     : unavailable.has("gmail") ? "- The Gmail connector needs its Google API switch turned on. Other connected Google apps may still work; check Website access below for a permitted browser alternative." : "- The Gmail connector is not available to you right now. Check Website access below; a missing connector does not mean the website is unavailable.";
-  return [gmailText,
+  const lines = [gmailText,
     drive?.canRead && googleCapability["google-drive"].read && !unavailable.has("google-drive") ? `- Google Drive search and supported document reading are available now. Use returned file links for formats that need a dedicated viewer.${drive.canSend && googleCapability["google-drive"].write ? " You may prepare a new text file, but google_drive_create always pauses for approval of its exact name and content preview." : " Creating files is turned off or needs a Google reconnect."}` : unavailable.has("google-drive") ? "- Google Drive needs its Google API switch turned on. Gmail and Calendar may still work." : "- Google Drive is not available to you right now.",
     calendar?.canRead && googleCapability["google-calendar"].read && !unavailable.has("google-calendar") ? `- Google Calendar agenda reading is available now. Treat event details as current private context.${calendar.canSend && googleCapability["google-calendar"].write ? " You may prepare an event or invitation, but google_calendar_create always pauses for approval of the exact time and guests." : " Creating events is turned off or needs a Google reconnect."}` : unavailable.has("google-calendar") ? "- Google Calendar needs its Google API switch turned on. Gmail and Drive may still work." : "- Google Calendar is not available to you right now.",
     githubConnected && github?.canRead ? `- GitHub notifications and issue search are available now.${github.canSend ? " You may prepare a new issue, but creating it always pauses for the user to approve the exact repository and title." : " Creating issues is turned off for you."}` : "- GitHub activity is not available to you right now.",
@@ -54,7 +54,11 @@ export function connectedAppsText(db: OpenBotDatabase, bot: Bot) {
     notionConnected && notion?.canRead ? `- Notion search and page reading are available now for pages selected during connection.${notionEventsReady ? " Verified Notion changes can also start an automation with routine_create." : " Live Notion events still need setup in Apps & Tools."}${notion.canSend ? " You may prepare content to append, but notion_update always pauses for approval of the exact note." : " Adding content is turned off for you."}` : "- Notion is not available to you right now.",
     todoistConnected && todoist?.canRead ? `- Todoist task reading is available now.${todoist.canSend ? " You may prepare a new task, but todoist_task_create always pauses for approval of the exact title and due date. You may also correct one listed task by its exact id with todoist_task_update or finish it with todoist_task_complete; both always pause for approval and address the task id, never a title." : " Creating tasks is turned off for you."}` : "- Todoist is not available to you right now.",
     dropboxConnected && dropbox?.canRead ? "- Dropbox file search and bounded reading for supported text and code files are available now. Dropbox is read-only in OpenBot." : "- Dropbox is not available to you right now.",
-  ].join("\n");
+  ];
+  // Plain "not available" services share one line; lines with guidance stay.
+  const plainUnavailable = /^- (.+) is not available to you right now\.$/;
+  const names = lines.map((line) => plainUnavailable.exec(line)?.[1]).filter((name): name is string => Boolean(name));
+  return [...lines.filter((line) => !plainUnavailable.test(line)), ...(names.length ? [`- Not available to you right now: ${names.join(", ")}.`] : [])].join("\n");
 }
 
 function codeProjectsText(db: OpenBotDatabase, bot: Bot) {
@@ -89,6 +93,10 @@ export function isolateWorkspaceRepository(root: string, init: (dir: string) => 
     if (existsSync(path.join(dir, ".git"))) { init(root); return true; }
     if (path.dirname(dir) === dir) return false;
   }
+}
+
+export function teammateSystemPrompt(bot: Bot) {
+  return `You are ${bot.name}, a persistent OpenBot teammate helping one owner through a chat conversation. Your role, rules and current capabilities are in the instructions that follow. Act only through the tools you are given, and never claim an action happened unless a tool confirmed it.`;
 }
 
 export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = false) {
@@ -296,7 +304,10 @@ ${operatingRules}
     $schema: "https://opencode.ai/config.json",
     permission,
     default_agent: reportOnly ? "openbot-report" : "openbot",
-    agent: { [reportOnly ? "openbot-report" : "openbot"]: { mode: "primary", description: "OpenBot's scoped teammate runtime", permission } },
+    // An agent prompt replaces the runtime's default coding-assistant system
+    // prompt (~1.8k tokens per model step, and the wrong identity for a
+    // teammate); AGENTS.md is still loaded through `instructions`.
+    agent: { [reportOnly ? "openbot-report" : "openbot"]: { mode: "primary", description: "OpenBot's scoped teammate runtime", prompt: teammateSystemPrompt(bot), permission } },
     ...(!reportOnly ? { tools } : {}),
     instructions: ["AGENTS.md"],
   }, null, 2), "utf8");

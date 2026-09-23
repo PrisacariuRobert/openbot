@@ -43,7 +43,8 @@ test("current task prompts surface relevant methods, honor opt-outs and preserve
     assert.match(runner["buildPrompt"](run, db.getBot("nova")!, true), /Conversation style:/);
     assert.match(prompt, /bundled-document-to-action-items/);
     const context = prompt.split("Reviewed methods already available")[1]!.split("Completion rules:")[0]!;
-    assert.equal((context.match(/- bundled-/g) || []).length, 3);
+    const suggested = (context.match(/- bundled-/g) || []).length;
+    assert.ok(suggested >= 1 && suggested <= 3, `only relevant methods, at most three (got ${suggested})`);
     assert.ok(context.length < 1_400);
     new CommunitySkills(db).remove("bundled-document-to-action-items");
     assert.doesNotMatch(runner["buildPrompt"](run, db.getBot("nova")!, true), /bundled-document-to-action-items/);

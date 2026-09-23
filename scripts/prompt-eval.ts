@@ -3,7 +3,7 @@
  * sends fixed requests to one teammate through the real API and runtime,
  * and records outcome checks, prompt size and latency.
  *
- *   node --import tsx scripts/prompt-eval.ts [--model opencode-go/deepseek-v4.1-flash] [--repeat 2] [--label baseline]
+ *   node --import tsx scripts/prompt-eval.ts [--model opencode-go/muse-spark-1.3-contributor] [--repeat 2] [--label baseline]
  *
  * Uses the owner's own OpenCode model access and never touches the real
  * studio. Results are written to qa/prompt-eval/<label>.json.
@@ -22,7 +22,7 @@ const argument = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
   return index > 0 && process.argv[index + 1] ? process.argv[index + 1]! : fallback;
 };
-const MODEL = argument("model", "opencode-go/deepseek-v4.1-flash");
+const MODEL = argument("model", "opencode-go/muse-spark-1.3-contributor");
 const REPEAT = Number(argument("repeat", "2"));
 const LABEL = argument("label", "run");
 const ONLY = argument("only", "");
@@ -116,7 +116,7 @@ async function runCase(item: Case, attempt: number) {
   let log = "";
   for (const stream of [child.stdout!, child.stderr!]) stream.on("data", (chunk) => { log = (log + chunk).slice(-4000); });
   const exited = once(child, "exit");
-  const result = { case: item.id, attempt, status: "not_started", pass: false, problem: "" as string | null, seconds: 0, contextTokens: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, modelSteps: 0, agentsMdChars: 0, reply: "" };
+  const result = { case: item.id, attempt, status: "not_started", pass: false, problem: "" as string | null, seconds: 0, contextTokens: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, modelSteps: 0, agentsMdChars: 0, reply: "", error: "" };
   try {
     let ready = false;
     for (let n = 0; n < 300 && !ready && child.exitCode === null; n++) {
@@ -134,7 +134,7 @@ async function runCase(item: Case, attempt: number) {
       await delay(500);
     }
     if (!run) throw new Error("no run created");
-    const reply = (db.prepare("SELECT body FROM messages WHERE sender_type='bot' AND thread_id=? ORDER BY created_at DESC LIMIT 1").get(threadId) as { body: string } | undefined)?.body || String(run.result || "");
+    const reply = (db.prepare("SELECT body FROM messages WHERE sender_type='bot' AND thread_id=? AND run_id=? ORDER BY created_at DESC LIMIT 1").get(threadId, run.id) as { body: string } | undefined)?.body || String(run.result || "");
     Object.assign(result, {
       status: String(run.status), seconds: Math.round((Date.now() - started) / 100) / 10,
       inputTokens: Number(run.input_tokens || 0), cacheReadTokens: Number(run.cache_read_tokens || 0), outputTokens: Number(run.output_tokens || 0),
@@ -142,7 +142,10 @@ async function runCase(item: Case, attempt: number) {
       agentsMdChars: existsSync(path.join(workspace, "AGENTS.md")) ? readFileSync(path.join(workspace, "AGENTS.md"), "utf8").length : 0,
     });
     result.contextTokens = result.inputTokens + result.cacheReadTokens;
-    result.problem = item.check({ status: result.status, reply, db, workspace, runId: String(run.id) });
+    result.error = String(run.error || "").slice(0, 400);
+    // A run that never reached the model is an infrastructure failure, not
+    // a behavior result, whatever the case's own check would say.
+    result.problem = result.modelSteps === 0 ? `never reached the model: ${result.error || result.status}` : item.check({ status: result.status, reply, db, workspace, runId: String(run.id) });
     result.pass = result.problem === null;
     db.close();
   } catch (error) {

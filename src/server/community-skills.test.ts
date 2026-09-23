@@ -68,3 +68,26 @@ test("memory correction and deletion invalidate old sessions; notes stay private
     assert.equal(toolAvailability(db, db.getBot("nova")!, true).memory_search, false);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+test("unprompted method suggestions need a real match, not a shared letter pair", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const { OpenBotDatabase } = await import("./testing/database.js");
+  const { CommunitySkills } = await import("./community-skills.js");
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-relevant-methods-"));
+  const db = new OpenBotDatabase(root);
+  try {
+    const skills = new CommunitySkills(db);
+    const ids = (request: string) => skills.relevant("nova", request).map((skill) => skill.id);
+    for (const request of ["hi", "how are you", "Email Anna the summary", "Write a 5-item packing checklist"]) assert.deepEqual(ids(request), [], request);
+    assert.equal(ids("Turn these meeting notes into action items")[0], "bundled-meeting-action-items");
+    assert.deepEqual(ids("Plan my week"), ["bundled-weekly-review-planning"]);
+    assert.deepEqual(ids("What are the total expenses in expenses.csv, per currency?"), ["bundled-checked-spreadsheet-analysis"]);
+    assert.deepEqual(ids("Pull the obligations and deadlines out of this contract"), ["bundled-document-to-action-items"]);
+    assert.ok(ids("Turn these meeting notes into action items").length <= 3);
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
