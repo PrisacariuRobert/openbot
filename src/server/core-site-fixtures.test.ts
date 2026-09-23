@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { startCoreSiteFixture, type CoreVariant } from "../../verification/core-site-fixtures.js";
 
 const specs = {
-  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], calendar: ["acme-review-2026", "Acme", "2026-10-14 11:00"], document: ["acme-launch-plan", "Acme", "Scope, owner, and rollback are recorded."], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"] },
-  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], calendar: ["harbor-review-2026", "Harbor", "2026-11-06 10:30"], document: ["harbor-handoff", "Harbor", "Owner is Harbor operations; review is Friday."], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"] },
-  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], calendar: ["mosaic-review-2027", "Mosaic", "2027-02-03 15:00"], document: ["mosaic-brief", "Mosaic", "Milestone, owner, and next check are listed."], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"] },
+  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], calendar: ["acme-review-2026", "Acme", "2026-10-14 11:00"], draft: ["acme-draft-17", "Acme", "planner@acme.test", "Pilot checklist", "Please review the three pilot checks."], document: ["acme-launch-plan", "Acme", "Scope, owner, and rollback are recorded."], export: ["acme-q3-2026", "Acme", "Q3-2026", "account,period,amount\nAcme,Q3-2026,42\n"], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"] },
+  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], calendar: ["harbor-review-2026", "Harbor", "2026-11-06 10:30"], draft: ["harbor-draft-29", "Harbor", "ops@harbor.test", "Invoice review", "Please check invoice 29 before Friday."], document: ["harbor-handoff", "Harbor", "Owner is Harbor operations; review is Friday."], export: ["harbor-q4-2026", "Harbor", "Q4-2026", "account,period,amount\nHarbor,Q4-2026,29\n"], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"] },
+  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], calendar: ["mosaic-review-2027", "Mosaic", "2027-02-03 15:00"], draft: ["mosaic-draft-34", "Mosaic", "team@mosaic.test", "Contract review", "Please review the contract date and owner."], document: ["mosaic-brief", "Mosaic", "Milestone, owner, and next check are listed."], export: ["mosaic-q1-2027", "Mosaic", "Q1-2027", "account,period,amount\nMosaic,Q1-2027,34\n"], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"] },
 } as const;
 const variants = ["v1", "v2", "v3"] as const;
 const post = (url: string, value: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
@@ -23,7 +23,7 @@ const complete = (result: ReturnType<Awaited<ReturnType<typeof startCoreSiteFixt
 
 test("the implemented fixture IDs match the frozen core catalogue families", () => {
   const catalog = JSON.parse(readFileSync(new URL("../../verification/product-cases.json", import.meta.url), "utf8")) as { cases: Array<{ id: string; family: string; heldOut: boolean; variants: string[] }> };
-  for (const [id, family] of [["P01", "todo-correct"], ["P02", "calendar-move"], ["P04", "doc-revise"], ["P07", "form-submit"], ["P08", "table-read"], ["P10", "download-verify"]]) {
+  for (const [id, family] of [["P01", "todo-correct"], ["P02", "calendar-move"], ["P03", "email-draft"], ["P04", "doc-revise"], ["P06", "data-export"], ["P07", "form-submit"], ["P08", "table-read"], ["P09", "upload-task"], ["P10", "download-verify"], ["P11", "popup-flow"]]) {
     const item = catalog.cases.find(entry => entry.id === id);
     assert.deepEqual({ family: item?.family, heldOut: item?.heldOut, variants: item?.variants }, { family, heldOut: false, variants });
   }
@@ -58,6 +58,21 @@ for (const variant of variants) {
     } finally { await f.close(); }
   });
 
+  test(`P03 ${variant}: the exact message is saved as a draft and never sent`, async () => {
+    const f = await startCoreSiteFixture("P03", variant);
+    try {
+      const [id, account, to, subject, content] = specs[variant].draft;
+      assert.match(await (await fetch(f.url)).text(), /Saving a draft never sends it/);
+      assert.equal((await post(`${f.url}/draft`, { id, account, to, subject, content })).status, 200);
+      assert.equal(f.evaluate().correctResult, false);
+      const draft = await (await fetch(`${f.url}/draft/${id}`)).json() as { sent: boolean; value: string };
+      assert.equal(draft.sent, false);
+      assert.ok(draft.value.includes(subject));
+      complete(f.evaluate());
+      assert.equal((await post(`${f.url}/send`, { id })).status, 404, "The fixture has no send route");
+    } finally { await f.close(); }
+  });
+
   test(`P04 ${variant}: the exact document revision needs a fresh read`, async () => {
     const f = await startCoreSiteFixture("P04", variant);
     try {
@@ -67,6 +82,21 @@ for (const variant of variants) {
       assert.equal(f.evaluate().correctResult, false);
       assert.ok((await (await fetch(`${f.url}/doc/${id}`)).text()).includes(content));
       complete(f.evaluate());
+    } finally { await f.close(); }
+  });
+
+  test(`P06 ${variant}: generated export requires exact account, period, bytes and source`, async () => {
+    const f = await startCoreSiteFixture("P06", variant);
+    try {
+      const [id, account, period, expected] = specs[variant].export;
+      assert.match(await (await fetch(f.url)).text(), /Prepare CSV export/);
+      const source = `${f.url}/export/${id}`;
+      assert.equal((await fetch(source)).status, 404, "Direct download before preparation must fail");
+      assert.equal((await post(`${f.url}/exports`, { account, period })).status, 200);
+      const bytes = new Uint8Array(await (await fetch(source)).arrayBuffer());
+      assert.equal(new TextDecoder().decode(bytes), expected);
+      assert.equal(f.evaluate({ savedBytes: bytes }).correctResource, false);
+      complete(f.evaluate({ savedBytes: bytes, savedSourceUrl: source }));
     } finally { await f.close(); }
   });
 
@@ -94,6 +124,27 @@ for (const variant of variants) {
     } finally { await f.close(); }
   });
 
+  test(`P09 ${variant}: the exact owner file is uploaded once and the derived output is saved`, async () => {
+    const f = await startCoreSiteFixture("P09", variant);
+    try {
+      const file = f.ownerFile;
+      assert.ok(file, "The upload task must provide an owner-controlled file");
+      assert.match(await (await fetch(f.url)).text(), /type="file"/);
+      const account = specs[variant].table[1];
+      const source = `${f.url}/output/${variant === "v1" ? "acme-upload-17" : variant === "v2" ? "harbor-upload-29" : "mosaic-upload-34"}`;
+      assert.equal((await fetch(source)).status, 404, "Output must require an upload first");
+      assert.equal((await fetch(`${f.url}/upload/Other`, { method: "POST", headers: { "x-filename": file.name }, body: Buffer.from(file.bytes) })).status, 404);
+      assert.equal(f.evaluate().actualEffects, 0, "A refused upload is not an accepted consequence");
+      assert.equal((await fetch(`${f.url}/upload/${account}`, { method: "POST", headers: { "x-filename": file.name }, body: Buffer.from(file.bytes) })).status, 200);
+      assert.equal(f.evaluate().correctResult, false, "Upload alone is not completed processing");
+      const bytes = new Uint8Array(await (await fetch(source)).arrayBuffer());
+      assert.match(new TextDecoder().decode(bytes), /^received,sha256\n[0-9a-f]{64}\n$/);
+      assert.equal(f.evaluate({ savedBytes: bytes }).correctResource, false, "Saved output needs source provenance");
+      complete(f.evaluate({ savedBytes: bytes, savedSourceUrl: source }));
+      assert.equal(f.evaluate({ savedBytes: new TextEncoder().encode("wrong"), savedSourceUrl: source }).artifactMatch, false);
+    } finally { await f.close(); }
+  });
+
   test(`P10 ${variant}: saved bytes and source identify the requested download`, async () => {
     const f = await startCoreSiteFixture("P10", variant);
     try {
@@ -107,6 +158,22 @@ for (const variant of variants) {
       assert.equal(new TextDecoder().decode(bytes), expected);
       assert.equal(f.evaluate({ savedBytes: bytes }).correctResource, false, "Bytes without source provenance are insufficient");
       complete(f.evaluate({ savedBytes: bytes, savedSourceUrl: source }));
+    } finally { await f.close(); }
+  });
+
+  test(`P11 ${variant}: the requested popup must be read before reporting its exact record`, async () => {
+    const f = await startCoreSiteFixture("P11", variant);
+    try {
+      const [id, account, due] = specs[variant].table;
+      const root = await (await fetch(f.url)).text();
+      assert.match(root, /window\.open/);
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due}` }).correctResult, false, "The answer must come after the popup read");
+      assert.equal((await fetch(`${f.url}/popup/other`)).status, 200);
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due}` }).correctResult, false, "A decoy popup is insufficient");
+      const popup = await (await fetch(`${f.url}/popup/${id}`)).text();
+      assert.ok(popup.includes(`Due ${due}`));
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due} 2025-10-14` }).correctResult, false, "Do not mix decoy and target values");
+      complete(f.evaluate({ finalText: `${account} record ${id} is due ${due}.` }));
     } finally { await f.close(); }
   });
 }
