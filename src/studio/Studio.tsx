@@ -105,6 +105,7 @@ const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((mod
 
 type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
+  | { kind: "new" }
   | { kind: "create" }
   | { kind: "group"; threadId?: string }
   | { kind: "workspace" }
@@ -1453,10 +1454,12 @@ export function Studio() {
     (item) =>
       !item.hidden &&
       !item.pinned && (!needsYouOnly || item.needsYou) &&
+      (item.id !== "team-room" || Boolean(item.lastMessage || item.needsYou)) &&
       conversationMatches(item, allBots, conversationQuery),
   );
   const groupThreads = visibleThreads.filter(isGroupThread);
   const dmThreads = visibleThreads.filter((item) => !isGroupThread(item));
+  const filteredConversationCount = pinnedThreads.length + visibleThreads.length;
   const threadRow = (item: Thread) => {
       const bot = allBots.find((bot) => bot.threadId === item.id);
       const members = (item.botIds || [])
@@ -1747,12 +1750,21 @@ export function Studio() {
     <>
       {dmThreads.length > 0 && <span className="conversation-section-label">Recent</span>}
       {dmThreads.map(threadRow)}
-      <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
-        <summary>Project rooms</summary>
-        {groupThreads.map(threadRow)}
-        <button className="compose-secondary" onClick={() => setDetail({ kind: "group" })}><Plus size={15} /> New project room</button>
-      </details>
-      {archivedThreads.length > 0 && (
+      {groupThreads.length > 0 && (
+        <details className="project-rooms" open={groupThreads.some((item) => item.id === thread) || Boolean(conversationQuery) || undefined}>
+          <summary>Shared chats</summary>
+          {groupThreads.map(threadRow)}
+        </details>
+      )}
+      {filteredConversationCount === 0 && (needsYouOnly || conversationQuery || Boolean(state?.bots.length)) && (
+        <div className="conversation-list-empty" role="status">
+          <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
+          <strong>{needsYouOnly ? "All caught up" : conversationQuery ? "No chats found" : "Start a conversation"}</strong>
+          <span>{needsYouOnly ? "Your teammates will ask when they need you." : conversationQuery ? "Try another name or word." : "Choose a teammate and say hello."}</span>
+          {conversationQuery && <button type="button" onClick={() => setConversationQuery("")}>Clear search</button>}
+        </div>
+      )}
+      {archivedThreads.length > 0 && !needsYouOnly && !conversationQuery && (
         <details className="archived-chats">
           <summary>Archived ({archivedThreads.length})</summary>
           {archivedThreads.map((item) => (
@@ -1805,18 +1817,20 @@ export function Studio() {
             <span className="conversation-new">
               <button
                 className="compose-primary"
-                aria-label="New message"
-                title="New message"
-                onClick={() => setDetail({ kind: "create" })}
+                aria-label="New conversation"
+                title="New conversation"
+                onClick={() => setDetail({ kind: state?.bots.length ? "new" : "create" })}
               >
                 <Plus size={20} />
               </button>
             </span>
           </header>
-          <div className="conversation-filters" aria-label="Filter conversations">
-            <button aria-pressed={!needsYouOnly} onClick={() => setNeedsYouOnly(false)}>All</button>
-            <button aria-pressed={needsYouOnly} onClick={() => setNeedsYouOnly(true)}>Needs you {attentionCount || ""}</button>
-          </div>
+          {Boolean(state?.bots.length) && (
+            <div className="conversation-filters" aria-label="Filter conversations">
+              <button aria-pressed={!needsYouOnly} onClick={() => setNeedsYouOnly(false)}>All</button>
+              <button aria-pressed={needsYouOnly} onClick={() => setNeedsYouOnly(true)}>Needs you {attentionCount || ""}</button>
+            </div>
+          )}
           {activeNow.length > 0 && (
             <div className="active-now" aria-label="Working right now">
               {activeNow.map((bot) => (
@@ -2649,9 +2663,11 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? detail.threadId ? "Room teammates" : "New project room"
+                ? detail.threadId ? "Shared chat members" : "New shared chat"
               : detail.kind === "workspace"
                 ? "Your workspace"
+                : detail.kind === "new"
+                  ? "New conversation"
                 : detail.kind === "create"
                   ? "Create a teammate"
                   : detail.kind === "teammate"
@@ -2698,6 +2714,24 @@ export function Studio() {
                 <ChevronRight size={16} />
               </button>
             </nav>
+          )}
+          {detail.kind === "new" && state && (
+            <div className="new-chat-chooser">
+              <p>Pick a teammate and say what’s on your mind. They can ask another teammate for help when it fits.</p>
+              <div className="new-chat-list" aria-label="Your teammates">
+                {state.bots.map((bot) => (
+                  <button type="button" key={bot.id} onClick={() => openThread(bot.threadId)}>
+                    <Face bot={bot} size={36} />
+                    <span><strong>{bot.name}</strong><small>{bot.role}</small></span>
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+              </div>
+              <div className="new-chat-options">
+                <button type="button" onClick={() => setDetail({ kind: "create" })}><Plus size={18} /> Create a teammate</button>
+                {state.bots.length > 1 && <button type="button" onClick={() => setDetail({ kind: "group" })}><UsersRound size={18} /> Start a shared chat</button>}
+              </div>
+            </div>
           )}
           {detail.kind === "create" && (
             <CreateTeammate

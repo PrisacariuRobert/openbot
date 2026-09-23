@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import type { AppState } from "../shared/types";
 
-/** Create or edit an optional project room: the owner picks the teammates; the
- * room keeps them. Mentions and the usual approvals still decide what happens. */
+/** Create or edit an optional shared chat. Mentions and the usual approvals
+ * still decide what happens; bot-to-bot help does not require a shared chat. */
 export function GroupEditor({
   state,
   threadId,
@@ -34,23 +34,22 @@ export function GroupEditor({
         body: JSON.stringify(editing ? { ...(title ? { title } : {}), botIds: members } : { title, botIds: members }),
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That group could not be saved.");
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "That shared chat could not be saved.");
       onOpen((data as { id: string }).id);
       onDone?.();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "That group could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "That shared chat could not be saved.");
     } finally {
       setBusy(false);
     }
   };
   return (
     <div className="group-editor">
-      <p className="overline">{editing ? "PROJECT ROOM" : "NEW PROJECT ROOM"}</p>
-      <h2 className="detail-title">{editing ? editing.title : "Project room"}</h2>
+      {editing && <h2 className="detail-title">{editing.title}</h2>}
       <p className="drawer-intro">
         {editing
-          ? "Rename the project room or change its teammates. Members change affects future tasks; running work keeps going."
-          : "Project rooms are optional shared conversations for project decisions and files. No room is needed for bots to ask each other for help."}
+          ? "Rename this chat or change who's here. Changes affect future tasks; work already running keeps going."
+          : "Keep a project conversation, its files, and several teammates together. Teammates can ask each other for help in any chat."}
       </p>
       <label className="group-name">
         <UsersRound size={15} />
@@ -58,12 +57,12 @@ export function GroupEditor({
           value={title}
           maxLength={48}
           required
-          placeholder="Room name"
-          aria-label="Room name"
+          placeholder="Chat name"
+          aria-label="Chat name"
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
-      <div className="group-members" role="group" aria-label="Room teammates">
+      <div className="group-members" role="group" aria-label="Shared chat teammates">
         {state.bots.map((bot) => (
           <button
             type="button"
@@ -78,13 +77,14 @@ export function GroupEditor({
           </button>
         ))}
       </div>
+      {!editing && <p className="group-members-hint">Choose at least two teammates.</p>}
       {error && <p className="extension-error" role="alert">{error}</p>}
       <button
         className="primary full-width"
-        disabled={busy || !title.trim() || !members.length}
+        disabled={busy || !title.trim() || members.length < (editing ? 1 : 2)}
         onClick={() => void save()}
       >
-        {editing ? "Save changes" : "Create room"} <ArrowRight size={15} />
+        {editing ? "Save changes" : "Create shared chat"} <ArrowRight size={15} />
       </button>
     </div>
   );
