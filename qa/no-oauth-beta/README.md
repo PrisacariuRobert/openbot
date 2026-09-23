@@ -16,6 +16,7 @@ Verification:
 - `npm test`: 963 passed.
 - `npm run check`, `npm run check:acceptance`, and `npm run check:release`: passed.
 - `npm run test:desktop`: 9 passed.
+- `npm run test:first-teammate`: passed at 1440, 390 and 320 px with one connected provider; verified no subscription or model is preselected, a model choice enables creation, refreshing preserves the draft, and the real creation API stores the selected teammate.
 - `npm run test:packaging`: 17 passed.
 - `npm run package:desktop`: passed; produced actual unsigned Apple Silicon DMG and ZIP, each with an arm64 Electron shell and arm64 Node/OpenCode runtime. The DMG checksum verified on read-only mount and contained the app and Applications link. The target-architecture regression guard prevents accidentally bundling a different runtime architecture.
 - `OPENBOT_TEST_BUNDLE="$PWD/dist-release/openbot-0.37.0-beta.1-darwin-arm64" OPENBOT_TEST_EXECUTABLE="$PWD/desktop/release/mac-arm64/OpenBot.app/Contents/MacOS/OpenBot" OPENBOT_TEST_ALL_SCREENS=1 npm run test:figma-conversation`: passed against the final packaged app, including browser-access setup routing, optional API setup, 14 workspace routes at desktop and phone sizes, conversation actions, recovery, stored document bytes, explicit model switching, and a blank new-teammate connection choice.

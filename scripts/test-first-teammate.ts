@@ -107,27 +107,34 @@ try {
       .fill("Find a realistic plan. Ask before changing my calendar.");
     await sheet.getByRole("button", { name: "Sprout shape" }).click();
     await sheet.getByRole("button", { name: "Leaf character" }).click();
+    await sheet.getByText("Choose your AI service", { exact: true }).waitFor();
     assert.equal(
       await sheet.getByRole("combobox", { name: "AI connection" }).innerText(),
-      provider.name,
-      "A sole connected provider preselects itself",
+      "Choose your AI service",
+      "Even a sole connected provider needs an explicit choice",
     );
     assert.ok(
-      await sheet
-        .getByRole("button", { name: "Create teammate", exact: true })
-        .isEnabled(),
-      "A sole provider and model preselect, so the form is submittable",
+      await sheet.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(),
+      "A teammate cannot be created before choosing the subscription and model",
     );
+    assert.equal(await sheet.getByRole("combobox", { name: /^Model/ }).count(), 0);
     await sheet.getByRole("combobox", { name: "AI connection" }).click();
     await sheet.getByRole("option", { name: provider.name, exact: true }).click();
     assert.equal(
       await sheet.getByRole("combobox", { name: /^Model/ }).innerText(),
       "Choose a model",
-      "Re-picking the provider resets the model",
+      "Choosing a provider still requires an explicit model",
     );
+    assert.ok(await sheet.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
     await sheet
       .getByRole("combobox", { name: /^Model/ })
       .click();
+    await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
+    assert.ok(await sheet.getByRole("button", { name: "Create teammate", exact: true }).isEnabled());
+    await sheet.getByRole("combobox", { name: "AI connection" }).click();
+    await sheet.getByRole("option", { name: provider.name, exact: true }).click();
+    assert.equal(await sheet.getByRole("combobox", { name: /^Model/ }).innerText(), "Choose a model", "Re-picking the provider resets the model");
+    await sheet.getByRole("combobox", { name: /^Model/ }).click();
     await sheet.getByRole("option", { name: "opencode/fixture-only", exact: true }).click();
     available = false;
     await sheet.getByRole("button", { name: "Refresh connections" }).click();
