@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { BrowserTarget } from "./safety.js";
 import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright-core";
+import sharp from "sharp";
 import type { ComputerStatus, SkillStep, TaughtWorkflow } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { skillSlug } from "../shared/skills.js";
@@ -673,7 +674,10 @@ export class BrowserManager {
     try {
       return await page.evaluate(() => {
         const root = document.documentElement;
-        const html = root ? root.outerHTML : "";
+        // Chromium's screenshot path may leave an empty style attribute on
+        // controls after temporarily hiding the caret. It has no visual or
+        // behavioral effect and must not invalidate the captured document.
+        const html = root ? root.outerHTML.replace(/ style=""/g, "") : "";
         const sample = `${document.title}|${html.length}|${html.slice(0, 2000)}|${html.slice(-2000)}`;
         let hash = 0x811c9dc5;
         for (let index = 0; index < sample.length; index += 1) {
@@ -1411,6 +1415,55 @@ export class BrowserManager {
     } catch { return null; }
   }
 
+  /** Read-only model image. The pixel bytes are returned only to the trusted
+   * adapter, which emits an actual image result instead of base64 prose. */
+  async visualObserve(botId: string, runId: string, sessionId: string) {
+    const observed = await this.observeScoped(botId, runId, { surface: "browser-visual", sessionId });
+    const capture = getObservation(observed.observationId);
+    if (!capture || capture.secureMode || this.secureHandoffActive(botId)) throw new Error("The owner is using a private browser handoff. No image was captured.");
+    const page = await this.page(botId);
+    if (capture.page !== page) throw new Error("The browser tab changed. Observe it again.");
+    this.assertPageAccess(botId, page);
+    const before = this.documentEpochFor(botId, page, (await this.contentGeneration(page)).hash);
+    if (before !== capture.documentEpoch) throw new Error("The page changed before capture. Observe it again.");
+    const run = this.db.getRun(runId);
+    if (!run || run.status !== "running" || capture.ownerEpoch !== this.ownerEpochFor(run.threadId, botId)) throw new Error("Browser control changed before capture.");
+    // Collect CSS-pixel bounds in the current viewport. Playwright's mask
+    // option mutates inline styles during capture, which changes the document
+    // identity we must bind to; redact host-side after the screenshot instead.
+    const privateRects = await page.evaluate(() => {
+      const nodes = new Set<Element>(document.querySelectorAll('input, textarea, select, [contenteditable], [role="textbox"], [data-openbot-private], iframe'));
+      // Closed shadow roots cannot be inspected from the page. Mask whole
+      // custom elements so a credential control inside one cannot leak.
+      for (const node of document.querySelectorAll("*")) if (node.tagName.includes("-")) nodes.add(node);
+      return [...nodes].map((node) => {
+      const rect = node.getBoundingClientRect();
+      if (![rect.x, rect.y, rect.right, rect.bottom].every(Number.isFinite)) throw new Error("Private browser region could not be bounded.");
+      return { x: Math.max(0, rect.x), y: Math.max(0, rect.y), width: Math.max(0, Math.min(innerWidth, rect.right) - Math.max(0, rect.x)), height: Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.y)) };
+      }).filter((rect) => rect.width > 0 && rect.height > 0);
+    });
+    const rawBytes = await page.screenshot({ type: "jpeg", quality: 60, fullPage: false, scale: "css", timeout: 8_000 });
+    const after = this.documentEpochFor(botId, page, (await this.contentGeneration(page)).hash);
+    const current = this.db.getRun(runId);
+    if (after !== before || this.secureHandoffActive(botId) || !current || current.status !== "running" || capture.ownerEpoch !== this.ownerEpochFor(current.threadId, botId)) throw new Error("Browser control or page content changed during capture. Image discarded.");
+    const rawMetadata = await sharp(rawBytes).metadata();
+    if (!rawMetadata.width || !rawMetadata.height || rawMetadata.width > 1280 || rawMetadata.height > 820) throw new Error("The browser image exceeded the safe viewport limit.");
+    const overlay = Buffer.from(`<svg width="${rawMetadata.width}" height="${rawMetadata.height}" xmlns="http://www.w3.org/2000/svg">${privateRects.map((rect) => `<rect x="${Math.floor(rect.x)}" y="${Math.floor(rect.y)}" width="${Math.ceil(rect.width)}" height="${Math.ceil(rect.height)}" fill="#20242d"/>`).join("")}</svg>`);
+    const bytes = await sharp(rawBytes).composite([{ input: overlay }]).jpeg({ quality: 60 }).toBuffer();
+    if (bytes.length > 1_500_000) throw new Error("The browser image exceeded the safe size limit.");
+    const metadata = await sharp(bytes).metadata();
+    if (!metadata.width || !metadata.height || metadata.width > 1280 || metadata.height > 820) throw new Error("The browser image exceeded the safe viewport limit.");
+    return {
+      observationId: observed.observationId, tabId: capture.tabId,
+      capturedAt: new Date(capture.capturedAt).toISOString(),
+      mimeType: "image/jpeg" as const, width: metadata.width, height: metadata.height,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      viewport: capture.viewport, crop: { x: 0, y: 0, width: metadata.width, height: metadata.height },
+      transform: { scale: 1, deviceScale: capture.deviceScale, scroll: capture.scroll },
+      imageBase64: bytes.toString("base64"),
+    };
+  }
+
   /**
    * R03 — Host-captured scoped observation. Everything authoritative is
    * derived by the host: tab/document identity, viewport/scroll/DPR,
@@ -1423,7 +1476,7 @@ export class BrowserManager {
   async observeScoped(
     botId: string,
     runId: string,
-    input: { surface: "browser-dom" | "browser-visual"; sessionId: string },
+    input: { surface: "browser-dom" | "browser-visual"; sessionId: string; visualCapability?: "visual-supported" | "text-only" },
   ): Promise<{ observationId: string; expiresAt: string; textPreview: string; modality: "semantic" | "visual" | "native"; reason: string; targetIds: string[]; targets: Array<{ targetId: string; role: string; label: string }>; paneTokens: string[] }> {
     const run = this.db.getRun(runId);
     if (!run || run.botId !== botId) throw new Error("That task is not available to this teammate.");
@@ -1524,7 +1577,7 @@ export class BrowserManager {
       canvasPrimary: looksCanvas,
       semanticCount: Math.min(250, snapshot.text.split("\n").length),
       opaqueWidgets: looksCanvas ? 1 : 0,
-      visualCapability: this.defaultVisualCapability(),
+      visualCapability: input.visualCapability ?? this.defaultVisualCapability(),
       nativeGranted: false,
     });
     return {

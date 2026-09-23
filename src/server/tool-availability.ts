@@ -47,6 +47,7 @@ export function toolAvailability(
   );
   const semanticBrowser = bot.browserEnabled && db.getStudioSettings().semanticBrowserEnabled;
   set(["browser_observe", "browser_semantic_act"], semanticBrowser);
+  flags.browser_see = semanticBrowser && db.providerForBot(bot.id)?.runtime === "opencode";
   if (semanticBrowser) set(["browser_snapshot", "browser_click", "browser_type", "browser_upload_saved_file"], false);
   set(
     [

@@ -15,12 +15,13 @@ test("semantic browser is off by default and hides selector tools when enabled",
   const runtime = `#!${process.execPath}
 const fs=require('node:fs');if(!process.env.OPENBOT_RUN_ID){console.log('Fixture');process.exit(0)}
 async function call(action,args){const response=await fetch(process.env.OPENBOT_INTERNAL_URL+'/api/internal/tools',{method:'POST',headers:{'content-type':'application/json','x-openbot-token':process.env.OPENBOT_INTERNAL_TOKEN},body:JSON.stringify({botId:process.env.OPENBOT_BOT_ID,runId:process.env.OPENBOT_RUN_ID,action,args})});return response.status}
-Promise.all([call('browser_observe',{}),call('browser_semantic_act',{targetId:'tgt_stale',kind:'click'})]).then(([observe,act])=>{fs.writeFileSync('.semantic-flags-'+process.env.OPENBOT_RUN_ID+'.json',JSON.stringify({observe,act}));console.log(JSON.stringify({type:'text',text:'The semantic browser capability is off.'}))}).catch(e=>{console.error(e);process.exitCode=1});`;
+Promise.all([call('browser_observe',{}),call('browser_see',{}),call('browser_semantic_act',{targetId:'tgt_stale',kind:'click'})]).then(([observe,see,act])=>{fs.writeFileSync('.semantic-flags-'+process.env.OPENBOT_RUN_ID+'.json',JSON.stringify({observe,see,act}));console.log(JSON.stringify({type:'text',text:'The semantic browser capability is off.'}))}).catch(e=>{console.error(e);process.exitCode=1});`;
   const f = await skillAuthoringFixture({ runtime, configure(db) { db.updateBot("nova", { browserEnabled: true }); } });
   try {
     const bot = f.db.getBot("nova")!;
     assert.equal(f.db.getStudioSettings().semanticBrowserEnabled, false);
     assert.equal(toolAvailability(f.db, bot).browser_observe, false);
+    assert.equal(toolAvailability(f.db, bot).browser_see, false);
     assert.equal(toolAvailability(f.db, bot).browser_click, true);
     const workspace = prepareWorkspace(f.db, bot);
     const declared = () => JSON.parse(readFileSync(path.join(workspace, "opencode.json"), "utf8")) as { tools: Record<string, boolean> };
@@ -31,16 +32,18 @@ Promise.all([call('browser_observe',{}),call('browser_semantic_act',{targetId:'t
     const { runs } = await submitted.json() as { runs: Array<{ id: string }> };
     const runId = runs[0]!.id;
     const file = path.join(f.db.workspacesDir, "nova", `.semantic-flags-${runId}.json`);
-    const statuses = await f.until(() => { try { return JSON.parse(readFileSync(file, "utf8")) as { observe: number; act: number }; } catch { return undefined; } });
-    assert.deepEqual(statuses, { observe: 403, act: 403 }, "a stale offered semantic tool must fail at dispatch while the flag is off");
+    const statuses = await f.until(() => { try { return JSON.parse(readFileSync(file, "utf8")) as { observe: number; see: number; act: number }; } catch { return undefined; } });
+    assert.deepEqual(statuses, { observe: 403, see: 403, act: 403 }, "a stale offered semantic tool must fail at dispatch while the flag is off");
     f.db.updateStudioSettings({ semanticBrowserEnabled: true });
     assert.equal(toolAvailability(f.db, bot).browser_observe, true);
+    assert.equal(toolAvailability(f.db, bot).browser_see, true);
     assert.equal(toolAvailability(f.db, bot).browser_semantic_act, true);
     assert.equal(toolAvailability(f.db, bot).browser_click, false);
     assert.equal(toolAvailability(f.db, bot).browser_type, false);
     assert.equal(toolAvailability(f.db, bot).browser_upload_saved_file, false);
     prepareWorkspace(f.db, bot);
     assert.equal(declared().tools.browser_observe, true);
+    assert.equal(declared().tools.browser_see, true);
     assert.equal(declared().tools.browser_semantic_act, true);
     assert.equal(declared().tools.browser_click, false);
     const bridge = spawnSync(process.execPath, [fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url))], {
@@ -51,6 +54,7 @@ Promise.all([call('browser_observe',{}),call('browser_semantic_act',{targetId:'t
     const listed = JSON.parse(bridge.stdout.trim()) as { result: { tools: Array<{ name: string }> } };
     const names = new Set(listed.result.tools.map(({ name }) => name));
     assert.equal(names.has("browser_observe"), true);
+    assert.equal(names.has("browser_see"), true);
     assert.equal(names.has("browser_semantic_act"), true);
     assert.equal(names.has("browser_click"), false);
   } finally { await f.close(); }
