@@ -242,6 +242,14 @@ class OpenCodeAuthBridge {
     if (!response.ok) throw new Error("The sign-in code was not accepted.");
   }
 
+  /** Saves an API key the owner pasted, through OpenCode's own credential
+   * store (the same place its /connect command writes). */
+  async setApiKey(providerId: string, key: string): Promise<void> {
+    const base = await this.ensure();
+    const response = await fetch(`${base}/auth/${encodeURIComponent(providerId)}`, { method: "PUT", headers: this.headers(), body: JSON.stringify({ type: "api", key }), signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error("OpenCode didn't save the key. Try again.");
+  }
+
   stop() { this.child?.kill("SIGTERM"); this.child = null; this.url = null; }
 }
 
@@ -250,7 +258,19 @@ export class ProviderConnectionManager {
   private readonly attempts = new Map<string, ProviderLoginAttempt>();
   private readonly claudeProcesses = new Map<string, ChildProcess>();
 
-  constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop"> = new OpenCodeAuthBridge()) {}
+  constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop" | "setApiKey"> = new OpenCodeAuthBridge()) {}
+
+  /** Paste-a-key setup (OpenCode Go). The key goes straight to OpenCode's
+   * credential store; OpenBot never keeps or shows it. */
+  async saveKey(providerId: "opencode-go", key: string): Promise<ProviderLoginAttempt> {
+    const trimmed = key.trim();
+    if (!/^[A-Za-z0-9_\-.]{20,300}$/.test(trimmed)) throw new Error("That doesn't look like an OpenCode key. Copy it again from opencode.ai.");
+    await this.bridge.setApiKey(providerId, trimmed);
+    const attempt: ProviderLoginAttempt = { id: randomUUID(), providerId: "opencode", status: "connected", url: null, callbackMode: null, instructions: "Key saved.", error: null };
+    this.attempts.set(attempt.id, attempt);
+    this.onChange();
+    return attempt;
+  }
 
   listAttempts(): ProviderLoginAttempt[] { return [...this.attempts.values()].slice(-6); }
 

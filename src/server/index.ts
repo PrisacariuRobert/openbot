@@ -777,6 +777,18 @@ app.post("/api/provider/connect", async (request, response) => {
   catch (error) { response.status(503).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
+app.post("/api/provider/key", async (request, response) => {
+  const parsed = z.object({ providerId: z.literal("opencode-go"), key: z.string().max(400) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Paste your OpenCode Go key." });
+  try {
+    await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
+    const status = await readProviderStatus(db, providerConnections.listAttempts());
+    const instance = status.instances.find((item) => item.id === "local-opencode" && item.connected);
+    if (!instance) return response.status(400).json({ error: "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
+    response.json({ connectionId: instance.id, models: instance.models || [] });
+  } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
+});
+
 app.post("/api/provider/connect/:attemptId/callback", async (request, response) => {
   const parsed = z.object({ code: z.string().trim().min(1).max(4_000) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Paste the sign-in code first." });

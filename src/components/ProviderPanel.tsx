@@ -3,6 +3,7 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
+  ExternalLink,
   KeyRound,
   LoaderCircle,
   Plus,
@@ -78,6 +79,47 @@ const presets: Record<
   },
 };
 
+/** The one-minute path for most people: a $10/month key, pasted once. */
+function RecommendedAI({ onConnected }: { onConnected: (connectionId: string) => Promise<void> }) {
+  const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId: "opencode-go", key }) });
+      const result = await response.json().catch(() => ({})) as { error?: string; connectionId?: string };
+      if (!response.ok || !result.connectionId) throw new Error(result.error || "The key wasn't accepted.");
+      setKey("");
+      await onConnected(result.connectionId);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The key wasn't accepted."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="ai-recommended" aria-labelledby="ai-recommended-title">
+      <span className="ai-recommended-badge">Recommended</span>
+      <h3 id="ai-recommended-title">OpenCode Go</h3>
+      <p>One subscription for your whole team — about $10 a month, with fast, capable models. Set up once, in about a minute.</p>
+      <ol>
+        <li>
+          <span>1</span>
+          <div><strong>Get your key</strong><small>Subscribe to Go, then copy your API key.</small></div>
+          <a className="ai-recommended-link" href="https://opencode.ai/go" target="_blank" rel="noreferrer">Open opencode.ai <ExternalLink size={14} /></a>
+        </li>
+        <li>
+          <span>2</span>
+          <div><strong>Paste it here</strong><small>It goes straight to OpenCode on this Mac. OpenBot never shows it again.</small></div>
+        </li>
+      </ol>
+      <form onSubmit={(event) => void submit(event)}>
+        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your OpenCode Go key" aria-label="OpenCode Go key" />
+        <button type="submit" className="button-primary" disabled={busy || key.trim().length < 20}>{busy ? <LoaderCircle size={15} className="spinner" /> : null}Connect</button>
+      </form>
+      {error && <p className="ai-recommended-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 export function ProviderPanel({
   provider,
   bots,
@@ -110,6 +152,9 @@ export function ProviderPanel({
   const [initialModel, setInitialModel] = useState("");
   const [pendingConnections, setPendingConnections] = useState<Record<string, string>>({});
   const needsChoice = bots.some((bot) => !bot.providerInstanceId && !bot.model);
+  const openCodeEntry = provider?.catalog.find((entry) => entry.id === "opencode");
+  // A saved key that failed its test still needs the simple path: paste again.
+  const openCodeConnected = Boolean(openCodeEntry?.connected) && connectionTests[openCodeEntry?.connectionId || "local-opencode"]?.ok !== false;
   const initial = provider?.instances.find((entry) => entry.id === initialConnection);
   // Polling refreshes the shared status. Never keep showing an old waiting
   // attempt after the runtime has reported success or failure.
@@ -303,7 +348,7 @@ export function ProviderPanel({
             </button>
           ) : (
             <span className="ai-state">
-              {entry.installed ? "Set up in OpenCode" : "Setup needed"}
+              {entry.id === "opencode" && entry.installed ? "Paste a key above" : entry.installed ? "Set up in OpenCode" : "Setup needed"}
             </span>
           )
         }
@@ -312,7 +357,13 @@ export function ProviderPanel({
   };
   return (
     <div className="provider-settings">
-      <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
+      {provider && !openCodeConnected && <RecommendedAI onConnected={async (connectionId) => {
+        setNotice("OpenCode Go is connected. Checking it with a short test…");
+        const result = await onTestConnection(connectionId).catch(() => null);
+        if (result?.ok) setNotice("OpenCode Go is connected and working. Choose it when you create a teammate.");
+        else { setNotice(null); setError(result?.error ? `The key was saved, but the test didn't pass: ${result.error}` : "The key was saved, but the first test didn't finish. Try “Test connection” below in a moment."); }
+      }} />}
+      {(!provider || openCodeConnected) && <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
         <div>
           <h3>Your AI, your choice.</h3>
           <p>
@@ -325,7 +376,7 @@ export function ProviderPanel({
             {mascot(bots[0])}
           </div>
         )}
-      </header>
+      </header>}
       {!provider && <p role="status">Checking your connections…</p>}
       {needsChoice && (
         <SettingsGroup title="First, choose the AI you want to use">
@@ -377,7 +428,7 @@ export function ProviderPanel({
           <p>{notice}</p>
         </div>
       )}
-      {!hasLocalModel && (
+      {!hasLocalModel && mode === "api" && (
         <div className="ai-local-path">
           <div>
             <strong>Local model, if you want one</strong>

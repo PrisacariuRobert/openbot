@@ -4,6 +4,7 @@
 
 Not released: the next public release waits until the competitive plan is complete.
 
+- Connecting an AI takes a minute, not a terminal: Your AI opens with one Recommended card — OpenCode Go (~$10/month), “Open opencode.ai”, paste the key, Connect. The key goes straight into OpenCode's own credential store and is tested with a short real reply; a key that fails its test says so and the card stays for a corrected one. Ollama moved to API Keys & Local Models.
 - Your phone in one scan: Settings → Your phone shows a QR code the phone's own camera opens — no app to download. The studio pairs that browser as a revocable device (one-time ticket kept out of logs, HttpOnly secure cookie), then a welcome sheet shows how to add OpenBot to the Home Screen and offers notifications at the right moment (on iPhone, once it runs from the Home Screen). Shared relays still pair only through the app.
 - Discover skills: Memory & skills now lists public skills in the open Agent Skills format (Anthropic's collection first). Each is checked by the same importer rules before it shows a Get button; skills that would run their own programs say why they can't be added. Pasting an ordinary GitHub folder or file link now works, and the skill's license travels with it. The phone status bar follows light/dark.
 - New teammates can look things up on the web out of the box: the create sheet shows a "Can look things up on the web" switch, on by default (their own private browser; sending, buying and signing in still ask first). The private computer still starts off.
