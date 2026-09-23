@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+Not released: the next public release waits until the competitive plan is complete.
+
+- Replies in seconds, not minutes: a plain "hi" went from 181s (or a stop) to ~10s. OpenCode no longer self-updates under a running studio and newer patch releases keep working; each teammate workspace is its own repository, so the runtime stops rescanning host worktrees before every reply
+- Leaner prompts: teammates receive only the rules for capabilities they have, a short teammate identity replaces the runtime's coding-assistant prompt, and per-message boilerplate is trimmed — context per model step down 31% (13.3k → 9.2k tokens on Muse Spark) with every eval check still passing
+- Teammates actually learn: `/learn` now reaches the skill review (the proposal tool was never enabled for real runs), and self-extension follows its setting
+- Asking a teammate takes ~40s instead of ~100s: one consultation, a direct brief for the helper, and no duplicate asks
+- Fewer interruptions: expanding a collapsed menu or section no longer needs approval, "do not sign in or buy" no longer warns about spending, and declining an action lets the teammate finish without it (and never re-propose it) instead of ending the task
+- Message your team from Telegram: owner-only pairing, replies back in the chat, approval notices with a link to the exact review
+- Bring your Hermes team over: agents on this Mac are listed with one-click import; Hermes cron jobs arrive as paused automations
+- The Mac stays awake while teammates work or an automation is due (idle sleep only)
+- First run: a recommended model is preselected, model names are readable, and OpenCode's app-only free tier is no longer offered; the welcome screen names a detected Hermes team
+- Quieter conversations: repeated automation runs fold into one line, and stops say what to fix ("Runtime update needed")
+- Safer data home: a warning when the data folder is inside iCloud Drive, Dropbox or OneDrive
+- `scripts/prompt-eval.ts`: a live eight-case teammate eval on a throwaway studio (16/16 on Muse Spark)
+
 ## 0.37.0-beta.1 — 2026-09-07
 
 First public beta candidate: owner-hosted AI teammates on Mac, Linux and Windows (terminal bundles) plus the Mac desktop app. Bring your own AI connection; the studio runs on your hardware and your data stays in your data directory.
