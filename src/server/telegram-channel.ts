@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { OpenBotDatabase } from "./database.js";
+import { ChannelConversation, type LocalApi } from "./channel-core.js";
 
 /** Owner-only Telegram channel: the owner talks to their teammates from
  * Telegram, and replies and approval notices come back there.
@@ -17,7 +18,6 @@ import type { OpenBotDatabase } from "./database.js";
 
 const RECORD = "channel";
 const CONFIG_ID = "telegram";
-const TRACKED_ID = "telegram-runs";
 const PAIRING_MINUTES = 15;
 const TELEGRAM_TEXT_LIMIT = 4000;
 
@@ -44,14 +44,10 @@ export interface TelegramStatus {
   lastError: string | null;
 }
 
-interface TrackedRun { runId: string; chatId: number; notifiedApprovalIds: string[] }
-
 interface TelegramUpdate {
   update_id: number;
   message?: { message_id: number; text?: string; chat: { id: number; type: string }; from?: { id: number; is_bot?: boolean; first_name?: string; username?: string } };
 }
-
-type LocalApi = (method: "POST", apiPath: string, body: unknown) => Promise<{ status: number; body: Record<string, unknown> }>;
 
 export class TelegramChannel {
   private polling = false;
@@ -59,6 +55,7 @@ export class TelegramChannel {
   private lastError: string | null = null;
   private deliverTimer: NodeJS.Timeout | null = null;
   private abort: AbortController | null = null;
+  private readonly conversation: ChannelConversation;
 
   constructor(private readonly options: {
     db: OpenBotDatabase;
@@ -69,14 +66,17 @@ export class TelegramChannel {
     fetchImpl?: typeof fetch;
     now?: () => number;
     pollTimeoutSeconds?: number;
-  }) {}
+  }) {
+    this.conversation = new ChannelConversation(options, "telegram", {
+      send: (chatId, text) => this.send(Number(chatId), text),
+      typing: async (chatId) => { const config = this.config(); if (config?.token) await this.call(config.token, "sendChatAction", { chat_id: Number(chatId), action: "typing" }); },
+    }, { get: () => this.config()?.defaultBotId, set: (botId) => { this.setDefaultTeammate(botId); } });
+  }
 
   private get apiBase() { return (this.options.apiBase || process.env.OPENBOT_TELEGRAM_API_BASE || "https://api.telegram.org").replace(/\/$/, ""); }
   private now() { return (this.options.now || Date.now)(); }
   private config() { return this.options.db.extensionRecord<TelegramConfig>(RECORD, CONFIG_ID); }
   private saveConfig(config: TelegramConfig) { this.options.db.saveExtensionRecord(RECORD, CONFIG_ID, config); }
-  private tracked() { return this.options.db.extensionRecord<TrackedRun[]>(RECORD, TRACKED_ID) || []; }
-  private saveTracked(runs: TrackedRun[]) { this.options.db.saveExtensionRecord(RECORD, TRACKED_ID, runs.slice(-200)); }
 
   status(): TelegramStatus {
     const config = this.config();
@@ -144,7 +144,7 @@ export class TelegramChannel {
   disconnect() {
     this.stop();
     this.options.db.saveExtensionRecord(RECORD, CONFIG_ID, null);
-    this.saveTracked([]);
+    this.conversation.clearTracked();
     this.lastError = null;
   }
 
@@ -204,7 +204,6 @@ export class TelegramChannel {
     await this.call(config.token, "sendMessage", { chat_id: chatId, text: body, disable_web_page_preview: true });
   }
 
-  private teammates() { return this.options.db.listBots().filter((bot) => !bot.retiredAt); }
 
   private async handleUpdate(update: TelegramUpdate) {
     const message = update.message;
@@ -219,90 +218,19 @@ export class TelegramChannel {
       const pairing = config.pairing;
       if (code && pairing && pairing.expiresAt > this.now() && code === pairing.code) {
         this.saveConfig({ ...config, ownerUserId: message.from.id, ownerChatId: message.chat.id, ownerName: message.from.first_name || message.from.username || "Owner", pairing: null });
-        await this.send(message.chat.id, `Connected to OpenBot. Message me and ${this.defaultTeammate()?.name || "your teammate"} will help. Start with @Name to ask another teammate; /who lists them.`);
+        await this.send(message.chat.id, this.conversation.greeting());
       }
       return; // Unpaired: say nothing to strangers.
     }
     if (message.from.id !== config.ownerUserId || message.chat.id !== config.ownerChatId) return;
-
-    if (text === "/start" || text === "/help") {
-      await this.send(message.chat.id, `Message me and ${this.defaultTeammate()?.name || "your teammate"} will take care of it. Start with @Name to ask another teammate. /who lists teammates; /use Name changes who answers by default. Approvals are reviewed in OpenBot.`);
-      return;
-    }
-    if (text === "/who") {
-      const current = this.defaultTeammate();
-      await this.send(message.chat.id, this.teammates().map((bot) => `${bot.id === current?.id ? "• " : "  "}${bot.name} — ${bot.role}`).join("\n") || "No teammates yet.");
-      return;
-    }
-    const use = /^\/use\s+(.+)$/i.exec(text);
-    if (use) {
-      const bot = this.findTeammate(use[1]!);
-      if (!bot) { await this.send(message.chat.id, `I couldn't find a teammate called ${use[1]}. /who lists them.`); return; }
-      this.setDefaultTeammate(bot.id);
-      await this.send(message.chat.id, `${bot.name} will answer by default.`);
-      return;
-    }
-
-    const mention = /^@([\p{L}\p{N}_.-]+)[,:]?\s+([\s\S]+)$/u.exec(text);
-    const named = mention ? this.findTeammate(mention[1]!) : null;
-    const bot = named || this.defaultTeammate();
-    const body = named ? mention![2]!.trim() : text;
-    if (!bot) { await this.send(message.chat.id, "There are no teammates in your studio yet. Create one in OpenBot first."); return; }
-
-    const result = await this.options.localApi("POST", "/api/messages", {
-      threadId: bot.threadId, body, targetBotIds: [bot.id], requestId: `telegram-${config.botUsername}-${update.update_id}`,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    });
-    if (result.status >= 400) {
-      await this.send(message.chat.id, `OpenBot couldn't start that: ${String(result.body.error || "please try again in the studio.")}`);
-      return;
-    }
-    const runs = Array.isArray(result.body.runs) ? result.body.runs as Array<{ id?: string }> : [];
-    const tracked = this.tracked();
-    for (const run of runs) if (run.id && !tracked.some((item) => item.runId === run.id)) tracked.push({ runId: run.id, chatId: message.chat.id, notifiedApprovalIds: [] });
-    this.saveTracked(tracked);
-    const config2 = this.config();
-    if (config2?.token) await this.call(config2.token, "sendChatAction", { chat_id: message.chat.id, action: "typing" }).catch(() => {});
-  }
-
-  private defaultTeammate() {
-    const config = this.config();
-    const teammates = this.teammates();
-    return teammates.find((bot) => bot.id === config?.defaultBotId) || teammates[0] || null;
-  }
-
-  private findTeammate(name: string) {
-    const wanted = name.trim().toLowerCase();
-    return this.teammates().find((bot) => bot.name.toLowerCase() === wanted || bot.id.toLowerCase() === wanted) || null;
+    await this.conversation.handleOwnerText(String(message.chat.id), text, `telegram-${config.botUsername}-${update.update_id}`);
   }
 
   /** Send final replies and approval notices for tasks started from
    * Telegram. Exposed for tests. */
   async deliver() {
-    const config = this.config();
-    if (!config?.ownerChatId || !this.options.isLeader()) return;
-    const tracked = this.tracked();
-    if (!tracked.length) return;
-    const remaining: TrackedRun[] = [];
-    for (const item of tracked) {
-      const run = this.options.db.getRun(item.runId);
-      if (!run) continue;
-      if (run.status === "awaiting_approval" && run.approvalId && !item.notifiedApprovalIds.includes(run.approvalId)) {
-        const approval = this.options.db.getApproval(run.approvalId);
-        await this.send(item.chatId, `${run.botName} needs your okay: ${approval?.actionLabel || "an action"}.\nReview it in OpenBot: ${this.options.appUrl.replace(/\/$/, "")}/?thread=${encodeURIComponent(run.threadId)}`);
-        item.notifiedApprovalIds.push(run.approvalId);
-      }
-      if (["completed", "failed", "cancelled"].includes(run.status)) {
-        const reply = this.options.db.listMessages(run.threadId).filter((message) => message.runId === run.id && message.senderType === "bot" && message.kind === "text").at(-1);
-        const text = run.status === "completed"
-          ? reply?.body || run.summary || `${run.botName} finished.`
-          : run.status === "cancelled" ? `${run.botName} stopped this task.` : `${run.botName} couldn't finish: ${run.error || "open OpenBot to see what happened."}`;
-        await this.send(item.chatId, text);
-        continue;
-      }
-      remaining.push(item);
-    }
-    this.saveTracked(remaining);
+    if (!this.config()?.ownerChatId) return;
+    await this.conversation.deliver();
   }
 }
 

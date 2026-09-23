@@ -89,6 +89,7 @@ import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentC
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
 import { TelegramChannel } from "./telegram-channel.js";
+import { DiscordChannel } from "./discord-channel.js";
 import { AwakeGuard } from "./awake-guard.js";
 import { syncedFolderProvider, syncedFolderWarning } from "./synced-folder.js";
 import { RunnerCareMonitor } from "./runner-care-monitor.js";
@@ -337,7 +338,12 @@ const telegram = new TelegramChannel({
     const response = await fetch(`http://127.0.0.1:${port}${apiPath}`, { method, headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body) });
     return { status: response.status, body: await response.json().catch(() => ({})) as Record<string, unknown> };
   },
-});
+});const channelLocalApi = async (method: "POST", apiPath: string, body: unknown) => {
+  const response = await fetch(`http://127.0.0.1:${port}${apiPath}`, { method, headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body) });
+  return { status: response.status, body: await response.json().catch(() => ({})) as Record<string, unknown> };
+};
+const discord = new DiscordChannel({ db, appUrl, isLeader: () => runner.isLeader(), localApi: channelLocalApi });
+
 const inspectPrivateHome = () => inspectRunnerCare({ config: deployment, dataDir: db.dataDir, rootDir, chromePath: process.env.OPENBOT_CHROME_PATH });
 const runnerCareMonitor = new RunnerCareMonitor({
   db,
@@ -4634,6 +4640,22 @@ app.post("/api/channels/telegram/default-teammate", (request, response) => {
   try { response.json(telegram.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
 });
 app.delete("/api/channels/telegram", (_request, response) => { telegram.disconnect(); response.json(telegram.status()); });
+app.get("/api/channels/discord", (_request, response) => response.json(discord.status()));
+app.post("/api/channels/discord", async (request, response) => {
+  const parsed = z.object({ token: z.string().trim().min(50).max(120) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Paste the bot token from your Discord application's Bot page." });
+  try { response.json(await discord.connect(parsed.data.token)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "Discord did not accept this token." }); }
+});
+app.post("/api/channels/discord/pairing-code", (_request, response) => {
+  try { response.json(discord.newPairingCode()); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "Connect a Discord bot first." }); }
+});
+app.post("/api/channels/discord/default-teammate", (request, response) => {
+  const parsed = z.object({ botId: z.string().trim().min(1).max(200).nullable() }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate." });
+  try { response.json(discord.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
+});
+app.delete("/api/channels/discord", (_request, response) => { discord.disconnect(); response.json(discord.status()); });
 
 app.use("/api", (_request, response) => response.status(404).json({ error: "This API is not available on this host. Check that OpenBot is up to date." }));
 if (existsSync(distDir)) {
@@ -4644,6 +4666,7 @@ if (existsSync(distDir)) {
 const server = app.listen(port, host, () => {
   relay?.start();
   if (telegram.status().configured) telegram.start();
+  if (discord.status().configured) discord.start();
   awakeGuard.start();
   console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
   if (deployment.mode === "private_runner") console.log("Private runner mode is active with HTTPS, durable storage, and proxy-aware secure cookies.");
@@ -4663,6 +4686,7 @@ async function shutdown() {
   externalHeartbeat.stop();
   notifications.stop();
   telegram.stop();
+  discord.stop();
   awakeGuard.stop();
   await runner.stop();
   providerConnections.stop();
