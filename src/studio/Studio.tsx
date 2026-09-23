@@ -988,6 +988,31 @@ export function Studio() {
       setSending(false);
     }
   };
+  // "Try again" on the latest finished reply: the same request, same
+  // teammate, through the normal send path (budgets, approvals, replay keys).
+  const retryTarget = useMemo(() => {
+    const talk = (state?.messages || []).filter((message) => message.kind === "text");
+    const reply = talk.at(-1);
+    if (!reply || reply.senderType !== "bot" || !reply.runId) return null;
+    const run = state?.runs.find((item) => item.id === reply.runId);
+    if (!run || run.parentRunId || !["completed", "failed", "cancelled"].includes(run.status)) return null;
+    const trigger = talk.find((message) => message.id === run.triggerMessageId) || [...talk].reverse().find((message) => message.senderType === "user");
+    if (!trigger || trigger.attachments.length) return null;
+    return { replyId: reply.id, body: trigger.body, botId: run.botId };
+  }, [state?.messages, state?.runs]);
+  const lastOwnMessageId = useMemo(() => {
+    return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "user")?.id || null;
+  }, [state?.messages]);
+  const retryReply = async () => {
+    if (!retryTarget || sending || !state) return;
+    setSending(true); setSendError("");
+    try {
+      await api("/api/messages", { threadId: thread, body: retryTarget.body, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, targetBotIds: [retryTarget.botId], requestId: `retry-${retryTarget.replyId}-${Date.now()}` });
+      setRefresh((n) => n + 1);
+    } catch (reason) {
+      setSendError(reason instanceof Error ? reason.message : "Couldn't ask again. Try once more.");
+    } finally { setSending(false); }
+  };
   const active =
     state?.studioRuns.filter(
       (run) => !run.parentRunId && activeStates.includes(run.status),
@@ -2608,6 +2633,8 @@ export function Studio() {
                               onReply={() => setReplyTo({ id: message.id, senderName: message.senderName, body: message.body })}
                               onReacted={() => setRefresh((n) => n + 1)}
                               readAloud={message.senderType === "bot" ? message.body : undefined}
+                              onRetry={retryTarget?.replyId === message.id ? () => void retryReply() : undefined}
+                              onEdit={lastOwnMessageId === message.id && !sending ? () => pickStarter(message.body) : undefined}
                             />
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard onOpenDocument={file => { setContextOpen(false); setDocumentFile(file); }} message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
