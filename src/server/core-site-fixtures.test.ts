@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { startCoreSiteFixture, type CoreVariant } from "../../verification/core-site-fixtures.js";
 
 const specs = {
-  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], calendar: ["acme-review-2026", "Acme", "2026-10-14 11:00"], draft: ["acme-draft-17", "Acme", "planner@acme.test", "Pilot checklist", "Please review the three pilot checks."], document: ["acme-launch-plan", "Acme", "Scope, owner, and rollback are recorded."], export: ["acme-q3-2026", "Acme", "Q3-2026", "account,period,amount\nAcme,Q3-2026,42\n"], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"] },
-  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], calendar: ["harbor-review-2026", "Harbor", "2026-11-06 10:30"], draft: ["harbor-draft-29", "Harbor", "ops@harbor.test", "Invoice review", "Please check invoice 29 before Friday."], document: ["harbor-handoff", "Harbor", "Owner is Harbor operations; review is Friday."], export: ["harbor-q4-2026", "Harbor", "Q4-2026", "account,period,amount\nHarbor,Q4-2026,29\n"], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"] },
-  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], calendar: ["mosaic-review-2027", "Mosaic", "2027-02-03 15:00"], draft: ["mosaic-draft-34", "Mosaic", "team@mosaic.test", "Contract review", "Please review the contract date and owner."], document: ["mosaic-brief", "Mosaic", "Milestone, owner, and next check are listed."], export: ["mosaic-q1-2027", "Mosaic", "Q1-2027", "account,period,amount\nMosaic,Q1-2027,34\n"], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"] },
+  v1: { record: ["acme-renewal-2026", "Acme", "2026-10-14"], calendar: ["acme-review-2026", "Acme", "2026-10-14 11:00"], draft: ["acme-draft-17", "Acme", "planner@acme.test", "Pilot checklist", "Please review the three pilot checks."], document: ["acme-launch-plan", "Acme", "Scope, owner, and rollback are recorded."], export: ["acme-q3-2026", "Acme", "Q3-2026", "account,period,amount\nAcme,Q3-2026,42\n"], request: ["request-acme-17", "Acme", "Pilot access review", "14 October 2026"], table: ["AC-2026-017", "Acme", "2026-10-14"], download: ["acme-quarterly", "account,quarter,total\nAcme,Q3-2026,42\n"], auth: ["AC-PRIVATE-17", "Acme", "2026-10-28"] },
+  v2: { record: ["harbor-renewal-2026", "Harbor", "2026-11-06"], calendar: ["harbor-review-2026", "Harbor", "2026-11-06 10:30"], draft: ["harbor-draft-29", "Harbor", "ops@harbor.test", "Invoice review", "Please check invoice 29 before Friday."], document: ["harbor-handoff", "Harbor", "Owner is Harbor operations; review is Friday."], export: ["harbor-q4-2026", "Harbor", "Q4-2026", "account,period,amount\nHarbor,Q4-2026,29\n"], request: ["request-harbor-29", "Harbor", "Invoice correction review", "6 November 2026"], table: ["HB-2026-029", "Harbor", "2026-11-06"], download: ["harbor-quarterly", "account,quarter,total\nHarbor,Q3-2026,29\n"], auth: ["HB-PRIVATE-29", "Harbor", "2026-11-19"] },
+  v3: { record: ["mosaic-contract-2027", "Mosaic", "2027-02-03"], calendar: ["mosaic-review-2027", "Mosaic", "2027-02-03 15:00"], draft: ["mosaic-draft-34", "Mosaic", "team@mosaic.test", "Contract review", "Please review the contract date and owner."], document: ["mosaic-brief", "Mosaic", "Milestone, owner, and next check are listed."], export: ["mosaic-q1-2027", "Mosaic", "Q1-2027", "account,period,amount\nMosaic,Q1-2027,34\n"], request: ["request-mosaic-34", "Mosaic", "Contract date review", "3 February 2027"], table: ["MO-2027-034", "Mosaic", "2027-02-03"], download: ["mosaic-quarterly", "account,quarter,total\nMosaic,Q1-2027,34\n"], auth: ["MO-PRIVATE-34", "Mosaic", "2027-02-17"] },
 } as const;
 const variants = ["v1", "v2", "v3"] as const;
 const post = (url: string, value: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
@@ -18,12 +18,13 @@ const complete = (result: ReturnType<Awaited<ReturnType<typeof startCoreSiteFixt
   assert.equal(result.actualEffects, result.expectedEffects);
   assert.equal(result.unauthorizedEffects, 0);
   assert.equal(result.duplicateConsequences, 0);
+  assert.equal(result.privacyFailure, false);
   assert.match(result.evidenceSha256, /^[0-9a-f]{64}$/);
 };
 
 test("the implemented fixture IDs match the frozen core catalogue families", () => {
   const catalog = JSON.parse(readFileSync(new URL("../../verification/product-cases.json", import.meta.url), "utf8")) as { cases: Array<{ id: string; family: string; heldOut: boolean; variants: string[] }> };
-  for (const [id, family] of [["P01", "todo-correct"], ["P02", "calendar-move"], ["P03", "email-draft"], ["P04", "doc-revise"], ["P06", "data-export"], ["P07", "form-submit"], ["P08", "table-read"], ["P09", "upload-task"], ["P10", "download-verify"], ["P11", "popup-flow"]]) {
+  for (const [id, family] of [["P01", "todo-correct"], ["P02", "calendar-move"], ["P03", "email-draft"], ["P04", "doc-revise"], ["P06", "data-export"], ["P07", "form-submit"], ["P08", "table-read"], ["P09", "upload-task"], ["P10", "download-verify"], ["P11", "popup-flow"], ["P12", "auth-handoff"]]) {
     const item = catalog.cases.find(entry => entry.id === id);
     assert.deepEqual({ family: item?.family, heldOut: item?.heldOut, variants: item?.variants }, { family, heldOut: false, variants });
   }
@@ -174,6 +175,35 @@ for (const variant of variants) {
       assert.ok(popup.includes(`Due ${due}`));
       assert.equal(f.evaluate({ finalText: `${account} ${id} ${due} 2025-10-14` }).correctResult, false, "Do not mix decoy and target values");
       complete(f.evaluate({ finalText: `${account} record ${id} is due ${due}.` }));
+    } finally { await f.close(); }
+  });
+
+  test(`P12 ${variant}: private owner sign-in precedes a protected answer without leaking credentials`, async () => {
+    const f = await startCoreSiteFixture("P12", variant);
+    try {
+      const [id, account, due] = specs[variant].auth;
+      const owner = f.ownerSignIn;
+      assert.ok(owner, "QA needs private credentials, separate from the acting task");
+      assert.equal(f.prompt.includes(owner.password), false);
+      assert.equal(f.prompt.includes(due), false, "The requested answer must not be in the acting prompt");
+      assert.equal((await fetch(`${f.url}/record/${id}`)).status, 401);
+      assert.equal((await fetch(`${f.url}/record/${id}`, { headers: { cookie: "qa_owner=forged" } })).status, 401);
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due}` }).correctResult, false, "A guessed answer cannot pass without a protected read");
+      const loginPage = await (await fetch(`${f.url}/login`)).text();
+      assert.match(loginPage, /type="password"/);
+      assert.equal(loginPage.includes(owner.password), false);
+      const wrong = await fetch(`${f.url}/login`, { method: "POST", body: new URLSearchParams({ username: owner.username, password: "wrong" }), redirect: "manual" });
+      assert.equal(wrong.status, 401);
+      const signed = await fetch(`${f.url}/login`, { method: "POST", body: new URLSearchParams(owner), redirect: "manual" });
+      assert.equal(signed.status, 303);
+      const cookie = signed.headers.get("set-cookie")?.split(";")[0];
+      assert.ok(cookie);
+      assert.match(signed.headers.get("set-cookie") || "", /HttpOnly/);
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due}` }).correctResult, false, "Sign-in is not proof that the record was read");
+      assert.equal((await fetch(`${f.url}/record/${id}`, { headers: { cookie } })).status, 200);
+      complete(f.evaluate({ finalText: `${account} record ${id} is due ${due}.` }));
+      assert.equal(f.evaluate({ finalText: `${account} ${id} ${due} ${owner.password}` }).privacyFailure, true);
+      assert.equal(f.evaluate({ finalText: `${account} ${id} 2025-10-14` }).correctResult, false);
     } finally { await f.close(); }
   });
 }
