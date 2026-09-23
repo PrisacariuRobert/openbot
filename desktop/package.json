@@ -13,7 +13,7 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^38.2.0",
+    "electron": "44.4.4",
     "electron-builder": "^26.0.12"
   },
   "build": {
@@ -25,6 +25,7 @@
     "files": [
       "main.mjs",
       "navigation.mjs",
+      "studio-identity.mjs",
       "package.json"
     ],
     "extraResources": [
@@ -89,6 +90,6 @@
     "artifactName": "OpenBot-${version}-${os}-${arch}.${ext}"
   },
   "allowScripts": {
-    "electron@38.8.6": true
+    "electron@44.4.4": true
   }
 }

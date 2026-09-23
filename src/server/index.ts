@@ -226,9 +226,10 @@ app.use("/api", (request, response, next) => {
   next();
 });
 
-app.get("/api/healthz", (_request, response) => {
+app.get("/api/healthz", (request, response) => {
   const health = runnerPayload(db.getRunnerHealth());
   response.setHeader("Cache-Control", "no-store");
+  if (process.env.OPENBOT_DESKTOP_INSTANCE_ID && request.get("x-openbot-desktop-identity") === process.env.OPENBOT_DESKTOP_INSTANCE_ID) response.setHeader("X-OpenBot-Desktop-Match", "1");
   response.status(health.status === "online" ? 200 : 503).json({ ok: health.status === "online", runner: health.status, deployment: health.deployment?.mode, version: appVersion });
 });
 

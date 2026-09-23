@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { installNavigationGuards } from "./navigation.mjs";
+import { studioHealth, studioIdentity } from "./studio-identity.mjs";
 
 // One shell, one web client, every platform: the window renders the same
 // conversation-first OpenBot UI the browser and relay serve, so the design
@@ -28,6 +29,7 @@ if (!app.requestSingleInstanceLock()) {
 function main() {
   let runner = null;
   let logFd = null;
+  let expectedIdentity = "";
 
   app.on("second-instance", () => {
     const [window] = BrowserWindow.getAllWindows();
@@ -80,13 +82,13 @@ function main() {
     }
     const appRoot = runnerScript === flatRunner ? bundle : path.join(bundle, "app");
     const dataDir = process.env.OPENBOT_DATA_DIR || path.join(os.homedir(), ".openbot");
-    mkdirSync(dataDir, { recursive: true });
+    expectedIdentity = studioIdentity(dataDir);
     const logDir = path.join(app.getPath("userData"), "logs");
     mkdirSync(logDir, { recursive: true });
     logFd = openSync(path.join(logDir, "runner.log"), "a");
     runner = spawn(node, [runnerScript], {
       cwd: appRoot,
-      env: { ...process.env, PATH: [path.join(bundle, "bin"), process.env.PATH || ""].join(path.delimiter), OPENBOT_PORT: String(PORT), OPENBOT_DATA_DIR: dataDir, NODE_ENV: "production" },
+      env: { ...process.env, PATH: [path.join(bundle, "bin"), process.env.PATH || ""].join(path.delimiter), OPENBOT_PORT: String(PORT), OPENBOT_DATA_DIR: dataDir, OPENBOT_DESKTOP_INSTANCE_ID: expectedIdentity, NODE_ENV: "production" },
       detached: true,
       stdio: ["ignore", logFd, logFd],
     });
@@ -98,9 +100,11 @@ function main() {
     return new Promise((resolve, reject) => {
       const attempt = () => {
         const healthURL = new URL("/api/healthz", BASE);
-        const request = (healthURL.protocol === "https:" ? https : http).get(healthURL, (response) => {
+        const request = (healthURL.protocol === "https:" ? https : http).get(healthURL, { headers: expectedIdentity ? { "x-openbot-desktop-identity": expectedIdentity } : {} }, (response) => {
           response.resume();
-          if (response.statusCode === 200) resolve();
+          const state = studioHealth(response.statusCode, response.headers, !DEV_URL);
+          if (state === "ready") resolve();
+          else if (state === "wrong-studio") reject(new Error(`Another studio or service is using ${BASE}. Close it or choose a free OPENBOT_PORT; OpenBot will not open a different data home.`));
           else retry();
         });
         request.on("error", retry);
