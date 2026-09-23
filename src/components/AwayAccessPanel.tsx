@@ -63,7 +63,7 @@ export function AwayAccessPanel() {
         {status?.ready && <SettingsRow
           title={invitation && seconds > 0 ? "Scan. Connect. You’re in." : "Connect my phone"}
           description={invitation && seconds > 0
-            ? <>{invitation.browser === false ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</> : <>Point your phone’s camera at the code and tap the link. No app to download.</>}<span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
+            ? <>{invitation.browser === false ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</> : <>Point your phone’s camera at the code and tap the link. No app to download.</>}<br /><span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
             : <>Scan one code with your phone’s camera. OpenBot opens, signed in, ready to add to your Home Screen.</>}
           control={invitation && seconds > 0
             ? <button onClick={() => void (async () => { setBusy(true); setError(""); try { await request("/pairing", "DELETE"); setInvitation(null); } catch (error) { setError(error instanceof Error ? error.message : "That code could not be cancelled."); } finally { setBusy(false); } })()} disabled={busy}>Hide and cancel code</button>
@@ -79,7 +79,7 @@ export function AwayAccessPanel() {
         {status?.devices.filter((device) => !device.revokedAt).map((device) => <SettingsRow
           key={device.id}
           title={device.name}
-          description={`Last connected ${new Date(device.lastUsedAt).toLocaleString()}`}
+          description={`Last connected ${new Date(device.lastUsedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
           control={<><Smartphone size={20} /><button onClick={() => void revoke(device)}>Disconnect</button></>}
         />)}
       </SettingsCard>
