@@ -18,7 +18,7 @@ Where OpenBot stands against the four products people compare it with, after the
 
 | Capability | Grok Bot | Muse | Hermes | OpenClaw | OpenBot now |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| Setup to first answer | ✅ sign in | ✅ app | 🟡 CLI/VPS | 🟡 guided | 🟡 app + a model connection; recommended model preselected, app-only free tier hidden |
+| Setup to first answer | ✅ sign in | ✅ app | 🟡 CLI/VPS | 🟡 guided | ✅ one sheet: name, job, paste an OpenCode Go key (~$10/mo), create — key tested live; no terminal |
 | Free way to start | ❌ | ✅ | ✅ Nous tier | 🟡 | ❌ needs a model plan — **owner decision** |
 | Speed of a simple reply | ✅ | ✅ | ✅ | ✅ | ✅ ~10s (was 181s) |
 | Named, persistent teammates | ✅ | 🟡 one agent | ✅ | 🟡 | ✅ |
@@ -30,10 +30,12 @@ Where OpenBot stands against the four products people compare it with, after the
 | Scheduled work | ✅ | ✅ | ✅ cron | ✅ heartbeat | ✅ routines; Mac stays awake when due |
 | Works while laptop is off | ✅ | ✅ | 🟡 needs VPS | 🟡 needs VPS | 🟡 Linux runner exists; no one-click hosted option — **owner decision** |
 | Chat-app reach | 🟡 Slack | ❌ | ✅ many | ✅ most | 🟡 Telegram + Discord (owner-only) |
-| Phone | ✅ iOS | ✅ iOS | 🟡 | 🟡 | 🟡 responsive web app + chat apps |
-| Voice | ❌ | ✅ | ✅ | 🟡 | 🟡 dictation + read-aloud in the browser |
+| Phone | ✅ iOS | ✅ iOS | 🟡 | 🟡 | 🟡 scan one QR with the camera → signed-in Home Screen app with notifications (no app store); native app not shipped |
+| Voice | ❌ | ✅ | ✅ | 🟡 | ✅ hands-free voice conversation (listen → send on pause → spoken reply with captions), dictation, read-aloud |
 | Switch from a competitor | — | — | ✅ imports Claude Code/Codex | — | ✅ one-click Hermes/OpenClaw import incl. automations (paused) |
 | Own your data and models | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Feels good to use | 🟡 | ✅ | ❌ | ❌ | ✅ character teammates, calm chat, a weekly “Your week” look back built only from finished work |
+| Replies stream word by word | ✅ | ✅ | ✅ | ✅ | ❌ answer appears when done (~10s); needs OpenCode server mode (`opencode serve` + `run --attach`, deltas proven) |
 | Prompt overhead (fresh chat) | — | — | ~57k chars | — | ~32k chars / 8.1k tokens measured |
 
 ## Where OpenBot can win now
@@ -46,10 +48,11 @@ Where OpenBot stands against the four products people compare it with, after the
 
 | Gap | Why it matters | What unblocks it |
 | :--- | :--- | :--- |
+| Replies don't stream | ChatGPT-style streaming makes waits feel shorter | Move runs to `opencode serve` + `run --attach` (text deltas verified); keep one tracked process group for stop/kill |
 | No free way to start | Muse and Hermes win first-time users on price | Owner decision: default plan (OpenCode Go), or a free provider the owner signs up for |
 | No always-on without your Mac | Grok Bot and Muse's core promise | A server the owner rents or owns; the Linux runner exists |
 | Native iPhone app | Grok Bot and Muse are phone-first | Rebuild or revive the native client; the web app works meanwhile |
-| WhatsApp / iMessage / Slack chat | OpenClaw and Hermes reach more apps | WhatsApp needs a Meta business account; iMessage needs Full Disk Access |
+| WhatsApp / iMessage / Slack chat | OpenClaw and Hermes reach more apps | Self-hosted Slack means two tokens per user — too much for normal people; ship an official OpenBot Slack app once there's a hosted relay. WhatsApp needs a Meta business account; iMessage needs Full Disk Access |
 | Skills marketplace breadth | OpenClaw's 5,400 skills | Discover ships with Anthropic's collection; add more vetted Agent Skills collections to `SKILL_CATALOGS` |
 | Signed installer | Zero-friction install | Final phase, after the plan (owner decision) |
 
