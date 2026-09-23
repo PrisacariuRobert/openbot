@@ -92,6 +92,9 @@ test("Telegram: owner-only pairing, messages become tasks, replies come back onc
     assert.equal(connected.paired, false);
     assert.equal(connected.botUsername, "openbot_fixture_bot");
     assert.match(connected.pairingCode, /^\d{6}$/);
+    const withLink = await (await api("/api/channels/telegram")).json() as { pairingLink: string; pairingQr: string };
+    assert.equal(withLink.pairingLink, `https://t.me/openbot_fixture_bot?start=${connected.pairingCode}`, "one tap opens the bot with the code");
+    assert.match(withLink.pairingQr, /^data:image\/png;base64,/);
     const status = await (await api("/api/channels/telegram")).json() as Record<string, unknown>;
     assert.ok(!JSON.stringify(status).includes(TOKEN), "the token never leaves the server");
 
@@ -99,6 +102,8 @@ test("Telegram: owner-only pairing, messages become tasks, replies come back onc
     telegram.message(99, "/start 000000");
     telegram.message(7, `/start ${connected.pairingCode}`);
     await until(() => telegram.sent.some((item) => item.chat_id === 7 && /Connected to OpenBot/.test(item.text)), "pairing confirmation");
+    assert.equal((await api("/api/channels/telegram/test", { method: "POST" })).status, 200);
+    await until(() => telegram.sent.some((item) => item.chat_id === 7 && /OpenBot is connected/.test(item.text)), "test message");
     assert.equal(telegram.sent.filter((item) => item.chat_id === 99).length, 0);
     assert.equal(((await (await api("/api/channels/telegram")).json()) as { paired: boolean }).paired, true);
 

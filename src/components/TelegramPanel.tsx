@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, LoaderCircle, MessageCircle, Send } from "lucide-react";
+import { Check, CheckCircle2, Copy, ExternalLink, LoaderCircle, MessageCircle, Send } from "lucide-react";
 import type { Bot } from "../shared/types";
 import { SettingsCard, SettingsGroup, SettingsRow } from "../studio/Settings";
 import "./away-access-panel.css";
@@ -7,14 +7,24 @@ import "./away-access-panel.css";
 type Status = {
   configured: boolean; botUsername: string | null; paired: boolean; ownerName: string | null;
   pairingCode: string | null; pairingExpiresAt: string | null; defaultBotId: string | null; lastError: string | null;
+  pairingLink?: string | null; pairingQr?: string | null; inviteLink?: string | null; profileLink?: string | null;
 };
+
+function CopyChip({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return <button type="button" className="copy-chip" onClick={() => void navigator.clipboard?.writeText(text).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }).catch(() => {})}>
+    <code>{text}</code>{copied ? <Check size={14} /> : <Copy size={14} />}<span className="sr-only">{copied ? "Copied" : "Copy"}</span>
+  </button>;
+}
 
 type Channel = "telegram" | "discord";
 
-const COPY: Record<Channel, { name: string; create: ReactNode; tokenHint: string; placeholder: string; pairCommand: (code: string) => string; handle: (name: string | null) => string }> = {
+const COPY: Record<Channel, { name: string; create: ReactNode; createLink: { href: string; label: string }; createCommand?: string; tokenHint: string; placeholder: string; pairCommand: (code: string) => string; handle: (name: string | null) => string }> = {
   telegram: {
     name: "Telegram",
-    create: <>In Telegram, message <strong>@BotFather</strong>, send <strong>/newbot</strong>, and copy the token it gives you.</>,
+    create: <>Send <strong>/newbot</strong> to BotFather, pick a name, and copy the token it replies with.</>,
+    createLink: { href: "https://t.me/BotFather", label: "Open BotFather" },
+    createCommand: "/newbot",
     tokenHint: "It stays encrypted on this host and is never shown again.",
     placeholder: "123456789:AA…",
     pairCommand: (code) => `/start ${code}`,
@@ -22,7 +32,8 @@ const COPY: Record<Channel, { name: string; create: ReactNode; tokenHint: string
   },
   discord: {
     name: "Discord",
-    create: <>At <strong>discord.com/developers</strong>, create an application, open <strong>Bot</strong>, copy its token, and add the bot to a server you're in so you can direct-message it.</>,
+    create: <>Choose <strong>New Application</strong>, open <strong>Bot</strong>, tap <strong>Reset Token</strong>, and copy it.</>,
+    createLink: { href: "https://discord.com/developers/applications", label: "Open the Discord developer portal" },
     tokenHint: "It stays encrypted on this host and is never shown again. Only direct messages are used.",
     placeholder: "MTIz….Gab….…",
     pairCommand: (code) => `pair ${code}`,
@@ -80,10 +91,12 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
 
     {!status?.configured && <SettingsGroup title="Connect a bot">
       <SettingsCard>
-        <SettingsRow
-          title="1. Create a bot"
-          description={copy.create}
-        />
+        <SettingsRow title="1. Create a bot" description={copy.create}>
+          <div className="channel-actions">
+            <a className="channel-link" href={copy.createLink.href} target="_blank" rel="noreferrer">{copy.createLink.label} <ExternalLink size={14} /></a>
+            {copy.createCommand && <CopyChip text={copy.createCommand} />}
+          </div>
+        </SettingsRow>
         <SettingsRow title="2. Paste the token" description={copy.tokenHint}>
           <form className="telegram-token" onSubmit={(event) => { event.preventDefault(); void run(async () => { const next = await request<Status>(channel, "", "POST", { token }); setToken(""); return next; }); }}>
             <input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(event) => setToken(event.target.value)} placeholder={copy.placeholder} aria-label={`${copy.name} bot token`} />
@@ -95,13 +108,24 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
 
     {status?.configured && !status.paired && <SettingsGroup title={`Link your ${copy.name} account`}>
       <SettingsCard>
-        <SettingsRow
-          title={status.pairingCode ? `Send this to ${copy.handle(status.botUsername)}` : "The code expired"}
-          description={status.pairingCode
-            ? <>From your own {copy.name} account, send <strong>{copy.pairCommand(status.pairingCode)}</strong> as a direct message. Only that account can use this bot.</>
-            : "Make a new one-time code."}
-          control={status.pairingCode ? <LoaderCircle className="spinner" size={19} aria-label="Waiting for your message" /> : <button onClick={() => void run(() => request<Status>(channel, "/pairing-code", "POST"))} disabled={busy}>New code</button>}
-        />
+        {channel === "discord" && status.inviteLink && <SettingsRow title="1. Add the bot to a server" description="Pick any server you manage. No server yet? In Discord tap +, then Create My Own.">
+          <div className="channel-actions"><a className="channel-link" href={status.inviteLink} target="_blank" rel="noreferrer">Add to a server <ExternalLink size={14} /></a></div>
+        </SettingsRow>}
+        {status.pairingCode ? <SettingsRow
+          title={channel === "telegram" ? "Tap to link your account" : "2. Send the bot this code"}
+          description={channel === "telegram"
+            ? <>Opens {copy.handle(status.botUsername)} in Telegram with your code filled in — just tap <strong>Start</strong>. Only your account can use this bot.</>
+            : <>Open a direct message with {copy.handle(status.botUsername)} and send the code. Only your account can use this bot.</>}
+          control={<LoaderCircle className="spinner" size={19} aria-label="Waiting for your message" />}
+        >
+          <div className="channel-actions">
+            {channel === "telegram" && status.pairingLink && <a className="away-pairing-primary channel-primary" href={status.pairingLink} target="_blank" rel="noreferrer"><Send size={16} /> Open in Telegram</a>}
+            {channel === "discord" && status.profileLink && <a className="channel-link" href={status.profileLink} target="_blank" rel="noreferrer">Open a direct message <ExternalLink size={14} /></a>}
+            <CopyChip text={copy.pairCommand(status.pairingCode)} />
+          </div>
+          {channel === "telegram" && status.pairingQr && <img className="channel-qr" src={status.pairingQr} width="160" height="160" alt="Scan with your phone's camera to open the bot in Telegram" />}
+        </SettingsRow> : <SettingsRow title="The code expired" description="Make a new one-time code."
+          control={<button onClick={() => void run(() => request<Status>(channel, "/pairing-code", "POST"))} disabled={busy}>New code</button>} />}
       </SettingsCard>
     </SettingsGroup>}
 
@@ -112,6 +136,8 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
           description={`${defaultName} answers by default. Start a message with @Name to ask someone else; /who lists your team.`}
           control={<CheckCircle2 size={19} />}
         />
+        <SettingsRow title="Check the connection" description={`Your bot sends you a short hello in ${copy.name}.`}
+          control={<button onClick={() => void run(async () => { await request(channel, "/test", "POST"); return undefined; })} disabled={busy}>Send a test message</button>} />
         {teammates.length > 1 && <SettingsRow title="Answers by default" description="Who replies when you don't name anyone.">
           <select value={status.defaultBotId || teammates[0]?.id || ""} disabled={busy} aria-label={`Default teammate on ${copy.name}`}
             onChange={(event) => void run(() => request<Status>(channel, "/default-teammate", "POST", { botId: event.target.value }))}>

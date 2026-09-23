@@ -41,6 +41,10 @@ export interface DiscordStatus {
   defaultBotId: string | null;
   connected: boolean;
   lastError: string | null;
+  /** Adds the bot to a server the owner manages (needed before a DM). */
+  inviteLink: string | null;
+  /** Opens the bot's profile, where "Message" starts the direct message. */
+  profileLink: string | null;
 }
 
 interface DiscordMessage { id: string; channel_id: string; guild_id?: string; content: string; author: { id: string; bot?: boolean; username?: string; global_name?: string | null } }
@@ -86,6 +90,8 @@ export class DiscordChannel {
       ownerName: config?.ownerName || null, pairingCode: pairing?.code || null,
       pairingExpiresAt: pairing ? new Date(pairing.expiresAt).toISOString() : null,
       defaultBotId: config?.defaultBotId || null, connected: this.ready, lastError: this.lastError,
+      inviteLink: config?.botUserId ? `https://discord.com/oauth2/authorize?client_id=${config.botUserId}&scope=bot&permissions=0` : null,
+      profileLink: config?.botUserId ? `https://discord.com/users/${config.botUserId}` : null,
     };
   }
 
@@ -133,6 +139,13 @@ export class DiscordChannel {
     if (botId && !this.options.db.getBot(botId)) throw new Error("That teammate does not exist.");
     this.saveConfig({ ...config, defaultBotId: botId || undefined });
     return this.status();
+  }
+
+  /** Prove the whole path works: the bot writes to the paired owner. */
+  async sendTest() {
+    const config = this.config();
+    if (!config?.ownerChannelId) throw new Error("Link your Discord account first.");
+    await this.send(config.ownerChannelId, "✅ OpenBot is connected. Message me here any time — your team will answer.");
   }
 
   disconnect() {

@@ -42,6 +42,8 @@ export interface TelegramStatus {
   pairingExpiresAt: string | null;
   defaultBotId: string | null;
   lastError: string | null;
+  /** Opens the bot in Telegram with the pairing code filled in: one tap on Start. */
+  pairingLink: string | null;
 }
 
 interface TelegramUpdate {
@@ -90,6 +92,7 @@ export class TelegramChannel {
       pairingExpiresAt: pairing ? new Date(pairing.expiresAt).toISOString() : null,
       defaultBotId: config?.defaultBotId || null,
       lastError: this.lastError,
+      pairingLink: pairing && config?.botUsername ? `https://t.me/${encodeURIComponent(config.botUsername)}?start=${pairing.code}` : null,
     };
   }
 
@@ -139,6 +142,13 @@ export class TelegramChannel {
     if (botId && !this.options.db.getBot(botId)) throw new Error("That teammate does not exist.");
     this.saveConfig({ ...config, defaultBotId: botId || undefined });
     return this.status();
+  }
+
+  /** Prove the whole path works: the bot writes to the paired owner. */
+  async sendTest() {
+    const config = this.config();
+    if (!config?.ownerChatId) throw new Error("Link your Telegram account first.");
+    await this.send(Number(config.ownerChatId), "✅ OpenBot is connected. Message me here any time — your team will answer.");
   }
 
   disconnect() {

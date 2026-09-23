@@ -16,3 +16,11 @@
 .away-pairing select{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}
 .telegram-footnote{font-size:12px!important;color:var(--muted)!important;line-height:1.5}
 @media(max-width:600px){.telegram-token button{flex:1 1 100%}}
+.channel-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.channel-link{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:12px;background:var(--surface-muted);color:var(--ink);font-size:13px;font-weight:600;text-decoration:none}
+.channel-link:hover{background:var(--selection)}.channel-link:focus-visible,.copy-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a.away-pairing-primary.channel-primary{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-size:13px;font-weight:600}
+.copy-chip{display:inline-flex!important;align-items:center;gap:8px;min-height:40px!important;padding:8px 12px!important;border:1px dashed var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:12px!important}
+.copy-chip code{font-family:"JetBrains Mono Variable",ui-monospace,monospace;font-size:13px}
+.channel-qr{display:block;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:6px}
+@media(max-width:600px){.channel-qr{display:none}.channel-actions>*{flex:1 1 auto;justify-content:center}}

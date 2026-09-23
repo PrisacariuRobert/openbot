@@ -88,6 +88,7 @@ import { validToolToken } from "./tool-auth.js";
 import { callbackUrl as deploymentCallbackUrl, deploymentStatus, readDeploymentConfig } from "./deployment.js";
 import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
+import QRCode from "qrcode";
 import { TelegramChannel } from "./telegram-channel.js";
 import { DiscordChannel } from "./discord-channel.js";
 import { AwakeGuard } from "./awake-guard.js";
@@ -4624,7 +4625,11 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
   if (error instanceof WorkflowCheckError) return response.status(409).json({ error: error.message, code: "workflow_check_required" });
   next(error);
 });
-app.get("/api/channels/telegram", (_request, response) => response.json(telegram.status()));
+app.get("/api/channels/telegram", async (_request, response) => {
+  const status = telegram.status();
+  // A QR of the one-tap pairing link, for setting up from a computer.
+  response.json({ ...status, pairingQr: status.pairingLink ? await QRCode.toDataURL(status.pairingLink, { errorCorrectionLevel: "M", margin: 2, width: 240 }) : null });
+});
 app.post("/api/channels/telegram", async (request, response) => {
   const parsed = z.object({ token: z.string().trim().min(20).max(200) }).strict().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Paste the bot token from @BotFather." });
@@ -4640,6 +4645,10 @@ app.post("/api/channels/telegram/default-teammate", (request, response) => {
   try { response.json(telegram.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
 });
 app.delete("/api/channels/telegram", (_request, response) => { telegram.disconnect(); response.json(telegram.status()); });
+app.post("/api/channels/telegram/test", async (_request, response) => {
+  try { await telegram.sendTest(); response.json({ ok: true }); }
+  catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The test message could not be sent." }); }
+});
 app.get("/api/channels/discord", (_request, response) => response.json(discord.status()));
 app.post("/api/channels/discord", async (request, response) => {
   const parsed = z.object({ token: z.string().trim().min(50).max(120) }).strict().safeParse(request.body);
@@ -4656,6 +4665,10 @@ app.post("/api/channels/discord/default-teammate", (request, response) => {
   try { response.json(discord.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
 });
 app.delete("/api/channels/discord", (_request, response) => { discord.disconnect(); response.json(discord.status()); });
+app.post("/api/channels/discord/test", async (_request, response) => {
+  try { await discord.sendTest(); response.json({ ok: true }); }
+  catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The test message could not be sent." }); }
+});
 
 app.use("/api", (_request, response) => response.status(404).json({ error: "This API is not available on this host. Check that OpenBot is up to date." }));
 if (existsSync(distDir)) {

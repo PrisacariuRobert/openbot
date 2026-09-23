@@ -99,6 +99,9 @@ test("Discord: owner-only DM pairing, DMs become tasks, servers and strangers ar
     const connected = await (await api("/api/channels/discord", { method: "POST", body: JSON.stringify({ token: TOKEN }) })).json() as { configured: boolean; paired: boolean; pairingCode: string };
     assert.equal(connected.configured, true);
     assert.match(connected.pairingCode, /^\d{6}$/);
+    const links = await (await api("/api/channels/discord")).json() as { inviteLink: string; profileLink: string };
+    assert.equal(links.inviteLink, "https://discord.com/oauth2/authorize?client_id=900&scope=bot&permissions=0");
+    assert.equal(links.profileLink, "https://discord.com/users/900");
     await until(() => discord.identified(), "gateway identify");
     assert.equal(discord.identified()!.intents, 1 << 12, "direct messages only");
     assert.ok(!JSON.stringify(await (await api("/api/channels/discord")).json()).includes(TOKEN), "the token never leaves the server");
