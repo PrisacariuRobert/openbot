@@ -37,9 +37,8 @@ test("Pixel asks Scout to review exact current files, then returns one corrected
     assert.equal(fixture.db.extensionRecords("handoff-artifact").length, 2);
     const expectedSha = createHash("sha256").update("# Quarterly brief\nTotal 41\n").digest("hex");
     assert.ok(fixture.db.extensionRecords<{ originSha256: string }>("handoff-artifact").some(record => record.value.originSha256 === expectedSha));
+    const final = await fixture.until(() => fixture.db.listMessages("bot-pixel").find(message => message.runId === runId && message.senderId === "pixel" && message.attachments.length > 0));
     const messages = fixture.db.listMessages("bot-pixel");
-    const final = messages.find(message => message.runId === runId && message.senderId === "pixel" && message.attachments.length > 0);
-    assert.ok(final, "Pixel returns the final result under the original run");
     assert.equal(final.attachments.length, 1);
     assert.equal(final.attachments[0]?.name, "brief.md");
     assert.match(readFileSync(fixture.db.attachmentFile(final.attachments[0]!.id)!.storagePath, "utf8"), /Total 42/);
