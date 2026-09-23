@@ -12,7 +12,7 @@ import type { LiveViewEvent, LiveViewSource } from "./live-view.js";
 import { createCodeCheckView } from "./code-check-view.js";
 import { createSkillPackage, parseSkillPackage, skillSecretFindings, skillTemplate, type SkillDefinition } from "./skill-library.js";
 import { captureTeachingStep, teachingAddress } from "./teaching-capture.js";
-import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock } from "./browser-access.js";
+import { browserNavigationBlock, browserServiceForUrl, browserWebsiteBlock, qaBrowserScopeBlock } from "./browser-access.js";
 import { AttachmentService } from "./attachments.js";
 import { signInOrigin } from "../shared/browser-sign-in.js";
 import { gateObservationCapture, redactSecretsForProvider, newObservationId, OBSERVATION_TTL_MS } from "./observation-envelope.js";
@@ -502,6 +502,22 @@ export class BrowserManager {
 
   constructor(private readonly db: OpenBotDatabase, private readonly options: { headlessTeaching?: boolean; onDownloadSaved?: () => void } = {}) {}
 
+  private async installBrowserRoutes(context: BrowserContext, botId: string) {
+    await context.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (browserWebsiteBlock(this.db, botId, url) || qaBrowserScopeBlock(url)) { await route.abort("blockedbyclient"); return; }
+      if (!process.env.OPENBOT_QA_BROWSER_ORIGIN) { await route.continue(); return; }
+      // Playwright's continue() does not intercept every redirect hop. In a
+      // synthetic campaign fetch one allowed request without following any
+      // redirect, then fulfill it. A redirect is refused before Chrome sees it.
+      try {
+        const response = await route.fetch({ maxRedirects: 0 });
+        if (response.status() >= 300 && response.status() < 400) { await route.abort("blockedbyclient"); return; }
+        await route.fulfill({ response });
+      } catch { await route.abort("blockedbyclient").catch(() => undefined); }
+    });
+  }
+
   private writeTaughtSkill(botId: string, slug: string, name: string, description: string, instructions: string, startUrl: string, steps: SkillStep[]): string {
     const stepText = steps.map((step, index) => `${index + 1}. ${step.type}${step.selector ? ` ${step.selector}` : ""}${step.value ? ` → ${step.value}` : ""} (${step.url})`).join("\n");
     const variables = [...new Set(steps.flatMap((step) => step.value?.match(/\{\{[a-z0-9_-]+\}\}/gi) || []))];
@@ -611,7 +627,7 @@ export class BrowserManager {
     // Known-service request filtering is not a general egress sandbox. Playwright
     // may only intercept the first request of a redirect; check the full chain
     // before returning page content too. Denials are always read from current DB.
-    await context.route("**/*", (route) => browserWebsiteBlock(this.db, botId, route.request().url()) ? route.abort("blockedbyclient") : route.continue());
+    await this.installBrowserRoutes(context, botId);
     const trackNavigation = (page: Page) => {
       page.on("response", (response) => {
         const request = response.request();
@@ -914,7 +930,7 @@ export class BrowserManager {
     } catch (error) {
       throw new Error(`A visible window needs a display on the Mac running OpenBot. ${error instanceof Error ? error.message : String(error)}`.slice(0, 300));
     }
-    await context.route("**/*", (route) => browserWebsiteBlock(this.db, botId, route.request().url()) ? route.abort("blockedbyclient") : route.continue());
+    await this.installBrowserRoutes(context, botId);
     context.on("close", () => { if (this.contexts.get(botId) === context) { this.contexts.delete(botId); this.contextHeadless.delete(botId); this.contextArgsVersions.delete(botId); } });
     this.contextHeadless.set(botId, false);
     this.contextArgsVersions.set(botId, BrowserManager.contextArgsVersion);
@@ -1282,12 +1298,12 @@ export class BrowserManager {
   }
 
   private assertWebsiteAccess(botId: string, url: string) {
-    const reason = browserWebsiteBlock(this.db, botId, url);
+    const reason = browserWebsiteBlock(this.db, botId, url) || qaBrowserScopeBlock(url);
     if (reason) throw new Error(reason);
   }
 
   private assertPageAccess(botId: string, page: Page) {
-    const reason = browserNavigationBlock(this.db, botId, [page.url(), ...(this.navigationServices.get(page) || [])]);
+    const reason = browserNavigationBlock(this.db, botId, [page.url(), ...(this.navigationServices.get(page) || [])]) || qaBrowserScopeBlock(page.url());
     if (reason) throw new Error(reason);
   }
 

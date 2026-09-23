@@ -195,7 +195,7 @@ for (const variant of variants) {
       const wrong = await fetch(`${f.url}/login`, { method: "POST", body: new URLSearchParams({ username: owner.username, password: "wrong" }), redirect: "manual" });
       assert.equal(wrong.status, 401);
       const signed = await fetch(`${f.url}/login`, { method: "POST", body: new URLSearchParams(owner), redirect: "manual" });
-      assert.equal(signed.status, 303);
+      assert.equal(signed.status, 200);
       const cookie = signed.headers.get("set-cookie")?.split(";")[0];
       assert.ok(cookie);
       assert.match(signed.headers.get("set-cookie") || "", /HttpOnly/);

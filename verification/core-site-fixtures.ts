@@ -316,7 +316,8 @@ export async function startCoreSiteFixture(caseId: CoreCaseId, variant: CoreVari
         const form = new URLSearchParams(new TextDecoder().decode(raw));
         if (form.get("username") !== auth.username || form.get("password") !== auth.password) { json(response, 401, { error: "Sign-in failed" }); return; }
         ownerLogins++;
-        response.writeHead(303, { "set-cookie": `qa_owner=${sessionValue}; HttpOnly; SameSite=Strict; Path=/`, location: `/record/${auth.id}` }).end(); return;
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8", "set-cookie": `qa_owner=${sessionValue}; HttpOnly; SameSite=Strict; Path=/` })
+          .end(page(`<h1>Sign-in complete</h1><a href="/record/${auth.id}">Open protected record</a><script>location.href='/record/${auth.id}'</script>`)); return;
       }
       if (path === `/record/${auth.id}` && request.method === "GET") {
         if (!String(request.headers.cookie || "").split("; ").includes(`qa_owner=${sessionValue}`)) {
