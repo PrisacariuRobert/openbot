@@ -4,6 +4,7 @@
 
 Not released: the next public release waits until the competitive plan is complete.
 
+- Replies write themselves in front of you with Claude: teammates on a Claude subscription now stream their answer into their reply bubble as it is written, and the finished answer settles in place. Other providers run through OpenCode, whose attached client currently exits early after a tool call (OpenCode 1.18.31: `run --attach` stops at the next step), so they keep showing the finished answer; live text for them is ready to switch on once that is fixed.
 - Talk with a teammate: the waveform button in a one-to-one chat opens a calm, full-screen voice conversation — it listens, sends when you pause, reads the answer aloud with captions, then listens again. Everything lands in the chat; approvals still happen in the app. Uses the browser's own speech (Safari, Chrome).
 - New teammates get a 2,000,000-token weekly guard (was 250,000, which ordinary daily use could hit in a day or two). Existing teammates keep the budget they have.
 - Your week with your team: a quiet “Your week · 7 things done” row tops the chat list and opens a warm look back — things done, time worked so you didn't have to, who helped most, and the biggest tasks. Built only from tasks that really finished (greetings aren't highlights). Sunday evening it arrives once as a notification.

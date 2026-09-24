@@ -14,3 +14,12 @@ export function conversationProgress(run: Run) {
     .sort((a, b) => (Number.isFinite(b.time) ? b.time : Number.NEGATIVE_INFINITY) - (Number.isFinite(a.time) ? a.time : Number.NEGATIVE_INFINITY) || b.index - a.index)[0]?.item;
   return { label: `${run.botName} is working on it`, detail: activity && visibleActivityLabels.has(activity.label) ? activity.label : "You can keep chatting while this runs.", animated: true };
 }
+
+/** The reply as it is being written: the latest part, cut at a clean break. */
+export function liveTail(text: string | null | undefined, limit = 900) {
+  const value = (text || "").trim();
+  if (value.length <= limit) return value;
+  const cut = value.slice(-limit);
+  const start = Math.max(cut.indexOf("\n\n"), 0) || Math.max(cut.indexOf(" "), 0);
+  return `…${cut.slice(start).trimStart()}`;
+}
