@@ -1,4 +1,5 @@
 import express from "express";
+import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -220,6 +221,22 @@ function privateValueMatches(expected: string, value: string | null | undefined)
 
 type RawBodyRequest = express.Request & { rawBody?: Buffer };
 app.use(express.json({ limit: "2mb", verify: (request, _response, buffer) => { (request as RawBodyRequest).rawBody = Buffer.from(buffer); } }));
+// Large JSON (the studio state is a few hundred KB) goes out gzipped when the
+// client accepts it: about 5x smaller, which matters on a phone. Only
+// res.json is wrapped, so the event stream and file downloads are untouched.
+app.use("/api", (request, response, next) => {
+  if (!/\bgzip\b/.test(String(request.headers["accept-encoding"] || ""))) return next();
+  const json = response.json.bind(response);
+  response.json = (body: unknown) => {
+    const text = JSON.stringify(body);
+    if (text === undefined || text.length < 16_384 || response.headersSent) return json(body);
+    response.setHeader("Content-Encoding", "gzip");
+    response.setHeader("Vary", "Accept-Encoding");
+    response.type("application/json; charset=utf-8");
+    return response.send(gzipSync(text, { level: 5 }));
+  };
+  next();
+});
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
@@ -428,10 +445,18 @@ app.delete("/api/auto-review/:id", (request, response) => {
   response.json({ ok: true });
 });
 
+/** The studio state is fetched after every change, so it carries only what
+ * the screens show: full activity logs for work in progress and the newest
+ * tasks; older finished tasks keep their last few steps. A task's full log
+ * still loads with its receipt. */
+function compactRuns<T extends { status: string; startedAt: string | null; activities: unknown[] }>(runs: T[], keepFull = 8): T[] {
+  const newest = new Set([...runs].sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || ""))).slice(0, keepFull));
+  return runs.map((run) => newest.has(run) || !["completed", "failed", "cancelled"].includes(run.status) || run.activities.length <= 3 ? run : { ...run, activities: run.activities.slice(-3) });
+}
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runner: runnerPayload(state.runner), weeklyRecap: cachedRecap() });
+  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap() });
 });
 
 app.get("/api/runner", (_request, response) => {
