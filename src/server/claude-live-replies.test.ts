@@ -62,13 +62,26 @@ test("Claude Code replies stream into the live preview before the finished answe
     const sent = await fetch(base + "/api/messages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId: bot.threadId, body: "Why do morning walks help?", targetBotIds: [bot.id], requestId: "claude-live-reply-1" }) });
     assert.equal(sent.status, 202, await sent.clone().text());
     const runId = ((await sent.json()) as { runs: Array<{ id: string }> }).runs[0]!.id;
+    // Live text arrives as small "live" events on the studio stream.
     const seen: string[] = [];
-    for (let i = 0; i < 300; i++) {
-      const run = view.getRun(runId)!;
-      if (run.partialText && run.partialText !== seen.at(-1) && run.status === "running") seen.push(run.partialText);
-      if (run.status === "completed") break;
-      await delay(50);
-    }
+    const stream = new AbortController();
+    const events = await fetch(base + "/api/events", { signal: stream.signal });
+    void (async () => {
+      const decoder = new TextDecoder(); let buffer = "";
+      try {
+        for await (const chunk of events.body!) {
+          buffer += decoder.decode(chunk as Uint8Array, { stream: true });
+          const lines = buffer.split("\n"); buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const event = JSON.parse(line.slice(6)) as { type?: string; runId?: string; text?: string };
+            if (event.type === "live" && event.runId === runId && event.text && event.text !== seen.at(-1)) seen.push(event.text);
+          }
+        }
+      } catch { /* stream closed */ }
+    })();
+    for (let i = 0; i < 300; i++) { if (view.getRun(runId)!.status === "completed") break; await delay(50); }
+    stream.abort();
     const run = view.getRun(runId)!;
     assert.equal(run.status, "completed", `${run.error} ${log}`);
     assert.ok(seen.length >= 2, `live text grew in steps while running: ${JSON.stringify(seen)}`);

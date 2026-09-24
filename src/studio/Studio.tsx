@@ -625,6 +625,8 @@ export function Studio() {
     [draftNotice, setDraftNotice] = useState(""),
     [online, setOnline] = useState(false),
     [refresh, setRefresh] = useState(0);
+  // The reply as it is written, per run, pushed by the studio event stream.
+  const [liveTexts, setLiveTexts] = useState<Record<string, string>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const sendError = sendErrors[thread] || "";
   const setSendError = (message: string) => setSendErrors((items) => ({ ...items, [thread]: message }));
@@ -812,7 +814,17 @@ export function Studio() {
       clearTimeout(timer);
       timer = setTimeout(() => setRefresh((n) => n + 1), 250);
     };
-    events.onmessage = update;
+    events.onmessage = (message) => {
+      // Live reply text is applied directly; it never refetches the studio.
+      try {
+        const event = JSON.parse(message.data) as { type?: string; runId?: string; text?: string };
+        if (event.type === "live" && event.runId && typeof event.text === "string") {
+          setLiveTexts((current) => ({ ...current, [event.runId!]: event.text! }));
+          return;
+        }
+      } catch { /* A plain state ping. */ }
+      update();
+    };
     events.onopen = () => {
       setOnline(true);
       update();
@@ -853,7 +865,7 @@ export function Studio() {
   useEffect(() => {
     if (page === "chat" && nearBottom.current)
       messagesEnd.current?.scrollIntoView({ block: "end" });
-  }, [state?.messages, state?.runs, page]);
+  }, [state?.messages, state?.runs, page, liveTexts]);
   useEffect(() => {
     setDetail((current) => {
       if (current?.kind !== "run" || !state) return current;
@@ -2677,7 +2689,7 @@ export function Studio() {
                             activeStates.includes(run.status),
                         )
                         .map((run) => (
-                          <ConversationProgress key={run.id} run={run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
+                          <ConversationProgress key={run.id} run={liveTexts[run.id] && liveTexts[run.id]!.length >= (run.partialText?.length || 0) ? { ...run, partialText: liveTexts[run.id]! } : run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
                         ))}
                     <div ref={messagesEnd} />
                   </div>

@@ -334,7 +334,7 @@ for (const receipt of db.listPreparedApprovedActions()) {
   db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Review again after restart", detail });
 }
 
-const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), internalUrl, internalToken, maxParallel: 3 });
+const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), onLive: (runId, text) => broadcast({ type: "live", runId, text }), internalUrl, internalToken, maxParallel: 3 });
 const notifications = new NotificationService(db, () => runner.isLeader());
 const awakeGuard = new AwakeGuard({ db, enabled: () => runner.isLeader() });
 const telegram = new TelegramChannel({

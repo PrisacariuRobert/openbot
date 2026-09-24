@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { accessSync, constants, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { scopedToolToken } from "./tool-auth.js";
 import { fileURLToPath } from "node:url";
@@ -25,6 +28,24 @@ import { conversationBridge, MAX_REUSED_CONTEXT, reportedContextSize } from "./c
 export { eventText, appendModelText } from "./model-output.js";
 
 const CLAUDE_MCP_PATH = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
+const OPENCODE_LIVE_PATH = fileURLToPath(new URL("./opencode-live.mjs", import.meta.url));
+
+/** Live replies for OpenCode run through a per-task server (opencode-live.mjs).
+ * Only for the real runtime: off when switched off, when a test injects its
+ * own process spawner, or when `opencode` resolves to a throwaway fixture. */
+export function liveOpenCodeAvailable(pathValue: string | undefined, injected: boolean) {
+  if (injected || process.env.OPENBOT_LIVE_REPLIES === "0") return false;
+  for (const dir of (pathValue || "").split(path.delimiter).filter(Boolean)) {
+    const candidate = path.join(dir, "opencode");
+    try {
+      accessSync(candidate, constants.X_OK);
+      const real = realpathSync(candidate);
+      const temporary = [tmpdir(), "/tmp", "/private/tmp", "/private/var/folders", "/var/folders"].map((root) => { try { return realpathSync(root); } catch { return root; } });
+      return !temporary.some((root) => real === root || real.startsWith(root + path.sep));
+    } catch { /* not in this directory */ }
+  }
+  return false;
+}
 
 function eventSessionId(event: Record<string, unknown>): string | null {
   if (typeof event.sessionID === "string") return event.sessionID;
@@ -140,6 +161,8 @@ function cleanError(raw: string): string {
 export interface OpenCodeRunnerOptions {
   db: OpenBotDatabase;
   onChange: () => void;
+  /** The reply as it is written, pushed without a full state refresh. */
+  onLive?: (runId: string, text: string) => void;
   internalUrl: string;
   internalToken: string;
   attachments: AttachmentService;
@@ -506,7 +529,9 @@ export class OpenCodeRunner {
     const args = useClaude
       ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", `${claudeTools},mcp__openbot__work_collect,mcp__openbot__work_report,mcp__openbot__code_benchmark`, ...(previousSession ? ["--resume", previousSession] : []), prompt]
       : ["run", "--auto", "--format", "json", "--model", model, "--dir", workspace, "--agent", run.expectedWorkKind ? "openbot-report" : "openbot", ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · OpenBot`, prompt];
-    const child = (this.options.spawnProcess || spawn)(useClaude ? "claude" : "opencode", args, { cwd: workspace, env: safeHostEnvironment(extraEnvironment), stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
+    const runEnvironment = safeHostEnvironment(extraEnvironment);
+    const liveOpenCode = !useClaude && liveOpenCodeAvailable(runEnvironment.PATH, Boolean(this.options.spawnProcess));
+    const child = (this.options.spawnProcess || spawn)(useClaude ? "claude" : liveOpenCode ? process.execPath : "opencode", liveOpenCode ? [OPENCODE_LIVE_PATH, ...args] : args, { cwd: workspace, env: runEnvironment, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
     this.running.set(run.id, child);
     let stdoutBuffer = "", stderr = "", responseText = "", sessionId: string | null = previousSession, lastTool = "";
     const output = new ModelOutput(useClaude ? "claude" : "opencode");
@@ -593,25 +618,32 @@ export class OpenCodeRunner {
     }, 1_000);
     watchdog.unref();
 
-    // The reply as it is written (Claude Code partial messages). Display
+    // The reply as it is written (Claude partial messages, OpenCode server
+    // deltas via opencode-live.mjs). Display
     // only: the finished answer still comes from ModelOutput below.
     const live = new LiveText();
-    let liveShown = "", liveTimer: NodeJS.Timeout | null = null;
+    let liveShown = "", liveTimer: NodeJS.Timeout | null = null, liveSavedAt = 0;
     const showLive = () => {
       liveTimer = null;
       const text = live.text;
       if (stoppedFor || processClosed || !text || text === liveShown || text.length < responseText.length) return;
       liveShown = text;
-      this.options.db.updateRun(run.id, { partialText: text, progressAt: new Date().toISOString() });
-      this.options.onChange();
+      // Pushed as a small event; saved (for reloads and salvage) at most once a second.
+      if (this.options.onLive) this.options.onLive(run.id, text);
+      if (!this.options.onLive || Date.now() - liveSavedAt > 1_000) {
+        liveSavedAt = Date.now();
+        this.options.db.updateRun(run.id, { partialText: text, progressAt: new Date().toISOString() });
+        if (!this.options.onLive) this.options.onChange();
+      }
     };
     const consumeLine = (line: string) => {
       if (!line.trim() || stoppedFor) return;
       try {
         const event = JSON.parse(line) as Record<string, unknown>;
         if (!event || typeof event !== "object" || Array.isArray(event)) return;
-        if (event.type === "stream_event") {
-          live.addClaude(event as Parameters<LiveText["addClaude"]>[0]);
+        if (event.type === "openbot.opencode_event" || event.type === "stream_event") {
+          if (event.type === "stream_event") live.addClaude(event as Parameters<LiveText["addClaude"]>[0]);
+          else live.addOpenCode((event.event || {}) as Parameters<LiveText["addOpenCode"]>[0]);
           meter.progress();
           if (!liveTimer) { liveTimer = setTimeout(showLive, 250); liveTimer.unref(); }
           return;

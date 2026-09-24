@@ -35,7 +35,7 @@ Where OpenBot stands against the four products people compare it with, after the
 | Switch from a competitor | — | — | ✅ imports Claude Code/Codex | — | ✅ one-click Hermes/OpenClaw import incl. automations (paused) |
 | Own your data and models | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Feels good to use | 🟡 | ✅ | ❌ | ❌ | ✅ character teammates, calm chat, a weekly “Your week” look back built only from finished work |
-| Replies stream word by word | ✅ | ✅ | ✅ | ✅ | 🟡 Claude subscriptions stream live; OpenCode providers show the finished answer (~10s) — its `run --attach` client exits after a tool call, and plain `run` exposes no stream |
+| Replies stream word by word | ✅ | ✅ | ✅ | ✅ | ✅ every provider streams into the reply bubble (Claude partial messages; OpenCode via a private per-task server); live eval 22/22, same total time |
 | Prompt overhead (fresh chat) | — | — | ~57k chars | — | ~32k chars / 8.1k tokens measured |
 
 ## Where OpenBot can win now
@@ -48,7 +48,6 @@ Where OpenBot stands against the four products people compare it with, after the
 
 | Gap | Why it matters | What unblocks it |
 | :--- | :--- | :--- |
-| OpenCode replies don't stream | ChatGPT-style streaming makes waits feel shorter | Upstream: `opencode run --attach` exits after the first tool step (repro in CHANGELOG). Once fixed, a per-task wrapper (serve + attach + forwarded `message.part.delta`) feeds the existing LiveText path; or drive the server API directly |
 | No free way to start | Muse and Hermes win first-time users on price | Owner decision: default plan (OpenCode Go), or a free provider the owner signs up for |
 | No always-on without your Mac | Grok Bot and Muse's core promise | A server the owner rents or owns; the Linux runner exists |
 | Native iPhone app | Grok Bot and Muse are phone-first | Rebuild or revive the native client; the web app works meanwhile |
