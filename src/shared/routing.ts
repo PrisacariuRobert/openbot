@@ -10,6 +10,14 @@ export function mentionedBotIds(body: string, bots: Pick<Bot, "id" | "name">[]):
   return bots.filter((bot) => tokens.has(mentionSlug(bot.name)) || tokens.has(mentionSlug(bot.id))).map((bot) => bot.id);
 }
 
+/** People address teammates the natural way too: "Nova: find…", "Pixel,
+ * make…". A name followed by a colon or comma, at the start of the message
+ * or a clause, counts as addressing that teammate. */
+export function addressedBotIds(body: string, bots: Pick<Bot, "id" | "name">[]): string[] {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return bots.filter((bot) => bot.name.trim() && new RegExp(`(?:^|[.!?;\\n]\\s*|\\s(?:and|&)\\s+|^(?:hey|hi|ok|okay)\\s+)${escape(bot.name.trim())}(?:\\s*[:,]|\\s+(?:and|&)\\s+[\\p{L}\\p{N}_-]+\\s*[:,])`, "iu").test(body.trim())).map((bot) => bot.id);
+}
+
 /** Teammates a bot's reply pulls into a group conversation. Unlike owner
  * mentions, @everyone/@team never fan out from a bot: only explicit,
  * existing members respond, so one reply can never wake the whole roster. */
@@ -46,6 +54,8 @@ export function resolveMessageTargets(input: {
   if (directBotId) return bots.filter((bot) => bot.id === directBotId);
   const mentions = mentionedBotIds(body, bots);
   if (mentions.length) return bots.filter((bot) => mentions.includes(bot.id));
+  const addressed = addressedBotIds(body, bots);
+  if (addressed.length) return bots.filter((bot) => addressed.includes(bot.id));
   if (requestedIds?.length) return bots.filter((bot) => requestedIds.includes(bot.id));
   return [...bots].sort((left, right) => {
     const score = routingScore(body, right) - routingScore(body, left);
