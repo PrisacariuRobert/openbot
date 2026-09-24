@@ -13,8 +13,10 @@ export const DEFAULT_EXECUTION_LIMITS: Readonly<ExecutionLimits> =
     maxActiveMs: 30 * 60_000,
     maxIdleMs: 5 * 60_000,
     maxSteps: 64,
-    maxTokens: 100_000,
-    maxJobTokens: 100_000,
+    // Web research reads whole pages; 100k stopped ordinary comparisons
+    // mid-task. The weekly teammate guard still bounds overall spend.
+    maxTokens: 400_000,
+    maxJobTokens: 400_000,
     maxOutputBytes: 4 * 1024 * 1024,
     terminationGraceMs: 2_000,
   });
@@ -36,8 +38,8 @@ export function executionLimits(
     maxActiveMs: integer("OPENBOT_RUN_MAX_MINUTES", 30, 1, 240) * 60_000,
     maxIdleMs: integer("OPENBOT_RUN_IDLE_MINUTES", 5, 1, 30) * 60_000,
     maxSteps: integer("OPENBOT_RUN_MAX_STEPS", 64, 1, 512),
-    maxTokens: integer("OPENBOT_RUN_MAX_TOKENS", 100_000, 1_000, 2_000_000),
-    maxJobTokens: integer("OPENBOT_JOB_MAX_TOKENS", 100_000, 1_000, 2_000_000),
+    maxTokens: integer("OPENBOT_RUN_MAX_TOKENS", 400_000, 1_000, 2_000_000),
+    maxJobTokens: integer("OPENBOT_JOB_MAX_TOKENS", 400_000, 1_000, 2_000_000),
   };
 }
 

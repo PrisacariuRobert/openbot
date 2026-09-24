@@ -139,11 +139,13 @@ export function browserApprovalReason(action: "open" | "click" | "type", value: 
     // Checked before the type scan: a formless button reports type "submit".
     if (isCollapsedDisclosure(target) && !/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(`${value} ${target!.label}`)) return null;
     if (isCookieDecline(target)) return null;
+    // A site search (GET form) only loads a results page. Icon fonts leak
+    // letters into labels ("sSearch"), so match the word, not the whole label.
+    if (target?.searchForm && target.formMethod === "get" && /search|find|^go$/i.test(target.label.trim()) && target.label.trim().length <= 24 && !SENSITIVE_CONTROL.test(target.label)) return null;
     if (/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(description)) return "This click may create an external or irreversible action.";
     // A CSS selector is not evidence of intent: #primary can mean Send.
     // Permit observed navigation/search; review other controls by default.
     if (target?.tag === "a" && /^https?:/i.test(target.href)) return null;
-    if (target?.searchForm && target.formMethod === "get" && /^(search|find)$/i.test(target.label.trim())) return null;
     return "Review this browser control before it runs; it may change data or send information.";
   }
   return null;

@@ -26,6 +26,7 @@ export function toolAvailability(
     handoff: true,
     message_teammate: true,
     spreadsheet_export: true,
+    document_export: true,
     spreadsheet_inspect: true,
     table_summary: true,
     table_reconcile: true,

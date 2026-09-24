@@ -161,3 +161,12 @@ test("declining a cookie banner needs no review; accepting and look-alikes still
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { contextScope: "form" })), null, "inside a form stays reviewed");
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { complete: false })), null, "an incomplete review stays reviewed");
 });
+
+test("site search buttons on GET search forms run without review, even with icon-font labels", async () => {
+  const { browserApprovalReason } = await import("./safety.js");
+  const search = (label: string, formMethod = "get", searchForm = true) => ({ url: "https://www.gsmarena.com/", tag: "button", role: "", label, inputType: "submit", autocomplete: "", href: "", formMethod, searchForm });
+  for (const label of ["Search", "sSearch", "Find", "Go", "Search phones"]) assert.equal(browserApprovalReason("click", "", search(label)), null, label);
+  assert.notEqual(browserApprovalReason("click", "", search("Search", "post")), null, "a POST form stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", search("Search", "get", false)), null, "not a search form");
+  assert.notEqual(browserApprovalReason("click", "", search("Submit")), null);
+});
