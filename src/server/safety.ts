@@ -126,8 +126,12 @@ export function isCookieDecline(target?: BrowserTarget): boolean {
   if (!(target.tag === "button" || target.role === "button")) return false;
   if (review.contextScope !== "dialog" && review.contextScope !== "page") return false;
   if (SENSITIVE_CONTROL.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return false;
-  return COOKIE_DECLINE.test(target.label.replace(/\s+/g, " ").trim());
+  const label = target.label.replace(/\s+/g, " ").trim();
+  // Opening the banner's own preferences only shows choices (where
+  // "Reject all" then needs no review either). Saving choices stays reviewed.
+  return COOKIE_DECLINE.test(label) || COOKIE_SETTINGS.test(label);
 }
+const COOKIE_SETTINGS = /^(?:cookie|privacy|consent)? ?(?:settings|preferences|options)(?:, opens the preference center dialog)?$|^(?:manage|customi[sz]e|change)(?: (?:my|your))? (?:cookies|cookie settings|preferences|options|choices|consent)$|^advanced settings(?:, opens the preference center dialog)?$|^(?:more options|show purposes|let me choose|customi[sz]e)$/i;
 
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
   // A formless button reports type "submit" by default; that type is only

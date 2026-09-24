@@ -153,7 +153,10 @@ test("declining a cookie banner needs no review; accepting and look-alikes still
   for (const label of ["Do not consent", "Reject all", "Reject All Cookies", "Decline", "Necessary cookies only", "Only necessary", "Use essential cookies only", "Continue without accepting"]) {
     assert.equal(browserApprovalReason("click", "", button(label)), null, label);
   }
-  for (const label of ["Accept all", "Consent", "Agree", "Reject all and subscribe", "Decline payment"]) {
+  for (const label of ["Cookie settings", "Advanced settings, Opens the preference center dialog", "Manage preferences", "Customize", "Let me choose", "More options"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  for (const label of ["Accept all", "Consent", "Agree", "Reject all and subscribe", "Decline payment", "Save settings", "Confirm my choices", "Account settings"]) {
     assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
   }
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", { formMethod: "post" })), null, "a submitting form stays reviewed");
