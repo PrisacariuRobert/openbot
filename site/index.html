@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OpenBot for Mac</title>
+  <meta name="description" content="Install OpenBot: a team of AI teammates on your Mac. Free and open source; bring the AI you already use." />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #ffffff; --surface: #f5f5f7; --surface-2: #ececf0; --ink: #1d1d1f; --muted: #6e6e73; --line: rgba(0,0,0,.1);
+      --strong: #1d1d1f; --on-strong: #ffffff; --ok: #1d8127; --key: #ffffff; --key-edge: rgba(0,0,0,.18);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --ink: #f5f5f7; --muted: #98989d; --line: rgba(255,255,255,.12); --strong: #f5f5f7; --on-strong: #000000; --ok: #30d158; --key: #3a3a3c; --key-edge: rgba(255,255,255,.14); }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+    main { max-width: 760px; margin: 0 auto; padding: 72px 20px 64px; }
+    .mark { width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; background: var(--surface); margin-bottom: 22px; animation: rise .6s cubic-bezier(.2,.9,.25,1) both; }
+    .mark svg { width: 40px; height: 40px; }
+    h1 { font-size: clamp(38px, 7vw, 60px); line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 14px; font-weight: 700; animation: rise .6s .05s cubic-bezier(.2,.9,.25,1) both; }
+    .lead { font-size: clamp(18px, 2.6vw, 22px); line-height: 1.4; color: var(--muted); margin: 0 0 40px; max-width: 34ch; animation: rise .6s .1s cubic-bezier(.2,.9,.25,1) both; }
+    .install { background: var(--surface); border-radius: 24px; padding: 22px; animation: rise .6s .15s cubic-bezier(.2,.9,.25,1) both; }
+    .install h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.01em; }
+    .install > p { margin: 0 0 16px; color: var(--muted); font-size: 15px; }
+    .command { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 14px; padding: 8px 8px 8px 16px; box-shadow: inset 0 0 0 1px var(--line); }
+    .command code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 500 14.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace; scrollbar-width: none; }
+    .copy { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--strong); color: var(--on-strong); font: 600 15px/1 inherit; cursor: pointer; transition: transform .12s ease, opacity .2s ease; }
+    .copy:active { transform: scale(.96); }
+    .copy:focus-visible { outline: 3px solid var(--muted); outline-offset: 2px; }
+    .copy.done { background: var(--ok); color: #fff; }
+    .steps { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
+    .steps li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--bg); transition: box-shadow .35s ease, transform .35s ease; }
+    .steps li.active { box-shadow: 0 0 0 2px var(--strong); transform: translateX(4px); }
+    .num { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 14px; }
+    .steps li.active .num { background: var(--strong); color: var(--on-strong); }
+    .say { flex: 1; font-size: 16px; line-height: 1.4; }
+    .keys { display: inline-flex; gap: 5px; align-items: center; }
+    kbd { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--key); box-shadow: 0 1px 0 var(--key-edge), inset 0 0 0 1px var(--key-edge); font: 600 13px/1 inherit; transition: transform .15s ease, box-shadow .15s ease; }
+    .steps li.active kbd { animation: press 1.6s ease-in-out infinite; }
+    .steps li.active kbd:nth-child(2) { animation-delay: .25s; }
+    @keyframes press { 0%, 60%, 100% { transform: translateY(0); } 20% { transform: translateY(2px); box-shadow: 0 0 0 var(--key-edge), inset 0 0 0 1px var(--key-edge); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .facts { margin: 44px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .fact { padding: 18px; border-radius: 18px; background: var(--surface); }
+    .fact strong { display: block; font-size: 15.5px; margin-bottom: 4px; }
+    .fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+    details { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 18px; }
+    summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+    details p, details li { color: var(--muted); font-size: 14.5px; line-height: 1.55; }
+    details code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; background: var(--surface); padding: 2px 6px; border-radius: 6px; color: var(--ink); }
+    footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+    footer a { color: inherit; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+    @media (max-width: 540px) { .command { flex-direction: column; align-items: stretch; padding: 12px; } .copy { justify-content: center; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="mark" aria-hidden="true">
+    <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="30" height="30" rx="9"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>
+  </div>
+  <h1>Your team,<br />on your Mac.</h1>
+  <p class="lead">Friendly AI teammates that research, write and get things done — with the AI you already use.</p>
+
+  <section class="install" aria-labelledby="install-title">
+    <h2 id="install-title">Install OpenBot</h2>
+    <p>Free and open source. Takes about a minute.</p>
+    <div class="command">
+      <code id="cmd">curl -fsSL https://openbots.foundation/install.sh | sh</code>
+      <button class="copy" id="copy" type="button" aria-describedby="cmd">Copy install command</button>
+    </div>
+    <ol class="steps" id="steps">
+      <li><span class="num">1</span><span class="say">Open Terminal</span><span class="keys"><kbd>⌘</kbd><kbd>Space</kbd></span></li>
+      <li><span class="num">2</span><span class="say">Type <strong>Terminal</strong> and press Return</span><span class="keys"><kbd>↩</kbd></span></li>
+      <li><span class="num">3</span><span class="say">Paste and press Return — OpenBot opens by itself</span><span class="keys"><kbd>⌘</kbd><kbd>V</kbd><kbd>↩</kbd></span></li>
+    </ol>
+  </section>
+
+  <div class="facts">
+    <div class="fact"><strong>Bring your own AI</strong><span>Start free with GitHub Copilot or a Gemini key, or use ChatGPT, Claude or Grok you already pay for.</span></div>
+    <div class="fact"><strong>Stays on your Mac</strong><span>Your studio and files live here. You choose which AI sees what.</span></div>
+    <div class="fact"><strong>Asks before it acts</strong><span>Anything that sends, buys or signs in waits for your okay.</span></div>
+  </div>
+
+  <details>
+    <summary>What the installer does</summary>
+    <ul>
+      <li>Downloads OpenBot for your Mac and checks its fingerprint before using it.</li>
+      <li>Installs it in <code>~/Library/Application Support/OpenBot</code> — no administrator password.</li>
+      <li>Runs it quietly in the background and starts it when you log in.</li>
+      <li>Adds OpenBot to Applications and your Dock, then opens your studio.</li>
+    </ul>
+    <p>To remove it: <code>"~/Library/Application Support/OpenBot/uninstall.sh"</code> (your data stays unless you add <code>--delete-data</code>).</p>
+    <p>Requires macOS 13 or later on an Apple silicon or Intel Mac.</p>
+  </details>
+
+  <footer>OpenBot is MIT-licensed. <a href="https://github.com/PrisacariuRobert/openbot">Source code</a></footer>
+</main>
+<script>
+  const copy = document.getElementById("copy");
+  const command = document.getElementById("cmd").textContent.trim();
+  const steps = [...document.querySelectorAll("#steps li")];
+  let timer = null, index = 0;
+  const show = (i) => steps.forEach((step, n) => step.classList.toggle("active", n === i));
+  const play = () => { clearInterval(timer); index = 0; show(0); timer = setInterval(() => { index = (index + 1) % steps.length; show(index); }, 2600); };
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(command); }
+    catch { const range = document.createRange(); range.selectNodeContents(document.getElementById("cmd")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); document.execCommand("copy"); }
+    copy.textContent = "Copied — now open Terminal";
+    copy.classList.add("done");
+    play();
+    setTimeout(() => { copy.textContent = "Copy install command"; copy.classList.remove("done"); }, 6000);
+  });
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTimeout(play, 1200);
+</script>
+</body>
+</html>

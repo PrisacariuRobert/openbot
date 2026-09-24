@@ -588,7 +588,7 @@ export interface RunnerCareStatus extends RunnerCareSnapshot {
   heartbeat: RunnerExternalHeartbeat;
 }
 
-export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
+export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "google" | "custom";
 export type ProviderRuntime = "opencode" | "claude_code";
 
 export interface ApiConnectionConfig {

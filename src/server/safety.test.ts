@@ -146,3 +146,18 @@ test("expanding a collapsed show/hide control needs no review; look-alikes still
   assert.ok(reviewed({ label: "" }, { label: "" }), "unlabelled control");
   assert.ok(browserApprovalReason("click", "#confirm-toggle", toggle), "a risky selector word still reviews");
 });
+
+test("declining a cookie banner needs no review; accepting and look-alikes still do", async () => {
+  const { browserApprovalReason } = await import("./safety.js");
+  const button = (label: string, extra: Record<string, unknown> = {}, review: Record<string, unknown> = {}) => ({ url: "https://www.gsmarena.com/", tag: "button", role: "", label, inputType: "", autocomplete: "", href: "", formMethod: "", searchForm: false, stateful: false, review: { url: "https://www.gsmarena.com/", label, control: "button", fields: [], contextScope: "dialog" as const, disclosure: null, complete: true, ...review }, ...extra });
+  for (const label of ["Do not consent", "Reject all", "Reject All Cookies", "Decline", "Necessary cookies only", "Only necessary", "Use essential cookies only", "Continue without accepting"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  for (const label of ["Accept all", "Consent", "Agree", "Reject all and subscribe", "Decline payment"]) {
+    assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  assert.notEqual(browserApprovalReason("click", "", button("Reject all", { formMethod: "post" })), null, "a submitting form stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { fields: [{ label: "Email", value: "me@example.com" }] })), null, "typed data stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { contextScope: "form" })), null, "inside a form stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { complete: false })), null, "an incomplete review stays reviewed");
+});

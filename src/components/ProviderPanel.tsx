@@ -27,6 +27,7 @@ import type {
   ProviderStatus,
 } from "../shared/types";
 import "./provider-panel.css";
+import { BringYourAI } from "./BringYourAI";
 
 type Props = {
   provider: ProviderStatus | null;
@@ -357,13 +358,13 @@ export function ProviderPanel({
   };
   return (
     <div className="provider-settings">
-      {provider && !openCodeConnected && <RecommendedAI onConnected={async (connectionId) => {
-        setNotice("OpenCode Go is connected. Checking it with a short test…");
+      {provider && !provider.instances.some((entry) => entry.connected && connectionTests[entry.id]?.ok !== false) && <BringYourAI onConnected={async (connectionId) => {
+        setNotice("Connected. Checking it with a short test…");
         const result = await onTestConnection(connectionId).catch(() => null);
-        if (result?.ok) setNotice("OpenCode Go is connected and working. Choose it when you create a teammate.");
-        else { setNotice(null); setError(result?.error ? `The key was saved, but the test didn't pass: ${result.error}` : "The key was saved, but the first test didn't finish. Try “Test connection” below in a moment."); }
+        if (result?.ok) setNotice("Connected and working. Choose it when you create a teammate.");
+        else { setNotice(null); setError(result?.error ? `Connected, but the test didn't pass: ${result.error}` : "Connected. The first test didn't finish; try “Test connection” below in a moment."); }
       }} />}
-      {(!provider || openCodeConnected) && <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
+      {(!provider || provider.instances.some((entry) => entry.connected && connectionTests[entry.id]?.ok !== false)) && <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
         <div>
           <h3>Your AI, your choice.</h3>
           <p>

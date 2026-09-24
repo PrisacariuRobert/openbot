@@ -102,11 +102,13 @@ try {
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Connection step fits a phone");
   await page.screenshot({ path: path.join(output, "connect-ai-mobile.png") });
   await page.setViewportSize({ width: 1280, height: 900 });
-  // The recommended key path is right in the sheet; other services open setup.
-  await creation.getByLabel("OpenCode Go key").waitFor();
-  assert.equal(await creation.getByRole("link", { name: /Open opencode\.ai/ }).getAttribute("href"), "https://opencode.ai/go");
+  // Free and already-owned options come first, right in the sheet.
+  await creation.getByText("Start free", { exact: true }).waitFor();
+  await creation.getByLabel("Paste your Gemini API key").waitFor();
+  assert.equal(await creation.getByRole("link", { name: /Get a free key/ }).getAttribute("href"), "https://aistudio.google.com/apikey");
+  await creation.getByText("Use a subscription you already have", { exact: true }).waitFor();
   const popup = page.waitForEvent("popup");
-  await creation.getByRole("link", { name: /Use Claude, ChatGPT or another service/ }).click();
+  await creation.getByRole("link", { name: /More AI settings/ }).click();
   const settings = await popup;
   settings.setDefaultTimeout(45_000);
   // The provider setup renders as a full panel in the separate tab now.

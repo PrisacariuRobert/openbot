@@ -84,6 +84,7 @@ export const providerInput = z
         "github-copilot",
         "gitlab",
         "xai",
+        "google",
         "custom",
       ])
       .optional(),
@@ -148,6 +149,7 @@ export function modelBelongsToConnection(
     "github-copilot": ["github-copilot/"],
     gitlab: ["gitlab/"],
     xai: ["xai/"],
+    google: ["google/"],
     custom: [],
   };
   return prefixes[instance.provider].some((prefix) => model.startsWith(prefix));
@@ -190,7 +192,7 @@ export function apiRuntimeEnvironment(
 
 /** Models known to run OpenBot teammates well, best first. The first one a
  * connection offers is shown first and preselected. */
-export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash"] as const;
+export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash", "google/gemini-2.5-flash"] as const;
 
 /** OpenCode's free tier only answers requests from OpenCode's own app, so it
  * rejects teammate runs (HTTP 403). Offering it would be a first-run trap. */

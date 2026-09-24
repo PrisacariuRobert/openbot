@@ -804,13 +804,14 @@ app.post("/api/provider/connect", async (request, response) => {
 });
 
 app.post("/api/provider/key", async (request, response) => {
-  const parsed = z.object({ providerId: z.literal("opencode-go"), key: z.string().max(400) }).strict().safeParse(request.body);
-  if (!parsed.success) return response.status(400).json({ error: "Paste your OpenCode Go key." });
+  const parsed = z.object({ providerId: z.enum(["opencode-go", "google"]), key: z.string().max(400) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Paste your key." });
   try {
     await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
     const status = await readProviderStatus(db, providerConnections.listAttempts());
-    const instance = status.instances.find((item) => item.id === "local-opencode" && item.connected);
-    if (!instance) return response.status(400).json({ error: "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
+    const instanceId = parsed.data.providerId === "google" ? "local-google" : "local-opencode";
+    const instance = status.instances.find((item) => item.id === instanceId && item.connected);
+    if (!instance) return response.status(400).json({ error: parsed.data.providerId === "google" ? "OpenCode saved the key but didn't list Gemini. Paste the key again." : "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
     response.json({ connectionId: instance.id, models: instance.models || [] });
   } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
 });
@@ -2829,6 +2830,18 @@ app.post("/api/delegations/:runId/recall", (request, response) => {
   response.json({ ok: true, recalled: consultants.length });
 });
 
+/** Name the field that is wrong instead of a generic "fill everything in". */
+function botInputProblem(error: z.ZodError) {
+  const field = String(error.issues[0]?.path[0] || "");
+  return ({
+    name: "Give your teammate a name (up to 30 characters).",
+    role: "Describe their job in a few words (up to 60 characters).",
+    instructions: "Add a short description of how they should work (up to 2,000 characters).",
+    mascot: "Choose one of the characters shown.",
+    color: "Choose one of the colors shown.",
+    emoji: "Choose a symbol for your teammate.",
+  } as Record<string, string>)[field] || "Some teammate details weren't valid. Check the form and try again.";
+}
 const botInput = z.object({
   name: z.string().trim().min(1).max(30), emoji: z.string().trim().min(1).max(8),
   mascot: z.enum(["nova", "blob", "sprout", "orbit", "pebble", "sunny"]).optional(),
@@ -2868,7 +2881,7 @@ app.post("/api/imports/profile/apply", (request, response) => {
 
 app.post("/api/bots", (request, response) => {
   const parsed = botInput.safeParse(request.body);
-  if (!parsed.success) return response.status(400).json({ error: "A name, role and personality are required." });
+  if (!parsed.success) return response.status(400).json({ error: botInputProblem(parsed.error) });
   const connection = db.getProvider(parsed.data.providerInstanceId || "");
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   if (!parsed.data.model || !modelBelongsToConnection(parsed.data.model, connection)) return response.status(400).json({ error: "Choose a model from the selected connection." });

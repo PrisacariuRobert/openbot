@@ -115,6 +115,20 @@ export function isCollapsedDisclosure(target?: BrowserTarget): boolean {
   return target.label.trim().length > 0 && !FINAL_ACTION_LABEL.test(target.label) && !SENSITIVE_CONTROL.test(text);
 }
 
+/** Declining a cookie banner only withholds consent, so it runs without
+ * review. Narrow on purpose (labels are page-authored): an exact decline
+ * phrase, a plain button in a banner or dialog, no link, no submitting form,
+ * nothing typed and nothing sensitive. Accepting cookies stays reviewed. */
+const COOKIE_DECLINE = /^(?:do not consent|don[’']t consent|reject(?: all)?(?: cookies)?|decline(?: all)?(?: cookies)?|refuse(?: all)?(?: cookies)?|deny(?: all)?|(?:use |allow )?(?:only )?(?:strictly )?(?:necessary|essential)(?: cookies)?(?: only)?|continue without accepting|no,? thanks)$/i;
+export function isCookieDecline(target?: BrowserTarget): boolean {
+  const review = target?.review;
+  if (!target || !review?.complete || target.href || target.formMethod || review.fields.length > 0) return false;
+  if (!(target.tag === "button" || target.role === "button")) return false;
+  if (review.contextScope !== "dialog" && review.contextScope !== "page") return false;
+  if (SENSITIVE_CONTROL.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return false;
+  return COOKIE_DECLINE.test(target.label.replace(/\s+/g, " ").trim());
+}
+
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
   // A formless button reports type "submit" by default; that type is only
   // evidence of a submission when a form owns the button.
@@ -124,6 +138,7 @@ export function browserApprovalReason(action: "open" | "click" | "type", value: 
   if (action === "click") {
     // Checked before the type scan: a formless button reports type "submit".
     if (isCollapsedDisclosure(target) && !/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(`${value} ${target!.label}`)) return null;
+    if (isCookieDecline(target)) return null;
     if (/send|submit|publish|buy|pay|order|delete|remove|confirm/i.test(description)) return "This click may create an external or irreversible action.";
     // A CSS selector is not evidence of intent: #primary can mean Send.
     // Permit observed navigation/search; review other controls by default.
