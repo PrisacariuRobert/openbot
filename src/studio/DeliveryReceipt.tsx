@@ -6,7 +6,7 @@ import { deliveryReview, deliveryReviewSummary } from "./delivery-review";
 import type { CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { newerDeliveredVersion } from "./artifact-versions";
+import { deliveredFiles, newerDeliveredVersion } from "./artifact-versions";
 import { isUnverifiedTextFallback } from "./delivery-fallback";
 import { Character } from "./Character";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
@@ -44,7 +44,7 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
           <div className="delivery-finding-full"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml disallowedElements={["a", "img"]} unwrapDisallowed>{review.detail}</ReactMarkdown></div>
         </details>}
       </section>)}</details>}
-      {message.attachments.map((file) => {
+      {deliveredFiles(message.attachments).map((file) => {
         const newer = newerDeliveredVersion(file, visibleFiles);
         return (
           <div className="delivery-version" key={file.id}>

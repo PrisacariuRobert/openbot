@@ -37,3 +37,13 @@ test("owners can address group teammates naturally: 'Nova: …', 'Pixel, …'", 
   const full = bots.map((bot) => ({ ...bot, role: "", instructions: "", status: "idle" })) as never[];
   assert.deepEqual(resolveMessageTargets({ body: "Nova: find prices. Pixel: budget it.", bots: full }).map((bot: { id: string }) => bot.id), ["nova", "pixel"]);
 });
+
+test("a later teammate who checks or refines earlier work follows that teammate", async () => {
+  const { followUpOrder } = await import("./routing.js");
+  const bots = [{ id: "scout", name: "Scout" }, { id: "nova", name: "Nova" }, { id: "pixel", name: "Pixel" }];
+  const order = (body: string) => Object.fromEntries(followUpOrder(body, bots));
+  assert.deepEqual(order("Nova: find three Italian restaurants near Stephansplatz. Scout, double-check their Sunday opening hours."), { scout: "nova" });
+  assert.deepEqual(order("Nova: research flights. Pixel, turn it into a one-page plan. Scout, verify the prices."), { pixel: "nova", scout: "pixel" });
+  assert.deepEqual(order("Nova: research flights to Rome. Pixel: write a birthday poem for Anna."), {}, "independent parts run side by side");
+  assert.deepEqual(order("Find flights to Rome."), {});
+});

@@ -1080,6 +1080,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "active_duration_ms INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_steps INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_override TEXT");
+    this.addColumn("runs", "after_run_id TEXT");
     this.addColumn("bots", "retired_at TEXT");
     this.addColumn("action_journal", "mutation_key TEXT");
     this.addColumn("action_journal", "effect_digest TEXT");
@@ -2039,7 +2040,7 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; triggerMessageId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"] }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; triggerMessageId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"]; afterRunId?: string | null }): Run {
     if (this.getBot(input.botId)?.retiredAt) throw new Error("This teammate is retired. Restore them before starting new work.");
     if (input.routineId) {
       const routine = this.getRoutine(input.routineId);
@@ -2060,8 +2061,21 @@ export class OpenBotDatabase {
       const approval = this.createApproval({ runId: id, botId: input.botId, kind: "prompt", reason: input.approvalReason, actionLabel: input.prompt.slice(0, 180), action: { type: "run" } });
       this.db.prepare("UPDATE runs SET approval_id=? WHERE id=?").run(approval.id, id);
     }
+    if (input.afterRunId) this.db.prepare("UPDATE runs SET after_run_id=?,task_stage='waiting' WHERE id=?").run(input.afterRunId, id);
     if (input.routineId) new WorkflowValidation(this).bindRun(id, input.routineId);
     return this.getRun(id)!;
+  }
+
+  /** Tasks waiting for a teammate's answer in the same conversation. */
+  runsWaitingFor(runId: string): Run[] {
+    return (this.db.prepare(this.runSelect("WHERE r.after_run_id=? AND r.status='waiting_for_teammate' AND r.consultation_pending=0 ORDER BY r.created_at ASC")).all(runId) as Row[]).map((row) => this.runFromRow(row));
+  }
+
+  /** Starts a waiting task with what it needs to know about the earlier answer. */
+  releaseRunAfter(id: string, prompt: string): Run | null {
+    const changed = this.db.prepare("UPDATE runs SET prompt=?,status='queued',task_stage='working',progress_at=? WHERE id=? AND status='waiting_for_teammate' AND consultation_pending=0").run(prompt, now(), id).changes === 1;
+    if (changed) for (const listener of this.runStatusListeners) listener(id, "queued");
+    return changed ? this.getRun(id) : null;
   }
 
   private runFromRow(row: Row): Run {
@@ -2103,6 +2117,7 @@ export class OpenBotDatabase {
       outcome: row.outcome === "delivered" || row.outcome === "blocked" ? row.outcome : null,
       attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
+      afterRunId: row.after_run_id ? String(row.after_run_id) : null,
       expectedWorkKind: ["morning", "inbox", "meeting", "weekly"].includes(String(row.expected_work_kind)) ? row.expected_work_kind as Run["expectedWorkKind"] : null,
       completionRepairCount: Number(row.completion_repair_count || 0),
       attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),

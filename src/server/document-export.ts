@@ -62,7 +62,11 @@ export function inlineRuns(text: string): string {
 export function markdownToBody(markdown: string, title?: string): { body: string; paragraphs: number } {
   const out: string[] = [];
   const para = (runs: string, style?: string, extra = "") => out.push(`<w:p>${style || extra ? `<w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ""}${extra}</w:pPr>` : ""}${runs}</w:p>`);
-  if (title) para(inlineRuns(title), "Title");
+  // A title that repeats the document's own first heading appears once.
+  const plain = (value: string) => value.replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const firstLine = markdown.replace(/\r\n?/g, "\n").split("\n").find((line) => line.trim()) || "";
+  const firstHeading = /^#{1,3}\s+(.*)$/.exec(firstLine.trim())?.[1];
+  if (title && !(firstHeading && plain(firstHeading) === plain(title))) para(inlineRuns(title), "Title");
   let paragraph: string[] = [];
   const flush = () => { if (paragraph.length) { para(inlineRuns(paragraph.join(" "))); paragraph = []; } };
   for (const raw of markdown.replace(/\r\n?/g, "\n").split("\n")) {

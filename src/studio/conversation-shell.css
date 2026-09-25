@@ -709,11 +709,14 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
   width: fit-content;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 16px;
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink);
   overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .chat-event { max-width: 94%; }
 }
 .chat-event.action-completed-group {
   margin-inline: 0;

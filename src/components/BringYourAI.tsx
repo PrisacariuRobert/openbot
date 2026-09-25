@@ -134,7 +134,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
   );
 }
 
-function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
+export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
   const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
     event.preventDefault();

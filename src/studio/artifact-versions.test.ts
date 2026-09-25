@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Attachment } from "../shared/types";
-import { newerDeliveredVersion } from "./artifact-versions";
+import { deliveredFiles, newerDeliveredVersion } from "./artifact-versions";
 
 const file = (id: string, revision: number, replacesAttachmentId: string | null = null, patch: Partial<Attachment> = {}) => ({ id, revision, replacesAttachmentId, source: "artifact", threadId: "conversation", name: "choice.md", ...patch } as Attachment);
 test("old result offers the latest known descendant without changing its own link", () => {
@@ -15,4 +15,11 @@ test("same names, other conversations, uploads and invalid ancestry do not count
   const first = file("one", 1);
   assert.equal(newerDeliveredVersion(first, [file("unrelated", 2), file("other-thread", 2, "one", {threadId:"elsewhere"}), file("upload", 2, "one", {source:"upload"}), file("invalid", 1, "one")]), null);
   assert.equal(newerDeliveredVersion(file("upload", 1, null, {source:"upload"}), [file("two", 2, "upload")]), null);
+});
+
+test("a Word document hides the text draft it was exported from", () => {
+  const names = (list: Attachment[]) => deliveredFiles(list).map((item) => item.name);
+  assert.deepEqual(names([file("a", 1, null, { name: "welcome-guide.docx" }), file("b", 1, null, { name: "welcome-guide.md" })]), ["welcome-guide.docx"]);
+  assert.deepEqual(names([file("b", 1, null, { name: "notes.md" }), file("a", 1, null, { name: "welcome-guide.docx" })]), ["notes.md", "welcome-guide.docx"]);
+  assert.deepEqual(names([file("b", 1, null, { name: "plan.md" })]), ["plan.md"]);
 });

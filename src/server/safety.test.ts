@@ -156,6 +156,12 @@ test("declining a cookie banner needs no review; accepting and look-alikes still
   for (const label of ["Cookie settings", "Advanced settings, Opens the preference center dialog", "Manage preferences", "Customize", "Let me choose", "More options"]) {
     assert.equal(browserApprovalReason("click", "", button(label)), null, label);
   }
+  for (const label of ["Nur notwendige Cookies verwenden", "Alle ablehnen", "Ablehnen", "Cookie-Einstellungen", "Tout refuser", "Continuer sans accepter", "Rechazar todo", "Rifiuta tutto", "Alles weigeren", "Alleen noodzakelijke cookies"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  for (const label of ["Alle akzeptieren", "Akzeptieren", "Tout accepter", "Aceptar todo", "Accetta tutto", "Alles accepteren", "Einstellungen speichern"]) {
+    assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
+  }
   for (const label of ["Accept all", "Consent", "Agree", "Reject all and subscribe", "Decline payment", "Save settings", "Confirm my choices", "Account settings"]) {
     assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
   }
@@ -163,6 +169,19 @@ test("declining a cookie banner needs no review; accepting and look-alikes still
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { fields: [{ label: "Email", value: "me@example.com" }] })), null, "typed data stays reviewed");
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { contextScope: "form" })), null, "inside a form stays reviewed");
   assert.notEqual(browserApprovalReason("click", "", button("Reject all", {}, { complete: false })), null, "an incomplete review stays reviewed");
+});
+
+test("closing a pop-up needs no review in any language; closing an account still does", async () => {
+  const { browserApprovalReason } = await import("./safety.js");
+  const button = (label: string, extra: Record<string, unknown> = {}, review: Record<string, unknown> = {}) => ({ url: "https://fabios.at/", tag: "button", role: "", label, inputType: "", autocomplete: "", href: "", formMethod: "", searchForm: false, stateful: false, review: { url: "https://fabios.at/", label, control: "button", fields: [], contextScope: "dialog" as const, disclosure: null, complete: true, ...review }, ...extra });
+  for (const label of ["Dialog schließen", "Close", "Close dialog", "Dismiss", "×", "Fermer", "Cerrar", "Not now", "Maybe later", "Nein, danke"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  for (const label of ["Close account", "Close order", "Dismiss and delete", "Close and send"]) {
+    assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  assert.notEqual(browserApprovalReason("click", "", button("Close", { formMethod: "post" })), null, "a submitting form stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Close", {}, { contextScope: "form" })), null, "inside a form stays reviewed");
 });
 
 test("site search buttons on GET search forms run without review, even with icon-font labels", async () => {

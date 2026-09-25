@@ -337,6 +337,8 @@ export interface Run {
   botMascot: MascotKind;
   botColor: string;
   parentRunId: string | null;
+  /** Starts after this run answers (a later teammate building on its work). */
+  afterRunId?: string | null;
   steeredFromRunId: string | null;
   /** Task outcome, separate from process status: a run whose process ended
    * is "completed", but only "delivered" means the requested work exists.

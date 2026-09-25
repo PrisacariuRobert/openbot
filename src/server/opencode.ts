@@ -486,7 +486,9 @@ export class OpenCodeRunner {
     }
     // Self-extension resumes the same run with the owner's chosen coding model.
     const model = run.modelOverride && modelBelongsToConnection(run.modelOverride, provider) ? run.modelOverride : bot.model;
-    const meter = new ExecutionMeter({ ...this.limits, maxTokens: this.limits.maxTokens + this.options.db.taskTokenPolicy(run.id).extraTokens }, run.activeDurationMs, run.modelSteps);
+    // A task answering after its step limit gets a few steps for that answer only.
+    const wrappingUp = Boolean(this.options.db.extensionRecord<{ at: string }>("step-wrapup", run.id));
+    const meter = new ExecutionMeter({ ...this.limits, maxTokens: this.limits.maxTokens + this.options.db.taskTokenPolicy(run.id).extraTokens, maxSteps: this.limits.maxSteps + (wrappingUp ? 6 : 0) }, run.activeDurationMs, run.modelSteps);
     const previousTokens = run.inputTokens + run.outputTokens + run.reasoningTokens;
     const initialStop = meter.reason(previousTokens, !this.options.db.budgetAvailable(bot.id).allowed);
     if (initialStop === "tokens") { this.pauseForTokens(run.id); return; }
@@ -546,6 +548,9 @@ export class OpenCodeRunner {
     let usage: Usage = zeroUsage();
     let peakContext = 0;
     let stoppedFor: ExecutionStop | null = null;
+    // At the step limit a teammate gets one short, tool-free turn to answer
+    // with what it already found, instead of ending with nothing to show.
+    let wrapUp = false;
     let killTimer: NodeJS.Timeout | null = null;
     let processClosed = false;
     const terminate = () => {
@@ -599,6 +604,15 @@ export class OpenCodeRunner {
       const reason = meter.reason(previousTokens + usage.inputTokens + usage.outputTokens + usage.reasoningTokens, !this.options.db.budgetAvailable(bot.id).allowed);
       if (!reason) return;
       if (reason === "tokens") { checkpoint(); this.pauseForTokens(run.id); return; }
+      if (reason === "steps" && !wrappingUp && !run.parentRunId) {
+        checkpoint();
+        wrapUp = true;
+        this.options.db.saveExtensionRecord("step-wrapup", run.id, { at: new Date().toISOString() });
+        this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Wrapping up with what it found", detail: "This task used its steps, so it’s answering now from what it already has." });
+        terminate();
+        this.options.onChange();
+        return;
+      }
       stoppedFor = reason;
       checkpoint();
       // Revoke tool access immediately, before waiting for process exit.
@@ -700,6 +714,12 @@ export class OpenCodeRunner {
       try {
       const approvalPaused = this.approvalPauses.delete(run.id);
       if (this.restartQueue.delete(run.id) || this.stopping) return;
+      if (wrapUp) {
+        this.options.db.setRunPrompt(run.id, "You have used this task's step budget. Do not use any more tools. From what you have already found in this conversation, give the user your best final answer to their request now. Say clearly which parts you could not check, and in one line what is left to do.");
+        this.options.db.updateRun(run.id, { ...usagePatch(), status: "queued", partialText: responseText || null, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
+        this.options.onChange();
+        return;
+      }
       if (sessionId) this.options.db.rememberSessionCapabilities(sessionId, capabilityFingerprint);
       const finishedAt = new Date().toISOString();
       const current = this.options.db.getRun(run.id);

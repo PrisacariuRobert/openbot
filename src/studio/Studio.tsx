@@ -218,6 +218,7 @@ function eventTitle(message: Message): string {
   const data = message.eventData || {};
   switch (message.eventType) {
     case "run_stopped":
+      return String(data.title || (data.botName ? `${data.botName} stopped` : "Task stopped"));
     case "action_completed":
       return String(data.title || "Task update");
     case "routine_created":
@@ -265,7 +266,7 @@ function resolveEventFaces(
   };
   const byId = data.botId;
   if (typeof byId === "string" && byId) push(bots.find((bot) => bot.id === byId));
-  for (const key of ["fromName", "toName"]) {
+  for (const key of ["fromName", "toName", "botName"]) {
     const name = data[key];
     if (typeof name === "string" && name) push(bots.find((bot) => bot.name === name));
   }
@@ -2559,6 +2560,19 @@ export function Studio() {
                           previous.senderId !== message.senderId ||
                           previous.senderType === "system" ||
                           message.senderType === "system";
+                        // Stopping a task stops its helpers too: one line says so.
+                        if (message.eventType === "run_stopped" && previous?.eventType === "run_stopped") return null;
+                        if (message.eventType === "run_stopped" && state.messages[index + 1]?.eventType === "run_stopped") {
+                          let last = index;
+                          while (state.messages[last + 1]?.eventType === "run_stopped") last += 1;
+                          const stops = state.messages.slice(index, last + 1);
+                          const faces = [...new Map(stops.flatMap((item) => resolveEventFaces(item.eventData || {}, allBots, 1)).map((bot) => [bot.id, bot])).values()].slice(0, 3);
+                          const stopped = state.runs.find((run) => run.id === message.runId && !run.parentRunId) || state.runs.find((run) => stops.some((item) => item.runId === run.id));
+                          return <div key={message.id} className="chat-event" data-event="run_stopped" role="status">
+                            <span className="chat-event-mark" aria-hidden="true">{faces.length ? faces.map((face) => <Face key={face.id} bot={face} size={20} />) : <MessageCircle size={14} />}</span>
+                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}</span>
+                          </div>;
+                        }
                         if (message.kind === "event") {
                           const foldFirst = talkFold.firstOf.get(message.id);
                           if (foldFirst && foldFirst.id !== message.id) return null;

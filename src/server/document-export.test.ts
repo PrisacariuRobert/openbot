@@ -16,6 +16,12 @@ test("Markdown becomes Word structure: title, headings, lists and inline styles"
   assert.ok(!inlineRuns("<script>&").includes("<script>"), "text is escaped");
 });
 
+test("a title that repeats the first heading is written once", () => {
+  const { body } = markdownToBody("# Welcome to the Studio! 🎉\n\nHello.", "Welcome to the Studio! 🎉");
+  assert.equal((body.match(/Welcome to the Studio!/g) || []).length, 1);
+  assert.doesNotMatch(body, /w:val="Title"/);
+});
+
 test("exports a real .docx that macOS can read, without overwriting or leaving the workspace", () => {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-docx-"));
   try {

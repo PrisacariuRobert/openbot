@@ -120,6 +120,9 @@ export function isCollapsedDisclosure(target?: BrowserTarget): boolean {
  * phrase, a plain button in a banner or dialog, no link, no submitting form,
  * nothing typed and nothing sensitive. Accepting cookies stays reviewed. */
 const COOKIE_DECLINE = /^(?:do not consent|don[’']t consent|reject(?: all)?(?: cookies)?|decline(?: all)?(?: cookies)?|refuse(?: all)?(?: cookies)?|deny(?: all)?|(?:use |allow )?(?:only )?(?:strictly )?(?:necessary|essential)(?: cookies)?(?: only)?|continue without accepting|no,? thanks)$/i;
+// The same choices in the languages teammates meet most often in Europe.
+const COOKIE_DECLINE_INTL = /^(?:(?:alle )?ablehnen|alle cookies ablehnen|nicht einverstanden|(?:nur )?(?:notwendige|erforderliche|essenzielle|technisch notwendige) cookies(?: verwenden| akzeptieren| zulassen| erlauben)?(?: nur)?|nur (?:notwendige|erforderliche|essenzielle)(?: cookies)?(?: verwenden| akzeptieren| zulassen| erlauben)?|weiter ohne (?:einwilligung|zustimmung|akzeptieren)|(?:tout )?refuser(?: tout| les cookies)?|continuer sans accepter|uniquement (?:les )?cookies (?:nécessaires|essentiels)|rechazar(?: todo| todas| cookies)?|(?:solo|sólo) (?:las )?(?:necesarias|esenciales)|rifiuta(?: tutto| tutti)?|(?:solo|usa solo) (?:i )?(?:cookie )?(?:necessari|essenziali)|continua senza accettare|(?:alles )?weigeren|alleen (?:noodzakelijke|functionele)(?: cookies)?)$/i;
+const COOKIE_SETTINGS_INTL = /^(?:cookie-?einstellungen|einstellungen(?: verwalten| anpassen)?|mehr optionen|anpassen|paramètres(?: des cookies)?|personnaliser|gérer (?:les )?(?:préférences|cookies)|configurar(?: cookies)?|personalizar|preferenze(?: cookie)?|personalizza|gestisci (?:le )?preferenze|instellingen(?: aanpassen)?|voorkeuren(?: beheren)?)$/i;
 export function isCookieDecline(target?: BrowserTarget): boolean {
   const review = target?.review;
   if (!target || !review?.complete || target.href || target.formMethod || review.fields.length > 0) return false;
@@ -129,8 +132,11 @@ export function isCookieDecline(target?: BrowserTarget): boolean {
   const label = target.label.replace(/\s+/g, " ").trim();
   // Opening the banner's own preferences only shows choices (where
   // "Reject all" then needs no review either). Saving choices stays reviewed.
-  return COOKIE_DECLINE.test(label) || COOKIE_SETTINGS.test(label);
+  return COOKIE_DECLINE.test(label) || COOKIE_DECLINE_INTL.test(label) || COOKIE_SETTINGS.test(label) || COOKIE_SETTINGS_INTL.test(label) || DISMISS.test(label);
 }
+// Closing a pop-up (newsletter, promo, language picker) only hides it, in
+// any language. Exact labels only: "Close account" never matches.
+const DISMISS = /^(?:(?:close|dismiss|hide)(?: (?:dialog|popup|pop-up|modal|window|banner|message|overlay|this))?|(?:dialog|fenster|popup) (?:schließen|schliessen)|schließen|schliessen|fermer|cerrar|chiudi|sluiten|fechar|zamknij|stäng|luk|lukk|sulje|закрыть|not now|maybe later|später|nicht jetzt|nein,? danke|non merci|no,? gracias|no,? grazie|nee,? bedankt|[×✕✖xX])$/i;
 const COOKIE_SETTINGS = /^(?:cookie|privacy|consent)? ?(?:settings|preferences|options)(?:, opens the preference center dialog)?$|^(?:manage|customi[sz]e|change)(?: (?:my|your))? (?:cookies|cookie settings|preferences|options|choices|consent)$|^advanced settings(?:, opens the preference center dialog)?$|^(?:more options|show purposes|let me choose|customi[sz]e)$/i;
 
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {

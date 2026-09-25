@@ -158,7 +158,7 @@ export function approvalPreview(
       const target = parsed.data.targetReview;
       if (object.type === "browser_click" && parsed.data.navigationAllowanceOffer) preview.browserNavigationAllowance = parsed.data.navigationAllowanceOffer;
       preview.actionLabel = visible(`${object.type === "browser_click" ? "Click" : "Enter text in"} “${target.label}” on ${new URL(target.url).hostname}`);
-      preview.fields.push({ label: "Website", value: visible(target.url) }, { label: "Private browser", value: `${approval.botName}’s existing profile. The website—not an API connection—determines the signed-in account.` }, { label: "Control", value: visible(`${target.label} (${target.control})`) });
+      preview.fields.push({ label: "Website", value: visible(target.url) }, { label: "Browser", value: `${approval.botName}’s own browser, signed in wherever ${approval.botName} is already signed in.` }, { label: "Control", value: visible(`${target.label} (${target.control})`) });
       if (object.type === "browser_click" && target.disclosure) preview.fields.push({
         label: "Page state",
         value: "The website describes this as collapsed content. That description does not prove the click is read-only.",
