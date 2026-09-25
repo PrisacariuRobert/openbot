@@ -143,6 +143,29 @@ const timeText = (date: string) =>
   new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dateText = (date: string) =>
   new Date(date).toLocaleDateString([], { month: "short", day: "numeric" });
+/** A teammate that needs the Mac's files asks in words; this turns that into
+ * one tap: switch on Files & apps for the studio, then tell it to go ahead.
+ * The tap itself is the owner's decision; nothing runs before it. */
+function MacAccessOffer({ name, threadId, onDone }: { name: string; threadId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const turnOn = async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ macAccessEnabled: true }) });
+      if (!response.ok) throw new Error("Files & apps couldn't be turned on. Try Control center.");
+      await api("/api/messages", { threadId, body: "I turned on Files & apps on this Mac — go ahead.", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, requestId: crypto.randomUUID() });
+      onDone();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Something went wrong."); setBusy(false); }
+  };
+  return (
+    <div className="mac-access-offer">
+      <button type="button" className="text-action strong" disabled={busy} onClick={() => void turnOn()}>{busy ? "Turning on…" : `Turn on Files & apps for ${name}`}</button>
+      <small>Lets your teammates use your Mac’s folders and apps. Changes still ask you first. You can turn it off in Control center.</small>
+      {error && <small role="alert">{error}</small>}
+    </div>
+  );
+}
+
 async function api<T>(
   path: string,
   body?: unknown,
@@ -2657,6 +2680,9 @@ export function Studio() {
                             )}
                             <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
+                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && (
+                                <MacAccessOffer name={message.senderName} threadId={message.threadId} onDone={() => setRefresh((n) => n + 1)} />
+                              )}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>

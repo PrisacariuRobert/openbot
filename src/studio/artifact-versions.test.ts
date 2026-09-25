@@ -22,4 +22,6 @@ test("a Word document hides the text draft it was exported from", () => {
   assert.deepEqual(names([file("a", 1, null, { name: "welcome-guide.docx" }), file("b", 1, null, { name: "welcome-guide.md" })]), ["welcome-guide.docx"]);
   assert.deepEqual(names([file("b", 1, null, { name: "notes.md" }), file("a", 1, null, { name: "welcome-guide.docx" })]), ["notes.md", "welcome-guide.docx"]);
   assert.deepEqual(names([file("b", 1, null, { name: "plan.md" })]), ["plan.md"]);
+  assert.deepEqual(names([file("a", 1, null, { name: "handy-preise.xlsx" }), file("b", 1, null, { name: "preise_at.csv" })]), ["handy-preise.xlsx"]);
+  assert.deepEqual(names([file("b", 1, null, { name: "export.csv" })]), ["export.csv"], "a CSV on its own is the delivery");
 });

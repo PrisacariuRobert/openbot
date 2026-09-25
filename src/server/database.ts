@@ -231,6 +231,16 @@ function startingTaskSteps(): TaskStep[] {
   ];
 }
 
+/** "Click “Book” on example.com" → "Clicked “Book” on example.com": the
+ * chat receipt says what happened, not the page's full title. */
+export function doneLabel(actionLabel: string | null | undefined): string {
+  const label = (actionLabel || "").trim();
+  if (!label) return "";
+  const past: Array<[RegExp, string]> = [[/^Click\b/, "Clicked"], [/^Type\b/, "Typed"], [/^Open\b/, "Opened"], [/^Send\b/, "Sent"], [/^Upload\b/, "Uploaded"], [/^Create\b/, "Created"], [/^Post\b/, "Posted"], [/^Reply\b/, "Replied"], [/^Save\b/, "Saved"]];
+  for (const [pattern, word] of past) if (pattern.test(label)) return `${label.replace(pattern, word)}.`.replace(/\.\.$/, ".");
+  return `Done: ${label}`;
+}
+
 export class OpenBotDatabase {
   readonly rootDir: string;
   readonly dataDir: string;
@@ -2800,7 +2810,7 @@ export class OpenBotDatabase {
         .run(resultSummary.slice(0, 2_000), now(), approvalId);
       const receipt = result.changes === 1 ? this.getApprovedAction(approvalId)! : null;
       const run = receipt ? this.getRun(receipt.runId) : null;
-      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel } });
+      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${doneLabel(receipt.actionLabel) || receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel, botId: run.botId } });
       this.db.exec("RELEASE approved_action_result");
       return receipt;
     } catch (error) {

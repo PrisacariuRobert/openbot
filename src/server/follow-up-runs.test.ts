@@ -22,3 +22,11 @@ test("a teammate building on another's answer waits for it, then starts with it"
     assert.deepEqual(db.runsWaitingFor(leader.id), []);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+test("approved-action receipts say what happened in plain words", async () => {
+  const { doneLabel } = await import("./database.js");
+  assert.equal(doneLabel("Click “JETZT RESERVIEREN” on www.danieli.at"), "Clicked “JETZT RESERVIEREN” on www.danieli.at.");
+  assert.equal(doneLabel("Send email to anna@example.com"), "Sent email to anna@example.com.");
+  assert.equal(doneLabel("Rename 3 files"), "Done: Rename 3 files");
+  assert.equal(doneLabel(""), "");
+});
