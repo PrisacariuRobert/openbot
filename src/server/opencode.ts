@@ -487,8 +487,12 @@ export class OpenCodeRunner {
     // Self-extension resumes the same run with the owner's chosen coding model.
     const model = run.modelOverride && modelBelongsToConnection(run.modelOverride, provider) ? run.modelOverride : bot.model;
     // A task answering after its step limit gets a few steps for that answer only.
-    const wrappingUp = Boolean(this.options.db.extensionRecord<{ at: string }>("step-wrapup", run.id));
-    const meter = new ExecutionMeter({ ...this.limits, maxTokens: this.limits.maxTokens + this.options.db.taskTokenPolicy(run.id).extraTokens, maxSteps: this.limits.maxSteps + (wrappingUp ? 6 : 0) }, run.activeDurationMs, run.modelSteps);
+    const wrapUpRecord = this.options.db.extensionRecord<{ at: string; steps?: number }>("step-wrapup", run.id);
+    const wrappingUp = Boolean(wrapUpRecord);
+    // Counted from where the task actually stopped: steps that land while the
+    // process shuts down must not eat the answer turn.
+    const wrapUpBase = Math.max(this.limits.maxSteps, wrapUpRecord?.steps ?? 0, wrappingUp ? run.modelSteps : 0);
+    const meter = new ExecutionMeter({ ...this.limits, maxTokens: this.limits.maxTokens + this.options.db.taskTokenPolicy(run.id).extraTokens, maxSteps: wrappingUp ? wrapUpBase + 6 : this.limits.maxSteps }, run.activeDurationMs, run.modelSteps);
     const previousTokens = run.inputTokens + run.outputTokens + run.reasoningTokens;
     const initialStop = meter.reason(previousTokens, !this.options.db.budgetAvailable(bot.id).allowed);
     if (initialStop === "tokens") { this.pauseForTokens(run.id); return; }
@@ -607,7 +611,7 @@ export class OpenCodeRunner {
       if (reason === "steps" && !wrappingUp && !run.parentRunId) {
         checkpoint();
         wrapUp = true;
-        this.options.db.saveExtensionRecord("step-wrapup", run.id, { at: new Date().toISOString() });
+        this.options.db.saveExtensionRecord("step-wrapup", run.id, { at: new Date().toISOString(), steps: meter.steps });
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Wrapping up with what it found", detail: "This task used its steps, so it’s answering now from what it already has." });
         terminate();
         this.options.onChange();

@@ -637,16 +637,18 @@ test("an armed tester fault stops the run through the normal failure path", { ti
 });
 
 test("at the step limit a task gets one tool-free turn to answer, then stops honestly", { timeout: 10000 }, async () => {
-  const stepping = 'let i = 0; setInterval(() => { i++; console.log(JSON.stringify({ type: "step_finish", part: { id: "s" + i } })); }, 20);';
+  const stepping = 'let i = 0; setInterval(() => { i++; console.log(JSON.stringify({ type: "step_finish", part: { id: "s" + i } })); }, 2);';
   const f = fixture(stepping, { maxSteps: 3 });
   try {
     const first = await f.start();
     assert.equal(first.status, "queued", "requeued for a final answer instead of failing");
     assert.match(first.prompt, /Do not use any more tools/);
     assert.ok(first.activities.some((activity) => activity.label === "Wrapping up with what it found"));
+    const stepsAtStop = first.modelSteps;
     const second = await f.start();
     assert.equal(second.status, "failed", "a wrap-up that keeps working still stops");
     assert.match(second.error || "", /step limit/);
-    assert.ok(second.modelSteps <= 3 + 6 + 1, `bounded wrap-up (${second.modelSteps} steps)`);
+    assert.ok(second.modelSteps > stepsAtStop, "the answer turn actually ran");
+    assert.ok(second.modelSteps <= stepsAtStop + 6 + 30, `bounded wrap-up (shutdown grace included) (${stepsAtStop} → ${second.modelSteps} steps)`);
   } finally { await f.close(); }
 });
