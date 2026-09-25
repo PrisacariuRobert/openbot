@@ -2810,7 +2810,7 @@ export class OpenBotDatabase {
         .run(resultSummary.slice(0, 2_000), now(), approvalId);
       const receipt = result.changes === 1 ? this.getApprovedAction(approvalId)! : null;
       const run = receipt ? this.getRun(receipt.runId) : null;
-      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${doneLabel(receipt.actionLabel) || receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel, botId: run.botId } });
+      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${/^browser_/.test(receipt.actionType) ? doneLabel(receipt.actionLabel) || receipt.resultSummary : receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel, botId: run.botId } });
       this.db.exec("RELEASE approved_action_result");
       return receipt;
     } catch (error) {
