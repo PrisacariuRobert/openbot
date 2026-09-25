@@ -68,6 +68,20 @@ rm -rf "$DIR/versions/$NAME"
 mv "$BUNDLE" "$DIR/versions/$NAME"
 ln -sfn "$DIR/versions/$NAME" "$DIR/current"
 
+# OpenBot.app runs the service, so macOS lists permissions as "OpenBot".
+SERVE="$DIR/current/openbot.sh"
+if [ -x "$DIR/current/mac-app/build-app.sh" ]; then
+  mkdir -p "$(dirname "$APP")"
+  LAUNCH="$WORK/openbot-launch"
+  cat > "$LAUNCH" <<LAUNCH_EOF
+#!/bin/sh
+if [ "\${1:-}" = "--serve" ]; then exec "$DIR/current/openbot.sh"; fi
+open "$URL/"
+LAUNCH_EOF
+  LAUNCHER=""; [ -f "$DIR/current/mac-app/OpenBot-launcher" ] && LAUNCHER="$DIR/current/mac-app/OpenBot-launcher"
+  if "$DIR/current/mac-app/build-app.sh" "$APP" "$LAUNCH" "$DIR/current/mac-app/icon.png" $LAUNCHER >/dev/null 2>&1; then SERVE="$APP/Contents/MacOS/OpenBot"; fi
+fi
+
 step "Starting OpenBot in the background…"
 mkdir -p "$HOME/Library/LaunchAgents"
 xml() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
@@ -77,7 +91,7 @@ cat > "$PLIST" <<EOF
 <plist version="1.0">
 <dict>
   <key>Label</key><string>$(xml "$LABEL")</string>
-  <key>ProgramArguments</key><array><string>$(xml "$DIR/current/openbot.sh")</string></array>
+  <key>ProgramArguments</key><array><string>$(xml "$SERVE")</string>$( [ "$SERVE" = "$DIR/current/openbot.sh" ] || printf '<string>--serve</string>' )</array>
   <key>EnvironmentVariables</key>
   <dict>
     <key>OPENBOT_DATA_DIR</key><string>$(xml "$DIR/data")</string>
@@ -111,6 +125,7 @@ printf '\n'
 [ -n "$READY" ] || fail "OpenBot didn't start. Details are in \"$DIR/logs/openbot-error.log\"."
 
 step "Adding OpenBot to your Applications and Dock…"
+if [ "$SERVE" = "$DIR/current/openbot.sh" ]; then
 mkdir -p "$(dirname "$APP")"
 rm -rf "$APP"
 osacompile -o "$APP" -e "open location \"$URL\"" >/dev/null 2>&1 || fail "the OpenBot app couldn't be created."
@@ -126,6 +141,7 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleName OpenBot" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $LABEL.app" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
 touch "$APP"
+fi
 if [ -z "${OPENBOT_INSTALL_NO_DOCK:-}" ] && ! defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "$(basename "$APP")"; then
   defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>file://$APP/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>" && killall Dock >/dev/null 2>&1 || true
 fi

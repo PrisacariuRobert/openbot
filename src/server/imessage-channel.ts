@@ -34,6 +34,10 @@ export interface IMessageConfig {
   /** Hashes of texts OpenBot sent recently: in a note-to-self thread our own
    * replies come back as "from me" and must not be read as commands. */
   sent?: Array<{ hash: string; at: number }>;
+  /** Texts already read: note-to-self delivers every message twice. */
+  seen?: Array<{ hash: string; at: number }>;
+  /** Paused by the loop brake; the owner turns it back on. */
+  paused?: boolean;
   connectedAt?: string;
 }
 
@@ -45,6 +49,7 @@ export interface IMessageStatus {
   pairingExpiresAt: string | null;
   needsFullDiskAccess: boolean;
   defaultBotId: string | null;
+  paused: boolean;
   lastError: string | null;
 }
 
@@ -163,6 +168,7 @@ export class IMessageChannel {
       pairingExpiresAt: pairing ? new Date(pairing.expiresAt).toISOString() : null,
       needsFullDiskAccess: this.needsAccess,
       defaultBotId: config?.defaultBotId || null,
+      paused: Boolean(config?.paused),
       lastError: this.lastError,
     };
   }
@@ -180,6 +186,14 @@ export class IMessageChannel {
     await this.send(`OpenBot: reply with ${pairing.code} to connect your team to iMessage. (Ignore this if you didn't ask for it.)`);
     this.lastError = null;
     this.start();
+    return this.status();
+  }
+
+  resume(): IMessageStatus {
+    const config = this.config();
+    if (!config) throw new Error("Connect iMessage first.");
+    this.saveConfig({ ...config, paused: false, seen: [], lastRowId: (() => { try { return this.store.maxRowId(); } catch { return config.lastRowId; } })() });
+    this.lastError = null;
     return this.status();
   }
 
@@ -233,12 +247,26 @@ export class IMessageChannel {
     for (const row of rows) {
       config = this.config()!;
       this.saveConfig({ ...config, lastRowId: Math.max(config.lastRowId, row.rowId) });
+      if (config.paused) continue;
       const text = (row.text ?? textFromAttributedBody(row.body) ?? "").trim();
       if (!text) continue;
-      const fromOwner = row.fromMe
-        ? sameHandle(row.chat, config.ownerHandle) && !(config.sent || []).some((item) => item.hash === hash(text))
-        : sameHandle(row.handle, config.ownerHandle);
+      const fromOwner = row.fromMe ? sameHandle(row.chat, config.ownerHandle) : sameHandle(row.handle, config.ownerHandle);
       if (!fromOwner) continue;
+      const key = hash(text), now = this.now();
+      // Never read OpenBot's own texts back, in either copy.
+      if ((config.sent || []).some((item) => item.hash === key)) continue;
+      // Note-to-self shows each message as sent and as received: read once.
+      const seen = (config.seen || []).filter((item) => now - item.at < 5 * 60_000);
+      if (seen.some((item) => item.hash === key)) continue;
+      const lastMinute = seen.filter((item) => now - item.at < 60_000).length;
+      this.saveConfig({ ...this.config()!, seen: [...seen, { hash: key, at: now }].slice(-50) });
+      // Loop brake: a person doesn't send 7 texts a minute to their team.
+      if (lastMinute >= 6) {
+        this.saveConfig({ ...this.config()!, paused: true });
+        this.lastError = "iMessage paused: too many messages in a minute. Turn it back on in Chat apps.";
+        await this.send("OpenBot paused iMessage because it received too many messages at once. Turn it back on in OpenBot → Chat apps.").catch(() => {});
+        return;
+      }
       if (!config.paired) {
         const pairing = config.pairing;
         if (pairing && pairing.expiresAt > this.now() && text === pairing.code) {

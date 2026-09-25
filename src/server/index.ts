@@ -4772,6 +4772,9 @@ app.post("/api/channels/imessage/default-teammate", (request, response) => {
   try { response.json(imessage.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
 });
 app.delete("/api/channels/imessage", (_request, response) => { imessage.disconnect(); response.json(imessage.status()); });
+app.post("/api/channels/imessage/resume", (_request, response) => {
+  try { response.json(imessage.resume()); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "Connect iMessage first." }); }
+});
 // Opens the exact System Settings page; the owner makes the change there.
 app.post("/api/channels/imessage/open-privacy", (_request, response) => {
   if (process.platform !== "darwin") return response.status(409).json({ error: "This is only on a Mac." });

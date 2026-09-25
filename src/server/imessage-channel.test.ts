@@ -75,3 +75,30 @@ test("text is read from attributedBody on newer macOS, and handles normalize", (
   assert.equal(normalizeHandle("tel:+43 (664) 123-4567"), "+436641234567");
   assert.equal(normalizeHandle("MAILTO:Robert@Example.com"), "robert@example.com");
 });
+
+test("note-to-self echoes never loop: own replies are skipped in both copies, duplicates read once, and a brake pauses a flood", async () => {
+  const f = fixture();
+  try {
+    await f.channel.connect("+32 456 39 17 65");
+    const code = /reply with (\d{6})/.exec(f.sent[0]!)![1]!;
+    // The code text itself echoes back as sent and as received.
+    f.add({ text: f.sent[0]!, fromMe: true, chat: "+32456391765" });
+    f.add({ text: f.sent[0]!, handle: "+32456391765" });
+    f.add({ text: code, fromMe: true, chat: "+32456391765" });
+    f.add({ text: code, handle: "+32456391765" });
+    await f.channel.pollOnce();
+    assert.equal(f.channel.status().paired, true);
+    const greeting = f.sent.at(-1)!;
+    f.add({ text: greeting, fromMe: true, chat: "+32456391765" });
+    f.add({ text: greeting, handle: "+32456391765" });
+    f.add({ text: "Find me a dentist nearby", fromMe: true, chat: "+32456391765" });
+    f.add({ text: "Find me a dentist nearby", handle: "+32456391765" });
+    await f.channel.pollOnce();
+    assert.deepEqual(f.posted.map((item) => item.body.body), ["Find me a dentist nearby"], "one task, and never from our own greeting");
+    for (let i = 0; i < 8; i++) f.add({ text: `message ${i}`, handle: "+32456391765" });
+    await f.channel.pollOnce();
+    assert.equal(f.channel.status().paused, true, "a flood pauses the channel");
+    assert.ok(f.posted.length <= 7);
+    assert.match(f.sent.at(-1)!, /paused iMessage/);
+  } finally { f.close(); }
+});

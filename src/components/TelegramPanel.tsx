@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, CheckCircle2, Copy, ExternalLink, LoaderCircle, MessageCircle, Send } from "lucide-react";
+import { Check, CheckCircle2, Copy, ExternalLink, LoaderCircle, Send } from "lucide-react";
 import type { Bot } from "../shared/types";
 import { SettingsCard, SettingsGroup, SettingsRow } from "../studio/Settings";
 import "./away-access-panel.css";
+import { BrandIcon } from "./brand-icons";
 
 type Status = {
   configured: boolean; botUsername: string | null; paired: boolean; ownerName: string | null;
@@ -85,7 +86,7 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
 
   const defaultName = teammates.find((bot) => bot.id === status?.defaultBotId)?.name || teammates[0]?.name || "your teammate";
   return <section className="away-pairing" aria-label={copy.name}>
-    <div className="away-pairing-heading"><span className="away-pairing-icon"><MessageCircle size={23} /></span><div>
+    <div className="away-pairing-heading"><span className="away-pairing-icon brand"><BrandIcon brand={channel} /></span><div>
       <h3>{status?.paired ? `Your team is on ${copy.name}` : `Message your team from ${copy.name}`}</h3>
       <p>Ask from your phone, get the answer back in the same chat. Approvals stay in OpenBot.</p>
     </div></div>
@@ -162,7 +163,7 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
   </section>;
 }
 
-type IMessageStatus = { available: boolean; configured: boolean; ownerHandle: string | null; paired: boolean; pairingExpiresAt: string | null; needsFullDiskAccess: boolean; defaultBotId: string | null; lastError: string | null };
+type IMessageStatus = { available: boolean; configured: boolean; ownerHandle: string | null; paired: boolean; pairingExpiresAt: string | null; needsFullDiskAccess: boolean; defaultBotId: string | null; paused?: boolean; lastError: string | null };
 
 /** Text your team from the Messages app. Uses this Mac's Messages, so there
  * is no bot account to create; macOS asks the owner for two permissions. */
@@ -193,7 +194,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
   if (status && !status.available) return null;
   const defaultName = teammates.find((bot) => bot.id === status?.defaultBotId)?.name || teammates[0]?.name || "your teammate";
   return <section className="away-pairing" aria-label="iMessage">
-    <div className="away-pairing-heading"><span className="away-pairing-icon"><MessageCircle size={23} /></span><div>
+    <div className="away-pairing-heading"><span className="away-pairing-icon brand"><BrandIcon brand="imessage" /></span><div>
       <h3>{status?.paired ? "Your team is on iMessage" : "Text your team from iMessage"}</h3>
       <p>Use Messages on your iPhone — no app to install. Replies come back in the same thread while your Mac is on.</p>
     </div></div>
@@ -223,6 +224,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
     {status?.paired && <SettingsGroup title="Connected">
       <SettingsCard>
         <SettingsRow title={status.ownerHandle || "You"} description={`${defaultName} answers by default. Start a text with @Name to ask someone else.`} control={<CheckCircle2 size={19} />} />
+        {status.paused && <SettingsRow title="Paused" description="OpenBot paused iMessage after too many messages in a minute." control={<button onClick={() => void run(() => call<IMessageStatus>("/resume", "POST"))} disabled={busy}>Turn back on</button>} />}
         {teammates.length > 1 && <SettingsRow title="Answers by default" description="Who replies when you don't name anyone.">
           <select value={status.defaultBotId || teammates[0]?.id || ""} disabled={busy} aria-label="Default teammate on iMessage"
             onChange={(event) => void run(() => call<IMessageStatus>("/default-teammate", "POST", { botId: event.target.value }))}>

@@ -7,6 +7,11 @@
 set -eu
 APP="$1"; LAUNCH="$2"; ICON="$3"; LAUNCHER="${4:-}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# macOS ties privacy permissions to the app's exact signature. Rebuilding an
+# unchanged app would silently drop Full Disk Access, so leave it alone when
+# the launcher, script and icon are the same.
+BUILD_ID="$( { cat "${LAUNCHER:-$HERE/launcher.c}" "$LAUNCH" "$ICON" 2>/dev/null; } | shasum -a 256 | awk '{print $1}')"
+if [ -f "$APP/Contents/Resources/build-id" ] && [ "$(cat "$APP/Contents/Resources/build-id")" = "$BUILD_ID" ] && [ -x "$APP/Contents/MacOS/OpenBot" ]; then echo "$APP"; exit 0; fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 if [ -n "$LAUNCHER" ]; then cp "$LAUNCHER" "$APP/Contents/MacOS/OpenBot"
@@ -40,6 +45,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 # Free ad-hoc signature: gives the app a stable identity for privacy settings.
+printf '%s' "$BUILD_ID" > "$APP/Contents/Resources/build-id"
 codesign --force --sign - --identifier foundation.openbots.studio "$APP" >/dev/null 2>&1 || true
 touch "$APP"
 echo "$APP"
