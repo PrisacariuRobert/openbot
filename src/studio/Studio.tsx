@@ -410,7 +410,7 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
 { title: "Connections", items: [
 { id: "provider", title: "Your AI", description: "Choose the connection. Keep the conversation.", icon: Sparkles, keywords: ["models", "provider", "api key", "account", "local"] },
 { id: "connectors", title: "Apps & tools", description: "Familiar tools. Clear boundaries.", icon: Boxes, keywords: ["google", "slack", "notion", "github", "connectors", "mcp"] },
-{ id: "telegram", title: "Chat apps", description: "Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
+{ id: "telegram", title: "Chat apps", description: "iMessage, Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["imessage", "messages", "sms", "telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
 { id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] }
 ]},
 { title: "Work", items: [

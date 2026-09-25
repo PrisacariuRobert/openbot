@@ -54,6 +54,7 @@ async function request<T>(channel: Channel, path = "", method = "GET", body?: un
 /** Message your team from the chat apps you already use. */
 export function TelegramPanel({ bots }: { bots: Bot[] }) {
   return <>
+    <IMessageSection bots={bots} />
     <ChannelSection channel="telegram" bots={bots} />
     <ChannelSection channel="discord" bots={bots} />
     <p className="telegram-footnote">Your Mac needs to be awake and online for replies. Messages pass through the chat app's servers; don't send anything you wouldn't put in that chat.</p>
@@ -157,6 +158,86 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
       </SettingsCard>
     </SettingsGroup>}
 
+    {(error || status?.lastError) && <p className="away-pairing-error" role="alert">{error || status?.lastError}</p>}
+  </section>;
+}
+
+type IMessageStatus = { available: boolean; configured: boolean; ownerHandle: string | null; paired: boolean; pairingExpiresAt: string | null; needsFullDiskAccess: boolean; defaultBotId: string | null; lastError: string | null };
+
+/** Text your team from the Messages app. Uses this Mac's Messages, so there
+ * is no bot account to create; macOS asks the owner for two permissions. */
+function IMessageSection({ bots }: { bots: Bot[] }) {
+  const [status, setStatus] = useState<IMessageStatus | null>(null);
+  const [handle, setHandle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [needsAccess, setNeedsAccess] = useState(false);
+  const teammates = bots.filter((bot) => !bot.retiredAt);
+  const call = async <T,>(path = "", method = "GET", body?: unknown): Promise<T> => {
+    const response = await fetch(`/api/channels/imessage${path}`, { method, credentials: "same-origin", ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }) });
+    const value = await response.json();
+    if (!response.ok) { if (value.needsFullDiskAccess) setNeedsAccess(true); throw new Error(value.error || "iMessage needs attention."); }
+    return value as T;
+  };
+  async function run(action: () => Promise<IMessageStatus | void>) {
+    setBusy(true); setError("");
+    try { const next = await action(); if (next) { setStatus(next); setNeedsAccess(next.needsFullDiskAccess); } }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "iMessage needs attention."); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => {
+    void run(() => call<IMessageStatus>());
+    const timer = window.setInterval(() => void call<IMessageStatus>().then((next) => { setStatus(next); if (next.needsFullDiskAccess) setNeedsAccess(true); }).catch(() => {}), 4_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (status && !status.available) return null;
+  const defaultName = teammates.find((bot) => bot.id === status?.defaultBotId)?.name || teammates[0]?.name || "your teammate";
+  return <section className="away-pairing" aria-label="iMessage">
+    <div className="away-pairing-heading"><span className="away-pairing-icon"><MessageCircle size={23} /></span><div>
+      <h3>{status?.paired ? "Your team is on iMessage" : "Text your team from iMessage"}</h3>
+      <p>Use Messages on your iPhone — no app to install. Replies come back in the same thread while your Mac is on.</p>
+    </div></div>
+
+    {needsAccess && !status?.paired && <SettingsGroup title="First, let OpenBot read Messages">
+      <SettingsCard>
+        <SettingsRow title="1. Open Full Disk Access" description="macOS protects your messages, so you choose to allow this."
+          control={<button onClick={() => void call("/open-privacy", "POST")}>Open System Settings</button>} />
+        <SettingsRow title="2. Add OpenBot" description={<>Tap <strong>Show OpenBot</strong>, then drag the highlighted file into the Full Disk Access list and switch it on. Come back and connect below.</>}
+          control={<button onClick={() => void call("/reveal-app", "POST")}>Show OpenBot</button>} />
+      </SettingsCard>
+    </SettingsGroup>}
+
+    {!status?.paired && <SettingsGroup title={status?.configured ? "Reply to the text we sent" : "Connect"}>
+      <SettingsCard>
+        {status?.configured && status.pairingExpiresAt
+          ? <SettingsRow title={`Check Messages on your iPhone`} description={<>OpenBot texted <strong>{status.ownerHandle}</strong> a 6-digit code. Reply with it. The first time, your Mac asks to let OpenBot use Messages — choose <strong>OK</strong>.</>} control={<LoaderCircle className="spinner" size={19} aria-label="Waiting for your reply" />} />
+          : <SettingsRow title="Your iPhone number or iMessage email" description="Only messages from this number or email are read. To text the Mac, message yourself (or the Mac's own Apple ID).">
+              <form className="telegram-token" onSubmit={(event) => { event.preventDefault(); void run(() => call<IMessageStatus>("", "POST", { handle })); }}>
+                <input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder="+43 664 123 4567" aria-label="Your iPhone number or iMessage email" autoComplete="off" />
+                <button className="away-pairing-primary" type="submit" disabled={busy || handle.trim().length < 5}>{busy ? <LoaderCircle className="spinner" size={18} /> : <Send size={18} />}Send code</button>
+              </form>
+            </SettingsRow>}
+      </SettingsCard>
+    </SettingsGroup>}
+
+    {status?.paired && <SettingsGroup title="Connected">
+      <SettingsCard>
+        <SettingsRow title={status.ownerHandle || "You"} description={`${defaultName} answers by default. Start a text with @Name to ask someone else.`} control={<CheckCircle2 size={19} />} />
+        {teammates.length > 1 && <SettingsRow title="Answers by default" description="Who replies when you don't name anyone.">
+          <select value={status.defaultBotId || teammates[0]?.id || ""} disabled={busy} aria-label="Default teammate on iMessage"
+            onChange={(event) => void run(() => call<IMessageStatus>("/default-teammate", "POST", { botId: event.target.value }))}>
+            {teammates.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}
+          </select>
+        </SettingsRow>}
+      </SettingsCard>
+    </SettingsGroup>}
+
+    {status?.configured && <SettingsGroup title="Manage">
+      <SettingsCard>
+        <SettingsRow title="Disconnect iMessage" description="OpenBot stops reading Messages. Tasks already started keep running."
+          control={<button onClick={() => { if (window.confirm("Disconnect iMessage?")) void run(() => call<IMessageStatus>("", "DELETE")); }} disabled={busy}>Disconnect</button>} />
+      </SettingsCard>
+    </SettingsGroup>}
     {(error || status?.lastError) && <p className="away-pairing-error" role="alert">{error || status?.lastError}</p>}
   </section>;
 }

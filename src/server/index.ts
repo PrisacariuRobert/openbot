@@ -91,6 +91,8 @@ import { NotificationService } from "./notifications.js";
 import { inspectRunnerCare } from "./runner-care.js";
 import QRCode from "qrcode";
 import { TelegramChannel } from "./telegram-channel.js";
+import { FullDiskAccessError, IMessageChannel } from "./imessage-channel.js";
+import { execFile } from "node:child_process";
 import { DiscordChannel } from "./discord-channel.js";
 import { weeklyRecap } from "../shared/weekly-recap.js";
 import { exportDocument } from "./document-export.js";
@@ -4740,6 +4742,32 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
   if (error instanceof WorkflowCheckError) return response.status(409).json({ error: error.message, code: "workflow_check_required" });
   next(error);
 });
+const imessage = new IMessageChannel({ db, appUrl, isLeader: () => runner.isLeader(), localApi: channelLocalApi });
+app.get("/api/channels/imessage", (_request, response) => { response.json(imessage.status()); });
+app.post("/api/channels/imessage", async (request, response) => {
+  const parsed = z.object({ handle: z.string().trim().min(3).max(120) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Enter the phone number or email you use for iMessage." });
+  try { response.json(await imessage.connect(parsed.data.handle)); }
+  catch (error) { response.status(error instanceof FullDiskAccessError ? 409 : 400).json({ error: error instanceof Error ? error.message : "iMessage could not be connected.", needsFullDiskAccess: error instanceof FullDiskAccessError }); }
+});
+app.post("/api/channels/imessage/default-teammate", (request, response) => {
+  const parsed = z.object({ botId: z.string().trim().min(1).max(200).nullable() }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate." });
+  try { response.json(imessage.setDefaultTeammate(parsed.data.botId)); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "That teammate is not available." }); }
+});
+app.delete("/api/channels/imessage", (_request, response) => { imessage.disconnect(); response.json(imessage.status()); });
+// Opens the exact System Settings page; the owner makes the change there.
+app.post("/api/channels/imessage/open-privacy", (_request, response) => {
+  if (process.platform !== "darwin") return response.status(409).json({ error: "This is only on a Mac." });
+  execFile("open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"], () => {});
+  response.json({ ok: true });
+});
+// Highlights the program to drag into the Full Disk Access list.
+app.post("/api/channels/imessage/reveal-app", (_request, response) => {
+  if (process.platform !== "darwin") return response.status(409).json({ error: "This is only on a Mac." });
+  execFile("open", ["-R", process.execPath], () => {});
+  response.json({ ok: true, path: process.execPath });
+});
 app.get("/api/channels/telegram", async (_request, response) => {
   const status = telegram.status();
   // A QR of the one-tap pairing link, for setting up from a computer.
@@ -4812,6 +4840,7 @@ if (existsSync(distDir)) {
 const server = app.listen(port, host, () => {
   relay?.start();
   if (telegram.status().configured) telegram.start();
+  if (imessage.status().configured) imessage.start();
   if (discord.status().configured) discord.start();
   awakeGuard.start();
   console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
@@ -4832,6 +4861,7 @@ async function shutdown() {
   externalHeartbeat.stop();
   notifications.stop();
   telegram.stop();
+  imessage.stop();
   discord.stop();
   awakeGuard.stop();
   await runner.stop();
