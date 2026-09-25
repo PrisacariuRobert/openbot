@@ -202,7 +202,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
       <SettingsCard>
         <SettingsRow title="1. Open Full Disk Access" description="macOS protects your messages, so you choose to allow this."
           control={<button onClick={() => void call("/open-privacy", "POST")}>Open System Settings</button>} />
-        <SettingsRow title="2. Add OpenBot" description={<>Tap <strong>Show OpenBot</strong>, then drag the highlighted file into the Full Disk Access list and switch it on. Come back and connect below.</>}
+        <SettingsRow title="2. Add OpenBot" description={<>Tap <strong>Show OpenBot</strong>, then drag the highlighted <strong>OpenBot</strong> app into the Full Disk Access list and switch it on. Come back and connect below.</>}
           control={<button onClick={() => void call("/reveal-app", "POST")}>Show OpenBot</button>} />
       </SettingsCard>
     </SettingsGroup>}

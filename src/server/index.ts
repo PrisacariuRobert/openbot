@@ -4781,8 +4781,10 @@ app.post("/api/channels/imessage/open-privacy", (_request, response) => {
 // Highlights the program to drag into the Full Disk Access list.
 app.post("/api/channels/imessage/reveal-app", (_request, response) => {
   if (process.platform !== "darwin") return response.status(409).json({ error: "This is only on a Mac." });
-  execFile("open", ["-R", process.execPath], () => {});
-  response.json({ ok: true, path: process.execPath });
+  // Inside OpenBot.app, macOS lists the permission as "OpenBot".
+  const target = process.env.OPENBOT_APP_BUNDLE || process.execPath;
+  execFile("open", ["-R", target], () => {});
+  response.json({ ok: true, path: target });
 });
 app.get("/api/channels/telegram", async (_request, response) => {
   const status = telegram.status();
