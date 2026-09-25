@@ -132,12 +132,14 @@ test("expanding a collapsed show/hide control needs no review; look-alikes still
     browserApprovalReason("click", "#x", { ...toggle, ...change, review: { ...toggle.review!, ...review } });
   assert.ok(reviewed({ label: "Delete project" }, { label: "Delete project" }), "an action label is never a harmless toggle");
   assert.ok(reviewed({ label: "Archive" }), "archive is an effect, not a disclosure");
-  assert.ok(reviewed({}, { disclosure: null }), "no host-observed disclosure");
-  assert.ok(reviewed({}, { disclosure: { expanded: false, controls: [] } }), "controls nothing");
+  assert.ok(reviewed({ label: "Complete task" }, { disclosure: null, label: "Complete task" }), "no disclosure and an effect label");
+  assert.equal(reviewed({}, { disclosure: null }), null, "without disclosure evidence, a view-only label on a plain button still runs (harmless-control rule)");
+  assert.equal(reviewed({}, { disclosure: { expanded: false, controls: [] } }), null, "a plain view-only button runs even when it controls nothing observable");
   assert.ok(reviewed({ stateful: true }), "held state (pressed/selected/checked)");
   assert.ok(reviewed({ stateful: undefined }), "state not observed");
   assert.ok(reviewed({ formMethod: "post" }), "inside a form");
-  assert.ok(reviewed({}, { contextScope: "dialog" }), "inside a dialog");
+  assert.equal(reviewed({}, { contextScope: "dialog" }), null, "a view-only button in a pop-up runs too");
+  assert.ok(reviewed({ label: "Delete list" }, { contextScope: "dialog", label: "Delete list" }), "an effect in a pop-up is reviewed");
   assert.ok(reviewed({}, { fields: [{ label: "Name", value: "x" }] }), "editable fields in scope");
   assert.ok(reviewed({}, { complete: false }), "incomplete observation");
   assert.ok(reviewed({ tag: "a", href: "javascript:go()" }), "links follow link rules");
@@ -194,4 +196,22 @@ test("site search buttons on GET search forms run without review, even with icon
   assert.notEqual(browserApprovalReason("click", "", search("Search", "post")), null, "a POST form stays reviewed");
   assert.notEqual(browserApprovalReason("click", "", search("Search", "get", false)), null, "not a search form");
   assert.notEqual(browserApprovalReason("click", "", search("Submit")), null);
+});
+
+test("buttons that only change what the page shows run freely; anything that can commit still asks", async () => {
+  const { browserApprovalReason } = await import("./safety.js");
+  const button = (label: string, extra: Record<string, unknown> = {}, review: Record<string, unknown> = {}) => ({ url: "https://www.danieli.at/", tag: "button", role: "", label, inputType: "", autocomplete: "", href: "", formMethod: "", searchForm: false, stateful: false, review: { url: "https://www.danieli.at/", label, control: "button", fields: [], contextScope: "page" as const, disclosure: null, complete: true, ...review }, ...extra });
+  for (const label of ["Show more", "Speisekarte", "Mehr anzeigen", "Next photo", "Filter", "Sort by rating", "Read more", "Toggle navigation", "Deutsch"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  for (const label of ["Jetzt reservieren", "JETZT RESERVIEREN", "Book a table", "Buy now", "Pay €20", "Add to cart", "Weiter", "Continue", "Speichern", "Sign in", "Subscribe", "Accept", "Löschen", "Commander", "Reservar", "提交", "Pay 19.90"]) {
+    assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
+  }
+  assert.notEqual(browserApprovalReason("click", "", button("Show more", { formMethod: "post" })), null, "inside a form");
+  assert.notEqual(browserApprovalReason("click", "", button("Show more", {}, { fields: [{ label: "Email", value: "a@b.c" }] })), null, "typed data in scope");
+  assert.notEqual(browserApprovalReason("click", "", button("72h", { stateful: true })), null, "choosing an option stays reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Show details", { url: "https://shop.example/checkout" }, { url: "https://shop.example/checkout" })), null, "checkout pages stay reviewed");
+  assert.notEqual(browserApprovalReason("click", "", button("Show more", {}, { complete: false })), null, "incomplete observation");
+  assert.notEqual(browserApprovalReason("click", "", button("Show more", {}, { destination: "https://elsewhere.example/go" })), null, "leads somewhere else");
+  assert.notEqual(browserApprovalReason("click", "", button("Show more", { tag: "div" })), null, "not a button");
 });

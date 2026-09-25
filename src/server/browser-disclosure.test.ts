@@ -17,7 +17,7 @@ const PAGE = `<!doctype html><title>Disclosure fixture</title>
 <div role="dialog"><button id="in-dialog" aria-expanded="false" aria-controls="projects-list">Advanced</button></div>
 <button id="plain">Continue</button>`;
 
-test("real browser: only a genuine collapsed show/hide control runs without review", { timeout: 120_000, skip: chromePath() ? false : "Chrome or Chromium is not installed" }, async () => {
+test("real browser: view-only controls run without review; effects, held state and forms do not", { timeout: 120_000, skip: chromePath() ? false : "Chrome or Chromium is not installed" }, async () => {
   const server = createServer((_request, response) => { response.setHeader("content-type", "text/html"); response.end(PAGE); });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const root = mkdtempSync(path.join(tmpdir(), "openbot-disclosure-"));
@@ -27,7 +27,10 @@ test("real browser: only a genuine collapsed show/hide control runs without revi
     await browser.open("nova", `http://127.0.0.1:${(server.address() as { port: number }).port}/`);
     const decision = async (id: string) => browserApprovalReason("click", `#${id}`, await browser.describeTarget("nova", `#${id}`));
     assert.equal(await decision("projects"), null);
-    for (const id of ["ghost", "delete", "pressed", "in-form", "in-dialog", "plain"]) assert.ok(await decision(id), `#${id} must stay reviewed`);
+    // View-only buttons with harmless labels now run under the harmless-control rule.
+    assert.equal(await decision("in-dialog"), null, "a view-only button in a pop-up runs");
+    // #ghost sees this page's editable field in scope, so it stays reviewed.
+    for (const id of ["ghost", "delete", "pressed", "in-form", "plain"]) assert.ok(await decision(id), `#${id} must stay reviewed`);
     assert.equal(await decision("delete"), "This click may create an external or irreversible action.");
     assert.equal(await decision("plain"), "Review this browser control before it runs; it may change data or send information.", "a formless button's default type is not a submission");
   } finally {

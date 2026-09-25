@@ -141,6 +141,33 @@ const MENU_TOGGLE = /^(?:toggle (?:navigation|menu|nav)|(?:open|show|main|site) 
 const DISMISS = /^(?:(?:close|dismiss|hide)(?: (?:dialog|popup|pop-up|modal|window|banner|message|overlay|this))?|(?:dialog|fenster|popup) (?:schließen|schliessen)|schließen|schliessen|fermer|cerrar|chiudi|sluiten|fechar|zamknij|stäng|luk|lukk|sulje|закрыть|not now|maybe later|später|nicht jetzt|nein,? danke|non merci|no,? gracias|no,? grazie|nee,? bedankt|[×✕✖xX])$/i;
 const COOKIE_SETTINGS = /^(?:cookie|privacy|consent)? ?(?:settings|preferences|options)(?:, opens the preference center dialog)?$|^(?:manage|customi[sz]e|change)(?: (?:my|your))? (?:cookies|cookie settings|preferences|options|choices|consent)$|^advanced settings(?:, opens the preference center dialog)?$|^(?:more options|show purposes|let me choose|customi[sz]e)$/i;
 
+// Words that commit something, in the languages teammates meet most. A
+// label containing one (or a price) always goes to the owner.
+const COMMITTING = /\b(?:complete|done|finish|mark|erledigt|erledigen|abschließen|terminer|completar|completa|voltooien|consent|einwilligen|archive|archivieren|account|konto|compte|cuenta|payment|payments|mark as|mute|block|report|melden|follow|unfollow|like|vote|rate|reply|antworten|forward|move|rename|edit|update|change|ändern|reset|restore|enable|disable|turn on|turn off|activate|deactivate|aktivieren|deaktivieren|claim|redeem|start|launch|run|execute|generate|create|erstellen|add|hinzufügen|upgrade|trial|send|submit|publish|post|buy|purchase|pay|order|checkout|check out|book|reserve|confirm|delete|remove|erase|cancel|unsubscribe|subscribe|sign|log ?in|log ?out|register|join|apply|donate|transfer|withdraw|save|upload|share|invite|accept|agree|allow|approve|continue|proceed|next step|place|add to|install|download|kaufen|kauf|bestellen|bestellung|buchen|reservieren|reservierung|senden|absenden|abschicken|bestätigen|löschen|entfernen|zahlen|bezahlen|kasse|anmelden|abmelden|registrieren|speichern|weiter|akzeptieren|zustimmen|einwilligung|übernehmen|envoyer|acheter|commander|réserver|payer|confirmer|supprimer|enregistrer|continuer|accepter|valider|inscri\w*|comprar|pedir|reservar|pagar|enviar|confirmar|eliminar|borrar|guardar|aceptar|continuar|acquista|ordina|prenota|paga|invia|conferma|elimina|salva|accetta|continua|iscriviti|kopen|reserveren|betalen|verzenden|bevestigen|verwijderen|opslaan|accepteren|doorgaan|aanmelden)\b/i;
+const PRICE = /[€$£¥₹]|\b(?:eur|usd|gbp|chf)\b|\d+[.,]\d{2}\b/i;
+const MONEY_PAGE = /checkout|cart|basket|payment|billing|account|login|signin|sign-in|warenkorb|kasse|bestell|zahlung|panier|paiement|carrito|pago|carrello|pagamento|winkelwagen|afrekenen/i;
+
+/** A button that only changes what the page shows — opening a menu, showing
+ * more, switching a photo, a filter — runs without review. Judged by what the
+ * click can reach, not by recognizing its label: no link, form, typed data or
+ * held selection; not on a checkout/account page; a readable Latin-script
+ * label without a committing word or a price. Anything else is reviewed. */
+export function isHarmlessPageControl(target?: BrowserTarget): boolean {
+  const review = target?.review;
+  if (!target || !review?.complete) return false;
+  if (!(target.tag === "button" || target.role === "button" || target.role === "menuitem")) return false;
+  if (/^(?:tab|option|radio|switch|checkbox|menuitemradio|menuitemcheckbox|slider|combobox)$/i.test(target.role)) return false;
+  // Held state must be observed as absent: an unobserved control may select.
+  if (target.href || target.formMethod || target.searchForm || target.stateful !== false || review.fields.length > 0) return false;
+  if (review.contextScope === "form") return false;
+  if (review.destination && review.destination !== review.url && review.destination !== target.url) return false;
+  const label = target.label.replace(/\s+/g, " ").trim();
+  if (!label || label.length > 40 || !/^[\p{Script=Latin}\p{N}\p{P}\p{Zs}\p{S}]+$/u.test(label)) return false;
+  if (COMMITTING.test(label) || PRICE.test(label) || SENSITIVE_CONTROL.test(`${label} ${target.inputType} ${target.autocomplete}`)) return false;
+  try { if (MONEY_PAGE.test(new URL(review.url || target.url).pathname)) return false; } catch { return false; }
+  return true;
+}
+
 export function browserApprovalReason(action: "open" | "click" | "type", value: string, target?: BrowserTarget): string | null {
   // A formless button reports type "submit" by default; that type is only
   // evidence of a submission when a form owns the button.
@@ -158,6 +185,7 @@ export function browserApprovalReason(action: "open" | "click" | "type", value: 
     // A CSS selector is not evidence of intent: #primary can mean Send.
     // Permit observed navigation/search; review other controls by default.
     if (target?.tag === "a" && /^https?:/i.test(target.href)) return null;
+    if (isHarmlessPageControl(target)) return null;
     return "Review this browser control before it runs; it may change data or send information.";
   }
   return null;
