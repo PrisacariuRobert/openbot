@@ -87,7 +87,9 @@ test("Claude Code replies stream into the live preview before the finished answe
     assert.ok(seen.length >= 2, `live text grew in steps while running: ${JSON.stringify(seen)}`);
     assert.ok(seen.every((text, index) => index === 0 || text.length > seen[index - 1]!.length), "each update extends the last");
     assert.ok(seen[0]!.startsWith("Morning walks"));
-    const reply = view.listMessages(bot.threadId).filter((message) => message.runId === runId && message.senderType === "bot").at(-1);
+    // The reply is saved just after the task is marked completed.
+    let reply: ReturnType<typeof view.listMessages>[number] | undefined;
+    for (let i = 0; i < 100 && !reply; i++) { reply = view.listMessages(bot.threadId).filter((message) => message.runId === runId && message.senderType === "bot").at(-1); if (!reply) await delay(50); }
     assert.equal(reply?.body, "Morning walks clear the head, wake the body, and make the first hour yours.");
   } finally {
     view.close();
