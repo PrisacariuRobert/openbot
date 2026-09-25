@@ -35,7 +35,7 @@ test("a teammate only receives rules for capabilities it has", () => {
 
 test("turning a capability on brings its rules back", () => {
   const browser = instructions((db) => db.updateBot("nova", { browserEnabled: true }));
-  for (const rule of ["Use the browser tools for websites.", "Use only your own persistent browser profile", "browser_request_sign_in"]) assert.ok(browser.includes(rule), rule);
+  for (const rule of ["Use the browser tools to interact with websites.", "use web_search first", "Use only your own persistent browser profile", "browser_request_sign_in"]) assert.ok(browser.includes(rule), rule);
   assert.ok(!browser.includes("your browser is off"));
 
   const computer = instructions((db) => db.updateBot("nova", { computerEnabled: true }));
