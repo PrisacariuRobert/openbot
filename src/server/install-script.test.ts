@@ -16,5 +16,5 @@ test("installer is valid POSIX sh and never asks for an administrator password",
   assert.ok(!/\bsudo\b/.test(script));
   assert.match(script, /shasum -a 256/, "the download is verified before use");
   assert.match(script, /uninstall\.sh/, "an uninstaller is always left behind");
-  assert.match(readFileSync(path.join(root, "site/index.html"), "utf8"), /curl -fsSL https:\/\/openbots\.foundation\/install\.sh \| sh/);
+  assert.match(readFileSync(path.join(root, "site/index.html"), "utf8").replace(/<wbr \/>/g, ""), /curl -fsSL https:\/\/openbots\.foundation\/install\.sh \| sh/);
 });
