@@ -3,121 +3,517 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>OpenBot for Mac</title>
-  <meta name="description" content="Install OpenBot: a team of AI teammates on your Mac. Free and open source; bring the AI you already use." />
+  <title>OpenBot — meet your AI team</title>
+  <meta name="description" content="Nova, Pixel and Scout are AI teammates that live on your Mac. They research, write and get things done — and ask before anything important. Free and open source, with the AI you already use." />
+  <meta property="og:title" content="OpenBot — meet your AI team" />
+  <meta property="og:description" content="Friendly AI teammates on your Mac. Free, open source, with the AI you already use." />
+  <meta property="og:image" content="https://openbots.foundation/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <style>
     :root {
-      --bg: #ffffff; --surface: #f5f5f7; --surface-2: #ececf0; --ink: #1d1d1f; --muted: #6e6e73; --line: rgba(0,0,0,.1);
-      --strong: #1d1d1f; --on-strong: #ffffff; --ok: #1d8127; --key: #ffffff; --key-edge: rgba(0,0,0,.18);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+      --bg: #ffffff; --bg-2: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --ink-2: #424245; --muted: #6e6e73; --line: rgba(0,0,0,.1); --hair: rgba(0,0,0,.06);
+      --nova: #6757d9; --pixel: #d86889; --scout: #299575;
+      --nova-soft: #efedfd; --pixel-soft: #fdeef3; --scout-soft: #e8f6f0;
+      --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Nunito", system-ui, sans-serif;
+      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --spring: cubic-bezier(.34, 1.56, .64, 1);
       color-scheme: light dark;
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --ink: #f5f5f7; --muted: #98989d; --line: rgba(255,255,255,.12); --strong: #f5f5f7; --on-strong: #000000; --ok: #30d158; --key: #3a3a3c; --key-edge: rgba(255,255,255,.14); }
+      :root { --bg: #000000; --bg-2: #111113; --card: #1c1c1e; --ink: #f5f5f7; --ink-2: #d1d1d6; --muted: #98989d; --line: rgba(255,255,255,.14); --hair: rgba(255,255,255,.08);
+        --nova-soft: #1d1a36; --pixel-soft: #33161f; --scout-soft: #0f2a21; }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
-    main { max-width: 760px; margin: 0 auto; padding: 72px 20px 64px; }
-    .mark { width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; background: var(--surface); margin-bottom: 22px; animation: rise .6s cubic-bezier(.2,.9,.25,1) both; }
-    .mark svg { width: 40px; height: 40px; }
-    h1 { font-size: clamp(38px, 7vw, 60px); line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 14px; font-weight: 700; animation: rise .6s .05s cubic-bezier(.2,.9,.25,1) both; }
-    .lead { font-size: clamp(18px, 2.6vw, 22px); line-height: 1.4; color: var(--muted); margin: 0 0 40px; max-width: 34ch; animation: rise .6s .1s cubic-bezier(.2,.9,.25,1) both; }
-    .install { background: var(--surface); border-radius: 24px; padding: 22px; animation: rise .6s .15s cubic-bezier(.2,.9,.25,1) both; }
-    .install h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.01em; }
-    .install > p { margin: 0 0 16px; color: var(--muted); font-size: 15px; }
-    .command { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 14px; padding: 8px 8px 8px 16px; box-shadow: inset 0 0 0 1px var(--line); }
-    .command code { flex: 1; min-width: 0; white-space: normal; overflow-wrap: break-word; font: 500 14px/1.45 ui-monospace, "SF Mono", Menlo, monospace; }
-    .copy { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--strong); color: var(--on-strong); font: 600 15px/1 inherit; cursor: pointer; transition: transform .12s ease, opacity .2s ease; }
-    .copy:active { transform: scale(.96); }
-    .copy:focus-visible { outline: 3px solid var(--muted); outline-offset: 2px; }
-    .copy.done { background: var(--ok); color: #fff; }
-    .steps { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
-    .steps li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--bg); transition: box-shadow .35s ease, transform .35s ease; }
-    .steps li.active { box-shadow: 0 0 0 2px var(--strong); transform: translateX(4px); }
-    .num { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 14px; }
-    .steps li.active .num { background: var(--strong); color: var(--on-strong); }
-    .say { flex: 1; font-size: 16px; line-height: 1.4; }
-    .keys { display: inline-flex; gap: 5px; align-items: center; }
-    kbd { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--key); box-shadow: 0 1px 0 var(--key-edge), inset 0 0 0 1px var(--key-edge); font: 600 13px/1 inherit; transition: transform .15s ease, box-shadow .15s ease; }
-    .steps li.active kbd { animation: press 1.6s ease-in-out infinite; }
-    .steps li.active kbd:nth-child(2) { animation-delay: .25s; }
-    @keyframes press { 0%, 60%, 100% { transform: translateY(0); } 20% { transform: translateY(2px); box-shadow: 0 0 0 var(--key-edge), inset 0 0 0 1px var(--key-edge); } }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-    .facts { margin: 44px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-    .fact { padding: 18px; border-radius: 18px; background: var(--surface); }
-    .fact strong { display: block; font-size: 15.5px; margin-bottom: 4px; }
-    .fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
-    details { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 18px; }
-    summary { cursor: pointer; font-weight: 600; font-size: 15px; }
-    details p, details li { color: var(--muted); font-size: 14.5px; line-height: 1.55; }
-    details code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; background: var(--surface); padding: 2px 6px; border-radius: 6px; color: var(--ink); }
-    footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
-    footer a { color: inherit; }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-    @media (max-width: 540px) { .command { flex-direction: column; align-items: stretch; padding: 12px; } .copy { justify-content: center; } .steps li { flex-wrap: wrap; } .say { min-width: 60%; } }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+    main { overflow-x: clip; }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    h1, h2, h3, .round { font-family: var(--round); }
+
+    /* Characters: eyes follow the pointer, eyelids blink, bodies breathe. */
+    .actor { position: relative; display: inline-block; }
+    .actor .char { display: block; width: 100%; height: auto; overflow: visible; animation: breathe 3.6s ease-in-out infinite; transform-origin: 50% 90%; }
+    .actor .char .character-eyes { transition: transform .18s ease-out; }
+    .actor .char .character-eyes > * { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; animation-delay: var(--blink, 0s); }
+    .actor .shadow { position: absolute; left: 18%; right: 18%; bottom: 4%; height: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.18), transparent); z-index: -1; animation: shadow 3.6s ease-in-out infinite; }
+    .actor.jump .char { animation: jump .7s var(--spring); }
+    .actor { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-4%) scale(1.01, .99); } }
+    @keyframes shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(.86); opacity: .7; } }
+    @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(.08); } }
+    @keyframes jump { 0% { transform: translateY(0) scale(1); } 25% { transform: translateY(2%) scale(1.08, .9); } 55% { transform: translateY(-22%) scale(.95, 1.06); } 80% { transform: translateY(0) scale(1.05, .95); } 100% { transform: none; } }
+
+    .bubble { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, 10px) scale(.6); opacity: 0; transform-origin: 50% 100%; background: var(--card); color: var(--ink); font: 600 16px/1.25 var(--round); padding: 11px 16px; border-radius: 20px; white-space: nowrap; box-shadow: 0 10px 30px -10px rgba(0,0,0,.25), 0 0 0 1px var(--hair); transition: transform .5s var(--spring), opacity .25s ease; pointer-events: none; }
+    .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; background: inherit; transform: translateX(-50%) rotate(45deg); border-radius: 3px; box-shadow: 3px 3px 0 -2px var(--hair); }
+    .bubble.show { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+
+    /* Nav */
+    header.top { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+    header.top .wrap { display: flex; align-items: center; height: 56px; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font: 700 19px/1 var(--round); letter-spacing: -0.01em; }
+    .brand svg { width: 24px; height: 24px; }
+    .top nav { margin-left: auto; display: flex; align-items: center; gap: 26px; font-size: 14px; }
+    .top nav a { text-decoration: none; color: var(--ink-2); }
+    .pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 18px; border-radius: 999px; background: var(--ink); color: var(--bg) !important; font: 600 15px/1 var(--round); text-decoration: none; border: 0; cursor: pointer; transition: transform .3s var(--spring), box-shadow .3s ease; }
+    .pill:hover { transform: scale(1.04); }
+    .pill:active { transform: scale(.96); }
+    .pill.big { height: 56px; padding: 0 30px; font-size: 19px; }
+    .pill.soft { background: var(--bg-2); color: var(--ink) !important; }
+    .pill:focus-visible, .copy:focus-visible, .actor:focus-visible { outline: 3px solid var(--nova); outline-offset: 3px; }
+
+    /* Hero */
+    .hero { position: relative; text-align: center; padding: 72px 0 40px; }
+    .aura { position: absolute; inset: -10% -20% auto; height: 820px; z-index: -1; pointer-events: none; filter: blur(60px); opacity: .55; }
+    .aura i { position: absolute; width: 520px; height: 520px; border-radius: 50%; animation: drift 18s ease-in-out infinite; }
+    .aura i:nth-child(1) { background: var(--nova); left: 12%; top: 18%; opacity: .28; }
+    .aura i:nth-child(2) { background: var(--pixel); right: 14%; top: 8%; opacity: .22; animation-delay: -6s; }
+    .aura i:nth-child(3) { background: var(--scout); left: 40%; top: 42%; opacity: .2; animation-delay: -12s; }
+    @keyframes drift { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(40px, -30px); } 66% { transform: translate(-30px, 30px); } }
+    h1 { font-size: clamp(52px, 9vw, 104px); line-height: .98; letter-spacing: -0.035em; font-weight: 700; margin: 0 0 22px; }
+    .lede { font-size: clamp(19px, 2.2vw, 24px); line-height: 1.4; color: var(--ink-2); margin: 0 auto 34px; max-width: 30em; }
+    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .fine-top { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
+    .stage { display: flex; justify-content: center; align-items: flex-end; gap: clamp(8px, 4vw, 56px); margin-top: 110px; }
+    .stage .actor { width: clamp(118px, 17vw, 210px); }
+    .stage .actor:nth-child(2) { width: clamp(136px, 20vw, 250px); }
+    .stage .name { margin-top: 6px; font: 700 18px/1.2 var(--round); }
+    .stage .job { font-size: 14px; color: var(--muted); }
+
+    /* Scenes */
+    .scene { padding: 140px 0; }
+    .scene.soft { background: var(--bg-2); }
+    .head { text-align: center; max-width: 760px; margin: 0 auto 64px; }
+    .head .who { display: inline-flex; align-items: center; gap: 8px; font: 700 15px/1 var(--round); padding: 7px 14px 7px 7px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--hair); margin-bottom: 20px; }
+    .head .who svg { width: 28px; height: 28px; }
+    h2 { font-size: clamp(40px, 6vw, 72px); line-height: 1.02; letter-spacing: -0.03em; font-weight: 700; margin: 0 0 18px; }
+    .head p { font-size: clamp(18px, 2vw, 22px); color: var(--ink-2); margin: 0; line-height: 1.45; }
+    .grad-nova { background: linear-gradient(90deg, var(--nova), var(--pixel)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .grad-scout { background: linear-gradient(90deg, var(--scout), var(--nova)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+    /* Live conversation between two characters */
+    .duet { display: grid; grid-template-columns: 170px minmax(0, 640px) 170px; justify-content: center; align-items: center; gap: 28px; }
+    .duet > .actor { width: 150px; justify-self: center; position: sticky; top: 40%; }
+    .chat { background: var(--card); border-radius: 28px; box-shadow: 0 30px 80px -30px rgba(0,0,0,.25), 0 0 0 1px var(--hair); overflow: hidden; }
+    .chat-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--hair); font: 700 16px/1 var(--round); }
+    .chat-head small { margin-left: auto; font: 500 13px var(--sans); color: var(--muted); }
+    .chat-body { padding: 22px 20px 24px; display: grid; gap: 14px; min-height: 620px; align-content: start; font-size: 15px; line-height: 1.5; }
+    .msg { display: flex; gap: 10px; align-items: flex-end; opacity: 0; transform: translateY(10px) scale(.98); transition: opacity .45s ease, transform .55s var(--spring); }
+    .msg.in { opacity: 1; transform: none; }
+    .msg .face { width: 30px; height: 30px; flex: none; }
+    .msg .b { background: var(--bg-2); border-radius: 20px 20px 20px 6px; padding: 11px 15px; max-width: 88%; }
+    .msg.nova .b { background: var(--nova-soft); } .msg.scout .b { background: var(--scout-soft); }
+    .msg .b b { font-weight: 650; }
+    .msg .who { display: block; font: 700 12.5px/1.4 var(--round); margin-bottom: 2px; }
+    .msg.nova .who { color: var(--nova); } .msg.scout .who { color: var(--scout); }
+    .msg.me { justify-content: flex-end; }
+    .msg.me .b { background: var(--ink); color: var(--bg); border-radius: 20px 20px 6px 20px; }
+    .msg ol, .msg ul { margin: 6px 0 4px; padding-left: 20px; }
+    .msg li { margin: 3px 0; }
+    .msg .dim { color: var(--muted); }
+    .note { justify-self: center; font-size: 13px; color: var(--muted); background: var(--bg-2); border-radius: 999px; padding: 6px 13px; opacity: 0; transition: opacity .4s ease; }
+    .note.in { opacity: 1; }
+    .typing .b { display: inline-flex; gap: 5px; padding: 15px 16px; }
+    .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: dot 1s infinite ease-in-out; }
+    .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+    @keyframes dot { 0%, 80%, 100% { opacity: .25; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+    .real { margin: 18px auto 0; text-align: center; font-size: 13.5px; color: var(--muted); }
+    .real::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--scout); margin-right: 8px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--scout) 20%, transparent); }
+
+    /* Talents: each hosted by a character peeking over the top */
+    .talents { display: grid; gap: 28px; }
+    .talent { position: relative; display: grid; grid-template-columns: 1fr 1.35fr; gap: 48px; align-items: center; padding: 56px; border-radius: 40px; background: var(--tint); overflow: visible; }
+    .talent.flip { grid-template-columns: 1.35fr 1fr; }
+    .talent.flip .words { order: 2; }
+    .talent h3 { font-size: clamp(30px, 3.6vw, 46px); line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 14px; }
+    .talent p { margin: 0 0 12px; color: var(--ink-2); font-size: 18px; }
+    .talent .by { display: inline-flex; align-items: center; gap: 8px; font: 700 14px/1 var(--round); color: var(--accent); margin-bottom: 14px; }
+    .talent .shot { position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(0,0,0,.4), 0 0 0 1px var(--hair); background: var(--card); transform: rotate(var(--tilt, 0deg)); transition: transform .6s var(--spring); }
+    .talent:hover .shot { transform: rotate(0deg) scale(1.01); }
+    .peek { position: absolute; top: -86px; width: 120px; height: 90px; overflow: hidden; pointer-events: auto; }
+    .peek .actor { width: 120px; transform: translateY(34px); transition: transform .6s var(--spring); }
+    .talent:hover .peek .actor, .peek .actor.jump { transform: translateY(8px); }
+    .peek .actor .shadow { display: none; }
+    .talent .float { position: absolute; width: 48%; right: -24px; bottom: -34px; border-radius: 16px; box-shadow: 0 24px 50px -18px rgba(0,0,0,.45); transform: rotate(3deg); }
+
+    /* Free */
+    .free-row { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
+    .zero { font: 800 clamp(120px, 18vw, 220px)/.85 var(--round); letter-spacing: -0.06em; margin: 0; }
+    .zero small { font-size: .2em; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: 8px; }
+    .free-row .lead { font-size: 22px; line-height: 1.45; color: var(--ink-2); margin: 18px 0 0; }
+    .facts { display: grid; gap: 14px; }
+    .fact { display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px; border-radius: 24px; background: var(--card); box-shadow: 0 0 0 1px var(--hair); transition: transform .5s var(--spring); }
+    .fact:hover { transform: translateY(-3px); }
+    .fact .dot { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--tint); color: var(--accent); font: 800 17px/1 var(--round); }
+    .fact strong { display: block; font: 700 18px/1.3 var(--round); margin-bottom: 2px; }
+    .fact span { color: var(--ink-2); font-size: 15.5px; }
+
+    /* Your AI */
+    .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; max-width: 900px; margin: 0 auto; }
+    .chip { font: 650 clamp(17px, 2vw, 22px)/1 var(--round); padding: 16px 24px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--hair), 0 10px 30px -18px rgba(0,0,0,.3); animation: float 6s ease-in-out infinite; }
+    .chip:nth-child(2n) { animation-delay: -2s; } .chip:nth-child(3n) { animation-delay: -4s; }
+    .chip.free { background: var(--scout-soft); color: var(--scout); }
+    .chip.local { background: var(--nova-soft); color: var(--nova); }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    .ai-note { text-align: center; color: var(--muted); font-size: 15px; margin: 34px auto 0; max-width: 40em; }
+
+    /* Install */
+    .install { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; }
+    .install h2 { text-align: left; }
+    .install .mini { display: flex; gap: 6px; margin-bottom: 10px; }
+    .install .mini .actor { width: 64px; }
+    .command { margin-top: 28px; display: flex; gap: 10px; align-items: center; padding: 8px 8px 8px 18px; border-radius: 18px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 20px 40px -24px rgba(0,0,0,.3); }
+    .command code { flex: 1; min-width: 0; font: 500 14.5px/1.45 var(--mono); overflow-wrap: break-word; }
+    .copy { flex: none; height: 46px; padding: 0 22px; border: 0; border-radius: 13px; background: var(--ink); color: var(--bg); font: 700 16px/1 var(--round); cursor: pointer; transition: transform .3s var(--spring); }
+    .copy:active { transform: scale(.94); }
+    .copy.done { background: var(--scout); color: #fff; }
+    .steps { margin: 20px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 16px; color: var(--ink-2); }
+    .steps li { display: flex; gap: 12px; align-items: baseline; }
+    .steps b { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-2); font: 700 13px/1 var(--round); color: var(--ink); transform: translateY(3px); }
+    kbd { font: 600 13px/1 var(--sans); padding: 3px 7px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line), 0 1px 0 var(--line); background: var(--card); }
+    .small { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
+    .small code { font: 13px var(--mono); }
+    .terminal { background: #1c1c1e; color: #e5e5ea; border-radius: 18px; box-shadow: 0 40px 80px -30px rgba(0,0,0,.55); overflow: hidden; font: 13.5px/1.65 var(--mono); }
+    .terminal .bar { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; background: #2c2c2e; }
+    .terminal .bar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; } .terminal .bar i:nth-child(2) { background: #febc2e; } .terminal .bar i:nth-child(3) { background: #28c840; }
+    .terminal pre { margin: 0; padding: 18px 20px 22px; white-space: pre-wrap; word-break: break-word; min-height: 280px; font: inherit; }
+    .terminal .p { color: #8e8e93; } .terminal .ok { color: #30d158; } .terminal b { color: #fff; }
+    .terminal .line { opacity: 0; transition: opacity .2s ease; } .terminal .line.in { opacity: 1; }
+    .terminal .caret { display: inline-block; width: 8px; height: 15px; background: #e5e5ea; vertical-align: -2px; animation: blink-caret 1s steps(1) infinite; }
+    @keyframes blink-caret { 50% { opacity: 0; } }
+    .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+    .confetti i { position: absolute; width: 10px; height: 10px; border-radius: 3px; animation: fall 1.6s cubic-bezier(.2,.6,.4,1) forwards; }
+    @keyframes fall { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; } }
+
+    /* Questions */
+    .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .qa details { background: var(--card); border-radius: 24px; padding: 22px 24px; box-shadow: 0 0 0 1px var(--hair); }
+    .qa summary { cursor: pointer; font: 700 18px/1.3 var(--round); list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    .qa summary::-webkit-details-marker { display: none; }
+    .qa summary::after { content: "+"; font-size: 24px; line-height: 1; color: var(--muted); transition: transform .3s var(--spring); }
+    .qa details[open] summary::after { transform: rotate(45deg); }
+    .qa p { margin: 12px 0 0; color: var(--ink-2); font-size: 16px; }
+
+    footer { padding: 70px 0 80px; text-align: center; color: var(--muted); font-size: 14px; }
+    footer .wave { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
+    footer .wave .actor { width: 54px; }
+    footer .wave .actor:nth-child(odd) .char { animation: wave 2.4s ease-in-out infinite; }
+    @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+    footer nav { display: flex; gap: 22px; justify-content: center; margin-top: 12px; }
+    footer a { text-decoration: none; color: var(--ink-2); }
+
+    .rise { opacity: 0; transform: translateY(30px) scale(.985); transition: opacity .9s ease, transform 1s var(--spring); }
+    .rise.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .rise, .msg, .note, .terminal .line { opacity: 1 !important; transform: none !important; } html { scroll-behavior: auto; } }
+
+    @media (max-width: 980px) {
+      .duet { grid-template-columns: minmax(0, 1fr); }
+      .duet > .actor { display: none; }
+      .talent, .talent.flip { grid-template-columns: 1fr; padding: 40px 28px 56px; gap: 28px; }
+      .talent.flip .words { order: 0; }
+      .free-row, .install { grid-template-columns: 1fr; gap: 44px; }
+      .qa { grid-template-columns: 1fr; }
+      .top nav a:not(.pill) { display: none; }
+      .scene { padding: 100px 0; }
+    }
+    @media (max-width: 560px) {
+      .wrap { padding: 0 18px; }
+      .stage { margin-top: 90px; gap: 10px; }
+      .stage .actor { width: 92px; } .stage .actor:nth-child(2) { width: 104px; }
+      .stage .name { font-size: 16px; } .stage .job { font-size: 12.5px; }
+      .bubble { font-size: 13px; padding: 8px 11px; border-radius: 14px; }
+      .chat-body { min-height: 0; font-size: 14.5px; }
+      .talent { border-radius: 30px; }
+      .talent .float { width: 62%; right: -8px; }
+      .command { flex-direction: column; align-items: stretch; padding: 12px; }
+      .peek { top: -70px; width: 96px; height: 72px; } .peek .actor { width: 96px; transform: translateY(28px); }
+    }
   </style>
 </head>
 <body>
-<main>
-  <div class="mark" aria-hidden="true">
-    <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="30" height="30" rx="9"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="OpenBot">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>
+      openbot
+    </a>
+    <nav aria-label="Main">
+      <a href="#watch">See them work</a>
+      <a href="#free">Free</a>
+      <a href="#ai">Your AI</a>
+      <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a>
+      <a class="pill" href="#install">Install</a>
+    </nav>
   </div>
-  <h1>Your team,<br />on your Mac.</h1>
-  <p class="lead">Friendly AI teammates that research, write and get things done — with the AI you already use.</p>
+</header>
 
-  <section class="install" aria-labelledby="install-title">
-    <h2 id="install-title">Install OpenBot</h2>
-    <p>Free and open source. Takes about a minute.</p>
-    <div class="command">
-      <code id="cmd">curl -fsSL <wbr />https://openbots.foundation/<wbr />install.sh <wbr />| sh</code>
-      <button class="copy" id="copy" type="button" aria-describedby="cmd">Copy install command</button>
+<main id="top">
+  <section class="hero wrap">
+    <div class="aura" aria-hidden="true"><i></i><i></i><i></i></div>
+    <h1 class="rise">Meet your<br />AI team.</h1>
+    <p class="lede rise">Friendly teammates who live on your Mac. They research, write and get things done — and always ask before anything important.</p>
+    <div class="cta rise">
+      <a class="pill big" href="#install">Install free</a>
+      <a class="pill big soft" href="#watch">See them work</a>
     </div>
-    <ol class="steps" id="steps">
-      <li><span class="num">1</span><span class="say">Open Terminal</span><span class="keys"><kbd>⌘</kbd><kbd>Space</kbd></span></li>
-      <li><span class="num">2</span><span class="say">Type <strong>Terminal</strong> and press Return</span><span class="keys"><kbd>↩</kbd></span></li>
-      <li><span class="num">3</span><span class="say">Paste and press Return — OpenBot opens by itself</span><span class="keys"><kbd>⌘</kbd><kbd>V</kbd><kbd>↩</kbd></span></li>
-    </ol>
+    <p class="fine-top rise">Free and open source · Uses the AI you already have · For Mac</p>
+
+    <div class="stage" aria-label="Nova, Pixel and Scout">
+      <div class="rise"><div class="actor" data-cast="nova" data-say="I’ll find it." tabindex="0" role="button" aria-label="Nova, research"></div><div class="name">Nova</div><div class="job">finds things out</div></div>
+      <div class="rise"><div class="actor" data-cast="pixel" data-say="I’ll write it up." tabindex="0" role="button" aria-label="Pixel, writing"></div><div class="name">Pixel</div><div class="job">makes real files</div></div>
+      <div class="rise"><div class="actor" data-cast="scout" data-say="I’ll double-check." tabindex="0" role="button" aria-label="Scout, checking"></div><div class="name">Scout</div><div class="job">checks the details</div></div>
+    </div>
   </section>
 
-  <div class="facts">
-    <div class="fact"><strong>Bring your own AI</strong><span>Start free with GitHub Copilot or a Gemini key, or use ChatGPT, Claude or Grok you already pay for.</span></div>
-    <div class="fact"><strong>Stays on your Mac</strong><span>Your studio and files live here. You choose which AI sees what.</span></div>
-    <div class="fact"><strong>Asks before it acts</strong><span>Anything that sends, buys or signs in waits for your okay.</span></div>
-  </div>
+  <section class="scene soft" id="watch">
+    <div class="wrap">
+      <div class="head rise">
+        <h2>Ask once.<br /><span class="grad-nova">They sort it out.</span></h2>
+        <p>Talk to them like a group chat. When Scout needs Nova’s answer first, Scout waits for it — just like people do.</p>
+      </div>
+      <div class="duet">
+        <div class="actor" data-cast="nova" id="duet-nova" aria-hidden="true"></div>
+        <div class="rise">
+          <div class="chat" aria-label="A real OpenBot conversation, replayed">
+            <div class="chat-head"><span>Weekend in Vienna</span><small>Nova, Scout and you</small></div>
+            <div class="chat-body" id="replay">
+              <div class="msg me"><div class="b"><b>Nova:</b> find three well-reviewed Italian restaurants near Stephansplatz that are open this Sunday evening. <b>Scout,</b> double-check their Sunday hours on their own websites.</div></div>
+              <div class="note">Scout waits for Nova’s list</div>
+              <div class="msg nova" data-actor="nova"><div class="face" data-face="nova"></div><div class="b"><span class="who">Nova</span>Here are 3 for Scout to verify — all near Stephansplatz and open Sunday evening:
+                <ol><li><b>Ristorante Danieli</b> — 4.1★, Himmelpfortgasse 3. Their site: open daily 11:30–24:00.</li><li><b>Trattoria Santo Stefano</b> — 4.2★, Dorotheergasse 5. Sun 11:30–23:30.</li><li><b>Regina Margherita</b> — 4.3★, Wallnerstr. 4. Sun 11:30–23:30.</li></ol>
+                <span class="dim">I couldn’t check main-course prices — menu pages were blocked.</span></div></div>
+              <div class="note">Nova’s answer is in · Scout is checking</div>
+              <div class="msg scout" data-actor="scout"><div class="face" data-face="scout"></div><div class="b"><span class="who">Scout</span>Checked on their own websites — all three are open this Sunday evening:
+                <ul><li><b>Danieli</b> — “365 days a year, daily 11:30–24:00”</li><li><b>Santo Stefano</b> — Monday–Sunday 11:30–23:00</li><li><b>Regina Margherita</b> — daily 11:30–23:30</li></ul>
+                <span class="dim">That matches Nova’s findings.</span></div></div>
+            </div>
+          </div>
+          <p class="real">A real run on 25 September 2026 — shortened, hours translated from German</p>
+        </div>
+        <div class="actor" data-cast="scout" id="duet-scout" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
 
-  <details>
-    <summary>What the installer does</summary>
-    <ul>
-      <li>Downloads OpenBot for your Mac and checks its fingerprint before using it.</li>
-      <li>Installs it in <code>~/Library/Application Support/OpenBot</code> — no administrator password.</li>
-      <li>Runs it quietly in the background and starts it when you log in.</li>
-      <li>Adds OpenBot to Applications and your Dock, then opens your studio.</li>
-    </ul>
-    <p>To remove it: <code>"~/Library/Application Support/OpenBot/uninstall.sh"</code> (your data stays unless you add <code>--delete-data</code>).</p>
-    <p>Requires macOS 13 or later on an Apple silicon or Intel Mac.</p>
-  </details>
+  <section class="scene">
+    <div class="wrap">
+      <div class="head rise">
+        <h2>Real work.<br /><span class="grad-scout">Not just replies.</span></h2>
+        <p>Every picture here is the app as it is today, doing real tasks.</p>
+      </div>
+      <div class="talents">
+        <article class="talent rise" style="--tint: var(--nova-soft); --accent: var(--nova); --tilt: 1.2deg">
+          <div class="peek" style="left: 64%"><div class="actor" data-cast="nova" aria-hidden="true"></div></div>
+          <div class="words"><span class="by">Nova</span><h3>Finds things out — and shows where.</h3><p>Browses the web in its own private browser and links every claim.</p><p>When something can’t be checked, it says so instead of guessing.</p></div>
+          <div class="shot"><img src="shots/team.jpg" width="2880" height="1800" alt="The OpenBot studio with Nova’s restaurant list and Scout’s check." loading="lazy" /></div>
+        </article>
+        <article class="talent flip rise" style="--tint: var(--pixel-soft); --accent: var(--pixel); --tilt: -1.2deg">
+          <div class="peek" style="left: 12%"><div class="actor" data-cast="pixel" aria-hidden="true"></div></div>
+          <div class="words"><span class="by">Pixel</span><h3>Makes files you can open.</h3><p>Word documents, spreadsheets and plans arrive as real files — ready to open, share or change.</p><p>Drop in a PDF and Pixel reads it first.</p></div>
+          <div style="position:relative"><div class="shot"><img src="shots/document.jpg" width="2880" height="1800" alt="Pixel delivers vienna-weekend.docx." loading="lazy" /></div><img class="float" src="shots/card-file.png" alt="The finished Word document, ready to open." loading="lazy" /></div>
+        </article>
+        <article class="talent rise" style="--tint: var(--scout-soft); --accent: var(--scout); --tilt: 1deg">
+          <div class="peek" style="left: 70%"><div class="actor" data-cast="scout" aria-hidden="true"></div></div>
+          <div class="words"><span class="by">Everyone</span><h3>Asks before it acts.</h3><p>Booking, sending, buying or signing in waits for your okay — with the website and the exact button.</p><p>Say no, and they finish honestly without it.</p></div>
+          <div class="shot"><img src="shots/review.jpg" width="2880" height="1800" alt="Nova asks before clicking “JETZT RESERVIEREN” on a restaurant website." loading="lazy" /></div>
+        </article>
+      </div>
+    </div>
+  </section>
 
-  <footer>OpenBot is MIT-licensed. <a href="https://github.com/PrisacariuRobert/openbot">Source code</a></footer>
+  <section class="scene soft" id="free">
+    <div class="wrap free-row">
+      <div class="rise">
+        <p class="zero">$0<small>a month</small></p>
+        <p class="lead">Other AI agents rent you their computer for $20–300 a month. OpenBot is free, runs on your Mac, and uses the AI you already have.</p>
+      </div>
+      <div class="facts">
+        <div class="fact rise" style="--tint: var(--nova-soft); --accent: var(--nova)"><span class="dot">1</span><div><strong>Your Mac, your files</strong><span>Your team and everything they make stay with you.</span></div></div>
+        <div class="fact rise" style="--tint: var(--pixel-soft); --accent: var(--pixel)"><span class="dot">2</span><div><strong>Each has their own desk</strong><span>A private workspace and browser for every teammate.</span></div></div>
+        <div class="fact rise" style="--tint: var(--scout-soft); --accent: var(--scout)"><span class="dot">3</span><div><strong>Always asks first</strong><span>Nothing is sent, bought or submitted without you.</span></div></div>
+        <div class="fact rise" style="--tint: var(--bg-2); --accent: var(--ink)"><span class="dot">4</span><div><strong>Open source</strong><span>Every line is public. No account, no tracking.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="scene" id="ai">
+    <div class="wrap">
+      <div class="head rise">
+        <h2>Bring the AI<br /><span class="grad-nova">you already have.</span></h2>
+        <p>Sign in once. Every teammate can use it — or give each one a different AI.</p>
+      </div>
+      <div class="chips rise">
+        <span class="chip">ChatGPT</span><span class="chip">Claude</span><span class="chip">Grok</span><span class="chip free">GitHub Copilot · free</span><span class="chip free">Gemini · free key</span><span class="chip">OpenCode Go</span><span class="chip local">Models on your Mac</span>
+      </div>
+      <p class="ai-note rise">Free options have their own limits. A model on your Mac keeps everything private.</p>
+    </div>
+  </section>
+
+  <section class="scene soft" id="install">
+    <div class="wrap install">
+      <div class="rise">
+        <div class="mini" aria-hidden="true"><div class="actor" data-cast="nova"></div><div class="actor" data-cast="pixel"></div><div class="actor" data-cast="scout"></div></div>
+        <h2>One line.<br />About a minute.</h2>
+        <p style="font-size:19px;color:var(--ink-2);margin:0">No account, no password. OpenBot opens by itself and stays in your Dock.</p>
+        <div class="command"><code id="cmd">curl -fsSL <wbr />https://openbots.foundation/<wbr />install.sh <wbr />| sh</code><button class="copy" id="copy" type="button">Copy</button></div>
+        <ol class="steps"><li><b>1</b><span>Open Terminal — <kbd>⌘</kbd> <kbd>Space</kbd>, type “Terminal”, <kbd>↩</kbd></span></li><li><b>2</b><span>Paste with <kbd>⌘</kbd> <kbd>V</kbd> and press <kbd>↩</kbd></span></li><li><b>3</b><span>Say hi to your team</span></li></ol>
+        <p class="small">macOS 13 or later. The installer checks the download’s fingerprint and never asks for your password. <a href="install.sh">Read it first</a> · remove any time with <code>uninstall.sh</code>.</p>
+      </div>
+      <div class="terminal rise" aria-label="What the installer prints">
+        <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <pre id="term"><span class="line"><span class="p">~ %</span> curl -fsSL https://openbots.foundation/install.sh | sh</span>
+<span class="line"> </span>
+<span class="line"><b>Installing OpenBot</b> <span class="p">— your team of AI teammates, on your Mac.</span></span>
+<span class="line"> </span>
+<span class="line"><b>•</b> Downloading OpenBot for this Mac…</span>
+<span class="line"><b>•</b> Unpacking…</span>
+<span class="line"><b>•</b> Starting OpenBot in the background…</span>
+<span class="line"><b>•</b> Opening your studio.....</span>
+<span class="line"><b>•</b> Adding OpenBot to your Applications and Dock…</span>
+<span class="line"> </span>
+<span class="line"><span class="ok"><b>OpenBot is installed.</b></span> It’s opening in your browser now.</span>
+<span class="line"><span class="p">~ %</span> <span class="caret"></span></span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="scene">
+    <div class="wrap">
+      <div class="head rise"><h2>Questions</h2></div>
+      <div class="qa rise">
+        <details><summary>Is it really free?</summary><p>Yes. OpenBot is free, open-source software. Your teammates use an AI you connect — OpenBot never charges anything on top.</p></details>
+        <details><summary>Does my data leave my Mac?</summary><p>Your team, chats and files live on your Mac. When a teammate works, what it needs goes to the AI you chose. Pick a model on your Mac to keep everything local.</p></details>
+        <details><summary>What do they do without asking?</summary><p>Read, search, write and make files in their own workspace. Anything that sends, buys, signs in or submits waits for you.</p></details>
+        <details><summary>Does it work when my Mac sleeps?</summary><p>They work while your Mac is on, and OpenBot keeps it awake when a scheduled job is due. It can also run on an always-on computer.</p></details>
+        <details><summary>Can I use it from my iPhone?</summary><p>Yes. Pair your iPhone with one scan to chat, get notified and approve from your Home Screen.</p></details>
+        <details><summary>Why Terminal?</summary><p>It lets us ship a free Mac app without a paid Apple certificate. It downloads from our public GitHub releases, checks the fingerprint and never asks for your password.</p></details>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <div class="wave" aria-hidden="true"><div class="actor" data-cast="nova" data-mood="happy"></div><div class="actor" data-cast="pixel" data-mood="happy"></div><div class="actor" data-cast="scout" data-mood="happy"></div></div>
+  <div>Made with care. Free and open source under the MIT license.</div>
+  <nav><a href="https://github.com/PrisacariuRobert/openbot">GitHub</a><a href="https://github.com/PrisacariuRobert/openbot/releases">Releases</a><a href="install.sh">Installer</a></nav>
+</footer>
+
+<script src="cast.js"></script>
 <script>
+(() => {
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let uid = 0;
+  const svgFor = (cast, mood = "calm") => (window.CAST[`${cast}-${mood}`] || "").replaceAll("__ID__", `c${++uid}`).replace('class="character', 'class="char character');
+  const actors = [...document.querySelectorAll(".actor[data-cast]")];
+
+  // Draw every character, with its own blink rhythm.
+  const draw = (el, mood) => {
+    const bubble = el.querySelector(".bubble");
+    el.innerHTML = svgFor(el.dataset.cast, mood || el.dataset.mood || "calm") + '<span class="shadow"></span>';
+    if (bubble) el.prepend(bubble);
+    el.style.setProperty("--blink", `${-(Math.random() * 5).toFixed(2)}s`);
+    el.dataset.current = mood || el.dataset.mood || "calm";
+  };
+  actors.forEach((el) => { draw(el); if (el.dataset.say) { const b = document.createElement("span"); b.className = "bubble"; b.textContent = el.dataset.say; el.prepend(b); } });
+  document.querySelectorAll("[data-face]").forEach((el) => { el.innerHTML = svgFor(el.dataset.face); });
+
+  const react = (el, mood = "happy", ms = 1600) => {
+    if (!el) return;
+    draw(el, mood);
+    el.classList.remove("jump"); void el.offsetWidth; el.classList.add("jump");
+    clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove("jump"); draw(el); }, ms);
+  };
+  const say = (el, ms = 2600) => { const b = el.querySelector(".bubble"); if (!b) return; b.classList.add("show"); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove("show"), ms); };
+
+  // Eyes follow the pointer.
+  if (!reduced) addEventListener("pointermove", (e) => {
+    for (const el of actors) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) continue;
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height * .55);
+      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 400);
+      const eyes = el.querySelector(".character-eyes");
+      if (eyes) eyes.style.transform = `translate(${(dx / d * 3.2 * k).toFixed(2)}px, ${(dy / d * 2.4 * k).toFixed(2)}px)`;
+    }
+  }, { passive: true });
+
+  // Poke a character: it cheers and says its line.
+  actors.forEach((el) => {
+    const poke = () => { react(el); say(el); };
+    el.addEventListener("click", poke);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); poke(); } });
+  });
+
+  // The hero cast introduce themselves.
+  const heroCast = [...document.querySelectorAll(".stage .actor")];
+  if (!reduced) heroCast.forEach((el, i) => setTimeout(() => { react(el, "happy", 1200); say(el, 2600); }, 900 + i * 900));
+
+  // Scroll reveals.
+  const reveal = (el) => el.classList.add("in");
+  if (reduced || !("IntersectionObserver" in window)) document.querySelectorAll(".rise").forEach(reveal);
+  else {
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { reveal(e.target); io.unobserve(e.target); } }), { rootMargin: "0px 0px -10% 0px" });
+    document.querySelectorAll(".rise").forEach((el) => io.observe(el));
+  }
+
+  // Replay the real conversation when it scrolls into view; the characters
+  // beside it react as their turn comes.
+  const items = [...document.querySelectorAll("#replay > *")];
+  const nova = document.getElementById("duet-nova"), scout = document.getElementById("duet-scout");
+  const play = () => {
+    let t = 300;
+    items.forEach((item) => {
+      const who = item.dataset.actor;
+      if (who) {
+        const actor = who === "nova" ? nova : scout;
+        setTimeout(() => {
+          draw(actor, "focused");
+          const typing = document.createElement("div");
+          typing.className = `msg ${who} typing in`;
+          typing.innerHTML = `<div class="face">${svgFor(who)}</div><div class="b"><i></i><i></i><i></i></div>`;
+          item.before(typing);
+          setTimeout(() => { typing.remove(); reveal(item); react(actor, "happy", 1800); }, 1500);
+        }, t);
+        t += 3200;
+      } else { setTimeout(() => { reveal(item); if (/waits/.test(item.textContent)) draw(scout, "curious"); }, t); t += 900; }
+    });
+  };
+  if (reduced) items.forEach(reveal);
+  else new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { o.disconnect(); play(); } }, { threshold: .35 }).observe(document.getElementById("replay"));
+
+  // Terminal types itself out once visible.
+  const lines = [...document.querySelectorAll("#term .line")];
+  if (reduced) lines.forEach(reveal);
+  else new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { o.disconnect(); lines.forEach((l, i) => setTimeout(() => reveal(l), 250 + i * (i > 3 && i < 9 ? 520 : 180))); } }, { threshold: .4 }).observe(document.getElementById("term"));
+
+  // Copy: the team cheers.
   const copy = document.getElementById("copy");
   const command = document.getElementById("cmd").textContent.trim();
-  const steps = [...document.querySelectorAll("#steps li")];
-  let timer = null, index = 0;
-  const show = (i) => steps.forEach((step, n) => step.classList.toggle("active", n === i));
-  const play = () => { clearInterval(timer); index = 0; show(0); timer = setInterval(() => { index = (index + 1) % steps.length; show(index); }, 2600); };
   copy.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(command); }
-    catch { const range = document.createRange(); range.selectNodeContents(document.getElementById("cmd")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); document.execCommand("copy"); }
-    copy.textContent = "Copied — now open Terminal";
-    copy.classList.add("done");
-    play();
-    setTimeout(() => { copy.textContent = "Copy install command"; copy.classList.remove("done"); }, 6000);
+    catch { const r = document.createRange(); r.selectNodeContents(document.getElementById("cmd")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand("copy"); }
+    copy.textContent = "Copied!"; copy.classList.add("done");
+    setTimeout(() => { copy.textContent = "Copy"; copy.classList.remove("done"); }, 2400);
+    document.querySelectorAll(".install .mini .actor").forEach((el, i) => setTimeout(() => react(el), i * 120));
+    if (reduced) return;
+    const box = document.createElement("div"); box.className = "confetti"; document.body.append(box);
+    const r = copy.getBoundingClientRect(), colors = ["#6757d9", "#d86889", "#299575", "#f5c542"];
+    for (let i = 0; i < 46; i++) {
+      const p = document.createElement("i");
+      p.style.left = `${r.left + r.width / 2}px`; p.style.top = `${r.top + r.height / 2}px`;
+      p.style.background = colors[i % colors.length];
+      p.style.setProperty("--dx", `${(Math.random() - .5) * 520}px`); p.style.setProperty("--dy", `${120 + Math.random() * 380}px`); p.style.setProperty("--r", `${Math.random() * 720}deg`);
+      p.style.animationDelay = `${Math.random() * .12}s`;
+      box.append(p);
+    }
+    setTimeout(() => box.remove(), 2000);
   });
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTimeout(play, 1200);
+})();
 </script>
 </body>
 </html>

@@ -177,6 +177,9 @@ test("closing a pop-up needs no review in any language; closing an account still
   for (const label of ["Dialog schließen", "Close", "Close dialog", "Dismiss", "×", "Fermer", "Cerrar", "Not now", "Maybe later", "Nein, danke"]) {
     assert.equal(browserApprovalReason("click", "", button(label)), null, label);
   }
+  for (const label of ["Toggle navigation", "Menu", "Open menu", "Menü öffnen"]) {
+    assert.equal(browserApprovalReason("click", "", button(label)), null, label);
+  }
   for (const label of ["Close account", "Close order", "Dismiss and delete", "Close and send"]) {
     assert.notEqual(browserApprovalReason("click", "", button(label)), null, label);
   }

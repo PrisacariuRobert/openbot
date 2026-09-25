@@ -132,8 +132,10 @@ export function isCookieDecline(target?: BrowserTarget): boolean {
   const label = target.label.replace(/\s+/g, " ").trim();
   // Opening the banner's own preferences only shows choices (where
   // "Reject all" then needs no review either). Saving choices stays reviewed.
-  return COOKIE_DECLINE.test(label) || COOKIE_DECLINE_INTL.test(label) || COOKIE_SETTINGS.test(label) || COOKIE_SETTINGS_INTL.test(label) || DISMISS.test(label);
+  return COOKIE_DECLINE.test(label) || COOKIE_DECLINE_INTL.test(label) || COOKIE_SETTINGS.test(label) || COOKIE_SETTINGS_INTL.test(label) || DISMISS.test(label) || MENU_TOGGLE.test(label);
 }
+// Opening a site's own menu only shows its links.
+const MENU_TOGGLE = /^(?:toggle (?:navigation|menu|nav)|(?:open|show|main|site) (?:menu|navigation)|menu|navigation|hamburger(?: menu)?|menü(?: öffnen)?|navigation (?:öffnen|umschalten)|ouvrir le menu|abrir (?:el )?menú|apri (?:il )?menu|menu openen)$/i;
 // Closing a pop-up (newsletter, promo, language picker) only hides it, in
 // any language. Exact labels only: "Close account" never matches.
 const DISMISS = /^(?:(?:close|dismiss|hide)(?: (?:dialog|popup|pop-up|modal|window|banner|message|overlay|this))?|(?:dialog|fenster|popup) (?:schließen|schliessen)|schließen|schliessen|fermer|cerrar|chiudi|sluiten|fechar|zamknij|stäng|luk|lukk|sulje|закрыть|not now|maybe later|später|nicht jetzt|nein,? danke|non merci|no,? gracias|no,? grazie|nee,? bedankt|[×✕✖xX])$/i;

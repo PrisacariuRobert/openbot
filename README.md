@@ -1,51 +1,61 @@
-# OpenBot 0.37.0-beta.1
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/social-dark.png" />
+    <img src="site/social.png" alt="Nova, Pixel and Scout — the OpenBot team" width="760" />
+  </picture>
+</p>
 
-### Your AI team. Your models. Your workspace.
+<h1 align="center">OpenBot</h1>
 
-OpenBot is a local-first, open-source home for persistent AI teammates. Give each teammate a role and a supported model, then work together through conversation—from research and files to code and recurring jobs.
+<p align="center">
+  <strong>A small team of AI teammates on your Mac.</strong><br />
+  They research, write and get things done — and ask before anything important.<br />
+  Free, open source, and powered by the AI you already use.
+</p>
 
-**[Get started](#start)** · **[Documentation](#documentation)** · **[Contributing](CONTRIBUTING.md)** · **[Security](SECURITY.md)**
+<p align="center">
+  <a href="https://openbots.foundation">Website</a> ·
+  <a href="#try-it">Try it</a> ·
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#how-it-compares">How it compares</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-[![Verify](https://github.com/PrisacariuRobert/openbot/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/PrisacariuRobert/openbot/actions/workflows/verify.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-242424.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/PrisacariuRobert/openbot/actions/workflows/verify.yml"><img alt="Verify" src="https://github.com/PrisacariuRobert/openbot/actions/workflows/verify.yml/badge.svg?branch=main" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-1d1d1f.svg" /></a>
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-1d1d1f.svg" />
+  <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-6757d9.svg" />
+</p>
 
-![OpenBot web Studio with a team conversation, named teammates, and review controls](marketing/website/public/actual-ui/team.webp)
+<br />
 
-*The web Studio, captured with a synthetic workspace. This is an interface preview, not evidence of a completed real-account task. Desktop and phone browsers share this interface.*
+<p align="center">
+  <img src="site/shots/team.jpg" alt="Nova finds three restaurants with links; Scout waits for Nova's list, then checks each restaurant's own website." width="900" />
+  <br />
+  <sub>A real run: “Nova, find three Italian restaurants near Stephansplatz open on Sunday. Scout, double-check their hours.”</sub>
+</p>
 
-> [!IMPORTANT]
-> **Development beta—not yet a signed public installer.** Electron is the desktop app for macOS, Windows and Linux. Phones use the same responsive web UI against the owner-hosted service. Public distribution and independent clean-install validation remain release gates. See the [release checklist](docs/FIRST_PUBLIC_RELEASE.md) and [candidate evidence](docs/QA_BETA_CANDIDATE.md).
+## Why OpenBot
 
-## Start with a conversation
+Hosted AI agents rent you their computer for $20–300 a month. OpenBot gives you the same kind of team on **your** Mac, for free.
 
-Ask a teammate to help with the work, not to explain which screen you should open.
+- **No new bill.** Sign in with ChatGPT, Claude or Grok you already pay for, start free with GitHub Copilot Free or a Gemini key, or run a model on your Mac.
+- **A real team, not one bot.** Every teammate has a name, a job, a private workspace and its own browser. When one builds on another’s work, it waits for the answer.
+- **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting always waits for your okay — with the website and the exact button.
+- **Nothing hidden.** No account, no tracking. Your studio is a folder on your Mac, and every line of OpenBot is here.
 
-> “Turn these notes into a project brief. Ask Scout to check the sources.”
->
-> “Find this bug, make a focused fix, and show me the checks before publishing.”
->
-> “Prepare a weekly review every Monday at 9.”
+## Try it
 
-These are example requests, not guaranteed outcomes. The selected model, runtime, connected sources, and permissions determine what can run. Sensitive actions use the configured review policy; missing access or an uncertain outcome should remain visible.
+**One-line install** (macOS 13+, Apple silicon or Intel) — available with the first public release:
 
-## What OpenBot brings together
+```sh
+curl -fsSL https://openbots.foundation/install.sh | sh
+```
 
-| | |
-| :--- | :--- |
-| **Persistent teammates** | Roles, model assignments, memory, private files, and customizable animated characters. Talk directly or work in project rooms. |
-| **Collaboration with accountability** | Teammates can ask specialists for focused help while a lead returns the answer. Inspect handoffs and recorded usage. |
-| **Work beyond the chat** | Connected apps, isolated browser profiles, explicitly granted Mac access, and Docker-backed computers for supported tasks. |
-| **Code with context** | Connected repositories, per-task worktrees, scoped edits, recorded checks, independent review, and approval-gated new pull requests. |
-| **Work over time** | Calendar routines, event triggers, and page-change monitoring, with persistent state, attention items, and recovery controls. |
-| **Inspectable results** | Files and revisions stay linked to the conversation. Receipts distinguish host checks, teammate reports, sources, and unresolved uncertainty. |
+No administrator password. It checks the download’s fingerprint, runs OpenBot in the background and adds it to your Dock. [Read the installer](scripts/install.sh) first if you like.
 
-The [extended reference](REFERENCE.md#what-is-included) documents the complete feature set and its boundaries. The [product gap audit](docs/PRODUCT_GAP_AUDIT.md) records work still needed; a feature appearing in source is not a reliability guarantee.
-
-## Start
-
-### Run the source preview
-
-Install **Node.js 22.13 or newer**, npm, and Git, then:
+**Run from source** today (Node.js 22.13+):
 
 ```sh
 git clone https://github.com/PrisacariuRobert/openbot.git
@@ -54,132 +64,100 @@ npm ci
 npm run dev
 ```
 
-Open **[http://127.0.0.1:4310](http://127.0.0.1:4310/)**. Create a teammate, choose its AI connection and model, and start with a read-only task. Older `/studio.html` links open the same Studio.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a teammate and say hello.
 
-Opening the interface does not require every optional tool. Install the dependencies for the work you actually enable:
+## What it does
 
-| Capability | Additional setup |
+<table>
+  <tr>
+    <td width="50%"><img src="site/shots/document.jpg" alt="Pixel delivers a Word document" /></td>
+    <td width="50%"><img src="site/shots/review.jpg" alt="Nova asks before clicking a reservation button" /></td>
+  </tr>
+  <tr>
+    <td><strong>Real files.</strong> Word documents, spreadsheets and plans arrive as files you can open and share. Drop in a PDF and your teammate reads it first.</td>
+    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it.</td>
+  </tr>
+</table>
+
+- **Research with sources** — each teammate browses in its own private browser and links what it found; when something can’t be checked, it says so.
+- **Group chats** — write “Nova: find… Scout, double-check…” and each does their part, in order.
+- **Routines** — “Every Monday at 9, plan my week.” Plus a Sunday look back at what got done.
+- **Voice and phone** — talk hands-free, or pair your iPhone with one scan to chat and approve from your Home Screen.
+- **Skills** — teach a teammate a method once, or add reviewed skills from the community.
+- **Bring your setup** — one-click import from Hermes Agent and OpenClaw, including automations.
+
+## Your AI, your choice
+
+| | |
 | :--- | :--- |
-| Run model-backed tasks | The selected execution adapter: OpenCode for its supported connections, or the official Claude Code runtime. |
-| Use websites | Google Chrome or Chromium, plus explicit browser access. |
-| Run isolated computer or code checks | Docker and the relevant project dependencies. |
-| Work with GitHub | GitHub CLI and your authorized account. |
-| Use a website through a teammate | Sign in yourself in that teammate's browser; no OpenBot OAuth client is needed. |
-| Use direct API connections (optional) | Service-specific setup and per-teammate permissions. |
+| **Start free** | GitHub Copilot Free · Google Gemini (free key) |
+| **Use your subscription** | ChatGPT · Claude · Grok |
+| **Pay per use** | OpenCode Go · any OpenAI-compatible API |
+| **Stay private** | Models on your Mac with Ollama |
 
-A saved account or API key is not a successful execution test. Test the chosen connection before depending on it. OpenBot does not provide model allowance or resell tokens; provider terms, supported authentication paths, and usage limits still apply.
+Each teammate can use a different AI. OpenBot never resells tokens or adds a fee; each provider’s own terms and limits apply.
 
-**[Detailed setup](REFERENCE.md#start)** · **[Model ownership](REFERENCE.md#how-model-ownership-works)** · **[Environment options](.env.example)**
+## How it compares
 
-### Choose a client
+| | Hosted agents (Grok Bot, Meta Muse) | Developer agents (Hermes, OpenClaw) | **OpenBot** |
+| :--- | :--- | :--- | :--- |
+| Price | $0–300/month plans | Free + your models | **Free + your models** |
+| Runs on | Their cloud | Your machine or server | **Your Mac** |
+| Setup | Sign in | Terminal and config files | **One line, then an app** |
+| Team of named teammates | Grok Bot | Yes | **Yes, each with its own browser** |
+| Asks before acting | Yes | Configurable | **Always, with the exact action** |
+| Works while your computer is off | Yes | With your own server | With your own server |
+| Phone | Native apps | Varies | Home Screen web app |
+| Open source | No | Yes | **Yes (MIT)** |
 
-| Client | Role | Instructions |
-| :--- | :--- | :--- |
-| **Web Studio** | React client served by your local or private host. | [Source setup above](#start) |
-| **Electron desktop shell** | Desktop shell around the web client, with platform-specific packaging. | [Desktop setup](desktop/README.md) |
-| **Phones** | Responsive web client connected to a reachable private host. | [Phone access](desktop/README.md#phones) |
+Competitor details as of September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
 
-There is one application UI in `src/studio/`. Electron packages it for desktop; phones open it over HTTPS. Platform installers still require independent clean-install validation.
+## Privacy and safety
 
-For a production-mode source run:
+Your studio, conversations and files live on your Mac. When a teammate works, what it needs is sent to the AI you chose, under that provider’s terms — pick a local model to keep everything on your Mac. Teammate browsers are separate profiles, not a security sandbox. Read the [security model](docs/SECURITY.md), and report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 
-```sh
-npm run build
-npm start
-```
+## Status
 
-The service normally listens on `127.0.0.1:4311`. A local routine cannot run while its host is asleep or offline. For an owner-operated Linux home, use the [private-runner guide](deploy/private-runner/README.md); that is a separate deployment, not an included hosted service.
-
-## Your models and connected tools
-
-Choose a supported subscription, API connection, or compatible local model for each teammate. OpenBot does not silently choose or switch a model when it discovers an account or when you browse another connection; changing a teammate requires your explicit model selection. Connection availability depends on the execution adapter and provider; OpenBot does not promise that every subscription works with every integration.
-
-The no-cost first-run path is a teammate conversation with optional access to its own browser. You can sign in to websites yourself when needed; OpenBot does not require a Google Cloud project, a public OAuth client, or any developer account to use that path. Browser work needs Chrome or Chromium, a working model, and your explicit teammate permission. Sites may ask for a new sign-in or refuse automation, so verify the actual result.
-
-For a model without API billing, open **Your AI → Set up Ollama** and enter a model already downloaded on the host Mac. Keep Ollama running while OpenBot works. The connection test checks a real reply; qualify the model with a full teammate conversation before relying on it. Our [local beta check](qa/no-oauth-beta/README.md) found that the two models already on the development Mac did not pass a simple conversation acceptance test.
-
-Direct API connections for **GitHub, Google Workspace, Slack, Notion, Todoist, and Dropbox** remain optional for owners who already use them or choose to configure them. They are not required for the first conversation, browser work, local files, or project tasks. Operations and permissions differ by service; a website session is not an API grant.
-
-- [Google Workspace setup](REFERENCE.md#connect-google-workspace)
-- [Slack, Notion, Todoist, and Dropbox](REFERENCE.md#connect-slack-notion-todoist-and-dropbox)
-- [Browser and connector boundaries](docs/BROWSER_AND_CONNECTORS.md)
-- [Skills, MCP, and interoperability](docs/PLUGIN_INTEROPERABILITY.md)
-
-Grant only the access the task needs. A website session is not an API grant, and a denied permission must not be bypassed by changing tools.
-
-## Control and privacy
-
-**Local-first means owner-hosted state—not necessarily on-device inference.** Selected prompts, files, and tool results may be sent to your chosen model provider or connected service. Review those paths before using sensitive data.
-
-**Review consequential actions.** Keep Ask First enabled while evaluating the beta. Action previews, current account identity, and result readback matter; a completed animation or a confident response is not proof that an external action succeeded.
-
-**Understand the boundaries.** Browser profiles are not a security sandbox. Chrome and explicitly permitted Mac app access are distinct from containerized command execution. Checks attached to a result verify specific properties, not every possible claim in that result.
-
-**Protect the data home.** Back up the database and matching vault key together with files and required session data, following the [platform recovery instructions](desktop/README.md#existing-data). Never commit credentials, browser profiles, runtime databases, or unredacted diagnostics.
-
-Read the [security model](docs/SECURITY.md) for the full threat model and limitations. Report suspected vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue containing secrets.
+OpenBot 0.37.0-beta.1 is a beta. The one-line installer ships with the first public release; until then, run from source. Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [release checklist](docs/FIRST_PUBLIC_RELEASE.md).
 
 ## What's new in 0.37.0-beta.1
 
-This beta develops the conversation-first clients, clearer task results and attention states, shared desktop and phone controls, and the Electron packaging path. These are implementation and candidate checks—not a claim that public-release gates are complete.
+- Replies appear word by word from every provider.
+- Start free with GitHub Copilot Free or a Gemini key; one-line Mac installer.
+- Teammates build on each other’s answers in group chats.
+- Word documents, weekly recap, hands-free voice, and phone pairing with one scan.
 
-See the [changelog](CHANGELOG.md), [result-flow evidence](docs/QA_RESULT_FLOW.md), and [detailed release notes](REFERENCE.md#whats-new-in-0370-beta1). Older notes remain available in the reference instead of crowding this introduction.
+Full notes in the [changelog](CHANGELOG.md).
 
-## Architecture
+## For developers
 
 ```text
-Electron desktop / Phone browser / Web Studio
-                    |
-          Authenticated OpenBot service
-                    |
-     Conversations, tools, approvals, and runner
-                    |
-       SQLite state + owner-controlled files
-                    |
-  Model adapters / connectors / browser / computers
+Web studio (desktop + phone)  →  OpenBot service  →  teammates' runtimes
+                                       │               (OpenCode, Claude Code)
+                               SQLite + your files      browser · Mac access · tools
 ```
 
-The service owns execution, permission checks, scheduling, recovery, and persisted results. Clients present that state; they do not grant authority by displaying a button.
-
-| Path | Purpose |
+| Path | What lives there |
 | :--- | :--- |
-| `src/studio/` | Web conversation UI and management screens. |
-| `src/server/` | Host runtime, database, tools, connectors, and approvals. |
-| `src/shared/` | Shared types and behavior contracts. |
-| `desktop/` | Electron application and platform packaging; shared UI in `src/studio/`. |
-| `skills/`, `mcp/` | Included skills and the OpenBot MCP interface. |
-| `scripts/`, `tests/` | Verification, packaging, and workflow fixtures. |
-| `deploy/` | Owner-hosted deployment and recovery tooling. |
-| `marketing/` | Website and editable introduction-film sources. |
-
-## Development
-
-Use the checked-in lockfile; keep changes focused and test with disposable data.
+| `src/studio/` | The app — one interface for desktop and phone |
+| `src/server/` | Service: conversations, teammates, tools, approvals, scheduling |
+| `src/shared/` | Types and behavior shared by both |
+| `site/` | The website and the Mac installer |
+| `desktop/` | Electron shell and packaging |
+| `deploy/` | Always-on hosting on your own Linux server |
+| `skills/`, `mcp/` | Bundled skills and the MCP interface |
 
 ```sh
-npm run verify
-npm run test:conversation-flow
-npm run test:studio-polish
-node scripts/check-static-assets.mjs
+npm run verify     # guards, types, build and ~1,000 tests
+npm start          # production build on 127.0.0.1:4311
 ```
 
-`verify` includes source guards, TypeScript, the web build, and unit tests. Native source-contract checks are **not** Xcode builds, device tests, or signed-package installation tests. Browser checks require Chrome/Chromium. Actual-model and live-account tests need separate authorization and an explicit usage budget.
+More in the [extended reference](REFERENCE.md), [desktop guide](desktop/README.md) and [private runner guide](deploy/private-runner/README.md).
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. Bug reports should include the version, client, reproduction, and redacted evidence. Improvements to reliability, onboarding, accessibility, and complete task workflows are especially useful.
+## Contributing
 
-## Documentation
-
-| Topic | Guide |
-| :--- | :--- |
-| Complete feature catalog, setup, and earlier release notes | [Extended reference](REFERENCE.md) |
-| Public-beta scope and remaining release gates | [First public release](docs/FIRST_PUBLIC_RELEASE.md) |
-| Current candidate record | [Beta candidate evidence](docs/QA_BETA_CANDIDATE.md) |
-| Product gaps and next priorities | [Product gap audit](docs/PRODUCT_GAP_AUDIT.md) |
-| Security and permissions | [Security model](docs/SECURITY.md) |
-| Private always-on hosting | [Private runner](deploy/private-runner/README.md) |
-| Asset ownership and cleanup rules | [Asset maintenance](docs/ASSET_MAINTENANCE.md) |
-| Contribution and verification expectations | [Contributing](CONTRIBUTING.md) |
+Issues and pull requests are welcome — especially for onboarding, reliability, accessibility and new skills. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-OpenBot is available under the [MIT License](LICENSE). Bundled dependencies, fonts, and service marks retain their own notices; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE). Bundled dependencies keep their own notices — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
