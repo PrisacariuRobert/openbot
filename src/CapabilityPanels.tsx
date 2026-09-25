@@ -1,3 +1,4 @@
+import { MacWakeCard } from "./components/MacWakeCard";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { WorkflowChecksPanel } from "./components/WorkflowChecksPanel";
 import { WorkSourcesPanel } from "./components/WorkSourcesPanel";
@@ -5562,6 +5563,7 @@ export function RoutinesPanel({
   }, [checkPrivateHome, privateRunner, runnerCareAttempted]);
   return (
     <div className="routines-view">
+      <MacWakeCard />
       <details className="automation-health" open={runner.status !== "online" ? true : undefined}>
       <summary><span className={runner.status === "online" ? "health-ready" : "health-attention"} />{runner.status === "online" ? "Your studio is awake" : "Your studio needs attention"}<small>Status & recovery</small></summary>
       <div className="automation-health-body">

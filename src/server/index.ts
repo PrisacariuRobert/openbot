@@ -92,6 +92,7 @@ import { inspectRunnerCare } from "./runner-care.js";
 import QRCode from "qrcode";
 import { TelegramChannel } from "./telegram-channel.js";
 import { FullDiskAccessError, IMessageChannel } from "./imessage-channel.js";
+import { plannedWakeTime, setMacWake, type MacWakeState } from "./mac-wake.js";
 import { execFile } from "node:child_process";
 import { DiscordChannel } from "./discord-channel.js";
 import { weeklyRecap } from "../shared/weekly-recap.js";
@@ -4741,6 +4742,21 @@ const distDir = process.env.OPENBOT_DIST_DIR ? path.resolve(process.env.OPENBOT_
 app.use((error: unknown, _request: express.Request, response: express.Response, next: express.NextFunction) => {
   if (error instanceof WorkflowCheckError) return response.status(409).json({ error: error.message, code: "workflow_check_required" });
   next(error);
+});
+// Wake a sleeping Mac a few minutes before the day's first routine.
+app.get("/api/mac-wake", (_request, response) => {
+  const state = db.extensionRecord<MacWakeState>("mac-wake", "schedule") || { enabled: false, time: null };
+  response.json({ available: process.platform === "darwin", ...state, suggested: plannedWakeTime(db.listRoutines()) });
+});
+app.post("/api/mac-wake", async (request, response) => {
+  const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose on or off." });
+  if (process.platform !== "darwin") return response.status(409).json({ error: "Waking up for routines works on a Mac." });
+  try {
+    const state = await setMacWake(parsed.data.enabled, db.listRoutines());
+    db.saveExtensionRecord("mac-wake", "schedule", state);
+    response.json({ available: true, ...state, suggested: plannedWakeTime(db.listRoutines()) });
+  } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The wake schedule wasn't changed." }); }
 });
 const imessage = new IMessageChannel({ db, appUrl, isLeader: () => runner.isLeader(), localApi: channelLocalApi });
 app.get("/api/channels/imessage", (_request, response) => { response.json(imessage.status()); });
