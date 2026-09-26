@@ -2372,3 +2372,15 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .mac-wake-card .mac-wake-error { color: var(--danger, #c0392b); }
 .mac-wake-actions { display: flex; gap: 8px; }
 @media (max-width: 640px) { .mac-wake-card { grid-template-columns: auto 1fr; } .mac-wake-actions { grid-column: 1 / -1; } }
+
+/* Ask with Siri. */
+.siri-card { display: grid; grid-template-columns: auto 1fr; gap: 14px; padding: 18px; margin: 0 0 18px; border-radius: 18px; background: var(--surface-muted); }
+.siri-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(135deg, #6757d9, #d86889); color: #fff; }
+.siri-copy strong { display: block; font-size: 16px; }
+.siri-copy p { margin: 4px 0 12px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.siri-copy img { display: block; border-radius: 14px; background: #fff; padding: 6px; margin: 4px 0 10px; }
+.siri-copy ol { margin: 0 0 8px; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+.siri-copy small { color: var(--muted); font-size: 12.5px; }
+.siri-copy button { display: inline-flex; align-items: center; gap: 6px; }
+.siri-error { color: var(--danger, #c0392b) !important; }
+.siri-hint { margin: 10px 0 0 !important; color: var(--ink) !important; font-size: 13.5px !important; }

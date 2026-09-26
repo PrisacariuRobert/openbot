@@ -196,7 +196,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
   return <section className="away-pairing" aria-label="iMessage">
     <div className="away-pairing-heading"><span className="away-pairing-icon brand"><BrandIcon brand="imessage" /></span><div>
       <h3>{status?.paired ? "Your team is on iMessage" : "Text your team from iMessage"}</h3>
-      <p>Use Messages on your iPhone — no app to install. Replies come back in the same thread while your Mac is on.</p>
+      <p>Use Messages on your iPhone. Works best when this Mac uses its own Apple ID, so your team shows up as a separate contact. With your own number, Messages shows every text twice — the OpenBot app on your Home Screen or Siri is nicer then.</p>
     </div></div>
 
     {needsAccess && !status?.paired && <SettingsGroup title="First, let OpenBot read Messages">

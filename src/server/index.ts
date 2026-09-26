@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { z } from "zod";
 import { gmailReplyInputSchema, gmailReplyReviewSchema } from "../shared/gmail-reply.js";
@@ -93,6 +93,7 @@ import QRCode from "qrcode";
 import { TelegramChannel } from "./telegram-channel.js";
 import { FullDiskAccessError, IMessageChannel } from "./imessage-channel.js";
 import { plannedWakeTime, setMacWake, type MacWakeState } from "./mac-wake.js";
+import { speakable } from "../shared/speakable.js";
 import { execFile } from "node:child_process";
 import { DiscordChannel } from "./discord-channel.js";
 import { weeklyRecap } from "../shared/weekly-recap.js";
@@ -297,7 +298,7 @@ function deviceSessionCookie(request: express.Request, key: string) {
 
 app.use("/api", (request, response, next) => {
   if (request.method === "GET" && request.path === "/extensions/oauth/callback") return next();
-  if (request.path === "/auth/login" || request.path === "/auth/pair" || request.path === "/auth/pair-browser" || request.path === "/auth/pairing-probe" || request.path.startsWith("/automation-hooks/") || request.path.startsWith("/connector-hooks/") || loopback(request)) return next();
+  if (request.path === "/auth/login" || request.path === "/auth/pair" || request.path === "/auth/pair-browser" || request.path === "/auth/siri-shortcut" || request.path === "/auth/pairing-probe" || request.path.startsWith("/automation-hooks/") || request.path.startsWith("/connector-hooks/") || loopback(request)) return next();
   const bearer = request.headers.authorization?.replace(/^Bearer\s+/i, "");
   const credential = acceptedAccessToken(bearer) ? bearer : cookie(request, "openbot_access");
   if (acceptedAccessToken(credential)) {
@@ -4757,6 +4758,33 @@ app.post("/api/mac-wake", async (request, response) => {
     db.saveExtensionRecord("mac-wake", "schedule", state);
     response.json({ available: true, ...state, suggested: plannedWakeTime(db.listRoutines()) });
   } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The wake schedule wasn't changed." }); }
+});
+// Siri and other quick askers: one request, the answer written for speaking.
+// Waits up to ~50 s (Shortcuts gives up around a minute); longer work keeps
+// going and arrives as a notification.
+app.post("/api/ask", async (request, response) => {
+  const parsed = z.object({ text: z.string().trim().min(1).max(4_000), source: z.string().max(20).optional() }).safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ answer: "I didn't catch that. Try again?" });
+  const teammate = db.listBots().filter((bot) => !bot.retiredAt)[0];
+  if (!teammate) return response.json({ answer: "You don't have a teammate yet. Create one in OpenBot on your Mac first." });
+  const sent = await channelLocalApi("POST", "/api/messages", { threadId: teammate.threadId, body: parsed.data.text, requestId: `ask-${randomUUID()}`, timeZone: "UTC" });
+  const runId = (sent.body.runIds as string[] | undefined)?.[0] || ((sent.body.runs as Array<{ id: string }> | undefined)?.[0]?.id);
+  if (!runId) return response.json({ answer: typeof sent.body.error === "string" ? sent.body.error : `${teammate.name} couldn't start that. Open OpenBot to check.` });
+  const deadline = Date.now() + 50_000;
+  while (Date.now() < deadline) {
+    const run = db.getRun(runId);
+    if (!run) break;
+    if (run.status === "completed") {
+      const reply = db.listMessages(teammate.threadId).filter((message) => message.runId === runId && message.senderType === "bot").at(-1)?.body || run.summary || "Done.";
+      // "[source](https://…)" reads as "(source)": drop link-only words when spoken.
+      const spoken = speakable(reply.replace(/\s*\(?\[(?:source|sources|link|here|website|site|more)\]\([^)]*\)\)?/gi, ""));
+      return response.json({ answer: spoken.length > 700 ? `${spoken.slice(0, 680).replace(/\s+\S*$/, "")}… The rest is in OpenBot.` : spoken, teammate: teammate.name, runId });
+    }
+    if (run.status === "awaiting_approval") return response.json({ answer: `${teammate.name} needs your okay before going on. Open OpenBot to review it.`, teammate: teammate.name, runId });
+    if (["failed", "cancelled"].includes(run.status)) return response.json({ answer: `${teammate.name} couldn't finish that. ${run.error ? speakable(run.error).slice(0, 200) : "Open OpenBot for details."}`, teammate: teammate.name, runId });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  response.json({ answer: `${teammate.name} is on it. You'll get a notification when it's done.`, teammate: teammate.name, runId });
 });
 const imessage = new IMessageChannel({ db, appUrl, isLeader: () => runner.isLeader(), localApi: channelLocalApi });
 app.get("/api/channels/imessage", (_request, response) => { response.json(imessage.status()); });
