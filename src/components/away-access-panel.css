@@ -26,4 +26,5 @@ a.away-pairing-primary.channel-primary{display:inline-flex;align-items:center;ga
 @media(max-width:600px){.channel-qr{display:none}.channel-actions>*{flex:1 1 auto;justify-content:center}}
 
 /* Chat app brand marks sit on white, not the grey tile. */
-.away-pairing-icon.brand { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.away-pairing .away-pairing-icon.brand { background: none !important; border: 0 !important; border-radius: 0; box-shadow: none; }
+.away-pairing-icon.brand svg { width: 40px; height: 40px; }

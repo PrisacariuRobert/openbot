@@ -703,18 +703,24 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 12px auto;
-  padding: 8px 12px;
+  margin: 10px auto;
+  padding: 5px 12px 5px 6px;
   max-width: 78%;
   width: fit-content;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--ink);
+  background: var(--surface-muted);
+  border: 0;
+  border-radius: 999px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
+/* Quiet system notes, like the small lines in Messages: the key words in
+ * ink, the rest muted; a note that wraps becomes a soft card. */
+.chat-event:not(:has(.chat-event-mark)) { padding-left: 12px; }
+.chat-event strong { color: var(--ink); }
+.chat-event .text-action { padding: 2px 0; margin: -2px 0; min-height: 0; color: var(--ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent); text-underline-offset: 3px; }
+.chat-event-mark .character { box-shadow: 0 0 0 2px var(--surface-muted); }
 @media (max-width: 640px) {
   .chat-event { max-width: 94%; }
 }
@@ -752,7 +758,7 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
 /* Talking pills expand inline: the chevron sits next to the title, detail
  * lines unfold beneath. No second "Details" row. */
 .talk-pill {
-  background: transparent;
+  background: var(--surface-muted);
 }.talk-pill > details {
   display: grid;
   min-width: 0;
@@ -760,6 +766,7 @@ header.topbar .topbar-center { display: flex; align-items: center; flex-directio
 /* Opened, the pill relaxes into a card — a tall 999px capsule looks broken. */
 .talk-pill:has(details[open]) {
   border-radius: 16px;
+  padding: 10px 14px;
 }
 .talk-pill summary {
   display: flex;
