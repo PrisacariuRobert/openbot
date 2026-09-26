@@ -25,3 +25,25 @@ test("explicit mentions override chips and natural room text picks a relevant ow
   assert.equal(resolveMessageTargets({ body: "Research and compare the latest sources", bots }).at(0)?.id, "nova");
   assert.equal(resolveMessageTargets({ body: "Build a polished settings screen", bots }).at(0)?.id, "pixel");
 });
+
+test("owners can address group teammates naturally: 'Nova: …', 'Pixel, …'", async () => {
+  const { addressedBotIds, resolveMessageTargets } = await import("./routing.js");
+  const bots = [{ id: "nova", name: "Nova" }, { id: "pixel", name: "Pixel" }, { id: "scout", name: "Scout" }];
+  assert.deepEqual(addressedBotIds("Plan a weekend. Nova: find 3 things to do. Pixel: make a budget table.", bots), ["nova", "pixel"]);
+  assert.deepEqual(addressedBotIds("Hey Scout, can you check this?", bots), ["scout"]);
+  assert.deepEqual(addressedBotIds("Nova and Pixel, compare these.", bots), ["nova", "pixel"]);
+  assert.deepEqual(addressedBotIds("Ask the team what Nova thinks about pixel art", bots), [], "mentioning a name is not addressing");
+  assert.deepEqual(addressedBotIds("I like the novel, it was great", bots), [], "whole names only");
+  const full = bots.map((bot) => ({ ...bot, role: "", instructions: "", status: "idle" })) as never[];
+  assert.deepEqual(resolveMessageTargets({ body: "Nova: find prices. Pixel: budget it.", bots: full }).map((bot: { id: string }) => bot.id), ["nova", "pixel"]);
+});
+
+test("a later teammate who checks or refines earlier work follows that teammate", async () => {
+  const { followUpOrder } = await import("./routing.js");
+  const bots = [{ id: "scout", name: "Scout" }, { id: "nova", name: "Nova" }, { id: "pixel", name: "Pixel" }];
+  const order = (body: string) => Object.fromEntries(followUpOrder(body, bots));
+  assert.deepEqual(order("Nova: find three Italian restaurants near Stephansplatz. Scout, double-check their Sunday opening hours."), { scout: "nova" });
+  assert.deepEqual(order("Nova: research flights. Pixel, turn it into a one-page plan. Scout, verify the prices."), { pixel: "nova", scout: "pixel" });
+  assert.deepEqual(order("Nova: research flights to Rome. Pixel: write a birthday poem for Anna."), {}, "independent parts run side by side");
+  assert.deepEqual(order("Find flights to Rome."), {});
+});

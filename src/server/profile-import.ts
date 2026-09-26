@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { homedir } from "node:os";
 import path from "node:path";
 import type { OpenBotDatabase } from "./database.js";
+import type { RoutineSchedule } from "../shared/calendar-schedule.js";
 
 /** Import a Hermes or OpenClaw agent profile into an OpenBot teammate.
  * What moves: the persona (SOUL.md → role + instructions), curated memories
  * (MEMORY.md/USER.md → private notes), and text skills (SKILL.md bundles →
  * the teammate's skill directories). What never moves: credentials and API
- * keys, chat history, messaging-platform settings, cron jobs — the preview
+ * keys, chat history, messaging-platform settings — the preview
  * says so explicitly, and secrets are detected and refused, not copied. */
 
 export type ImportSourceKind = "hermes" | "openclaw";
@@ -30,15 +31,29 @@ export interface ProfileImportPlan {
   memories: Array<{ kind: "agent" | "owner"; text: string }>;
   skills: ProfileImportSkill[];
   hints: { provider: string | null; model: string | null };
+  /** Hermes cron jobs. Convertible ones become paused OpenBot routines. */
+  jobs: ProfileImportJob[];
   skipped: string[];
   warnings: string[];
 }
+
+export interface ProfileImportJob {
+  name: string;
+  scheduleDisplay: string;
+  /** Null when the schedule has no faithful OpenBot equivalent. */
+  schedule: ConvertedSchedule | null;
+  reason: string | null;
+  prompt: string;
+}
+
+export interface ConvertedSchedule { intervalMinutes: number; schedule: RoutineSchedule; label: string }
 
 export interface ProfileImportResult {
   botId: string;
   name: string;
   memories: number;
   skills: number;
+  routines: number;
   warnings: string[];
 }
 
@@ -155,6 +170,101 @@ function detectKind(dir: string): ImportSourceKind {
   throw new Error("That folder does not look like a Hermes profile or an OpenClaw home. Look for SOUL.md inside it — for example ~/.hermes, ~/.hermes/profiles/<name>, or ~/.openclaw.");
 }
 
+const MAX_JOBS = 20;
+const MAX_JOB_PROMPT_CHARS = 8_000;
+const DAY_NAMES: Record<string, number> = { sun: 7, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+/** Map a Hermes schedule onto an OpenBot one only when it is exact:
+ * daily or weekday clock times, every N minutes, hourly, or a single time.
+ * Anything else (day-of-month, month, ranges of hours…) is left for the
+ * owner rather than approximated. */
+export function convertHermesSchedule(schedule: unknown, timeZone: string): ConvertedSchedule | { reason: string } {
+  const value = (schedule && typeof schedule === "object" ? schedule : {}) as Record<string, unknown>;
+  const kind = String(value.kind || "");
+  if (kind === "interval" || kind === "every") {
+    const minutes = Number(value.minutes ?? (Number(value.seconds) / 60));
+    if (Number.isFinite(minutes) && minutes >= 5 && minutes <= 7 * 24 * 60 && Number.isInteger(minutes)) return { intervalMinutes: minutes, schedule: { kind: "interval" }, label: `Every ${minutes} minutes` };
+    return { reason: "Its repeat interval is shorter than five minutes or not a whole number of minutes." };
+  }
+  if (kind === "once" || kind === "at") {
+    const at = String(value.at || value.run_at || "");
+    if (Number.isFinite(Date.parse(at))) return { intervalMinutes: 24 * 60, schedule: { kind: "once", timeZone, at: new Date(at).toISOString() }, label: `Once at ${at}` };
+    return { reason: "Its one-time run has no readable date." };
+  }
+  if (kind !== "cron") return { reason: `Its "${kind || "unknown"}" schedule type has no OpenBot equivalent.` };
+  const fields = String(value.expr || "").trim().split(/\s+/);
+  if (fields.length !== 5) return { reason: "Its cron expression is not the standard five fields." };
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields as [string, string, string, string, string];
+  const every = /^\*\/(\d{1,4})$/.exec(minute);
+  if (every && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+    const minutes = Number(every[1]);
+    if (minutes >= 5) return { intervalMinutes: minutes, schedule: { kind: "interval" }, label: `Every ${minutes} minutes` };
+    return { reason: "It repeats more often than every five minutes." };
+  }
+  if (/^\d{1,2}$/.test(minute) && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") return { intervalMinutes: 60, schedule: { kind: "interval" }, label: "Every hour" };
+  if (!/^\d{1,2}$/.test(minute) || !/^\d{1,2}$/.test(hour) || Number(minute) > 59 || Number(hour) > 23) return { reason: "It does not run at one fixed time of day." };
+  if (dayOfMonth !== "*" || month !== "*") return { reason: "It depends on the day of the month or the month." };
+  const days = new Set<number>();
+  if (dayOfWeek === "*") [1, 2, 3, 4, 5, 6, 7].forEach((day) => days.add(day));
+  else for (const part of dayOfWeek.toLowerCase().split(",")) {
+    const range = /^([a-z]{3}|\d)(?:-([a-z]{3}|\d))?$/.exec(part);
+    if (!range) return { reason: "Its day-of-week field is not a simple list or range." };
+    const toDay = (token: string) => /^\d$/.test(token) ? (Number(token) === 0 ? 7 : Number(token)) : DAY_NAMES[token];
+    const start = toDay(range[1]!), end = range[2] ? toDay(range[2]) : start;
+    if (!start || !end || start > end) return { reason: "Its day-of-week field is not a simple list or range." };
+    for (let day = start; day <= end; day++) days.add(day);
+  }
+  const time = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  const daysOfWeek = [...days].sort((a, b) => a - b);
+  const label = daysOfWeek.length === 7 ? `Daily at ${time}` : JSON.stringify(daysOfWeek) === "[1,2,3,4,5]" ? `Weekdays at ${time}` : `At ${time} on ${daysOfWeek.map((day) => ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day]).join(", ")}`;
+  return { intervalMinutes: 24 * 60, schedule: { kind: "calendar", timeZone, time, daysOfWeek }, label };
+}
+
+function readHermesJobs(source: string): ProfileImportJob[] {
+  const raw = readText(path.join(source, "cron", "jobs.json"));
+  if (!raw) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return []; }
+  const list = Array.isArray(parsed) ? parsed : Array.isArray((parsed as { jobs?: unknown })?.jobs) ? (parsed as { jobs: unknown[] }).jobs : [];
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return list.slice(0, MAX_JOBS).flatMap((item) => {
+    const job = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const prompt = typeof job.prompt === "string" ? job.prompt.trim() : "";
+    if (!prompt) return []; // script-only jobs have nothing for a teammate to do
+    const converted = convertHermesSchedule(job.schedule, typeof job.timezone === "string" ? job.timezone : timeZone);
+    const display = String((job.schedule as { display?: unknown } | undefined)?.display || job.schedule_display || "");
+    return [{
+      name: String(job.name || "Imported automation").replace(/\s+/g, " ").trim().slice(0, 80),
+      scheduleDisplay: "label" in converted ? converted.label : display || "unknown schedule",
+      schedule: "label" in converted ? converted : null,
+      reason: "reason" in converted ? converted.reason : null,
+      prompt: prompt.slice(0, MAX_JOB_PROMPT_CHARS),
+    }];
+  });
+}
+
+export interface DiscoveredProfile { path: string; kind: ImportSourceKind; name: string; memories: number; skills: number; jobs: number; importedBotId: string | null }
+
+/** Hermes and OpenClaw agents already on this Mac, ready to bring over. */
+export function discoverAgentProfiles(db: OpenBotDatabase, home = homedir()): DiscoveredProfile[] {
+  const candidates = [path.join(home, ".hermes"), path.join(home, ".openclaw")];
+  const profilesDir = path.join(home, ".hermes", "profiles");
+  if (existsSync(profilesDir)) {
+    for (const entry of readdirSync(profilesDir, { withFileTypes: true })) if (entry.isDirectory() && !entry.name.startsWith(".")) candidates.push(path.join(profilesDir, entry.name));
+  }
+  const found: DiscoveredProfile[] = [];
+  for (const candidate of candidates) {
+    if (!existsSync(path.join(candidate, "SOUL.md"))) continue;
+    try {
+      const plan = previewProfileImport(candidate);
+      const record = db.extensionRecord<{ botId: string }>("profile-import", candidate);
+      const bot = record ? db.getBot(record.botId) : null;
+      found.push({ path: candidate, kind: plan.kind, name: plan.name, memories: plan.memories.length, skills: plan.skills.length, jobs: plan.jobs.length, importedBotId: bot && !bot.retiredAt ? bot.id : null });
+    } catch { /* not an importable profile */ }
+  }
+  return found;
+}
+
 export function previewProfileImport(rawPath: string): ProfileImportPlan {
   const source = expandHome(rawPath);
   const kind = detectKind(source);
@@ -162,7 +272,7 @@ export function previewProfileImport(rawPath: string): ProfileImportPlan {
     throw new Error("That folder does not look like a Hermes profile or an OpenClaw home. Look for SOUL.md inside it — for example ~/.hermes, ~/.hermes/profiles/<name>, or ~/.openclaw.");
   }
   const baseName = path.basename(source);
-  const folder = baseName === ".hermes" || baseName === ".openclaw" ? kind : baseName;
+  const folder = baseName === ".hermes" ? "Hermes" : baseName === ".openclaw" ? "OpenClaw" : baseName;
   const { frontmatter, body } = stripFrontmatter(readText(path.join(source, "SOUL.md")));
   const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim() || null;
   const nameRaw = frontmatterValue(frontmatter, "name") || heading || folder;
@@ -173,7 +283,7 @@ export function previewProfileImport(rawPath: string): ProfileImportPlan {
   const hints = { provider: null as string | null, model: null as string | null };
   const warnings: string[] = [];
   const plan: ProfileImportPlan = {
-    source, kind,
+    source, kind, jobs: kind === "hermes" ? readHermesJobs(source) : [],
     name: nameRaw.replace(/\s+/g, " ").trim().slice(0, 40) || "Imported teammate",
     nameSource: frontmatterValue(frontmatter, "name") ? "frontmatter" : heading ? "heading" : "folder",
     role: roleRaw.replace(/\s+/g, " ").trim().slice(0, 90),
@@ -184,7 +294,7 @@ export function previewProfileImport(rawPath: string): ProfileImportPlan {
       "Credentials and API keys (config.yaml, .env) — never copied. Connect the model in OpenBot; the owner re-enters any key.",
       "Chat history and sessions (state.db) — they stay in the original tool.",
       "Messaging platform settings (Telegram, Discord, Slack, …).",
-      "Cron jobs — recreate them as OpenBot routines when you are ready.",
+      "Cron jobs with schedules OpenBot cannot express exactly — listed below; recreate those by hand.",
     ],
   };
   parseMemoryFile(path.join(source, kind === "hermes" ? path.join("memories", "MEMORY.md") : "MEMORY.md"), "agent", plan);
@@ -254,14 +364,27 @@ export function applyProfileImport(db: OpenBotDatabase, rawPath: string, options
   }
   let skillFilesCopied = 0;
   for (const skill of plan.skills) skillFilesCopied += copySkill(plan.source, skill, bot.id, db);
+  // Imported automations always start paused: the owner reviews each one
+  // in Automations and turns it on; nothing runs on import.
+  let routines = 0;
+  for (const job of plan.jobs) {
+    if (!job.schedule) continue;
+    db.createRoutine({ name: job.name, botId: bot.id, threadId: bot.threadId, prompt: job.prompt, intervalMinutes: job.schedule.intervalMinutes, schedule: job.schedule.schedule, enabled: false });
+    routines += 1;
+  }
+  db.saveExtensionRecord("profile-import", plan.source, { botId: bot.id, importedAt: new Date().toISOString() });
+  const leftOut = plan.jobs.filter((job) => !job.schedule);
   return {
     botId: bot.id,
     name: bot.name,
     memories: plan.memories.length,
     skills: plan.skills.length,
+    routines,
     warnings: [
       ...plan.warnings,
       skillFilesCopied ? `Copied ${skillFilesCopied} skill files.` : plan.skills.length ? "No skill files could be copied safely — review the originals." : "",
+      routines ? `${routines} automation${routines === 1 ? "" : "s"} added paused — review and turn them on in Automations.` : "",
+      ...leftOut.map((job) => `“${job.name}” was not converted: ${job.reason}`),
     ].filter(Boolean),
   };
 }

@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import { Studio } from "./Studio";
 import { StudioAccess } from "./StudioAccess";
+import { PhonePairing, PhoneWelcome } from "./PhoneWelcome";
 import "./studio.css";
 import "./conversation-shell.css";
 import "./design-tokens.css";
@@ -15,7 +16,9 @@ applyAppearance(savedAppearance());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <StudioAccess><Studio /></StudioAccess>
+    {window.location.pathname === "/pair" && window.location.hash.length > 1
+      ? <PhonePairing />
+      : <StudioAccess><Studio /><PhoneWelcome /></StudioAccess>}
   </StrictMode>,
 );
 

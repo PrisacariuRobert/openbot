@@ -134,6 +134,20 @@ try {
   const dataDirHint = platform === "win-x64" ? "%USERPROFILE%\\.openbot" : "$HOME/.openbot";
   writeFileSync(path.join(stage, "openbot.sh"), `#!/bin/sh\n# OpenBot ${version} for ${platform}. Data lives in $OPENBOT_DATA_DIR or ${dataDirHint}.\nset -eu\nHERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexport OPENBOT_DATA_DIR="\${OPENBOT_DATA_DIR:-${dataDirHint}}"\nPATH="$HERE/bin:$PATH"\nexec "$HERE/bin/node" "$HERE/app/scripts/background-runner.mjs" "$@"\n`);
   chmodSync(path.join(stage, "openbot.sh"), 0o755);
+  if (platform.startsWith("darwin-")) {
+    // OpenBot.app wrapper (see desktop/mac-app): the installer builds it so
+    // macOS lists privacy permissions as "OpenBot", not "node".
+    const macApp = path.join(stage, "mac-app");
+    mkdirSync(macApp, { recursive: true });
+    copyFileSync(path.join(root, "desktop", "mac-app", "build-app.sh"), path.join(macApp, "build-app.sh"));
+    copyFileSync(path.join(root, "desktop", "mac-app", "launcher.c"), path.join(macApp, "launcher.c"));
+    copyFileSync(path.join(root, "desktop", "mac-app", "icon.png"), path.join(macApp, "icon.png"));
+    chmodSync(path.join(macApp, "build-app.sh"), 0o755);
+    if (process.platform === "darwin") {
+      const built = spawnSync("clang", ["-O2", "-arch", "arm64", "-arch", "x86_64", "-mmacosx-version-min=12.0", "-o", path.join(macApp, "OpenBot-launcher"), path.join(root, "desktop", "mac-app", "launcher.c")], { stdio: "inherit" });
+      if (built.status !== 0) throw new Error("The OpenBot.app launcher could not be compiled.");
+    }
+  }
   writeFileSync(path.join(stage, "openbot.ps1"), `# OpenBot ${version} for ${platform}. Data lives in $env:OPENBOT_DATA_DIR or $env:USERPROFILE\\.openbot.\n$here = Split-Path -Parent $MyInvocation.MyCommand.Path\nif (-not $env:OPENBOT_DATA_DIR) { $env:OPENBOT_DATA_DIR = Join-Path $env:USERPROFILE ".openbot" }\n$env:PATH = "$here\\bin;" + $env:PATH\n& "$here\\bin\\node.exe" "$here\\app\\scripts\\background-runner.mjs"\n`);
   writeFileSync(path.join(stage, "openbot.cmd"), `@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0openbot.ps1"\r\n`);
   writeFileSync(path.join(stage, "README.txt"), `OpenBot ${version} (${platform})\n\nStart:  ./openbot.sh            (Linux/macOS terminal)\n        openbot.ps1            (Windows PowerShell)\nThe studio opens at http://127.0.0.1:4311 once the runner reports ready.\nYour data stays in OPENBOT_DATA_DIR (default ${dataDirHint}).\nFirst run: choose an AI connection, create a teammate, give it a job.\n\nBundled: Node ${nodeVersion}, opencode ${opencodeVersion} (licenses/bundled-licenses).\nBeta limits: unsigned build, no auto-update. The Mac desktop app is separate.\n`);

@@ -1,0 +1,45 @@
+{
+  "label": "muse-teammate",
+  "model": "opencode-go/muse-spark-1.3-contributor",
+  "repeat": 2,
+  "at": "2026-09-23T14:59:15.437Z",
+  "passed": 2,
+  "total": 2,
+  "medianSeconds": 97.8,
+  "medianContextTokens": 139012,
+  "agentsMdChars": 13999,
+  "results": [
+    {
+      "case": "teammate-help",
+      "attempt": 1,
+      "status": "completed",
+      "pass": true,
+      "problem": null,
+      "seconds": 96.3,
+      "contextTokens": 139012,
+      "inputTokens": 24745,
+      "cacheReadTokens": 114267,
+      "outputTokens": 1126,
+      "modelSteps": 11,
+      "agentsMdChars": 13999,
+      "reply": "221 isn't prime — 221 = 13 × 17.\n\nScout's check is saved here: [scout-finding-221.txt](scout-finding-221.txt). I checked the file and it contains the requested text.",
+      "error": ""
+    },
+    {
+      "case": "teammate-help",
+      "attempt": 2,
+      "status": "completed",
+      "pass": true,
+      "problem": null,
+      "seconds": 97.8,
+      "contextTokens": 96444,
+      "inputTokens": 13763,
+      "cacheReadTokens": 82681,
+      "outputTokens": 876,
+      "modelSteps": 9,
+      "agentsMdChars": 13999,
+      "reply": "221 isn't prime — it's 13 × 17.",
+      "error": ""
+    }
+  ]
+}

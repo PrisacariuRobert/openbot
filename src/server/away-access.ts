@@ -45,7 +45,7 @@ export class AwayAccess {
       if (!probe.ok || identity.studio !== this.probeIdentity || guard.status !== 401) {
         return { ...base, detail: "This internet connection did not pass the studio and privacy checks. Pairing stays off until it is fixed." };
       }
-      return { ...base, ready: true, checkedAt: Date.now(), detail: "Secure address and access protection checked. Scan with OpenBot on your iPhone; no extra networking app is needed." };
+      return { ...base, ready: true, checkedAt: Date.now(), detail: "Secure address and access protection checked. Scan the code with your phone’s camera; no app or VPN needed." };
     } catch { return { ...base, detail: "The secure address is not answering yet. Keep this Mac online and check again." }; }
   }
 }

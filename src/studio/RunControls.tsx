@@ -262,10 +262,10 @@ export function RunControls({
             <p role="status">Loading action details…</p>
           )}
           {preview?.limitation && (
-            <p className="run-control-note">{preview.limitation}{approval?.kind === "budget" && <button type="button" className="text-action" disabled={busy} onClick={() => setReload(value => value + 1)}>Refresh allowance</button>}</p>
+            <p className="run-control-note">{preview.limitation}{!preview.canApprove && approval && approval.kind !== "prompt" && approval.kind !== "budget" ? ` Decline it and ${approval.botName} will finish without it and tell you what is left.` : ""}{approval?.kind === "budget" && <button type="button" className="text-action" disabled={busy} onClick={() => setReload(value => value + 1)}>Refresh allowance</button>}</p>
           )}
           {previewPending && preview?.canApprove && !completeReview && !preview.limitation && (
-            <p className="run-control-note">This review is incomplete or out of date. Refresh before approving. You can still decline it.</p>
+            <p className="run-control-note">This review is incomplete or out of date. Refresh before approving, or decline it{approval && approval.kind !== "prompt" ? ` and ${approval.botName} will finish without it` : ""}.</p>
           )}
           {completeReview && preview?.browserSignIn && <label><input type="checkbox" checked={reviewed} disabled={busy || signInBusy || needsRefresh || Boolean(notice)} onChange={(event) => setReviewed(event.target.checked)} /> I’ve finished signing in to the account I want to use.</label>}
           {completeReview && preview?.browserNavigationAllowance && !preview.browserSignIn && <label className="navigation-allowance"><input type="checkbox" checked={allowNavigation} disabled={busy || needsRefresh || Boolean(notice)} onChange={(event) => setAllowNavigation(event.target.checked)} /> For this task, allow up to {preview.browserNavigationAllowance.maxClicks} more eligible navigation clicks on {new URL(preview.browserNavigationAllowance.origin).hostname} for {preview.browserNavigationAllowance.expiresInMinutes} minutes. Website handlers may still change state; risky, sensitive, unknown, or changed controls still pause.</label>}

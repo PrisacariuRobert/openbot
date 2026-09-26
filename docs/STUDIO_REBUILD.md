@@ -36,7 +36,7 @@ Selected draft files now have explicit server-backed bindings separate from text
 
 Production databases no longer seed Nova, Pixel and Scout. An empty studio has a focused first-teammate invitation; existing databases retain their bots and history. Creation uses the actual `/api/bots` endpoint, with name, job, instructions, animated shape/color previews and explicit provider/model selection. Connection setup opens separately, and Refresh connections preserves the draft.
 
-Creating a teammate starts no model job and inserts no fabricated greeting. Existing Google grants are not inherited. Browser/private-computer access starts off in this new form; the user's existing studio-wide Mac access policy still applies. Connecting Google later retains the current complete app's account-connection behavior; this change does not redesign that consent flow. Advanced permissions remain in the complete app.
+Creating a teammate starts no model job and inserts no fabricated greeting. Existing Google grants are not inherited. Web browsing is a visible switch on this form that starts on (its own private browser; sending, buying and signing in still ask first), and private-computer access starts off; the user's existing studio-wide Mac access policy still applies. Connecting Google later retains the current complete app's account-connection behavior; this change does not redesign that consent flow. Advanced permissions remain in the complete app.
 
 Tests and safe recipe demonstrations opt into a separate seeded fixture roster. This must not become a production default again.
 

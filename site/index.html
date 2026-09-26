@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OpenBot — your new favorite coworkers</title>
+  <meta name="description" content="Nova, Pixel and Scout are AI teammates that live on your Mac. They research, write and handle the busywork — and ask before anything important. Free and open source, with the AI you already use." />
+  <meta property="og:title" content="OpenBot — your new favorite coworkers" />
+  <meta property="og:description" content="Free, open-source AI teammates on your Mac, with the AI you already use." />
+  <meta property="og:image" content="https://openbots.foundation/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #ffffff; --cloud: #f4f3f0; --line: #e7e5e0;
+      --nova: #6757d9; --nova-dark: #4c3fb8; --nova-light: #e9e6fb;
+      --pixel: #d86889; --pixel-dark: #b44a6b; --pixel-light: #fbe6ed;
+      --scout: #299575; --scout-dark: #1c735a; --scout-light: #dcf2ea;
+      --sun: #ffc83d; --sun-dark: #e0a400;
+      --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+      --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --pop: cubic-bezier(.34, 1.56, .64, 1);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 18px/1.5 var(--text); -webkit-font-smoothing: antialiased; }
+    main { overflow-x: clip; }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+    h1, h2, h3, .chunky { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; }
+
+    /* Tactile buttons: they sit on a ledge and press down. */
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 58px; padding: 0 28px; border: 0; border-radius: 18px; background: var(--face); color: var(--label) !important; font: 800 19px/1 var(--round); text-decoration: none; cursor: pointer; box-shadow: 0 6px 0 var(--edge); transform: translateY(0); transition: transform .08s ease, box-shadow .08s ease, filter .2s ease; }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(6px); box-shadow: 0 0 0 var(--edge); }
+    .btn.small { height: 44px; padding: 0 18px; font-size: 16px; border-radius: 14px; box-shadow: 0 4px 0 var(--edge); }
+    .btn.small:active { transform: translateY(4px); }
+    .btn.white { --face: #fff; --edge: rgba(0,0,0,.18); --label: var(--ink); }
+    .btn.ghost { --face: var(--cloud); --edge: var(--line); --label: var(--ink); }
+    .btn:focus-visible, .actor:focus-visible { outline: 4px solid var(--sun); outline-offset: 4px; }
+
+    /* Characters */
+    .actor { position: relative; display: inline-block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .actor .char { display: block; width: 100%; height: auto; overflow: visible; animation: breathe 3.4s ease-in-out infinite; transform-origin: 50% 92%; }
+    .actor .char .character-eyes { transition: transform .15s ease-out; }
+    .actor .char .character-eyes > * { transform-box: fill-box; transform-origin: center; animation: blink 5.2s infinite; animation-delay: var(--blink, 0s); }
+    .actor .shadow { position: absolute; left: 20%; right: 20%; bottom: 5%; height: 7%; border-radius: 50%; background: rgba(0,0,0,.14); z-index: -1; animation: shadow 3.4s ease-in-out infinite; }
+    .band .actor .shadow { background: rgba(0,0,0,.2); }
+    .actor.jump .char { animation: jump .75s var(--pop); }
+    .prop { position: absolute; pointer-events: none; animation: bob 3.4s ease-in-out infinite; }
+    @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-4%) scale(1.012, .988); } }
+    @keyframes shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(.85); opacity: .65; } }
+    @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(.08); } }
+    @keyframes jump { 0% { transform: none; } 25% { transform: translateY(3%) scale(1.1, .88); } 55% { transform: translateY(-24%) scale(.94, 1.07); } 80% { transform: translateY(0) scale(1.05, .95); } 100% { transform: none; } }
+    @keyframes bob { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-8px) rotate(var(--r, 0deg)); } }
+    .say { position: absolute; left: 50%; bottom: 102%; transform: translate(-50%, 10px) scale(.5); opacity: 0; transform-origin: 50% 100%; background: #fff; color: var(--ink); font: 800 17px/1.2 var(--round); padding: 12px 18px; border-radius: 20px; white-space: nowrap; box-shadow: 0 4px 0 rgba(0,0,0,.12), 0 0 0 2px var(--ink); transition: transform .5s var(--pop), opacity .2s ease; pointer-events: none; z-index: 2; }
+    .say::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 16px; height: 16px; background: #fff; transform: translateX(-50%) rotate(45deg); box-shadow: 2px 2px 0 0 var(--ink); }
+    .say.show { opacity: 1; transform: translate(-50%, -4px) scale(1); }
+
+    /* Stickers */
+    .sticker { position: absolute; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 16px; background: #fff; color: var(--ink); font: 800 16px/1.15 var(--round); box-shadow: 0 5px 0 rgba(0,0,0,.14), 0 0 0 2.5px var(--ink); transform: rotate(var(--r, -4deg)); white-space: nowrap; z-index: 3; }
+    .sticker b { font-weight: 900; font-size: 22px; }
+    .sticker.sun { background: var(--sun); }
+    .squiggle { position: relative; white-space: nowrap; }
+    .squiggle svg { position: absolute; left: -2%; bottom: -.1em; width: 104%; height: .24em; overflow: visible; }
+    h1:has(.squiggle), h2:has(.squiggle) { margin-bottom: 34px !important; }
+    .squiggle path { stroke-dasharray: 400; stroke-dashoffset: 400; transition: stroke-dashoffset 1.1s ease .3s; }
+    .in .squiggle path, .squiggle.in path { stroke-dashoffset: 0; }
+
+    /* Nav */
+    header.top { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.92); backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px); border-bottom: 2px solid var(--cloud); }
+    header.top .wrap { display: flex; align-items: center; height: 68px; gap: 26px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 900 23px/1 var(--round); letter-spacing: -0.02em; }
+    .brand svg { width: 30px; height: 30px; }
+    .top nav { margin-left: auto; display: flex; align-items: center; gap: 26px; font: 700 16px/1 var(--round); }
+    .top nav a:not(.btn) { text-decoration: none; color: var(--ink-2); }
+    .top nav a:not(.btn):hover { color: var(--ink); }
+
+    /* Hero */
+    .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; padding: 70px 0 90px; }
+    h1 { font-size: clamp(54px, 7.6vw, 96px); line-height: .95; margin: 0 0 24px; }
+    .lede { font-size: clamp(19px, 1.9vw, 22px); color: var(--ink-2); margin: 0 0 34px; max-width: 27em; line-height: 1.45; }
+    .cta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .note { margin: 24px 0 0; font: 700 15px/1.4 var(--round); color: var(--muted); }
+    .stage { position: relative; height: 520px; }
+    .stage .actor { position: absolute; }
+    .stage .a-nova { width: 220px; left: 4%; top: 150px; }
+    .stage .a-pixel { width: 250px; left: 36%; top: 40px; }
+    .stage .a-scout { width: 210px; right: 0; top: 230px; }
+    .stage .floor { position: absolute; left: 6%; right: 2%; bottom: 20px; height: 70%; border-radius: 48% 52% 44% 56% / 50%; background: var(--cloud); z-index: -2; }
+
+
+    /* Make your own teammate */
+    .make { background: var(--cloud); }
+    .make-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .field { margin-top: 22px; }
+    .field label, .field .label { display: block; font: 900 14px/1 var(--round); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .field input { width: 100%; max-width: 360px; height: 56px; padding: 0 18px; border-radius: 16px; border: 3px solid var(--ink); background: #fff; font: 900 22px/1 var(--round); color: var(--ink); box-shadow: 0 5px 0 var(--ink); outline: none; }
+    .field input:focus { border-color: var(--nova); box-shadow: 0 5px 0 var(--nova-dark); }
+    .pills { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pills button { height: 44px; padding: 0 16px; border-radius: 14px; border: 2.5px solid var(--ink); background: #fff; font: 800 16px/1 var(--round); color: var(--ink); cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .08s ease, box-shadow .08s ease; }
+    .pills button[aria-checked="true"] { background: var(--ink); color: #fff; }
+    .pills button:active, .faces button:active, .swatches button:active { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
+    .faces { display: flex; flex-wrap: wrap; gap: 10px; }
+    .faces button { width: 64px; height: 64px; padding: 6px; border-radius: 18px; border: 2.5px solid var(--line); background: #fff; cursor: pointer; box-shadow: 0 4px 0 var(--line); }
+    .faces button[aria-checked="true"] { border-color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+    .faces svg { width: 100%; height: 100%; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+    .swatches button { width: 44px; height: 44px; border-radius: 50%; border: 4px solid #fff; background: var(--c); cursor: pointer; box-shadow: 0 0 0 2px var(--line), 0 4px 0 rgba(0,0,0,.15); }
+    .swatches button[aria-checked="true"] { box-shadow: 0 0 0 3px var(--ink), 0 4px 0 rgba(0,0,0,.15); }
+    .pills button:focus-visible, .faces button:focus-visible, .swatches button:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+    .make-preview { display: grid; justify-items: center; }
+    .card-mate { position: relative; width: min(420px, 100%); padding: 90px 30px 30px; border-radius: 36px; background: var(--c-light, #fff); border: 3px solid var(--ink); box-shadow: 0 10px 0 var(--ink); display: grid; justify-items: center; transition: background .4s ease; }
+    .mk-actor { width: 240px; }
+    .card-mate .say { bottom: 96%; }
+    .tag { margin-top: 10px; text-align: center; }
+    .tag strong { display: block; font: 900 38px/1.05 var(--round); letter-spacing: -0.02em; }
+    .tag span { display: inline-block; margin-top: 10px; padding: 8px 14px; border-radius: 999px; background: #fff; border: 2.5px solid var(--ink); font: 800 16px/1 var(--round); }
+    /* Color bands: one per teammate */
+    .band { position: relative; color: #fff; padding: 110px 0; }
+    .band.nova { background: var(--nova); }
+    .band.pixel { background: var(--pixel); }
+    .band.scout { background: var(--scout); }
+    .band.sun { background: var(--sun); color: var(--ink); }
+    .band.night { background: var(--ink); }
+    .band-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 64px; align-items: center; }
+    .band-grid.flip { grid-template-columns: 1.25fr 1fr; }
+    .band-grid.flip > .words { order: 2; }
+    .band h2 { font-size: clamp(44px, 6vw, 78px); line-height: .98; margin: 0 0 20px; }
+    .band p { font-size: 21px; line-height: 1.45; margin: 0 0 16px; opacity: .92; max-width: 26em; }
+    .band .hostline { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .band .hostline .actor { width: 96px; padding: 10px; border-radius: 50%; background: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+    .band .hostline .actor .shadow { display: none; }
+    .band .hostline span { font: 900 18px/1 var(--round); letter-spacing: .02em; text-transform: uppercase; opacity: .8; }
+    .picture { position: relative; }
+    .picture .shot { border-radius: 22px; overflow: hidden; background: #fff; box-shadow: 0 10px 0 rgba(0,0,0,.18); transform: rotate(var(--tilt, 2deg)); transition: transform .6s var(--pop); border: 4px solid #fff; }
+    .picture:hover .shot { transform: rotate(0deg) scale(1.01); }
+    .picture .card { position: absolute; width: 50%; left: -8%; bottom: -40px; border-radius: 18px; box-shadow: 0 8px 0 rgba(0,0,0,.2); transform: rotate(-5deg); border: 3px solid #fff; background: #fff; }
+    .picture .big-actor { position: absolute; width: 150px; right: -40px; top: -96px; z-index: 2; }
+    .ticks { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 12px; font: 800 19px/1.3 var(--round); }
+    .ticks li { display: flex; align-items: center; gap: 12px; }
+    .ticks li::before { content: "✓"; flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: rgba(255,255,255,.22); font-size: 17px; }
+
+    /* Chat replay */
+    .replay-row { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
+    .section { padding: 120px 0; }
+    .section h2 { font-size: clamp(44px, 6vw, 78px); line-height: .98; margin: 0 0 20px; }
+    .section .lead { font-size: 21px; color: var(--ink-2); margin: 0 0 20px; line-height: 1.45; }
+    .chat { background: #fff; border-radius: 30px; border: 3px solid var(--ink); box-shadow: 0 10px 0 var(--ink); overflow: hidden; }
+    .chat-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px; border-bottom: 3px solid var(--ink); font: 900 18px/1 var(--round); background: var(--cloud); }
+    .chat-head small { margin-left: auto; font: 700 14px var(--round); color: var(--muted); }
+    .chat-body { padding: 22px; display: grid; gap: 14px; min-height: 560px; align-content: start; font-size: 15.5px; line-height: 1.5; }
+    .msg { display: flex; gap: 10px; align-items: flex-end; opacity: 0; transform: translateY(12px) scale(.96); transition: opacity .35s ease, transform .5s var(--pop); }
+    .msg.in { opacity: 1; transform: none; }
+    .msg .face { width: 34px; height: 34px; flex: none; }
+    .msg .b { border-radius: 22px 22px 22px 8px; padding: 12px 16px; max-width: 88%; background: var(--cloud); }
+    .msg.nova .b { background: var(--nova-light); } .msg.scout .b { background: var(--scout-light); }
+    .msg .who { display: block; font: 900 13px/1.4 var(--round); margin-bottom: 3px; }
+    .msg.nova .who { color: var(--nova); } .msg.scout .who { color: var(--scout); }
+    .msg.me { justify-content: flex-end; }
+    .msg.me .b { background: var(--ink); color: #fff; border-radius: 22px 22px 8px 22px; }
+    .msg ol { margin: 6px 0 2px; padding-left: 20px; } .msg li { margin: 4px 0; }
+    .msg .dim { color: var(--muted); }
+    .event { justify-self: center; font: 800 13.5px/1 var(--round); color: var(--ink-2); background: var(--sun); border-radius: 999px; padding: 8px 14px; opacity: 0; transform: scale(.8); transition: opacity .3s ease, transform .45s var(--pop); }
+    .event.in { opacity: 1; transform: none; }
+    .typing .b { display: inline-flex; gap: 5px; padding: 16px 18px; }
+    .typing i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); animation: dot 1s infinite ease-in-out; }
+    .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+    @keyframes dot { 0%, 80%, 100% { opacity: .3; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+    .real { margin: 22px 0 0; font: 700 14px/1.4 var(--round); color: var(--muted); }
+    .stat { display: inline-flex; align-items: baseline; gap: 10px; margin: 8px 0 22px; padding: 14px 20px; border-radius: 20px; background: var(--sun); box-shadow: 0 6px 0 var(--sun-dark); font: 900 20px/1 var(--round); transform: rotate(-2deg); }
+    .stat b { font-size: 44px; letter-spacing: -0.03em; }
+
+    /* Price */
+    .price { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+    .band .zero { font: 900 clamp(150px, 22vw, 290px)/.8 var(--round); letter-spacing: -0.07em; margin: 0; opacity: 1; max-width: none; text-shadow: 0 10px 0 var(--sun-dark); transform: rotate(-4deg); }
+    .price h2 { font-size: clamp(40px, 5vw, 64px); }
+    .price .vs { display: grid; gap: 12px; margin-top: 26px; }
+    .price .row { display: flex; justify-content: space-between; gap: 16px; padding: 16px 20px; border-radius: 18px; background: rgba(255,255,255,.55); font: 800 18px/1.2 var(--round); }
+    .price .row s { opacity: .55; text-decoration-thickness: 3px; }
+    .price .row.us { background: var(--ink); color: var(--sun); }
+
+    /* Your AI */
+    .chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 36px; }
+    .chip { font: 900 clamp(18px, 2vw, 24px)/1 var(--round); padding: 16px 22px; border-radius: 18px; background: #fff; border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--ink); transform: rotate(var(--r, 0deg)); transition: transform .3s var(--pop); }
+    .chip:hover { transform: rotate(0deg) translateY(-3px); }
+    .chip.free { background: var(--scout-light); } .chip.free small { color: var(--scout-dark); }
+    .chip.local { background: var(--nova-light); }
+    .chip small { font-size: .62em; font-weight: 800; margin-left: 6px; color: var(--muted); }
+
+    /* Install */
+    .install { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; }
+    .command { margin-top: 30px; display: flex; gap: 12px; align-items: center; padding: 10px 10px 10px 20px; border-radius: 22px; background: #fff; color: var(--ink); }
+    .command code { flex: 1; min-width: 0; font: 600 15px/1.45 var(--mono); overflow-wrap: break-word; }
+    .steps { margin: 24px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; font: 700 18px/1.4 var(--round); }
+    .steps li { display: flex; gap: 12px; align-items: center; }
+    .steps b { flex: none; width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--sun); color: var(--ink); font: 900 16px/1 var(--round); }
+    kbd { font: 800 14px/1 var(--round); padding: 5px 8px; border-radius: 8px; background: #fff; color: var(--ink); box-shadow: 0 3px 0 rgba(255,255,255,.35); }
+    .band .fine { margin: 20px 0 0; font-size: 15px; opacity: .65; }
+    .fine code { font: 14px var(--mono); }
+    .terminal { background: #2a2a30; color: #e5e5ea; border-radius: 22px; border: 3px solid #45454d; overflow: hidden; font: 14px/1.7 var(--mono); box-shadow: 0 10px 0 #0c0c0e; }
+    .terminal .bar { display: flex; gap: 8px; padding: 14px 16px; background: #34343b; }
+    .terminal .bar i { width: 13px; height: 13px; border-radius: 50%; background: #ff5f57; } .terminal .bar i:nth-child(2) { background: #febc2e; } .terminal .bar i:nth-child(3) { background: #28c840; }
+    .terminal pre { margin: 0; padding: 18px 22px 24px; white-space: pre-wrap; word-break: break-word; min-height: 290px; font: inherit; }
+    .terminal .p { color: #8e8e93; } .terminal .ok { color: #30d158; } .terminal b { color: #fff; }
+    .terminal .line { opacity: 0; } .terminal .line.in { opacity: 1; }
+    .terminal .caret { display: inline-block; width: 9px; height: 16px; background: #e5e5ea; vertical-align: -3px; animation: caret 1s steps(1) infinite; }
+    @keyframes caret { 50% { opacity: 0; } }
+    .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
+    .confetti i { position: absolute; width: 11px; height: 11px; border-radius: 3px; animation: fall 1.7s cubic-bezier(.2,.6,.4,1) forwards; }
+    @keyframes fall { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; } }
+
+    /* Questions */
+    .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px; }
+    .qa details { border-radius: 22px; padding: 22px 24px; background: var(--cloud); }
+    .qa summary { cursor: pointer; font: 900 20px/1.25 var(--round); list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    .qa summary::-webkit-details-marker { display: none; }
+    .qa summary::after { content: "+"; font-size: 28px; line-height: .8; transition: transform .3s var(--pop); }
+    .qa details[open] summary::after { transform: rotate(45deg); }
+    .qa p { margin: 12px 0 0; color: var(--ink-2); font-size: 17px; }
+
+    footer { padding: 80px 0 90px; text-align: center; background: var(--cloud); }
+    footer .gang { display: flex; justify-content: center; gap: 4px; margin-bottom: 18px; }
+    footer .gang .actor { width: 76px; }
+    footer .gang .actor:nth-child(2) .char { animation: wave 2.2s ease-in-out infinite; }
+    @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+    footer .made { font: 900 24px/1.2 var(--round); margin: 0 0 8px; }
+    footer .small { color: var(--muted); font: 700 15px/1.4 var(--round); }
+    footer nav { display: flex; gap: 22px; justify-content: center; margin-top: 18px; font: 800 16px/1 var(--round); }
+    footer nav a { text-decoration: none; }
+
+    .rise { opacity: 0; transform: translateY(34px); transition: opacity .7s ease, transform .9s var(--pop); }
+    .rise.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .rise, .msg, .event, .terminal .line { opacity: 1 !important; transform: none !important; } .squiggle path { stroke-dashoffset: 0 !important; } html { scroll-behavior: auto; } }
+
+    @media (max-width: 980px) {
+      .hero, .band-grid, .band-grid.flip, .replay-row, .price, .install { grid-template-columns: 1fr; gap: 48px; }
+      .band-grid.flip > .words { order: 0; }
+      .top nav a:not(.btn) { display: none; }
+      .hero { padding-top: 40px; }
+      .stage { height: 420px; max-width: 560px; }
+      .qa { grid-template-columns: 1fr; }
+      .make-grid { grid-template-columns: 1fr; gap: 44px; }
+      .band, .section { padding: 90px 0; }
+      .picture .big-actor { right: -6px; width: 120px; top: -80px; }
+    }
+    @media (max-width: 560px) {
+      .wrap { padding: 0 18px; }
+      body { font-size: 17px; }
+      .stage { height: 320px; }
+      .stage .a-nova { width: 130px; left: 0; top: 120px; }
+      .stage .a-pixel { width: 150px; left: 30%; top: 30px; }
+      .stage .a-scout { width: 125px; right: 0; top: 170px; }
+      .say { font-size: 14px; padding: 9px 12px; border-radius: 14px; }
+      .band p, .section .lead { font-size: 18px; }
+      .command { flex-direction: column; align-items: stretch; padding: 14px; }
+      .chat-body { min-height: 0; font-size: 15px; padding: 16px; }
+      .picture .card { width: 64%; left: -4px; bottom: -30px; }
+      .sticker { font-size: 14px; padding: 8px 12px; }
+      .sticker b { font-size: 18px; }
+      .btn { height: 54px; font-size: 18px; }
+      .mk-actor { width: 180px; }
+      .faces button { width: 54px; height: 54px; }
+    }
+  </style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="squiggle" viewBox="0 0 200 12"><path d="M2 8 C 20 2, 30 12, 50 6 S 80 2, 100 7 S 130 12, 150 6 S 180 2, 198 7" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="OpenBot">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>
+      openbot
+    </a>
+    <nav aria-label="Main">
+      <a href="#make">Make one</a>
+      <a href="#free">Free</a>
+      <a href="#ai">Your AI</a>
+      <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a>
+      <a class="btn small" href="#install">Get OpenBot</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="wrap hero">
+    <div class="rise">
+      <h1>Your new favorite <span class="squiggle" style="color:var(--pixel)">coworkers.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h1>
+      <p class="lede">Make AI teammates for whatever you need — someone to research, someone to write, someone to check. Give each a name, a face and a job. They live on your Mac and always ask before anything important.</p>
+      <div class="cta">
+        <a class="btn" href="#install">Get OpenBot — it’s free</a>
+        <a class="btn ghost" href="#make">Make a teammate</a>
+      </div>
+      <p class="note">For Mac · Open source · Works with the AI you already have</p>
+    </div>
+    <div class="stage" aria-label="Nova, Pixel and Scout">
+      <div class="floor" aria-hidden="true"></div>
+      <div class="actor a-nova" data-cast="nova" data-say="I’ll look it up!" tabindex="0" role="button" aria-label="Nova"></div>
+      <div class="actor a-pixel" data-cast="pixel" data-say="I’ll write it up!" tabindex="0" role="button" aria-label="Pixel"></div>
+      <div class="actor a-scout" data-cast="scout" data-say="I’ll double-check!" tabindex="0" role="button" aria-label="Scout"></div>
+      <svg class="prop" style="width:74px;left:0;top:300px;--r:-18deg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="26" cy="26" r="17" fill="#e9e6fb" stroke="#1b1b1f" stroke-width="5"/><path d="M39 39l16 16" stroke="#1b1b1f" stroke-width="8" stroke-linecap="round"/><path d="M18 20a9 9 0 0 1 9-7" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+      <svg class="prop" style="width:62px;left:62%;top:26px;--r:24deg;animation-delay:-1.2s" viewBox="0 0 64 64" aria-hidden="true"><path d="M44 6l14 14L22 56H8V42z" fill="#ffc83d" stroke="#1b1b1f" stroke-width="5" stroke-linejoin="round"/><path d="M36 14l14 14" stroke="#1b1b1f" stroke-width="5"/><path d="M8 42l14 14" stroke="#1b1b1f" stroke-width="5"/></svg>
+      <svg class="prop" style="width:66px;right:2%;top:170px;--r:12deg;animation-delay:-2.3s" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="#dcf2ea" stroke="#1b1b1f" stroke-width="5"/><path d="M20 33l8 8 16-17" fill="none" stroke="#1b1b1f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </section>
+
+
+  <section class="section make" id="make">
+    <div class="wrap make-grid">
+      <div class="rise">
+        <h2>Make your own <span class="squiggle" style="color:var(--nova)">teammate.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h2>
+        <p class="lead">No presets you’re stuck with. Pick a face, a color, a name and a job — just like in the app. Try it:</p>
+        <div class="field"><label for="mk-name">Name</label><input id="mk-name" maxlength="18" value="Juno" autocomplete="off" spellcheck="false" /></div>
+        <div class="field"><span class="label">Job</span><div class="pills" id="mk-jobs" role="radiogroup" aria-label="Job"></div></div>
+        <div class="field"><span class="label">Face</span><div class="faces" id="mk-shapes" role="radiogroup" aria-label="Face"></div></div>
+        <div class="field"><span class="label">Color</span><div class="swatches" id="mk-colors" role="radiogroup" aria-label="Color"></div></div>
+      </div>
+      <div class="rise make-preview">
+        <div class="card-mate" id="mk-card">
+          <div class="actor mk-actor" id="mk-actor" tabindex="0" role="button" aria-label="Your teammate"><span class="say" id="mk-say"></span></div>
+          <div class="tag"><strong id="mk-title">Juno</strong><span id="mk-job">Research</span></div>
+        </div>
+        <p class="real" style="text-align:center">Six faces, any color — the same characters as in the app.</p>
+      </div>
+    </div>
+  </section>
+  <section class="band nova" id="team">
+    <div class="wrap band-grid">
+      <div class="words rise">
+        <div class="hostline"><div class="actor" data-cast="nova" aria-hidden="true"></div><span>A researcher, like Nova</span></div>
+        <h2>Finds things out. Fast.</h2>
+        <p>Ask anything that needs a search. A research teammate reads the web, compares what it finds and brings back the answer — with a link for every fact.</p>
+        <ul class="ticks"><li>Sources for everything</li><li>Says so when it can’t check something</li></ul>
+      </div>
+      <div class="picture rise" style="--tilt: 2.5deg">
+        <div class="shot"><img src="shots/team.jpg" width="2880" height="1800" alt="Nova’s answer with three Italian restaurants near Stephansplatz, their hours, prices and links, followed by Scout’s check." loading="lazy" /></div>
+        <span class="sticker sun" style="left:-18px;top:-26px;--r:-6deg"><b>64 sec</b> start to finish</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band pixel">
+    <div class="wrap band-grid flip">
+      <div class="words rise">
+        <div class="hostline"><div class="actor" data-cast="pixel" aria-hidden="true"></div><span>A writer, like Pixel</span></div>
+        <h2>Makes real files.</h2>
+        <p>Not just a wall of chat. Ask for a document, a spreadsheet or a plan and your writer hands you a file you can open, print or send.</p>
+        <ul class="ticks"><li>Word, Excel and more</li><li>Reads the PDFs you drop in</li></ul>
+      </div>
+      <div class="picture rise" style="--tilt: -2deg">
+        <div class="shot"><img src="shots/document.jpg" width="2880" height="1800" alt="Pixel delivers vienna-weekend.docx." loading="lazy" /></div>
+        <img class="card" src="shots/card-file.png" alt="The finished Word document, ready to open." loading="lazy" />
+        <span class="sticker" style="right:-14px;top:-24px;--r:5deg">📄 vienna-weekend.docx</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band scout">
+    <div class="wrap band-grid">
+      <div class="words rise">
+        <div class="hostline"><div class="actor" data-cast="scout" aria-hidden="true"></div><span>A checker, like Scout</span></div>
+        <h2>Checks. Then asks.</h2>
+        <p>A checker double-checks the details. And nobody on your team sends, books, buys or signs in without your okay — you see the exact button first.</p>
+        <ul class="ticks"><li>You approve the important stuff</li><li>Say no and they finish without it</li></ul>
+      </div>
+      <div class="picture rise" style="--tilt: 2deg">
+        <div class="shot"><img src="shots/review.jpg" width="2880" height="1800" alt="Nova asks before clicking “JETZT RESERVIEREN” on a restaurant website." loading="lazy" /></div>
+        <span class="sticker sun" style="left:-16px;bottom:-22px;--r:-5deg">✋ Waits for you</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap replay-row">
+      <div class="rise">
+        <h2>Ask once. They <span class="squiggle" style="color:var(--nova)">team up.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h2>
+        <p class="lead">Talk to them like a group chat. When Scout needs Nova’s answer, Scout waits for it — like a real team.</p>
+        <div class="stat"><b>64</b> seconds, both done</div>
+        <p class="real">A real run on 25 September 2026, shortened. Hours and prices from the restaurants’ own websites.</p>
+      </div>
+      <div class="rise">
+        <div class="chat" aria-label="A real OpenBot conversation, replayed">
+          <div class="chat-head"><span>Weekend in Vienna</span><small>Nova · Scout · you</small></div>
+          <div class="chat-body" id="replay">
+            <div class="msg me"><div class="b"><b>Nova:</b> find three well-reviewed Italian places near Stephansplatz open this Sunday evening, with prices. <b>Scout,</b> double-check their hours on their own websites.</div></div>
+            <div class="event">Scout waits for Nova</div>
+            <div class="msg nova" data-actor="nova"><div class="face" data-face="nova"></div><div class="b"><span class="who">Nova</span>Here are three, all open Sunday evening:
+              <ol><li><b>Cantinetta Antinori</b> — right at Stephansplatz. Mon–Sun 11:30–23:30. Pasta about €19–31.</li><li><b>Da Capo</b> — 2 min away. Kitchen daily 11:30–22:00. Pizzas about €14–16.</li><li><b>Trattoria Santo Stefano</b> — 5 min walk. Mon–Sun 11:30–23:00. Lasagne about €15.</li></ol></div></div>
+            <div class="event">Nova’s done · Scout is checking</div>
+            <div class="msg scout" data-actor="scout"><div class="face" data-face="scout"></div><div class="b"><span class="who">Scout</span>Checked all three on their own sites — all open this Sunday evening, last warm orders around 22:00. ✓</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band sun" id="free">
+    <div class="wrap price">
+      <div class="rise">
+        <p class="zero">$0</p>
+      </div>
+      <div class="rise">
+        <h2>Free. Like, actually free.</h2>
+        <p style="opacity:1;color:var(--ink-2)">Other AI agents rent you their computer every month. OpenBot runs on yours and uses the AI you already have — even a free one.</p>
+        <div class="vs">
+          <div class="row"><span>Hosted AI agents</span><s>$20–300 / month</s></div>
+          <div class="row us"><span>OpenBot</span><span>$0, forever</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="ai">
+    <div class="wrap">
+      <div class="rise" style="max-width:760px">
+        <h2>Bring the AI you <span class="squiggle" style="color:var(--scout)">already have.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h2>
+        <p class="lead">Sign in once and the whole team can use it. Or give each teammate a different one.</p>
+      </div>
+      <div class="chips rise">
+        <span class="chip" style="--r:-2deg">ChatGPT</span><span class="chip" style="--r:1.5deg">Claude</span><span class="chip" style="--r:-1deg">Grok</span><span class="chip free" style="--r:2deg">GitHub Copilot<small>free</small></span><span class="chip free" style="--r:-2.5deg">Gemini<small>free key</small></span><span class="chip" style="--r:1deg">OpenCode Go</span><span class="chip local" style="--r:-1.5deg">Your own Mac<small>private</small></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band night" id="install">
+    <div class="wrap install">
+      <div class="rise">
+        <h2>One line.<br />About a minute.</h2>
+        <p>No account and no password. OpenBot opens by itself and lives in your Dock.</p>
+        <div class="command"><code id="cmd">curl -fsSL <wbr />https://openbots.foundation/<wbr />install.sh <wbr />| sh</code><button class="btn small" id="copy" type="button">Copy</button></div>
+        <ol class="steps"><li><b>1</b><span>Open Terminal: <kbd>⌘</kbd> <kbd>Space</kbd>, type “Terminal”, <kbd>↩</kbd></span></li><li><b>2</b><span>Paste with <kbd>⌘</kbd> <kbd>V</kbd>, press <kbd>↩</kbd></span></li><li><b>3</b><span>Say hi to your team 👋</span></li></ol>
+        <p class="fine">macOS 13 or later. Checks the download’s fingerprint, never asks for your password. <a href="install.sh">Read the installer</a> · remove any time with <code>uninstall.sh</code>.</p>
+      </div>
+      <div class="rise">
+        <div class="terminal" aria-label="What the installer prints">
+          <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+          <pre id="term"><span class="line"><span class="p">~ %</span> curl -fsSL https://openbots.foundation/install.sh | sh</span>
+<span class="line"> </span>
+<span class="line"><b>Installing OpenBot</b> <span class="p">— your team of AI teammates, on your Mac.</span></span>
+<span class="line"> </span>
+<span class="line"><b>•</b> Downloading OpenBot for this Mac…</span>
+<span class="line"><b>•</b> Unpacking…</span>
+<span class="line"><b>•</b> Starting OpenBot in the background…</span>
+<span class="line"><b>•</b> Opening your studio.....</span>
+<span class="line"><b>•</b> Adding OpenBot to your Applications and Dock…</span>
+<span class="line"> </span>
+<span class="line"><span class="ok"><b>OpenBot is installed.</b></span> It’s opening in your browser now.</span>
+<span class="line"><span class="p">~ %</span> <span class="caret"></span></span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <h2 class="rise">Good questions.</h2>
+      <div class="qa rise">
+        <details><summary>Is it really free?</summary><p>Yes. OpenBot is free, open-source software. Your team uses an AI you connect, and OpenBot never charges anything on top.</p></details>
+        <details><summary>Does my stuff leave my Mac?</summary><p>Your team, chats and files live on your Mac. When a teammate works, what it needs goes to the AI you picked. Choose a model on your Mac to keep everything local.</p></details>
+        <details><summary>What do they do without asking?</summary><p>Search, read, write and make files in their own workspace. Anything that sends, books, buys, signs in or submits waits for you.</p></details>
+        <details><summary>Does it work while my Mac sleeps?</summary><p>They work while your Mac is on, and OpenBot keeps it awake when a scheduled job is due. It can also run on a computer that’s always on.</p></details>
+        <details><summary>Can I use it on my iPhone?</summary><p>Yes. Pair your iPhone with one scan to chat, get notified and approve things from your Home Screen.</p></details>
+        <details><summary>Why Terminal?</summary><p>It lets us give you a free Mac app without a paid Apple certificate. It downloads from our public GitHub releases, checks the fingerprint and never asks for your password.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="gang" aria-hidden="true"><div class="actor" data-cast="nova" data-mood="happy"></div><div class="actor" data-cast="pixel" data-mood="happy"></div><div class="actor" data-cast="scout" data-mood="happy"></div></div>
+  <p class="made">See you on your Mac!</p>
+  <p class="small">OpenBot is free and open source (MIT).</p>
+  <nav><a href="https://github.com/PrisacariuRobert/openbot">GitHub</a><a href="https://github.com/PrisacariuRobert/openbot/releases">Releases</a><a href="install.sh">Installer</a></nav>
+</footer>
+
+<script src="cast.js"></script>
+<script>
+(() => {
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let uid = 0;
+  const svgFor = (cast, mood = "calm") => (window.CAST[`${cast}-${mood}`] || "").replaceAll("__ID__", `c${++uid}`).replace('class="character', 'class="char character');
+  const actors = [...document.querySelectorAll(".actor[data-cast]")];
+  const draw = (el, mood) => {
+    const bubble = el.querySelector(".say");
+    el.innerHTML = svgFor(el.dataset.cast, mood || el.dataset.mood || "calm") + '<span class="shadow"></span>';
+    if (bubble) el.prepend(bubble);
+    if (!el.style.getPropertyValue("--blink")) el.style.setProperty("--blink", `${-(Math.random() * 5).toFixed(2)}s`);
+  };
+  actors.forEach((el) => { draw(el); if (el.dataset.say) { const b = document.createElement("span"); b.className = "say"; b.textContent = el.dataset.say; el.prepend(b); } });
+  document.querySelectorAll("[data-face]").forEach((el) => { el.innerHTML = svgFor(el.dataset.face); });
+  const react = (el, mood = "happy", ms = 1500) => {
+    if (!el) return;
+    draw(el, mood);
+    el.classList.remove("jump"); void el.offsetWidth; el.classList.add("jump");
+    clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove("jump"); draw(el); }, ms);
+  };
+  const speak = (el, ms = 2400) => { const b = el.querySelector(".say"); if (!b) return; b.classList.add("show"); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove("show"), ms); };
+
+
+  // Make your own teammate: the app's six faces and eight colors.
+  const jobs = [["Research", "I’ll look things up for you!"], ["Writing", "I’ll write it up for you!"], ["Checking", "I’ll double-check everything!"], ["Planning", "I’ll keep us on track!"], ["Inbox", "I’ll sort your email!"], ["Numbers", "I’ll crunch the numbers!"]];
+  const mk = { name: "Juno", job: 0, shape: "orbit", color: window.COLORS[3][1] };
+  const mkActor = document.getElementById("mk-actor"), mkSay = document.getElementById("mk-say"), mkCard = document.getElementById("mk-card");
+  const shapeSvg = (shape, mood) => (window.SHAPES[`${shape}-${mood}`] || "").replaceAll("__ID__", `m${++uid}`).replace('class="character', 'class="char character');
+  const light = (hex) => { const n = parseInt(hex.slice(1), 16); const mix = (c) => Math.round(c + (255 - c) * .82); return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`; };
+  const drawMk = (mood = "calm") => {
+    mkActor.innerHTML = shapeSvg(mk.shape, mood) + '<span class="shadow"></span>';
+    mkActor.prepend(mkSay);
+    mkActor.style.setProperty("--character-color", mk.color);
+    mkCard.style.setProperty("--c-light", light(mk.color));
+    document.getElementById("mk-title").textContent = mk.name.trim() || "Your teammate";
+    document.getElementById("mk-job").textContent = jobs[mk.job][0];
+    mkSay.textContent = `Hi, I’m ${mk.name.trim() || "new here"}! ${jobs[mk.job][1]}`;
+  };
+  const cheer = () => { drawMk("happy"); mkActor.classList.remove("jump"); void mkActor.offsetWidth; mkActor.classList.add("jump"); mkSay.classList.add("show"); clearTimeout(mkActor._t); mkActor._t = setTimeout(() => { mkActor.classList.remove("jump"); drawMk(); }, 1400); clearTimeout(mkSay._t); mkSay._t = setTimeout(() => mkSay.classList.remove("show"), 2600); };
+  const group = (id, items, render, isOn, choose) => {
+    const box = document.getElementById(id);
+    const paint = () => [...box.children].forEach((b, i) => b.setAttribute("aria-checked", String(isOn(items[i], i))));
+    items.forEach((item, i) => { const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "radio"); render(b, item, i); b.addEventListener("click", () => { choose(item, i); paint(); cheer(); }); box.append(b); });
+    paint();
+  };
+  group("mk-jobs", jobs, (b, [label]) => { b.textContent = label; }, (_, i) => i === mk.job, (_, i) => { mk.job = i; });
+  group("mk-shapes", window.SHAPE_NAMES, (b, [id, name]) => { b.innerHTML = shapeSvg(id, "calm"); b.style.setProperty("--character-color", "#9a9aa4"); b.setAttribute("aria-label", name); }, ([id]) => id === mk.shape, ([id]) => { mk.shape = id; });
+  group("mk-colors", window.COLORS, (b, [label, value]) => { b.style.setProperty("--c", value); b.setAttribute("aria-label", label); }, ([, value]) => value === mk.color, ([, value]) => { mk.color = value; document.querySelectorAll("#mk-shapes button").forEach((s) => s.style.setProperty("--character-color", value)); });
+  document.querySelectorAll("#mk-shapes button").forEach((s) => s.style.setProperty("--character-color", mk.color));
+  document.getElementById("mk-name").addEventListener("input", (e) => { mk.name = e.target.value.slice(0, 18); drawMk(); mkSay.classList.add("show"); clearTimeout(mkSay._t); mkSay._t = setTimeout(() => mkSay.classList.remove("show"), 2200); });
+  mkActor.addEventListener("click", cheer);
+  mkActor.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cheer(); } });
+  drawMk();
+  actors.push(mkActor);
+  // Eyes follow the pointer.
+  if (!reduced) addEventListener("pointermove", (e) => {
+    for (const el of actors) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) continue;
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height * .55);
+      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 380);
+      const eyes = el.querySelector(".character-eyes");
+      if (eyes) eyes.style.transform = `translate(${(dx / d * 3.4 * k).toFixed(2)}px, ${(dy / d * 2.6 * k).toFixed(2)}px)`;
+    }
+  }, { passive: true });
+
+  // Poke a character and it hops and talks.
+  actors.forEach((el) => {
+    if (!el.dataset.cast) return;
+    const poke = () => { react(el); speak(el); };
+    el.addEventListener("click", poke);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); poke(); } });
+  });
+  const heroCast = [...document.querySelectorAll(".stage .actor")];
+  if (!reduced) heroCast.forEach((el, i) => setTimeout(() => { react(el, "happy", 1100); speak(el, 2600); }, 700 + i * 850));
+
+  // Reveal on scroll; each band's host hops in.
+  const reveal = (el) => el.classList.add("in");
+  if (reduced || !("IntersectionObserver" in window)) document.querySelectorAll(".rise, .squiggle").forEach(reveal);
+  else {
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (!e.isIntersecting) return; reveal(e.target); e.target.querySelectorAll(".squiggle").forEach(reveal); const host = e.target.querySelector(".hostline .actor"); if (host) setTimeout(() => react(host), 350); io.unobserve(e.target); }), { rootMargin: "0px 0px -12% 0px" });
+    document.querySelectorAll(".rise").forEach((el) => io.observe(el));
+  }
+
+  // Replay the real conversation when it comes into view.
+  const items = [...document.querySelectorAll("#replay > *")];
+  const play = () => {
+    let t = 300;
+    items.forEach((item) => {
+      const who = item.dataset.actor;
+      if (who) {
+        setTimeout(() => {
+          const typing = document.createElement("div");
+          typing.className = `msg ${who} typing in`;
+          typing.innerHTML = `<div class="face">${svgFor(who, "focused")}</div><div class="b"><i></i><i></i><i></i></div>`;
+          item.before(typing);
+          setTimeout(() => { typing.remove(); reveal(item); }, 1400);
+        }, t);
+        t += 3000;
+      } else { setTimeout(() => reveal(item), t); t += 800; }
+    });
+  };
+  if (reduced) items.forEach(reveal);
+  else new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { o.disconnect(); play(); } }, { threshold: .3 }).observe(document.getElementById("replay"));
+
+  // The terminal types itself out.
+  const lines = [...document.querySelectorAll("#term .line")];
+  if (reduced) lines.forEach(reveal);
+  else new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { o.disconnect(); lines.forEach((l, i) => setTimeout(() => reveal(l), 250 + i * (i > 3 && i < 9 ? 480 : 170))); } }, { threshold: .4 }).observe(document.getElementById("term"));
+
+  // Copy: confetti in the team's colors.
+  const copy = document.getElementById("copy");
+  const command = document.getElementById("cmd").textContent.trim();
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(command); }
+    catch { const r = document.createRange(); r.selectNodeContents(document.getElementById("cmd")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand("copy"); }
+    copy.textContent = "Copied!";
+    setTimeout(() => { copy.textContent = "Copy"; }, 2200);
+    if (reduced) return;
+    const box = document.createElement("div"); box.className = "confetti"; document.body.append(box);
+    const r = copy.getBoundingClientRect(), colors = ["#6757d9", "#d86889", "#299575", "#ffc83d"];
+    for (let i = 0; i < 50; i++) {
+      const p = document.createElement("i");
+      p.style.left = `${r.left + r.width / 2}px`; p.style.top = `${r.top}px`; p.style.background = colors[i % 4];
+      p.style.setProperty("--dx", `${(Math.random() - .5) * 560}px`); p.style.setProperty("--dy", `${-80 + Math.random() * 460}px`); p.style.setProperty("--r", `${Math.random() * 720}deg`);
+      p.style.animationDelay = `${Math.random() * .1}s`;
+      box.append(p);
+    }
+    setTimeout(() => box.remove(), 2100);
+  });
+})();
+</script>
+</body>
+</html>

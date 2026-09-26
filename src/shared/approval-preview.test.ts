@@ -28,7 +28,7 @@ test('browser review shows the exact control and visible fields without pretendi
   const result = buildPreview(browserApproval, run, action);
   assert.equal(result.canApprove, true); assert.equal(result.limitation, null);
   assert.ok(result.fields.some(field => field.label === 'On the page: Title' && field.value === 'Dinner'));
-  assert.ok(result.fields.some(field => field.label === 'Private browser'));
+  assert.ok(result.fields.some(field => field.label === 'Browser' && /own browser/.test(field.value)));
   assert.equal(result.fields.some(field => field.label === 'Connected account'), false);
   for (const args of [{ selector: '#save', targetFingerprint: input.targetFingerprint }, { ...input, targetReview: { ...input.targetReview, complete: false } }, { ...input, targetReview: { ...input.targetReview, fields: [{ label: 'password', value: 'password=secret' }] } }, { ...input, targetFingerprint: 'invalid' }, { ...input, value: 'unreviewed' }]) assert.equal(buildPreview(browserApproval, run, { ...action, args }).canApprove, false);
   const typed = buildPreview(browserApproval, run, { ...action, type: 'browser_type', args: { ...input, value: 'A complete replacement' } });

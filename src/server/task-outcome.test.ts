@@ -44,3 +44,15 @@ test("a plain answer with no checked deliverable stays outcome-less, never block
     { outcome: null, error: null },
   );
 });
+
+test("a real answer about input files is the result when no file was promised", () => {
+  const answer = "The paper introduces the Transformer. ".repeat(4);
+  assert.deepEqual(
+    decideTaskOutcome({ prompt: WITH_FILES, deliveredArtifacts: 0, deliveredReports: 0, verificationStatus: "partial", deliverable: "A finished, reviewable result in this conversation", answerLength: answer.length }),
+    { outcome: null, error: null },
+  );
+  // A promised file is still required, whatever the answer says.
+  assert.equal(decideTaskOutcome({ prompt: WITH_FILES, deliveredArtifacts: 0, deliveredReports: 0, verificationStatus: "partial", deliverable: "A reconciled spreadsheet file", answerLength: answer.length }).outcome, "blocked");
+  // A token reply is not an answer.
+  assert.equal(decideTaskOutcome({ prompt: WITH_FILES, deliveredArtifacts: 0, deliveredReports: 0, verificationStatus: "partial", deliverable: "A finished, reviewable result in this conversation", answerLength: 12 }).outcome, "blocked");
+});

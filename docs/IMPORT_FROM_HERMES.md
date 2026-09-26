@@ -4,7 +4,7 @@ Bring an agent you already raised in [Hermes](https://github.com/NousResearch/he
 
 ## What it is
 
-OpenBot's **New teammate** sheet (Control center → Add a teammate) has an **Import from Hermes or OpenClaw** disclosure. Point it at a profile folder and it shows exactly what will move before anything is created.
+**Your team** lists the Hermes and OpenClaw agents already on this Mac (`~/.hermes`, `~/.hermes/profiles/*`, `~/.openclaw`) with a **Bring over** button for each; agents already imported are not offered again. The **New teammate** sheet still has an **Import from Hermes or OpenClaw** disclosure for any other folder, and it shows exactly what will move before anything is created.
 
 Supported sources:
 
@@ -20,12 +20,14 @@ Supported sources:
 - **Curated memories** — `MEMORY.md` (the agent's notes) and `USER.md` (your profile) become private memory notes owned by the teammate. `§`-separated and line-based entries both parse. Notes longer than OpenBot's per-note size are listed for hand review instead of silently trimmed.
 - **Text skills** — every `skills/**/SKILL.md` bundle is copied (with `references/`, `templates/`, `assets/`, `examples/` text files) into the teammate's skill directories for both runtimes. Scripts, hidden files, and parent paths are not imported — the same safety line as OpenBot's community-skill importer.
 
+- **Cron jobs** — Hermes jobs with a prompt become OpenBot automations, **always paused**, when their schedule has an exact equivalent: daily or chosen weekdays at a fixed time, every N minutes (5 or more), hourly, or once. Others (day-of-month, month, hour ranges) are listed as not converted, with the reason. Script-only jobs are skipped.
+
 ## What never moves
 
 - **Credentials and API keys** — never copied. If the profile contains credential-looking settings, the preview says so and the plan carries no secret values. Connect the model in OpenBot yourself.
 - **Chat history and sessions** (`state.db`) — they stay in the original tool.
 - **Messaging platform settings** (Telegram, Discord, Slack, …) — reconnect those through OpenBot's connectors.
-- **Cron jobs** — recreate them as OpenBot routines when you're ready (they get OpenBot's connector-readiness gates and Work Receipts).
+
 
 ## How to use it
 
@@ -38,6 +40,7 @@ Supported sources:
 Or over the API (owner-only):
 
 ```
+GET  /api/imports/profile/discover
 POST /api/imports/profile/preview   { "path": "~/.hermes/profiles/researcher" }
 POST /api/imports/profile/apply     { "path": "~/.hermes/profiles/researcher" }
 ```

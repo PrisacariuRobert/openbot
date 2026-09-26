@@ -28,6 +28,7 @@ import {
   ArrowRightLeft,
   ArrowUp,
   Archive,
+  AudioLines,
   CalendarDays,
   Check,
   ChevronDown,
@@ -44,6 +45,7 @@ import {
   Pin,
   Plus,
   Search,
+  Send,
   Settings2,
   ShieldCheck,
   ShieldQuestion,
@@ -73,6 +75,9 @@ import type { CommunitySkill } from "../shared/extensions";
 import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
+import { WeeklyRecapEntry } from "./WeeklyRecap";
+import { VoiceMode, voiceModeSupported } from "./VoiceMode";
+import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
 import { ComputerTakeover } from "./LiveComputer";
@@ -89,7 +94,10 @@ import { ConversationProgress } from "./ConversationProgress";
 import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
 import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
-import { groupConsecutiveActionEvents } from "./action-event-groups";
+import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
+import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
+import { DictationButton, dictationSupported } from "../components/Dictation";
+import { tasksNeedingOwner } from "./attention";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Advanced } from "./Advanced";
@@ -113,6 +121,7 @@ type Detail =
   | { kind: "run"; run: Run }
   | { kind: "app"; app: ConnectorCatalogEntry }
   | { kind: "skill"; skill: CommunitySkill }
+  | { kind: "discover"; entry: CatalogEntry }
   | { kind: "settings" }
   | { kind: "search" };
 const activeStates = ["running", "queued", "waiting_for_teammate"];
@@ -134,6 +143,29 @@ const timeText = (date: string) =>
   new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dateText = (date: string) =>
   new Date(date).toLocaleDateString([], { month: "short", day: "numeric" });
+/** A teammate that needs the Mac's files asks in words; this turns that into
+ * one tap: switch on Files & apps for the studio, then tell it to go ahead.
+ * The tap itself is the owner's decision; nothing runs before it. */
+function MacAccessOffer({ name, threadId, onDone }: { name: string; threadId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const turnOn = async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ macAccessEnabled: true }) });
+      if (!response.ok) throw new Error("Files & apps couldn't be turned on. Try Control center.");
+      await api("/api/messages", { threadId, body: "I turned on Files & apps on this Mac — go ahead.", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, requestId: crypto.randomUUID() });
+      onDone();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Something went wrong."); setBusy(false); }
+  };
+  return (
+    <div className="mac-access-offer">
+      <button type="button" className="text-action strong" disabled={busy} onClick={() => void turnOn()}>{busy ? "Turning on…" : `Turn on Files & apps for ${name}`}</button>
+      <small>Lets your teammates use your Mac’s folders and apps. Changes still ask you first. You can turn it off in Control center.</small>
+      {error && <small role="alert">{error}</small>}
+    </div>
+  );
+}
+
 async function api<T>(
   path: string,
   body?: unknown,
@@ -209,6 +241,7 @@ function eventTitle(message: Message): string {
   const data = message.eventData || {};
   switch (message.eventType) {
     case "run_stopped":
+      return String(data.title || (data.botName ? `${data.botName} stopped` : "Task stopped"));
     case "action_completed":
       return String(data.title || "Task update");
     case "routine_created":
@@ -256,7 +289,7 @@ function resolveEventFaces(
   };
   const byId = data.botId;
   if (typeof byId === "string" && byId) push(bots.find((bot) => bot.id === byId));
-  for (const key of ["fromName", "toName"]) {
+  for (const key of ["fromName", "toName", "botName"]) {
     const name = data[key];
     if (typeof name === "string" && name) push(bots.find((bot) => bot.name === name));
   }
@@ -311,10 +344,11 @@ function eventDetail(message: Message): string {
   switch (message.eventType) {
     case "run_stopped": {
       // The pill carries title + action on one line. The server paragraph
-      // only shows when the title itself says nothing ("Task update").
+      // only shows when the title itself says nothing ("Work stopped").
       const rawTitle = String(message.eventData?.title || "");
-      if (rawTitle && !/^(Task update|Studio event)$/.test(rawTitle)) return "";
-      const sentence = message.body.split(". ")[0]!.trim();
+      if (rawTitle && !/^(Task update|Studio event|Work stopped)$/.test(rawTitle)) return "";
+      // The body leads with "<Bot>: " — the face already says who.
+      const sentence = message.body.replace(/^[^:.]{1,40}:\s*/, "").split(". ")[0]!.trim();
       const line = sentence.endsWith(".") ? sentence : `${sentence}.`;
       return line.length > 140 ? `${line.slice(0, 137)}…` : line;
     }
@@ -326,12 +360,34 @@ function eventDetail(message: Message): string {
       return String(data.task ?? message.body).replace(/\s+/g, " ").trim();
     case "teammate_message":
       return data.expectsReply === "true" ? "Reply requested" : "Update shared";
+    case "action_completed":
+      // The face shows who; the task view keeps the full record with links.
+      return message.body.replace(/^[^:.]{1,40}:\s*/, "").replace(/\s*\(https?:\/\/[^)\s]+\)/g, "").trim();
     default:
       return message.body;
   }
 }
 
 
+
+const STARTER_PROMPTS = [
+  { label: "Plan my week", hint: "Three things that matter most", text: "Help me plan my week: ask what's on my plate, then pick the three things that matter most." },
+  { label: "Make sense of something", hint: "A document, notes or a long message", text: "Summarize this and tell me what I need to do: " },
+  { label: "Look something up", hint: "With sources you can check", text: "Research this and bring back a short answer with sources: " },
+] as const;
+
+/** Starters fill the message box without sending, so a blank page never
+ * has to be solved alone. Shown until the owner sends a first message. */
+function ChatStarters({ onPick }: { onPick: (text: string) => void }) {
+  return <div className="chat-starters" aria-label="Ideas to start with">
+    {STARTER_PROMPTS.map((starter) => (
+      <button key={starter.label} type="button" className="chat-starter" onClick={() => onPick(starter.text)}>
+        <strong>{starter.label}</strong>
+        <span>{starter.hint}</span>
+      </button>
+    ))}
+  </div>;
+}
 
 const SETTINGS_CATEGORIES: ReadonlyArray<{
   title: string;
@@ -344,21 +400,29 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
     badgeVariant?: (state: AppState) => "neutral" | "success" | "warning";
     keywords: ReadonlyArray<string>;
   }>;
-}> = [{ title: "Workspace", items: [
+}> = [
+{ title: "Team", items: [
 { id: "team", title: "Your team", description: "A few useful personalities. One familiar place to work.", icon: UsersRound, keywords: ["teammates", "import", "restore"] },
+{ id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
+{ id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
+{ id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] }
+]},
+{ title: "Connections", items: [
 { id: "provider", title: "Your AI", description: "Choose the connection. Keep the conversation.", icon: Sparkles, keywords: ["models", "provider", "api key", "account", "local"] },
 { id: "connectors", title: "Apps & tools", description: "Familiar tools. Clear boundaries.", icon: Boxes, keywords: ["google", "slack", "notion", "github", "connectors", "mcp"] },
-{ id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] },
+{ id: "telegram", title: "Chat apps", description: "iMessage, Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["imessage", "messages", "sms", "telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
+{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] }
+]},
+{ title: "Work", items: [
 { id: "projects", title: "Projects", description: "Real changes, with room to review.", icon: FolderGit2, keywords: ["git", "code", "worktree"] },
 { id: "artifacts", title: "Files & results", description: "What came back, and the source it came from.", icon: FileText, keywords: ["documents", "deliverables", "revisions"] },
-{ id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
-{ id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
-{ id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
-{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] },
-{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] },
-{ id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
 { id: "files", title: "Private files", description: "Inspect their workspace without widening access.", icon: Files, keywords: ["scratchpad", "files"] },
 { id: "computer", title: "Computer", description: "A private workspace with visible boundaries.", icon: Monitor, keywords: ["browser", "container", "desktop"] }
+]},
+{ title: "Trust & usage", items: [
+{ id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
+{ id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
+{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] }
 ]}];
 
 function SettingsWorkspacePage({
@@ -585,6 +649,8 @@ export function Studio() {
     [draftNotice, setDraftNotice] = useState(""),
     [online, setOnline] = useState(false),
     [refresh, setRefresh] = useState(0);
+  // The reply as it is written, per run, pushed by the studio event stream.
+  const [liveTexts, setLiveTexts] = useState<Record<string, string>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const sendError = sendErrors[thread] || "";
   const setSendError = (message: string) => setSendErrors((items) => ({ ...items, [thread]: message }));
@@ -661,6 +727,12 @@ export function Studio() {
   const fileInput = useRef<HTMLInputElement>(null);
   const draft = composerDraft.body,
     setDraft = composerDraft.setBody;
+  const [dictating, setDictating] = useState(false);
+  const showsMic = dictating || (!draft.trim() && !attached.files.length && !sending && dictationSupported());
+  const pickStarter = (text: string) => {
+    setDraft(text);
+    window.setTimeout(() => { const box = document.getElementById("studio-message") as HTMLTextAreaElement | null; box?.focus(); box?.setSelectionRange(box.value.length, box.value.length); }, 0);
+  };
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null),
     [mentionAt, setMentionAt] = useState(0);
   const mentionChoices = useMemo(() => {
@@ -766,7 +838,17 @@ export function Studio() {
       clearTimeout(timer);
       timer = setTimeout(() => setRefresh((n) => n + 1), 250);
     };
-    events.onmessage = update;
+    events.onmessage = (message) => {
+      // Live reply text is applied directly; it never refetches the studio.
+      try {
+        const event = JSON.parse(message.data) as { type?: string; runId?: string; text?: string };
+        if (event.type === "live" && event.runId && typeof event.text === "string") {
+          setLiveTexts((current) => ({ ...current, [event.runId!]: event.text! }));
+          return;
+        }
+      } catch { /* A plain state ping. */ }
+      update();
+    };
     events.onopen = () => {
       setOnline(true);
       update();
@@ -807,7 +889,7 @@ export function Studio() {
   useEffect(() => {
     if (page === "chat" && nearBottom.current)
       messagesEnd.current?.scrollIntoView({ block: "end" });
-  }, [state?.messages, state?.runs, page]);
+  }, [state?.messages, state?.runs, page, liveTexts]);
   useEffect(() => {
     setDetail((current) => {
       if (current?.kind !== "run" || !state) return current;
@@ -947,15 +1029,37 @@ export function Studio() {
       setSending(false);
     }
   };
+  // "Try again" on the latest finished reply: the same request, same
+  // teammate, through the normal send path (budgets, approvals, replay keys).
+  const retryTarget = useMemo(() => {
+    const talk = (state?.messages || []).filter((message) => message.kind === "text");
+    const reply = talk.at(-1);
+    if (!reply || reply.senderType !== "bot" || !reply.runId) return null;
+    const run = state?.runs.find((item) => item.id === reply.runId);
+    if (!run || run.parentRunId || !["completed", "failed", "cancelled"].includes(run.status)) return null;
+    const trigger = talk.find((message) => message.id === run.triggerMessageId) || [...talk].reverse().find((message) => message.senderType === "user");
+    if (!trigger || trigger.attachments.length) return null;
+    return { replyId: reply.id, body: trigger.body, botId: run.botId };
+  }, [state?.messages, state?.runs]);
+  const lastOwnMessageId = useMemo(() => {
+    return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "user")?.id || null;
+  }, [state?.messages]);
+  const retryReply = async () => {
+    if (!retryTarget || sending || !state) return;
+    setSending(true); setSendError("");
+    try {
+      await api("/api/messages", { threadId: thread, body: retryTarget.body, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, targetBotIds: [retryTarget.botId], requestId: `retry-${retryTarget.replyId}-${Date.now()}` });
+      setRefresh((n) => n + 1);
+    } catch (reason) {
+      setSendError(reason instanceof Error ? reason.message : "Couldn't ask again. Try once more.");
+    } finally { setSending(false); }
+  };
   const active =
     state?.studioRuns.filter(
       (run) => !run.parentRunId && activeStates.includes(run.status),
     ) || [];
   const conversationFiles = useMemo(() => state?.messages.flatMap((message) => message.attachments) || [], [state?.messages]);
-  const attention =
-    state?.studioRuns.filter((run) =>
-      ["failed", "awaiting_approval"].includes(run.status),
-    ) || [];
+  const attention = tasksNeedingOwner(state?.studioRuns || []);
   const uncertain =
     state?.approvedActions.filter((action) => action.status === "uncertain") ||
     [];
@@ -994,15 +1098,20 @@ export function Studio() {
       .sort((a, b) => a.nextRunAt!.localeCompare(b.nextRunAt!)) || [];
   const threadTitle =
     state?.threads.find((item) => item.id === thread)?.title || "Conversation";
+  const agentsToBringOver = useAgentsToBringOver();
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
+  const routineGroups = groupConsecutiveRoutineRuns(state?.messages || []);
+  const routineGroupByFirstId = new Map(routineGroups.map((group) => [group[0]!.id, group]));
+  const routineGroupMemberIds = new Set(routineGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
   // Fold consecutive talking pills between the same pair — Apple groups
   // repeated system lines instead of stacking five identical pills.
   const talkFold = useMemo(
     () => foldTalkingPills(state?.messages || []),
     [state?.messages],
   );
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const conversationBot =
     page === "chat"
       ? state?.bots.find((bot) => bot.threadId === thread)
@@ -1206,8 +1315,14 @@ export function Studio() {
         <span className="composer-hint">
           {sending ? "Sending…" : !composerDraft.ready ? "Restoring draft…" : "Enter to send"}
         </span>
+        {/* One action slot, as in Messages: the microphone while the box is
+            empty (or while dictating), Send once there is something to send. */}
+        <span className={`composer-action ${showsMic ? "shows-mic" : "shows-send"}`}>
+        <DictationButton draft={draft} setDraft={setDraft} disabled={!composerDraft.ready || sending} onListening={setDictating} concealed={!showsMic} />
         <button
           className="send"
+          tabIndex={showsMic ? -1 : undefined}
+          aria-hidden={showsMic || undefined}
           aria-label="Send message"
           disabled={
             (!draft.trim() && !attached.files.length) ||
@@ -1225,6 +1340,7 @@ export function Studio() {
             <ArrowUp size={20} />
           )}
         </button>
+        </span>
       </div>
       {!botReady && state && (
         <a className="provider-needed" href="/?panel=provider">
@@ -1833,6 +1949,7 @@ export function Studio() {
               ))}
             </div>
           )}
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
           {conversationRows}
         </div>
@@ -1843,7 +1960,7 @@ export function Studio() {
             onClick={() => page === "chat" || page === "settings" ? openCapability("team") : setDetail({ kind: "workspace" })}
           >
             <Layers3 size={17} /> Workspace{" "}
-            {attentionCount > 0 && <b>{attentionCount} need you</b>}
+            {attentionCount > 0 && <b>{attentionCount} {attentionCount === 1 ? "needs" : "need"} you</b>}
           </button>
           <div>
             <span className={`connection-dot ${online ? "" : "offline"}`} />
@@ -1926,6 +2043,11 @@ export function Studio() {
           </span>
           <div className="topbar-right">
             {page === "settings" && <button className="workspace-return" onClick={() => openThread(thread)}>Back to conversation</button>}
+            {page === "chat" && conversationBot && botReady && voiceModeSupported() && (
+              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name}`} onClick={() => setVoiceOpen(true)}>
+                <AudioLines size={19} strokeWidth={1.5} />
+              </button>
+            )}
             {page === "chat" && state?.bots.length ? (
               <button
                 className="topbar-control"
@@ -2031,6 +2153,7 @@ export function Studio() {
                   ))}
                 </div>
                 <div className="inbox-conversations">
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
                   {conversationRows}
                 </div>
@@ -2388,6 +2511,9 @@ export function Studio() {
                     </a>
                   </div>
                 )}
+                {libraryTab === "skills" && (
+                  <SkillDiscover query={query} refreshKey={refresh} onOpen={(entry) => setDetail({ kind: "discover", entry })} />
+                )}
                 <a className="text-action" href="/?panel=artifacts">
                   <FileText size={15} /> Browse artifacts your team delivered
                 </a>
@@ -2409,7 +2535,7 @@ export function Studio() {
                     {!state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><h1>A small team.<br/>A familiar conversation.</h1><p>A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>Bring an existing teammate</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>
@@ -2427,11 +2553,21 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
+                        <ChatStarters onPick={pickStarter} />
                       </div>
-                    ) : (
+                    ) : (<>{
                       state.messages.map((message, index) => {
                         if (actionGroupMemberIds.has(message.id)) return null;
                         const actionGroup = actionGroupByFirstId.get(message.id);
+                        if (routineGroupMemberIds.has(message.id)) return null;
+                        const routineGroup = routineGroupByFirstId.get(message.id);
+                        if (routineGroup) {
+                          const runs = routineGroup.filter((item) => item.eventType === "routine_run");
+                          const replyFor = (item: Message) => routineGroup.find((reply) => reply.runId === item.runId && reply.id !== item.id);
+                          return <div key={message.id} className="chat-event action-completed-group routine-run-group" role="status" data-event="routine_run">
+                            <details><summary><Zap size={14} aria-hidden="true" /><span>{eventTitle(message).replace(/ started$/, "")} · ran {runs.length} times · last {timeText(runs[runs.length - 1]!.createdAt)}</span><ChevronDown size={14} aria-hidden="true" /></summary><div className="action-completed-records">{runs.map((item) => { const reply = replyFor(item); return <p key={item.id}><strong>{timeText(item.createdAt)}</strong><small>{eventDetail(item)}{reply ? ` · ${machineMarkerText(reply.body)}` : ""}</small></p>; })}</div></details>
+                          </div>;
+                        }
                         const cancelledOutcome = cancelledRunForTrigger(state.runs, state.messages, message.id);
                         // Event pills carry both teammates' mascots when the
                         // event names them — talking feels two-sided.
@@ -2447,6 +2583,19 @@ export function Studio() {
                           previous.senderId !== message.senderId ||
                           previous.senderType === "system" ||
                           message.senderType === "system";
+                        // Stopping a task stops its helpers too: one line says so.
+                        if (message.eventType === "run_stopped" && previous?.eventType === "run_stopped") return null;
+                        if (message.eventType === "run_stopped" && state.messages[index + 1]?.eventType === "run_stopped") {
+                          let last = index;
+                          while (state.messages[last + 1]?.eventType === "run_stopped") last += 1;
+                          const stops = state.messages.slice(index, last + 1);
+                          const faces = [...new Map(stops.flatMap((item) => resolveEventFaces(item.eventData || {}, allBots, 1)).map((bot) => [bot.id, bot])).values()].slice(0, 3);
+                          const stopped = state.runs.find((run) => run.id === message.runId && !run.parentRunId) || state.runs.find((run) => stops.some((item) => item.runId === run.id));
+                          return <div key={message.id} className="chat-event" data-event="run_stopped" role="status">
+                            <span className="chat-event-mark" aria-hidden="true">{faces.length ? faces.map((face) => <Face key={face.id} bot={face} size={20} />) : <MessageCircle size={14} />}</span>
+                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}</span>
+                          </div>;
+                        }
                         if (message.kind === "event") {
                           const foldFirst = talkFold.firstOf.get(message.id);
                           if (foldFirst && foldFirst.id !== message.id) return null;
@@ -2531,6 +2680,9 @@ export function Studio() {
                             )}
                             <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
+                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && (
+                                <MacAccessOffer name={message.senderName} threadId={message.threadId} onDone={() => setRefresh((n) => n + 1)} />
+                              )}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>
@@ -2548,14 +2700,18 @@ export function Studio() {
                               reactions={message.reactions || []}
                               onReply={() => setReplyTo({ id: message.id, senderName: message.senderName, body: message.body })}
                               onReacted={() => setRefresh((n) => n + 1)}
+                              readAloud={message.senderType === "bot" ? message.body : undefined}
+                              onRetry={retryTarget?.replyId === message.id ? () => void retryReply() : undefined}
+                              onEdit={lastOwnMessageId === message.id && !sending ? () => pickStarter(message.body) : undefined}
                             />
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard onOpenDocument={file => { setContextOpen(false); setDocumentFile(file); }} message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
-                      })
-                    )}
+                      })}
+                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} />}
+                    </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);
                       return fallback ? <CancelledRunOutcome run={fallback} dated onReview={() => setDetail({ kind: "run", run: fallback })} /> : null;
@@ -2573,7 +2729,7 @@ export function Studio() {
                             activeStates.includes(run.status),
                         )
                         .map((run) => (
-                          <ConversationProgress key={run.id} run={run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
+                          <ConversationProgress key={run.id} run={liveTexts[run.id] && liveTexts[run.id]!.length >= (run.partialText?.length || 0) ? { ...run, partialText: liveTexts[run.id]! } : run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
                         ))}
                     <div ref={messagesEnd} />
                   </div>
@@ -2694,7 +2850,7 @@ export function Studio() {
                   <Icon size={19} />
                   <span>{label}</span>
                   {key === "activity" && attentionCount > 0 && (
-                    <b>{attentionCount} need you</b>
+                    <b>{attentionCount} {attentionCount === 1 ? "needs" : "need"} you</b>
                   )}
                   <ChevronRight size={16} />
                 </button>
@@ -2918,6 +3074,15 @@ export function Studio() {
               </p>
             </>
           )}
+          {detail.kind === "discover" && (
+            <SkillDiscoverDetail
+              key={detail.entry.url}
+              entry={detail.entry}
+              bots={state?.bots || []}
+              face={(bot) => <Face bot={bot} size={30} />}
+              onAdded={() => { setDetail(null); setRefresh((value) => value + 1); }}
+            />
+          )}
           {detail.kind === "skill" && (
             <>
               <p className="overline">
@@ -2955,6 +3120,26 @@ export function Studio() {
             </>
           )}
         </Drawer>
+      )}
+      {voiceOpen && conversationBot && state && (
+        <VoiceMode
+          bot={conversationBot}
+          messages={state.messages.filter((message) => message.threadId === conversationBot.threadId)}
+          runs={[...state.runs, ...state.studioRuns]}
+          onClose={() => setVoiceOpen(false)}
+          onSend={async (text) => {
+            await api("/api/messages", {
+              threadId: conversationBot.threadId,
+              body: text,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              targetBotIds: [],
+              attachmentIds: [],
+              replyToId: null,
+              requestId: `voice-${conversationBot.id}-${Date.now()}`,
+            });
+            setRefresh((n) => n + 1);
+          }}
+        />
       )}
       {takeoverBot && (
         <ComputerTakeover bot={takeoverBot} onClose={() => setTakeoverBot(null)} />

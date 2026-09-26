@@ -231,6 +231,16 @@ function startingTaskSteps(): TaskStep[] {
   ];
 }
 
+/** "Click “Book” on example.com" → "Clicked “Book” on example.com": the
+ * chat receipt says what happened, not the page's full title. */
+export function doneLabel(actionLabel: string | null | undefined): string {
+  const label = (actionLabel || "").trim();
+  if (!label) return "";
+  const past: Array<[RegExp, string]> = [[/^Click\b/, "Clicked"], [/^Type\b/, "Typed"], [/^Open\b/, "Opened"], [/^Send\b/, "Sent"], [/^Upload\b/, "Uploaded"], [/^Create\b/, "Created"], [/^Post\b/, "Posted"], [/^Reply\b/, "Replied"], [/^Save\b/, "Saved"]];
+  for (const [pattern, word] of past) if (pattern.test(label)) return `${label.replace(pattern, word)}.`.replace(/\.\.$/, ".");
+  return `Done: ${label}`;
+}
+
 export class OpenBotDatabase {
   readonly rootDir: string;
   readonly dataDir: string;
@@ -464,7 +474,7 @@ export class OpenBotDatabase {
         computer_enabled INTEGER NOT NULL DEFAULT 1,
         browser_enabled INTEGER NOT NULL DEFAULT 1,
         mac_access_enabled INTEGER NOT NULL DEFAULT 0,
-        weekly_token_budget INTEGER NOT NULL DEFAULT 250000
+        weekly_token_budget INTEGER NOT NULL DEFAULT 2000000
       );
       CREATE TABLE IF NOT EXISTS threads (
         id TEXT PRIMARY KEY,
@@ -1080,6 +1090,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "active_duration_ms INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_steps INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "model_override TEXT");
+    this.addColumn("runs", "after_run_id TEXT");
     this.addColumn("bots", "retired_at TEXT");
     this.addColumn("action_journal", "mutation_key TEXT");
     this.addColumn("action_journal", "effect_digest TEXT");
@@ -1406,7 +1417,8 @@ export class OpenBotDatabase {
       id, DEFAULT_OWNER, input.providerInstanceId || null, input.name, input.emoji, input.mascot || "orbit",
       input.color, input.role, input.instructions, input.model || "", input.computerEnabled === false ? 0 : 1,
       input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
-      input.weeklyTokenBudget ?? 250000, createdAt,
+      // A guard against runaway API bills, not a wall: ~100+ ordinary tasks a week.
+      input.weeklyTokenBudget ?? 2_000_000, createdAt,
     );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);
@@ -2038,7 +2050,7 @@ export class OpenBotDatabase {
     return this.listMessageAttachments(messageId);
   }
 
-  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; triggerMessageId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"] }): Run {
+  createRun(input: { threadId: string; botId: string; prompt: string; status: RunStatus; approvalReason?: string | null; parentRunId?: string | null; steeredFromRunId?: string | null; triggerMessageId?: string | null; routineId?: string | null; automationEventId?: string | null; attachmentIds?: string[]; expectedWorkKind?: Run["expectedWorkKind"]; afterRunId?: string | null }): Run {
     if (this.getBot(input.botId)?.retiredAt) throw new Error("This teammate is retired. Restore them before starting new work.");
     if (input.routineId) {
       const routine = this.getRoutine(input.routineId);
@@ -2059,8 +2071,21 @@ export class OpenBotDatabase {
       const approval = this.createApproval({ runId: id, botId: input.botId, kind: "prompt", reason: input.approvalReason, actionLabel: input.prompt.slice(0, 180), action: { type: "run" } });
       this.db.prepare("UPDATE runs SET approval_id=? WHERE id=?").run(approval.id, id);
     }
+    if (input.afterRunId) this.db.prepare("UPDATE runs SET after_run_id=?,task_stage='waiting' WHERE id=?").run(input.afterRunId, id);
     if (input.routineId) new WorkflowValidation(this).bindRun(id, input.routineId);
     return this.getRun(id)!;
+  }
+
+  /** Tasks waiting for a teammate's answer in the same conversation. */
+  runsWaitingFor(runId: string): Run[] {
+    return (this.db.prepare(this.runSelect("WHERE r.after_run_id=? AND r.status='waiting_for_teammate' AND r.consultation_pending=0 ORDER BY r.created_at ASC")).all(runId) as Row[]).map((row) => this.runFromRow(row));
+  }
+
+  /** Starts a waiting task with what it needs to know about the earlier answer. */
+  releaseRunAfter(id: string, prompt: string): Run | null {
+    const changed = this.db.prepare("UPDATE runs SET prompt=?,status='queued',task_stage='working',progress_at=? WHERE id=? AND status='waiting_for_teammate' AND consultation_pending=0").run(prompt, now(), id).changes === 1;
+    if (changed) for (const listener of this.runStatusListeners) listener(id, "queued");
+    return changed ? this.getRun(id) : null;
   }
 
   private runFromRow(row: Row): Run {
@@ -2102,6 +2127,7 @@ export class OpenBotDatabase {
       outcome: row.outcome === "delivered" || row.outcome === "blocked" ? row.outcome : null,
       attemptCount: Number(row.attempt_count || 0), recoveredAt: row.recovered_at ? String(row.recovered_at) : null,
       consultationPending: asBoolean(row.consultation_pending),
+      afterRunId: row.after_run_id ? String(row.after_run_id) : null,
       expectedWorkKind: ["morning", "inbox", "meeting", "weekly"].includes(String(row.expected_work_kind)) ? row.expected_work_kind as Run["expectedWorkKind"] : null,
       completionRepairCount: Number(row.completion_repair_count || 0),
       attachmentIds: jsonArray<string>(row.attachment_ids_json).filter((id) => typeof id === "string"),
@@ -2240,6 +2266,12 @@ export class OpenBotDatabase {
 
   listRuns(threadId: string): Run[] {
     const rows = this.db.prepare(this.runSelect("WHERE r.thread_id=? ORDER BY r.created_at DESC LIMIT 40")).all(threadId) as Row[];
+    return rows.map((row) => this.runFromRow(row));
+  }
+
+  /** Finished top-level tasks since a moment, for the weekly recap. */
+  finishedRunsSince(sinceIso: string, limit = 500): Run[] {
+    const rows = this.db.prepare(this.runSelect("WHERE r.status='completed' AND r.parent_run_id IS NULL AND r.finished_at>=? ORDER BY r.finished_at DESC LIMIT ?")).all(sinceIso, limit) as Row[];
     return rows.map((row) => this.runFromRow(row));
   }
 
@@ -2520,7 +2552,7 @@ export class OpenBotDatabase {
     );
     if (outcome === "failed" && !run.parentRunId && !this.db.prepare("SELECT 1 FROM messages WHERE run_id=? AND event_type='run_stopped'").get(id)) {
       const reason = detail || run.error || "The task stopped before it finished.";
-      const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : "Work stopped";
+      const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : /runtime not verified|could not check the installed OpenCode/i.test(reason) ? "Runtime update needed" : "Work stopped";
       this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId } });
     }
     return this.getRun(id)!.task;
@@ -2778,7 +2810,7 @@ export class OpenBotDatabase {
         .run(resultSummary.slice(0, 2_000), now(), approvalId);
       const receipt = result.changes === 1 ? this.getApprovedAction(approvalId)! : null;
       const run = receipt ? this.getRun(receipt.runId) : null;
-      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel } });
+      if (receipt && run && !run.parentRunId) this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: run.id, kind: "event", eventType: "action_completed", body: `${receipt.botName}: ${/^browser_/.test(receipt.actionType) ? doneLabel(receipt.actionLabel) || receipt.resultSummary : receipt.resultSummary}`, eventData: { title: "Approved action completed", approvalId, actionLabel: receipt.actionLabel, botId: run.botId } });
       this.db.exec("RELEASE approved_action_result");
       return receipt;
     } catch (error) {
@@ -3066,7 +3098,11 @@ export class OpenBotDatabase {
     return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.run_id=? ORDER BY a.created_at ASC").all(runId) as Row[]).map((row) => this.approvalFromRow(row));
   }
 
-  decideApproval(id: string, decision: "approved" | "denied"): Approval | null {
+  /** A declined mid-task action (terminal, browser or connector) lets the
+   * teammate finish without it and say what is left, instead of ending the
+   * whole task silently. Declining a task start, Stop, and repeated declines
+   * in one task still cancel. */
+  decideApproval(id: string, decision: "approved" | "denied", options: { continueAfterDecline?: boolean } = {}): Approval | null {
     const approval = this.getApproval(id);
     if (!approval || approval.status !== "pending" || approval.kind === "budget") return null;
     const result = this.db.prepare("UPDATE approvals SET status=?,decided_at=? WHERE id=? AND status='pending'").run(decision, now(), id);
@@ -3077,8 +3113,19 @@ export class OpenBotDatabase {
     }
     else {
       this.db.prepare("DELETE FROM approved_actions WHERE approval_id=? AND status='prepared'").run(id);
-      this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
-      this.finishRunTask(approval.runId, "cancelled");
+      const run = this.getRun(approval.runId);
+      const declines = Number((this.db.prepare("SELECT COUNT(*) AS n FROM approvals WHERE run_id=? AND status='denied'").get(approval.runId) as { n: number }).n);
+      if (options.continueAfterDecline && approval.kind !== "prompt" && run && !["completed", "failed", "cancelled"].includes(run.status) && declines <= MAX_DECLINES_BEFORE_STOP) {
+        const original = this.extensionRecord<{ prompt: string }>("declined-original-request", run.id)?.prompt ?? run.prompt;
+        this.saveExtensionRecord("declined-original-request", run.id, { prompt: original });
+        this.setRunPrompt(run.id, declinedActionPrompt(approval.actionLabel, original));
+        this.updateRun(run.id, { status: "queued", approvalReason: null, taskStage: "working", finishedAt: null, error: null, progressAt: now() });
+        this.db.prepare("UPDATE automation_alerts SET resolved_at=? WHERE run_id=? AND kind='approval' AND resolved_at IS NULL").run(now(), run.id);
+        this.addActivity({ runId: run.id, botId: run.botId, kind: "status", label: "Declined by you", detail: `${run.botName} will finish without it and tell you what is left.` });
+      } else {
+        this.updateRun(approval.runId, { status: "cancelled", finishedAt: now(), taskStage: "blocked", progressAt: now() });
+        this.finishRunTask(approval.runId, "cancelled");
+      }
     }
     return this.getApproval(id);
   }
@@ -4176,6 +4223,17 @@ export class OpenBotDatabase {
     return rows.map((row) => this.runFromRow(row));
   }
 
+  /** True while any task is queued, running or waiting on a teammate. */
+  hasActiveWork(): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM runs WHERE status IN ('queued','running','waiting_for_teammate') LIMIT 1").get());
+  }
+
+  /** The earliest upcoming run time of an enabled clock routine, if any. */
+  nextScheduledRoutineAt(): string | null {
+    const row = this.db.prepare("SELECT MIN(next_run_at) AS next FROM routines WHERE enabled=1 AND trigger_type='schedule' AND next_run_at IS NOT NULL").get() as { next: string | null } | undefined;
+    return row?.next || null;
+  }
+
   dueRoutines(): Routine[] {
     return (this.db.prepare("SELECT r.*,b.name bot_name,b.emoji bot_emoji FROM routines r JOIN bots b ON b.id=r.bot_id WHERE r.enabled=1 AND r.trigger_type='schedule' AND r.next_run_at IS NOT NULL AND r.next_run_at<=?").all(now()) as Row[]).map((row) => this.routineFromRow(row));
   }
@@ -4627,4 +4685,11 @@ export class OpenBotDatabase {
     const activeThreadId = defaultConversation(threads, threadId);
     return { bots: this.listBots(), threads, messages: this.listMessages(activeThreadId), runs: this.listRuns(activeThreadId), studioRuns: this.listStudioRuns(), routines: this.listRoutines(), automationEvents: this.listAutomationEvents(), automationAlerts: this.listAutomationAlerts(), runner: this.getRunnerHealth(), workflows: this.listWorkflows(), approvals: this.listApprovals(), approvedActions: this.listApprovedActions(),   agentMessages: this.listAgentMessages(activeThreadId), delegations: this.listDelegations(), retiredBots: this.listBots(true).filter((bot) => bot.retiredAt), providers: this.listProviders(), settings: this.getStudioSettings(), draft: this.getDraft(activeThreadId), usage: this.getUsageSummary(), activeThreadId };
   }
+}
+
+/** After this many declined actions in one task, the next decline stops it. */
+export const MAX_DECLINES_BEFORE_STOP = 3;
+
+export function declinedActionPrompt(actionLabel: string, originalRequest: string) {
+  return `The owner declined this proposed action: ${actionLabel}. Do not retry it, do not attempt an equivalent action another way (another tool, website, app, account or teammate), and do not ask for it again. Finish the task as far as you safely can without it: give the user the useful result you already have, say plainly what was not done because of the decline, and mention a simple step the owner could take themselves if one exists.\n\nOriginal request: ${originalRequest}`;
 }

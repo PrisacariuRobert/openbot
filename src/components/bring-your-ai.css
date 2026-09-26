@@ -1,0 +1,34 @@
+/* Choose the AI behind your team: free first, then what you already pay for. */
+.byo { display: grid; gap: 6px; padding: 22px; margin: 0 0 24px; border-radius: 20px; background: var(--secondary-system-background); }
+.byo.is-compact { padding: 16px; margin: 6px 0 2px; border-radius: 16px; }
+.byo h3 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--label-primary); }
+.byo.is-compact h3 { font-size: 17px; }
+.byo-lead { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: var(--label-secondary); }
+.byo h4 { margin: 10px 0 4px; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: var(--label-tertiary); text-transform: uppercase; }
+.byo-list { list-style: none; margin: 0; padding: 0; border-radius: 14px; overflow: hidden; background: var(--system-background); }
+.byo-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
+.byo-row + .byo-row { border-top: 1px solid var(--separator); }
+.byo-row-text { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
+.byo-row-text strong { display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--label-primary); }
+.byo-row-text small { font-size: 12.5px; line-height: 1.4; color: var(--label-secondary); }
+.byo-free { padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--label-primary); box-shadow: inset 0 0 0 1px var(--separator-strong); }
+.byo .byo-action { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--strong, #1d1d1f); color: var(--on-strong, #fff); font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform .12s ease, opacity .18s ease; }
+.byo .byo-action:disabled { opacity: .45; cursor: default; }
+.byo .byo-action:active:not(:disabled) { transform: scale(.96); }
+.byo-connected { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--success); }
+.byo-unavailable { flex: none; font-size: 12px; color: var(--label-tertiary); }
+.byo-key-row { align-items: flex-start; }
+.byo-key { flex: 1 1 100%; display: grid; gap: 8px; }
+.byo-key form, .byo-code { display: flex; gap: 8px; }
+.byo-key input, .byo-code input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--secondary-system-background); color: var(--label-primary); font-size: 14px; }
+.byo .byo-link { justify-self: start; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--label-primary); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--separator-strong); }
+.byo-attempt { display: grid; gap: 6px; padding: 12px 14px; margin-top: 8px; border-radius: 12px; background: var(--system-background); }
+.byo-attempt strong { font-size: 14px; } .byo-attempt p { margin: 0; font-size: 13px; color: var(--label-secondary); }
+.byo-attempt a { font-size: 13px; color: var(--label-primary); }
+.byo-error { margin: 4px 0 0; font-size: 13px; color: var(--danger); }
+.byo-more { margin-top: 10px; }
+.byo-more summary { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--label-secondary); list-style: none; }
+.byo-more summary::-webkit-details-marker { display: none; }
+.byo-more[open] summary svg { transform: rotate(180deg); }
+.byo-more .byo-list { margin-top: 8px; }
+@media (max-width: 520px) { .byo { padding: 16px; } .byo-key form, .byo-code { flex-direction: column; } }

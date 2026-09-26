@@ -232,4 +232,4 @@ button.decision-stop-btn:disabled { opacity: .5; cursor: default; }
 .decision-actions { grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: center; gap: 10px; }
 .decision-actions .decision-confirm { min-height: 44px; font-size: 13px; border-radius: 9px; }
 .decision-actions .decision-decline { width: 100%; font-size: 13px; border-radius: 9px; }
-@media(max-width:600px) { .run-controls > .decision-card { padding: 16px; } .decision-actions { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:600px) { .run-controls > .decision-card { padding: 16px; } .run-controls > .decision-card .decision-headline { font-size: 18px; line-height: 24px; letter-spacing: -.3px; } .run-controls > .decision-card .decision-top > .character { width: 28px; height: 28px; } .decision-facts > div { grid-template-columns: 1fr; gap: 2px; } .decision-actions { grid-template-columns: minmax(0,1fr); } }

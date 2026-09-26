@@ -1,0 +1,289 @@
+#!/usr/bin/env node
+// Live replies for OpenCode. Drop-in for `opencode run --format json …`:
+// it starts a private per-task `opencode serve`, sends the same prompt through
+// the server's API, and prints the same JSON lines `run` prints (step_start,
+// text, tool_use, step_finish, error) — plus display-only
+// {"type":"openbot.opencode_event"} lines with streaming text.
+//
+// Why not `run --attach`? Its client exits after the first tool step while
+// the server keeps working (OpenCode 1.18.31–32), which would drop answers.
+//
+// - The server gets this task's environment (its scoped tool token), a random
+//   password (environment only, never argv) and a random loopback port.
+// - `--auto` answers permission requests "once", as `run --auto` does;
+//   questions are declined, as in non-interactive `run`.
+// - When the session goes idle, saved messages are re-read so nothing the
+//   event stream missed is lost.
+// - Anything unexpected falls back to plain `opencode run` with the same args.
+// All processes share one process group: stopping the task stops them all.
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { createServer } from "node:net";
+import { basename, extname, resolve } from "node:path";
+
+const argv = process.argv.slice(2);
+const children = new Set();
+let exiting = false, sessionId = null, base = null;
+const auth = { authorization: "" };
+
+const write = (value) => process.stdout.write(`${typeof value === "string" ? value : JSON.stringify(value)}\n`);
+const stopAll = (signal = "SIGTERM") => { for (const child of children) { try { child.kill(signal); } catch { /* gone */ } } };
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => {
+  exiting = true;
+  const abort = sessionId && base ? fetch(`${base}/session/${sessionId}/abort`, { method: "POST", headers: auth, signal: AbortSignal.timeout(1_500) }).catch(() => {}) : Promise.resolve();
+  void abort.finally(() => { stopAll(signal); process.exit(143); });
+  setTimeout(() => { stopAll("SIGKILL"); process.exit(143); }, 3_000).unref();
+});
+
+/** Only the argument shapes OpenBot sends; anything else runs plain `run`. */
+function parse(args) {
+  if (args[0] !== "run") return null;
+  const out = { auto: false, files: [] };
+  const rest = args.slice(1);
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i];
+    if (arg === "--auto") out.auto = true;
+    else if (arg === "--format") { if (rest[++i] !== "json") return null; }
+    else if (["--model", "--dir", "--agent", "--session", "--title", "--file"].includes(arg)) {
+      const value = rest[++i];
+      if (value === undefined) return null;
+      if (arg === "--file") out.files.push(value); else out[arg.slice(2)] = value;
+    } else if (arg.startsWith("-")) return null;
+    else if (i === rest.length - 1) out.prompt = arg;
+    else return null;
+  }
+  if (!out.prompt || !out.model || !out.model.includes("/") || !out.dir) return null;
+  return out;
+}
+
+function plainRun() {
+  const child = spawn("opencode", argv, { env: process.env, stdio: ["ignore", "inherit", "inherit"] });
+  children.add(child);
+  child.on("error", (error) => { process.stderr.write(`${error.message}\n`); process.exit(1); });
+  child.on("close", (code, signal) => { children.delete(child); process.exit(exiting ? 143 : signal ? 1 : code ?? 1); });
+}
+
+function freePort() {
+  return new Promise((done, fail) => {
+    const server = createServer();
+    server.on("error", fail);
+    server.listen(0, "127.0.0.1", () => { const { port } = server.address(); server.close(() => done(port)); });
+  });
+}
+
+function startServer(env) {
+  return new Promise((done) => {
+    void freePort().then((port) => {
+      const serve = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", String(port)], { env, stdio: ["ignore", "pipe", "pipe"] });
+      children.add(serve);
+      let seen = "", settled = false;
+      const finish = (url) => {
+        if (settled) return; settled = true; clearTimeout(timer);
+        if (!url) { children.delete(serve); try { serve.kill("SIGTERM"); } catch { /* gone */ } }
+        done(url);
+      };
+      const inspect = (chunk) => { seen = (seen + String(chunk)).slice(-4_000); if (seen.includes(`http://127.0.0.1:${port}`)) finish(`http://127.0.0.1:${port}`); };
+      serve.stdout.on("data", inspect); serve.stderr.on("data", inspect);
+      serve.on("error", () => finish(null));
+      serve.on("close", () => { children.delete(serve); if (!settled) finish(null); else if (!exiting) failed("The OpenCode server stopped unexpectedly."); });
+      const timer = setTimeout(() => finish(null), 10_000);
+    }, () => done(null));
+  });
+}
+
+const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv", ".json": "application/json" };
+const mimeFor = (file) => MIME[extname(file).toLowerCase()] || "text/plain";
+
+class Rejected extends Error {}
+async function api(path, body, method = "POST") {
+  // Generous: a busy Mac can take a while, and the task has its own limits.
+  const response = await fetch(`${base}${path}`, { method, headers: { ...auth, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(120_000) });
+  if (!response.ok) throw new Rejected(`OpenCode ${method} ${path.replace(/ses_\w+/, "…")} → ${response.status} ${(await response.text()).slice(0, 300)}`);
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+let finished = false, sawWork = false, hadError = false;
+const emitted = new Set();
+// Messages that existed before this prompt (a continued session) are never ours to print.
+const earlier = new Set();
+function failed(message) {
+  if (finished) return;
+  write({ type: "error", timestamp: Date.now(), sessionID: sessionId, error: { name: "UnknownError", data: { message } } });
+  hadError = true;
+  void done();
+}
+
+/** Print a part exactly once, in `run --format json` shape, when complete. */
+function emitPart(part) {
+  if (!part || part.sessionID !== sessionId || emitted.has(part.id) || earlier.has(part.messageID)) return;
+  // (Callers pass assistant parts only: live events are routed by role, and
+  // the final re-read reads assistant messages.)
+  let type = null;
+  if (part.type === "step-start") type = "step_start";
+  else if (part.type === "step-finish") type = "step_finish";
+  else if (part.type === "text" && part.time?.end && !part.synthetic) type = "text";
+  else if (part.type === "tool" && ["completed", "error"].includes(part.state?.status)) type = "tool_use";
+  if (!type) return;
+  emitted.add(part.id);
+  sawWork = true;
+  write({ type, timestamp: Date.now(), sessionID: sessionId, part });
+}
+
+async function done() {
+  if (finished) return;
+  finished = true;
+  // Reconcile with what the server saved: nothing the stream missed is lost.
+  try {
+    const messages = await api(`/session/${sessionId}/message`, undefined, "GET");
+    for (const message of messages || []) if (message.info?.role === "assistant") for (const part of message.parts || []) emitPart(part);
+  } catch { /* The live stream already delivered what it could. */ }
+  stopAll();
+  process.exit(hadError ? 1 : 0);
+}
+
+async function subscribe(signal, onEvent) {
+  const response = await fetch(`${base}/event`, { headers: auth, signal });
+  if (!response.ok || !response.body) throw new Error("The OpenCode event stream did not open.");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  (async () => {
+    try {
+      for await (const chunk of response.body) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try { onEvent(JSON.parse(line.slice(6))); } catch { /* skip a malformed event */ }
+        }
+      }
+      if (!finished && !exiting) void done();
+    } catch { if (!finished && !exiting) void done(); }
+  })();
+}
+
+function fallBack(stream) {
+  stream.abort();
+  finished = true;
+  for (const child of [...children]) { children.delete(child); try { child.kill("SIGTERM"); } catch { /* gone */ } }
+  plainRun();
+}
+
+async function main() {
+  const options = parse(argv);
+  if (!options) return plainRun();
+  const password = randomUUID();
+  const env = { ...process.env, OPENCODE_SERVER_PASSWORD: password };
+  base = await startServer(env);
+  if (!base || exiting) return plainRun();
+  auth.authorization = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`;
+  const directory = `?directory=${encodeURIComponent(options.dir)}`;
+  const stream = new AbortController();
+  let prompted = false;
+  // Only the assistant's words are ever shown live. The prompt is a text part
+  // too, so every part waits until its message's role is known.
+  const roles = new Map(), waiting = new Map();
+  const forward = (event) => {
+    const props = event.properties || {};
+    if (event.type === "message.part.updated") {
+      const part = props.part;
+      if (part.type !== "tool") write({ type: "openbot.opencode_event", event: { type: event.type, properties: { part: { id: part.id, messageID: part.messageID, type: part.type, text: part.type === "text" ? part.text : undefined } } } });
+      emitPart(part);
+    } else write({ type: "openbot.opencode_event", event: { type: event.type, properties: { partID: props.partID, messageID: props.messageID, field: props.field, delta: props.delta } } });
+  };
+  const route = (event, messageId) => {
+    const role = roles.get(messageId);
+    if (role === "assistant") forward(event);
+    else if (role === undefined) waiting.set(messageId, [...(waiting.get(messageId) || []), event].slice(-2_000));
+  };
+  const onEvent = (event) => {
+    const props = event.properties || {};
+    switch (event.type) {
+      case "message.updated": {
+        const info = props.info;
+        if (!info?.id || info.sessionID !== sessionId) return;
+        roles.set(info.id, info.role);
+        const held = waiting.get(info.id) || [];
+        waiting.delete(info.id);
+        if (info.role === "assistant") for (const item of held) forward(item);
+        return;
+      }
+      case "message.part.updated": {
+        const part = props.part;
+        if (part?.sessionID !== sessionId || earlier.has(part.messageID)) return;
+        route(event, part.messageID);
+        return;
+      }
+      case "message.part.delta":
+        if ((props.sessionID && props.sessionID !== sessionId) || earlier.has(props.messageID)) return;
+        route(event, props.messageID);
+        return;
+      case "permission.asked": case "permission.updated":
+        // The server is private to this task, so every request here is ours.
+        if (props.id) void api(`/permission/${props.id}/reply${directory}`, options.auto ? { reply: "once" } : { reply: "reject" }).catch(() => {});
+        return;
+      case "question.asked":
+        if (props.id) void api(`/question/${props.id}/reject${directory}`, {}).catch(() => {});
+        return;
+      case "session.error":
+        if (props.sessionID && props.sessionID !== sessionId) return;
+        write({ type: "error", timestamp: Date.now(), sessionID: sessionId, error: props.error || { name: "UnknownError", data: { message: "OpenCode reported an error." } } });
+        hadError = true;
+        return;
+      case "session.status":
+        if (props.sessionID === sessionId && prompted && props.status?.type === "busy") sawWork = true;
+        if (props.sessionID === sessionId && prompted && sawWork && props.status?.type === "idle") void done();
+        return;
+      case "session.idle":
+        if (props.sessionID === sessionId && prompted && sawWork) void done();
+        return;
+      default:
+    }
+  };
+  try {
+    await subscribe(stream.signal, onEvent);
+    // Nothing has been sent yet: if setting up fails, run the plain way.
+    try {
+      if (options.session) {
+        sessionId = options.session;
+        for (const message of (await api(`/session/${sessionId}/message`, undefined, "GET")) || []) if (message.info?.id) earlier.add(message.info.id);
+      }
+      else sessionId = (await api(`/session${directory}`, { ...(options.title ? { title: options.title } : {}) })).id;
+    } catch { return fallBack(stream); }
+    const slash = options.model.indexOf("/");
+    const parts = [
+      { type: "text", text: options.prompt },
+      ...options.files.map((file) => { const path = resolve(options.dir, file); return { type: "file", mime: mimeFor(path), filename: basename(path), url: `file://${path}` }; }),
+    ];
+    prompted = true;
+    try {
+      await api(`/session/${sessionId}/prompt_async${directory}`, { model: { providerID: options.model.slice(0, slash), modelID: options.model.slice(slash + 1) }, ...(options.agent ? { agent: options.agent } : {}), parts });
+    } catch (error) {
+      // Refused outright: nothing ran, so the plain way is safe. A timeout may
+      // mean it is already running, so keep watching rather than send twice.
+      if (error instanceof Rejected) return fallBack(stream);
+    }
+    // A quick model can finish before the stream reports busy: poll status too.
+    const poll = setInterval(async () => {
+      try {
+        const status = await api(`/session/status${directory}`, undefined, "GET");
+        const mine = status?.[sessionId];
+        if (mine?.type === "busy") sawWork = true;
+        if (!mine || mine.type === "idle") {
+          if (!sawWork) {
+            const messages = await api(`/session/${sessionId}/message`, undefined, "GET");
+            const last = (messages || []).filter((message) => message.info?.role === "assistant" && !earlier.has(message.info.id)).at(-1);
+            if (last?.info?.time?.completed) sawWork = true;
+          }
+          if (sawWork) { clearInterval(poll); void done(); }
+        }
+      } catch { /* try again */ }
+    }, 1_500);
+    poll.unref?.();
+  } catch (error) {
+    failed(error instanceof Error ? error.message : String(error));
+  }
+}
+
+void main();

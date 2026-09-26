@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+Not released: the next public release waits until the competitive plan is complete.
+
+- Found by real testing on real models (web research, files, memory, group work) and fixed:
+  - Word documents are built in: teammates write Markdown and `document_export` turns it into a real .docx (headings, lists, bold, links) — no more asking to write their own tool. Verified by macOS reading the file back.
+  - Answering a question about an attached file (e.g. "summarize this PDF") no longer shows a false "nothing was delivered" error; tasks that promised a file still need one.
+  - Site search buttons with icon-font labels ("sSearch") on GET search forms run without approval.
+  - In group chats you can address teammates naturally — “Nova: find prices. Pixel: make the budget.” — not only with @names.
+  - A task can use up to 400k tokens (was 100k, which stopped an ordinary two-phone web comparison mid-way); the weekly guard still bounds spend.
+- Start free, or bring what you already have: choosing an AI now leads with free options — GitHub Copilot Free (one-tap sign-in) and Google Gemini (a free AI Studio key, no card) — then subscriptions people already pay for (ChatGPT, Claude, Grok), with OpenCode Go and local models under Other options. Gemini is a new first-class connection (key saved through OpenCode; gemini-2.5-flash preselected).
+- Free Mac install, no Apple fee: `curl -fsSL https://openbots.foundation/install.sh | sh` downloads the bundle for this Mac, checks its SHA-256, installs to ~/Library/Application Support/OpenBot, runs it as a login service, adds an OpenBot app to Applications and the Dock, opens the studio, and leaves an uninstaller. A static install page (`site/`) has a Copy button and an animated 3-step Terminal guide. The release workflow now builds the stable-named bundles it downloads. Tested end to end on this Mac, including a real task and a clean uninstall.
+- Declining a cookie banner (“Do not consent”, “Reject all”, “Necessary only”…) or opening its own cookie settings no longer asks for approval, and teammates are told to decline rather than accept; accepting still asks, and look-alikes in forms, with typed data or incomplete reviews stay reviewed.
+- Teammate creation errors now name the field that's wrong.
+- Lighter studio refreshes: large JSON responses are gzipped (the studio state goes from ~370 KB to ~66 KB on the wire — about 5× less over mobile data and the tunnel), and older finished tasks carry only their last few steps in the state (full logs still load with the receipt).
+- Replies write themselves in front of you, with every provider: the answer streams into the teammate's reply bubble as it is written and the finished answer settles in place. Claude subscriptions use Claude Code's partial messages; everything else (OpenCode Go, ChatGPT, Copilot, API keys, local models) runs through a private per-task OpenCode server driven directly (`src/server/opencode-live.mjs`), because OpenCode's own `run --attach` client exits after the first tool step. The finished answer still comes from the same authoritative events; only the assistant's words are ever shown live (never the prompt); live text travels as a small event instead of a full studio refresh. Falls back to plain `opencode run` if anything is off; `OPENBOT_LIVE_REPLIES=0` switches it off. Live eval: 22/22 on the new path.
+- Talk with a teammate: the waveform button in a one-to-one chat opens a calm, full-screen voice conversation — it listens, sends when you pause, reads the answer aloud with captions, then listens again. Everything lands in the chat; approvals still happen in the app. Uses the browser's own speech (Safari, Chrome).
+- New teammates get a 2,000,000-token weekly guard (was 250,000, which ordinary daily use could hit in a day or two). Existing teammates keep the budget they have.
+- Your week with your team: a quiet “Your week · 7 things done” row tops the chat list and opens a warm look back — things done, time worked so you didn't have to, who helped most, and the biggest tasks. Built only from tasks that really finished (greetings aren't highlights). Sunday evening it arrives once as a notification.
+- Connecting an AI takes a minute, not a terminal: Your AI opens with one Recommended card — OpenCode Go (~$10/month), “Open opencode.ai”, paste the key, Connect. The key goes straight into OpenCode's own credential store and is tested with a short real reply; a key that fails its test says so and the card stays for a corrected one. Ollama moved to API Keys & Local Models.
+- Your phone in one scan: Settings → Your phone shows a QR code the phone's own camera opens — no app to download. The studio pairs that browser as a revocable device (one-time ticket kept out of logs, HttpOnly secure cookie), then a welcome sheet shows how to add OpenBot to the Home Screen and offers notifications at the right moment (on iPhone, once it runs from the Home Screen). Shared relays still pair only through the app.
+- Discover skills: Memory & skills now lists public skills in the open Agent Skills format (Anthropic's collection first). Each is checked by the same importer rules before it shows a Get button; skills that would run their own programs say why they can't be added. Pasting an ordinary GitHub folder or file link now works, and the skill's license travels with it. The phone status bar follows light/dark.
+- New teammates can look things up on the web out of the box: the create sheet shows a "Can look things up on the web" switch, on by default (their own private browser; sending, buying and signing in still ask first). The private computer still starts off.
+- Replies in seconds, not minutes: a plain "hi" went from 181s (or a stop) to ~10s. OpenCode no longer self-updates under a running studio and newer patch releases keep working; each teammate workspace is its own repository, so the runtime stops rescanning host worktrees before every reply
+- Leaner prompts: teammates receive only the rules for capabilities they have, a short teammate identity replaces the runtime's coding-assistant prompt, and per-message boilerplate is trimmed — context per model step down 31% (13.3k → 9.2k tokens on Muse Spark) with every eval check still passing
+- Teammates actually learn: `/learn` now reaches the skill review (the proposal tool was never enabled for real runs), and self-extension follows its setting
+- Asking a teammate takes ~40s instead of ~100s: one consultation, a direct brief for the helper, and no duplicate asks
+- Fewer interruptions: expanding a collapsed menu or section no longer needs approval, "do not sign in or buy" no longer warns about spending, and declining an action lets the teammate finish without it (and never re-propose it) instead of ending the task
+- Message your team from Telegram: owner-only pairing, replies back in the chat, approval notices with a link to the exact review
+- Bring your Hermes team over: agents on this Mac are listed with one-click import; Hermes cron jobs arrive as paused automations
+- The Mac stays awake while teammates work or an automation is due (idle sleep only)
+- First run: a recommended model is preselected, model names are readable, and OpenCode's app-only free tier is no longer offered; the welcome screen names a detected Hermes team
+- Quieter conversations: repeated automation runs fold into one line, and stops say what to fix ("Runtime update needed")
+- Safer data home: a warning when the data folder is inside iCloud Drive, Dropbox or OneDrive
+- Message your team from Discord too (direct messages only); Telegram and Discord share one channel core under Settings → Chat apps
+- Voice: dictate messages and have replies read aloud, using the browser's own speech
+- Calmer chat: short replies without tool work no longer say "not independently checked", and "Needs you" counts only what needs you now (a stale studio went from 30 to 1)
+- Teammates answer questions in chat instead of saving unrequested files
+- `scripts/prompt-eval.ts`: a live eleven-case teammate eval on a throwaway studio — greeting, spreadsheet totals, routine, memory, no false "sent", file, teammate help, /learn, web reading, honest decline, and a real Hermes import (22/22 on Muse Spark)
+
 ## 0.37.0-beta.1 — 2026-09-07
 
 First public beta candidate: owner-hosted AI teammates on Mac, Linux and Windows (terminal bundles) plus the Mac desktop app. Bring your own AI connection; the studio runs on your hardware and your data stays in your data directory.

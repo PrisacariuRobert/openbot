@@ -67,6 +67,7 @@ function agentModels(models: string[]): string[] {
 function preferredModel(provider: ProviderInstance["provider"], models: string[]): string | undefined {
   if (provider === "opencode") return models.find((model) => model === "opencode-go/deepseek-v4.1-flash") || models.find((model) => model === "opencode-go/muse-spark-1.3-contributor") || models.find((model) => model === "opencode-go/deepseek-v4-flash") || models.find((model) => model.endsWith("-free")) || models[0];
   if (provider === "claude") return models.find((model) => model.endsWith("/sonnet")) || models[0];
+  if (provider === "google") return models.find((model) => model === "google/gemini-2.5-flash") || models[0];
   if (provider === "openai") {
     const baseModels = models.filter((model) => /^openai\/gpt-\d+(?:\.\d+)*$/.test(model));
     return baseModels.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] || models.find((model) => /codex/i.test(model)) || models[0];
@@ -77,7 +78,7 @@ function preferredModel(provider: ProviderInstance["provider"], models: string[]
 function modelsFor(provider: ProviderInstance["provider"], allModels: string[]): string[] {
   const prefixes: Record<ProviderInstance["provider"], string[]> = {
     opencode: ["opencode/", "opencode-go/"], claude: ["claude-code/"], openai: ["openai/"],
-    "github-copilot": ["github-copilot/"], gitlab: ["gitlab/"], xai: ["xai/"], custom: [],
+    "github-copilot": ["github-copilot/"], gitlab: ["gitlab/"], xai: ["xai/"], google: ["google/"], custom: [],
   };
   const selected = agentModels(allModels.filter((model) => prefixes[provider].some((prefix) => model.startsWith(prefix))));
   if (provider === "claude") return ["claude-code/sonnet", "claude-code/opus", "claude-code/haiku"];
@@ -138,6 +139,7 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
   const copilotConnected = auth.code === 0 && authHas(auth.stdout, /GitHub Copilot\s+(?:api|oauth)/i);
   const gitlabConnected = auth.code === 0 && authHas(auth.stdout, /GitLab\s+(?:api|oauth)/i);
   const xaiConnected = auth.code === 0 && authHas(auth.stdout, /xAI\s+(?:api|oauth)/i);
+  const googleConnected = auth.code === 0 && authHas(auth.stdout, /Google\s+api/i);
   let claudeConnected = false;
   try { claudeConnected = Boolean(JSON.parse(claudeAuth.stdout || "{}").loggedIn); } catch { claudeConnected = /logged.?in\D+true/i.test(claudeAuth.stdout); }
 
@@ -145,6 +147,7 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
   if (openAIConnected) connectedInstance(db, { id: "local-openai", name: "ChatGPT / OpenAI", provider: "openai", authMode: "subscription", runtime: "opencode" });
   if (copilotConnected) connectedInstance(db, { id: "local-github-copilot", name: "GitHub Copilot", provider: "github-copilot", authMode: "subscription", runtime: "opencode" });
   if (gitlabConnected) connectedInstance(db, { id: "local-gitlab", name: "GitLab Duo", provider: "gitlab", authMode: "subscription", runtime: "opencode" });
+  if (googleConnected) connectedInstance(db, { id: "local-google", name: "Google Gemini", provider: "google", authMode: "cli", runtime: "opencode" });
   if (xaiConnected) connectedInstance(db, { id: "local-xai", name: "SuperGrok / xAI", provider: "xai", authMode: "subscription", runtime: "opencode" });
   if (claudeConnected) connectedInstance(db, { id: "local-claude", name: "Claude", provider: "claude", authMode: "subscription", runtime: "claude_code" });
 
@@ -167,9 +170,10 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
     { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "Free and Go models through your OpenCode account.", badge: "Free + Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? "Sign-in found on this Mac; model access is checked when a task runs." : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
     { id: "claude", name: "Claude", shortName: "Claude", description: "Use the official Claude Code login with Pro, Max, Team, Enterprise, or Console.", badge: "Official login", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with OpenBot." : "Install Claude Code first." },
     { id: "openai", name: "ChatGPT / OpenAI", shortName: "ChatGPT", description: "Use ChatGPT Plus/Pro OAuth or your existing OpenAI connection.", badge: "Subscription", connected: openAIConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: openAIConnected ? "local-openai" : null, models: modelsFor("openai", allModels), note: openAIConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Browser sign-in through OpenCode." },
-    { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with your Copilot account.", badge: "Subscription", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Connect a GitHub.com account." },
+    { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with your Copilot account — Copilot Free works too.", badge: "Free plan", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Connect a GitHub.com account." },
     { id: "gitlab", name: "GitLab Duo", shortName: "GitLab", description: "Connect a GitLab Duo seat for agent work.", badge: "Experimental", connected: gitlabConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: gitlabConnected ? "local-gitlab" : null, models: modelsFor("gitlab", allModels), note: gitlabConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "GitLab support in OpenCode is experimental." },
     { id: "xai", name: "SuperGrok / xAI", shortName: "Grok", description: "Use SuperGrok device login or an xAI API connection.", badge: "Subscription", connected: xaiConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: xaiConnected ? "local-xai" : null, models: modelsFor("xai", allModels), note: xaiConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Secure device sign-in through OpenCode." },
+    { id: "google", name: "Google Gemini", shortName: "Gemini", description: "A free Gemini API key from Google AI Studio — a Google account is enough, no card. Free-tier limits apply.", badge: "Free key", connected: googleConnected, installed: openCodeInstalled, canConnect: false, connectionId: googleConnected ? "local-google" : null, models: modelsFor("google", allModels).filter((model) => !/(?:deep-research|computer-use|preview-tts)/.test(model)), note: googleConnected ? "Key saved in OpenCode on this Mac; free-tier limits apply." : "Paste a free key from aistudio.google.com." },
   ];
   const connectionMap = new Map(catalog.map((entry) => [entry.connectionId, entry]));
   const instances = db.listProviders().map((instance) => {
@@ -242,6 +246,14 @@ class OpenCodeAuthBridge {
     if (!response.ok) throw new Error("The sign-in code was not accepted.");
   }
 
+  /** Saves an API key the owner pasted, through OpenCode's own credential
+   * store (the same place its /connect command writes). */
+  async setApiKey(providerId: string, key: string): Promise<void> {
+    const base = await this.ensure();
+    const response = await fetch(`${base}/auth/${encodeURIComponent(providerId)}`, { method: "PUT", headers: this.headers(), body: JSON.stringify({ type: "api", key }), signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error("OpenCode didn't save the key. Try again.");
+  }
+
   stop() { this.child?.kill("SIGTERM"); this.child = null; this.url = null; }
 }
 
@@ -250,7 +262,19 @@ export class ProviderConnectionManager {
   private readonly attempts = new Map<string, ProviderLoginAttempt>();
   private readonly claudeProcesses = new Map<string, ChildProcess>();
 
-  constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop"> = new OpenCodeAuthBridge()) {}
+  constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop" | "setApiKey"> = new OpenCodeAuthBridge()) {}
+
+  /** Paste-a-key setup (OpenCode Go). The key goes straight to OpenCode's
+   * credential store; OpenBot never keeps or shows it. */
+  async saveKey(providerId: "opencode-go" | "google", key: string): Promise<ProviderLoginAttempt> {
+    const trimmed = key.trim();
+    if (!/^[A-Za-z0-9_\-.]{20,300}$/.test(trimmed)) throw new Error(providerId === "google" ? "That doesn't look like a Gemini API key. Copy it again from aistudio.google.com." : "That doesn't look like an OpenCode key. Copy it again from opencode.ai.");
+    await this.bridge.setApiKey(providerId, trimmed);
+    const attempt: ProviderLoginAttempt = { id: randomUUID(), providerId: providerId === "google" ? "google" : "opencode", status: "connected", url: null, callbackMode: null, instructions: "Key saved.", error: null };
+    this.attempts.set(attempt.id, attempt);
+    this.onChange();
+    return attempt;
+  }
 
   listAttempts(): ProviderLoginAttempt[] { return [...this.attempts.values()].slice(-6); }
 

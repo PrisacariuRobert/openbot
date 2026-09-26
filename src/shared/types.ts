@@ -337,6 +337,8 @@ export interface Run {
   botMascot: MascotKind;
   botColor: string;
   parentRunId: string | null;
+  /** Starts after this run answers (a later teammate building on its work). */
+  afterRunId?: string | null;
   steeredFromRunId: string | null;
   /** Task outcome, separate from process status: a run whose process ended
    * is "completed", but only "delivered" means the requested work exists.
@@ -588,7 +590,7 @@ export interface RunnerCareStatus extends RunnerCareSnapshot {
   heartbeat: RunnerExternalHeartbeat;
 }
 
-export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "custom";
+export type ProviderKind = "opencode" | "claude" | "openai" | "github-copilot" | "gitlab" | "xai" | "google" | "custom";
 export type ProviderRuntime = "opencode" | "claude_code";
 
 export interface ApiConnectionConfig {
@@ -1084,6 +1086,8 @@ export interface StudioDraft {
 }
 
 export interface AppState {
+  /** The last 7 days of finished work, when there is any (see weekly-recap). */
+  weeklyRecap?: import("./weekly-recap").WeeklyRecap | null;
   bots: Bot[];
   threads: Thread[];
   messages: Message[];

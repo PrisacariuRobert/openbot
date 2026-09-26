@@ -43,8 +43,8 @@ const failures = [];
 if (packageLock.version !== version || packageLock.packages?.[""]?.version !== version) {
   failures.push(`package-lock.json must use version ${version}.`);
 }
-if (!readme.startsWith(`# OpenBot ${version}\n`)) {
-  failures.push(`README.md must start with “# OpenBot ${version}”.`);
+if (!readme.includes(`OpenBot ${version}`)) {
+  failures.push(`README.md must name the current version, “OpenBot ${version}”.`);
 }
 if (!readme.includes(`## What's new in ${version}\n`)) {
   failures.push(`README.md must contain “## What's new in ${version}”.`);

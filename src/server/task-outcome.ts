@@ -15,9 +15,17 @@ export function decideTaskOutcome(input: {
   deliveredArtifacts: number;
   deliveredReports: number;
   verificationStatus: string | null;
+  /** What the task promised (its contract), when known. */
+  deliverable?: string;
+  /** Length of the teammate's final answer in the conversation. */
+  answerLength?: number;
 }): { outcome: TaskOutcome; error: string | null } {
   const delivered = input.deliveredArtifacts > 0 || input.deliveredReports > 0;
   if (delivered || input.verificationStatus === "passed") return { outcome: "delivered", error: null };
+  // "Summarize this PDF" promises an answer, not a file: a real answer in the
+  // conversation is the result. Tasks that promised a file still need one.
+  const promisedFile = /\b(?:file|spreadsheet|workbook|xlsx|csv|pdf|docx|document|deck|slides?|presentation|image|chart|export|download)\b/i.test(input.deliverable || "");
+  if (!promisedFile && (input.answerLength || 0) >= 80) return { outcome: null, error: null };
   if (input.prompt.includes(INPUT_FILES_MARKER)) {
     return {
       outcome: "blocked",

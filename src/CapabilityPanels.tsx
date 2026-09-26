@@ -1,3 +1,4 @@
+import { MacWakeCard } from "./components/MacWakeCard";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { WorkflowChecksPanel } from "./components/WorkflowChecksPanel";
 import { WorkSourcesPanel } from "./components/WorkSourcesPanel";
@@ -5,6 +6,7 @@ import { WorkFollowupsPanel } from "./components/WorkFollowupsPanel";
 import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
+import { SiriCard } from "./components/SiriCard";
 import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
 import { prefixCrumbs, visibleWorkspaceFiles } from "./studio/file-navigation";
 import { groupActivityAttentionRuns } from "./studio/activity-attention";
@@ -4328,6 +4330,7 @@ export function RemotePanel({ bots, runner, installPrompt, onInstalled, onNotice
       <h3>Your team comes with you.</h3>
       <p>Send a task, see what changed, and approve work from your iPhone. Just OpenBot—no extra networking apps.</p>
     </div>
+    {local && <SiriCard />}
     {local ? <AwayAccessPanel /> : <div className="remote-status good"><Check size={18} /><span><strong>Connected to your studio</strong><small>Manage paired phones from OpenBot on your host.</small></span></div>}
     {local && (
       <Advanced title="Advanced connection settings" summary="Owner access key, direct network URLs, and host notifications">
@@ -5562,6 +5565,7 @@ export function RoutinesPanel({
   }, [checkPrivateHome, privateRunner, runnerCareAttempted]);
   return (
     <div className="routines-view">
+      <MacWakeCard />
       <details className="automation-health" open={runner.status !== "online" ? true : undefined}>
       <summary><span className={runner.status === "online" ? "health-ready" : "health-attention"} />{runner.status === "online" ? "Your studio is awake" : "Your studio needs attention"}<small>Status & recovery</small></summary>
       <div className="automation-health-body">
