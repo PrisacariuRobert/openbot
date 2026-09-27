@@ -40,7 +40,7 @@
 
 Hosted AI agents rent you their computer for $20–300 a month. OpenBot gives you the same kind of team on **your** Mac, for free.
 
-- **No new bill.** Sign in with ChatGPT, Claude or Grok you already pay for, start free with GitHub Copilot Free or a Gemini key, or run a model on your Mac.
+- **No new bill.** Sign in with ChatGPT, Claude, Grok or GitHub Copilot you already pay for, start free with a Gemini key, or run a model on your Mac.
 - **A real team, not one bot.** Every teammate has a name, a job, a private workspace and its own browser. When one builds on another’s work, it waits for the answer.
 - **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting always waits for your okay — with the website and the exact button.
 - **Nothing hidden.** No account, no tracking. Your studio is a folder on your Mac, and every line of OpenBot is here.
@@ -90,8 +90,8 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
 
 | | |
 | :--- | :--- |
-| **Start free** | GitHub Copilot Free · Google Gemini (free key) |
-| **Use your subscription** | ChatGPT · Claude · Grok |
+| **Start free** | Google Gemini (free key — a Google account, no card) |
+| **Use your subscription** | ChatGPT · Claude · Grok · GitHub Copilot (Pro, Pro+, Business) |
 | **Pay per use** | OpenCode Go · any OpenAI-compatible API |
 | **Stay private** | Models on your Mac with Ollama |
 
@@ -123,7 +123,7 @@ OpenBot 0.37.0-beta.1 is a beta. The one-line installer ships with the first pub
 ## What's new in 0.37.0-beta.1
 
 - Replies appear word by word from every provider.
-- Start free with GitHub Copilot Free or a Gemini key; one-line Mac installer.
+- Start free with a Gemini key; one-line Mac installer.
 - Teammates build on each other’s answers in group chats.
 - Word documents, weekly recap, hands-free voice, and phone pairing with one scan.
 

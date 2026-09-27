@@ -80,7 +80,6 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
 
       <h4>Start free</h4>
       <ul className="byo-list">
-        {account("github-copilot", "GitHub Copilot", "Copilot Free comes with any GitHub account. Monthly limits apply.", true)}
         <li className="byo-row byo-key-row">
           <div className="byo-row-text">
             <strong>Google Gemini{!entry("google")?.connected && <span className="byo-free">Free key</span>}</strong>
@@ -95,6 +94,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
       <h4>Use a subscription you already have</h4>
       <ul className="byo-list">
         {account("openai", "ChatGPT", "Plus, Pro or Business")}
+        {account("github-copilot", "GitHub Copilot", "Pro, Pro+ or Business")}
         {account("claude", "Claude", "Pro or Max")}
         {account("xai", "Grok", "SuperGrok")}
       </ul>
