@@ -1,3 +1,4 @@
+import { SidebarExtras } from "../components/SidebarExtras";
 import type { Attachment } from "../shared/types";
 import { DocumentPane } from "./DocumentPane";
 import {
@@ -1954,6 +1955,7 @@ export function Studio() {
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
+          <SidebarExtras />
           <button
             className="workspace-link"
             aria-label="Open workspace"
@@ -2534,8 +2536,8 @@ export function Studio() {
                     {state.activeThreadId === thread && state.messages[0] && <div className="conversation-date">{dayKey(state.messages[0].createdAt) === dayKey(new Date()) ? "Today" : dateText(state.messages[0].createdAt)} · {timeText(state.messages[0].createdAt)}</div>}
                     {!state.bots.length ? (
                       <div className="first-teammate refined-welcome">
-                        <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><h1>A small team.<br/>A familiar conversation.</h1><p>A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your workspace stays on your host. Selected prompts and files can go to the model provider you choose.</small></div>
+                        <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><p className="welcome-tagline">A little help with the work.<br/>A little more room for you.</p></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>

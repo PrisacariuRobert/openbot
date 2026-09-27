@@ -94,6 +94,7 @@ import { TelegramChannel } from "./telegram-channel.js";
 import { FullDiskAccessError, IMessageChannel } from "./imessage-channel.js";
 import { plannedWakeTime, setMacWake, type MacWakeState } from "./mac-wake.js";
 import { speakable } from "../shared/speakable.js";
+import { UpdateChecker } from "./updates.js";
 import { execFile } from "node:child_process";
 import { DiscordChannel } from "./discord-channel.js";
 import { weeklyRecap } from "../shared/weekly-recap.js";
@@ -4759,6 +4760,12 @@ app.post("/api/mac-wake", async (request, response) => {
     response.json({ available: true, ...state, suggested: plannedWakeTime(db.listRoutines()) });
   } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The wake schedule wasn't changed." }); }
 });
+// A newer release: a small note in the studio; installed copies update in one tap.
+const updates = new UpdateChecker({ current: appVersion });
+app.get("/api/update", (_request, response) => { response.json(updates.status()); });
+app.post("/api/update", (_request, response) => {
+  try { response.json(updates.install()); } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : "The update couldn't start." }); }
+});
 // Siri and other quick askers: one request, the answer written for speaking.
 // Waits up to ~50 s (Shortcuts gives up around a minute); longer work keeps
 // going and arrives as a notification.
@@ -4890,6 +4897,7 @@ const server = app.listen(port, host, () => {
   relay?.start();
   if (telegram.status().configured) telegram.start();
   if (imessage.status().configured) imessage.start();
+  updates.start();
   if (discord.status().configured) discord.start();
   awakeGuard.start();
   console.log(`OpenBot is awake at ${deployment.mode === "private_runner" ? appUrl : `http://${host}:${process.env.NODE_ENV === "production" ? port : 4310}`}`);
@@ -4911,6 +4919,7 @@ async function shutdown() {
   notifications.stop();
   telegram.stop();
   imessage.stop();
+  updates.stop();
   discord.stop();
   awakeGuard.stop();
   await runner.stop();

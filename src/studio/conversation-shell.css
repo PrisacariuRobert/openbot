@@ -2384,3 +2384,25 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .siri-copy button { display: inline-flex; align-items: center; gap: 6px; }
 .siri-error { color: var(--danger, #c0392b) !important; }
 .siri-hint { margin: 10px 0 0 !important; color: var(--ink) !important; font-size: 13.5px !important; }
+
+/* Sidebar: update note and feedback. */
+.sidebar-extras { display: grid; gap: 6px; margin-bottom: 8px; width: 100%; justify-items: start; }
+.sidebar-extras .update-pill { justify-self: stretch; }
+.update-pill { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--surface-muted); font-size: 13px; }
+.update-pill strong { display: block; font-size: 13px; }
+.update-pill small { color: var(--muted); font-size: 12px; }
+.update-pill button, .update-pill a { font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 9px; background: var(--ink); color: var(--surface, #fff); border: 0; text-decoration: none; cursor: pointer; }
+.update-error { margin: 0; color: var(--danger, #c0392b); font-size: 12px; }
+.feedback-link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border: 0; background: none; color: var(--muted); font-size: 13px; cursor: pointer; border-radius: 8px; }
+.feedback-link:hover { color: var(--ink); }
+.feedback-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(0,0,0,.35); padding: 16px; }
+.feedback-sheet { width: min(480px, 100%); display: grid; gap: 12px; padding: 18px; border-radius: 20px; background: var(--surface, #fff); box-shadow: 0 30px 80px -20px rgba(0,0,0,.45); }
+.feedback-sheet header { display: flex; justify-content: space-between; align-items: center; }
+.feedback-sheet header button { border: 0; background: none; color: var(--muted); cursor: pointer; }
+.feedback-sheet textarea { width: 100%; resize: vertical; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; }
+.feedback-sheet label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
+.feedback-sheet footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.feedback-sheet footer small { color: var(--muted); font-size: 12px; }
+.feedback-sheet footer button { padding: 9px 16px; border-radius: 11px; border: 0; background: var(--ink); color: var(--surface, #fff); font-weight: 600; cursor: pointer; }
+.feedback-sheet footer button:disabled { opacity: .4; cursor: default; }
+.welcome-personality .welcome-tagline { font-size: 17px; line-height: 1.45; color: var(--muted); text-align: center; margin: 18px 0 0; }
