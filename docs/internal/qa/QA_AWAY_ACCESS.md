@@ -107,7 +107,7 @@ cancelled without sending a connection request to the example address.
 
 ## Operator setup
 
-See [the relay deployment guide](../deploy/relay/README.md) and Render Blueprint.
+See [the relay deployment guide](../../../deploy/relay/README.md) and Render Blueprint.
 The YAML parses and its durable path, single-instance configuration and generated
 secret were checked locally; it has not been validated by a deployed Render service.
 The pilot can use Render's included address now, with a branded address later.

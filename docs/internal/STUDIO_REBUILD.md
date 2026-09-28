@@ -2,7 +2,7 @@
 
 Status: **the only web application interface** in the 0.37.0 development checkout. Native apps still require their own build/install and visual checks; this is not a public-release claim.
 
-Open `/` on the running host. `/studio.html` is a compatible alias for the same entry. Older `?panel=` links open the corresponding feature inside Studio, without loading another shell. [Migration evidence](QA_UI_UNIFICATION.md).
+Open `/` on the running host. `/studio.html` is a compatible alias for the same entry. Older `?panel=` links open the corresponding feature inside Studio, without loading another shell. [Migration evidence](qa/QA_UI_UNIFICATION.md).
 
 ## What starts from zero
 
@@ -12,7 +12,7 @@ The retired `App.tsx`, `styles.css` and `studio-design.css` are removed. Functio
 
 The visual system uses white, near-black, neutral gray, system fonts, quiet separators and restrained rounded controls. Color belongs only to the characters, including grayscale service logos in the chrome. Characters are recolorable SVGs with name-dependent blink/float timings, hover response and reduced-motion support—not flattened images.
 
-The latest polish adds saved light/dark/system appearance, keyboard-operable top-layer menus and six distinct editable character shapes. Native Mac/iPhone source now shares a Canvas character renderer, adaptive conversation colors, searchable message previews and full supported approval review. It remains native SwiftUI, not an embedded copy of this page. See the [design contract](DESIGN_LANGUAGE.md) and [current verification record](QA_APP_POLISH.md); compilation does not update previously installed apps.
+The latest polish adds saved light/dark/system appearance, keyboard-operable top-layer menus and six distinct editable character shapes. Native Mac/iPhone source now shares a Canvas character renderer, adaptive conversation colors, searchable message previews and full supported approval review. It remains native SwiftUI, not an embedded copy of this page. See the [design contract](../DESIGN_LANGUAGE.md) and [current verification record](qa/QA_APP_POLISH.md); compilation does not update previously installed apps.
 
 The teammate list is the primary navigation, with real last-message previews and a compact composer. Activity, Schedule, Library and settings sit inside a secondary Workspace menu, not four competing primary destinations. An optional desktop pane keeps a teammate's computer snapshot, work and routines beside the chat; phones use a focused detail sheet.
 
@@ -54,7 +54,7 @@ No owner data, providers, routines or permissions are changed merely by viewing 
 
 ## Verification
 
-The [conversation-workflow QA record](QA_CONVERSATION_WORKFLOW.md) separates actual browser/API evidence from native and live-model work still outstanding.
+The [conversation-workflow QA record](qa/QA_CONVERSATION_WORKFLOW.md) separates actual browser/API evidence from native and live-model work still outstanding.
 
 Run:
 

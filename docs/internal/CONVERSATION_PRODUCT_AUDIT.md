@@ -6,7 +6,7 @@ Independent audit, 6 September 2026, with implementation follow-through updated 
 
 The concern is justified: OpenBot drifted toward a control centre for agent infrastructure. The desired experience is a personal roster of useful, persistent teammates. The backend investment is largely useful; exposing its modules as equally important destinations is the mismatch. More connector cards, scheduling options or mascot decoration will not solve that mismatch.
 
-The Studio preview now moves back toward that model: conversation is the main workspace, text and attachment drafts are integrated, supported decisions can be reviewed in chat, and the optional context pane reads real teammate computer/work/routine state. The final combined browser/API suite and 357-test verification pass are green; [the QA record](QA_CONVERSATION_WORKFLOW.md) states precisely what they cover. That is meaningful progress, not evidence that the entire product or native clients have reached parity.
+The Studio preview now moves back toward that model: conversation is the main workspace, text and attachment drafts are integrated, supported decisions can be reviewed in chat, and the optional context pane reads real teammate computer/work/routine state. The final combined browser/API suite and 357-test verification pass are green; [the QA record](qa/QA_CONVERSATION_WORKFLOW.md) states precisely what they cover. That is meaningful progress, not evidence that the entire product or native clients have reached parity.
 
 Use one ordinary loop:
 

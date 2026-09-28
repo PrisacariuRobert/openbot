@@ -33,4 +33,4 @@ This temporary candidate does not replace an installed application and is not si
 
 The exact build-42 candidate was launched successfully (process path verified). Its native executable SHA-256 is `db21e9a66209c8204036903cd532ffda86fc0310b8d40d6738a95c34fca234bb`. Only this pass's disposable Debug preview and loopback fixture were stopped; older owner app processes and their data were left untouched. Launch verification while locked does not certify the visible window.
 
-The [introduction film](../marketing/intro-film/README.md) is a separate pre-launch creative asset, not a release test or a recording of the owner's workspace.
+The [introduction film](../../../marketing/intro-film/README.md) is a separate pre-launch creative asset, not a release test or a recording of the owner's workspace.

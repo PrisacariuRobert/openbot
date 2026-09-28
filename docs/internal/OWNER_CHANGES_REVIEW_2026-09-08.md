@@ -2,7 +2,7 @@
 
 Review only, as requested. No product source was changed by this review. This covers the current dirty checkout, not a published release or every historical capability. Files were still changing during review; rerun checks after the final edits.
 
-Later, the owner authorized fixes. See [verified fixes and remaining limits](QA_BUG_FIXES_2026-09-08.md) for the follow-up; the findings below retain the original review evidence.
+Later, the owner authorized fixes. See [verified fixes and remaining limits](qa/QA_BUG_FIXES_2026-09-08.md) for the follow-up; the findings below retain the original review evidence.
 
 ## Overall assessment
 

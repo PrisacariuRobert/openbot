@@ -2,7 +2,7 @@
 
 6 September 2026 · working-tree development preview · OpenBot 0.37.0.
 
-The product target is a persistent teammate completing work in one understandable conversation, not a collection of disconnected tools. See [the independent assessment](CONVERSATION_PRODUCT_AUDIT.md) and [preview scope](STUDIO_REBUILD.md).
+The product target is a persistent teammate completing work in one understandable conversation, not a collection of disconnected tools. See [the independent assessment](../CONVERSATION_PRODUCT_AUDIT.md) and [preview scope](../STUDIO_REBUILD.md).
 
 ## Changes verified
 

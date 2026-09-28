@@ -58,4 +58,4 @@ Evidence paths printed by these runs: `openbot-extension-acceptance-8VnN0z` and 
 3. **Dependable remote use:** physical phone pairing/cellular/reconnect/approval tests, then paid-team APNs/share acceptance, signed distribution and updates. Private hosting exists; managed always-on provisioning and powered-off-laptop equivalence are not proven.
 4. **Quality across providers:** repeat the existing checked workflows over representative providers and interruption scenarios, with whole-job usage and failure rates. Two successful new synthetic tasks do not establish general superiority.
 
-User testing instructions: [iPhone preview checklist](../ios/README.md#phone-test-checklist). Connector and plugin boundary: [compatibility matrix](PLUGIN_INTEROPERABILITY.md).
+User testing instructions: [iPhone preview checklist](../ios/README.md#phone-test-checklist). Connector and plugin boundary: [compatibility matrix](../../PLUGIN_INTEROPERABILITY.md).

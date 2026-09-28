@@ -19,7 +19,7 @@ This document deliberately stays **outside** the film. User direction is to prep
 | Build → test → improve → use → reuse in the demo-led cut | The local parser fixture reproduces two failures, four passing cases after a manual source change and a €1,749.50 total. It does not prove an agent can autonomously generate, load, test, repair, invoke and later rediscover a new tool. That end-to-end cycle, bounded retries, honest failure reporting and permission preservation require live-model tests. This illustrates tool self-extension, not model-weight training or unlimited authority. |
 | Open source and local-first | Ship matching source/license, installation instructions and dependency notices. Local-first does not mean remote model requests never leave the Mac. |
 
-The [unlocked-Mac evidence](../../docs/QA_UNLOCKED_MAC_2026-09-07.md) records actual unit/build/fixture checks, synthetic free-model scenarios and bounded real Gmail/Drive reads. Its Google Calendar pilot is blocked by API configuration. Neither that evidence nor this animation establishes competitor parity.
+The [unlocked-Mac evidence](../../docs/internal/qa/QA_UNLOCKED_MAC_2026-09-07.md) records actual unit/build/fixture checks, synthetic free-model scenarios and bounded real Gmail/Drive reads. Its Google Calendar pilot is blocked by API configuration. Neither that evidence nor this animation establishes competitor parity.
 
 This task changes the UI and creates the film. It does **not** complete every roadmap feature, enable public away access, install a physical phone app, sign/notarize a public installer, or publish marketing.
 

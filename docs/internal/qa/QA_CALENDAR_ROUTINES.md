@@ -1,6 +1,6 @@
 # Calendar routines: first competitive-plan delivery
 
-Verified 5 September 2026 in the 0.35.0 development checkout. This closes the calendar-time scheduling slice of [delivery A](COMPETITIVE_EXECUTION_PLAN.md), not the whole competitive plan or the seven-day unattended-operation gate.
+Verified 5 September 2026 in the 0.35.0 development checkout. This closes the calendar-time scheduling slice of [delivery A](../COMPETITIVE_EXECUTION_PLAN.md), not the whole competitive plan or the seven-day unattended-operation gate.
 
 ## Available now
 

@@ -26,7 +26,7 @@ Compared the running native Mac preview with the owner-approved conversation-fir
 
 ### Later local follow-up: outcome-first replies and packaged runner
 
-The concatenated-progress defect is now corrected for provider-delimited new runs, with expandable work updates in all three clients and regression coverage for unfinished/error responses. A fresh native Release build has also been packaged with its runner and passed an isolated launch/shutdown check. Neither change retroactively changes historical messages or replaces the earlier preview being inspected. See [the exact result-flow and package evidence](QA_RESULT_FLOW.md). Source publication, independent clean-machine setup, visual Mac inspection, signing/distribution, hosted access and real-account pilots remain open.
+The concatenated-progress defect is now corrected for provider-delimited new runs, with expandable work updates in all three clients and regression coverage for unfinished/error responses. A fresh native Release build has also been packaged with its runner and passed an isolated launch/shutdown check. Neither change retroactively changes historical messages or replaces the earlier preview being inspected. See [the exact result-flow and package evidence](qa/QA_RESULT_FLOW.md). Source publication, independent clean-machine setup, visual Mac inspection, signing/distribution, hosted access and real-account pilots remain open.
 
 The private security-report configuration gate below was subsequently closed: GitHub private vulnerability reporting was enabled and its API confirmed `enabled: true`. No test report was submitted, and release/merge permissions were unchanged. The original audit observations below remain dated evidence.
 
@@ -36,7 +36,7 @@ The local native code now shares one attention model across Mac and iPhone, comb
 
 Provider labels now distinguish saved credentials/sign-in from a tested model request; connected apps with missing write scope show **Read access connected**. No live-check timestamp or successful model execution is fabricated. The remaining result-log presentation, web/native visual continuity, packaging, publishing and pilot gates above remain open.
 
-This follow-up is in the local candidate only, not an installed-app update or GitHub release. Mac build/unit checks pass; the latest rendered Mac follow-up is blocked because the desktop locked again. See the current verification entry in [native QA](QA_NATIVE_CONVERSATIONS.md).
+This follow-up is in the local candidate only, not an installed-app update or GitHub release. Mac build/unit checks pass; the latest rendered Mac follow-up is blocked because the desktop locked again. See the current verification entry in [native QA](qa/QA_NATIVE_CONVERSATIONS.md).
 
 | Check | Observed result | What it does not prove |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ This follow-up is in the local candidate only, not an installed-app update or Gi
 
 The web build also reports an approximately 601 kB main JavaScript chunk (about 180 kB gzip). That warning is not a failed build, but startup should be measured on a modest device before a mobile-web performance claim.
 
-Logs for this audit are local: `/tmp/openbot-release-audit-verify.log` and `/tmp/openbot-release-audit-runtime.log`. The native test evidence is recorded in [native QA](QA_NATIVE_CONVERSATIONS.md). Older clean-package, provider and workflow reports are dated observations, not fresh certification of this changed candidate. In particular, [provider QA](QA_PROVIDER_CHOICE.md) records four earlier live-model artifact/consultation examples, and [candidate QA](QA_BETA_CANDIDATE.md) records four live Spark runs against synthetic sources. These are useful small samples, not repeated real-account or head-to-head trials.
+Logs for this audit are local: `/tmp/openbot-release-audit-verify.log` and `/tmp/openbot-release-audit-runtime.log`. The native test evidence is recorded in [native QA](qa/QA_NATIVE_CONVERSATIONS.md). Older clean-package, provider and workflow reports are dated observations, not fresh certification of this changed candidate. In particular, [provider QA](qa/QA_PROVIDER_CHOICE.md) records four earlier live-model artifact/consultation examples, and [candidate QA](qa/QA_BETA_CANDIDATE.md) records four live Spark runs against synthetic sources. These are useful small samples, not repeated real-account or head-to-head trials.
 
 ## Release blockers verified now
 

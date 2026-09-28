@@ -668,6 +668,14 @@ export class OpenCodeRunner {
           if (!liveTimer) { liveTimer = setTimeout(showLive, 250); liveTimer.unref(); }
           return;
         }
+        if (event.type === "openbot.waiting") {
+          // The provider asked us to wait (a per-minute allowance). Not stalled.
+          meter.progress();
+          const seconds = Math.max(5, Math.min(600, Number(event.seconds) || 60));
+          this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Waiting for your AI’s allowance", detail: `Your AI asked for a short pause. Trying again in about ${seconds < 90 ? `${Math.round(seconds / 5) * 5 || 5} seconds` : `${Math.round(seconds / 60)} minutes`}.` });
+          this.options.onChange();
+          return;
+        }
         sessionId = eventSessionId(event) || sessionId;
         peakContext = Math.max(peakContext, reportedContextSize(event) || 0);
         output.add(event);

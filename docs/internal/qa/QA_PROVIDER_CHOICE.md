@@ -4,7 +4,7 @@
 
 ## Research and defects
 
-[Fresh comparative audit](COMPETITOR_RECHECK_2026-09-05.md) maps current official Grok Bot docs and user reports to actual source paths and outcome tests. No authenticated Grok Bot run was performed. Prioritize complete, dependable workflows over feature labels.
+[Fresh comparative audit](../COMPETITOR_RECHECK_2026-09-05.md) maps current official Grok Bot docs and user reports to actual source paths and outcome tests. No authenticated Grok Bot run was performed. Prioritize complete, dependable workflows over feature labels.
 
 Found implicit OpenCode/Muse seeding, a global OpenCode-preferred model, fallback assignment on bot creation, and a legacy seed update that would reassign NULL providers on restart. Fresh bots now keep NULL provider/empty model until an explicit choice. Existing assignments and legacy configured OpenCode models survive. Choosing for the team only changes previously unconfigured bots. The user must choose both connection and model; saving/discovering a credential never makes that choice. Dispatch refuses unconfigured work before starting a model. New web/native Mac teammates no longer automatically select the first provider.
 

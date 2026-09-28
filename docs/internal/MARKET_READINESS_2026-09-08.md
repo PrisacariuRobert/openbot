@@ -56,7 +56,7 @@ The live pilot exposed a misleading check: the model supplied a claim about work
 
 ## Live test, including the failure
 
-The existing [token and teamwork pilot](QA_TASK_TOKENS_AND_TEAMWORK_2026-09-08.md) records the earlier real workbook creation, private Nova/Scout reviews, an initially broken formula export, its repair, and independent recalculation. Those results are prior evidence, not a new three-bot test in this pass.
+The existing [token and teamwork pilot](qa/QA_TASK_TOKENS_AND_TEAMWORK_2026-09-08.md) records the earlier real workbook creation, private Nova/Scout reviews, an initially broken formula export, its repair, and independent recalculation. Those results are prior evidence, not a new three-bot test in this pass.
 
 This pass used the actual OpenBot chat UI and Pixel's unchanged `opencode-go/glm-5.3-flash` selection. The task was read-only: inspect the existing workbook, retrieve the earlier caveat and provide a concise answer. No evaluator completed the work for the bot.
 

@@ -14,7 +14,7 @@ The promise to earn is: **give a teammate a job, get useful finished work, teach
 
 [Grok Bot](https://x.ai/news/introducing-grok-bot) emphasizes persistent teammates, work across desktop/phone and repeatable workflows. [Hermes skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills) support learning from conversation or source material; [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) adds persistent profiles and team coordination. Use these outcomes as benchmarks, not their branding or screen layout.
 
-The [Hermes audit](HERMES_COMPARISON_2026-09-08.md) and [product audit](PRODUCT_GAP_AUDIT.md) describe existing foundations and limits. Neither competitor has been run head-to-head against this checkout. Historical feature checkmarks do not establish parity.
+The [Hermes audit](HERMES_COMPARISON_2026-09-08.md) and [product audit](../PRODUCT_GAP_AUDIT.md) describe existing foundations and limits. Neither competitor has been run head-to-head against this checkout. Historical feature checkmarks do not establish parity.
 
 ## Ordered implementation queue
 
@@ -69,7 +69,7 @@ See [current market-readiness assessment](MARKET_READINESS_2026-09-08.md) for ex
 - Approved instructions become a real, versioned teammate skill in both runtime directories. Non-browser workflows no longer need a fake website. The editor, exports, imports and receipt-derived drafts support this.
 - Learned-skill revisions now participate in the runtime-session fingerprint, so new or edited skills do not leave the teammate using a cached older skill list. Other teammates' skill changes do not reset its session.
 - Existing two-input, owner-reviewed scheduling gates remain active. A saved or edited draft is not silently certified.
-- Added a small in-app explanation and [usage guide](LEARNING_WORKFLOWS.md), with no new dashboard or replacement engine.
+- Added a small in-app explanation and [usage guide](../LEARNING_WORKFLOWS.md), with no new dashboard or replacement engine.
 
 **Verification:** `npm run verify` passed with 555 application tests plus 9 macOS-packaging and 5 desktop tests, source checks, TypeScript and the production build. `npm run test:skill-authoring-ui` passed against the rendered desktop and 390px web client, including approval gating, exact saved instructions, a general skill in the list and the optional website editor. Claude's actual stdio bridge forwards the tool against a fixture host. The application runner test uses a deterministic child, not a paid/live model. The existing large-bundle warning remains non-blocking.
 
@@ -87,7 +87,7 @@ Package 2 is now the active engineering slice; the remaining real-model and nati
 - Fixed a shared approval-handoff race exposed by these tests: a fast decision could queue continuation before the retiring process exited, and that old process's shutdown incorrectly cancelled the continuation. Pause now revokes old-worker tools immediately, targets only the captured process and preserves the host's newer decision. Browser sign-in uses the same pause primitive.
 - Added rendered desktop/390px approval-flow QA, without redesigning the app or removing any provider choices.
 
-Evidence, commands and precise limits are recorded in [customer workflow QA](QA_CUSTOMER_WORKFLOW_2026-09-08.md).
+Evidence, commands and precise limits are recorded in [customer workflow QA](qa/QA_CUSTOMER_WORKFLOW_2026-09-08.md).
 
 **Still open in package 2:** real-account customer pilot; expense documents → reconciled editable workbook + exceptions with two source sets; code bug → unchanged test oracle + reviewed delivery with two bugs. Existing individual tool tests do not count as completing these combined pilots. No overall competitor-parity or public-release claim follows from this implementation.
 
@@ -99,4 +99,4 @@ Evidence, commands and precise limits are recorded in [customer workflow QA](QA_
 - Added exact, source-linked `table_reconcile` plus two upload-to-editable-workbook runtime cases. Totals, exceptions, original rows and unchanged sources are independently checked. This closes the bounded CSV reconciliation implementation slice; arbitrary scanned receipts and real-model accounting judgment are not thereby certified.
 - Repaired live-browser lifecycle and second-viewer behavior; verified Calendar opens in Pixel's saved profile through the actual app without another login. No real event or email was created by this test.
 
-Full evidence and limits: [workflow QA](QA_BROWSER_AND_WORKFLOWS_2026-09-08.md). The current suite passed 589 application tests, packaging/desktop tests, source checks and builds; rendered approval/budget tests cover desktop and phone widths. Real-model combined customer and file-work pilots, two-bug comparative code delivery, native-device parity and release gates remain open. Do not interpret deterministic fixtures or a reused sign-in as overall Hermes/Grok Bot parity.
+Full evidence and limits: [workflow QA](qa/QA_BROWSER_AND_WORKFLOWS_2026-09-08.md). The current suite passed 589 application tests, packaging/desktop tests, source checks and builds; rendered approval/budget tests cover desktop and phone widths. Real-model combined customer and file-work pilots, two-bug comparative code delivery, native-device parity and release gates remain open. Do not interpret deterministic fixtures or a reused sign-in as overall Hermes/Grok Bot parity.

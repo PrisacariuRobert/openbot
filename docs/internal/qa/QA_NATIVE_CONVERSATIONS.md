@@ -28,7 +28,7 @@ Scope: the actual AppKit/SwiftUI Mac app and SwiftUI iPhone preview. This pass i
 
 The 6 September release audit inspected the running native Mac preview against the approved prototype: direct/group conversations, attachments, contextual details, provider overview/selection, connected apps, team/group management and routine creation/cancellation. The continuous neutral layout and simplified navigation are present. No provider connection, group, routine or external action was saved during inspection.
 
-This closes the locked-screen inspection blocker, not every visual or release gate. The audit found inconsistent failed-work attention between web and Mac, small secondary controls, unclear connection-readiness wording and remaining web/native visual differences. The running preview is ad-hoc signed and has no embedded runner. See the [release decision and prioritized findings](RELEASE_DECISION_2026-09-06.md).
+This closes the locked-screen inspection blocker, not every visual or release gate. The audit found inconsistent failed-work attention between web and Mac, small secondary controls, unclear connection-readiness wording and remaining web/native visual differences. The running preview is ad-hoc signed and has no embedded runner. See the [release decision and prioritized findings](../RELEASE_DECISION_2026-09-06.md).
 
 ## Still required before calling this visually finished
 

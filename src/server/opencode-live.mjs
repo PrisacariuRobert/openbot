@@ -114,6 +114,26 @@ function failed(message) {
   void done();
 }
 
+/** OpenCode retries a full allowance forever. Free tiers often limit each
+ * minute, so short waits are shown and allowed; a long wait, or several in a
+ * row, means the allowance is used up: stop and say so instead of spinning. */
+let quotaRetries = 0, abortSession = () => {};
+function quotaRetry(status) {
+  const message = String(status.message || "");
+  if (!/quota|rate.?limit|resource.?exhausted|too many requests|429/i.test(message)) return;
+  quotaRetries += 1;
+  const wait = Number(/retry in ([\d.]+)\s*s/i.exec(message)?.[1]) || (typeof status.next === "number" ? Math.max(0, (status.next - Date.now()) / 1000) : 60);
+  if (quotaRetries <= 5 && wait <= 120 && !/per.?day|daily/i.test(message)) {
+    write({ type: "openbot.waiting", timestamp: Date.now(), sessionID: sessionId, seconds: Math.ceil(wait) });
+    return;
+  }
+  abortSession();
+  if (finished) return;
+  write({ type: "error", timestamp: Date.now(), sessionID: sessionId, error: { name: "APIError", data: { statusCode: 429, message: message.slice(0, 2000) } } });
+  hadError = true;
+  void done();
+}
+
 /** Print a part exactly once, in `run --format json` shape, when complete. */
 function emitPart(part) {
   if (!part || part.sessionID !== sessionId || emitted.has(part.id) || earlier.has(part.messageID)) return;
@@ -179,6 +199,7 @@ async function main() {
   if (!base || exiting) return plainRun();
   auth.authorization = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`;
   const directory = `?directory=${encodeURIComponent(options.dir)}`;
+  abortSession = () => void api(`/session/${sessionId}/abort${directory}`, {}).catch(() => {});
   const stream = new AbortController();
   let prompted = false;
   // Only the assistant's words are ever shown live. The prompt is a text part
@@ -232,6 +253,7 @@ async function main() {
         hadError = true;
         return;
       case "session.status":
+        if (props.sessionID === sessionId && prompted && props.status?.type === "retry") quotaRetry(props.status);
         if (props.sessionID === sessionId && prompted && props.status?.type === "busy") sawWork = true;
         if (props.sessionID === sessionId && prompted && sawWork && props.status?.type === "idle") void done();
         return;

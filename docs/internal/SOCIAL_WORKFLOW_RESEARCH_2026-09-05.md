@@ -23,7 +23,7 @@ The [work guide](https://cursor.com/docs/grok-bot/work) emphasizes persistent cl
 
 Web and native Mac creation/edit/pause/check controls and natural-chat creation share validated host behavior. Failed reads/dispatch keep the previous baseline; event/run and new baseline commit together. Restart does not replay an unchanged page. Editing the source starts fresh.
 
-Limits: 20 watches, minimum 15-minute scheduled interval (manual Check now can run sooner), two simultaneous reads, 15-second timeout, 1 MB response and 8,000 characters of complete readable text. Public HTTPS only; no login, credentials, query strings, fragments, redirects or JavaScript. DNS is validated and pinned. No pixel/link-only comparison or every intermediate change between polls. The host must be awake. Normal budgets/approvals apply; page events cannot create more automations. This does not reuse Codex's Chrome sessions. [Verification](QA_PAGE_WATCH.md).
+Limits: 20 watches, minimum 15-minute scheduled interval (manual Check now can run sooner), two simultaneous reads, 15-second timeout, 1 MB response and 8,000 characters of complete readable text. Public HTTPS only; no login, credentials, query strings, fragments, redirects or JavaScript. DNS is validated and pinned. No pixel/link-only comparison or every intermediate change between polls. The host must be awake. Normal budgets/approvals apply; page events cannot create more automations. This does not reuse Codex's Chrome sessions. [Verification](qa/QA_PAGE_WATCH.md).
 
 ## Remaining outcome gaps
 

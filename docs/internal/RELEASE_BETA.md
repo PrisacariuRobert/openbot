@@ -1,10 +1,10 @@
 # OpenBot development preview and beta downloads
 
-The [first-public-release checklist](FIRST_PUBLIC_RELEASE.md) defines the supported release gate. No public desktop installer is approved by this document. Older unsigned-archive instructions described a development experiment and are not a current download promise.
+The [first-public-release checklist](../FIRST_PUBLIC_RELEASE.md) defines the supported release gate. No public desktop installer is approved by this document. Older unsigned-archive instructions described a development experiment and are not a current download promise.
 
 ## Continue without a paid developer account
 
-Run the shared client from source using the [README setup](../README.md#start). On a Mac, the [Electron development shell](../desktop/README.md#develop) opens that same UI. You can build an unsigned local package with `npm run package:desktop -- --dir` and test it with disposable data. This path does not need Apple Developer Program membership or an OpenBot Google OAuth client.
+Run the shared client from source using the [README setup](../../README.md#start). On a Mac, the [Electron development shell](../../desktop/README.md#develop) opens that same UI. You can build an unsigned local package with `npm run package:desktop -- --dir` and test it with disposable data. This path does not need Apple Developer Program membership or an OpenBot Google OAuth client.
 
 The first useful path is a conversation with a teammate using a model connection you choose. For supported website tasks, grant that teammate browser access and sign in yourself when needed. Chrome or Chromium is separate from the package. A model provider or website may have its own usage terms or costs; OpenBot does not include model allowance. Direct API connectors are optional and may require developer credentials or service review.
 

@@ -56,7 +56,7 @@ Total reported input: 33,564 tokens; output: 2,094. The runtime also reported 1,
 
 ## What still prevents a supported public release
 
-The [first-public-release checklist](FIRST_PUBLIC_RELEASE.md) is the source of truth. Its unchecked items remain open:
+The [first-public-release checklist](../../FIRST_PUBLIC_RELEASE.md) is the source of truth. Its unchecked items remain open:
 
 1. Freeze/review the intended source changes and exact artifact; run the candidate in GitHub CI. This checkout is not clean release provenance.
 2. Enable a working private vulnerability reporting route and verify owner-only merge authority plus required checks. The read-only audit found private reporting disabled; local workflow/CODEOWNERS files do not change those settings.

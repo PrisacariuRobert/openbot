@@ -1,6 +1,6 @@
 # Grok Bot recheck: compete on finished work
 
-The [social-workflow follow-up](SOCIAL_WORKFLOW_RESEARCH_2026-09-05.md) adds primary X examples, an outcome gap matrix and tested change-aware public-page monitoring. Its [QA record](QA_PAGE_WATCH.md) separates deterministic checks, two live Spark outcomes and native/web review.
+The [social-workflow follow-up](SOCIAL_WORKFLOW_RESEARCH_2026-09-05.md) adds primary X examples, an outcome gap matrix and tested change-aware public-page monitoring. Its [QA record](qa/QA_PAGE_WATCH.md) separates deterministic checks, two live Spark outcomes and native/web review.
 
 Primary docs and user reports rechecked 5 September 2026. No authenticated head-to-head test was performed. This supersedes claims that visual similarity, connector count or passing source-contract tests establish parity.
 
@@ -29,7 +29,7 @@ The usage discussion includes confusion and a support explanation distinguishing
 
 **Conclusion:** credible differentiated foundations, not yet a proven general replacement. Higher quality and lower cost remain hypotheses until measured on matched tasks. Prioritize dependable document/outcome workflows, safe integration breadth and clean-host/always-on distribution over another settings redesign.
 
-The [checked-outcome record](QA_CHECKED_OUTCOMES.md) adds seven successful live Spark 1.3 cases: three varied expense workflows (one with a source-bound private review), morning brief, inbox follow-ups, meeting preparation, and an isolated JavaScript fix with real failing/passing container checks. These use synthetic inputs, not personal accounts or an authenticated competitor. Earlier superficial consultation passes were not accepted as source-quality proof after manual inspection exposed stale-file review.
+The [checked-outcome record](qa/QA_CHECKED_OUTCOMES.md) adds seven successful live Spark 1.3 cases: three varied expense workflows (one with a source-bound private review), morning brief, inbox follow-ups, meeting preparation, and an isolated JavaScript fix with real failing/passing container checks. These use synthetic inputs, not personal accounts or an authenticated competitor. Earlier superficial consultation passes were not accepted as source-quality proof after manual inspection exposed stale-file review.
 
 ## Why it is useful
 

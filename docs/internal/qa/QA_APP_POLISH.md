@@ -10,7 +10,7 @@ This is a tested development change, not an App Store release, complete legacy-s
 - Top-layer selection menus work inside dialogs, reposition within the viewport, support arrows/Home/End/type-ahead/Enter/Escape, and restore focus.
 - Native conversation lists have search and latest-message previews. Menus are native SwiftUI controls, not web views. Captured send/draft destinations prevent a delayed request from changing the current conversation.
 - Mac/iPhone approval sheets load a matching pending, allowlisted full-action preview. Unsupported, masked, empty or stale previews cannot be approved. A review acknowledgement and single-flight decision gate are required. An uncertain response is not automatically retried.
-- Browser-only discovery separates missing connector setup from explicit read denial. It never equates a saved browser profile with a verified account. See [browser policy and limitations](BROWSER_AND_CONNECTORS.md).
+- Browser-only discovery separates missing connector setup from explicit read denial. It never equates a saved browser profile with a verified account. See [browser policy and limitations](../../BROWSER_AND_CONNECTORS.md).
 
 ## Executed checks
 
@@ -37,4 +37,4 @@ The local development host was refreshed only after confirming no active work or
 - Known-service permission checks are not a universal network/process sandbox. Redirects, unknown aliases, terminal tools and other egress paths have the limitations described in the browser policy document.
 - Public away-access relay hosting, cellular proof, signing/notarization, clean-install testing and long-running release reliability remain release gates.
 
-Use [the design contract](DESIGN_LANGUAGE.md) for future work; do not add isolated cosmetic overrides or call a saved connection live-tested.
+Use [the design contract](../../DESIGN_LANGUAGE.md) for future work; do not add isolated cosmetic overrides or call a saved connection live-tested.
