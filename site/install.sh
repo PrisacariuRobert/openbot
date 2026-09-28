@@ -76,6 +76,11 @@ if [ -x "$DIR/current/mac-app/build-app.sh" ]; then
   cat > "$LAUNCH" <<LAUNCH_EOF
 #!/bin/sh
 if [ "\${1:-}" = "--serve" ]; then exec "$DIR/current/openbot.sh"; fi
+# Double-clicked: wake the background service if it stopped, then open.
+if ! /usr/bin/curl -fs -o /dev/null --max-time 2 "$URL/"; then
+  /bin/launchctl kickstart "gui/\$(/usr/bin/id -u)/$LABEL" >/dev/null 2>&1 || true
+  i=0; while [ \$i -lt 30 ] && ! /usr/bin/curl -fs -o /dev/null --max-time 2 "$URL/"; do sleep 0.5; i=\$((i + 1)); done
+fi
 open "$URL/"
 LAUNCH_EOF
   LAUNCHER=""; [ -f "$DIR/current/mac-app/OpenBot-launcher" ] && LAUNCHER="$DIR/current/mac-app/OpenBot-launcher"
@@ -112,7 +117,15 @@ cat > "$PLIST" <<EOF
 EOF
 DOMAIN="gui/$(id -u)"
 launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
-launchctl bootstrap "$DOMAIN" "$PLIST" || fail "macOS didn't let OpenBot start in the background."
+# Stopping the old copy finishes in the background; wait for it before starting
+# the new one (this is the update path too).
+i=0; while [ $i -lt 20 ] && launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; do sleep 0.5; i=$((i + 1)); done
+STARTED=""
+for attempt in 1 2 3 4 5; do
+  if launchctl bootstrap "$DOMAIN" "$PLIST" >/dev/null 2>&1; then STARTED=1; break; fi
+  sleep 1
+done
+[ -n "$STARTED" ] || fail "macOS didn't let OpenBot start in the background."
 
 printf '%s•%s Opening your studio' "$BOLD" "$RESET"
 READY=""
