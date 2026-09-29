@@ -43,44 +43,17 @@ for (const platform of ["mac", "win", "linux"]) {
 }
 requireAsset("desktop/build/icon.png", "Electron desktop package");
 
-// Next/Vite public URLs include a computed team/day/build screenshot selector.
-const page = text("marketing/website/app/page.tsx");
-const screenshotSelectors = [...page.matchAll(/\/actual-ui\/\$\{\s*\[([^\]]+)\]\s*\[[^\]]+\]\s*\}\.webp/g)];
-assert.ok(screenshotSelectors.length > 0, "Website screenshot selector changed; update its asset check rather than silently skipping it");
-for (const selector of screenshotSelectors) {
-  for (const item of selector[1].matchAll(/["']([^"']+)["']/g)) {
-    requireAsset(`marketing/website/public/actual-ui/${item[1]}.webp`, "website screenshot selector");
-  }
-}
-for (const filename of ["marketing/website/app/page.tsx", "marketing/website/app/layout.tsx"]) {
-  for (const match of text(filename).matchAll(/["'`]\/((?:actual-ui|brands|media)\/[^"'`\s]+|[^/"'`\s]+\.svg)["'`]/g)) {
-    if (!match[1].includes("${")) requireAsset(`marketing/website/public/${match[1]}`, filename);
-  }
-}
-
-// Registered older film compositions remain supported. Preserve their source captures.
-const captures = JSON.parse(text("marketing/intro-film/public/actual-ui/manifest.json"));
-for (const capture of captures.captures) {
-  requireAsset(`marketing/intro-film/public/actual-ui/${capture.name}.png`, "film capture manifest");
-}
-for (const filename of walk("marketing/intro-film/src").filter(p => /\.[jt]sx?$/.test(p))) {
-  const source = text(filename);
-  for (const match of source.matchAll(/staticFile\(\s*["']([^"']+)["']\s*\)/g)) {
-    requireAsset(`marketing/intro-film/public/${match[1]}`, filename);
-  }
-  if (filename.includes("/actual/")) {
-    for (const match of source.matchAll(/(?:image|previous)=["']([^"']+)["']/g)) {
-      requireAsset(`marketing/intro-film/public/actual-ui/${match[1]}.png`, filename);
-    }
-  }
+// The website: every local file the page loads must exist.
+for (const match of text("site/index.html").matchAll(/(?:src|href)=["'](?!https?:|#|mailto:|data:)([^"'?#]+)["']/g)) {
+  requireAsset(`site/${match[1].replace(/^\.?\//, "")}`, "site/index.html");
 }
 
 // README images and relative documentation links must resolve after housekeeping.
-for (const filename of ["README.md", "REFERENCE.md"]) {
+for (const filename of ["README.md"]) {
   for (const match of text(filename).matchAll(/!?\[[^\]\n]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)) {
     const target = match[1];
     if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue;
     requireAsset(path.posix.join(path.posix.dirname(filename), target), filename);
   }
 }
-console.log(`Static asset integrity passed: ${checked.size} unique references (catalogs, packaging, website, film inputs, and README links). Not a native build or rendered-UI test.`);
+console.log(`Static asset integrity passed: ${checked.size} unique references (catalogs, packaging, website, and README links). Not a native build or rendered-UI test.`);

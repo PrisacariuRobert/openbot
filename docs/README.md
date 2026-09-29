@@ -19,14 +19,11 @@
 - [Plugin interoperability](PLUGIN_INTEROPERABILITY.md)
 - [Testing through MCP](MCP_TESTING.md)
 - [Design language](DESIGN_LANGUAGE.md)
-- [Asset maintenance](ASSET_MAINTENANCE.md)
 
 ## Project
 
 - [Roadmap](ROADMAP.md)
 - [Competitive scorecard](COMPETITIVE_SCORECARD_2026-09-23.md)
 - [Product gap audit](PRODUCT_GAP_AUDIT.md)
-- [First public release checklist](FIRST_PUBLIC_RELEASE.md)
-- [Beta release notes](RELEASE_BETA_NOTES.md)
+- [Release notes](RELEASE_BETA_NOTES.md)
 
-Working notes, QA runs and planning history live in [internal/](internal/).

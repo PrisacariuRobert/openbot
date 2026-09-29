@@ -12,7 +12,7 @@ A useful private report contains the affected version/commit and platform, impac
 
 ## Supported scope
 
-Security fixes target the latest development source and the next explicitly published beta. There is no LTS or promise of backports to historical `0.x` versions. A version number in README is not evidence of a signed or reviewed downloadable release. Check release notes and the [first public beta checklist](docs/FIRST_PUBLIC_RELEASE.md).
+Security fixes target the latest development source and the next explicitly published beta. There is no LTS or promise of backports to historical `0.x` versions. A version number in README is not evidence of a signed or reviewed downloadable release. Check the release notes.
 
 ## If a credential was exposed
 

@@ -45,4 +45,3 @@ __MACOSX/
 
 # Generated platform runtimes and local QA logs
 dist-release/
-qa/figma-implementation/logs/
