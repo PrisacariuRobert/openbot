@@ -2,7 +2,7 @@
 
 Owner-approved sequencing after the Hermes (NousResearch) and sign-in pattern studies. Every item keeps the house rules: approvals stay human-owned, sign-in secrets stay out of model context, and evidence distinguishes host checks from teammate claims. Sizes are historical estimates: S ≤ half a day, M ≤ two days, L bigger.
 
-**8 September evidence correction:** the [current Hermes comparison](internal/HERMES_COMPARISON_2026-09-08.md) supersedes earlier competitive assumptions. Hermes has local browsers, Bot Mode and optional approval-gated skill writes. A code/fixture checkmark below is not release or real-account proof. Installer, sign-in and migration claims need their own live evidence.
+**8 September evidence correction:** the current Hermes comparison supersedes earlier competitive assumptions. Hermes has local browsers, Bot Mode and optional approval-gated skill writes. A code/fixture checkmark below is not release or real-account proof. Installer, sign-in and migration claims need their own live evidence.
 
 ## Working order
 

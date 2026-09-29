@@ -1,6 +1,6 @@
 # Contributing to OpenBot
 
-OpenBot is an owner-operated desktop and phone development beta. Help us make a few useful workflows dependable before adding more settings or claiming competitor parity. The [first public beta checklist](docs/FIRST_PUBLIC_RELEASE.md) defines what is still missing.
+OpenBot is an owner-operated desktop and phone development beta. Help us make a few useful workflows dependable before adding more settings or claiming competitor parity. The [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and [roadmap](docs/ROADMAP.md) list what is still missing.
 
 ## Start with one reproducible problem
 

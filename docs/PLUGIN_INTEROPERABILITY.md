@@ -1,6 +1,6 @@
 # Plugin interoperability: use open standards, not another app's private access
 
-Research and implementation checked 5 September 2026. OpenBot 0.36 includes limited standards-based interoperability, not a complete marketplace integration. [Original checks](internal/qa/QA_OPEN_EXTENSIONS.md) and [new OAuth checks and limits](internal/qa/QA_0.36.md).
+Research and implementation checked 5 September 2026. OpenBot 0.36 includes limited standards-based interoperability, not a complete marketplace integration. Original checks and new OAuth checks and limits.
 
 ## Implemented in the development beta
 

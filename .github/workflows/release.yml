@@ -66,8 +66,8 @@ jobs:
           pattern: openbot-desktop-*
           merge-multiple: true
           path: release-artifacts
-      - name: Create unsigned draft for owner review
-        run: gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "$RELEASE_TAG desktop beta (unsigned)" --notes-file docs/RELEASE_BETA_NOTES.md release-artifacts/*
+      - name: Create a draft for owner review (publish it as Latest so the installer finds it)
+        run: gh release create "$RELEASE_TAG" --verify-tag --draft --title "OpenBot $RELEASE_TAG" --notes-file docs/RELEASE_BETA_NOTES.md release-artifacts/*
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
