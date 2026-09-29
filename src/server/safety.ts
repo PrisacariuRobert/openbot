@@ -20,7 +20,11 @@ export function approvalReason(prompt: string): string | null {
   // "Do not install packages, push, publish, or change my checkout."
   // Only accept explicit OR lists of recognized verbs. Ambiguous conjunctions
   // and contrast/sequence clauses stay subject to the conservative detector.
-  const withoutExcludedLists = prompt.replace(/\b(?:do\s+not|don't|never)\s+[^.;!?\n]+/gi, (clause) => {
+  // A quoted name for something being created ("add a reminder “Call Anna -
+  // delete me”") is a label, not an instruction. Only labels right after such
+  // a noun are set aside; any other quoted text is still checked.
+  const unlabelled = prompt.replace(/\b(reminder|note|event|task|to-?do|titled|called|named|subject(?:\s+line)?|heading|title)(\s*:?\s*)["“]([^"”\n]{1,120})["”]/gi, (_match, noun: string, gap: string) => `${noun}${gap}[a title]`);
+  const withoutExcludedLists = unlabelled.replace(/\b(?:do\s+not|don't|never)\s+[^.;!?\n]+/gi, (clause) => {
     const actions = clause.replace(/^(?:do\s+not|don't|never)\s+/i, "");
     if (!/\s+or\s+/i.test(actions) || /\b(?:but|then|instead|however|also|actually|afterwards|except)\b/i.test(actions)) return clause;
     const parts = actions.split(/,\s*(?:or\s+)?|\s+or\s+|\s*\/\s*(?=[a-z])/i);
