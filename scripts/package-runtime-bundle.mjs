@@ -52,8 +52,8 @@ async function resolveOpencodeVersion() {
     if (!/^v?\d+\.\d+\.\d+$/.test(args.opencode)) throw new Error("Pass an exact opencode version such as --opencode 1.18.29.");
     return args.opencode.replace(/^v/, "");
   }
-  const response = await fetch("https://api.github.com/repos/anomalyco/opencode/releases/latest", { signal: AbortSignal.timeout(30_000), headers: { Accept: "application/vnd.github+json" } });
-  if (!response.ok) throw new Error("The opencode release index could not be read.");
+  const response = await fetch("https://api.github.com/repos/anomalyco/opencode/releases/latest", { signal: AbortSignal.timeout(30_000), headers: { Accept: "application/vnd.github+json", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) } });
+  if (!response.ok) throw new Error(`The opencode release index could not be read (${response.status}).`);
   const tag = (await response.json()).tag_name;
   if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error("The opencode release tag is not a version.");
   return tag.slice(1);
