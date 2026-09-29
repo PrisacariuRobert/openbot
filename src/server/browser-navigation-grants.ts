@@ -3,14 +3,12 @@ import { browserControlApprovalSchema } from "../shared/browser-control-review.j
 import type { AutoReviewRule } from "../shared/auto-review.js";
 import type { RunStatus } from "../shared/types.js";
 import { browserAutoDecision } from "./auto-review.js";
-import type { BrowserTarget } from "./safety.js";
+import { FINAL_ACTION_LABEL, SENSITIVE_CONTROL, type BrowserTarget } from "./safety.js";
 
 export const BROWSER_NAVIGATION_GRANT_CLICKS = 12 as const;
 export const BROWSER_NAVIGATION_GRANT_MINUTES = 15 as const;
 const GRANT_TTL_MS = BROWSER_NAVIGATION_GRANT_MINUTES * 60_000;
 
-const FINAL_ACTION_LABEL = /\b(?:create|new|add|save|send|submit|delete|remove|complete|finish|share|invite|buy|purchase|pay|checkout|order|subscribe|publish|post|upload|deploy|merge|confirm|approve|accept|apply|book|reserve|cancel|archive|sign[ -]?out|log[ -]?out)\b/i;
-const SENSITIVE_CONTROL = /password|passcode|secret|token|credit.?card|checkout|payment|one.time.code|verification|cc-/i;
 const NAVIGATION_LABEL = /^(?:search|inbox|home|back|forward|next|previous|today|upcoming|calendar|dashboard|overview|activity|notifications?|projects?|my tasks|workspace|browse channels?|channels?|open menu|main menu|navigation menu)(?:\s+[0-9]+)?$/i;
 
 export function browserNavigationAllowanceOffer(

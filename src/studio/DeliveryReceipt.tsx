@@ -6,7 +6,7 @@ import { deliveryReview, deliveryReviewSummary } from "./delivery-review";
 import type { CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { newerDeliveredVersion } from "./artifact-versions";
+import { deliveredFiles, newerDeliveredVersion } from "./artifact-versions";
 import { isUnverifiedTextFallback } from "./delivery-fallback";
 import { Character } from "./Character";
 import { fileLabel, fileSiglaClass } from "./file-glyph";
@@ -44,7 +44,7 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
           <div className="delivery-finding-full"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml disallowedElements={["a", "img"]} unwrapDisallowed>{review.detail}</ReactMarkdown></div>
         </details>}
       </section>)}</details>}
-      {message.attachments.map((file) => {
+      {deliveredFiles(message.attachments).map((file) => {
         const newer = newerDeliveredVersion(file, visibleFiles);
         return (
           <div className="delivery-version" key={file.id}>
@@ -53,9 +53,12 @@ export function DeliveryCard({ message, run, childRuns, teammates, visibleFiles 
           </div>
         );
       })}
-      <div className="delivery-summary">
+      {/* A reply that used no tools and made no files did nothing that could
+          be checked; "not independently checked" under it only adds doubt.
+          Tool work and files keep the receipt; the task view keeps details. */}
+      {!(isUnverifiedTextFallback(run, kids.length > 0, message.attachments.length > 0) && !run.activities.some((activity) => activity.kind === "tool")) && <div className="delivery-summary">
       <DeliveryReceipt run={run} teammates={teammates} reviews={kids} hasDeliveredArtifacts={message.attachments.length > 0} />
-      </div>
+      </div>}
     </div>
   );
 }

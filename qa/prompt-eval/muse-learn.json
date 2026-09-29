@@ -1,0 +1,45 @@
+{
+  "label": "muse-learn",
+  "model": "opencode-go/muse-spark-1.3-contributor",
+  "repeat": 2,
+  "at": "2026-09-23T14:52:16.505Z",
+  "passed": 2,
+  "total": 2,
+  "medianSeconds": 105.8,
+  "medianContextTokens": 51148,
+  "agentsMdChars": 13999,
+  "results": [
+    {
+      "case": "learn-skill",
+      "attempt": 1,
+      "status": "awaiting_approval",
+      "pass": true,
+      "problem": null,
+      "seconds": 105.8,
+      "contextTokens": 51148,
+      "inputTokens": 20503,
+      "cacheReadTokens": 30645,
+      "outputTokens": 1030,
+      "modelSteps": 5,
+      "agentsMdChars": 13999,
+      "reply": "",
+      "error": ""
+    },
+    {
+      "case": "learn-skill",
+      "attempt": 2,
+      "status": "awaiting_approval",
+      "pass": true,
+      "problem": null,
+      "seconds": 21.6,
+      "contextTokens": 38678,
+      "inputTokens": 19794,
+      "cacheReadTokens": 18884,
+      "outputTokens": 925,
+      "modelSteps": 4,
+      "agentsMdChars": 13999,
+      "reply": "",
+      "error": ""
+    }
+  ]
+}

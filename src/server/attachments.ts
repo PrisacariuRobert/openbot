@@ -152,7 +152,7 @@ async function extractDocx(filePath: string): Promise<Pick<AttachmentAnalysis, "
     const xml = strFromU8(bytes).replace(/<w:tab\/?\s*>/g, "\t").replace(/<w:br\/?\s*>/g, "\n");
     const paragraphs = [...xml.matchAll(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g)].map((paragraph) => [...((paragraph[1] || "").matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g))].map((match) => xmlText(match[1] || "")).join("")).filter(Boolean);
     const text = paragraphs.length ? paragraphs.join("\n") : [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((match) => xmlText(match[1] || "")).join("");
-    return text.trim() ? `${name === "word/document.xml" ? "Document" : path.basename(name, ".xml")}\n${text}` : "";
+    return !text.trim() ? "" : name === "word/document.xml" ? text : `${path.basename(name, ".xml")}\n${text}`;
   }).filter(Boolean);
   const extractedText = boundedText(sections.join("\n\n"));
   return { summary: extractedText ? "Word document · text ready" : "Word document · no readable text", extractedText: extractedText || null, metadata: { sections: sections.length } };

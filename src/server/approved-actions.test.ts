@@ -120,3 +120,18 @@ test("an approved but not-yet-started action survives restart and detects change
     rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+test("a runtime version stop says what to fix instead of a generic stop", () => {
+  const f = fixture();
+  try {
+    const reason = "OpenCode runtime not verified. OpenBot detected an unsupported OpenCode version. Detected: 2.0.0 (unsupported).";
+    f.db.updateRun(f.run.id, { status: "failed", error: reason });
+    f.db.finishRunTask(f.run.id, "failed", reason);
+    const stopped = f.db.listMessages("team-room").filter((message) => message.eventType === "run_stopped");
+    assert.equal(stopped.length, 1);
+    assert.equal(stopped[0]!.eventData?.title, "Runtime update needed");
+  } finally {
+    f.db.close();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});

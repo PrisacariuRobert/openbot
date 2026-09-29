@@ -49,6 +49,7 @@ export function registerExtensionRoutes(app: Express, db: OpenBotDatabase, onCha
     mcp.configure(String(request.params.id), input.botId, input.grants); return { saved: true };
   }));
   app.post("/api/extensions/skills/inspect", route((request) => inspectCommunitySkill(request.body)));
+  app.get("/api/extensions/skills/catalog", route((request) => skills.catalog(request.query.refresh === "1")));
   app.post("/api/extensions/skills/fetch", route((request) => skills.fetchPreview(z.object({ url: z.string().max(2_048) }).strict().parse(request.body).url)));
   app.post("/api/extensions/skills", route((request) => {
     const input = z.object({ bundle: z.unknown(), digest: z.string().length(64), botIds: z.array(z.string()).min(1).max(30) }).strict().parse(request.body);

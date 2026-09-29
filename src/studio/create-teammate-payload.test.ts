@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createTeammatePayload } from "./create-teammate-payload.js";
 
-const base = { name: "Scout", role: "Plan my week", instructions: "", color: "#6757d9", mascot: "nova", providerInstanceId: "provider-1", model: "model-1" };
-test("create payload falls back to the job and keeps access off", () => {
+const base = { name: "Scout", role: "Plan my week", instructions: "", color: "#6757d9", mascot: "nova", providerInstanceId: "provider-1", model: "model-1", browserEnabled: false };
+test("create payload falls back to the job and keeps the computer off", () => {
   const payload = createTeammatePayload(base);
   assert.equal(payload.instructions, "Plan my week");
   assert.equal(payload.browserEnabled, false);
@@ -14,4 +14,9 @@ test("create payload preserves explicit instructions and never chooses a model",
   const payload = createTeammatePayload({ ...base, instructions: "Ask before changing anything.", model: "" });
   assert.equal(payload.instructions, "Ask before changing anything.");
   assert.equal(payload.model, "");
+});
+test("create payload honors the visible web-browsing choice but never grants the computer", () => {
+  const payload = createTeammatePayload({ ...base, browserEnabled: true });
+  assert.equal(payload.browserEnabled, true);
+  assert.equal(payload.computerEnabled, false);
 });

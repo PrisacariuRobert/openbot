@@ -2108,3 +2108,10 @@ h2 {
 .studio-access input { width: 100%; padding: 12px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--surface); font-size: 16px; }
 .studio-access button { display: inline-flex; gap: 12px; align-items: center; justify-content: center; padding: 12px 18px; border-radius: 9px; min-height: 44px; }
 .character-celebrating .character-drawing, .character-mood-happy .character-drawing { animation-duration: 1.6s; }
+.studio-access .access-mark img { display: block; }
+:root[data-appearance="dark"] .studio-access .access-mark img { filter: invert(1); }
+@media (prefers-color-scheme: dark) { :root:not([data-appearance="light"]) .studio-access .access-mark img { filter: invert(1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .studio-access .access-mark.is-opening { animation: access-breathe 1.6s ease-in-out infinite; }
+}
+@keyframes access-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }

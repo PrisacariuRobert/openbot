@@ -46,3 +46,12 @@ test("does not turn conditional page watches or paused drafts into enabled sched
     'Stop my every hour reminder',
   ]) assert.equal(parseRoutineIntent(request), null, request);
 });
+
+test("routines get short names people recognise in Automations", async () => {
+  const { routineTitle } = await import("./routine-intent.js");
+  assert.equal(routineTitle("give me a short brief of the three most important AI news stories with links"), "AI news brief");
+  assert.equal(routineTitle("Send me a summary of tech news"), "Tech news summary");
+  assert.equal(routineTitle("check the weather in Vienna and tell me if I need an umbrella"), "Weather in Vienna");
+  assert.equal(routineTitle("plan my week"), "Plan my week");
+  assert.equal(routineTitle("give me a quick update on my open invoices with totals"), "Update on my open invoices");
+});

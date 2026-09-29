@@ -1,0 +1,40 @@
+/* Your week: a quiet row in the chat list, a warm sheet when opened. */
+.weekly-recap-row { display: flex; align-items: center; gap: 10px; width: calc(100% - 16px); margin: 4px 8px 10px; padding: 10px 12px; border: 0; border-radius: 14px; background: var(--secondary-system-background); color: var(--label-primary); text-align: left; cursor: pointer; transition: background-color .18s ease, transform .12s ease; }
+.weekly-recap-row:hover { background: var(--tertiary-system-background); }
+.weekly-recap-row:active { transform: scale(.985); }
+.weekly-recap-row:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+.weekly-recap-row > span:nth-child(2) { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.weekly-recap-row strong { font-size: 13.5px; font-weight: 600; }
+.weekly-recap-row small { font-size: 12px; color: var(--label-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.weekly-recap-row > svg { color: var(--label-tertiary); flex: none; }
+.weekly-recap-icon { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--system-background); color: var(--label-primary); box-shadow: inset 0 0 0 1px var(--separator); }
+
+.weekly-recap-sheet { width: min(440px, calc(100vw - 24px)); max-height: 90dvh; margin: auto; padding: 28px 26px calc(22px + env(safe-area-inset-bottom)); border: 0; border-radius: 28px; background: var(--system-background); color: var(--label-primary); box-shadow: 0 24px 60px rgba(0,0,0,.22); overflow: auto; text-align: center; animation: weekly-recap-in .45s cubic-bezier(.2,.9,.25,1); }
+.weekly-recap-sheet::backdrop { background: rgba(0,0,0,.32); animation: weekly-recap-fade .3s ease; }
+@keyframes weekly-recap-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes weekly-recap-fade { from { opacity: 0; } to { opacity: 1; } }
+.weekly-recap-faces { display: flex; justify-content: center; margin-bottom: 14px; min-height: 8px; }
+.weekly-recap-faces > span { margin: 0 -5px; animation: weekly-recap-bob 2.8s ease-in-out infinite; }
+.weekly-recap-faces > span:nth-child(2) { animation-delay: .25s; }
+.weekly-recap-faces > span:nth-child(3) { animation-delay: .5s; }
+@keyframes weekly-recap-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.weekly-recap-overline { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; color: var(--label-tertiary); }
+.weekly-recap-sheet h2 { margin: 4px 0 18px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.weekly-recap-sheet h2:focus { outline: none; }
+.weekly-recap-stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; }
+.weekly-recap-stats > div { flex: 1; max-width: 180px; display: grid; gap: 2px; padding: 16px 10px; border-radius: 18px; background: var(--secondary-system-background); }
+.weekly-recap-stats strong { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.weekly-recap-stats span { font-size: 12.5px; color: var(--label-secondary); }
+.weekly-recap-detail { margin: 0 0 18px; font-size: 15px; line-height: 1.45; color: var(--label-secondary); }
+.weekly-recap-sheet h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--label-tertiary); text-align: left; }
+.weekly-recap-highlights, .weekly-recap-team { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; border-radius: 16px; overflow: hidden; background: var(--secondary-system-background); }
+.weekly-recap-highlights li, .weekly-recap-team li { display: flex; align-items: center; gap: 10px; padding: 11px 14px; font-size: 14px; line-height: 1.35; }
+.weekly-recap-highlights li + li, .weekly-recap-team li + li { border-top: 1px solid var(--separator); }
+.weekly-recap-highlights svg { flex: none; color: var(--success); }
+.weekly-recap-team span { flex: 1; }
+.weekly-recap-team b { font-weight: 600; color: var(--label-secondary); }
+.weekly-recap-done { height: 50px; border-radius: 14px; font-size: 16px; margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .weekly-recap-sheet, .weekly-recap-sheet::backdrop, .weekly-recap-faces > span { animation: none; } }
+/* The sidebar styles every button span as a flexible label; not these. */
+.sidebar-conversations .weekly-recap-row > .weekly-recap-icon, .weekly-recap-row > .weekly-recap-icon { flex: 0 0 28px; width: 28px; }
+.sidebar-conversations .weekly-recap-row { color: var(--label-primary); opacity: 1; }

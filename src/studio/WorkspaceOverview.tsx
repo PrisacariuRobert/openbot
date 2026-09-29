@@ -1,3 +1,4 @@
+import { ExistingAgentsCard } from "../components/ExistingAgentsCard";
 import { useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, ChevronRight, Plus, Upload } from "lucide-react";
 import type { AppState, Bot } from "../shared/types";
@@ -29,6 +30,7 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
         if (raw?.kind !== "openbot-teammate" || raw?.version !== 1 || typeof raw.bot?.name !== "string" || typeof raw.bot?.role !== "string" || typeof raw.bot?.instructions !== "string") throw new Error("This is not an OpenBot teammate profile.");
         setPreview({raw, name: raw.bot.name, role: raw.bot.role, instructions: raw.bot.instructions, skills: Array.isArray(raw.skills) ? raw.skills.length : 0, routines: Array.isArray(raw.routines) ? raw.routines.length : 0}); });
     }} />
+    <ExistingAgentsCard onOpen={(botId) => { const bot = state.bots.find((item) => item.id === botId); if (bot) onEdit(bot.threadId); }} />
     {error && <p role="alert" className="panel-error">{error}</p>}
     {preview && <section className="workspace-import-preview" aria-label="Profile preview"><h3>Bring a familiar face.</h3><strong>{preview.name}</strong><p>{preview.role}</p><details><summary>Read instructions</summary><p>{preview.instructions}</p></details><p>{preview.skills} skill references · {preview.routines} routines, imported paused</p><WorkspaceNote title="Your workspace keeps its boundaries.">This imports a new profile. Accounts, keys, history, memory and access grants are not imported. Choose an AI connection before starting work.</WorkspaceNote><div className="workspace-page-actions"><button disabled={pending} className="button-primary" onClick={() => void perform(async () => { await onImport(preview.raw); setPreview(null); })}>{pending ? "Importing…" : "Import teammate"}</button><button disabled={pending} onClick={() => setPreview(null)}>Cancel import</button></div></section>}
     <div className="workspace-team-grid">{state.bots.map(bot => <article key={bot.id} className="workspace-teammate">

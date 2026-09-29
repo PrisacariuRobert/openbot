@@ -23,6 +23,7 @@ test("passes only allowlisted host environment values to model processes", () =>
   assert.equal(env.OPENBOT_TEST_VALUE, "safe");
   assert.equal("AWS_SECRET_ACCESS_KEY" in env, false);
   assert.equal("GITHUB_TOKEN" in env, false);
+  assert.equal(env.OPENCODE_DISABLE_AUTOUPDATE, "true", "the runtime must not self-update under running teammates");
 });
 
 test("discovers user CLIs with a background-service PATH without inheriting secrets", () => {

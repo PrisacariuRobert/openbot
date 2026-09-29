@@ -18,7 +18,24 @@ export const VERIFIED_OPENCODE_VERSION = "1.18.31";
 export interface RuntimeCompatibility {
   runtime: "opencode";
   detectedVersion: string | null;
-  compatibility: "verified" | "unsupported" | "unknown";
+  compatibility: "verified" | "compatible" | "unsupported" | "unknown";
+}
+
+/** A newer patch in the verified major.minor line is compatible: OpenCode
+ * ships patches often (and self-updates), and failing closed on each one
+ * stopped every teammate until OpenBot itself was re-released. A different
+ * major/minor, an older patch or an unparseable version still fails closed. */
+export function classifyOpencodeVersion(version: string): RuntimeCompatibility["compatibility"] {
+  if (version === VERIFIED_OPENCODE_VERSION) return "verified";
+  const parse = (value: string) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value.trim())?.slice(1).map(Number);
+  const detected = parse(version);
+  const verified = parse(VERIFIED_OPENCODE_VERSION)!;
+  if (!detected) return "unsupported";
+  return detected[0] === verified[0] && detected[1] === verified[1] && detected[2] > verified[2] ? "compatible" : "unsupported";
+}
+
+export function runtimeMayExecute(compatibility: RuntimeCompatibility["compatibility"]): boolean {
+  return compatibility === "verified" || compatibility === "compatible";
 }
 
 export const RUNTIME_INCOMPATIBLE_MESSAGE =
@@ -32,7 +49,7 @@ export function opencodeCompatibility(options: { refresh?: boolean; probe?: () =
   // the verified version — this is not a bypass.
   const declared = (process.env.OPENBOT_OPENCODE_VERSION || "").trim();
   if (declared) {
-    cached = { runtime: "opencode", detectedVersion: declared, compatibility: declared === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" };
+    cached = { runtime: "opencode", detectedVersion: declared, compatibility: classifyOpencodeVersion(declared) };
     return cached;
   }
   const readVersion = options.probe || (() => {
@@ -49,7 +66,7 @@ export function opencodeCompatibility(options: { refresh?: boolean; probe?: () =
     version = null;
   }
   const next: RuntimeCompatibility = version
-    ? { runtime: "opencode", detectedVersion: version, compatibility: version === VERIFIED_OPENCODE_VERSION ? "verified" : "unsupported" }
+    ? { runtime: "opencode", detectedVersion: version, compatibility: classifyOpencodeVersion(version) }
     : { runtime: "opencode", detectedVersion: null, compatibility: "unknown" };
   // A transient probe failure must not wedge the host: only definitive
   // verdicts are cached, so the next task re-probes instead of failing

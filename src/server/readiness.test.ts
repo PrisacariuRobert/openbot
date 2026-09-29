@@ -70,6 +70,10 @@ test("readiness steps tell saved apart from runnable", () => {
   assert.match(unsupported[0]!.detail, /9\.9\.9 is not verified/);
   assert.match(unsupported[0]!.detail, /1\.18\.31/);
 
+  const patched = buildReadinessSteps({ ...base, compatibility: "compatible", detectedVersion: "1.18.32" });
+  assert.equal(patched[0]!.ready, true, "a newer verified-line patch can run");
+  assert.match(patched[0]!.detail, /1\.18\.32 is ready.*newer patch/);
+
   const unknown = buildReadinessSteps({ ...base, cliAvailable: true, compatibility: "unknown", detectedVersion: null });
   assert.equal(unknown[0]!.ready, false);
   assert.match(unknown[0]!.detail, /did not report a version/);

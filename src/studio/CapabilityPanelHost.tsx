@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { enablePushNotifications } from "./push";
 import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
 import { ProviderPanel } from "../components/ProviderPanel";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
@@ -12,6 +13,8 @@ import "./settings-pages.css";
 import "./refined-workspace.css";
 
 import type { CapabilityPanel } from "./capability-navigation";
+import { TelegramPanel } from "../components/TelegramPanel";
+import { friendlyModelName } from "../shared/provider-config";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
 async function request<T = unknown>(url: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -92,19 +95,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     }
   }
   const saveBot = async (id: string, patch: Partial<Bot>) => { await change(`/api/bots/${encodeURIComponent(id)}`, "PATCH", patch); await loadProvider(); };
-  const notifications = async () => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotice("Background notifications are unavailable in this browser."); return false; }
-    if (await Notification.requestPermission() !== "granted") { setNotice("Notifications stayed off."); return false; }
-    const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
-    const { publicKey } = await request<{ publicKey: string }>("/api/notifications/key");
-    const encoded = publicKey.replace(/-/g, "+").replace(/_/g, "/");
-    const key = Uint8Array.from(atob(encoded + "=".repeat((4 - encoded.length % 4) % 4)), (c) => c.charCodeAt(0));
-    const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-    const saved = subscription.toJSON();
-    if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error("This browser did not finish notification setup.");
-    await request("/api/notifications/subscriptions", "POST", { endpoint: saved.endpoint, keys: saved.keys });
-    localStorage.setItem("openbot_push_enabled", "1"); setNotice("Background notifications are on."); return true;
-  };
+  const notifications = async () => { const result = await enablePushNotifications(); setNotice(result.message); return result.ok; };
   const reviewRun = [...state.runs, ...state.studioRuns].find((run) => run.id === reviewRunId);
   return <div className={`capabilities capability-${panel}`}>
     {panel === "team" && <TeamOverview state={state} onCreate={() => onCreate()} onEdit={id => onEditBot(id)} onThread={onThread} onImport={async bundle => { await change("/api/bots/import", "POST", bundle, "Profile imported. Choose an AI connection before starting work."); }} onRestore={async id => { await change(`/api/bots/${encodeURIComponent(id)}/restore`, "POST", undefined, "Teammate restored."); }} />}
@@ -114,7 +105,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {["bot", "files", "computer", "teach"].includes(panel) && state.bots.length > 1 && <div className="capability-owner"><span>Teammate</span><ChoiceMenu label="Teammate" value={bot?.id || ""} choices={state.bots.map((item) => ({ value: item.id, label: item.name, detail: item.role, icon: <Character name={item.name} color={item.color} variant={item.mascot} size={28} /> }))} onChange={setChosenBot} /></div>}
     {["bot", "files", "computer", "teach"].includes(panel) && !bot && <p>Create a teammate first to use this feature.</p>}
     {panel === "control" && <><WorkspaceNote bot={bot} title="Before important actions">Ask First stays visible. Accounts, recipients, resources and versions belong in the review. Access to a browser is not permission for every website.</WorkspaceNote><div className="workspace-row-group">{state.bots.map(item => <button className="workspace-list-row" key={item.id} onClick={() => onEditBot(item.threadId)}><Character name={item.name} color={item.color} variant={item.mascot} size={36}/><span><strong>{item.name}</strong><small>Browser {item.browserEnabled ? "allowed" : "off"} · private computer {item.computerEnabled ? "allowed" : "off"} · Mac access {item.macAccessEnabled && state.settings.macAccessEnabled ? "enabled" : "off"}</small></span><span className="workspace-row-action">Review access</span></button>)}</div></>}
-    {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={(model) => model.split("/").at(-1) || model} onUpdateBot={saveBot}
+    {panel === "provider" && <ProviderPanel provider={provider} bots={state.bots} mascot={(item) => <Character name={item.name} color={item.color} variant={item.mascot} size={36} />} modelLabel={friendlyModelName} onUpdateBot={saveBot}
       connectionTests={connectionTests}
       onTestConnection={async (id) => {
         const receipt = await change<ProviderConnectionTest>(`/api/provider/${encodeURIComponent(id)}/test`, "POST", {});
@@ -130,6 +121,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
       await workflowMessage("team-room", prompt, botId ? [botId] : [], expectedWorkKind);
     }} />}
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}
+    {panel === "telegram" && <TelegramPanel bots={state.bots} />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
     {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} onSave={saveBot}
       onUpdateThread={async (patch) => { await change(`/api/threads/${encodeURIComponent(bot.threadId)}`, "PATCH", patch); }}

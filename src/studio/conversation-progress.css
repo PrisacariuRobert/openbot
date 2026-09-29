@@ -15,3 +15,13 @@
 .conversation-progress-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes conversation-pulse { 0%, 70%, 100% { opacity: .35; } 35% { opacity: .9; } }
 @media (prefers-reduced-motion: reduce) { .conversation-progress-dots i { animation: none; opacity: .6; } }
+/* The reply as it is written, already in the teammate's reply bubble so the
+ * finished answer simply settles in place. Faded at the top only if trimmed. */
+.conversation-progress-live { margin: 10px 0 2px 42px; width: fit-content; max-width: 88%; max-height: 340px; overflow: hidden; padding: 11px 15px; border-radius: 18px 18px 18px 6px; background: color-mix(in srgb, var(--message-tint, var(--secondary)) 9%, var(--system-background)); color: var(--ink); font-size: 15px; line-height: 22px; display: flex; flex-direction: column; justify-content: flex-end; animation: conversation-live-in .3s ease; }
+.conversation-progress-live.is-trimmed { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px); mask-image: linear-gradient(to bottom, transparent 0, #000 40px); }
+.conversation-progress-live > :last-child::after { content: ""; display: inline-block; width: 7px; height: 1em; margin-left: 3px; vertical-align: -2px; border-radius: 2px; background: currentColor; opacity: .35; animation: conversation-pulse 1.2s ease-in-out infinite; }
+@keyframes conversation-live-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .conversation-progress-live, .conversation-progress-live > :last-child::after { animation: none; } }
+/* Match the finished bubble's rhythm so nothing shifts when it lands. */
+.conversation-progress-live > * + * { margin-top: 16px; }
+.conversation-progress-live > * { margin-bottom: 0; }

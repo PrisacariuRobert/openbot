@@ -1,5 +1,5 @@
 import type { ReadinessStep } from "../shared/types.js";
-import { VERIFIED_OPENCODE_VERSION, type RuntimeCompatibility } from "./runtime-compatibility.js";
+import { runtimeMayExecute, VERIFIED_OPENCODE_VERSION, type RuntimeCompatibility } from "./runtime-compatibility.js";
 
 /** First-run readiness truth (D01). Saved is not ready:
  * - runtime needs the CLI present AND a verified version (an unsupported
@@ -17,11 +17,13 @@ export function buildReadinessSteps(input: {
   readyTeammates: number;
   totalTeammates: number;
 }): ReadinessStep[] {
-  const runtimeReady = input.cliAvailable && input.compatibility === "verified";
+  const runtimeReady = input.cliAvailable && runtimeMayExecute(input.compatibility);
   const runtimeDetail = !input.cliAvailable
     ? "Install the OpenCode runtime so teammates can work."
     : input.compatibility === "verified"
       ? `OpenCode${input.detectedVersion ? ` ${input.detectedVersion.trim().split("\n")[0]}` : ""} is ready on this host.`
+      : input.compatibility === "compatible"
+        ? `OpenCode ${input.detectedVersion || ""} is ready on this host (a newer patch of verified ${VERIFIED_OPENCODE_VERSION}).`
       : input.compatibility === "unsupported"
         ? `OpenCode ${input.detectedVersion || "unknown version"} is not verified with this OpenBot release (verified: ${VERIFIED_OPENCODE_VERSION}). Update OpenBot or switch runtimes; files, results, settings and receipts remain available.`
         : "OpenCode did not report a version just now, so execution readiness is unknown. If this persists, reinstall the runtime and try again.";

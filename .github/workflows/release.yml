@@ -11,8 +11,45 @@ concurrency:
 jobs:
   desktop:
     uses: ./.github/workflows/desktop.yml
+  # The free, one-command Mac install (scripts/install.sh) downloads these
+  # under stable names from the latest release.
+  terminal-bundles:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: macos-15-intel, platform: darwin-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Bundle Node, OpenCode and the app for the terminal installer
+        run: node scripts/package-runtime-bundle.mjs --platform ${{ matrix.platform }} --out dist-release
+      - name: Stable names for the installer
+        run: |
+          cd dist-release
+          cp openbot-*-${{ matrix.platform }}.tar.gz openbot-${{ matrix.platform }}.tar.gz
+          shasum -a 256 openbot-${{ matrix.platform }}.tar.gz > openbot-${{ matrix.platform }}.tar.gz.sha256
+          cp ../scripts/install.sh install.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: openbot-desktop-terminal-${{ matrix.platform }}
+          path: |
+            dist-release/openbot-${{ matrix.platform }}.tar.gz
+            dist-release/openbot-${{ matrix.platform }}.tar.gz.sha256
+            dist-release/install.sh
+          if-no-files-found: error
   publish:
-    needs: [desktop]
+    needs: [desktop, terminal-bundles]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

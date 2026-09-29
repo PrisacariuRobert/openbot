@@ -20,10 +20,12 @@ export function StudioAccess({ children }: { children: ReactNode }) {
   }, [retry]);
   if (phase === "ready") return children;
   return <main className="studio-access"><section>
-    <span className="access-mark"><LockKeyhole size={24} strokeWidth={1.5} /></span>
+    {/* A lock only when a key is needed; otherwise the OpenBot face, gently
+        breathing while the studio opens. */}
+    <span className={`access-mark${phase === "checking" ? " is-opening" : ""}`}>{phase === "locked" ? <LockKeyhole size={24} strokeWidth={1.5} /> : <img src="/design/openbot-face.svg" width="26" height="26" alt="" />}</span>
     <p className="overline">OPENBOT</p>
     <h1>{phase === "locked" ? "Your studio is private." : phase === "offline" ? "Let’s reconnect." : "Opening your studio."}</h1>
-    <p>{phase === "locked" ? "Use your studio’s access key to continue on this device." : phase === "offline" ? "Keep the Mac running OpenBot awake and connected. We’ll reconnect automatically when it’s available." : "Your conversations and teammates will be here in a moment."}</p>
+    <p>{phase === "locked" ? "On your Mac, open Settings → Your phone and scan the code with this phone’s camera. Or use your studio’s access key." : phase === "offline" ? "Keep the Mac running OpenBot awake and connected. We’ll reconnect automatically when it’s available." : "Your conversations and teammates will be here in a moment."}</p>
     {phase === "checking" && <LoaderCircle className="spinner" size={21} aria-label="Loading" />}
     {phase === "offline" && <button className="primary" onClick={() => { setPhase("checking"); setRetry((n) => n + 1); }}>Try again <ArrowRight size={16} /></button>}
     {phase === "locked" && <form onSubmit={async (event) => {

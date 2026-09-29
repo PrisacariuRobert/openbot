@@ -33,8 +33,7 @@ export function parseRoutineIntent(input: string, timeZone?: string): RoutineInt
     // Leave alternate time zones, extra timing rules and ambiguous requests to
     // the normal tool flow; never discard them as if they were task wording.
     if (/^(?:[A-Z]{2,5}|in\s+\w+)\b/.test(prompt) || /\b(?:except|until|starting|only|unless)\b/i.test(prompt)) return null;
-    const short = prompt.replace(/[.!?]+$/g, "").slice(0, 44);
-    return { schedule: parsed.data, intervalMinutes: 1440, name: short.charAt(0).toUpperCase() + short.slice(1), prompt,
+    return { schedule: parsed.data, intervalMinutes: 1440, name: routineTitle(prompt), prompt,
       confirmation: `Scheduled: ${scheduleLabel(parsed.data, 1440)}. I’ll ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}. You can preview, test or pause it in Automations. Your execution host needs to be awake.` };
   }
   // A wall-clock request must not fall through to an elapsed 24-hour interval.
@@ -69,8 +68,25 @@ export function parseRoutineIntent(input: string, timeZone?: string): RoutineInt
   const schedule = routineScheduleLabel(intervalMinutes);
   return {
     intervalMinutes,
-    name: `${shortTask.charAt(0).toUpperCase()}${shortTask.slice(1)}`,
+    name: routineTitle(friendlyTask),
     prompt,
     confirmation: `I’ll ${localText ? `post “${shortTask}” here` : friendlyTask} ${schedule.toLowerCase()}. You can test, pause or change it anytime in Automations.`,
   };
+}
+
+/** A short name for the Automations list: "Give me a short brief of the
+ * three most important AI news stories with links" → "AI news brief". */
+export function routineTitle(request: string): string {
+  let text = request.replace(/[.!?]+$/g, "").replace(/\s+/g, " ").trim();
+  const kind = /\b(brief|briefing|summary|digest|roundup|update|report|overview)\b/i.exec(text)?.[1]?.toLowerCase();
+  const news = /\b((?:[A-Za-z0-9&+-]+\s+){0,2}?)news\b/i.exec(text.replace(/\b(?:the|three|five|ten|top|most|important|latest|biggest|\d+)\b\s*/gi, ""));
+  if (news) {
+    const topic = news[1]!.trim().split(" ").filter((word) => !/^(?:of|on|about|for|in|my|a|an)$/i.test(word)).join(" ");
+    const title = `${topic ? `${topic} ` : ""}news ${kind === "briefing" ? "brief" : kind || "brief"}`.trim();
+    return title.charAt(0).toUpperCase() + title.slice(1);
+  }
+  text = text.replace(/^(?:please\s+)?(?:give|send|tell|get|show|make|prepare|write|create|compile|do|check)\s+(?:me\s+|us\s+)?(?:(?:a|an|the|my|our)\s+)?(?:(?:short|quick|brief|little|daily|weekly)\s+)?/i, "");
+  text = text.replace(/\s+(?:with|including|and (?:send|post|text|email|tell|let)|so that|to me|for me|please)\b.*$/i, "");
+  const words = text.split(" ").slice(0, 6).join(" ").slice(0, 44);
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Routine";
 }

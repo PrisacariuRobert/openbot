@@ -36,6 +36,8 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
   return result;
 }
 type Preview = Omit<CommunitySkill, "id" | "botIds" | "installedAt">;
+type CatalogEntry = { name: string; description: string; url: string; collection: string; license: string; addable: boolean; reason: string | null; installed?: boolean };
+const skillTitle = (name: string) => name.replace(/-/g, " ").replace(/\b(mcp|api|pdf|ui|csv|seo)\b/g, (word) => word.toUpperCase()).replace(/^./, (letter) => letter.toUpperCase());
 
 
 function getSkillMeta(id: string, name: string) {
@@ -119,6 +121,9 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
   const [mode, setMode] = useState<"http" | "stdio">("http"); const [command, setCommand] = useState(""); const [argsText, setArgsText] = useState(""); const [envText, setEnvText] = useState("");
   const [source, setSource] = useState(""), [markdown, setMarkdown] = useState(""), [preview, setPreview] = useState<Preview | null>(null);
   const skillFile = useRef<HTMLInputElement>(null);
+  const [previewFrom, setPreviewFrom] = useState<"discover" | "import">("import");
+  const [catalog, setCatalog] = useState<CatalogEntry[] | null>(null), [catalogError, setCatalogError] = useState("");
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const [memories, setMemories] = useState<PrivateMemory[]>([]), [memoryKey, setMemoryKey] = useState(""), [memoryText, setMemoryText] = useState("");
   const [memoryRevision, setMemoryRevision] = useState<string | undefined>(), [memoryExpiry, setMemoryExpiry] = useState("");
   // U04d: first paint distinguishes loading from empty so a slow catalog
@@ -139,6 +144,12 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
     if (tab === "memory" && botId) void request<PrivateMemory[]>(`/memory/${encodeURIComponent(botId)}`).then((notes) => { if (active) setMemories(notes); }).catch((error) => { if (active) setError(error.message); });
     return () => { active = false; };
   }, [tab, botId, notice]);
+  const showImportPreview = (next: Preview) => { setPreviewFrom("import"); setPreview(next); };
+  const loadCatalog = (refresh = false) => {
+    setCatalogError("");
+    void request<CatalogEntry[]>(`/skills/catalog${refresh ? "?refresh=1" : ""}`).then(setCatalog).catch((cause) => setCatalogError(cause instanceof Error ? cause.message : "Public skills are unavailable right now."));
+  };
+  useEffect(() => { if (tab === "skills" && !catalog) loadCatalog(); }, [tab]);
   const run = async (work: () => Promise<unknown>, message = "Saved.") => {
     setBusy(true); setError(""); setNotice("");
     try { await work(); await load(); setNotice(message); }
@@ -146,6 +157,56 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
     finally { setBusy(false); }
   };
   void SwitchRow;
+  const reviewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (preview && previewFrom === "discover") reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [preview, previewFrom]);
+  const review = preview ? (
+<div className="extension-review" ref={reviewRef}>
+                <h4>{skillTitle(preview.name)}</h4>
+                <p>{preview.description}</p>
+                <small>
+                  {preview.files["LICENSE.txt"] ? "License included" : preview.license} · {Object.keys(preview.files).length} {Object.keys(preview.files).length === 1 ? "file" : "files"} · pinned to this exact version
+                </small>
+                <ul>
+                  {preview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                  {preview.blockers.map((blocker) => (
+                    <li className="extension-error" key={blocker}>
+                      {blocker}
+                    </li>
+                  ))}
+                </ul>
+                <details>
+                  <summary>Read bundle contents</summary>
+                  {Object.entries(preview.files).map(([file, content]) => (
+                    <div key={file}>
+                      <h4>{file}</h4>
+                      <pre>{content}</pre>
+                    </div>
+                  ))}
+                </details>
+                <button
+                  type="button"
+                  className="button-primary"
+                  disabled={preview.blockers.length > 0}
+                  onClick={() =>
+                    void run(async () => {
+                      await request("/skills", "POST", {
+                        bundle: { files: preview.files, source: preview.source },
+                        digest: preview.digest,
+                        botIds: [botId],
+                      });
+                      setPreview(null);
+                      setMarkdown("");
+                      if (previewFrom === "discover") loadCatalog();
+                    }, `${skillTitle(preview.name)} added for ${currentBot?.name || "this teammate"}.`)
+                  }
+                >
+                  Add for {currentBot?.name || "this teammate"}
+                </button>
+              </div>
+  ) : null;
+  const addable = catalog?.filter((entry) => entry.addable) || [], unavailable = catalog?.filter((entry) => !entry.addable) || [];
   return <section className={`extensions-panel ${skillsOnly ? "included-library" : ""}`} aria-label="Open extensions">
     <header><div><span className="extension-eyebrow">Made to work your way</span><h3>{skillsOnly ? "Ready-to-use skills" : "Tools, skills & memory"}</h3><p>{skillsOnly ? "Useful methods, already here. Your teammates choose the right one for your task." : "Use an included skill, add an open connection, or correct what a teammate remembers."}</p></div><Cable size={24} aria-hidden="true" /></header>
     {!skillsOnly && (
@@ -521,6 +582,53 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
             </div>
           )}
 
+        <section className="skills-discover" aria-labelledby="skills-discover-title">
+          <header>
+            <div>
+              <h4 id="skills-discover-title">Discover</h4>
+              <p>Public skills in the open Agent Skills format. Each one is checked before you can add it, and nothing is added until you review it.</p>
+            </div>
+            {catalogError && <button type="button" className="button-secondary" onClick={() => loadCatalog(true)}>Try again</button>}
+          </header>
+          {catalogError ? <p className="skills-discover-note" role="status">{catalogError}</p>
+            : !catalog ? <div className="skills-discover-grid" aria-busy="true" aria-label="Loading public skills">{[0, 1, 2, 3].map((index) => <div className="discover-card skeleton" key={index} />)}</div>
+            : <>
+              <div className="skills-discover-grid">
+                {addable.map((entry) => (
+                  <article className="discover-card" key={entry.url}>
+                    <div className="discover-card-text">
+                      <h5>{skillTitle(entry.name)}</h5>
+                      <p>{entry.description}</p>
+                      <small>{entry.collection}{entry.license && !/not declared/i.test(entry.license) ? " · license included" : ""}</small>
+                    </div>
+                    {entry.installed
+                      ? <span className="discover-added"><Check size={13} aria-hidden="true" /> Added</span>
+                      : <button
+                          type="button"
+                          className="discover-get"
+                          aria-label={`Review ${skillTitle(entry.name)}`}
+                          disabled={Boolean(reviewing)}
+                          onClick={() => {
+                            setReviewing(entry.url); setError("");
+                            void request<Preview>("/skills/fetch", "POST", { url: entry.url })
+                              .then((next) => { setPreviewFrom("discover"); setPreview(next); })
+                              .catch((cause) => setError(cause instanceof Error ? cause.message : "That skill could not be loaded."))
+                              .finally(() => setReviewing(null));
+                          }}
+                        >{reviewing === entry.url ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : "Get"}</button>}
+                  </article>
+                ))}
+              </div>
+              {previewFrom === "discover" && review}
+              {unavailable.length > 0 && (
+                <details className="skills-discover-unavailable">
+                  <summary>{unavailable.length} more can’t be added as they are</summary>
+                  <ul>{unavailable.map((entry) => <li key={entry.url}><strong>{skillTitle(entry.name)}</strong> — {entry.reason}</li>)}</ul>
+                </details>
+              )}
+            </>}
+        </section>
+
         <details className="purpose-disclosure skills-add-disclosure">
           <summary>
             <Plus size={18} />
@@ -540,7 +648,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                     event.preventDefault();
                     void run(
                       async () =>
-                        setPreview(
+                        showImportPreview(
                           await request<Preview>("/skills/fetch", "POST", {
                             url: source,
                           })
@@ -588,7 +696,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                       };
                       if (shared.kind !== "openbot-skill" || !shared.bundle)
                         throw new Error("That file is not an OpenBot skill file.");
-                      setPreview(
+                      showImportPreview(
                         await request<Preview>("/skills/inspect", "POST", shared.bundle)
                       );
                     }, "Shared skill loaded for review. Not installed yet.");
@@ -622,7 +730,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                   onClick={() =>
                     void run(
                       async () =>
-                        setPreview(
+                        showImportPreview(
                           await request<Preview>("/skills/inspect", "POST", {
                             files: { "SKILL.md": markdown },
                             source: "Manually provided by the studio owner",
@@ -637,52 +745,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
               </div>
             </div>
 
-            {preview && (
-              <div className="extension-review">
-                <h4>{preview.name}</h4>
-                <p>{preview.description}</p>
-                <small>
-                  {preview.license} · {Object.keys(preview.files).length} files · pinned {preview.digest.slice(0, 10)}
-                </small>
-                <ul>
-                  {preview.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                  {preview.blockers.map((blocker) => (
-                    <li className="extension-error" key={blocker}>
-                      {blocker}
-                    </li>
-                  ))}
-                </ul>
-                <details>
-                  <summary>Read bundle contents</summary>
-                  {Object.entries(preview.files).map(([file, content]) => (
-                    <div key={file}>
-                      <h4>{file}</h4>
-                      <pre>{content}</pre>
-                    </div>
-                  ))}
-                </details>
-                <button
-                  type="button"
-                  className="button-primary"
-                  disabled={preview.blockers.length > 0}
-                  onClick={() =>
-                    void run(async () => {
-                      await request("/skills", "POST", {
-                        bundle: { files: preview.files, source: preview.source },
-                        digest: preview.digest,
-                        botIds: [botId],
-                      });
-                      setPreview(null);
-                      setMarkdown("");
-                    }, "Reviewed skill installed for this teammate.")
-                  }
-                >
-                  Approve & Install Skill
-                </button>
-              </div>
-            )}
+            {previewFrom === "import" && review}
           </div>
         </details>
       </div>

@@ -78,6 +78,7 @@ test("automatic login finishes its callback and updates the attempt", async () =
         complete = resolve;
       });
     },
+    setApiKey: async () => {},
     stop() {},
   };
   const manager = new ProviderConnectionManager(() => {}, bridge);
@@ -105,6 +106,7 @@ test("manual codes keep the selected method and unsupported login returns a visi
     callback: async (...args) => {
       calls.push(args);
     },
+    setApiKey: async () => {},
     stop() {},
   });
   const attempt = await manager.connect("openai");
@@ -113,4 +115,22 @@ test("manual codes keep the selected method and unsupported login returns a visi
   const unsupported = await manager.connect("xai");
   assert.equal(unsupported.status, "failed");
   assert.equal(unsupported.error, "Use an API key instead.");
+});
+
+test("pasting an OpenCode Go key saves it through OpenCode and never keeps it", async () => {
+  const saved: Array<[string, string]> = [];
+  let changes = 0;
+  const manager = new ProviderConnectionManager(() => { changes++; }, {
+    authorize: async () => { throw new Error("not used"); },
+    callback: async () => {},
+    setApiKey: async (providerId, key) => { saved.push([providerId, key]); },
+    stop() {},
+  });
+  await assert.rejects(manager.saveKey("opencode-go", "short"), /doesn't look like an OpenCode key/);
+  await assert.rejects(manager.saveKey("opencode-go", "has spaces in it which keys never have"), /doesn't look like/);
+  const attempt = await manager.saveKey("opencode-go", "  sk-abcdefghijklmnopqrstuvwxyz0123  ");
+  assert.deepEqual(saved, [["opencode-go", "sk-abcdefghijklmnopqrstuvwxyz0123"]]);
+  assert.equal(attempt.status, "connected");
+  assert.equal(changes, 1);
+  assert.ok(!JSON.stringify(manager.listAttempts()).includes("sk-abcdef"), "the key is never kept in attempts");
 });

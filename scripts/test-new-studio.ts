@@ -480,7 +480,7 @@ try {
     );
     await capture(name + "-chat");
     busy = true;
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
     await nav(width)
       .getByRole("button", { name: /Activity/ })
       .click();
@@ -533,7 +533,7 @@ try {
     });
   await page.getByRole("button", { name: "Remove brief.txt" }).waitFor();
   await page.waitForFunction(async () => (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft.body === "My test draft");
-  await page.reload();
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Remove brief.txt" }).waitFor();
   await page.waitForFunction(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value === "My test draft").catch(async (error) => {
     console.error("Synthetic draft recovery diagnostics", await page.evaluate(async () => ({ url: location.href, value: document.querySelector<HTMLTextAreaElement>(".composer textarea")?.value, draft: (await (await fetch("/api/state?threadId=bot-pixel")).json()).draft })));
@@ -595,7 +595,7 @@ try {
   // The thread URL is committed in a React effect. Reload the exact Pixel
   // route, not the previous conversation if navigation is still settling.
   await page.waitForFunction(() => new URL(location.href).searchParams.get("thread") === "bot-pixel");
-  await page.reload();
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page
     .locator(".sidebar-conversations")
     .getByRole("button", { name: "Pixel", exact: true })

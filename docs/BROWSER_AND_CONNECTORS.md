@@ -57,7 +57,7 @@ Do not render `available-unverified` as “Gmail connected.” Suitable copy is 
 
 ## Verification
 
-Current handoff checks and explicit pilot limits: [On-demand sign-in QA](QA_BROWSER_SIGN_IN.md).
+Current handoff checks and explicit pilot limits: [On-demand sign-in QA](internal/qa/QA_BROWSER_SIGN_IN.md).
 
 - `src/server/browser-sign-in.test.ts`: generic origins, saved task and private metadata, duplicate/profile isolation, reopened database, deny/revocation, serialized work, credential-free tool contracts and continuation without false login proof.
 - `npm run test:browser-sign-in`: actual disposable host and Chromium; owner enters a fixture password, an HttpOnly session produces account/ticket readback, review-bound continuation preserves the task, repeated decisions and stale private input are rejected, and nothing is sent. No real website/account/model is used.

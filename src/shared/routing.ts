@@ -10,6 +10,35 @@ export function mentionedBotIds(body: string, bots: Pick<Bot, "id" | "name">[]):
   return bots.filter((bot) => tokens.has(mentionSlug(bot.name)) || tokens.has(mentionSlug(bot.id))).map((bot) => bot.id);
 }
 
+/** People address teammates the natural way too: "Nova: find…", "Pixel,
+ * make…". A name followed by a colon or comma, at the start of the message
+ * or a clause, counts as addressing that teammate. */
+export function addressedBotIds(body: string, bots: Pick<Bot, "id" | "name">[]): string[] {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return bots.filter((bot) => bot.name.trim() && new RegExp(`(?:^|[.!?;\\n]\\s*|\\s(?:and|&)\\s+|^(?:hey|hi|ok|okay)\\s+)${escape(bot.name.trim())}(?:\\s*[:,]|\\s+(?:and|&)\\s+[\\p{L}\\p{N}_-]+\\s*[:,])`, "iu").test(body.trim())).map((bot) => bot.id);
+}
+
+/** "Nova: find three restaurants. Scout, double-check their hours." Scout's
+ * part builds on Nova's result, so Scout should start once Nova has answered
+ * rather than race her. Returns follower → teammate it follows, for parts
+ * addressed later in the message that check, refine or use earlier work. */
+export function followUpOrder(body: string, bots: Pick<Bot, "id" | "name">[]): Map<string, string> {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const addressed = new Set(addressedBotIds(body, bots));
+  const positions = bots.filter((bot) => addressed.has(bot.id)).map((bot) => {
+    const match = new RegExp(`(?:^|[.!?;\\n]\\s*|\\s(?:and|&)\\s+|^(?:hey|hi|ok|okay)\\s+)(${escape(bot.name.trim())})\\s*[:,]`, "iu").exec(body.trim());
+    return match ? { id: bot.id, at: match.index + match[0].indexOf(match[1]!) } : null;
+  }).filter((item): item is { id: string; at: number } => Boolean(item)).sort((a, b) => a.at - b.at);
+  const order = new Map<string, string>();
+  const text = body.trim();
+  positions.forEach((item, index) => {
+    if (!index) return;
+    const part = text.slice(item.at, positions[index + 1]?.at ?? text.length);
+    if (/\b(?:double[- ]?check|check|verify|confirm|review|proofread|fact[- ]?check|edit|polish|improve|tidy|shorten|summari[sz]e|translate|turn (?:it|this|that|them|those|these)|use (?:it|that|those|these|them|the (?:list|results?|plan|draft))|based on|afterwards?|then)\b|\b(?:their|them|those|these|it|her|his)\b/i.test(part)) order.set(item.id, positions[index - 1]!.id);
+  });
+  return order;
+}
+
 /** Teammates a bot's reply pulls into a group conversation. Unlike owner
  * mentions, @everyone/@team never fan out from a bot: only explicit,
  * existing members respond, so one reply can never wake the whole roster. */
@@ -46,6 +75,8 @@ export function resolveMessageTargets(input: {
   if (directBotId) return bots.filter((bot) => bot.id === directBotId);
   const mentions = mentionedBotIds(body, bots);
   if (mentions.length) return bots.filter((bot) => mentions.includes(bot.id));
+  const addressed = addressedBotIds(body, bots);
+  if (addressed.length) return bots.filter((bot) => addressed.includes(bot.id));
   if (requestedIds?.length) return bots.filter((bot) => requestedIds.includes(bot.id));
   return [...bots].sort((left, right) => {
     const score = routingScore(body, right) - routingScore(body, left);

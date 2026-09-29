@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Copy, MessageCircleReply, SmilePlus, X } from "lucide-react";
+import { Check, Copy, MessageCircleReply, Pencil, RotateCcw, SmilePlus, X } from "lucide-react";
+import { ReadAloudButton } from "../components/Dictation";
 
 /** Per-message contextual actions (U02c): reply, copy and the five
  * host-supported reactions. No message delete exists on this path by
@@ -9,8 +10,14 @@ import { Check, Copy, MessageCircleReply, SmilePlus, X } from "lucide-react";
 export const MESSAGE_EMOJIS = ["👍", "❤️", "✅", "👀", "🎉"] as const;
 export type MessageEmoji = (typeof MESSAGE_EMOJIS)[number];
 
-export function MessageControls({ messageId, reactions, onReply, onReacted }: {
+export function MessageControls({ messageId, reactions, onReply, onReacted, readAloud, onRetry, onEdit }: {
   messageId: string;
+  /** Ask the same teammate again (latest reply only). */
+  onRetry?: () => void;
+  /** Put your latest message back in the box to adjust and resend. */
+  onEdit?: () => void;
+  /** A teammate reply that can be read aloud. */
+  readAloud?: string;
   reactions: Array<{ emoji: string; count: number; reactedByYou: boolean }>;
   onReply: () => void;
   onReacted: () => void;
@@ -50,6 +57,9 @@ export function MessageControls({ messageId, reactions, onReply, onReacted }: {
       <button type="button" className="message-control" aria-label={copied ? "Copied" : "Copy message text"} title={copied ? "Copied" : "Copy"} onClick={() => void copy()}>
         {copied ? <Check size={15} /> : <Copy size={15} />}
       </button>
+      {readAloud && <ReadAloudButton text={readAloud} className="message-control" />}
+      {onRetry && <button type="button" className="message-control" aria-label="Try again" title="Try again" onClick={onRetry}><RotateCcw size={15} /></button>}
+      {onEdit && <button type="button" className="message-control" aria-label="Edit and resend" title="Edit" onClick={onEdit}><Pencil size={15} /></button>}
       <button type="button" className="message-control" aria-label="React to this message" title="React" aria-expanded={reacting} onClick={() => { setReacting((open) => !open); setError(""); }}>
         {reacting ? <X size={15} /> : <SmilePlus size={15} />}
       </button>

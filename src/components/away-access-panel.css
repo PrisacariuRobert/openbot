@@ -12,3 +12,19 @@
 .away-devices{border-top:1px solid var(--line);padding-top:20px;display:grid;gap:16px}.away-devices>div{display:flex;align-items:center;gap:12px;min-height:44px}.away-devices span{flex:1;min-width:0}.away-devices small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
 @media(max-width:600px){.away-pairing{padding:20px;gap:16px}.away-pairing-heading{align-items:center}.away-qr{flex-direction:column;text-align:center}.away-pairing-footer{align-items:flex-start;flex-direction:column}.away-pairing h3{font-size:18px}.away-pairing .settings-row-control{flex:1 1 100%;justify-content:stretch}.away-pairing .settings-row-control button{flex:1 1 auto}.away-pairing button.away-pairing-primary{align-self:stretch}}
 @media (prefers-reduced-motion: reduce){.away-pairing *,.away-pairing *::before,.away-pairing *::after{transition:none !important;animation:none !important}}
+.telegram-token{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}.telegram-token input{flex:1 1 220px;min-width:0;min-height:44px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}.telegram-token input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.away-pairing select{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}
+.telegram-footnote{font-size:12px!important;color:var(--muted)!important;line-height:1.5}
+@media(max-width:600px){.telegram-token button{flex:1 1 100%}}
+.channel-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.channel-link{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:12px;background:var(--surface-muted);color:var(--ink);font-size:13px;font-weight:600;text-decoration:none}
+.channel-link:hover{background:var(--selection)}.channel-link:focus-visible,.copy-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a.away-pairing-primary.channel-primary{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-size:13px;font-weight:600}
+.copy-chip{display:inline-flex!important;align-items:center;gap:8px;min-height:40px!important;padding:8px 12px!important;border:1px dashed var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:12px!important}
+.copy-chip code{font-family:"JetBrains Mono Variable",ui-monospace,monospace;font-size:13px}
+.channel-qr{display:block;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:6px}
+@media(max-width:600px){.channel-qr{display:none}.channel-actions>*{flex:1 1 auto;justify-content:center}}
+
+/* Chat app brand marks sit on white, not the grey tile. */
+.away-pairing .away-pairing-icon.brand { background: none !important; border: 0 !important; border-radius: 0; box-shadow: none; }
+.away-pairing-icon.brand svg { width: 40px; height: 40px; }

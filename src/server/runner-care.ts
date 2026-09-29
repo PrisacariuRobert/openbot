@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { RunnerCareCheck, RunnerCareSnapshot } from "../shared/types.js";
 import type { DeploymentConfig } from "./deployment.js";
+import { syncedFolderProvider } from "./synced-folder.js";
 
 const execFileAsync = promisify(execFile);
 type CommandResult = { ok: boolean; output: string };
@@ -88,6 +89,8 @@ function updateRecord(dataDir: string): UpdateRecord | null {
 }
 
 function storageCheck(dataDir: string): RunnerCareCheck {
+  const synced = syncedFolderProvider(dataDir);
+  if (synced) return { id: "storage", label: "Storage", status: "attention", value: `In ${synced}`, detail: "Move the data folder out of the synced folder; syncing a live database can corrupt it" };
   try {
     const stats = statfsSync(dataDir, { bigint: true });
     const total = Number(stats.blocks * stats.bsize);

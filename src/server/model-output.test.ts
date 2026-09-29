@@ -5,7 +5,7 @@ import { ModelOutput, eventText } from "./model-output.js";
 const text = (messageID: string, id: string, text: string) => ({ type: "text", part: { type: "text", messageID, id, text, time: { end: 1 } } });
 
 test("provider failures explain the recovery path without leaking payloads", () => {
-  for (const [statusCode, message, expected] of [[400, "json_parse_error MessageContent", /file format/], [429, "quota", /usage or rate limit/], [401, "unauthorized", /Reconnect/], [503, "failed", /temporarily unavailable/]] as const) {
+  for (const [statusCode, message, expected] of [[400, "json_parse_error MessageContent", /file format/], [429, "quota", /usage or rate limit/], [401, "unauthorized", /Reconnect/], [503, "failed", /temporarily unavailable/], [404, "This model models/gemini-2.5-flash is no longer available to new users.", /retired this model/]] as const) {
     const output = new ModelOutput("opencode");
     output.add({ type: "error", error: { data: { statusCode, message: `${message} secret-private-payload`, responseHeaders: { Authorization: "secret" } } } });
     assert.equal(output.finalText, "");

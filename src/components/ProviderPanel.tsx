@@ -3,6 +3,7 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
+  ExternalLink,
   KeyRound,
   LoaderCircle,
   Plus,
@@ -10,6 +11,9 @@ import {
 import { SettingsCard, SettingsGroup, SettingsRow, SegmentedControl } from "../studio/Settings";
 import {
   isFreeTierModel,
+  isBlockedFreeTierModel,
+  defaultModelChoice,
+  modelChoices,
   isLocalModelUrl,
   providerInput,
   type ProviderInput,
@@ -23,6 +27,7 @@ import type {
   ProviderStatus,
 } from "../shared/types";
 import "./provider-panel.css";
+import { BringYourAI, KeyPaste } from "./BringYourAI";
 
 type Props = {
   provider: ProviderStatus | null;
@@ -75,6 +80,47 @@ const presets: Record<
   },
 };
 
+/** The one-minute path for most people: a $10/month key, pasted once. */
+export function RecommendedAI({ onConnected, compact = false }: { onConnected: (connectionId: string) => Promise<void>; compact?: boolean }) {
+  const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId: "opencode-go", key }) });
+      const result = await response.json().catch(() => ({})) as { error?: string; connectionId?: string };
+      if (!response.ok || !result.connectionId) throw new Error(result.error || "The key wasn't accepted.");
+      setKey("");
+      await onConnected(result.connectionId);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The key wasn't accepted."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className={`ai-recommended${compact ? " is-compact" : ""}`} aria-labelledby="ai-recommended-title">
+      <span className="ai-recommended-badge">Recommended</span>
+      <h3 id="ai-recommended-title">OpenCode Go</h3>
+      <p>One subscription for your whole team — about $10 a month, with fast, capable models. Set up once, in about a minute.</p>
+      <ol>
+        <li>
+          <span>1</span>
+          <div><strong>Get your key</strong><small>Subscribe to Go, then copy your API key.</small></div>
+          <a className="ai-recommended-link" href="https://opencode.ai/go" target="_blank" rel="noreferrer">Open opencode.ai <ExternalLink size={14} /></a>
+        </li>
+        <li>
+          <span>2</span>
+          <div><strong>Paste it here</strong><small>It goes straight to OpenCode on this Mac. OpenBot never shows it again.</small></div>
+        </li>
+      </ol>
+      <form onSubmit={(event) => void submit(event)}>
+        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your OpenCode Go key" aria-label="OpenCode Go key" />
+        <button type="submit" className="button-primary" disabled={busy || key.trim().length < 20}>{busy ? <LoaderCircle size={15} className="spinner" /> : null}Connect</button>
+      </form>
+      {error && <p className="ai-recommended-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 export function ProviderPanel({
   provider,
   bots,
@@ -107,6 +153,9 @@ export function ProviderPanel({
   const [initialModel, setInitialModel] = useState("");
   const [pendingConnections, setPendingConnections] = useState<Record<string, string>>({});
   const needsChoice = bots.some((bot) => !bot.providerInstanceId && !bot.model);
+  const openCodeEntry = provider?.catalog.find((entry) => entry.id === "opencode");
+  // A saved key that failed its test still needs the simple path: paste again.
+  const openCodeConnected = Boolean(openCodeEntry?.connected) && connectionTests[openCodeEntry?.connectionId || "local-opencode"]?.ok !== false;
   const initial = provider?.instances.find((entry) => entry.id === initialConnection);
   // Polling refreshes the shared status. Never keep showing an old waiting
   // attempt after the runtime has reported success or failure.
@@ -298,18 +347,27 @@ export function ProviderPanel({
                 "Connect"
               )}
             </button>
+          ) : entry.id === "google" && entry.installed ? (
+            <KeyPaste providerId="google" link="https://aistudio.google.com/apikey" linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={afterConnect} />
           ) : (
             <span className="ai-state">
-              {entry.installed ? "Set up in OpenCode" : "Setup needed"}
+              {entry.id === "opencode" && entry.installed ? "Paste a key above" : entry.installed ? "Set up in OpenCode" : "Setup needed"}
             </span>
           )
         }
       />
     );
   };
+  const afterConnect = async (connectionId: string) => {
+    setNotice("Connected. Checking it with a short test…");
+    const result = await onTestConnection(connectionId).catch(() => null);
+    if (result?.ok) setNotice("Connected and working. Choose it when you create a teammate.");
+    else { setNotice(null); setError(result?.error ? `Connected, but the test didn't pass: ${result.error}` : "Connected. The first test didn't finish; try “Test connection” below in a moment."); }
+  };
   return (
     <div className="provider-settings">
-      <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
+      {provider && !provider.instances.some((entry) => entry.connected && connectionTests[entry.id]?.ok !== false) && <BringYourAI onConnected={afterConnect} />}
+      {(!provider || provider.instances.some((entry) => entry.connected && connectionTests[entry.id]?.ok !== false)) && <header className="ai-intro" style={bots[0] ? { "--mascot-color": bots[0].color } as CSSProperties : undefined}>
         <div>
           <h3>Your AI, your choice.</h3>
           <p>
@@ -322,7 +380,7 @@ export function ProviderPanel({
             {mascot(bots[0])}
           </div>
         )}
-      </header>
+      </header>}
       {!provider && <p role="status">Checking your connections…</p>}
       {needsChoice && (
         <SettingsGroup title="First, choose the AI you want to use">
@@ -342,7 +400,7 @@ export function ProviderPanel({
               control={
                 <select aria-label="First model" value={initialModel} onChange={(event) => setInitialModel(event.target.value)} disabled={!initial || busy !== null}>
                   <option value="">Choose a model</option>
-                  {initial?.models?.map((model) => <option key={model} value={model}>{modelLabel(model)}{isFreeTierModel(model) ? " · Free tier" : ""}</option>)}
+                  {modelChoices(initial?.models || []).map((choice) => <option key={choice.value} value={choice.value} disabled={choice.disabled}>{choice.label}{choice.detail ? ` · ${choice.detail}` : ""}</option>)}
                 </select>
               }
             >
@@ -374,7 +432,7 @@ export function ProviderPanel({
           <p>{notice}</p>
         </div>
       )}
-      {!hasLocalModel && (
+      {!hasLocalModel && mode === "api" && (
         <div className="ai-local-path">
           <div>
             <strong>Local model, if you want one</strong>
@@ -721,17 +779,19 @@ export function ProviderPanel({
                     >
                       {(changingConnection || !bot.model) && <option value="">Choose a model</option>}
                       {models.map((model) => (
-                        <option key={model} value={model}>
+                        <option key={model} value={model} disabled={isBlockedFreeTierModel(model) && model !== bot.model}>
                           {modelLabel(model)}
                           {connection?.models?.includes(model)
-                            ? isFreeTierModel(model) ? " · Free tier" : ""
+                            ? isBlockedFreeTierModel(model) ? " · works only inside OpenCode" : isFreeTierModel(model) ? " · Free tier" : model === defaultModelChoice(connection.models || []) ? " · Recommended" : ""
                             : " · unavailable"}
                         </option>
                       ))}
                     </select>
                   }
                 >
-                  {isFreeTierModel(bot.model) && (
+                  {isBlockedFreeTierModel(bot.model) ? (
+                    <p className="settings-row-note">{bot.name} can't work on this model: OpenCode's free tier only answers inside OpenCode's own app. Choose another model.</p>
+                  ) : isFreeTierModel(bot.model) && (
                     <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
                   )}
                 </SettingsRow>

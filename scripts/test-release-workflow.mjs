@@ -6,7 +6,13 @@ const read = name => parse(readFileSync(new URL(`../.github/workflows/${name}.ym
 test('draft releases wait for all desktop installers and never publish automatically', () => {
   const release = read('release');
   assert.equal(release.jobs.desktop.uses, './.github/workflows/desktop.yml');
-  assert.deepEqual(release.jobs.publish.needs, ['desktop']);
+  assert.deepEqual(release.jobs.publish.needs, ['desktop', 'terminal-bundles']);
+  // The one-command Mac install downloads these stable names from the release.
+  const bundles = release.jobs['terminal-bundles'];
+  assert.deepEqual(bundles.strategy.matrix.include.map(v => v.platform).sort(), ['darwin-arm64', 'darwin-x64']);
+  const upload = bundles.steps.find(s => s.uses?.startsWith('actions/upload-artifact'));
+  assert.equal(upload.with['if-no-files-found'], 'error');
+  assert.match(upload.with.name, /^openbot-desktop-/, 'merged into the same draft release');
   const command = release.jobs.publish.steps.find(s => s.run?.includes('gh release')).run;
   assert.match(command, /--draft\b/); assert.match(command, /--verify-tag\b/);
   assert.doesNotMatch(release.jobs.publish.if, /always\(/);

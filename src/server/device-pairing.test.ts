@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomBytes } from "node:crypto";
-import { DevicePairing, pairingLink, PAIRING_TTL_MS } from "./device-pairing.js";
+import { DevicePairing, newBrowserDeviceKey, pairingLink, PAIRING_TTL_MS, webPairingLink } from "./device-pairing.js";
 const key = () => `obd_${randomBytes(32).toString("base64url")}`;
 
 test("QR claim is single-use, retry-safe, bounded and revocable", () => {
@@ -35,4 +35,22 @@ test("pairing links carry an expiring fragment, never an owner key, and require 
   const hosted = `https://pilot.onrender.com/s/${"b".repeat(24)}`;
   assert.equal(new URL(pairingLink(hosted + "/", ticket)).searchParams.get("server"), hosted);
   for (const address of ["http://studio.example.com", "https://user:pass@studio.example.com", "https://studio.example.com/extra", "https://studio.example.com?key=x"]) assert.throws(() => pairingLink(address, ticket));
+});
+
+test("browser pairing: the camera link keeps the ticket in the fragment and the minted key pairs once", () => {
+  const pairing = new DevicePairing(":memory:");
+  const { ticket } = pairing.invite();
+  const url = new URL(webPairingLink("https://app.example.com/", ticket));
+  assert.equal(url.origin + url.pathname, "https://app.example.com/pair");
+  assert.equal(url.hash, `#${ticket}`);
+  assert.equal(url.search, "");
+  assert.throws(() => webPairingLink("http://app.example.com", ticket));
+  const key = newBrowserDeviceKey();
+  const paired = pairing.redeem(ticket, key, "iPhone (Safari)");
+  assert.ok(paired);
+  assert.equal(pairing.authenticate(key), paired!.deviceId);
+  assert.equal(pairing.redeem(ticket, newBrowserDeviceKey(), "Another phone"), null, "a used ticket never pairs a second browser");
+  assert.ok(pairing.revoke(paired!.deviceId));
+  assert.equal(pairing.authenticate(key), null);
+  pairing.close();
 });

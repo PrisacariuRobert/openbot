@@ -4,6 +4,7 @@ import { connectorCatalog } from "./google-workspace.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { McpConnections } from "./mcp-connections.js";
 import { CommunitySkills } from "./community-skills.js";
+import { webResearchEnabled } from "./web-research.js";
 
 // Context reduction only. The tool endpoints remain the authorization boundary
 // and recheck grants when a call arrives, including after session revocation.
@@ -26,6 +27,9 @@ export function toolAvailability(
     handoff: true,
     message_teammate: true,
     spreadsheet_export: true,
+    document_export: true,
+    web_search: bot.browserEnabled && webResearchEnabled(),
+    web_read: bot.browserEnabled && webResearchEnabled(),
     spreadsheet_inspect: true,
     table_summary: true,
     table_reconcile: true,
@@ -37,6 +41,11 @@ export function toolAvailability(
     community_skill_read: new CommunitySkills(db).search(bot.id).length > 0,
     memory_search: true,
     conversation_search: true,
+    // Teaching and self-extension always pause for the owner's exact review
+    // (even in YOLO). They must be listed here: the runtime denies every tool
+    // that is not, so /learn silently produced a loose file instead.
+    skill_propose: true,
+    self_extend: db.getStudioSettings().selfExtendEnabled,
   };
   const set = (names: string[], available: boolean) => {
     for (const name of names) flags[name] = available;
