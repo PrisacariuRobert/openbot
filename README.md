@@ -47,7 +47,7 @@ Hosted AI agents rent you their computer for $20–300 a month. OpenBot gives yo
 
 ## Try it
 
-**One-line install** (macOS 13+, Apple silicon or Intel) — available with the first public release:
+**One-line install** (macOS 13+, Apple silicon or Intel):
 
 ```sh
 curl -fsSL https://openbots.foundation/install.sh | sh
@@ -55,7 +55,7 @@ curl -fsSL https://openbots.foundation/install.sh | sh
 
 No administrator password. It checks the download’s fingerprint, runs OpenBot in the background and adds it to your Dock. [Read the installer](scripts/install.sh) first if you like.
 
-**Run from source** today (Node.js 22.13+):
+**Or run from source** (Node.js 22.13+):
 
 ```sh
 git clone https://github.com/PrisacariuRobert/openbot.git
@@ -118,7 +118,7 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.37.0-beta.1 is a beta. The one-line installer ships with the first public release; until then, run from source. Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [release checklist](docs/FIRST_PUBLIC_RELEASE.md).
+OpenBot 0.37.0-beta.1 is the first public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.37.0-beta.1)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [release checklist](docs/FIRST_PUBLIC_RELEASE.md).
 
 ## What's new in 0.37.0-beta.1
 
