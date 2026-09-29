@@ -34,6 +34,9 @@ jobs:
       - run: npm run build
       - name: Bundle Node, OpenCode and the app for the terminal installer
         run: node scripts/package-runtime-bundle.mjs --platform ${{ matrix.platform }} --out dist-release
+        env:
+          # Shared runners hit GitHub's anonymous API limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Stable names for the installer
         run: |
           cd dist-release
