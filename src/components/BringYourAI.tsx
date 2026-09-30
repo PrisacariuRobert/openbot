@@ -34,6 +34,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
     if (live && live.status !== attempt?.status) setAttempt(live);
   }, [status]);
   const entry = (id: string) => status?.catalog?.find((item) => item.id === id);
+  const nousConnected = Boolean(status?.instances?.some((item) => item.id === "nous-portal" && item.connected));
   const signIn = async (id: string) => {
     setBusy(id); setError("");
     try {
@@ -89,6 +90,15 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
             ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
             : <KeyPaste providerId="google" link="https://aistudio.google.com/apikey" linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={onConnected} />}
         </li>
+        <li className="byo-row byo-key-row">
+          <div className="byo-row-text">
+            <strong>Nous Portal{!nousConnected && <span className="byo-free">Free plan</span>}</strong>
+            <small>A free plan with a rotating set of free models, from the makers of Hermes Agent. An account is enough, no card. Free models may use your requests to improve their service.</small>
+          </div>
+          {nousConnected
+            ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
+            : <KeyPaste providerId="nous" link="https://portal.nousresearch.com" linkLabel="Get a free key" placeholder="Paste your Nous Portal API key" onSaved={onConnected} />}
+        </li>
       </ul>
 
       <h4>Use a subscription you already have</h4>
@@ -134,7 +144,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
   );
 }
 
-export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
+export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go" | "nous"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
   const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
     event.preventDefault();
