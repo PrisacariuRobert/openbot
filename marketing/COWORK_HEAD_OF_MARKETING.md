@@ -28,8 +28,12 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
   - OpenCode Go, any OpenAI-compatible API, or local models with Ollama.
 - **One-click import** from Hermes Agent and OpenClaw.
 
-## Positioning
-Hosted agents like Grok Bot and Meta Muse rent you their computer for $0–300 a month. Developer agents like Hermes Agent and OpenClaw need a terminal and config files. OpenBot is the friendly middle: a real team on your own Mac, free, installed with one line, and it always asks before acting.
+## Positioning (updated 30 September 2026)
+**An AI team that does the work on your real Mac — not just answers.**
+- Cloud agents (OpenAI dots, Grok Bot, Meta Muse) rent you their computer for $0–300 a month and can't reach your Mac's apps or files. OpenAI dots isn't available in the EU, UK or Switzerland — OpenBot works in Europe.
+- Siri AI (macOS 27) is great for quick questions and single actions. OpenBot is for the whole job: long, multi-step work across apps and websites, on schedules, by a team, with finished files. They work together: "Hey Siri, Ask OpenBot". Never attack Siri — position as the extension.
+- Hermes Desktop now has a friendly app and free models. Don't claim OpenBot is easier than Hermes; win on Mac depth (Mail, Calendar, iMessage, Siri), exact approvals, a team of teammates with their own browsers, and phone pairing.
+- Full comparison: docs/COMPETITIVE_SCORECARD_2026-09-23.md in the repo.
 
 ## Be honest about the limits
 - It's a beta. The Mac app is ad-hoc signed, not notarized.
