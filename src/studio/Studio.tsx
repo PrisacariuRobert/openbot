@@ -377,11 +377,18 @@ const STARTER_PROMPTS = [
   { label: "Look something up", hint: "With sources you can check", text: "Research this and bring back a short answer with sources: " },
 ] as const;
 
+/** With Files & apps on, lead with what only a team on your own Mac can do. */
+const MAC_STARTER_PROMPTS = [
+  { label: "What's on my plate?", hint: "Your reminders, calendar and notes", text: "What's on my plate today? Check my reminders, calendar and notes, and tell me the three things that matter most." },
+  { label: "Remind me", hint: "Added to Reminders after your okay", text: "Remind me to " },
+  { label: "Find that note", hint: "Searches your Apple Notes", text: "Find my note about " },
+] as const;
+
 /** Starters fill the message box without sending, so a blank page never
  * has to be solved alone. Shown until the owner sends a first message. */
-function ChatStarters({ onPick }: { onPick: (text: string) => void }) {
+function ChatStarters({ onPick, mac = false }: { onPick: (text: string) => void; mac?: boolean }) {
   return <div className="chat-starters" aria-label="Ideas to start with">
-    {STARTER_PROMPTS.map((starter) => (
+    {(mac ? MAC_STARTER_PROMPTS : STARTER_PROMPTS).map((starter) => (
       <button key={starter.label} type="button" className="chat-starter" onClick={() => onPick(starter.text)}>
         <strong>{starter.label}</strong>
         <span>{starter.hint}</span>
@@ -2555,7 +2562,7 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
-                        <ChatStarters onPick={pickStarter} />
+                        <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
                       </div>
                     ) : (<>{
                       state.messages.map((message, index) => {
@@ -2712,7 +2719,7 @@ export function Studio() {
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
-                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} />}
+                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
                     </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);
