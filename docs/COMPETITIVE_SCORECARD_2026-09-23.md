@@ -2,6 +2,18 @@
 
 Where OpenBot stands against the four products people compare it with, after the competitive-plan work on branch `fix/runtime-pin-and-quiet-chat` ([#92](https://github.com/PrisacariuRobert/openbot/pull/92)). Competitor facts come from their public pages and press as of this date; OpenBot facts come from this checkout and its live eval (`qa/prompt-eval/`). Nothing here is a head-to-head benchmark on equal models.
 
+## Update — 30 September 2026: three new entrants
+
+| | What it is | Price / reach | Where OpenBot differs |
+| :--- | :--- | :--- | :--- |
+| **OpenAI dots** (DevDay, 29 Sep) | Always-on agent on its own cloud computer with a virtual browser (GPT-6 Astra); 4,000+ apps via plugins; read-only until approved | ChatGPT Pro and Business Premium; Pro gets one dot; not available in the EEA, UK or Switzerland | Runs on your Mac with your apps and files; a team, not one agent; any AI; available in Europe |
+| **Apple Siri AI** (macOS 27, 14 Sep) | Rebuilt Siri with personal context (Mail, Messages, Notes, Photos, Calendar via Spotlight), on-screen awareness and in-app actions; on-device + Private Cloud Compute | Free beta, English first, daily usage caps, paid access planned; Apple silicon | Siri answers and does single actions; OpenBot runs long multi-step jobs across apps and websites, on schedules, with several teammates, and delivers files. OpenBot plugs into Siri ("Hey Siri, Ask OpenBot") |
+| **Hermes Desktop** (Nous, public preview 2 Jun, MIT) | Native app for macOS, Windows, Linux on the Hermes core: chat, file browser, voice, plugins, self-written skills; optional Nous Portal sign-in for free/discounted models and cloud agents | Free | Hermes is no longer terminal-only, so OpenBot competes on Mac depth (Mail, Calendar, iMessage, Siri, Shortcuts), exact action reviews, teammate isolation, phone pairing and routines. Hermes has a free model tier without a key; OpenBot needs a free Gemini key |
+
+Sources: [OpenAI dots](https://www.androidheadlines.com/2026/09/openai-launches-dots-always-on-ai-agents.html), [dots at DevDay](https://pasqualepillitteri.it/en/news/19302/openai-dots-personal-ai-agent-devday-2026), [Siri AI](https://www.apple.com/newsroom/2026/09/siri-ai-a-profoundly-more-capable-and-personal-assistant-is-here/), [Siri AI limits](https://appleinsider.com/articles/26/09/09/siri-ai-will-launch-in-beta-complicated-by-daily-usage-caps-future-paid-access), [Hermes Desktop](https://hermes-agent.nousresearch.com/desktop), [Hermes Desktop launch](https://the-decoder.com/nous-research-releases-hermes-desktop-an-open-source-ai-agent-for-every-platform/).
+
+The plan that follows from this: **an AI team that does the work on your real Mac — not just answers.** See the roadmap.
+
 ## The field
 
 | | What it is | Price | Where it runs |

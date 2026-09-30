@@ -1,5 +1,18 @@
 # OpenBot working roadmap
 
+## Next releases (from 30 September 2026)
+
+**Promise: an AI team that does the work on your real Mac — not just answers.** Cloud agents (OpenAI dots, Grok Bot, Muse) can't reach your Mac; Siri AI answers and does single actions; Hermes Desktop is developer-first. See the [scorecard](COMPETITIVE_SCORECARD_2026-09-23.md).
+
+| Release | Theme | Highlights |
+| :--- | :--- | :--- |
+| 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; run your Shortcuts; "Send to OpenBot" share sheet; "Hey Siri, ask Nova to…"; a quick-ask hotkey; one permissions screen; a free start without a key if possible; install without Terminal |
+| 0.39 | Knows you, privately | Opt-in on-device index of your files, Notes, Mail and Messages; morning brief; one-switch private mode on a local model; a page showing everything the team knows |
+| 0.40 | Share your teammates | Export and import teammates as files; a reviewed teammate gallery on the website; shareable results |
+| Later | Always there | Run on a second Mac or a home server; Slack, WhatsApp or a native iPhone app if users ask |
+
+The working order below is the earlier plan and stays for reference.
+
 Owner-approved sequencing after the Hermes (NousResearch) and sign-in pattern studies. Every item keeps the house rules: approvals stay human-owned, sign-in secrets stay out of model context, and evidence distinguishes host checks from teammate claims. Sizes are historical estimates: S ≤ half a day, M ≤ two days, L bigger.
 
 **8 September evidence correction:** the current Hermes comparison supersedes earlier competitive assumptions. Hermes has local browsers, Bot Mode and optional approval-gated skill writes. A code/fixture checkmark below is not release or real-account proof. Installer, sign-in and migration claims need their own live evidence.
