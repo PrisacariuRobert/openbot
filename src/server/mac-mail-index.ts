@@ -147,6 +147,21 @@ export class MacMail {
     return found.sort((a, b) => b.at - a.at).map((item) => item.file);
   }
 
+  /** The newest messages within the window, parsed, for indexing. `skip`
+   * lets the caller leave out ones it already has without opening them. */
+  recent(days: number, limit: number, skip: (id: string) => boolean = () => false): MailMessage[] {
+    this.checkAccess();
+    const out: MailMessage[] = [];
+    for (const file of this.recentFiles(Math.max(1, Math.min(3650, days)))) {
+      if (out.length >= limit) break;
+      const id = idOf(file);
+      if (!id || skip(id)) continue;
+      const read = this.readFile(file);
+      if (read) out.push(read);
+    }
+    return out;
+  }
+
   async search(query: string, days = 60, limit = 6): Promise<{ messages: MailSummary[]; matched: number }> {
     this.checkAccess();
     const words = query.toLowerCase().replace(/["*\\]/g, " ").trim().split(/\s+/).filter((word) => word.length > 1).slice(0, 6);

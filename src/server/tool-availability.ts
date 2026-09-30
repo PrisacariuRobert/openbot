@@ -80,6 +80,8 @@ export function toolAvailability(
     ["mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run"],
     db.getStudioSettings().macAccessEnabled && process.platform === "darwin",
   );
+  // The personal index is searchable once the owner has switched a source on.
+  flags.search_my_mac = db.getStudioSettings().macAccessEnabled && process.platform === "darwin" && Object.values(db.extensionRecord<{ enabled?: Record<string, boolean> }>("personal-index", "config")?.enabled || {}).some(Boolean);
   const apps: {
     id: string;
     service: ConnectorServiceId;

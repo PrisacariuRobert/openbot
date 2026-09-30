@@ -413,6 +413,7 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
 { id: "team", title: "Your team", description: "A few useful personalities. One familiar place to work.", icon: UsersRound, keywords: ["teammates", "import", "restore"] },
 { id: "bot", title: "Teammate settings", description: "Personality, instructions, access and limits.", icon: UsersRound, keywords: ["bot", "edit", "personality"] },
 { id: "teach", title: "Memory & skills", description: "Useful context. Reusable know-how.", icon: WandSparkles, keywords: ["teach", "recipes", "mcp", "learn", "memory"] },
+{ id: "knows", title: "What they know", description: "Choose what your team can search on this Mac.", icon: Search, keywords: ["index", "search", "notes", "mail", "files", "private", "forget", "messages"] },
 { id: "routines", title: "Automations", description: "Useful work that comes back to you. Easy to adjust; easy to pause.", icon: Clock, keywords: ["schedule", "watcher", "cron", "routine"] }
 ]},
 { title: "Connections", items: [
