@@ -29,6 +29,8 @@ export const eventCreateInput = z.object({ title: line(300), start: iso, end: is
 export const mailDraftInput = z.object({ to: z.array(z.string().trim().email()).min(1).max(20), cc: z.array(z.string().trim().email()).max(20).default([]), subject: z.string().max(300), body: z.string().max(20_000) }).strict();
 export const mailSearchInput = z.object({ query: line(200), days: z.number().int().min(1).max(365).default(60), limit: z.number().int().min(1).max(10).default(6) }).strict();
 export const mailReadInput = z.object({ id: z.string().regex(/^\d{1,15}$/) }).strict();
+export const calendarEventsInput = z.object({ from: iso.optional(), days: z.number().int().min(1).max(14).default(1) }).strict();
+export const mailUnreadInput = z.object({ days: z.number().int().min(1).max(14).default(3), limit: z.number().int().min(1).max(20).default(10) }).strict();
 export const mailSaveAttachmentInput = z.object({ id: z.string().regex(/^\d{1,15}$/), attachment: line(300), folder: z.string().trim().min(1).max(300).regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\0]+$/, "Use a folder inside your home folder, like Documents/Receipts.") }).strict();
 export const shortcutRunInput = z.object({ name: line(200), input: z.string().max(20_000).optional() }).strict();
 
@@ -137,6 +139,24 @@ function run(argv) {
   return JSON.stringify({ id: String(event.uid()), calendar: String(target.name()), title: String(event.summary()), start: event.startDate().toISOString(), end: event.endDate().toISOString() });
 }`;
 
+// One calendar per call: Calendar answers range queries slowly on big or
+// subscribed calendars (a holiday calendar alone can take 5 seconds), so each
+// gets its own time limit and a slow one can't hold back the rest.
+export const CALENDAR_EVENTS_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), app = Application("Calendar"), calendar = app.calendars()[input.index];
+  var events = calendar.events.whose({ _and: [{ startDate: { _lessThan: new Date(input.until) } }, { endDate: { _greaterThan: new Date(input.from) } }] })();
+  var out = [];
+  for (var i = 0; i < events.length && i < 40; i++) {
+    var e = events[i], status = "";
+    try { status = String(e.status()).toLowerCase(); } catch (x) {}
+    if (status === "cancelled") continue;
+    var location = ""; try { location = String(e.location() || ""); } catch (x) {}
+    out.push({ title: String(e.summary() || "Untitled event").slice(0, 200), start: e.startDate().toISOString(), end: e.endDate().toISOString(), allDay: Boolean(e.alldayEvent()), location: location.slice(0, 200) });
+  }
+  return JSON.stringify({ name: String(calendar.name()), events: out });
+}`;
+
 export const CALENDARS_LIST_SCRIPT = `
 function run() {
   var app = Application("Calendar"), calendars = app.calendars(), out = [];
@@ -158,12 +178,18 @@ function run(argv) {
   return JSON.stringify({ opened: true });
 }`;
 
+type CalendarEvent = { calendar: string; title: string; start: string; end: string; allDay: boolean; location: string };
+export interface CalendarCache { at: number; from: string; until: string; events: CalendarEvent[]; incomplete: string[] }
+export interface CalendarCacheStore { load(): CalendarCache | null; save(cache: CalendarCache): void }
+const CALENDAR_WINDOW_DAYS = 14;
+const CALENDAR_FRESH_MS = 30 * 60_000;
+
 export type Execute = (command: string, args: string[], timeoutMs: number) => Promise<string>;
 const defaultExecute: Execute = async (command, args, timeoutMs) => (await exec(command, args, { timeout: timeoutMs, maxBuffer: 1024 * 1024 })).stdout;
 
 export class AppleApps {
   readonly available: boolean;
-  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail()) { this.available = platform === "darwin"; }
+  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail(), private readonly cacheStore: CalendarCacheStore | null = null, private readonly now: () => number = Date.now) { this.available = platform === "darwin"; }
 
   private async script(app: string, script: string, input: object): Promise<Record<string, unknown>> {
     if (!this.available) throw new Error("Apple apps are only available when OpenBot runs on a Mac.");
@@ -210,6 +236,72 @@ export class AppleApps {
     const args = contactsFindInput.parse(input);
     const result = await this.script("Contacts", CONTACTS_FIND_SCRIPT, args);
     return { contacts: z.array(contactSchema).parse(result.contacts) };
+  }
+  private calendarCache: CalendarCache | null = null;
+  private calendarRefresh: Promise<CalendarCache> | null = null;
+
+  /** Reads every calendar for [from, until). A calendar that answers too
+   * slowly is named, not waited for forever. Calendar answers range queries
+   * slowly and one at a time (about 40 seconds for 17 calendars), so callers
+   * normally go through the cache below. */
+  private async readCalendars(from: Date, until: Date): Promise<CalendarCache> {
+    const { calendars } = await this.listCalendars();
+    const events: CalendarEvent[] = [], slow: string[] = [];
+    const deadline = Date.now() + 110_000;
+    const eventSchema = z.object({ name: z.string(), events: z.array(z.object({ title: z.string(), start: z.string(), end: z.string(), allDay: z.boolean(), location: z.string() })) });
+    for (let index = 0; index < calendars.length; index++) {
+      if (Date.now() > deadline) { slow.push(calendars[index]!.name); continue; }
+      try {
+        const raw = JSON.parse(await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", CALENDAR_EVENTS_SCRIPT, JSON.stringify({ index, from: from.toISOString(), until: until.toISOString() })], 30_000)) as unknown;
+        const result = eventSchema.parse(raw);
+        for (const event of result.events) events.push({ calendar: result.name, ...event });
+      } catch (error) {
+        if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error("Allow OpenBot to use Calendar in System Settings → Privacy & Security → Automation, then try again. Nothing was read.");
+        slow.push(calendars[index]!.name);
+      }
+    }
+    // The same event can sit in a shared calendar and a personal one.
+    const seen = new Set<string>();
+    const unique = events.filter((event) => { const key = `${event.title}|${event.start}|${event.end}`; if (seen.has(key)) return false; seen.add(key); return true; });
+    unique.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+    return { at: this.now(), from: from.toISOString(), until: until.toISOString(), events: unique.slice(0, 400), incomplete: [...new Set(slow)] };
+  }
+
+  /** Read the next two weeks once; everything inside that window is then
+   * answered at once. Refreshes share one run. */
+  refreshCalendar(): Promise<CalendarCache> {
+    if (this.calendarRefresh) return this.calendarRefresh;
+    const now = new Date(this.now()), from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const job = this.readCalendars(from, new Date(from.getTime() + CALENDAR_WINDOW_DAYS * 86_400_000)).then((cache) => { this.calendarCache = cache; this.cacheStore?.save(cache); return cache; }).finally(() => { this.calendarRefresh = null; });
+    this.calendarRefresh = job;
+    return job;
+  }
+
+  /** Whether a background refresh is worthwhile: the calendar was asked about recently. */
+  calendarNeedsWarming(): boolean { return Boolean(this.calendarUsedAt && this.now() - this.calendarUsedAt < 24 * 3_600_000) && this.now() - (this.loadedCache()?.at ?? 0) > CALENDAR_FRESH_MS / 1.5; }
+  private calendarUsedAt = 0;
+  private loadedCache(): CalendarCache | null { return this.calendarCache ??= this.cacheStore?.load() ?? null; }
+
+  async calendarEvents(input: z.input<typeof calendarEventsInput>) {
+    const args = calendarEventsInput.parse(input);
+    this.calendarUsedAt = this.now();
+    const now = new Date(this.now()), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const from = args.from ? new Date(args.from) : today;
+    const until = new Date(from.getTime() + args.days * 86_400_000);
+    let cache = this.loadedCache();
+    const covered = cache && Date.parse(cache.from) <= from.getTime() && Date.parse(cache.until) >= until.getTime() && Date.parse(cache.from) === today.getTime();
+    // Stale beyond half an hour: refresh first, so a brief is never out of date.
+    if (!covered || this.now() - cache!.at > CALENDAR_FRESH_MS) {
+      if (covered || !args.from || until.getTime() <= today.getTime() + CALENDAR_WINDOW_DAYS * 86_400_000) cache = await this.refreshCalendar();
+      else cache = await this.readCalendars(from, until);
+    }
+    const events = cache!.events.filter((event) => Date.parse(event.end) > from.getTime() && Date.parse(event.start) < until.getTime()).slice(0, 60);
+    return { from: from.toISOString(), until: until.toISOString(), events, asOf: new Date(cache!.at).toISOString(), ...(cache!.incomplete.length ? { incomplete: cache!.incomplete } : {}) };
+  }
+  async unreadMail(input: z.input<typeof mailUnreadInput>) {
+    const args = mailUnreadInput.parse(input);
+    const messages = this.mail.unread(args.days, args.limit);
+    return { messages, count: messages.length };
   }
   async listCalendars() {
     const result = await this.script("Calendar", CALENDARS_LIST_SCRIPT, {});

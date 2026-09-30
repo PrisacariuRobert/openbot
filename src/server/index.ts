@@ -28,6 +28,7 @@ import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
 import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
+import { describeMorningBrief, findMorningBrief, morningBriefPrompt, removeMorningBrief, setupMorningBrief } from "./morning-brief.js";
 import { PersonalIndexer, type IndexerConfig } from "./personal-indexer.js";
 import { checkNousKey, NOUS_BASE_URL } from "./nous-portal.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
@@ -178,7 +179,9 @@ const attachmentsService = new AttachmentService(db);
 const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
-const appleApps = new AppleApps();
+const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
+// Calendar answers slowly; while it's being used, keep the next two weeks warm.
+setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
 const personalIndex = new PersonalIndex(path.join(db.dataDir, "personal-index.sqlite"));
 const personalIndexer = new PersonalIndexer({ index: personalIndex, load: () => db.extensionRecord<IndexerConfig>("personal-index", "config"), save: (config) => db.saveExtensionRecord("personal-index", "config", config) });
 const codeProjects = new CodeProjectManager(db, undefined, { withGitHubIdentity: (identity, operation) => withPinnedGitHubWriteIdentity(identity, operation, { fetch: approvedConnectorDispatch.fetch }) });
@@ -3069,6 +3072,25 @@ app.patch("/api/bots/:id", (request, response) => {
   response.json(bot);
 });
 
+// Morning brief: one ready-made routine, set up in a tap.
+app.get("/api/morning-brief", (_request, response) => { response.json({ ...describeMorningBrief(db), bots: db.listBots().filter((bot) => !bot.retiredAt).map((bot) => ({ id: bot.id, name: bot.name })), macAccess: db.getStudioSettings().macAccessEnabled, available: process.platform === "darwin" }); });
+app.post("/api/morning-brief", (request, response) => {
+  const parsed = z.object({ botId: z.string().min(1).max(200), time: z.string().regex(/^\d{2}:\d{2}$/), weekdaysOnly: z.boolean(), city: z.string().max(60).nullish(), timeZone: z.string().max(100).optional() }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Choose a teammate and a time." });
+  try { setupMorningBrief(db, { ...parsed.data, timeZone: parsed.data.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone }); broadcast(); response.json(describeMorningBrief(db)); }
+  catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "The morning brief couldn't be set up." }); }
+});
+app.delete("/api/morning-brief", (_request, response) => { removeMorningBrief(db); broadcast(); response.json(describeMorningBrief(db)); });
+app.post("/api/morning-brief/try", async (_request, response) => {
+  const routine = findMorningBrief(db);
+  const bot = routine ? db.getBot(routine.botId) : db.listBots().find((item) => !item.retiredAt);
+  if (!bot) return response.status(409).json({ error: "Create a teammate first." });
+  const city = routine ? describeMorningBrief(db).routine?.city : null;
+  const sent = await channelLocalApi("POST", "/api/messages", { threadId: bot.threadId, body: morningBriefPrompt(city), requestId: `brief-${randomUUID()}`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (sent.status >= 400) return response.status(sent.status).json({ error: typeof sent.body.error === "string" ? sent.body.error : "The brief couldn't start." });
+  response.json({ started: true, threadId: bot.threadId });
+});
+
 // "What your team knows": the personal index of this Mac. Every source is
 // opt-in; everything can be forgotten; nothing is uploaded.
 app.get("/api/personal-index", (_request, response) => { response.json({ ...personalIndexer.status(), available: process.platform === "darwin", macAccess: db.getStudioSettings().macAccessEnabled }); });
@@ -3694,7 +3716,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -4144,8 +4166,10 @@ app.post("/api/internal/tools", async (request, response) => {
     }
     if (action.startsWith("mac_")) {
       if (!db.getStudioSettings().macAccessEnabled) return response.status(403).json({ error: "Mac files and apps are turned off for the studio. The user can turn them on in Control center." });
-      if (action === "mac_mail_search" || action === "mac_mail_read" || action === "mac_mail_save_attachment" || action === "mac_reminders" || action === "mac_notes_search" || action === "mac_note_read" || action === "mac_contacts_find" || action === "mac_calendars" || action === "mac_shortcuts_list" || action === "mac_mail_draft" || action === "mac_reminder_create" || action === "mac_note_create" || action === "mac_event_create" || action === "mac_shortcut_run") {
+      if (action === "mac_calendar_events" || action === "mac_mail_unread" || action === "mac_mail_search" || action === "mac_mail_read" || action === "mac_mail_save_attachment" || action === "mac_reminders" || action === "mac_notes_search" || action === "mac_note_read" || action === "mac_contacts_find" || action === "mac_calendars" || action === "mac_shortcuts_list" || action === "mac_mail_draft" || action === "mac_reminder_create" || action === "mac_note_create" || action === "mac_event_create" || action === "mac_shortcut_run") {
         try {
+          if (action === "mac_calendar_events") return response.json(await appleApps.calendarEvents(args as never));
+          if (action === "mac_mail_unread") return response.json(await appleApps.unreadMail(args as never));
           if (action === "mac_mail_search") return response.json(await appleApps.searchMail(args as never));
           if (action === "mac_mail_read") return response.json(await appleApps.readMail(args as never));
           if (action === "mac_reminders") return response.json(await appleApps.reminders(args as never));
