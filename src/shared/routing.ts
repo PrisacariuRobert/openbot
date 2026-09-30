@@ -86,3 +86,20 @@ export function resolveMessageTargets(input: {
     return leftBusy - rightBusy || left.name.localeCompare(right.name);
   }).slice(0, 1);
 }
+
+/** Spoken requests carry no punctuation: "ask Nova to find a hotel", "tell
+ * Scout to check it", "Nova find a hotel". Returns the addressed teammate
+ * and the request without the addressing, or null when no teammate is named
+ * at the start. */
+export function spokenTeammate<T extends Pick<Bot, "id" | "name">>(text: string, bots: T[]): { bot: T; request: string } | null {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const trimmed = text.trim();
+  for (const bot of [...bots].filter((item) => item.name.trim()).sort((a, b) => b.name.length - a.name.length)) {
+    const match = new RegExp(`^(?:(?:hey|hi|ok|okay|please)[,\\s]+)?(?:(?:ask|tell|have|get|let)\\s+)?${escape(bot.name.trim())}(?:[,:!]\\s*|\\s+)(?:(?:to|please|can you|could you|would you)\\s+)?`, "iu").exec(trimmed);
+    if (match && trimmed.length > match[0].length) {
+      const request = trimmed.slice(match[0].length).trim();
+      return { bot, request: request.charAt(0).toUpperCase() + request.slice(1) };
+    }
+  }
+  return null;
+}

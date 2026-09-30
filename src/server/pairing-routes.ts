@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { DevicePairing, newBrowserDeviceKey, pairingLink, webPairingLink } from "./device-pairing.js";
 import { AwayAccess } from "./away-access.js";
 import { LoginAttemptGate, trustedLocalRequest } from "./auth-security.js";
-import { shortcutPlist, signedShortcut } from "./siri-shortcut.js";
+import { shareShortcutPlist, shortcutPlist, signedShortcut } from "./siri-shortcut.js";
 
 export function registerPairingRoutes(app: Express, devices: DevicePairing, away: AwayAccess, revokeStreams: (id: string) => void, sessionCookie: (req: Request, value: string) => string) {
   const gate = new LoginAttemptGate(30, 60_000);
@@ -59,11 +59,12 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
   app.delete("/api/access/pairing", localOnly, (_req, res) => { devices.cancel(); res.json({ ok: true }); });
   // "Hey Siri, Ask OpenBot": a one-time link the iPhone opens to import a
   // signed Shortcut carrying its own device key (listed as "Siri", revocable).
-  app.post("/api/access/siri", localOnly, async (_req, res) => {
+  app.post("/api/access/siri", localOnly, async (req, res) => {
+    const kind = req.body?.kind === "share" ? "share" : "ask";
     const state = await away.status();
     if (!state.ready || !state.url) return res.status(409).json({ error: state.detail || "Turn on Away access first so your iPhone can reach this Mac." });
     const invitation = devices.invite();
-    const link = `${state.url.replace(/\/$/, "")}/api/auth/siri-shortcut?ticket=${encodeURIComponent(invitation.ticket)}`;
+    const link = `${state.url.replace(/\/$/, "")}/api/auth/siri-shortcut?ticket=${encodeURIComponent(invitation.ticket)}${kind === "share" ? "&kind=share" : ""}`;
     res.json({ link, qr: await QRCode.toDataURL(link, { errorCorrectionLevel: "M", margin: 4, width: 320 }), expiresAt: invitation.expiresAt });
   });
   app.get("/api/auth/siri-shortcut", async (req, res) => {
@@ -75,17 +76,46 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
     const state = await away.status();
     if (!state.url) return res.status(409).send("Away access is off on the Mac.");
     const key = newBrowserDeviceKey();
-    const result = ticket.length === 43 ? devices.redeem(ticket, key, "Siri") : null;
+    const share = req.query.kind === "share";
+    const result = ticket.length === 43 ? devices.redeem(ticket, key, share ? "Share sheet" : "Siri") : null;
     if (!result) { gate.failed(peer); return res.status(401).send("This link has expired or was already used. Make a new one on your Mac."); }
     gate.succeeded(peer);
     try {
-      const file = await signedShortcut(shortcutPlist({ askUrl: `${state.url.replace(/\/$/, "")}/api/ask`, deviceKey: key }));
+      const askUrl = `${state.url.replace(/\/$/, "")}/api/ask`, name = share ? "Send to OpenBot" : "Ask OpenBot";
+      const file = await signedShortcut(share ? shareShortcutPlist({ askUrl, deviceKey: key }) : shortcutPlist({ askUrl, deviceKey: key }), name);
       res.setHeader("Content-Type", "application/octet-stream");
-      res.setHeader("Content-Disposition", 'attachment; filename="Ask OpenBot.shortcut"');
+      res.setHeader("Content-Disposition", `attachment; filename="${name}.shortcut"`);
       res.send(file);
     } catch (error) {
       devices.revoke(result.deviceId);
       res.status(500).send(error instanceof Error ? `The shortcut couldn't be made: ${error.message}` : "The shortcut couldn't be made.");
+    }
+  });
+  // The same shortcuts for this Mac: Spotlight, Siri on the Mac, the menu
+  // bar, the Share menu, and any keyboard shortcut the owner gives them. They
+  // talk to this Mac's own address, so no internet connection is needed.
+  app.post("/api/access/mac-shortcut", localOnly, async (req, res) => {
+    if (process.platform !== "darwin") return res.status(409).json({ error: "This only works on a Mac." });
+    const share = req.body?.kind === "share";
+    const port = Number(process.env.OPENBOT_PORT || new URL(`http://${req.headers.host || "127.0.0.1:4310"}`).port || 4310);
+    const askUrl = `http://127.0.0.1:${port}/api/ask`, name = share ? "Send to OpenBot" : "Ask OpenBot";
+    const key = newBrowserDeviceKey(), invitation = devices.invite();
+    const result = devices.redeem(invitation.ticket, key, share ? "Mac Share menu" : "Mac shortcut");
+    if (!result) return res.status(500).json({ error: "The shortcut couldn't be made." });
+    try {
+      const file = await signedShortcut(share ? shareShortcutPlist({ askUrl, deviceKey: key, source: "share-mac" }) : shortcutPlist({ askUrl, deviceKey: key }), name);
+      const { mkdtempSync, writeFileSync } = await import("node:fs");
+      const { tmpdir } = await import("node:os");
+      const path = await import("node:path");
+      const target = path.join(mkdtempSync(path.join(tmpdir(), "openbot-shortcut-")), `${name}.shortcut`);
+      writeFileSync(target, file, { mode: 0o600 });
+      // Shortcuts opens its own "Add Shortcut" sheet; the owner confirms there.
+      const { execFile } = await import("node:child_process");
+      execFile("/usr/bin/open", [target], () => {});
+      res.json({ ok: true, name });
+    } catch (error) {
+      devices.revoke(result.deviceId);
+      res.status(500).json({ error: error instanceof Error ? `The shortcut couldn't be made: ${error.message}` : "The shortcut couldn't be made." });
     }
   });
   app.delete("/api/access/devices/:id", localOnly, (req, res) => {

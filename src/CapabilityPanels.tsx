@@ -7,6 +7,7 @@ import { RecipeLibraryPanel } from "./components/RecipeLibraryPanel";
 import type { RoutineSchedule } from "./shared/calendar-schedule";
 import { AwayAccessPanel } from "./components/AwayAccessPanel";
 import { SiriCard } from "./components/SiriCard";
+import { MacShortcutsCard } from "./components/MacShortcutsCard";
 import { DirectScreen, type DirectOp } from "./studio/DirectScreen";
 import { prefixCrumbs, visibleWorkspaceFiles } from "./studio/file-navigation";
 import { groupActivityAttentionRuns } from "./studio/activity-attention";
@@ -430,7 +431,7 @@ export function ControlPanel({
         <SettingsCard>
           <SwitchRow
             title="Files & apps on this Mac"
-            description="Teammates can inspect visible files and accessible app controls, plus read Calendar and Mail with macOS Automation consent. Consequential actions (moving files, clicks, terminal commands) still wait for your okay."
+            description="Teammates can work in your own apps — read Reminders, Notes, Contacts, Calendar and Mail, look at visible files and app controls. Adding a reminder, note or event, running a shortcut, moving files or clicking in an app always waits for your okay. Emails are only ever drafted for you to send."
             checked={state.settings.macAccessEnabled}
             onChange={(enabled) => {
               if (
@@ -443,6 +444,7 @@ export function ControlPanel({
             }}
           />
         </SettingsCard>
+        {state.settings.macAccessEnabled && ["127.0.0.1", "localhost", "::1", "[::1]"].includes(window.location.hostname) && navigator.userAgent.includes("Mac") && <MacShortcutsCard />}
       </SettingsGroup>
 
       <SettingsGroup title="Teammates">

@@ -23,6 +23,37 @@ function plist(value: Plist): string {
 const text = (value: string): Plist => ({ Value: { string: value }, WFSerializationType: "WFTextTokenString" });
 const variable = (uuid: string, name: string): Plist => ({ Value: { string: "￼", attachmentsByRange: { "{0, 1}": { OutputUUID: uuid, Type: "ActionOutput", OutputName: name } } }, WFSerializationType: "WFTextTokenString" });
 const field = (key: string, value: Plist): Plist => ({ WFItemType: 0, WFKey: text(key), WFValue: value });
+const shortcutInput: Plist = { Value: { string: "￼", attachmentsByRange: { "{0, 1}": { Type: "ExtensionInput" } } }, WFSerializationType: "WFTextTokenString" };
+
+/** "Send to OpenBot": in the share sheet of any app. Whatever is shared (a
+ * page, link or text) goes to the team with one short question about what to
+ * do with it; naming a teammate ("Nova, summarize it") reaches that one. */
+export function shareShortcutPlist(input: { askUrl: string; deviceKey: string; source?: "share" | "share-mac" }): string {
+  if (!/^https?:\/\//.test(input.askUrl)) throw new Error("The studio address must be http(s).");
+  if (!/^obd_[A-Za-z0-9_-]{43}$/.test(input.deviceKey)) throw new Error("A device key is required.");
+  const ask = randomUUID().toUpperCase(), shared = randomUUID().toUpperCase(), fetched = randomUUID().toUpperCase(), answer = randomUUID().toUpperCase();
+  const workflow: Plist = {
+    WFWorkflowActions: [
+      { WFWorkflowActionIdentifier: "is.workflow.actions.gettext", WFWorkflowActionParameters: { UUID: shared, WFTextActionText: shortcutInput } },
+      { WFWorkflowActionIdentifier: "is.workflow.actions.ask", WFWorkflowActionParameters: { UUID: ask, WFAskActionPrompt: "What should your team do with this?", WFAskActionDefaultAnswer: "Summarize it for me", WFInputType: "Text" } },
+      { WFWorkflowActionIdentifier: "is.workflow.actions.downloadurl", WFWorkflowActionParameters: {
+        UUID: fetched, WFURL: input.askUrl, WFHTTPMethod: "POST", WFHTTPBodyType: "JSON", ShowHeaders: true,
+        WFHTTPHeaders: { Value: { WFDictionaryFieldValueItems: [field("Authorization", text(`Bearer ${input.deviceKey}`))] }, WFSerializationType: "WFDictionaryFieldValue" },
+        WFJSONValues: { Value: { WFDictionaryFieldValueItems: [field("text", variable(ask, "Provided Input")), field("shared", variable(shared, "Text")), field("source", text(input.source || "share"))] }, WFSerializationType: "WFDictionaryFieldValue" },
+      } },
+      { WFWorkflowActionIdentifier: "is.workflow.actions.getvalueforkey", WFWorkflowActionParameters: { UUID: answer, WFDictionaryKey: "answer", WFInput: { Value: { OutputUUID: fetched, Type: "ActionOutput", OutputName: "Contents of URL" }, WFSerializationType: "WFTextTokenAttachment" } } },
+      { WFWorkflowActionIdentifier: "is.workflow.actions.showresult", WFWorkflowActionParameters: { Text: variable(answer, "Dictionary Value") } },
+    ],
+    WFWorkflowClientVersion: "2605.0.5",
+    WFWorkflowMinimumClientVersion: 900,
+    WFWorkflowIcon: { WFWorkflowIconStartColor: 4292093695, WFWorkflowIconGlyphNumber: 61440 },
+    WFWorkflowTypes: ["ActionExtension"],
+    WFWorkflowHasShortcutInputVariables: true,
+    WFWorkflowInputContentItemClasses: ["WFURLContentItem", "WFSafariWebPageContentItem", "WFArticleContentItem", "WFStringContentItem", "WFRichTextContentItem"],
+    WFWorkflowImportQuestions: [],
+  };
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">${plist(workflow)}</plist>\n`;
+}
 
 export function shortcutPlist(input: { askUrl: string; deviceKey: string; prompt?: string }): string {
   if (!/^https?:\/\//.test(input.askUrl)) throw new Error("The studio address must be http(s).");
@@ -30,7 +61,7 @@ export function shortcutPlist(input: { askUrl: string; deviceKey: string; prompt
   const ask = randomUUID().toUpperCase(), fetched = randomUUID().toUpperCase(), answer = randomUUID().toUpperCase();
   const workflow: Plist = {
     WFWorkflowActions: [
-      { WFWorkflowActionIdentifier: "is.workflow.actions.ask", WFWorkflowActionParameters: { UUID: ask, WFAskActionPrompt: input.prompt || "What should your team do?", WFInputType: "Text" } },
+      { WFWorkflowActionIdentifier: "is.workflow.actions.ask", WFWorkflowActionParameters: { UUID: ask, WFAskActionPrompt: input.prompt || "What should your team do? You can start with a name, like “ask Nova to…”", WFInputType: "Text" } },
       { WFWorkflowActionIdentifier: "is.workflow.actions.downloadurl", WFWorkflowActionParameters: {
         UUID: fetched, WFURL: input.askUrl, WFHTTPMethod: "POST", WFHTTPBodyType: "JSON", ShowHeaders: true,
         WFHTTPHeaders: { Value: { WFDictionaryFieldValueItems: [field("Authorization", text(`Bearer ${input.deviceKey}`))] }, WFSerializationType: "WFDictionaryFieldValue" },
@@ -54,11 +85,11 @@ const run = (command: string, args: string[]) => new Promise<void>((resolve, rej
 });
 
 /** Binary plist, signed for anyone to import. Needs macOS with Shortcuts. */
-export async function signedShortcut(xml: string): Promise<Buffer> {
+export async function signedShortcut(xml: string, name = "Ask OpenBot"): Promise<Buffer> {
   if (process.platform !== "darwin") throw new Error("Siri shortcuts are made on a Mac.");
   const dir = mkdtempSync(path.join(tmpdir(), "openbot-siri-"));
   try {
-    const source = path.join(dir, "source.plist"), unsigned = path.join(dir, "Ask OpenBot.shortcut"), signed = path.join(dir, "signed.shortcut");
+    const source = path.join(dir, "source.plist"), unsigned = path.join(dir, `${name.replace(/[^\w ]/g, "")}.shortcut`), signed = path.join(dir, "signed.shortcut");
     writeFileSync(source, xml, { mode: 0o600 });
     await run("plutil", ["-convert", "binary1", source, "-o", unsigned]);
     await run("shortcuts", ["sign", "--mode", "anyone", "--input", unsigned, "--output", signed]);

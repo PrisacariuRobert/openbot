@@ -47,3 +47,15 @@ test("a later teammate who checks or refines earlier work follows that teammate"
   assert.deepEqual(order("Nova: research flights to Rome. Pixel: write a birthday poem for Anna."), {}, "independent parts run side by side");
   assert.deepEqual(order("Find flights to Rome."), {});
 });
+
+test("spoken requests name a teammate without punctuation", async () => {
+  const { spokenTeammate } = await import("./routing.js");
+  const bots = [{ id: "nova", name: "Nova" }, { id: "scout", name: "Scout" }];
+  assert.deepEqual(spokenTeammate("ask Nova to find a hotel in Rome", bots), { bot: bots[0], request: "Find a hotel in Rome" });
+  assert.deepEqual(spokenTeammate("Tell scout to check the train times", bots), { bot: bots[1], request: "Check the train times" });
+  assert.deepEqual(spokenTeammate("Nova what's on my calendar tomorrow", bots), { bot: bots[0], request: "What's on my calendar tomorrow" });
+  assert.deepEqual(spokenTeammate("Hey Nova, can you add milk", bots), { bot: bots[0], request: "Add milk" });
+  assert.equal(spokenTeammate("what's the weather in Novara", bots), null);
+  assert.equal(spokenTeammate("Novak Djokovic results", bots), null);
+  assert.equal(spokenTeammate("Nova", bots), null);
+});

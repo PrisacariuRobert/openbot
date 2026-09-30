@@ -13,3 +13,15 @@ test("the Siri shortcut asks, posts to this studio with its own key, and shows t
   assert.throws(() => shortcutPlist({ askUrl: "https://x.example/api/ask", deviceKey: "stolen-access-key" }), "only a device key goes in");
   assert.ok(!shortcutPlist({ askUrl: "https://x.example/api/ask?a=<b>&c", deviceKey: key }).includes("<b>&c"), "text is escaped");
 });
+
+test("the share-sheet shortcut sends the shared item and the request, with its own key", async () => {
+  const { shareShortcutPlist } = await import("./siri-shortcut.js");
+  const key = `obd_${"k".repeat(43)}`;
+  const xml = shareShortcutPlist({ askUrl: "https://studio.example/api/ask", deviceKey: key });
+  assert.match(xml, /<string>ActionExtension<\/string>/);
+  assert.match(xml, /<string>ExtensionInput<\/string>/);
+  assert.match(xml, /<string>WFURLContentItem<\/string>/);
+  assert.match(xml, new RegExp(`Bearer ${key}`));
+  for (const name of ["text", "shared", "source"]) assert.match(xml, new RegExp(`<string>${name}</string>`));
+  assert.throws(() => shareShortcutPlist({ askUrl: "file:///etc", deviceKey: key }));
+});
