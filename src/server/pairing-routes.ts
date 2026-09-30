@@ -91,6 +91,33 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
       res.status(500).send(error instanceof Error ? `The shortcut couldn't be made: ${error.message}` : "The shortcut couldn't be made.");
     }
   });
+  // The same shortcuts for this Mac: Spotlight, Siri on the Mac, the menu
+  // bar, the Share menu, and any keyboard shortcut the owner gives them. They
+  // talk to this Mac's own address, so no internet connection is needed.
+  app.post("/api/access/mac-shortcut", localOnly, async (req, res) => {
+    if (process.platform !== "darwin") return res.status(409).json({ error: "This only works on a Mac." });
+    const share = req.body?.kind === "share";
+    const port = Number(process.env.OPENBOT_PORT || new URL(`http://${req.headers.host || "127.0.0.1:4310"}`).port || 4310);
+    const askUrl = `http://127.0.0.1:${port}/api/ask`, name = share ? "Send to OpenBot" : "Ask OpenBot";
+    const key = newBrowserDeviceKey(), invitation = devices.invite();
+    const result = devices.redeem(invitation.ticket, key, share ? "Mac Share menu" : "Mac shortcut");
+    if (!result) return res.status(500).json({ error: "The shortcut couldn't be made." });
+    try {
+      const file = await signedShortcut(share ? shareShortcutPlist({ askUrl, deviceKey: key, source: "share-mac" }) : shortcutPlist({ askUrl, deviceKey: key }), name);
+      const { mkdtempSync, writeFileSync } = await import("node:fs");
+      const { tmpdir } = await import("node:os");
+      const path = await import("node:path");
+      const target = path.join(mkdtempSync(path.join(tmpdir(), "openbot-shortcut-")), `${name}.shortcut`);
+      writeFileSync(target, file, { mode: 0o600 });
+      // Shortcuts opens its own "Add Shortcut" sheet; the owner confirms there.
+      const { execFile } = await import("node:child_process");
+      execFile("/usr/bin/open", [target], () => {});
+      res.json({ ok: true, name });
+    } catch (error) {
+      devices.revoke(result.deviceId);
+      res.status(500).json({ error: error instanceof Error ? `The shortcut couldn't be made: ${error.message}` : "The shortcut couldn't be made." });
+    }
+  });
   app.delete("/api/access/devices/:id", localOnly, (req, res) => {
     const id = String(req.params.id);
     const revoked = devices.revoke(id);

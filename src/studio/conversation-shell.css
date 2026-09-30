@@ -2426,3 +2426,12 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .feedback-sheet footer button { padding: 9px 16px; border-radius: 11px; border: 0; background: var(--ink); color: var(--surface, #fff); font-weight: 600; cursor: pointer; }
 .feedback-sheet footer button:disabled { opacity: .4; cursor: default; }
 .welcome-personality .welcome-tagline { font-size: 17px; line-height: 1.45; color: var(--muted); text-align: center; margin: 18px 0 0; }
+
+.mac-shortcuts-card { margin-top: 12px; padding: 18px 20px; border-radius: 18px; background: var(--surface-muted); border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent); }
+.mac-shortcuts-copy strong { display: block; font-size: 15px; }
+.mac-shortcuts-copy > p { margin: 4px 0 10px; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.mac-shortcuts-card .mac-shortcuts-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+.mac-shortcuts-card .mac-shortcuts-actions button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 999px; border: 0; font-weight: 600; font-size: 13.5px; cursor: pointer; color: var(--on-strong, #fff); background: var(--strong, #1d1d1f); }
+.mac-shortcuts-card .mac-shortcuts-actions button.secondary { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.mac-shortcuts-card .mac-shortcuts-actions button:disabled { opacity: .6; cursor: default; }
+.mac-shortcuts-card .mac-shortcuts-next { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
