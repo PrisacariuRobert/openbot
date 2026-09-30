@@ -130,8 +130,11 @@ done
 printf '%s•%s Opening your studio' "$BOLD" "$RESET"
 READY=""
 i=0
-while [ $i -lt 90 ]; do
+# The first start prepares the bundled tools and can take a few minutes on a
+# busy Mac; later starts take seconds.
+while [ $i -lt 300 ]; do
   if curl -fsS -o /dev/null --max-time 2 "$URL/api/healthz" 2>/dev/null; then READY=1; break; fi
+  [ $i -eq 45 ] && printf '\n  %sThe first start can take a couple of minutes…%s ' "$DIM" "$RESET"
   printf '.'; sleep 1; i=$((i + 1))
 done
 printf '\n'
