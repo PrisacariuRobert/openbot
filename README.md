@@ -99,18 +99,19 @@ Each teammate can use a different AI. OpenBot never resells tokens or adds a fee
 
 ## How it compares
 
-| | Hosted agents (Grok Bot, Meta Muse) | Developer agents (Hermes, OpenClaw) | **OpenBot** |
-| :--- | :--- | :--- | :--- |
-| Price | $0–300/month plans | Free + your models | **Free + your models** |
-| Runs on | Their cloud | Your machine or server | **Your Mac** |
-| Setup | Sign in | Terminal and config files | **One line, then an app** |
-| Team of named teammates | Grok Bot | Yes | **Yes, each with its own browser** |
-| Asks before acting | Yes | Configurable | **Always, with the exact action** |
-| Works while your computer is off | Yes | With your own server | With your own server |
-| Phone | Native apps | Varies | Home Screen web app |
-| Open source | No | Yes | **Yes (MIT)** |
+| | Cloud agents (OpenAI dots, Grok Bot, Meta Muse) | Siri AI (macOS 27) | Hermes Desktop, OpenClaw | **OpenBot** |
+| :--- | :--- | :--- | :--- | :--- |
+| Price | $0–300/month plans | Free, with daily limits | Free + your models | **Free + your models** |
+| Runs on | Their cloud computers | Your Mac + Apple's cloud | Your machine | **Your Mac** |
+| Uses your Mac's apps and files | No | Quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
+| Long jobs on websites | Yes, in their browser | No | Yes | **Yes, each teammate in its own browser** |
+| A team of named teammates | Grok Bot only | No | Hermes Bot Mode | **Yes** |
+| Scheduled work | Yes | No | Yes | **Yes, and your Mac wakes for it** |
+| Asks before acting | Yes | Yes | Configurable | **Always, with the exact button** |
+| Choose your AI | No | No | Yes | **Yes — ChatGPT, Claude, Gemini, local…** |
+| Open source | No | No | Yes (MIT) | **Yes (MIT)** |
 
-Competitor details as of September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
+Siri is great for quick questions — OpenBot is for the whole job, and works with Siri (“Hey Siri, Ask OpenBot”). OpenAI dots is not available in the EU, UK or Switzerland; OpenBot works wherever your Mac does. Competitor details as of 30 September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
 
 ## Privacy and safety
 
