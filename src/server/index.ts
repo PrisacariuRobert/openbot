@@ -26,6 +26,7 @@ import { summarizeTable } from "./table-summary.js";
 import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
+import { checkNousKey, NOUS_BASE_URL } from "./nous-portal.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
@@ -831,8 +832,16 @@ app.post("/api/provider/connect", async (request, response) => {
 });
 
 app.post("/api/provider/key", async (request, response) => {
-  const parsed = z.object({ providerId: z.enum(["opencode-go", "google"]), key: z.string().max(400) }).strict().safeParse(request.body);
+  const parsed = z.object({ providerId: z.enum(["opencode-go", "google", "nous"]), key: z.string().max(400) }).strict().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Paste your key." });
+  if (parsed.data.providerId === "nous") {
+    try {
+      const models = await checkNousKey(parsed.data.key);
+      const instance = db.upsertProvider({ id: "nous-portal", name: "Nous Portal", provider: "custom", authMode: "api_key", runtime: "opencode", secret: parsed.data.key.trim(), apiConfig: { baseUrl: NOUS_BASE_URL, protocol: "openai-compatible", modelIds: models } });
+      broadcast();
+      return response.json({ connectionId: instance.id, models });
+    } catch (error) { return response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
+  }
   try {
     await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
     const status = await readProviderStatus(db, providerConnections.listAttempts());
