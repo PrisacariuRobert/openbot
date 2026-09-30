@@ -97,7 +97,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
           </div>
           {nousConnected
             ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
-            : <KeyPaste providerId="nous" link="https://portal.nousresearch.com" linkLabel="Get a free key" placeholder="Paste your Nous Portal API key" onSaved={onConnected} />}
+            : <KeyPaste providerId="nous" link="https://portal.nousresearch.com" linkLabel="Create a free account" placeholder="Paste your Nous Portal API key" onSaved={onConnected} />}
         </li>
       </ul>
 
