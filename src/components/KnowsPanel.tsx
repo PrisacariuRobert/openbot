@@ -10,7 +10,7 @@ const COPY: Record<SourceId, { title: string; description: string; icon: typeof 
   files: { title: "Documents in folders you choose", description: "Word, PDF, PowerPoint, Excel and text files.", icon: FileText, color: "#5b7cfa", unit: "files" },
   notes: { title: "Apple Notes", description: "All your notes, read once and kept up to date.", icon: NotebookText, color: "#f5b800", unit: "notes" },
   mail: { title: "Mail", description: "Your newest emails from the last year, with attachment names.", icon: Mail, color: "#1668e3", unit: "emails" },
-  messages: { title: "Messages", description: "Your texts and iMessages. Coming in the next update.", icon: MessageSquare, color: "#34c759", unit: "messages" },
+  messages: { title: "Messages", description: "Your texts and iMessages, grouped by conversation and day, with names from Contacts.", icon: MessageSquare, color: "#34c759", unit: "messages" },
 };
 
 const ago = (iso: string | null) => {
@@ -74,14 +74,14 @@ export function KnowsPanel() {
               : copy.description;
             return (
               <SwitchRow key={id} title={copy.title} description={detail} icon={<Icon size={16} />} iconBg={copy.color}
-                checked={info.enabled} disabled={busy !== null || id === "messages" || !status.macAccess || (id === "files" && !info.enabled && !status.folders.length)}
+                checked={info.enabled} disabled={busy !== null || !status.macAccess || (id === "files" && !info.enabled && !status.folders.length)}
                 onChange={(enabled) => void call(id, "/api/personal-index/sources", "POST", { source: id, enabled })} />
             );
           })}
         </SettingsCard>
         {[source("mail"), source("messages")].some((item) => item.problem?.needsFullDiskAccess) && (
           <div className="knows-fda" role="status">
-            <strong>Mail needs Full Disk Access.</strong>
+            <strong>Mail and Messages need Full Disk Access.</strong>
             <p>In System Settings → Privacy &amp; Security → Full Disk Access, switch on <strong>OpenBot</strong>, then come back here.</p>
             <button type="button" onClick={() => void fetch("/api/channels/imessage/open-privacy", { method: "POST", credentials: "same-origin" })}>Open that page</button>
             <button type="button" className="secondary" disabled={busy !== null} onClick={() => void call("retry", "/api/personal-index/refresh", "POST")}>Try again</button>

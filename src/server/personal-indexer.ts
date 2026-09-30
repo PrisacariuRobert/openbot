@@ -5,6 +5,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { inspectAttachment } from "./attachments.js";
 import { MacMail, MailAccessError } from "./mac-mail-index.js";
+import { FullDiskAccessError } from "./imessage-channel.js";
+import { ContactNames, readMessageItems } from "./mac-messages-index.js";
 import { PersonalIndex, SOURCES, type IndexItem, type SourceKind } from "./personal-index.js";
 
 /** Fills the personal index from the sources the owner switched on, and
@@ -105,6 +107,7 @@ export class PersonalIndexer {
     home?: string;
     mail?: MacMail;
     notes?: () => Promise<IndexItem[]>;
+    messages?: () => IndexItem[];
     platform?: NodeJS.Platform;
     now?: () => number;
   }) {}
@@ -162,7 +165,7 @@ export class PersonalIndexer {
           this.update((config) => { config.indexedAt[id] = new Date((this.options.now || Date.now)()).toISOString(); delete config.problem[id]; });
         } catch (error) {
           const message = error instanceof Error ? error.message : "That source couldn't be indexed.";
-          this.update((config) => { config.problem[id] = { message, needsFullDiskAccess: error instanceof MailAccessError || /Full Disk Access/i.test(message) }; });
+          this.update((config) => { config.problem[id] = { message, needsFullDiskAccess: error instanceof MailAccessError || error instanceof FullDiskAccessError || /Full Disk Access/i.test(message) }; });
         } finally { this.running.delete(id); }
       })();
       this.running.set(id, job);
@@ -201,7 +204,9 @@ export class PersonalIndexer {
         await tick();
       }
     } else if (source === "messages") {
-      throw new Error("Messages indexing arrives in the next update.");
+      const items = (this.options.messages || (() => readMessageItems({ days: 365, limit: 60_000, names: ContactNames.load(this.home) })))();
+      for (let at = 0; at < items.length; at += 100) { index.upsert(items.slice(at, at + 100)); await tick(); }
+      index.prune("messages", new Set(items.map((item) => item.key)));
     }
   }
 
