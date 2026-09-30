@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Bot } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
@@ -10,6 +10,15 @@ import { browserAccessText } from "./browser-access.js";
 import { SKILL_AUTHORING_GUIDANCE } from "../shared/skill-authoring.js";
 import { SavedFileLibrary } from "./saved-files.js";
 import { safeHostEnvironment } from "./runtime.js";
+
+/** OpenCode installs the tool helper package only when node_modules is
+ * missing. If files inside it were removed (a cleanup tool, an interrupted
+ * install), every tool fails to load and each task stops at once. Removing
+ * the broken copy lets OpenCode install a fresh one on the next task. */
+export function repairPluginInstall(opencodeDir: string) {
+  const modules = path.join(opencodeDir, "node_modules");
+  if (existsSync(modules) && !existsSync(path.join(modules, "@opencode-ai", "plugin", "package.json"))) rmSync(modules, { recursive: true, force: true });
+}
 
 function toolFile(name: string, description: string, fields: string, action: string) {  return `import { tool } from "@opencode-ai/plugin";
 
@@ -103,6 +112,7 @@ export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = fal
   const root = path.join(db.workspacesDir, bot.id);
   const savedFilesText = new SavedFileLibrary(db).prepareWorkspace(bot.id, root);
   const toolsDir = path.join(root, ".opencode", "tools");
+  repairPluginInstall(path.join(root, ".opencode"));
   mkdirSync(toolsDir, { recursive: true });
   isolateWorkspaceRepository(root);
   for (const [name, description, fields] of [

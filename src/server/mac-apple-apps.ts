@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { MacMail } from "./mac-mail-index.js";
 import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -146,45 +147,6 @@ function run() {
   return JSON.stringify({ calendars: out });
 }`;
 
-// Searching asks Mail for matching messages first; attachments and text are
-// only read for those few, since reading them can download each message.
-export const MAIL_SEARCH_SCRIPT = `
-function run(argv) {
-  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail"), since = new Date(Date.now() - input.days * 86400000);
-  var found = mail.inbox.messages.whose({ _or: [ { subject: { _contains: input.query } }, { sender: { _contains: input.query } } ] })();
-  var items = [];
-  for (var i = 0; i < found.length && i < 200; i++) { try { var d = found[i].dateReceived(); if (d >= since) items.push({ m: found[i], d: d }); } catch (e) {} }
-  items.sort(function(a,b){ return b.d - a.d; });
-  var out = [];
-  for (var j = 0; j < items.length && out.length < input.limit; j++) {
-    var m = items[j].m, attachments = [], text = "";
-    try { attachments = m.mailAttachments().map(function(a){ var size = 0; try { size = a.fileSize(); } catch (e) {} return { name: String(a.name()).slice(0,300), size: size }; }).slice(0,20); } catch (e) {}
-    try { text = String(m.content() || ""); } catch (e) {}
-    out.push({ id: String(m.id()), subject: String(m.subject() || "").slice(0,300), from: String(m.sender() || "").slice(0,300), date: items[j].d.toISOString(), snippet: text.replace(/\\s+/g, " ").slice(0,600), attachments: attachments });
-  }
-  return JSON.stringify({ messages: out, matched: items.length });
-}`;
-
-export const MAIL_READ_SCRIPT = `
-function run(argv) {
-  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail"), found = mail.inbox.messages.whose({ id: Number(input.id) })();
-  if (!found.length) return JSON.stringify({ error: "not_found" });
-  var m = found[0], text = String(m.content() || ""), attachments = [];
-  try { attachments = m.mailAttachments().map(function(a){ return { name: String(a.name()).slice(0,300), size: a.fileSize() }; }).slice(0,20); } catch (e) {}
-  return JSON.stringify({ id: String(m.id()), subject: String(m.subject() || "").slice(0,300), from: String(m.sender() || "").slice(0,300), date: m.dateReceived().toISOString(), text: text.slice(0,20000), truncated: text.length > 20000, attachments: attachments });
-}`;
-
-export const MAIL_SAVE_ATTACHMENT_SCRIPT = `
-function run(argv) {
-  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail"), found = mail.inbox.messages.whose({ id: Number(input.id) })();
-  if (!found.length) return JSON.stringify({ error: "not_found" });
-  var attachments = found[0].mailAttachments(), target = null;
-  for (var i = 0; i < attachments.length; i++) if (String(attachments[i].name()) === input.attachment) target = attachments[i];
-  if (!target) return JSON.stringify({ error: "no_attachment", names: attachments.map(function(a){ return String(a.name()); }).slice(0,20) });
-  mail.save(target, { in: Path(input.path) });
-  return JSON.stringify({ saved: input.path });
-}`;
-
 export const MAIL_DRAFT_SCRIPT = `
 function run(argv) {
   var input = JSON.parse(argv[0]), mail = Application("com.apple.mail");
@@ -201,7 +163,7 @@ const defaultExecute: Execute = async (command, args, timeoutMs) => (await exec(
 
 export class AppleApps {
   readonly available: boolean;
-  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform) { this.available = platform === "darwin"; }
+  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail()) { this.available = platform === "darwin"; }
 
   private async script(app: string, script: string, input: object): Promise<Record<string, unknown>> {
     if (!this.available) throw new Error("Apple apps are only available when OpenBot runs on a Mac.");
@@ -267,14 +229,10 @@ export class AppleApps {
   }
   async searchMail(input: z.input<typeof mailSearchInput>) {
     const args = mailSearchInput.parse(input);
-    const result = await this.script("Mail", MAIL_SEARCH_SCRIPT, args);
-    return { messages: z.array(z.object({ id: z.string(), subject: z.string(), from: z.string(), date: z.string(), snippet: z.string(), attachments: z.array(z.object({ name: z.string(), size: z.number() })) })).parse(result.messages), matched: Number(result.matched) };
+    return this.mail.search(args.query, args.days, args.limit);
   }
   async readMail(input: z.input<typeof mailReadInput>) {
-    const args = mailReadInput.parse(input);
-    const result = await this.script("Mail", MAIL_READ_SCRIPT, args);
-    if (result.error) throw new Error("That email isn't in your inbox anymore. Search again.");
-    return z.object({ id: z.string(), subject: z.string(), from: z.string(), date: z.string(), text: z.string(), truncated: z.boolean(), attachments: z.array(z.object({ name: z.string(), size: z.number() })) }).parse(result);
+    return this.mail.read(mailReadInput.parse(input).id);
   }
   /** Saves into a folder inside the owner's home, creating it if needed, and
    * never overwrites: an existing name gets " 2", " 3"… */
@@ -282,16 +240,15 @@ export class AppleApps {
     const args = mailSaveAttachmentInput.parse(input);
     const folder = path.resolve(home, args.folder);
     if (!folder.startsWith(home + path.sep)) throw new Error("Choose a folder inside your home folder.");
+    const bytes = this.mail.attachment(args.id, args.attachment);
+    if (!bytes.length) throw new Error("That attachment is empty on this Mac — open the email in Mail once so it downloads, then try again. Nothing was saved.");
     const safeName = path.basename(args.attachment).replace(/[\0/:]/g, "-") || "attachment";
     mkdirSync(folder, { recursive: true });
     const ext = path.extname(safeName), stem = safeName.slice(0, safeName.length - ext.length);
     let target = path.join(folder, safeName);
     for (let n = 2; existsSync(target) && n < 1000; n++) target = path.join(folder, `${stem} ${n}${ext}`);
-    const result = await this.script("Mail", MAIL_SAVE_ATTACHMENT_SCRIPT, { id: args.id, attachment: args.attachment, path: target });
-    if (result.error === "no_attachment") throw new Error(`That email has no attachment called “${args.attachment}”. Its attachments: ${(result.names as string[]).join(", ") || "none"}.`);
-    if (result.error) throw new Error("That email isn't in your inbox anymore. Search again. Nothing was saved.");
-    if (!existsSync(target)) throw new Error("Mail didn't save the file. Nothing was changed.");
-    return { saved: target };
+    writeFileSync(target, bytes, { flag: "wx" });
+    return { saved: target, bytes: bytes.length };
   }
   async listShortcuts(): Promise<string[]> {
     if (!this.available) throw new Error("Shortcuts are only available when OpenBot runs on a Mac.");

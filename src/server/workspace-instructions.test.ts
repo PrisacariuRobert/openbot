@@ -79,3 +79,16 @@ test("teaching and self-extension are allowed by the runtime config, not only by
   assert.equal(permissions((db) => db.updateStudioSettings({ selfExtendEnabled: true })).self_extend, "allow");
   assert.notEqual(permissions((db) => db.updateStudioSettings({ selfExtendEnabled: false })).self_extend, "allow");
 });
+
+test("a half-deleted tool helper package is removed so OpenCode reinstalls it", async () => {
+  const { repairPluginInstall } = await import("./workspace.js");
+  const { mkdirSync, writeFileSync, existsSync } = await import("node:fs");
+  const dir = mkdtempSync(path.join(tmpdir(), "openbot-plugin-"));
+  mkdirSync(path.join(dir, "node_modules/@opencode-ai/plugin/dist"), { recursive: true });
+  repairPluginInstall(dir);
+  assert.equal(existsSync(path.join(dir, "node_modules")), false);
+  mkdirSync(path.join(dir, "node_modules/@opencode-ai/plugin"), { recursive: true });
+  writeFileSync(path.join(dir, "node_modules/@opencode-ai/plugin/package.json"), "{}");
+  repairPluginInstall(dir);
+  assert.equal(existsSync(path.join(dir, "node_modules/@opencode-ai/plugin/package.json")), true);
+});
