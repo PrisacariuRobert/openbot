@@ -1,4 +1,8 @@
 import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { MacMail } from "./mac-mail-index.js";
+import { homedir } from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 
@@ -23,6 +27,9 @@ export const eventCreateInput = z.object({ title: line(300), start: iso, end: is
   .refine((value) => Date.parse(value.end) > Date.parse(value.start), "The event must end after it starts.")
   .refine((value) => Date.parse(value.end) - Date.parse(value.start) <= 14 * 86_400_000, "Events can be at most 14 days long.");
 export const mailDraftInput = z.object({ to: z.array(z.string().trim().email()).min(1).max(20), cc: z.array(z.string().trim().email()).max(20).default([]), subject: z.string().max(300), body: z.string().max(20_000) }).strict();
+export const mailSearchInput = z.object({ query: line(200), days: z.number().int().min(1).max(365).default(60), limit: z.number().int().min(1).max(10).default(6) }).strict();
+export const mailReadInput = z.object({ id: z.string().regex(/^\d{1,15}$/) }).strict();
+export const mailSaveAttachmentInput = z.object({ id: z.string().regex(/^\d{1,15}$/), attachment: line(300), folder: z.string().trim().min(1).max(300).regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\0]+$/, "Use a folder inside your home folder, like Documents/Receipts.") }).strict();
 export const shortcutRunInput = z.object({ name: line(200), input: z.string().max(20_000).optional() }).strict();
 
 const reminderSchema = z.object({ id: z.string().max(400), title: z.string().max(300), notes: z.string().max(4000), due: z.string().nullable(), list: z.string().max(120), completed: z.boolean() });
@@ -156,7 +163,7 @@ const defaultExecute: Execute = async (command, args, timeoutMs) => (await exec(
 
 export class AppleApps {
   readonly available: boolean;
-  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform) { this.available = platform === "darwin"; }
+  constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail()) { this.available = platform === "darwin"; }
 
   private async script(app: string, script: string, input: object): Promise<Record<string, unknown>> {
     if (!this.available) throw new Error("Apple apps are only available when OpenBot runs on a Mac.");
@@ -164,7 +171,7 @@ export class AppleApps {
     try { raw = await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", script, JSON.stringify(input)], 30_000); }
     catch (error) {
       if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error(`Allow OpenBot to use ${app} in System Settings → Privacy & Security → Automation, then try again. Nothing was changed.`);
-      if (/-600|isn.t running|timed out|ETIMEDOUT/i.test(String(error))) throw new Error(`${app} didn't respond in time. Open ${app} once on this Mac, then try again. Nothing was changed.`);
+      if ((error as { killed?: boolean })?.killed || /-600|-1712|isn.t running|timed out|ETIMEDOUT/i.test(String(error))) throw new Error(`${app} took too long to answer — it may be busy syncing. Try again in a minute, or narrow the request. Nothing was changed.`);
       throw new Error(`${app} couldn't be reached on this Mac. Nothing was changed.`);
     }
     return JSON.parse(raw) as Record<string, unknown>;
@@ -220,6 +227,29 @@ export class AppleApps {
     await this.script("Mail", MAIL_DRAFT_SCRIPT, args);
     return { opened: true };
   }
+  async searchMail(input: z.input<typeof mailSearchInput>) {
+    const args = mailSearchInput.parse(input);
+    return this.mail.search(args.query, args.days, args.limit);
+  }
+  async readMail(input: z.input<typeof mailReadInput>) {
+    return this.mail.read(mailReadInput.parse(input).id);
+  }
+  /** Saves into a folder inside the owner's home, creating it if needed, and
+   * never overwrites: an existing name gets " 2", " 3"… */
+  async saveMailAttachment(input: z.input<typeof mailSaveAttachmentInput>, home = homedir()) {
+    const args = mailSaveAttachmentInput.parse(input);
+    const folder = path.resolve(home, args.folder);
+    if (!folder.startsWith(home + path.sep)) throw new Error("Choose a folder inside your home folder.");
+    const bytes = this.mail.attachment(args.id, args.attachment);
+    if (!bytes.length) throw new Error("That attachment is empty on this Mac — open the email in Mail once so it downloads, then try again. Nothing was saved.");
+    const safeName = path.basename(args.attachment).replace(/[\0/:]/g, "-") || "attachment";
+    mkdirSync(folder, { recursive: true });
+    const ext = path.extname(safeName), stem = safeName.slice(0, safeName.length - ext.length);
+    let target = path.join(folder, safeName);
+    for (let n = 2; existsSync(target) && n < 1000; n++) target = path.join(folder, `${stem} ${n}${ext}`);
+    writeFileSync(target, bytes, { flag: "wx" });
+    return { saved: target, bytes: bytes.length };
+  }
   async listShortcuts(): Promise<string[]> {
     if (!this.available) throw new Error("Shortcuts are only available when OpenBot runs on a Mac.");
     const out = await this.execute("/usr/bin/shortcuts", ["list"], 20_000);
@@ -256,6 +286,10 @@ export function describeAppleChange(action: string, args: Record<string, unknown
   if (action === "mac_event_create") {
     const a = eventCreateInput.parse(args);
     return { label: `Add event: ${a.title}`, reason: `Add “${a.title}” to ${a.calendar ? `your “${a.calendar}” calendar` : "your main calendar"}: ${when(a.start)} – ${when(a.end)}${a.location ? ` at ${a.location}` : ""}.` };
+  }
+  if (action === "mac_mail_save_attachment") {
+    const a = mailSaveAttachmentInput.parse(args);
+    return { label: `Save attachment: ${a.attachment}`, reason: `Save “${a.attachment}” from that email into ~/${a.folder.replace(/\/+$/, "")}. Nothing is overwritten or deleted.` };
   }
   if (action === "mac_shortcut_run") {
     const a = shortcutRunInput.parse(args);

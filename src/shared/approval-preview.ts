@@ -291,7 +291,7 @@ export function approvalPreview(
     field("plan", "Plan for the new tool", true);
     field("toolName", "New tool file", true);
     preview.fields.push({ label: "Effect", value: "Approving restarts this same task with the studio's coding model and lets the teammate write exactly one new tool file in its own private workspace. The tool is self-contained and runs in OpenBot's control. Review or delete the file in Files any time." });
-  } else if (object.type === "mac_reminder_create" || object.type === "mac_note_create" || object.type === "mac_event_create" || object.type === "mac_shortcut_run" || object.type === "mac_app_click" || object.type === "mac_app_type" || object.type === "mac_app_key" || object.type === "mac_app_scroll") {
+  } else if (object.type === "mac_mail_save_attachment" || object.type === "mac_reminder_create" || object.type === "mac_note_create" || object.type === "mac_event_create" || object.type === "mac_shortcut_run" || object.type === "mac_app_click" || object.type === "mac_app_type" || object.type === "mac_app_key" || object.type === "mac_app_scroll") {
     const exactTime = (key: string, label: string, required: boolean) => {
       const value = args[key];
       if (value === undefined && !required) { preview.fields.push({ label, value: "None" }); return; }
@@ -299,7 +299,12 @@ export function approvalPreview(
       preview.fields.push({ label, value: new Date(value).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }) });
     };
     preview.fields.push({ label: "Computer", value: "The Mac running this OpenBot studio" });
-    if (object.type === "mac_reminder_create") {
+    if (object.type === "mac_mail_save_attachment") {
+      preview.fields.push({ label: "App", value: "Mail" });
+      boundedText("attachment", "Attachment", 300, true);
+      boundedText("folder", "Save into (inside your home folder)", 300, true);
+      preview.fields.push({ label: "Effect", value: "Save a copy of this one attachment. An existing file with the same name is kept; the copy gets a number instead. Nothing is deleted." });
+    } else if (object.type === "mac_reminder_create") {
       preview.fields.push({ label: "App", value: "Reminders" });
       boundedText("title", "Reminder", 300, true);
       exactTime("due", "Due", false);
