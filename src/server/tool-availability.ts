@@ -74,6 +74,12 @@ export function toolAvailability(
     ],
     db.getStudioSettings().macAccessEnabled,
   );
+  // Apple app tools run fixed scripts against Reminders, Notes, Calendar…:
+  // only on a Mac.
+  set(
+    ["mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run"],
+    db.getStudioSettings().macAccessEnabled && process.platform === "darwin",
+  );
   const apps: {
     id: string;
     service: ConnectorServiceId;

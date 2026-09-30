@@ -215,3 +215,10 @@ test("buttons that only change what the page shows run freely; anything that can
   assert.notEqual(browserApprovalReason("click", "", button("Show more", {}, { destination: "https://elsewhere.example/go" })), null, "leads somewhere else");
   assert.notEqual(browserApprovalReason("click", "", button("Show more", { tag: "div" })), null, "not a button");
 });
+
+test("a quoted name for a new reminder or note is a label, not an instruction", () => {
+  assert.equal(approvalReason('Add a reminder "OpenBot demo - delete me" for tomorrow at 9:00.'), null);
+  assert.equal(approvalReason("Create a note called “Remove the old files”"), null);
+  assert.notEqual(approvalReason('Please "delete all my files" now'), null);
+  assert.notEqual(approvalReason('Add a reminder "Call Anna" and delete my old notes'), null);
+});

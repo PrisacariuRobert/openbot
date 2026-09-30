@@ -291,6 +291,49 @@ export function approvalPreview(
     field("plan", "Plan for the new tool", true);
     field("toolName", "New tool file", true);
     preview.fields.push({ label: "Effect", value: "Approving restarts this same task with the studio's coding model and lets the teammate write exactly one new tool file in its own private workspace. The tool is self-contained and runs in OpenBot's control. Review or delete the file in Files any time." });
+  } else if (object.type === "mac_reminder_create" || object.type === "mac_note_create" || object.type === "mac_event_create" || object.type === "mac_shortcut_run" || object.type === "mac_app_click" || object.type === "mac_app_type" || object.type === "mac_app_key" || object.type === "mac_app_scroll") {
+    const exactTime = (key: string, label: string, required: boolean) => {
+      const value = args[key];
+      if (value === undefined && !required) { preview.fields.push({ label, value: "None" }); return; }
+      if (typeof value !== "string" || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || !Number.isFinite(Date.parse(value))) { incomplete = true; return; }
+      preview.fields.push({ label, value: new Date(value).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }) });
+    };
+    preview.fields.push({ label: "Computer", value: "The Mac running this OpenBot studio" });
+    if (object.type === "mac_reminder_create") {
+      preview.fields.push({ label: "App", value: "Reminders" });
+      boundedText("title", "Reminder", 300, true);
+      exactTime("due", "Due", false);
+      boundedText("list", "List", 120, false, false, "Your default list");
+      boundedText("notes", "Notes", 4_000);
+      preview.fields.push({ label: "Effect", value: "Add one new reminder. Nothing existing is changed or removed." });
+    } else if (object.type === "mac_note_create") {
+      preview.fields.push({ label: "App", value: "Notes" });
+      boundedText("title", "Title", 200, true);
+      boundedText("folder", "Folder", 120, false, false, "Your default Notes folder");
+      boundedText("body", "Text", 20_000, true);
+      preview.fields.push({ label: "Effect", value: "Create one new note. Existing notes are not changed." });
+    } else if (object.type === "mac_event_create") {
+      preview.fields.push({ label: "App", value: "Calendar" });
+      boundedText("title", "Event", 300, true);
+      exactTime("start", "Starts", true);
+      exactTime("end", "Ends", true);
+      boundedText("location", "Location", 300);
+      boundedText("calendar", "Calendar", 120, false, false, "Your main calendar");
+      boundedText("notes", "Notes", 4_000);
+      if (typeof args.start === "string" && typeof args.end === "string" && Date.parse(args.end) <= Date.parse(args.start)) incomplete = true;
+      preview.fields.push({ label: "Effect", value: "Add one new event. No invitations are sent and nothing existing is changed." });
+    } else if (object.type === "mac_shortcut_run") {
+      preview.fields.push({ label: "App", value: "Shortcuts" });
+      boundedText("name", "Shortcut", 200, true);
+      boundedText("input", "Input", 20_000);
+      preview.fields.push({ label: "Effect", value: "Run your own shortcut once. It can do anything it is built to do — check it in the Shortcuts app if you're unsure." });
+    } else {
+      boundedText("app", "App", 160, true);
+      if (object.type === "mac_app_click") boundedText("elementIndex", "Control", 40, true);
+      if (object.type === "mac_app_type") boundedText("text", "Text to enter", 20_000, true);
+      if (object.type === "mac_app_key") boundedText("key", "Key", 40, true);
+      preview.fields.push({ label: "Effect", value: object.type === "mac_app_type" ? "Type this text into the focused field of that app." : object.type === "mac_app_scroll" ? "Move through the app with navigation keys." : "Act once in that app, exactly as described above." });
+    }
   } else if (object.type === "mac_organize") {    preview.fields.push({ label: "Computer", value: "The Mac running this OpenBot studio" });
     preview.fields.push({ label: "Path base", value: "Relative paths and ~/ start in the host user's home folder. Absolute paths are shown exactly as requested." });
     const moves = args.moves;
@@ -375,7 +418,7 @@ export function approvalPreview(
         incomplete = true;
     }
   } else supported = false;
-  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && object.type !== "routine_resume" && object.type !== "routine_update" && object.type !== "routine_delete" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
+  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && !String(object.type).startsWith("mac_") && object.type !== "routine_resume" && object.type !== "routine_update" && object.type !== "routine_delete" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
     if (!accountLabel?.trim()) incomplete = true;
     preview.fields.unshift({
       label: "Connected account",
