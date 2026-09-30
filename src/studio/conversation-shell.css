@@ -2397,6 +2397,10 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .siri-card .siri-add:active { transform: translateY(0); }
 .siri-card .siri-add:disabled { opacity: .7; cursor: default; transform: none; }
 .siri-card .siri-add:focus-visible { outline: 3px solid color-mix(in srgb, #6a4dff 45%, transparent); outline-offset: 2px; }
+.siri-card .siri-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-start; margin: 0; }
+.siri-card .siri-share { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); border: 0; cursor: pointer; }
+.siri-card .siri-share:hover { background: color-mix(in srgb, var(--ink) 11%, transparent); }
+.siri-card .siri-share:disabled { opacity: .6; cursor: default; }
 @media (max-width: 520px) { .siri-card { grid-template-columns: 1fr; gap: 12px; padding: 18px; } }
 .siri-error { color: var(--danger, #c0392b) !important; }
 .siri-hint { margin: 10px 0 0 !important; color: var(--ink) !important; font-size: 13.5px !important; }
