@@ -129,6 +129,18 @@
     .band.scout { background: var(--scout); }
     .band.sun { background: var(--sun); color: var(--ink); }
     .band.night { background: var(--ink); }
+    .band.mac { background: #f5f3ee; color: var(--ink); }
+    .band.mac .ticks li::before { background: var(--nova); }
+    .mac-chat { background: #fff; border-radius: 26px; padding: 18px; box-shadow: 0 24px 60px rgba(30,20,60,.14), 0 2px 0 rgba(0,0,0,.04); display: grid; gap: 10px; max-width: 460px; margin-left: auto; transform: rotate(var(--tilt, 0deg)); }
+    .mac-chat .m { padding: 11px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45; max-width: 88%; }
+    .mac-chat .me { justify-self: end; background: var(--ink); color: #fff; border-bottom-right-radius: 6px; }
+    .mac-chat .bot { background: var(--nova-light); color: var(--ink); border-bottom-left-radius: 6px; }
+    .mac-chat .ask { border: 2px solid var(--nova); background: #fff; }
+    .mac-chat .ask b { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--nova-dark); margin-bottom: 4px; }
+    .mac-chat .ok { justify-self: center; font-size: 13px; color: var(--scout-dark); background: var(--scout-light); padding: 6px 12px; border-radius: 999px; }
+    .apps { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+    .apps li { background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; box-shadow: 0 1px 0 rgba(0,0,0,.06); }
+    @media (max-width: 760px) { .mac-chat { margin: 0 auto; } }
     .band-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 64px; align-items: center; }
     .band-grid.flip { grid-template-columns: 1.25fr 1fr; }
     .band-grid.flip > .words { order: 2; }
@@ -296,7 +308,7 @@
   <section class="wrap hero">
     <div class="rise">
       <h1>Your new favorite <span class="squiggle" style="color:var(--pixel)">coworkers.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h1>
-      <p class="lede">Make AI teammates for whatever you need — someone to research, someone to write, someone to check. Give each a name, a face and a job. They live on your Mac and always ask before anything important.</p>
+      <p class="lede">Make AI teammates for whatever you need — someone to research, someone to write, someone to check. Give each a name, a face and a job. They live on your Mac, work in your own Mail, Calendar and Notes, and always ask before anything important.</p>
       <div class="cta">
         <a class="btn" href="#install">Get OpenBot — it’s free</a>
         <a class="btn ghost" href="#make">Make a teammate</a>
@@ -376,6 +388,26 @@
       <div class="picture rise" style="--tilt: 2deg">
         <div class="shot"><img src="shots/review.jpg" width="2880" height="1800" alt="Nova asks before clicking “JETZT RESERVIEREN” on a restaurant website." loading="lazy" /></div>
         <span class="sticker sun" style="left:-16px;bottom:-22px;--r:-5deg">✋ Waits for you</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band mac" id="mac">
+    <div class="wrap band-grid">
+      <div class="words rise">
+        <div class="hostline"><div class="actor" data-cast="nova" aria-hidden="true"></div><span>New in 0.38</span></div>
+        <h2>Works in your own apps.</h2>
+        <p>Cloud assistants can’t see your Mac. Your team can: it finds the email, saves the file, adds the reminder — in your own Mail, Calendar and Notes. And it asks before it changes anything.</p>
+        <ul class="apps" aria-label="Apps your team can use"><li>✉️ Mail</li><li>📅 Calendar</li><li>✅ Reminders</li><li>🗒️ Notes</li><li>👤 Contacts</li><li>⚡ Shortcuts</li><li>🎙️ Siri</li></ul>
+        <ul class="ticks"><li>“Hey Siri, ask Nova to…”</li><li>Emails are only drafted — you press Send</li></ul>
+      </div>
+      <div class="picture rise">
+        <div class="mac-chat" style="--tilt: 1.5deg" aria-label="A real OpenBot conversation">
+          <div class="m me">Find my latest receipt email and save the PDF to Documents/Receipts.</div>
+          <div class="m bot ask"><b>Needs your okay</b>Save “Figma-invoice-September.pdf” from that email into ~/Documents/Receipts. Nothing is overwritten.</div>
+          <div class="ok">✓ Approved</div>
+          <div class="m bot">Saved it — your €45 Figma invoice from 23 September. Want a reminder to pay it Friday?</div>
+        </div>
       </div>
     </div>
   </section>
