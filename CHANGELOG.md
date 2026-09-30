@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.38.0 — Your Mac, your apps (1 October 2026)
+
+- Teammates work in your own Apple apps on this Mac, through fixed scripts (never model-written code):
+  - Read: Mail (search and read, fast even on very large inboxes), Reminders, Notes, Contacts, calendars, Shortcuts.
+  - After your approval: add reminders, notes and calendar events, run a shortcut, save a Mail attachment into a folder you name (never overwriting).
+  - Mail drafts open for you to send yourself; nothing is ever sent.
+  - Mail needs Full Disk Access for OpenBot (the same switch as iMessage); other apps ask through macOS Automation.
+- Proper review screens for these actions and for clicks and typing in Mac apps.
+- Teammates are told today's date, time and time zone ("tomorrow at 9" landed on the wrong day before), and confirmations carry the time read back from the app.
+- Siri: "Hey Siri, Ask OpenBot" then "ask Nova to…" reaches that teammate; answers use your time zone and drop link words.
+- Send to OpenBot: a signed share-sheet shortcut for iPhone, and "Ask from anywhere on this Mac" in Control center (Spotlight, Siri, menu bar, a keyboard shortcut, the Share menu).
+- A second free start: Nous Portal (free models, no card), next to Gemini.
+- Free Gemini keys default to Flash-Lite; free limits show a visible wait or a plain "allowance used up" stop; retired models are explained.
+- New chats suggest Mac-only starters when Files & apps is on.
+- A quoted name for a new reminder or note no longer holds the whole message for review.
+- A half-deleted OpenCode tool package in a teammate's workspace is repaired automatically.
+
 ## 0.37.0-beta.1 — first public beta (29 September 2026)
 
 - Found by real testing on real models (web research, files, memory, group work) and fixed:

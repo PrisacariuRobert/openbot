@@ -12,7 +12,7 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
   curl -fsSL https://openbots.foundation/install.sh | sh
   ```
   No admin password, and the installer checks the download's fingerprint.
-- Current version: 0.37.0-beta.1, the first public beta, released 29 September 2026. Release notes: https://github.com/PrisacariuRobert/openbot/releases/tag/v0.37.0-beta.1
+- Current version: 0.38.0 ("Your Mac, your apps"), released 1 October 2026. Release notes: https://github.com/PrisacariuRobert/openbot/releases/tag/v0.38.0. First public beta was 0.37.0-beta.1 on 29 September 2026.
 
 ## What it does
 - **Make your own teammates:** a name, a face, a job. Each teammate gets its own workspace and its own browser.

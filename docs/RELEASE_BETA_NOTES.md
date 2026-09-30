@@ -1,39 +1,31 @@
-**OpenBot's first public beta.** OpenBot gives you a small team of AI teammates on your Mac. They research, write and get things done, and ask before anything important. It's free, open source, and works with the AI you already use.
+**OpenBot 0.38 — Your Mac, your apps.** Your team of AI teammates now works in your own apps on your Mac, not just in a chat.
 
-## Install (macOS 13+, Apple silicon or Intel)
+## Install or update (macOS 13+, Apple silicon or Intel)
 
 ```sh
 curl -fsSL https://openbots.foundation/install.sh | sh
 ```
 
-No administrator password is needed. The installer checks the download's SHA-256 and runs OpenBot in the background as **OpenBot.app**. It opens your studio in the browser. To uninstall, run `~/Library/Application Support/OpenBot/uninstall.sh`.
+Already on 0.37? Tap **Update** in OpenBot's sidebar, or run the same line. Your teammates, chats and files stay.
 
-## Highlights
+## New
 
-- **Make your own teammates.** Pick a name, a face, a color and a job. Each teammate gets its own workspace and its own browser.
-- **Research in seconds.** Built-in web search and reading, with links to sources.
-- **Group chats that work in order.** Write "Nova, find three restaurants. Scout, check their hours." Scout waits for Nova's list.
-- **Real files.** Word documents and spreadsheets you can open and share.
-- **Asks before it acts.** Sending, buying, signing in or submitting always shows the website and the exact button first.
-- **Reach your team anywhere:**
-  - Telegram, Discord and iMessage
-  - "Hey Siri, Ask OpenBot"
-  - Pair your iPhone with one scan
-  - Hands-free voice
-- **Routines.** "Every Monday at 9, plan my week." Your Mac can wake up for them.
-- **Your AI, your choice:**
-  - A free Google Gemini key
-  - The ChatGPT, Claude, Grok or Copilot (Pro/Business) subscription you already have
-  - OpenCode Go
-  - Any OpenAI-compatible API
-  - Local models with Ollama
-- **Bring your setup.** One-click import from Hermes Agent and OpenClaw.
-- **Updates in one tap** from the sidebar.
+- **Your Mail, Calendar, Reminders, Notes, Contacts and Shortcuts.** Try:
+  - "Find my latest receipt email and save the PDF to Documents/Receipts."
+  - "What's on my plate today?"
+  - "Remind me to pay it Friday."
+  - Reading happens right away.
+  - Adding a reminder, note or event, saving an attachment or running a shortcut shows you exactly what will change and waits for your okay.
+  - Emails are only ever drafted for you to send.
+- **"Hey Siri, ask Nova to…"** Siri reaches the teammate you name.
+- **Send to OpenBot.** Share any page, link or text from your iPhone or Mac, and say what to do with it.
+- **Ask from anywhere on your Mac.** Use Spotlight, Siri, the menu bar or a keyboard shortcut (Control center → Ask from anywhere on this Mac).
+- **Two free ways to start.** Use a Google Gemini key, or a Nous Portal account with free models. No card needed.
+- **Dates you can trust.** Teammates know today's date and your time zone, and report the exact time an app saved.
 
 ## Good to know
 
-- This is a beta. The Mac app is ad-hoc signed, not notarized; the one-line installer is the supported way to install it.
-- Free AI keys have tight limits. With Google's free tier, Flash-Lite is used by default, and OpenBot tells you when the free allowance is used up.
-- Known gaps: [product gap audit](https://github.com/PrisacariuRobert/openbot/blob/main/docs/PRODUCT_GAP_AUDIT.md). Found a bug? Use **Send feedback** in the app or [open an issue](https://github.com/PrisacariuRobert/openbot/issues/new/choose).
+- **Mail needs Full Disk Access** for OpenBot (System Settings → Privacy & Security → Full Disk Access), the same switch iMessage uses. The other apps ask once through macOS.
+- **This is still a beta.** The Mac app is ad-hoc signed, not notarized; the one-line installer is the supported way to install it.
 
 Full details are in the [changelog](https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md).

@@ -119,14 +119,14 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.37.0-beta.1 is the first public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.37.0-beta.1)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+OpenBot 0.38.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.38.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
-## What's new in 0.37.0-beta.1
+## What's new in 0.38.0
 
-- Replies appear word by word from every provider.
-- Start free with a Gemini key; one-line Mac installer.
-- Teammates build on each other’s answers in group chats.
-- Word documents, weekly recap, hands-free voice, and phone pairing with one scan.
+- **Your Mac, your apps.** Teammates work in your own Mail, Calendar, Reminders, Notes, Contacts and Shortcuts: “find the receipt in my Mail and save the PDF to Documents”, “what's on my plate today?”, “remind me Friday”. Anything that changes something waits for your okay; emails are only drafted for you to send.
+- **“Hey Siri, ask Nova to…”** — Siri reaches the teammate you name. A **Send to OpenBot** share sheet on iPhone and Mac, and Ask OpenBot from Spotlight or a keyboard shortcut.
+- **Two free starts** — a Google Gemini key or a Nous Portal account, no card.
+- Teammates know today's date and your time zone, and report the exact time an app saved.
 
 Full notes in the [changelog](CHANGELOG.md).
 
