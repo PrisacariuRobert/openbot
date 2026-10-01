@@ -31,7 +31,7 @@ const ONLY = argument("only", "");
 const ROOT = path.resolve(import.meta.dirname, "..");
 
 interface Outcome { status: string; reply: string; db: DatabaseSync; workspace: string; runId: string }
-interface Case { id: string; prompt: string; setup?: (workspace: string) => void; check: (outcome: Outcome) => string | null; browser?: boolean; declineApprovals?: boolean; importHermes?: string }
+interface Case { id: string; prompt: string; setup?: (workspace: string) => void; check: (outcome: Outcome) => string | null; browser?: boolean; declineApprovals?: boolean; importHermes?: string; autopilot?: boolean }
 
 /** A tiny local website so browser cases never touch the real internet. */
 const site = { url: "", subscribed: 0 };
@@ -141,6 +141,21 @@ const CASES: Case[] = [
     },
   },
   {
+    id: "autopilot-live",
+    browser: true,
+    autopilot: true,
+    prompt: "Open {SITE}/subscribe and subscribe me to the newsletter with test@example.com.",
+    check: ({ status, reply, db, runId }) => {
+      if (status !== "completed") return `status ${status} (Autopilot should not stop for approval)`;
+      if (site.subscribed !== 1) return `the form was submitted ${site.subscribed} times, expected once`;
+      const pending = db.prepare("SELECT COUNT(*) AS n FROM approvals WHERE status='pending'").get() as { n: number };
+      if (pending.n > 0) return `${pending.n} approval(s) still waiting`;
+      const auto = db.prepare("SELECT COUNT(*) AS n FROM activities WHERE run_id=? AND label='Auto-approved by Autopilot'").get(runId) as { n: number };
+      if (auto.n < 1) return "the decision was not recorded as Autopilot in the activity feed";
+      return /\b(not subscribed|couldn't|could not|wasn't able|did not)\b/i.test(reply) ? "reply says it did not subscribe" : null;
+    },
+  },
+  {
     id: "hermes-import",
     prompt: "In one short paragraph: who are you, what is your job, and name two of your skills.",
     importHermes: "~/.hermes/profiles/jobhunter",
@@ -162,7 +177,7 @@ async function runCase(item: Case, attempt: number) {
   // Bring a real Hermes agent over, then talk to it (read-only on the Hermes side).
   const imported = item.importHermes ? applyProfileImport(setupDb, item.importHermes) : null;
   const bot = setupDb.getBot(imported?.botId || "nova")!;
-  for (const teammate of setupDb.listBots()) setupDb.updateBot(teammate.id, { providerInstanceId: "local-opencode", model: MODEL, computerEnabled: false, browserEnabled: Boolean(item.browser) });
+  for (const teammate of setupDb.listBots()) setupDb.updateBot(teammate.id, { providerInstanceId: "local-opencode", model: MODEL, computerEnabled: false, browserEnabled: Boolean(item.browser), autopilot: Boolean(item.autopilot) });
   site.subscribed = 0;
   const dataDir = setupDb.dataDir, threadId = bot.threadId;
   setupDb.close();
