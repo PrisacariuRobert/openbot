@@ -81,3 +81,18 @@ test("a teammate from someone else starts with the browser and computer off, on 
     db.close();
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("a shared routine's clock time follows the importer's time zone", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "openbot-sharing-zone-"));
+  try {
+    const db = new OpenBotDatabase(root);
+    const bundle = { kind: "openbot-teammate", version: 1, bot: { name: "Planner", emoji: "x", color: "#123456", role: "Plans", instructions: "Plan my week." }, skills: [], routines: [{ name: "Sunday planning", prompt: "Plan my week.", intervalMinutes: 10_080, schedule: { kind: "calendar", timeZone: "Pacific/Auckland", time: "18:00", daysOfWeek: [7] } }] };
+    const { bot } = importBot(db, bundle);
+    const routine = db.listRoutines().find((item) => item.botId === bot.id)!;
+    assert.equal(routine.schedule?.kind, "calendar");
+    assert.equal((routine.schedule as { timeZone: string }).timeZone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+    assert.equal((routine.schedule as { time: string }).time, "18:00");
+    assert.equal(routine.enabled, false);
+    db.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
