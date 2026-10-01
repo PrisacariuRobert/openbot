@@ -2,6 +2,14 @@
 
 Where OpenBot stands against the four products people compare it with, after the competitive-plan work on branch `fix/runtime-pin-and-quiet-chat` ([#92](https://github.com/PrisacariuRobert/openbot/pull/92)). Competitor facts come from their public pages and press as of this date; OpenBot facts come from this checkout and its live eval (`qa/prompt-eval/`). Nothing here is a head-to-head benchmark on equal models.
 
+## Update — 1 October 2026: the closest competitor we had missed
+
+| | What it is | Reach | Money | Where OpenBot differs |
+| :--- | :--- | :--- | :--- | :--- |
+| **OpenMausBot** (milind-soni, Apache-2.0, created 11 Aug 2026) | An open-source "Grok Bot alternative": a chat app with a roster of AI bots, each with its own personality, model and tools, running on the Claude, Codex and Grok command-line tools already installed on your machine; optional always-on cloud workspace | 3,894 stars, 663 forks, hundreds of open issues, up to about 30,000 downloads on a single release, about 1,900 Discord members, 92 releases in under eight weeks; macOS, Windows, Ubuntu, Android, iOS, npm and Docker | Free app; Pro $49 a month at launch ($89 later); GitHub Sponsors; enterprise offer; templates marketplace | Aimed at developers; OpenBot is for ordinary Mac users: one-line install, no command-line tools, local Mail, Calendar, Notes and Messages. It is far ahead on reach, platforms and community, and we are not ahead on product speed |
+
+Why it is better known: it named the enemy and launched the same day as Grok Bot's beta, it is trivial for developers to try (npm, Docker), it runs everywhere, and it built a community from day one. Sources: [GitHub](https://github.com/milind-soni/OpenMausBot), [website](https://www.openmausbot.com/), [pricing](https://www.openmausbot.com/pricing), [directory listing](https://www.opensourcealternatives.to/item/openmausbot). Everything above comes from public pages; we have not used the product.
+
 ## Update — 30 September 2026: three new entrants
 
 | | What it is | Price / reach | Where OpenBot differs |

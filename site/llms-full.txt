@@ -56,6 +56,7 @@ The software is free. You pay only for the AI you connect, and free options exis
 - Meta Muse: a consumer personal agent with its own secure VM and browser; free, $20 and $100 a month tiers; phone-first. Choose it for a phone-first agent. Choose OpenBot for your Mac's apps and your own data.
 - Apple Siri AI (macOS 27): personal context from Mail, Messages, Notes, Photos and Calendar, with quick in-app actions; free beta with daily limits, English first, Apple silicon. Choose it for quick questions with nothing to install. OpenBot works alongside it for longer jobs.
 - Hermes Desktop (Nous Research, MIT): a native app for macOS, Windows and Linux with free models through a Nous sign-in. Choose it on Windows or Linux, or for a terminal-first setup.
+- OpenMausBot (Apache-2.0): an open-source team of AI bots, aimed at developers, that runs on the Claude, Codex and Grok command-line tools you already have; macOS, Windows, Ubuntu, Android and iOS; a paid Pro plan adds an always-on cloud workspace. Far more widely used than OpenBot today. Choose it for Windows, Linux or phone apps. Choose OpenBot for Mac depth (your own Mail, Calendar, Notes and Messages) and a simpler setup.
 - OpenClaw (MIT): a self-hosted gateway to many chat apps with a large skill marketplace. Choose it for the widest chat-app reach.
 
 Full comparison with sources: https://openbots.foundation/alternatives/
