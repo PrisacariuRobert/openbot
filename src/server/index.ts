@@ -32,6 +32,7 @@ import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
 import { describeMorningBrief, findMorningBrief, morningBriefPrompt, removeMorningBrief, setupMorningBrief } from "./morning-brief.js";
 import { PersonalIndexer, type IndexerConfig } from "./personal-indexer.js";
 import { checkNousKey, NOUS_BASE_URL } from "./nous-portal.js";
+import { renderResultPage } from "./share-result.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
@@ -3037,6 +3038,20 @@ app.get("/api/bots/:id/share", (request, response) => {
   } catch (error) {
     response.status(error instanceof Error && /not found/i.test(error.message) ? 404 : 400).json({ error: error instanceof Error ? error.message : "This teammate could not be shared." });
   }
+});
+
+// A finished result as a page you can send: personal details hidden first.
+app.get("/api/messages/:id/share-page", (request, response) => {
+  const message = db.getMessage(request.params.id);
+  if (!message || message.senderType !== "bot" || !message.runId) return response.status(400).json({ error: "Only a teammate's finished result can be shared." });
+  const run = db.getRun(message.runId), bot = message.senderId ? db.getBot(message.senderId) : null;
+  if (!run || !bot) return response.status(404).json({ error: "That result isn't available." });
+  if (["queued", "running", "awaiting_approval", "waiting_for_teammate"].includes(run.status)) return response.status(409).json({ error: "Wait until this task has finished, then share it." });
+  // The question: the message that started the task, or else the owner's last message before this reply.
+  const trigger = (run.triggerMessageId ? db.getMessage(run.triggerMessageId) : null) || db.listMessages(message.threadId, 200).filter((item) => item.senderType === "user" && item.createdAt <= message.createdAt).at(-1) || null;
+  const withQuestion = request.query.question !== "0";
+  const page = renderResultPage({ question: withQuestion ? (trigger?.body || null) : null, answer: message.body, files: (message.attachments || []).map((file) => file.name), teammate: { name: bot.name, role: bot.role, color: bot.color, mascot: bot.mascot }, at: new Date(message.createdAt) });
+  response.json({ title: page.title, html: page.html, text: page.text, filename: page.filename, hidden: page.hidden, total: page.total, summary: page.summary, hasQuestion: Boolean(trigger?.body) });
 });
 
 // Preview a gallery teammate before adding it. Fetches only from the OpenBot gallery.

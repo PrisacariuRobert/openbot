@@ -1,3 +1,4 @@
+import { ShareResultSheet } from "../components/ShareResultSheet";
 import { AUTOPILOT_WARNING } from "../shared/autopilot";
 import { SidebarExtras } from "../components/SidebarExtras";
 import type { Attachment } from "../shared/types";
@@ -732,6 +733,7 @@ export function Studio() {
   // U02c: reply target for the composer. Cleared when the conversation
   // changes or the send lands; the host validates it still exists.
   const [replyTo, setReplyTo] = useState<{ id: string; senderName: string; body: string } | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
   useEffect(() => { setReplyTo(null); }, [thread]);
   const sendKeys = useRef(createSubmissionKeys());
   const fileInput = useRef<HTMLInputElement>(null);
@@ -1970,6 +1972,7 @@ export function Studio() {
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
+          {sharing && <ShareResultSheet messageId={sharing} onClose={() => setSharing(null)} />}
           <SidebarExtras />
           <button
             className="workspace-link"
@@ -2719,6 +2722,7 @@ export function Studio() {
                               onReacted={() => setRefresh((n) => n + 1)}
                               readAloud={message.senderType === "bot" ? message.body : undefined}
                               onRetry={retryTarget?.replyId === message.id ? () => void retryReply() : undefined}
+                              onShare={message.senderType === "bot" && message.runId && !state.runs.some((run) => run.id === message.runId && ["queued", "running", "awaiting_approval", "waiting_for_teammate"].includes(run.status)) ? () => setSharing(message.id) : undefined}
                               onEdit={lastOwnMessageId === message.id && !sending ? () => pickStarter(message.body) : undefined}
                             />
                             {message.senderType === "bot" && message.runId
