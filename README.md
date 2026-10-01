@@ -119,14 +119,13 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.38.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.38.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+OpenBot 0.39.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.39.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
-## What's new in 0.38.0
+## What's new in 0.39.0
 
-- **Your Mac, your apps.** Teammates work in your own Mail, Calendar, Reminders, Notes, Contacts and Shortcuts: “find the receipt in my Mail and save the PDF to Documents”, “what's on my plate today?”, “remind me Friday”. Anything that changes something waits for your okay; emails are only drafted for you to send.
-- **“Hey Siri, ask Nova to…”** — Siri reaches the teammate you name. A **Send to OpenBot** share sheet on iPhone and Mac, and Ask OpenBot from Spotlight or a keyboard shortcut.
-- **Two free starts** — a Google Gemini key or a Nous Portal account, no card.
-- Teammates know today's date and your time zone, and report the exact time an app saved.
+- **Knows you, privately.** Your team can search your own Notes, Mail, Messages and the folders you choose: “what did Anna say about the Berlin trip?”, “find my note about the Antwerp visit”. The index lives in OpenBot's folder on your Mac, is readable only by you, and **What they know** lets you turn each source off or forget everything.
+- **A morning brief in one tap.** Each morning your teammate writes what's on your calendar, the mail that needs you and what's due. It only reads.
+- Calendar, unread mail and reminders as read tools for any teammate.
 
 Full notes in the [changelog](CHANGELOG.md).
 
