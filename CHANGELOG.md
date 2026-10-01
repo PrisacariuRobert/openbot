@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.40.0 — Share your teammates (1 October 2026)
+
+- Share a teammate as a link: open a teammate and tap Copy share link. The link holds the name, face, job, instructions, skills and routines in the link itself, so nothing is uploaded anywhere. Opening it on openbots.foundation shows what it is told to do and an "Add to my Mac" button.
+- Add from a link: Workspace → Add from a link (or paste a link or a gallery address). You see a preview first. An imported teammate starts with the browser and private computer off, uses your usual AI, and its routines arrive paused, with calendar routines moved to your time zone. Your accounts, history and memory are never part of a shared teammate.
+- A gallery of eight ready-made teammates at openbots.foundation/teammates: Receipt keeper, Inbox triage, Trip planner, Meeting prepper, Study buddy, Weekly planner, Price watcher and Proofreader. Anyone can propose one (CONTRIBUTING.md); tests check every entry's schema, skills and routine prompts.
+- Share a result: the share button on a finished answer turns it into one self-contained web page. Emails, phone numbers, IBANs, long numbers, links with keys and your home folder are hidden first, and you see what was hidden before you copy or save the page. The page loads nothing from the internet.
+- Found by testing on a real model and fixed: question lookup for a shared answer, an imported teammate that would have started with the browser on and no AI.
+
 ## 0.39.0 — Knows you, privately (1 October 2026)
 
 - A private index of your own material, so a teammate can answer "what did Anna say about the Berlin trip?" without scanning everything:
