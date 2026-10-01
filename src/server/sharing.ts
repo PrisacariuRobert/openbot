@@ -18,6 +18,8 @@ export const botShareSchema = z.object({
     color: z.string().regex(/^#[0-9a-f]{6}$/i), role: z.string().trim().min(1).max(60),
     instructions: z.string().trim().min(1).max(2_000), model: z.string().max(300).optional(),
   }),
+  /** One plain sentence for galleries and the preview. */
+  about: z.string().trim().max(240).optional(),
   skills: z.array(z.string().max(100)).max(50).default([]),
   routines: z.array(z.object({
     name: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(4_000),
@@ -59,13 +61,32 @@ export function exportBot(db: OpenBotDatabase, botId: string): BotShareBundle {
   };
 }
 
+/** The AI most of this studio's teammates already use. A teammate from
+ * someone else starts on the owner's own choice, so it works at once; the
+ * sharer's model name means nothing on this Mac. */
+export function ownersUsualAI(db: OpenBotDatabase): { providerInstanceId: string; model: string } | null {
+  const counts = new Map<string, { providerInstanceId: string; model: string; count: number }>();
+  for (const bot of db.listBots()) {
+    if (bot.retiredAt || !bot.providerInstanceId || !bot.model || !db.getProvider(bot.providerInstanceId)) continue;
+    const key = `${bot.providerInstanceId}|${bot.model}`;
+    counts.set(key, { providerInstanceId: bot.providerInstanceId, model: bot.model, count: (counts.get(key)?.count ?? 0) + 1 });
+  }
+  const best = [...counts.values()].sort((a, b) => b.count - a.count)[0];
+  return best ? { providerInstanceId: best.providerInstanceId, model: best.model } : null;
+}
+
 export function importBot(db: OpenBotDatabase, raw: unknown): { bot: Bot; skills: number; routines: number } {
   const bundle = botShareSchema.parse(raw);
   rejectCredentials(`${bundle.bot.name}\n${bundle.bot.role}\n${bundle.bot.instructions}`, "this teammate's profile");
   for (const routine of bundle.routines) rejectCredentials(`${routine.name}\n${routine.prompt}`, `the routine "${routine.name}"`);
+  // A teammate from someone else starts with the browser and the private
+  // computer off: with those off it has no way to send anything out, however
+  // its instructions are worded. The owner can switch them on in its settings.
+  const usual = ownersUsualAI(db);
   const bot = db.createBot({
     name: bundle.bot.name, emoji: bundle.bot.emoji, mascot: bundle.bot.mascot as MascotKind | undefined,
-    color: bundle.bot.color, role: bundle.bot.role, instructions: bundle.bot.instructions, model: bundle.bot.model || "",
+    color: bundle.bot.color, role: bundle.bot.role, instructions: bundle.bot.instructions,
+    model: usual?.model ?? "", providerInstanceId: usual?.providerInstanceId ?? null, browserEnabled: false, computerEnabled: false,
   });
   const skills = new CommunitySkills(db);
   const known = skills.list().filter((skill) => skill.bundled && bundle.skills.includes(skill.id)).map((skill) => skill.id);
@@ -90,4 +111,31 @@ export function importBot(db: OpenBotDatabase, raw: unknown): { bot: Bot; skills
     routines += 1;
   }
   return { bot: db.getBot(bot.id)!, skills: assigned, routines };
+}
+
+/** Where gallery teammates live. The studio only ever fetches from here, so a
+ * link can't make it request an arbitrary address. */
+export const GALLERY_ORIGIN = "https://openbots.foundation";
+const GALLERY_PATH = /^\/teammates\/[a-z0-9][a-z0-9-]{0,60}\.json$/;
+
+export function galleryUrl(raw: string): URL | null {
+  try {
+    const url = new URL(raw);
+    const host = url.hostname === "www.openbots.foundation" ? "openbots.foundation" : url.hostname;
+    return url.protocol === "https:" && host === "openbots.foundation" && !url.port && !url.username && !url.search && !url.hash && GALLERY_PATH.test(url.pathname) ? new URL(`${GALLERY_ORIGIN}${url.pathname}`) : null;
+  } catch { return null; }
+}
+
+export async function fetchGalleryTeammate(raw: string, fetcher: typeof fetch = fetch): Promise<BotShareBundle> {
+  const url = galleryUrl(raw);
+  if (!url) throw new Error("That isn't a teammate from the OpenBot gallery.");
+  let response: Response;
+  try { response = await fetcher(url, { redirect: "error", signal: AbortSignal.timeout(10_000), headers: { accept: "application/json" } }); }
+  catch { throw new Error("The gallery couldn't be reached. Check your internet connection and try again."); }
+  if (!response.ok) throw new Error("That teammate isn't in the gallery anymore.");
+  const text = await response.text();
+  if (text.length > 64_000) throw new Error("That teammate file is too large.");
+  const bundle = botShareSchema.parse(JSON.parse(text));
+  rejectCredentials(`${bundle.bot.name}\n${bundle.bot.role}\n${bundle.bot.instructions}`, "this teammate's profile");
+  return bundle;
 }

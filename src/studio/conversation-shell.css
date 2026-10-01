@@ -2473,3 +2473,24 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .brief-note { margin: 10px 0 0 !important; color: var(--ink) !important; font-size: 13.5px !important; }
 .brief-error { color: var(--danger, #c0392b); margin: 10px 0 0; font-size: 13.5px; }
 @media (max-width: 520px) { .brief-card { grid-template-columns: 1fr; } }
+
+.teammate-link-form { display: flex; gap: 8px; margin: 10px 0 0; }
+.teammate-link-form input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); background: var(--surface, transparent); color: var(--ink); font-size: 14px; }
+.teammate-preview { margin: 14px 0; padding: 22px; border-radius: 22px; background: var(--surface-muted); border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent); display: grid; gap: 14px; max-width: 640px; }
+.teammate-preview-head { display: flex; align-items: center; gap: 16px; }
+.teammate-preview-kicker { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.teammate-preview h3 { margin: 2px 0 0; font-size: 22px; letter-spacing: -.02em; }
+.teammate-preview-head p { margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
+.teammate-preview-about { margin: 0; font-size: 15px; line-height: 1.5; }
+.teammate-preview details { background: color-mix(in srgb, var(--ink) 4%, transparent); border-radius: 14px; padding: 10px 14px; }
+.teammate-preview summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.teammate-preview-instructions { margin: 8px 0 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.teammate-preview ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.teammate-preview li { display: grid; gap: 2px; font-size: 13.5px; }
+.teammate-preview li span { color: var(--muted); }
+.teammate-preview-safe { margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.teammate-preview-safe svg { flex: none; margin-top: 2px; color: var(--scout, #299575); }
+.teammate-preview-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.teammate-preview-actions button { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px; border-radius: 999px; border: 0; font-weight: 600; font-size: 14px; cursor: pointer; color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.teammate-preview-actions button.primary { color: var(--on-strong, #fff); background: var(--strong, #1d1d1f); }
+.teammate-preview-actions button:disabled { opacity: .55; cursor: default; }

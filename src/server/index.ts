@@ -34,7 +34,7 @@ import { checkNousKey, NOUS_BASE_URL } from "./nous-portal.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
-import { exportBot, importBot } from "./sharing.js";
+import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
@@ -3034,6 +3034,12 @@ app.get("/api/bots/:id/share", (request, response) => {
   } catch (error) {
     response.status(error instanceof Error && /not found/i.test(error.message) ? 404 : 400).json({ error: error instanceof Error ? error.message : "This teammate could not be shared." });
   }
+});
+
+// Preview a gallery teammate before adding it. Fetches only from the OpenBot gallery.
+app.get("/api/teammate-source", async (request, response) => {
+  try { response.json(await fetchGalleryTeammate(String(request.query.url || ""))); }
+  catch (error) { response.status(400).json({ error: error instanceof z.ZodError ? "That isn't an OpenBot teammate file." : error instanceof Error ? error.message : "That teammate couldn't be loaded." }); }
 });
 
 app.post("/api/bots/import", (request, response) => {
