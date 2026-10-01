@@ -10,7 +10,7 @@
 | ✅ 0.39 | Knows you, privately | On-device index of Notes, Mail, Messages and files; morning brief; "What they know" page |
 | ✅ 0.40 | Share your teammates | Share links, a teammate gallery, shareable result pages |
 | ✅ 0.41 | Autopilot | Per-teammate "act like a person" with hard stops, chat notes and a log |
-| **0.42** | **Ready for anyone** | A "made with OpenBot" link on shared pages (the growth loop); opt-in anonymous usage counts so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
+| **0.42** | **Ready for anyone** | Shared pages already carry a "Made with OpenBot" link: tag it so we can measure the growth loop; opt-in anonymous usage counts (only with the owner's go-ahead, since we promise no tracking) so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
 | **0.43** | **Everywhere** | Windows beta and Linux packages (our CI already builds the installers; Mac-only tools stay Mac-only); a Docker image for an always-on server; `npx` and Homebrew installs once the Apple signing and the name are settled |
 | **0.44** | **Packs, no subscription** | One-time teammate packs for a profession (freelancer, accountant, agent); prepaid pay-as-you-go credits for people who do not want to find an AI key (after reading each provider's terms) |
 | Later | Always there | Run on a second Mac or home server; business invoices with a shared library and policies; a marketplace; native iPhone app if users ask |

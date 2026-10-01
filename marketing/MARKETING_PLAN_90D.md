@@ -125,7 +125,7 @@ Rules: honest limits said calmly (beta, Mac only for now, works while the Mac is
 | From | What | When |
 |---|---|---|
 | Engineering | Demo recorder (drive the demo studio, record, caption) | release 0.42 |
-| Engineering | "Made with OpenBot" link on shared result pages; opt-in anonymous usage counts | 0.42 |
+| Engineering | Tag the existing "Made with OpenBot" link on shared result pages (`?ref=result`, done, ships in 0.42) so Cloudflare Analytics can count visits from shares; opt-in anonymous usage counts only if Robert agrees (we promise no tracking today) | 0.42 |
 | Engineering | Press kit page `/press` (logo, screenshots, one-paragraph description, founder bio) | this month |
 | Engineering | Windows beta, `npx`, Homebrew | 0.43, after the Windows PC, the Apple certificate and the name decision |
 | Robert | Create the Discord server; turn on Cloudflare Web Analytics; decide on the Cloudflare AI-crawler setting | week 1 |
