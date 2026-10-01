@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Siri AI alternative and companion: OpenBot, open source on your Mac</title>
+  <meta name="description" content="Comparing OpenBot with Apple's Siri AI on macOS 27. Siri is built in for quick questions; OpenBot is a free, open-source team for longer jobs across your apps and the web. When to use each." />
+  <link rel="canonical" href="https://openbots.foundation/alternatives/siri-ai/" />
+  <meta property="og:title" content="Siri AI alternative and companion: OpenBot, open source on your Mac" />
+  <meta property="og:description" content="Siri AI is built into your Mac for quick questions and single actions. OpenBot is an open-source team for the whole job, and it works with Siri." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://openbots.foundation/alternatives/siri-ai/" />
+  <meta property="og:image" content="https://openbots.foundation/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "headline": "OpenBot and Siri AI: use both, or choose",
+      "description": "Comparing OpenBot with Apple's Siri AI on macOS 27. Siri is built in for quick questions; OpenBot is a free, open-source team for longer jobs across your apps and the web. When to use each.",
+      "dateModified": "2026-10-02",
+      "author": {
+        "@type": "Organization",
+        "name": "OpenBot"
+      },
+      "mainEntityOfPage": "https://openbots.foundation/alternatives/siri-ai/"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does OpenBot replace Siri?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Siri is good for quick questions and single actions. OpenBot is for longer jobs. You can say \"Hey Siri, ask OpenBot\" to hand a job to your team."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Siri AI free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Reports describe a free beta with daily usage limits and paid access planned. OpenBot is free, open-source software with no subscription; you pay only for the AI you connect."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does OpenBot read my Mail and Calendar like Siri?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, on your own Mac. Teammates can read Apple Mail, Calendar, Reminders, Notes, Contacts and Messages, search folders you choose, and ask before they change anything."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+  <style>
+    :root { --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #fff; --cloud: #f4f3f0; --line: #e7e5e0; --nova: #6757d9; --scout: #299575; --sun: #ffc83d; --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif; --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cloud); color: var(--ink); font: 18px/1.65 var(--text); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+    a { color: inherit; text-underline-offset: 3px; }
+    header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; max-width: 1040px; margin: 0 auto; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 900 22px/1 var(--round); letter-spacing: -.03em; text-decoration: none; }
+    .brand svg { width: 32px; height: 32px; }
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 16px; border: 0; border-radius: 13px; background: var(--face); color: var(--label); font: 800 15px/1 var(--round); text-decoration: none; box-shadow: 0 4px 0 var(--edge); }
+    .btn.ghost { --face: #fff; --edge: var(--line); --label: var(--ink); }
+    main { max-width: 1040px; margin: 0 auto; padding: 16px 24px 90px; }
+    h1 { font-size: clamp(36px, 6vw, 58px); margin: 12px 0 14px; }
+    .lede { font-size: 21px; color: var(--ink-2); max-width: 760px; margin: 0 0 8px; }
+    .updated { color: var(--muted); font-size: 15px; margin: 0 0 30px; }
+    section { background: #fff; border-radius: 28px; padding: 32px 34px; margin: 0 0 22px; box-shadow: 0 2px 0 rgba(0,0,0,.04); }
+    section h2 { font-size: 30px; margin: 0 0 12px; }
+    section h3 { font-size: 21px; margin: 24px 0 6px; }
+    section p { margin: 0 0 12px; }
+    ul { margin: 0 0 12px; padding-left: 22px; } li { margin: 4px 0; }
+    .table { overflow-x: auto; margin: 8px -6px 0; padding: 0 6px; }
+    table { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 15px; line-height: 1.45; }
+    th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    th { font: 800 14px/1.2 var(--round); color: var(--muted); }
+    td:first-child, th:first-child { position: sticky; left: 0; background: #fff; font-weight: 800; color: var(--ink); min-width: 150px; }
+    .us { background: #f1eefd; } td.us:first-child { background: #fff; }
+    .cmd { display: block; background: var(--ink); color: #fff; border-radius: 14px; padding: 14px 18px; font: 15px/1.5 var(--mono); overflow-wrap: anywhere; margin: 12px 0; }
+    details { border-top: 1px solid var(--line); padding: 14px 0; } details:first-of-type { border-top: 0; }
+    summary { cursor: pointer; font: 800 19px/1.3 var(--round); }
+    details p { margin: 10px 0 0; color: var(--ink-2); }
+    .sources { font-size: 14.5px; color: var(--ink-2); } .sources li { margin: 3px 0; }
+    footer { text-align: center; color: var(--muted); font-size: 14.5px; padding: 0 24px 50px; }
+    @media (max-width: 760px) {
+      .table { overflow: visible; margin: 8px 0 0; padding: 0; }
+      table, tbody, tr, td { display: block; }
+      table { min-width: 0; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      tr { border: 1px solid var(--line); border-radius: 20px; padding: 16px 18px 10px; margin: 0 0 14px; }
+      td, td:first-child { position: static; min-width: 0; border: 0; padding: 7px 0; background: none; }
+      td:first-child { font: 900 19px/1.25 var(--round); letter-spacing: -.02em; padding: 0 0 6px; }
+      td[data-label]::before { content: attr(data-label); display: block; font: 800 12.5px/1.3 var(--round); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 1px; }
+      td.us { background: #f1eefd; border-radius: 14px; padding: 10px 14px; margin: 4px 0 6px; }
+      td.us::before { color: var(--nova); }
+    }
+    @media (max-width: 700px) { section { padding: 24px 20px; border-radius: 22px; } body { font-size: 17px; } }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } section, td:first-child, th:first-child { background: #1c1c22; } .us, td.us { background: #26233a; } td.us::before { color: #b9b0ff; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .cmd { background: #0c0c10; } }
+  </style>
+  <style>.table table { min-width: 560px; }</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
+  <a class="btn ghost" href="../../#install">Get OpenBot</a>
+</header>
+<main>
+  <h1>OpenBot and Siri AI: use both, or choose</h1>
+  <p class="lede">Siri AI is built into your Mac for quick questions and single actions. OpenBot is an open-source team for the whole job, and it works with Siri.</p>
+  <p class="updated">Last updated 2 October 2026. Details about Siri AI come from its public pages (linked below) and can change. If something is out of date, <a href="https://github.com/PrisacariuRobert/openbot/issues/new">tell us</a>. See the <a href="../">full comparison</a> with the other options.</p>
+
+  <section id="what">
+    <h2>What Siri AI is</h2>
+    <p>Apple's rebuilt Siri arrived in beta with macOS 27 on 14 September 2026. It uses personal context from Mail, Messages, Notes, Photos and Calendar through Spotlight, understands what is on your screen, and can act inside apps. It runs on your Mac and on Apple's Private Cloud Compute. Reports describe a free beta with daily usage limits, English first, on Apple silicon, with paid access planned.</p>
+  </section>
+
+  <section id="comparison">
+    <h2>Side by side</h2>
+    <div class="table"><table><thead><tr><th></th><th class="us">OpenBot</th><th>Siri AI</th></tr></thead><tbody><tr><td>What it is</td><td data-label="OpenBot" class="us">A team for long, multi-step jobs across apps and websites</td><td data-label="Siri AI">A built-in assistant for quick questions and single actions</td></tr><tr><td>Price</td><td data-label="OpenBot" class="us">Free and open source (MIT). No subscription.</td><td data-label="Siri AI">Free beta with daily limits; paid access planned</td></tr><tr><td>Choice of AI</td><td data-label="OpenBot" class="us">Your choice: ChatGPT, Claude, Grok, GitHub Copilot, Gemini, Nous Portal, OpenCode Go or a model on your Mac</td><td data-label="Siri AI">Apple's own</td></tr><tr><td>Long jobs on websites</td><td data-label="OpenBot" class="us">Yes, each teammate in its own browser</td><td data-label="Siri AI">Not its focus</td></tr><tr><td>Scheduled work</td><td data-label="OpenBot" class="us">Yes, routines such as a morning brief</td><td data-label="Siri AI">No</td></tr><tr><td>Source code</td><td data-label="OpenBot" class="us">Open (MIT)</td><td data-label="Siri AI">Closed</td></tr><tr><td>Together</td><td data-label="OpenBot" class="us">Hands longer jobs from Siri to your team</td><td data-label="Siri AI">Say "Hey Siri, ask OpenBot"</td></tr></tbody></table></div>
+  </section>
+
+  <section id="when">
+    <h2>When to choose which</h2>
+    <h3>Choose Siri AI if you…</h3>
+    <ul><li>want help already built into your Mac for quick questions and in-app actions, with nothing to install</li><li>are on macOS 27 on Apple silicon and like Apple's on-device privacy by default</li></ul>
+    <h3>Choose OpenBot if you…</h3>
+    <ul><li>want longer jobs done across apps and websites, or on a schedule</li><li>want a team of teammates instead of one assistant</li><li>want to pick the AI and read the code</li><li>don't want a paid tier later</li></ul>
+  </section>
+
+  <section id="try">
+    <h2>Try OpenBot</h2>
+    <p>On a Mac (macOS 13 or later), one line installs it. No administrator password, and the installer checks the download's fingerprint. <a href="https://github.com/PrisacariuRobert/openbot/blob/main/scripts/install.sh">Read the installer</a> first if you like.</p>
+    <code class="cmd">curl -fsSL https://openbots.foundation/install.sh | sh</code>
+    <p>Then connect an AI (a free Gemini key is enough to start) and make your first teammate, or <a href="../../teammates/">add a ready-made one from the gallery</a>. Source code and docs: <a href="https://github.com/PrisacariuRobert/openbot">github.com/PrisacariuRobert/openbot</a>.</p>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details open><summary>Does OpenBot replace Siri?</summary><p>No. Siri is good for quick questions and single actions. OpenBot is for longer jobs. You can say "Hey Siri, ask OpenBot" to hand a job to your team.</p></details>
+    <details><summary>Is Siri AI free?</summary><p>Reports describe a free beta with daily usage limits and paid access planned. OpenBot is free, open-source software with no subscription; you pay only for the AI you connect.</p></details>
+    <details><summary>Does OpenBot read my Mail and Calendar like Siri?</summary><p>Yes, on your own Mac. Teammates can read Apple Mail, Calendar, Reminders, Notes, Contacts and Messages, search folders you choose, and ask before they change anything.</p></details>
+  </section>
+
+  <section id="sources">
+    <h2>Sources</h2>
+    <ul class="sources"><li><a href="https://www.apple.com/newsroom/2026/09/siri-ai-a-profoundly-more-capable-and-personal-assistant-is-here/">Apple Newsroom on Siri AI</a></li><li><a href="https://appleinsider.com/articles/26/09/09/siri-ai-will-launch-in-beta-complicated-by-daily-usage-caps-future-paid-access">AppleInsider on limits and pricing</a></li><li><a href="https://github.com/PrisacariuRobert/openbot">OpenBot source code</a>, <a href="https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md">changelog</a></li></ul>
+  </section>
+</main>
+<footer>OpenBot — free, open-source AI teammates for your Mac. <a href="../../">Home</a> · <a href="../">All comparisons</a> · <a href="../../teammates/">Teammate gallery</a> · <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a></footer>
+</body>
+</html>

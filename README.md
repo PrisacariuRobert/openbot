@@ -8,9 +8,9 @@
 <h1 align="center">OpenBot</h1>
 
 <p align="center">
-  <strong>A small team of AI teammates on your Mac.</strong><br />
-  They research, write and get things done — and ask before anything important.<br />
-  Free, open source, and powered by the AI you already use.
+  <strong>The open-source alternative to OpenAI dots, Grok Bot and Siri AI.</strong><br />
+  A small team of AI teammates on your Mac. They work in your own Mail, Calendar and Notes — and ask before anything important.<br />
+  Free, open source, no subscription, and powered by the AI you already use.
 </p>
 
 <p align="center">

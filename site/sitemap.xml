@@ -2,6 +2,10 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://openbots.foundation/</loc><lastmod>2026-10-01</lastmod></url>
   <url><loc>https://openbots.foundation/alternatives/</loc><lastmod>2026-10-01</lastmod></url>
+  <url><loc>https://openbots.foundation/alternatives/openai-dots/</loc><lastmod>2026-10-02</lastmod></url>
+  <url><loc>https://openbots.foundation/alternatives/grok-bot/</loc><lastmod>2026-10-02</lastmod></url>
+  <url><loc>https://openbots.foundation/alternatives/siri-ai/</loc><lastmod>2026-10-02</lastmod></url>
+  <url><loc>https://openbots.foundation/alternatives/openmausbot/</loc><lastmod>2026-10-02</lastmod></url>
   <url><loc>https://openbots.foundation/teammates/</loc><lastmod>2026-10-01</lastmod></url>
   <url><loc>https://openbots.foundation/llms.txt</loc><lastmod>2026-10-01</lastmod></url>
 </urlset>
