@@ -11,7 +11,7 @@ import path from "node:path";
 
 export class MailAccessError extends Error {}
 
-export interface MailSummary { id: string; subject: string; from: string; date: string; snippet: string; attachments: { name: string; size: number }[] }
+export interface MailSummary { id: string; subject: string; from: string; date: string; snippet: string; attachments: { name: string; size: number }[]; unread?: boolean | null }
 export interface MailMessage extends MailSummary { text: string; truncated: boolean }
 
 // ---------- MIME ----------
@@ -96,6 +96,10 @@ export function parseEmlx(file: Buffer) {
   const newline = file.indexOf("\n");
   const length = Number(file.subarray(0, newline).toString().trim());
   const raw = Number.isFinite(length) && length > 0 ? file.subarray(newline + 1, newline + 1 + length) : file;
+  // After the message, Mail appends a property list; bit 0 of "flags" is "read".
+  const trailer = Number.isFinite(length) && length > 0 ? file.subarray(newline + 1 + length).toString("utf8") : "";
+  const flags = /<key>flags<\/key>\s*<integer>(\d+)<\/integer>/.exec(trailer)?.[1];
+  const unread = flags === undefined ? null : (Number(BigInt(flags) & 1n)) === 0;
   const root = splitHeaders(raw);
   const parts = leaves(root);
   const plain = parts.find((leaf) => leaf.type.startsWith("text/plain") && !leaf.filename);
@@ -108,11 +112,14 @@ export function parseEmlx(file: Buffer) {
     date: new Date(root.headers.get("date") || 0),
     text,
     attachments,
+    unread,
   };
 }
 
 // ---------- Finding files ----------
 
+/** Mailboxes whose unread messages don't need the owner's attention. */
+const NOT_INBOX = /^(?:junk|spam|bulk mail|trash|deleted (?:messages|items)|bin|sent(?: messages| mail| items)?|drafts?|outbox|archive)\.(?:imap)?mbox$/i;
 const idOf = (file: string) => /(\d+)(?:\.partial)?\.emlx$/.exec(file)?.[1] || null;
 
 export class MacMail {
@@ -145,6 +152,24 @@ export class MacMail {
       }
     }
     return found.sort((a, b) => b.at - a.at).map((item) => item.file);
+  }
+
+  /** Unread messages that arrived in the last few days, newest first. Junk,
+   * Trash, Sent, Drafts and Archive are left out. Gmail accounts keep
+   * everything in "All Mail", so mailboxes are excluded by name rather than
+   * the Inbox being required. */
+  unread(days: number, limit: number): MailSummary[] {
+    this.checkAccess();
+    const out: MailSummary[] = [];
+    for (const file of this.recentFiles(Math.max(1, Math.min(30, days)))) {
+      if (out.length >= limit) break;
+      if (file.split(/[\\/]/).some((segment) => NOT_INBOX.test(segment))) continue;
+      const read = this.readFile(file);
+      if (!read || read.unread !== true) continue;
+      const { text, truncated: _truncated, ...summary } = read;
+      out.push({ ...summary, snippet: text.replace(/\s+/g, " ").slice(0, 500) });
+    }
+    return out;
   }
 
   /** The newest messages within the window, parsed, for indexing. `skip`
@@ -213,7 +238,7 @@ export class MacMail {
       const extra = separate.filter((item) => !parsed.attachments.some((known) => known.name === item.name));
       return {
         id, subject: parsed.subject.slice(0, 300), from: parsed.from.slice(0, 300), date: (Number.isFinite(parsed.date.getTime()) ? parsed.date : new Date(statSync(file).mtimeMs)).toISOString(),
-        snippet: "", text: parsed.text.slice(0, 20_000), truncated: parsed.text.length > 20_000,
+        snippet: "", unread: parsed.unread, text: parsed.text.slice(0, 20_000), truncated: parsed.text.length > 20_000,
         attachments: [...parsed.attachments.map(({ name, size }) => ({ name: name.slice(0, 300), size })), ...extra.map(({ name, size }) => ({ name, size }))].slice(0, 20),
       };
     } catch { return null; }
