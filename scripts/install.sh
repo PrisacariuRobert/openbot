@@ -17,7 +17,10 @@
 # OPENBOT_INSTALL_NO_DOCK=1, OPENBOT_INSTALL_NO_OPEN=1.
 set -eu
 
-FROM="${OPENBOT_INSTALL_FROM:-https://github.com/PrisacariuRobert/openbot/releases/latest/download}"
+# The bundle is served through openbots.foundation (fast, cached at Cloudflare); GitHub is the fallback.
+MIRROR="https://openbots.foundation/download/latest"
+GITHUB="https://github.com/PrisacariuRobert/openbot/releases/latest/download"
+FROM="${OPENBOT_INSTALL_FROM:-$MIRROR}"
 DIR="${OPENBOT_INSTALL_DIR:-$HOME/Library/Application Support/OpenBot}"
 PORT="${OPENBOT_INSTALL_PORT:-4311}"
 LABEL="${OPENBOT_INSTALL_LABEL:-foundation.openbots.studio}"
@@ -61,12 +64,22 @@ fetch_with_progress() { # source-name destination
   esac
 }
 
-step "Downloading OpenBot for this Mac (about 140 MB: a minute or two, a few more on a slow connection)…"
-fetch_with_progress "$ASSET" "$WORK/$ASSET" || fail "the download didn't finish. Check your internet connection and try again."
-fetch "$ASSET.sha256" "$WORK/$ASSET.sha256" || fail "the download's fingerprint couldn't be fetched."
-EXPECTED="$(awk '{print $1}' "$WORK/$ASSET.sha256")"
-ACTUAL="$(shasum -a 256 "$WORK/$ASSET" | awk '{print $1}')"
-[ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ] || fail "the download didn't match its fingerprint, so nothing was installed. Please try again."
+# Fetch the bundle and its fingerprint from one place and check they match.
+download_bundle() { # base-url
+  FROM="$1"
+  fetch_with_progress "$ASSET" "$WORK/$ASSET" || return 1
+  fetch "$ASSET.sha256" "$WORK/$ASSET.sha256" || return 1
+  EXPECTED="$(awk '{print $1}' "$WORK/$ASSET.sha256")"
+  ACTUAL="$(shasum -a 256 "$WORK/$ASSET" | awk '{print $1}')"
+  [ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ]
+}
+
+step "Downloading OpenBot for this Mac (about 140 MB: a minute or less on most connections)…"
+if ! download_bundle "$FROM"; then
+  [ -z "${OPENBOT_INSTALL_FROM:-}" ] || fail "the download didn't finish or didn't match its fingerprint, so nothing was installed. Please try again."
+  step "That route didn't work. Trying GitHub directly (this can be slower)…"
+  download_bundle "$GITHUB" || fail "the download didn't finish or didn't match its fingerprint, so nothing was installed. Check your internet connection and try again."
+fi
 
 step "Unpacking…"
 mkdir -p "$DIR/versions" "$DIR/data" "$DIR/logs"
