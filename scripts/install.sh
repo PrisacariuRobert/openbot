@@ -51,8 +51,18 @@ fetch() { # source-name destination
   esac
 }
 
-step "Downloading OpenBot for this Mac…"
-fetch "$ASSET" "$WORK/$ASSET" || fail "the download didn't finish. Check your internet connection and try again."
+# The bundle is large (it carries its own runtime), so show a progress bar when a person is watching.
+fetch_with_progress() { # source-name destination
+  case "$FROM" in
+    http://*|https://*)
+      if [ -t 2 ]; then curl -fL --retry 3 --connect-timeout 15 --progress-bar -o "$2" "$FROM/$1"
+      else curl -fsSL --retry 3 --connect-timeout 15 -o "$2" "$FROM/$1"; fi ;;
+    *) cp "$FROM/$1" "$2" ;;
+  esac
+}
+
+step "Downloading OpenBot for this Mac (about 140 MB: a minute or two, a few more on a slow connection)…"
+fetch_with_progress "$ASSET" "$WORK/$ASSET" || fail "the download didn't finish. Check your internet connection and try again."
 fetch "$ASSET.sha256" "$WORK/$ASSET.sha256" || fail "the download's fingerprint couldn't be fetched."
 EXPECTED="$(awk '{print $1}' "$WORK/$ASSET.sha256")"
 ACTUAL="$(shasum -a 256 "$WORK/$ASSET" | awk '{print $1}')"
