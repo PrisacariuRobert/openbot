@@ -94,12 +94,13 @@ test("the comparison page is honest, dated, sourced and consistent with its own 
   assert.match(html, /<link rel="canonical" href="https:\/\/openbots\.foundation\/alternatives\/" \/>/);
   assert.match(html, /Last updated \d{1,2} [A-Z][a-z]+ 2026/);
   const text = plain(html);
-  for (const product of ["OpenAI dots", "Grok Bot", "Meta Muse", "Siri", "Hermes Desktop", "OpenClaw"]) {
+  for (const product of ["OpenAI dots", "Grok Bot", "Meta Muse", "Siri", "Hermes Desktop", "OpenClaw", "OpenMausBot"]) {
     assert.ok(text.includes(product), `compares with ${product}`);
   }
   // It has to tell people when somebody else is the better pick.
   assert.match(html, /Choose a cloud agent/);
   assert.match(html, /Choose Hermes Desktop or OpenClaw/);
+  assert.match(html, /Choose OpenMausBot if you/, "says when the closest competitor is the better pick");
   assert.match(html, /keep working while your computer is off/);
   const sources = html.slice(html.indexOf('id="sources"'));
   assert.ok([...sources.matchAll(/href="https:\/\//g)].length >= 10, "every product has a public source");
