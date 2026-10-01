@@ -2440,7 +2440,8 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .knows-intro { padding: 4px 2px 14px; }
 .knows-intro strong { display: block; font-size: 17px; letter-spacing: -.01em; }
 .knows-intro p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 62ch; }
-.knows-intro .knows-warning { color: var(--ink); background: color-mix(in srgb, #ffb020 16%, transparent); padding: 10px 12px; border-radius: 12px; }
+.knows-intro .knows-warning strong { display: inline; font-size: inherit; }
+.knows-intro .knows-warning { max-width: none; color: var(--ink); background: color-mix(in srgb, #ffb020 16%, transparent); padding: 10px 12px; border-radius: 12px; }
 .knows-working { display: inline-flex; align-items: center; gap: 6px; }
 .knows-problem { color: var(--danger, #c0392b); }
 .knows-fda { margin-top: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface-muted); display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
@@ -2481,17 +2482,21 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .brief-error { color: var(--danger, #c0392b); margin: 10px 0 0; font-size: 13.5px; }
 @media (max-width: 520px) { .brief-card { grid-template-columns: 1fr; } .brief-form { grid-template-columns: 1fr; } }
 
-.teammate-link-form { display: flex; gap: 8px; margin: 10px 0 0; }
-.teammate-link-form input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); background: var(--surface, transparent); color: var(--ink); font-size: 14px; }
+.teammate-link-form:not(#link) { display: flex; gap: 8px; margin: 14px 0 22px; }
+.teammate-link-form input:not(#link) { flex: 1; min-width: 0; height: 44px; min-height: 44px; margin: 0; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); background: color-mix(in srgb, var(--ink) 5%, var(--surface-muted)); color: var(--ink); font-size: 14px; box-shadow: none; }
+.teammate-link-form button:not(#link) { height: 44px; padding: 0 20px; border-radius: 12px; }
 .teammate-preview { margin: 14px 0; padding: 22px; border-radius: 22px; background: var(--surface-muted); border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent); display: grid; gap: 14px; max-width: 640px; }
 .teammate-preview-head { display: flex; align-items: center; gap: 16px; }
 .teammate-preview-kicker { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .teammate-preview h3 { margin: 2px 0 0; font-size: 22px; letter-spacing: -.02em; }
 .teammate-preview-head p { margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
 .teammate-preview-about { margin: 0; font-size: 15px; line-height: 1.5; }
-.teammate-preview details { background: color-mix(in srgb, var(--ink) 4%, transparent); border-radius: 14px; padding: 10px 14px; }
-.teammate-preview summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-.teammate-preview-instructions { margin: 8px 0 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.teammate-preview details:not(#preview) { margin: 0; background: color-mix(in srgb, var(--ink) 5%, transparent); border-radius: 14px; padding: 12px 14px; }
+.teammate-preview summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.teammate-preview summary::-webkit-details-marker { display: none; }
+.teammate-preview summary::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 3px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; opacity: .45; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+.teammate-preview details[open] > summary::after { transform: rotate(225deg) translateY(-2px); }
+.teammate-preview .teammate-preview-instructions:not(#preview) { margin: 10px 0 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
 .teammate-preview ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .teammate-preview li { display: grid; gap: 2px; font-size: 13.5px; }
 .teammate-preview li span { color: var(--muted); }
