@@ -45,3 +45,6 @@ __MACOSX/
 
 # Generated platform runtimes and local QA logs
 dist-release/
+
+# Generated demo clips (scripts/record-demo.mjs)
+marketing/queue/media/

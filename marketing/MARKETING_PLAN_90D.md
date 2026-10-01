@@ -57,7 +57,7 @@ Rules: honest limits said calmly (beta, Mac only for now, works while the Mac is
 
 **2. Launch on other people's launch days.** Every morning (08:30 Bucharest) scan Hacker News, X and the main Mac and AI news sites for competitor news: OpenAI dots rollout or EU launch, Siri AI release, Meta Muse and Grok Bot updates, Hermes and OpenMausBot releases. If there is a moment, draft within the hour: one post that states the news neutrally, says "here is the open-source alternative that runs on your Mac", links the matching comparison page, and carries a clip. Keep ready-made templates in `marketing/queue/templates/` for each likely event so approval takes minutes.
 
-**3. One real demo a day for 30 days, then three a week.** 30 to 40 seconds, outcome first, captions burned in, ends on openbots.foundation, cut for 16:9 and 9:16. Privacy rule: demos use the demo studio and sample data only, never Robert's real mail, messages or calendar; Robert approves each clip before it posts. Until the recorder tool exists (engineering, release 0.42), Robert records with the macOS screen recorder. The 22 shots are in §7.
+**3. One real demo a day for 30 days, then three a week.** 30 to 40 seconds, outcome first, captions burned in, ends on openbots.foundation, cut for 16:9 and 9:16. Privacy rule: demos use the demo studio and sample data only, never Robert's real mail, messages or calendar; Robert approves each clip before it posts. The recorder exists: `node --import tsx scripts/record-demo.mjs --fresh --prompt "..." --out marketing/queue/media/demo-NN.mp4` starts a throwaway studio with an empty conversation, types the prompt in a real browser, waits for the real answer, speeds up the waiting and adds an end card (add `--vertical` for 9:16 and `--browser` when the task needs the web). **Test every prompt once off-camera and record only prompts where the first answer is a finished result**, not a question back. Mac-app clips (Mail, Calendar, Notes) need sample data in a demo user account, so Robert records those with the macOS screen recorder. The 22 shots are in §7.
 
 **4. Easy for developers to try.** Marketing's part: a 20-second GIF at the top of the README, "good first issue" labels on 10 real issues, a CONTRIBUTING pass, replies to every issue and comment within two hours on weekdays. Engineering's part: `npx` and Homebrew installs (blocked on the Apple certificate and the name decision).
 
@@ -124,7 +124,7 @@ Rules: honest limits said calmly (beta, Mac only for now, works while the Mac is
 
 | From | What | When |
 |---|---|---|
-| Engineering | Demo recorder (drive the demo studio, record, caption) | release 0.42 |
+| Engineering | Demo recorder: done (`scripts/record-demo.mjs`); next, a small library of tested prompts and sample data for the Mac-app clips | this month |
 | Engineering | Tag the existing "Made with OpenBot" link on shared result pages (`?ref=result`, done, ships in 0.42) so Cloudflare Analytics can count visits from shares; opt-in anonymous usage counts only if Robert agrees (we promise no tracking today) | 0.42 |
 | Engineering | Press kit page `/press` (logo, screenshots, one-paragraph description, founder bio) | this month |
 | Engineering | Windows beta, `npx`, Homebrew | 0.43, after the Windows PC, the Apple certificate and the name decision |
