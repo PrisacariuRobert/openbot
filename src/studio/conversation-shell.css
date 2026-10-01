@@ -2435,3 +2435,22 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .mac-shortcuts-card .mac-shortcuts-actions button.secondary { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .mac-shortcuts-card .mac-shortcuts-actions button:disabled { opacity: .6; cursor: default; }
 .mac-shortcuts-card .mac-shortcuts-next { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
+
+.knows-panel { display: grid; gap: 4px; }
+.knows-intro { padding: 4px 2px 14px; }
+.knows-intro strong { display: block; font-size: 17px; letter-spacing: -.01em; }
+.knows-intro p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 62ch; }
+.knows-intro .knows-warning { color: var(--ink); background: color-mix(in srgb, #ffb020 16%, transparent); padding: 10px 12px; border-radius: 12px; }
+.knows-working { display: inline-flex; align-items: center; gap: 6px; }
+.knows-problem { color: var(--danger, #c0392b); }
+.knows-fda { margin-top: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface-muted); display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.knows-fda strong { flex-basis: 100%; }
+.knows-fda p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.knows-fda button, .knows-add button, .knows-forget { height: 34px; padding: 0 14px; border-radius: 999px; border: 0; font-weight: 600; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; color: var(--on-strong, #fff); background: var(--strong, #1d1d1f); }
+.knows-fda button.secondary { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.knows-forget { color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 10%, transparent); }
+.knows-remove { width: 30px; height: 30px; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted); background: transparent; }
+.knows-remove:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.knows-add { display: flex; gap: 8px; padding: 12px 16px; }
+.knows-add input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); background: var(--surface, transparent); color: var(--ink); font-size: 14px; }
+.knows-add button:disabled, .knows-fda button:disabled, .knows-forget:disabled { opacity: .55; cursor: default; }
