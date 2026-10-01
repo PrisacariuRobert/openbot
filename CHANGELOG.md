@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.41.1 — Tidier screens, easier install (1 October 2026)
+
+- The morning brief card is fixed: its fields lined up badly (different heights and borders), a label wrapped, the dropdowns had no arrow and the Mac-access notice broke across three lines. It is now a clean two-column form that looks the same in light and dark and on a phone.
+- The same notice on "What they know", the disclosure arrows and spacing in the shared-teammate preview, and the spacing of "Add from a link" are tidied.
+- The installer shows a progress bar and says how long to expect (the download is about 140 MB, and it used to print nothing for minutes on a slow connection). It now downloads through openbots.foundation, which was about five times faster in testing, and falls back to GitHub if that fails; the fingerprint check is unchanged.
+- The website no longer labels sections "New in 0.xx"; the home page describes what OpenBot is and links to the latest release notes.
+
 ## 0.41.0 — Autopilot (1 October 2026)
 
 - Autopilot: let a teammate act like a person, without asking first. It is off by default and the owner chooses it:
