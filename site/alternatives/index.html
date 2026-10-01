@@ -74,8 +74,20 @@
     details p { margin: 10px 0 0; color: var(--ink-2); }
     .sources { font-size: 14.5px; color: var(--ink-2); } .sources li { margin: 3px 0; }
     footer { text-align: center; color: var(--muted); font-size: 14.5px; padding: 0 24px 50px; }
+    @media (max-width: 760px) {
+      .table { overflow: visible; margin: 8px 0 0; padding: 0; }
+      table, tbody, tr, td { display: block; }
+      table { min-width: 0; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      tr { border: 1px solid var(--line); border-radius: 20px; padding: 16px 18px 10px; margin: 0 0 14px; }
+      td, td:first-child { position: static; min-width: 0; border: 0; padding: 7px 0; background: none; }
+      td:first-child { font: 900 19px/1.25 var(--round); letter-spacing: -.02em; padding: 0 0 6px; }
+      td[data-label]::before { content: attr(data-label); display: block; font: 800 12.5px/1.3 var(--round); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 1px; }
+      td.us { background: #f1eefd; border-radius: 14px; padding: 10px 14px; margin: 4px 0 6px; }
+      td.us::before { color: var(--nova); }
+    }
     @media (max-width: 700px) { section { padding: 24px 20px; border-radius: 22px; } body { font-size: 17px; } }
-    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } section, td:first-child, th:first-child { background: #1c1c22; } .us { background: #26233a; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .cmd { background: #0c0c10; } }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } section, td:first-child, th:first-child { background: #1c1c22; } .us, td.us { background: #26233a; } td.us::before { color: #b9b0ff; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .cmd { background: #0c0c10; } }
   </style>
 </head>
 <body>
@@ -100,13 +112,13 @@
     <table>
       <thead><tr><th></th><th class="us">OpenBot</th><th>OpenAI dots</th><th>Grok Bot</th><th>Meta Muse</th><th>Apple Siri AI</th><th>Hermes Desktop</th><th>OpenClaw</th></tr></thead>
       <tbody>
-        <tr><td>Runs on</td><td class="us">Your Mac</td><td>Its own cloud computer with a virtual browser</td><td>A managed cloud computer shared by the teammates</td><td>Meta's cloud (a secure VM and browser)</td><td>Your Mac, with Apple's cloud for larger requests</td><td>Your computer</td><td>Your machine or a server</td></tr>
-        <tr><td>Price</td><td class="us">Free software; you pay only your AI (free options exist)</td><td>Included with ChatGPT Pro and Business Premium; one dot on Pro</td><td>Bundled with $120–300 a month plans</td><td>Free, $20 and $100 a month tiers</td><td>Free beta with daily usage limits; paid access planned</td><td>Free software; optional Nous Portal sign-in</td><td>Free software plus your models</td></tr>
-        <tr><td>Works in your Mac's Mail, Calendar, Notes and files</td><td class="us">Yes</td><td>No (cloud apps through plugins)</td><td>No</td><td>No</td><td>Yes, for quick requests and in-app actions</td><td>Files and scripts; no deep Mac app tools that we know of</td><td>Through skills you install</td></tr>
-        <tr><td>A team of named teammates</td><td class="us">Yes, each with its own browser and workspace</td><td>One agent per dot</td><td>Yes, sharing one computer</td><td>One agent</td><td>One assistant</td><td>Named bots (Bot Mode)</td><td>Partly</td></tr>
-        <tr><td>Open source</td><td class="us">Yes (MIT)</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Yes (MIT)</td><td>Yes (MIT)</td></tr>
-        <tr><td>Where you use it</td><td class="us">macOS 13+ (Apple silicon and Intel); iPhone through a Home Screen app, Siri and the Share menu</td><td>Cloud, through ChatGPT</td><td>Desktop and iOS</td><td>Phone-first</td><td>macOS 27 on Apple silicon</td><td>macOS, Windows, Linux</td><td>Your machine or a server</td></tr>
-        <tr><td>Good to know</td><td class="us">Works while your Mac is on; asks before it sends, buys or changes anything</td><td>Not offered in the EEA, UK or Switzerland at launch; read-only until you approve</td><td>Allow, deny or always-allow for actions</td><td>—</td><td>English first; beta</td><td>Free models with a Nous sign-in, no key needed</td><td>Large skill marketplace</td></tr>
+        <tr><td>Runs on</td><td data-label="OpenBot" class="us">Your Mac</td><td data-label="OpenAI dots">Its own cloud computer with a virtual browser</td><td data-label="Grok Bot">A managed cloud computer shared by the teammates</td><td data-label="Meta Muse">Meta's cloud (a secure VM and browser)</td><td data-label="Apple Siri AI">Your Mac, with Apple's cloud for larger requests</td><td data-label="Hermes Desktop">Your computer</td><td data-label="OpenClaw">Your machine or a server</td></tr>
+        <tr><td>Price</td><td data-label="OpenBot" class="us">Free software; you pay only your AI (free options exist)</td><td data-label="OpenAI dots">Included with ChatGPT Pro and Business Premium; one dot on Pro</td><td data-label="Grok Bot">Bundled with $120–300 a month plans</td><td data-label="Meta Muse">Free, $20 and $100 a month tiers</td><td data-label="Apple Siri AI">Free beta with daily usage limits; paid access planned</td><td data-label="Hermes Desktop">Free software; optional Nous Portal sign-in</td><td data-label="OpenClaw">Free software plus your models</td></tr>
+        <tr><td>Works in your Mac's Mail, Calendar, Notes and files</td><td data-label="OpenBot" class="us">Yes</td><td data-label="OpenAI dots">No (cloud apps through plugins)</td><td data-label="Grok Bot">No</td><td data-label="Meta Muse">No</td><td data-label="Apple Siri AI">Yes, for quick requests and in-app actions</td><td data-label="Hermes Desktop">Files and scripts; no deep Mac app tools that we know of</td><td data-label="OpenClaw">Through skills you install</td></tr>
+        <tr><td>A team of named teammates</td><td data-label="OpenBot" class="us">Yes, each with its own browser and workspace</td><td data-label="OpenAI dots">One agent per dot</td><td data-label="Grok Bot">Yes, sharing one computer</td><td data-label="Meta Muse">One agent</td><td data-label="Apple Siri AI">One assistant</td><td data-label="Hermes Desktop">Named bots (Bot Mode)</td><td data-label="OpenClaw">Partly</td></tr>
+        <tr><td>Open source</td><td data-label="OpenBot" class="us">Yes (MIT)</td><td data-label="OpenAI dots">No</td><td data-label="Grok Bot">No</td><td data-label="Meta Muse">No</td><td data-label="Apple Siri AI">No</td><td data-label="Hermes Desktop">Yes (MIT)</td><td data-label="OpenClaw">Yes (MIT)</td></tr>
+        <tr><td>Where you use it</td><td data-label="OpenBot" class="us">macOS 13+ (Apple silicon and Intel); iPhone through a Home Screen app, Siri and the Share menu</td><td data-label="OpenAI dots">Cloud, through ChatGPT</td><td data-label="Grok Bot">Desktop and iOS</td><td data-label="Meta Muse">Phone-first</td><td data-label="Apple Siri AI">macOS 27 on Apple silicon</td><td data-label="Hermes Desktop">macOS, Windows, Linux</td><td data-label="OpenClaw">Your machine or a server</td></tr>
+        <tr><td>Good to know</td><td data-label="OpenBot" class="us">Works while your Mac is on; asks before it sends, buys or changes anything</td><td data-label="OpenAI dots">Not offered in the EEA, UK or Switzerland at launch; read-only until you approve</td><td data-label="Grok Bot">Allow, deny or always-allow for actions</td><td data-label="Meta Muse">—</td><td data-label="Apple Siri AI">English first; beta</td><td data-label="Hermes Desktop">Free models with a Nous sign-in, no key needed</td><td data-label="OpenClaw">Large skill marketplace</td></tr>
       </tbody>
     </table>
     </div>
