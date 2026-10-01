@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teammates ready to go — OpenBot</title>
+  <meta name="description" content="Ready-made AI teammates for your Mac: a receipt keeper, an inbox sorter, a trip planner and more. Read what each one is told to do, then add it in one click." />
+  <meta property="og:title" content="Teammates ready to go — OpenBot" />
+  <meta property="og:description" content="Ready-made AI teammates for your Mac. Read what each one is told to do, then add it in one click." />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #ffffff; --cloud: #f4f3f0; --line: #e7e5e0;
+      --nova: #6757d9; --pixel: #d86889; --scout: #299575; --sun: #ffc83d;
+      --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+      --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cloud); color: var(--ink); font: 17px/1.55 var(--text); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; }
+    a { color: inherit; }
+    header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 900 22px/1 var(--round); letter-spacing: -.03em; text-decoration: none; }
+    .brand svg { width: 32px; height: 32px; }
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 20px; border: 0; border-radius: 15px; background: var(--face); color: var(--label); font: 800 16px/1 var(--round); cursor: pointer; text-decoration: none; box-shadow: 0 5px 0 var(--edge); transition: transform .12s, box-shadow .12s, filter .15s; }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(5px); box-shadow: 0 0 0 var(--edge); }
+    .btn.small { height: 40px; padding: 0 16px; font-size: 15px; border-radius: 13px; box-shadow: 0 4px 0 var(--edge); }
+    .btn.small:active { transform: translateY(4px); }
+    .btn.ghost { --face: #fff; --edge: var(--line); --label: var(--ink); }
+    .btn:focus-visible, .card a:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 24px 90px; }
+    .hero { padding: 24px 0 36px; max-width: 720px; }
+    .hero h1 { margin: 0 0 12px; font-size: clamp(40px, 7vw, 68px); line-height: 1; }
+    .hero p { margin: 0; font-size: 20px; color: var(--ink-2); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+    .card { position: relative; background: #fff; border-radius: 28px; padding: 26px; display: grid; gap: 14px; align-content: start; box-shadow: 0 24px 50px rgba(40,30,80,.07), 0 2px 0 rgba(0,0,0,.04); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1); }
+    .card:hover { transform: translateY(-4px); }
+    .card .face { width: 96px; height: 96px; margin-bottom: 2px; }
+    .card .face .char { display: block; width: 100%; height: auto; overflow: visible; }
+    .card h2 { margin: 0; font-size: 26px; line-height: 1.1; }
+    .card .job { margin: -6px 0 0; color: var(--muted); font-weight: 700; font-size: 15px; }
+    .card .about { margin: 0; font-size: 16px; color: var(--ink-2); }
+    .card .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .card > a.cover { position: absolute; inset: 0; border-radius: 28px; }
+    .card .actions a { position: relative; z-index: 1; }
+    .share { margin-top: 56px; background: var(--ink); color: #fff; border-radius: 32px; padding: 40px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: center; }
+    .share h2 { margin: 0 0 10px; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; }
+    .share p { margin: 0 0 12px; color: #d8d7df; font-size: 17px; }
+    .share ol { margin: 0; padding-left: 22px; color: #d8d7df; font-size: 16px; line-height: 1.9; }
+    .share .btn { --face: #fff; --label: var(--ink); --edge: rgba(255,255,255,.25); margin-top: 8px; }
+    .cmd { display: flex; gap: 8px; align-items: center; background: #0c0c10; color: #fff; border-radius: 14px; padding: 10px 10px 10px 16px; font: 13.5px/1.4 var(--mono); }
+    .cmd code { overflow-wrap: anywhere; }
+    .install p { margin: 0 0 10px; }
+    @media (max-width: 760px) { .share { grid-template-columns: 1fr; padding: 28px; } }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } .card { background: #1c1c22; box-shadow: none; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .share { background: #1c1c22; } .share .btn { --face: #f3f2f6; --label: #1b1b1f; } }
+  </style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
+  <a class="btn small ghost" href="../#install">Get OpenBot</a>
+</header>
+<main>
+  <section class="hero">
+    <h1>Teammates, ready to go.</h1>
+    <p>Pick one, read exactly what it's told to do, and add it to OpenBot in a click. It starts with the browser off and uses the AI you already chose.</p>
+  </section>
+  <section class="grid" id="grid" aria-label="Ready-made teammates"></section>
+
+  <section class="share">
+    <div>
+      <h2>Made a good one? Share it.</h2>
+      <p>Any teammate you build can become a link. Send it to a friend, post it, or add it here for everyone.</p>
+      <ol>
+        <li>In OpenBot, open a teammate's settings.</li>
+        <li>Tap <strong>Copy share link</strong>.</li>
+        <li>Paste it anywhere. It opens a page like these.</li>
+      </ol>
+      <a class="btn small" href="https://github.com/PrisacariuRobert/openbot/blob/main/CONTRIBUTING.md#add-a-teammate-to-the-gallery">Add yours to the gallery</a>
+    </div>
+    <div class="install">
+      <p>New to OpenBot? One line installs it:</p>
+      <div class="cmd"><code>curl -fsSL https://openbots.foundation/install.sh | sh</code></div>
+    </div>
+  </section>
+</main>
+<script src="../cast.js"></script>
+<script>
+(function () {
+  "use strict";
+  var uid = 0, grid = document.getElementById("grid");
+  var MASCOTS = ["nova", "blob", "sprout", "orbit", "pebble", "sunny"];
+  function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; }
+  fetch("index.json", { cache: "no-cache" }).then(function (response) { return response.json(); }).then(function (list) {
+    list.forEach(function (item) {
+      if (!/^[a-z0-9][a-z0-9-]{0,60}$/.test(item.slug)) return;
+      var mascot = MASCOTS.indexOf(item.mascot) >= 0 ? item.mascot : "nova", color = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#6757d9";
+      var card = el("article", "card"), face = el("div", "face");
+      face.setAttribute("aria-hidden", "true");
+      face.innerHTML = ((window.SHAPES && window.SHAPES[mascot + "-happy"]) || "").split("__ID__").join("g" + (++uid)).replace('class="character', 'class="char character');
+      face.style.setProperty("--character-color", color);
+      var cover = el("a", "cover"); cover.href = "../t/?g=" + item.slug; cover.setAttribute("aria-label", "See " + item.name);
+      var actions = el("div", "actions"), see = el("a", "btn small ghost", "Details"), add = el("a", "btn small", "Add to my Mac");
+      see.href = "../t/?g=" + item.slug;
+      add.href = "http://127.0.0.1:4311/?panel=team&import=" + encodeURIComponent("https://openbots.foundation/teammates/" + item.slug + ".json");
+      add.title = "Opens OpenBot on this Mac and shows you this teammate to confirm";
+      actions.appendChild(see); actions.appendChild(add);
+      card.appendChild(face); card.appendChild(el("h2", "", item.name)); card.appendChild(el("p", "job", item.role)); card.appendChild(el("p", "about", item.about)); card.appendChild(actions); card.appendChild(cover);
+      grid.appendChild(card);
+    });
+  }).catch(function () { grid.appendChild(el("p", "about", "The gallery couldn't be loaded. Try again in a moment.")); });
+})();
+</script>
+</body>
+</html>
