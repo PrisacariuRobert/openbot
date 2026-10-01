@@ -1,0 +1,66 @@
+[
+  {
+    "slug": "receipt-keeper",
+    "name": "Receipt keeper",
+    "role": "Finds receipts and files them",
+    "about": "Finds the receipts and invoices in your Mail, saves the PDFs where you can find them, and keeps a simple spreadsheet.",
+    "mascot": "sprout",
+    "color": "#299575"
+  },
+  {
+    "slug": "inbox-triage",
+    "name": "Inbox triage",
+    "role": "Sorts your unread mail",
+    "about": "Looks at your unread mail and tells you what needs an answer and what can wait, with drafts you can send yourself.",
+    "mascot": "nova",
+    "color": "#6757d9"
+  },
+  {
+    "slug": "trip-planner",
+    "name": "Trip planner",
+    "role": "Plans trips, with sources",
+    "about": "Researches where to go, stay and eat, checks opening hours, and writes you an itinerary you can open and print. Works best with the browser on.",
+    "mascot": "sunny",
+    "color": "#c28735"
+  },
+  {
+    "slug": "meeting-prepper",
+    "name": "Meeting prepper",
+    "role": "Gets you ready for meetings",
+    "about": "Before a meeting, gathers the mail, notes and messages that matter. Afterwards, turns your notes into decisions and actions.",
+    "mascot": "orbit",
+    "color": "#528ed1"
+  },
+  {
+    "slug": "study-buddy",
+    "name": "Study buddy",
+    "role": "Turns notes into study material",
+    "about": "Summarizes your notes and PDFs, then quizzes you until it sticks.",
+    "mascot": "blob",
+    "color": "#d77560"
+  },
+  {
+    "slug": "weekly-planner",
+    "name": "Weekly planner",
+    "role": "Plans your week on Sundays",
+    "about": "Looks at your calendar, reminders and notes and proposes a realistic week.",
+    "mascot": "pebble",
+    "color": "#8780bf"
+  },
+  {
+    "slug": "price-watcher",
+    "name": "Price watcher",
+    "role": "Compares prices, with sources",
+    "about": "Finds the best price for what you want and keeps the comparison in a spreadsheet. Works best with the browser on.",
+    "mascot": "nova",
+    "color": "#687588"
+  },
+  {
+    "slug": "proofreader",
+    "name": "Proofreader",
+    "role": "Improves your writing",
+    "about": "Fixes mistakes and sharpens what you wrote, in your own voice.",
+    "mascot": "blob",
+    "color": "#d86889"
+  }
+]

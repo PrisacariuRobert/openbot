@@ -75,6 +75,11 @@ export function ownersUsualAI(db: OpenBotDatabase): { providerInstanceId: string
   return best ? { providerInstanceId: best.providerInstanceId, model: best.model } : null;
 }
 
+function localClock(schedule: unknown): unknown {
+  const item = schedule as { kind?: string; timeZone?: string } | null;
+  return item?.kind === "calendar" ? { ...item, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } : schedule;
+}
+
 export function importBot(db: OpenBotDatabase, raw: unknown): { bot: Bot; skills: number; routines: number } {
   const bundle = botShareSchema.parse(raw);
   rejectCredentials(`${bundle.bot.name}\n${bundle.bot.role}\n${bundle.bot.instructions}`, "this teammate's profile");
@@ -103,7 +108,8 @@ export function importBot(db: OpenBotDatabase, raw: unknown): { bot: Bot; skills
     db.createRoutine({
       name: routine.name.slice(0, 120), botId: bot.id, threadId: bot.threadId, prompt: routine.prompt,
       intervalMinutes: routine.intervalMinutes,
-      ...(routine.schedule !== undefined ? { schedule: routine.schedule as Parameters<OpenBotDatabase["createRoutine"]>[0]["schedule"] } : {}),
+      // A clock time means the importer's clock, not the sharer's time zone.
+      ...(routine.schedule !== undefined ? { schedule: localClock(routine.schedule) as Parameters<OpenBotDatabase["createRoutine"]>[0]["schedule"] } : {}),
       ...(routine.triggerType ? { triggerType: routine.triggerType } : {}),
       ...(routine.triggerConfig ? { triggerConfig: routine.triggerConfig as Parameters<OpenBotDatabase["createRoutine"]>[0]["triggerConfig"] } : {}),
       enabled: false,

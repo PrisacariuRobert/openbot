@@ -45,7 +45,8 @@ requireAsset("desktop/build/icon.png", "Electron desktop package");
 
 // The website: every local file the page loads must exist.
 for (const match of text("site/index.html").matchAll(/(?:src|href)=["'](?!https?:|#|mailto:|data:)([^"'?#]+)["']/g)) {
-  requireAsset(`site/${match[1].replace(/^\.?\//, "")}`, "site/index.html");
+  const target = match[1].replace(/^\.?\//, "");
+  requireAsset(`site/${target.endsWith("/") ? `${target}index.html` : target}`, "site/index.html");
 }
 
 // README images and relative documentation links must resolve after housekeeping.

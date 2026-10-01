@@ -38,6 +38,16 @@ npm run test:browser-sessions
 
 The browser checks require Chrome/Chromium. Set `OPENBOT_CHROME_PATH` to its executable if it is not discovered automatically. `verify` runs release/source guards, unit tests, TypeScript checks and the web build; its native checks are source-contract checks, **not** Xcode builds. Run the native tests/build instructions when modifying Swift, entitlements or packaging. Use the relevant deterministic benchmark for workflow changes and retain its artifact, not just the model's success message.
 
+## Add a teammate to the gallery
+
+The [gallery](https://openbots.foundation/teammates/) is a folder of plain JSON files, `site/teammates/<name>.json`. To add one:
+
+1. Build the teammate in OpenBot, try it on real work, then use **Share as a file** in its settings.
+2. Save the file as `site/teammates/<short-name>.json` (lowercase letters, digits and dashes) and add one line about it to `site/teammates/index.json`. Keep `about` to one plain sentence.
+3. Run `npx tsx --test src/server/gallery.test.ts`. It checks that the file is valid, small, free of credentials, uses skills that exist, that its routines can run unattended, and that the index matches.
+
+What we look for: it does one job well; its instructions are readable and say what it must never do (send, buy, pay, delete on its own); it needs nothing the owner hasn't chosen to give it. Shared teammates start with the browser and the private computer off, so say in `about` if it works best with the browser on.
+
 ## Pull requests
 
 - Work on a focused branch; keep unrelated owner changes intact. Maintainers merge after review. A contribution does not authorize publishing, tagging, deploying or changing repository protection.
