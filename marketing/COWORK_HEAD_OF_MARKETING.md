@@ -12,14 +12,16 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
   curl -fsSL https://openbots.foundation/install.sh | sh
   ```
   No admin password, and the installer checks the download's fingerprint.
-- Current version: 0.38.0 ("Your Mac, your apps"), released 1 October 2026. Release notes: https://github.com/PrisacariuRobert/openbot/releases/tag/v0.38.0. First public beta was 0.37.0-beta.1 on 29 September 2026.
+- Current version: 0.41.0 ("Autopilot"). Release notes: https://github.com/PrisacariuRobert/openbot/releases/latest. History: 0.37.0-beta.1 (29 Sept, first public beta), 0.38 "Your Mac, your apps", 0.39 "Knows you, privately", 0.40 "Share your teammates", all on 1 October 2026.
 
 ## What it does
 - **Make your own teammates:** a name, a face, a job. Each teammate gets its own workspace and its own browser.
 - **Research with sources**, in seconds.
 - **Group chats that run in order:** "Nova, find three restaurants. Scout, check their hours." Scout waits for Nova's list.
 - **Real files:** Word documents and spreadsheets.
-- **Asks before acting:** sending, buying, signing in or submitting always shows the exact website and button first.
+- **Asks before acting, unless you say otherwise:** by default, sending, buying, signing in or submitting shows the exact website and button first. **Autopilot** (off by default, per teammate) lets a teammate act like a person without asking; it still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, and every action is logged.
+- **Knows your stuff, privately:** teammates can search your own Notes, Mail, Messages and folders from an index that stays on your Mac, and write a morning brief.
+- **Share a teammate** as a link or from the gallery at https://openbots.foundation/teammates/; **share a result** as a page with private details removed.
 - **Reach your team** from Telegram, Discord or iMessage, with "Hey Siri, Ask OpenBot", or by pairing your iPhone with one scan. Hands-free voice too.
 - **Routines** ("Every Monday at 9, plan my week"), and the Mac can wake up for them.
 - **Your AI, your choice:**
@@ -33,11 +35,13 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
 - Cloud agents (OpenAI dots, Grok Bot, Meta Muse) rent you their computer for $0–300 a month and can't reach your Mac's apps or files. OpenAI dots isn't available in the EU, UK or Switzerland — OpenBot works in Europe.
 - Siri AI (macOS 27) is great for quick questions and single actions. OpenBot is for the whole job: long, multi-step work across apps and websites, on schedules, by a team, with finished files. They work together: "Hey Siri, Ask OpenBot". Never attack Siri — position as the extension.
 - Hermes Desktop now has a friendly app and free models. Don't claim OpenBot is easier than Hermes; win on Mac depth (Mail, Calendar, iMessage, Siri), exact approvals, a team of teammates with their own browsers, and phone pairing.
-- Full comparison: docs/COMPETITIVE_SCORECARD_2026-09-23.md in the repo.
+- Full comparison: docs/COMPETITIVE_SCORECARD_2026-09-23.md in the repo, and the public page https://openbots.foundation/alternatives/ (keep it dated and current).
+- **Being recommended by AI assistants** (ChatGPT, Claude, Perplexity, Gemini) is a goal. Follow `marketing/DISCOVERY_PLAYBOOK.md`: honest, quotable pages; the same plain description everywhere; genuine answers in the places people ask; a monthly check of what assistants say about us. Never hidden text, never text aimed at AI models, never fake reviews.
 
 ## Be honest about the limits
 - It's a beta. The Mac app is ad-hoc signed, not notarized.
 - It works only while your Mac is on, unless you set up your own server.
+- Autopilot means a teammate can be misled by a hostile web page or email like any assistant with its hands on the keyboard. Say so when you promote it, and never suggest it for teammates with access to money or accounts the user would not hand to a stranger.
 - The iPhone side is a Home Screen web app, not an App Store app.
 - Free Gemini keys have tight daily limits.
 - There's no Windows or Linux one-line installer yet.

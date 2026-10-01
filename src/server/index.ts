@@ -21,6 +21,7 @@ import { WorkReportService } from "./work-reports.js";
 import { WorkExtraSources } from "./work-extra-sources.js";
 import { WorkFollowups } from "./work-followups.js";
 import { workApp, workSourcesInput } from "../shared/work-sources.js";
+import { autopilotMayDecide, autopilotOn } from "../shared/autopilot.js";
 import { exportSpreadsheet } from "./spreadsheet-export.js";
 import { inspectWorkspaceSpreadsheet } from "./spreadsheet-inspect.js";
 import { summarizeTable } from "./table-summary.js";
@@ -2317,19 +2318,21 @@ function currentApprovalReview(approvalId: string) {
   return { approval, preview, fingerprint };
 }
 
-/** YOLO mode: instantly decide a fresh approval exactly as if the owner had
- * reviewed and approved it. The full review, fingerprint check, execution
- * path and ledger stay intact; only the human pause is skipped. Reviews that
- * cannot be approved (incomplete preview) stay pending for the owner. Access
- * grants are untouched: YOLO skips reviews, never permissions. */
+/** Autopilot (the studio-wide "yoloMode" setting, or a teammate's own switch): instantly decide a fresh approval
+ * exactly as if the owner had reviewed and approved it. The full review, fingerprint check, execution path and
+ * ledger stay intact; only the human pause is skipped. Reviews that cannot be approved (incomplete preview) stay
+ * pending for the owner. Access grants are untouched: Autopilot skips reviews, never permissions, and the reviews
+ * listed in shared/autopilot.ts always wait for a person, including more spending. */
+function autopilotDecides(approvalId: string) {
+  const approval = db.getApproval(approvalId);
+  if (!approval) return false;
+  if (!autopilotOn(db.getStudioSettings().yoloMode, db.getBot(approval.botId))) return false;
+  const stored = db.getApprovalAction(approvalId) as { type?: string; args?: { semanticBound?: boolean } } | null;
+  return autopilotMayDecide({ kind: approval.kind, actionType: stored?.type, semanticBound: stored?.args?.semanticBound === true });
+}
+
 function autoApproveIfYolo(approvalId: string) {
-  // More spending always needs a human decision, including in YOLO mode.
-  if (db.getApproval(approvalId)?.kind === "budget") return;
-  if (!db.getStudioSettings().yoloMode) return;
-  // Persistent instructions can affect later tasks. They always need human review.
-  if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "skill_propose") return;
-  if ((db.getApprovalAction(approvalId) as { args?: { semanticBound?: boolean } } | null)?.args?.semanticBound === true) return;
-  if ((db.getApprovalAction(approvalId) as { type?: string } | null)?.type === "browser_upload_saved_file") return;
+  if (!autopilotDecides(approvalId)) return;
   void (async () => {
     try {
       const reviewed = currentApprovalReview(approvalId);
@@ -2337,9 +2340,9 @@ function autoApproveIfYolo(approvalId: string) {
       const approval = db.getApproval(approvalId);
       if (!approval || approval.status !== "pending") return;
       const decided = await decideApproval(approvalId, "approved", reviewed.fingerprint);
-      if (decided) db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Auto-approved by YOLO mode", detail: approval.actionLabel.slice(0, 180) });
+      if (decided) db.addActivity({ runId: approval.runId, botId: approval.botId, kind: "status", label: "Auto-approved by Autopilot", detail: approval.actionLabel.slice(0, 180) });
     } catch (error) {
-      console.warn(`YOLO auto-approval skipped: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(`Autopilot auto-approval skipped: ${error instanceof Error ? error.message : String(error)}`);
     }
   })();
 }
@@ -3068,18 +3071,25 @@ app.post("/api/bots/import", (request, response) => {
 });
 
 app.patch("/api/bots/:id", (request, response) => {
-  const parsed = botInput.partial().safeParse(request.body);
+  // Autopilot is only ever switched here, by the owner: never by creating a teammate, a shared link, a routine or a tool call.
+  const parsed = botInput.partial().extend({ autopilot: z.boolean().optional() }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Those bot settings are not valid." });
   const current = db.getBot(request.params.id);
   if (!current) return response.status(404).json({ error: "Teammate not found." });
   // Appearance does not execute a model or change access. It remains editable
   // when an old teammate has no provider or its chosen model is unavailable.
-  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color"].includes(key));
+  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot"].includes(key));
   // Name, job and appearance are local profile metadata. Keep them editable
   // when an older teammate's provider is unavailable; access/model changes
   // still use the full connection validation below.
   if (profileOnly) {
     const bot = db.updateBot(request.params.id, parsed.data);
+    // Leave a note in the chat whenever the safety posture changes, so it is never a silent switch.
+    if (bot && parsed.data.autopilot !== undefined && parsed.data.autopilot !== current.autopilot) {
+      db.addMessage({ threadId: bot.threadId, senderType: "system", senderId: null, body: parsed.data.autopilot
+        ? `Autopilot is on for ${bot.name}: it will act without asking first. You can switch it back to Ask first in ${bot.name}’s settings.`
+        : `Autopilot is off for ${bot.name}: it asks before anything important.` });
+    }
     broadcast();
     return response.json(bot);
   }
@@ -3759,10 +3769,10 @@ app.post("/api/internal/tools", async (request, response) => {
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not
     // let its eventual shutdown cancel the approved action or replacement.
-    const yolo = action !== "skill_propose" && action !== "browser_upload_saved_file" && action !== "browser_semantic_upload" && action !== "browser_semantic_act" && db.getStudioSettings().yoloMode;
+    const yolo = autopilotDecides(approval.id);
     if (yolo) autoApproveIfYolo(approval.id);
     broadcast();
-    return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by YOLO mode. OpenBot is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
+    return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by Autopilot. OpenBot is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
   };
   try {
     new WorkflowValidation(db).assertRun(runId);

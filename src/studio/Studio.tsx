@@ -1,4 +1,5 @@
 import { ShareResultSheet } from "../components/ShareResultSheet";
+import { AUTOPILOT_WARNING } from "../shared/autopilot";
 import { SidebarExtras } from "../components/SidebarExtras";
 import type { Attachment } from "../shared/types";
 import { DocumentPane } from "./DocumentPane";
@@ -1074,19 +1075,25 @@ export function Studio() {
   const uncertain =
     state?.approvedActions.filter((action) => action.status === "uncertain") ||
     [];
-  const yoloMode = state?.settings.yoloMode === true;
+  // Autopilot: in a chat with one teammate it is that teammate's switch; anywhere else it is the studio-wide one.
+  const everyoneOnAutopilot = state?.settings.yoloMode === true;
+  const autopilotBot = page === "chat" ? state?.bots.find((bot) => bot.threadId === thread) : undefined;
+  const yoloMode = everyoneOnAutopilot || autopilotBot?.autopilot === true;
   const [modeBusy, setModeBusy] = useState(false);
   async function toggleMode() {
     if (modeBusy) return;
     const next = !yoloMode;
-    if (next && !window.confirm("YOLO mode auto-approves every new review exactly as if you had approved it instantly. Sign-ins, access grants and unapprovable reviews still pause. Turn it on?")) return;
+    const forTeammate = !everyoneOnAutopilot && autopilotBot ? autopilotBot : null;
+    if (next && !window.confirm(`${forTeammate ? `Turn on Autopilot for ${forTeammate.name}?` : "Turn on Autopilot for every teammate?"}\n\n${AUTOPILOT_WARNING}`)) return;
     setModeBusy(true);
     try {
-      const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ yoloMode: next }) });
+      const response = forTeammate
+        ? await fetch(`/api/bots/${encodeURIComponent(forTeammate.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autopilot: next }) })
+        : await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ yoloMode: next }) });
       if (!response.ok) throw new Error("The mode could not be changed.");
       setRefresh((value) => value + 1);
     } catch {
-      setError("The mode could not be changed. Try again.");
+      setError("Autopilot could not be changed. Try again.");
     } finally {
       setModeBusy(false);
     }
@@ -1287,11 +1294,11 @@ export function Studio() {
           onClick={() => void toggleMode()}
           disabled={modeBusy}
           aria-pressed={yoloMode}
-          title={yoloMode ? "Safety: auto-approves reviews. Switch back to asking first." : "Safety: work can start, but sensitive actions wait for your approval. Change in Details anytime."}
-          aria-label={yoloMode ? "Safety is set to auto-approve. Switch to ask first." : "Safety is set to ask first. Switch to auto-approve."}
+          title={yoloMode ? "Autopilot: acts without asking first. Switch back to asking first." : "Ask first: work can start, but sensitive actions wait for your approval. Switch on Autopilot to let it act like a person."}
+          aria-label={yoloMode ? "Autopilot is on. Switch to ask first." : "Ask first is on. Switch to Autopilot."}
         >
           <ShieldQuestion size={15} />
-          {yoloMode ? "Auto-approve" : "Ask first"}
+          {yoloMode ? "Autopilot" : "Ask first"}
         </button>
         <button
           type="button"

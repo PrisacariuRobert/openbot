@@ -42,7 +42,7 @@ Hosted AI agents rent you their computer for $20–300 a month. OpenBot gives yo
 
 - **No new bill.** Sign in with ChatGPT, Claude, Grok or GitHub Copilot you already pay for, start free with a Gemini key, or run a model on your Mac.
 - **A real team, not one bot.** Every teammate has a name, a job, a private workspace and its own browser. When one builds on another’s work, it waits for the answer.
-- **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting always waits for your okay — with the website and the exact button.
+- **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting waits for your okay by default — with the website and the exact button. Trust a teammate completely? Turn on **Autopilot** for it.
 - **Nothing hidden.** No account, no tracking. Your studio is a folder on your Mac, and every line of OpenBot is here.
 
 ## Try it
@@ -75,7 +75,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
   </tr>
   <tr>
     <td><strong>Real files.</strong> Word documents, spreadsheets and plans arrive as files you can open and share. Drop in a PDF and your teammate reads it first.</td>
-    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it.</td>
+    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on.</td>
   </tr>
 </table>
 
@@ -107,7 +107,7 @@ Each teammate can use a different AI. OpenBot never resells tokens or adds a fee
 | Long jobs on websites | Yes, in their browser | No | Yes | **Yes, each teammate in its own browser** |
 | A team of named teammates | Grok Bot only | No | Hermes Bot Mode | **Yes** |
 | Scheduled work | Yes | No | Yes | **Yes, and your Mac wakes for it** |
-| Asks before acting | Yes | Yes | Configurable | **Always, with the exact button** |
+| Asks before acting | Yes | Yes | Configurable | **By default, with the exact button — or Autopilot** |
 | Choose your AI | No | No | Yes | **Yes — ChatGPT, Claude, Gemini, local…** |
 | Open source | No | No | Yes (MIT) | **Yes (MIT)** |
 
@@ -119,18 +119,17 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.40.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.40.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+OpenBot 0.41.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.41.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
-## What's new in 0.40.0
+## What's new in 0.41.0
+
+- **Autopilot.** Turn it on for a teammate you trust and it acts like a person: it sends, books, posts and buys without asking first. It's off until you switch it on, one teammate at a time (or for everyone in Control center → Advanced). You see a clear warning first, a note appears in the teammate's chat, a chip shows who is on Autopilot, and every action is logged in the activity feed. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, and it is never part of a shared teammate.
+- A new [comparison page](https://openbots.foundation/alternatives/) and plain-text facts for AI assistants, so OpenBot is easy to find and quote accurately.
+
+## Earlier: 0.40.0
 
 - **Share a teammate.** Tap *Copy share link* on a teammate and send it to anyone. They see exactly what it is told to do before adding it, and it starts with the browser and private computer off, on their own AI. Or start from the [gallery](https://openbots.foundation/teammates/) of ready-made teammates: receipts, inbox triage, trip planning, meeting prep and more.
 - **Share a result.** Turn a finished answer into one web page. Emails, phone numbers, keys and your home folder are hidden first, and you see what was hidden before you share it.
-
-## Earlier: 0.39.0
-
-- **Knows you, privately.** Your team can search your own Notes, Mail, Messages and the folders you choose: “what did Anna say about the Berlin trip?”, “find my note about the Antwerp visit”. The index lives in OpenBot's folder on your Mac, is readable only by you, and **What they know** lets you turn each source off or forget everything.
-- **A morning brief in one tap.** Each morning your teammate writes what's on your calendar, the mail that needs you and what's due. It only reads.
-- Calendar, unread mail and reminders as read tools for any teammate.
 
 Full notes in the [changelog](CHANGELOG.md).
 

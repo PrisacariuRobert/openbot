@@ -1,6 +1,8 @@
 import { MacWakeCard } from "./components/MacWakeCard";
 import { MorningBriefCard } from "./components/MorningBriefCard";
 import { CopyShareLink } from "./components/CopyShareLink";
+import { AutopilotCard } from "./components/AutopilotCard";
+import { AUTOPILOT_WARNING } from "./shared/autopilot";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { WorkflowChecksPanel } from "./components/WorkflowChecksPanel";
 import { WorkSourcesPanel } from "./components/WorkSourcesPanel";
@@ -27,6 +29,7 @@ import {
 } from "react";
 import {
   Archive,
+  Plane,
   ArrowLeft,
   ArrowRight,
   Brain,
@@ -481,18 +484,18 @@ export function ControlPanel({
         </SettingsCard>
       </SettingsGroup>
 
-      <Advanced title="Advanced Safety & System Controls" summary="YOLO mode, self-built tools, semantic embeddings, and seat limits">
-        <SettingsGroup title="Unrestricted Execution">
+      <Advanced title="Advanced Safety & System Controls" summary="Autopilot for everyone, self-built tools, semantic embeddings, and seat limits">
+        <SettingsGroup title="Autopilot">
           <SettingsCard>
             <SwitchRow
-              title="Let teammates act without asking (YOLO Mode)"
-              description="Sends, publishes, file moves, browser clicks and code runs go through immediately without confirmation prompts. Every auto-decision is still recorded in your activity receipts."
+              title="Autopilot for every teammate"
+              description="Every teammate acts like a person: sends, posts, buys, moves files and runs commands without asking first. Every action is still recorded in the activity feed. You can also turn Autopilot on for one teammate in their settings."
               checked={state.settings.yoloMode}
               onChange={(enabled) => {
                 if (
                   !enabled ||
                   window.confirm(
-                    "Turn on YOLO mode? Teammates will send, publish, move files and run commands without asking first — including actions your Auto Review rules would normally stop. Every auto-decision is still recorded, and access grants do not change.",
+                    `Turn on Autopilot for every teammate?\n\n${AUTOPILOT_WARNING}`,
                   )
                 )
                   void onSetYoloMode(enabled);
@@ -4627,6 +4630,7 @@ export function BotPanel({
   thread,
   provider,
   apps = [],
+  autopilotForEveryone = false,
   onSave,
   onUpdateThread,
   onDuplicate,
@@ -4637,6 +4641,7 @@ export function BotPanel({
   thread: Thread;
   provider: ProviderStatus | null;
   apps?: ConnectorStatus["access"];
+  autopilotForEveryone?: boolean;
   onSave: (id: string, patch: Partial<Bot>) => Promise<void>;
   onUpdateThread: (
     patch: Partial<Pick<Thread, "section" | "pinned" | "hidden">>,
@@ -4771,6 +4776,7 @@ export function BotPanel({
             <Globe2 size={12} />{" "}
             {form.browserEnabled ? "own browser" : "browser off"}
           </span>
+          {(bot.autopilot || autopilotForEveryone) && <span className="autopilot-chip"><Plane size={12} /> Autopilot</span>}
           <span className={!bot.macAccessEnabled ? "off" : ""}>
             <HardDrive size={12} />{" "}
             {bot.macAccessEnabled
@@ -4820,6 +4826,7 @@ export function BotPanel({
           )}
         </div>
       </div>
+      <AutopilotCard name={bot.name} on={bot.autopilot} everyone={autopilotForEveryone} onChange={(next) => onSave(bot.id, { autopilot: next })} />
       <SettingsGroup title="Teammate Profile">
         <SettingsCard>
           <SettingsRow

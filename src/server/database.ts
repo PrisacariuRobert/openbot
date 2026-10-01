@@ -999,6 +999,7 @@ export class OpenBotDatabase {
     this.addColumn("bots", "computer_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("bots", "autopilot INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
     this.addColumn("threads", "section_name TEXT");
     this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
@@ -1211,7 +1212,7 @@ export class OpenBotDatabase {
       name: String(row.name), emoji: String(row.emoji), mascot: String(row.mascot || "orbit") as MascotKind,
       color: String(row.color), role: String(row.role), instructions: String(row.instructions), model: String(row.model),
       status: this.botStatus(row), currentAction: row.current_action ? String(row.current_action) : null,
-      computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), macAccessEnabled: asBoolean(row.mac_access_enabled),
+      computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), autopilot: asBoolean(row.autopilot), macAccessEnabled: asBoolean(row.mac_access_enabled),
       weeklyTokenBudget: Number(row.weekly_token_budget || 0), tokensUsedThisWeek: Number(row.tokens_used_week || 0),
       createdAt: String(row.created_at), lastActiveAt: row.last_active_at ? String(row.last_active_at) : null,
       threadId: String(row.thread_id), retiredAt: row.retired_at ? String(row.retired_at) : null,
@@ -1450,13 +1451,13 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
-    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
+    this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, autopilot=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
       patch.name ?? current.name, patch.role ?? current.role, patch.instructions ?? current.instructions, patch.model ?? current.model,
       patch.mascot ?? current.mascot, patch.color ?? current.color, (patch.computerEnabled ?? current.computerEnabled) ? 1 : 0,
-      (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
+      (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, (patch.autopilot ?? current.autopilot) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );
     if (patch.name) this.db.prepare("UPDATE threads SET title=? WHERE bot_id=?").run(patch.name, id);

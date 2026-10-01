@@ -36,7 +36,7 @@
           { "@type": "Question", "name": "Does OpenBot work on Windows, Linux or iPhone?", "acceptedAnswer": { "@type": "Answer", "text": "OpenBot installs on macOS 13 or later, on Apple silicon and Intel Macs. There is no Windows or Linux desktop app yet (a Linux runner exists for an always-on server). On iPhone you pair a Home Screen web app with one scan, and can use Siri and the Share menu through shortcuts. For Windows and Linux, Hermes Desktop is an open-source option." } },
           { "@type": "Question", "name": "How much does OpenBot cost?", "acceptedAnswer": { "@type": "Answer", "text": "OpenBot is free, open-source software. You pay only for the AI you connect, and free options exist: a free Google Gemini key or a free Nous Portal plan. OpenBot never adds a fee or resells tokens." } },
           { "@type": "Question", "name": "Does my data leave my Mac?", "acceptedAnswer": { "@type": "Answer", "text": "Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms; choose a model running on your Mac to keep everything local." } },
-          { "@type": "Question", "name": "Does OpenBot ask before it acts?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval." } }
+          { "@type": "Question", "name": "Does OpenBot ask before it acts?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, by default. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval. If you trust a teammate completely you can turn on Autopilot for it, and it will act like a person without asking; that is off until you choose it, and it still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions." } }
         ]
       }
     ]
@@ -103,7 +103,7 @@
   <section id="short-answer">
     <h2>The short answer</h2>
     <p><strong>OpenBot</strong> is a free, open-source (MIT) app for macOS that gives you a small team of named AI teammates running on <em>your own Mac</em>. They work in your Mail, Calendar, Reminders, Notes, Messages and folders, browse the web in their own private browsers, and ask before anything important. You bring the AI you already have: a ChatGPT, Claude, Grok or GitHub Copilot subscription, a free Gemini key, a free Nous Portal plan, OpenCode Go, or a model running on your Mac.</p>
-    <p>Choose it if you want an agent that can use your Mac's apps and files, don't want to pay for or depend on a cloud computer, and want to be asked before it sends, buys or changes anything. Choose something else if you need an agent that keeps working while your computer is off, runs on Windows or Linux, or needs a native phone app — see below.</p>
+    <p>Choose it if you want an agent that can use your Mac's apps and files, don't want to pay for or depend on a cloud computer, and want to be asked before it sends, buys or changes anything (or to switch that off for a teammate you trust). Choose something else if you need an agent that keeps working while your computer is off, runs on Windows or Linux, or needs a native phone app — see below.</p>
   </section>
 
   <section id="comparison">
@@ -118,7 +118,7 @@
         <tr><td>A team of named teammates</td><td data-label="OpenBot" class="us">Yes, each with its own browser and workspace</td><td data-label="OpenAI dots">One agent per dot</td><td data-label="Grok Bot">Yes, sharing one computer</td><td data-label="Meta Muse">One agent</td><td data-label="Apple Siri AI">One assistant</td><td data-label="Hermes Desktop">Named bots (Bot Mode)</td><td data-label="OpenClaw">Partly</td></tr>
         <tr><td>Open source</td><td data-label="OpenBot" class="us">Yes (MIT)</td><td data-label="OpenAI dots">No</td><td data-label="Grok Bot">No</td><td data-label="Meta Muse">No</td><td data-label="Apple Siri AI">No</td><td data-label="Hermes Desktop">Yes (MIT)</td><td data-label="OpenClaw">Yes (MIT)</td></tr>
         <tr><td>Where you use it</td><td data-label="OpenBot" class="us">macOS 13+ (Apple silicon and Intel); iPhone through a Home Screen app, Siri and the Share menu</td><td data-label="OpenAI dots">Cloud, through ChatGPT</td><td data-label="Grok Bot">Desktop and iOS</td><td data-label="Meta Muse">Phone-first</td><td data-label="Apple Siri AI">macOS 27 on Apple silicon</td><td data-label="Hermes Desktop">macOS, Windows, Linux</td><td data-label="OpenClaw">Your machine or a server</td></tr>
-        <tr><td>Good to know</td><td data-label="OpenBot" class="us">Works while your Mac is on; asks before it sends, buys or changes anything</td><td data-label="OpenAI dots">Not offered in the EEA, UK or Switzerland at launch; read-only until you approve</td><td data-label="Grok Bot">Allow, deny or always-allow for actions</td><td data-label="Meta Muse">—</td><td data-label="Apple Siri AI">English first; beta</td><td data-label="Hermes Desktop">Free models with a Nous sign-in, no key needed</td><td data-label="OpenClaw">Large skill marketplace</td></tr>
+        <tr><td>Good to know</td><td data-label="OpenBot" class="us">Works while your Mac is on; asks before it sends, buys or changes anything unless you turn on Autopilot</td><td data-label="OpenAI dots">Not offered in the EEA, UK or Switzerland at launch; read-only until you approve</td><td data-label="Grok Bot">Allow, deny or always-allow for actions</td><td data-label="Meta Muse">—</td><td data-label="Apple Siri AI">English first; beta</td><td data-label="Hermes Desktop">Free models with a Nous sign-in, no key needed</td><td data-label="OpenClaw">Large skill marketplace</td></tr>
       </tbody>
     </table>
     </div>
@@ -130,7 +130,7 @@
     <ul>
       <li>want an agent that works in <strong>your own Mail, Calendar, Notes, Messages and folders</strong> ("find the receipt in my Mail and save the PDF", "what did Anna say about the trip?");</li>
       <li>want <strong>a team</strong> — a researcher, a writer, a checker — each with its own browser, instead of one assistant;</li>
-      <li>want to be <strong>asked first</strong> and shown the exact button or change;</li>
+      <li>want to be <strong>asked first</strong> and shown the exact button or change, or to hand a trusted teammate Autopilot;</li>
       <li>prefer <strong>free, open-source</strong> software on your own hardware, with the AI of your choice;</li>
       <li>live in a region where cloud agents aren't offered yet.</li>
     </ul>
@@ -160,7 +160,7 @@
     <details><summary>Does OpenBot work on Windows, Linux or iPhone?</summary><p>OpenBot installs on macOS 13 or later, on Apple silicon and Intel Macs. There is no Windows or Linux desktop app yet (a Linux runner exists for an always-on server). On iPhone you pair a Home Screen web app with one scan, and can use Siri and the Share menu through shortcuts. For Windows and Linux, Hermes Desktop is an open-source option.</p></details>
     <details><summary>How much does OpenBot cost?</summary><p>OpenBot is free, open-source software. You pay only for the AI you connect, and free options exist: a free Google Gemini key or a free Nous Portal plan. OpenBot never adds a fee or resells tokens.</p></details>
     <details><summary>Does my data leave my Mac?</summary><p>Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms; choose a model running on your Mac to keep everything local.</p></details>
-    <details><summary>Does OpenBot ask before it acts?</summary><p>Yes. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval.</p></details>
+    <details><summary>Does OpenBot ask before it acts?</summary><p>Yes, by default. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval. If you trust a teammate completely you can turn on Autopilot for it, and it will act like a person without asking; that is off until you choose it, and it still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions.</p></details>
   </section>
 
   <section id="sources">
