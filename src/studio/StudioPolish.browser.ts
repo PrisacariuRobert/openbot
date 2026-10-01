@@ -22,6 +22,7 @@ const bot: Bot = {
   currentAction: null,
   computerEnabled: false,
   browserEnabled: false,
+  autopilot: false,
   macAccessEnabled: false,
   weeklyTokenBudget: 0,
   tokensUsedThisWeek: 0,

@@ -125,7 +125,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {panel === "telegram" && <TelegramPanel bots={state.bots} />}
     {panel === "knows" && <KnowsPanel />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
-    {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} onSave={saveBot}
+    {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} autopilotForEveryone={state.settings.yoloMode} onSave={saveBot}
       onUpdateThread={async (patch) => { await change(`/api/threads/${encodeURIComponent(bot.threadId)}`, "PATCH", patch); }}
       onDuplicate={async () => { const copy = await change<Bot>(`/api/bots/${encodeURIComponent(bot.id)}/duplicate`); onThread(copy.threadId); }} onOpenTeach={() => onOpen("teach")}
       onRetire={async () => { const result = await change<{ stopped: number }>(`/api/bots/${encodeURIComponent(bot.id)}/retire`, "POST"); setNotice(result.stopped ? `${bot.name} retired. ${result.stopped} active task${result.stopped === 1 ? " was" : "s were"} stopped; history is preserved.` : `${bot.name} retired. History is preserved.`); onThread("team-room"); }} />}

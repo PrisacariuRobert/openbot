@@ -68,6 +68,8 @@ export interface Bot {
   currentAction: string | null;
   computerEnabled: boolean;
   browserEnabled: boolean;
+  /** Acts like a person: reviews are approved for the owner as they appear. Off unless the owner turns it on. */
+  autopilot: boolean;
   macAccessEnabled: boolean;
   weeklyTokenBudget: number;
   tokensUsedThisWeek: number;

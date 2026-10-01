@@ -51,7 +51,7 @@ export function ConversationContext({
           <h3>Safety</h3>
           <p>
             {yoloMode
-              ? "Auto-approve is on: reviews pass by themselves. Sign-ins and access grants still pause."
+              ? "Autopilot is on: sends, posts and purchases go ahead without asking. Sign-ins, access grants and more AI spending still pause."
               : "Ask first: work can start, but sensitive actions wait for your approval."}
           </p>
           <button
@@ -62,7 +62,7 @@ export function ConversationContext({
             onClick={onToggleSafety}
           >
             <ShieldQuestion size={15} />
-            {yoloMode ? "Auto-approve on" : "Ask first on"}
+            {yoloMode ? "Autopilot on" : "Ask first on"}
           </button>
         </section>
       )}
