@@ -1,15 +1,21 @@
 # OpenBot working roadmap
 
-## Next releases (from 30 September 2026)
+## Next releases (from 2 October 2026)
 
-**Promise: an AI team that does the work on your real Mac — not just answers.** Cloud agents (OpenAI dots, Grok Bot, Muse) can't reach your Mac; Siri AI answers and does single actions; Hermes Desktop is developer-first. See the [scorecard](COMPETITIVE_SCORECARD_2026-09-23.md).
+**Promise: an AI team that does the work on your real Mac — not just answers. And it costs no subscription.** Where we stand: the product is ahead of its reach. OpenMausBot (open source, runs everywhere, 3.9k stars) is far better known; we win on Mac depth, a one-line install and ordinary-user simplicity, so the next releases remove every reason a person would not try us, and every reason they would not tell a friend. Plan and numbers: the company plan and `marketing/MARKETING_PLAN_90D.md`.
 
 | Release | Theme | Highlights |
 | :--- | :--- | :--- |
-| 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; run your Shortcuts; "Send to OpenBot" share sheet; "Hey Siri, ask Nova to…"; a quick-ask hotkey; one permissions screen; a free start without a key if possible; install without Terminal |
-| 0.39 | Knows you, privately | Opt-in on-device index of your files, Notes, Mail and Messages; morning brief; one-switch private mode on a local model; a page showing everything the team knows |
-| 0.40 | Share your teammates | Export and import teammates as files; a reviewed teammate gallery on the website; shareable results |
-| Later | Always there | Run on a second Mac or a home server; Slack, WhatsApp or a native iPhone app if users ask |
+| ✅ 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; Shortcuts; "Send to OpenBot"; "Hey Siri, ask Nova to…" |
+| ✅ 0.39 | Knows you, privately | On-device index of Notes, Mail, Messages and files; morning brief; "What they know" page |
+| ✅ 0.40 | Share your teammates | Share links, a teammate gallery, shareable result pages |
+| ✅ 0.41 | Autopilot | Per-teammate "act like a person" with hard stops, chat notes and a log |
+| **0.42** | **Ready for anyone** | A "made with OpenBot" link on shared pages (the growth loop); opt-in anonymous usage counts so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
+| **0.43** | **Everywhere** | Windows beta and Linux packages (our CI already builds the installers; Mac-only tools stay Mac-only); a Docker image for an always-on server; `npx` and Homebrew installs once the Apple signing and the name are settled |
+| **0.44** | **Packs, no subscription** | One-time teammate packs for a profession (freelancer, accountant, agent); prepaid pay-as-you-go credits for people who do not want to find an AI key (after reading each provider's terms) |
+| Later | Always there | Run on a second Mac or home server; business invoices with a shared library and policies; a marketplace; native iPhone app if users ask |
+
+Quality bar for every release: weekly cadence, `npm test` and the live Muse Spark cases pass, installer update tested from the previous version in an isolated folder, no new "always asks" claim without a test. Left over from 0.38 and worth finishing when there is room: the quick-ask hotkey and a single permissions screen.
 
 The working order below is the earlier plan and stays for reference.
 

@@ -12,7 +12,7 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
   curl -fsSL https://openbots.foundation/install.sh | sh
   ```
   No admin password, and the installer checks the download's fingerprint.
-- Current version: 0.41.0 ("Autopilot"). Release notes: https://github.com/PrisacariuRobert/openbot/releases/latest. History: 0.37.0-beta.1 (29 Sept, first public beta), 0.38 "Your Mac, your apps", 0.39 "Knows you, privately", 0.40 "Share your teammates", all on 1 October 2026.
+- Current version: 0.41.1. Release notes: https://github.com/PrisacariuRobert/openbot/releases/latest. History: 0.37.0-beta.1 (29 Sept, first public beta), 0.38 "Your Mac, your apps", 0.39 "Knows you, privately", 0.40 "Share your teammates", all on 1 October 2026.
 
 ## What it does
 - **Make your own teammates:** a name, a face, a job. Each teammate gets its own workspace and its own browser.
@@ -31,7 +31,7 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
 - **One-click import** from Hermes Agent and OpenClaw.
 
 ## Positioning (updated 30 September 2026)
-**An AI team that does the work on your real Mac — not just answers.**
+**The open-source alternative to OpenAI dots, Grok Bot and Siri AI. An AI team that does the work on your real Mac, with no subscription.**
 - Cloud agents (OpenAI dots, Grok Bot, Meta Muse) rent you their computer for $0–300 a month and can't reach your Mac's apps or files. OpenAI dots isn't available in the EU, UK or Switzerland — OpenBot works in Europe.
 - Siri AI (macOS 27) is great for quick questions and single actions. OpenBot is for the whole job: long, multi-step work across apps and websites, on schedules, by a team, with finished files. They work together: "Hey Siri, Ask OpenBot". Never attack Siri — position as the extension.
 - Hermes Desktop now has a friendly app and free models. Don't claim OpenBot is easier than Hermes; win on Mac depth (Mail, Calendar, iMessage, Siri), exact approvals, a team of teammates with their own browsers, and phone pairing.
@@ -47,6 +47,8 @@ OpenBot is a small team of AI teammates that runs on your Mac. They research, wr
 - There's no Windows or Linux one-line installer yet.
 
 Never claim features, numbers, users, press or partnerships that aren't real.
+
+**Your plan now lives in `marketing/MARKETING_PLAN_90D.md`** (3 Oct → 31 Dec 2026): the nine moves, weekly rhythm, calendar, targets, approval queue (`marketing/queue/`) and the scheduled tasks to create. Read it first, then start with week 1. The closest competitor is OpenMausBot (3.9k stars); it is covered on our comparison pages and in the plan.
 
 # Assets
 The project folder is `~/Developer/openbot-competitive`.
