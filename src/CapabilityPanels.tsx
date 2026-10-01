@@ -1,5 +1,6 @@
 import { MacWakeCard } from "./components/MacWakeCard";
 import { MorningBriefCard } from "./components/MorningBriefCard";
+import { CopyShareLink } from "./components/CopyShareLink";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { WorkflowChecksPanel } from "./components/WorkflowChecksPanel";
 import { WorkSourcesPanel } from "./components/WorkSourcesPanel";
@@ -5023,8 +5024,9 @@ export function BotPanel({
               }}
             >
               <Download size={15} />
-              Share setup
+              Share as a file
             </button>
+            <CopyShareLink botId={bot.id} />
             <button
               type="button"
               className="quiet-danger"

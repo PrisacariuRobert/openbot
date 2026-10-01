@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A teammate for you — OpenBot</title>
+  <meta name="description" content="Someone shared an OpenBot teammate with you. See what it does, then add it to OpenBot on your Mac." />
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #ffffff; --cloud: #f4f3f0; --line: #e7e5e0;
+      --nova: #6757d9; --scout: #299575; --scout-light: #dcf2ea; --sun: #ffc83d;
+      --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+      --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --pop: cubic-bezier(.34, 1.56, .64, 1);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cloud); color: var(--ink); font: 17px/1.55 var(--text); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, .chunky { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; }
+    header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; max-width: 920px; margin: 0 auto; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 900 22px/1 var(--round); letter-spacing: -.03em; text-decoration: none; color: inherit; }
+    .brand svg { width: 32px; height: 32px; }
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 54px; padding: 0 26px; border: 0; border-radius: 17px; background: var(--face); color: var(--label); font: 800 18px/1 var(--round); cursor: pointer; text-decoration: none; box-shadow: 0 6px 0 var(--edge); transition: transform .12s, box-shadow .12s, filter .15s; }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(6px); box-shadow: 0 0 0 var(--edge); }
+    .btn.small { height: 42px; padding: 0 16px; font-size: 15px; border-radius: 13px; box-shadow: 0 4px 0 var(--edge); }
+    .btn.small:active { transform: translateY(4px); }
+    .btn.ghost { --face: #fff; --edge: var(--line); --label: var(--ink); }
+    .btn:focus-visible { outline: 4px solid var(--sun); outline-offset: 4px; }
+    main { max-width: 920px; margin: 0 auto; padding: 8px 24px 80px; }
+    .card { background: #fff; border-radius: 32px; padding: 36px; box-shadow: 0 30px 70px rgba(40, 30, 80, .10), 0 2px 0 rgba(0,0,0,.04); display: grid; grid-template-columns: 220px 1fr; gap: 36px; align-items: start; }
+    .face { position: sticky; top: 24px; }
+    .face .char { display: block; width: 100%; height: auto; overflow: visible; animation: breathe 3.4s ease-in-out infinite; transform-origin: 50% 92%; }
+    .face .char .character-eyes > * { transform-box: fill-box; transform-origin: center; animation: blink 5.2s infinite; }
+    @keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4%) scale(1.012, .988); } }
+    @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(.08); } }
+    .kicker { font: 800 13px/1 var(--round); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    h1 { margin: 10px 0 2px; font-size: clamp(38px, 6vw, 56px); line-height: 1.02; }
+    .job { margin: 0 0 14px; font-size: 20px; color: var(--ink-2); font-weight: 600; }
+    .about { margin: 0 0 20px; font-size: 18px; }
+    .box { background: var(--cloud); border-radius: 18px; padding: 16px 18px; margin: 0 0 14px; }
+    .box h2 { margin: 0 0 6px; font-size: 15px; letter-spacing: 0; }
+    .box p, .box li { margin: 0; font-size: 15.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .box ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .box li span { display: block; color: var(--muted); font-size: 14px; }
+    .safe { display: flex; gap: 12px; align-items: flex-start; background: var(--scout-light); border-radius: 18px; padding: 14px 16px; margin: 0 0 22px; font-size: 15.5px; }
+    .safe svg { flex: none; margin-top: 3px; color: #1c735a; }
+    .actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .actions small { color: var(--muted); font-size: 14px; }
+    .install { margin-top: 28px; background: #fff; border-radius: 24px; padding: 26px 30px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; box-shadow: 0 2px 0 rgba(0,0,0,.04); }
+    .install h2 { margin: 0 0 4px; font-size: 24px; }
+    .install p { margin: 0; color: var(--ink-2); font-size: 16px; }
+    .cmd { display: flex; gap: 8px; align-items: center; background: var(--ink); color: #fff; border-radius: 14px; padding: 10px 10px 10px 16px; font: 14px/1.4 var(--mono); max-width: 100%; }
+    .cmd code { overflow-wrap: anywhere; }
+    .error { background: #fff; border-radius: 28px; padding: 40px; text-align: center; box-shadow: 0 30px 70px rgba(40,30,80,.08); }
+    .error h1 { font-size: 34px; }
+    .error p { color: var(--ink-2); }
+    [hidden] { display: none !important; }
+    @media (max-width: 720px) { .card { grid-template-columns: 1fr; padding: 24px; gap: 8px; } .face { position: static; width: 150px; margin: 0 auto; } }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; --scout-light: #17352c; } body, .card, .install, .error { background: #1c1c22; } body { background: #141418; } .box { background: #25252d; } .safe svg { color: #5ad3ae; } .btn.ghost { --face: #2a2a31; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .cmd { background: #0c0c10; } }
+    @media (prefers-reduced-motion: reduce) { .face .char, .face .char .character-eyes > * { animation: none; } }
+  </style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
+  <a class="btn small ghost" href="../#install">Get OpenBot</a>
+</header>
+<main>
+  <section id="loading" class="error"><p>Opening your teammate…</p></section>
+
+  <section id="problem" class="error" hidden>
+    <h1>That link didn't open.</h1>
+    <p id="problem-text">It may be incomplete. Ask whoever sent it to share it again.</p>
+    <p><a class="btn ghost" href="../teammates/">See ready-made teammates</a></p>
+  </section>
+
+  <article id="card" class="card" hidden>
+    <div class="face" id="face" aria-hidden="true"></div>
+    <div>
+      <span class="kicker">A teammate for you</span>
+      <h1 id="name"></h1>
+      <p class="job" id="job"></p>
+      <p class="about" id="about" hidden></p>
+      <div class="box"><h2>What it's told to do</h2><p id="instructions"></p></div>
+      <div class="box" id="routines-box" hidden><h2 id="routines-title"></h2><ul id="routines"></ul></div>
+      <p class="safe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 8.3 8 9 4.8-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span><strong>Starts with the browser and private computer off.</strong> No accounts, history or memory come with it. It uses the AI you already chose, and anything it does that matters still asks you first.</span></p>
+      <div class="actions">
+        <a class="btn" id="add" href="#">Add to OpenBot</a>
+        <button class="btn ghost small" id="copy" type="button">Copy link</button>
+        <button class="btn ghost small" id="download" type="button">Download file</button>
+      </div>
+      <p class="actions" style="margin-top:12px"><small>“Add to OpenBot” opens OpenBot on this Mac and shows you this teammate to confirm. Not installed yet? Scroll down.</small></p>
+    </div>
+  </article>
+
+  <section class="install" id="install">
+    <div><h2>New to OpenBot?</h2><p>A free team of AI teammates on your Mac. One line to install.</p></div>
+    <div class="cmd"><code>curl -fsSL https://openbots.foundation/install.sh | sh</code><button class="btn small ghost" id="copy-install" type="button">Copy</button></div>
+  </section>
+</main>
+<script src="../cast.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX_BUNDLE = 64000, MAX_PAYLOAD = 60000;
+  var $ = function (id) { return document.getElementById(id); };
+  var show = function (id) { ["loading", "problem", "card"].forEach(function (name) { $(name).hidden = name !== id; }); };
+  var problem = function (text) { if (text) $("problem-text").textContent = text; show("problem"); };
+
+  function fromBase64Url(text) {
+    var binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+  async function inflate(bytes) {
+    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    var reader = stream.getReader(), chunks = [], size = 0;
+    for (;;) {
+      var step = await reader.read();
+      if (step.done) break;
+      size += step.value.length;
+      if (size > MAX_BUNDLE) { await reader.cancel(); throw new Error("big"); }
+      chunks.push(step.value);
+    }
+    var out = new Uint8Array(size), at = 0;
+    chunks.forEach(function (chunk) { out.set(chunk, at); at += chunk.length; });
+    return JSON.parse(new TextDecoder().decode(out));
+  }
+  async function decode(payload) {
+    if (payload.indexOf("1.") !== 0 || payload.length > MAX_PAYLOAD || !/^[A-Za-z0-9_-]+$/.test(payload.slice(2))) throw new Error("shape");
+    return inflate(fromBase64Url(payload.slice(2)));
+  }
+
+  var MASCOTS = ["nova", "blob", "sprout", "orbit", "pebble", "sunny"];
+  var uid = 0;
+  function render(bundle) {
+    var bot = bundle && bundle.bot;
+    if (!bundle || bundle.kind !== "openbot-teammate" || bundle.version !== 1 || !bot || typeof bot.name !== "string" || typeof bot.role !== "string" || typeof bot.instructions !== "string") throw new Error("shape");
+    var mascot = MASCOTS.indexOf(bot.mascot) >= 0 ? bot.mascot : "nova";
+    var color = /^#[0-9a-f]{6}$/i.test(bot.color || "") ? bot.color : "#6757d9";
+    $("name").textContent = bot.name.slice(0, 30);
+    $("job").textContent = bot.role.slice(0, 60);
+    document.title = bot.name.slice(0, 30) + " — a teammate for you · OpenBot";
+    if (typeof bundle.about === "string" && bundle.about.trim()) { $("about").textContent = bundle.about.slice(0, 240); $("about").hidden = false; }
+    $("instructions").textContent = bot.instructions.slice(0, 2000);
+    var routines = (Array.isArray(bundle.routines) ? bundle.routines : []).filter(function (r) { return r && typeof r.name === "string" && typeof r.prompt === "string"; }).slice(0, 20);
+    if (routines.length) {
+      $("routines-title").textContent = (routines.length === 1 ? "1 routine" : routines.length + " routines") + " — they arrive paused";
+      routines.forEach(function (routine) {
+        var li = document.createElement("li"), name = document.createElement("strong"), what = document.createElement("span");
+        name.textContent = routine.name.slice(0, 120); what.textContent = routine.prompt.slice(0, 280) + (routine.prompt.length > 280 ? "…" : "");
+        li.appendChild(name); li.appendChild(what); $("routines").appendChild(li);
+      });
+      $("routines-box").hidden = false;
+    }
+    var svg = (window.SHAPES && window.SHAPES[mascot + "-happy"]) || "";
+    var face = $("face");
+    face.innerHTML = svg.split("__ID__").join("t" + (++uid)).replace('class="character', 'class="char character');
+    face.style.setProperty("--character-color", color);
+  }
+
+  async function main() {
+    var params = new URLSearchParams(location.search), slug = params.get("g"), hash = location.hash.slice(1), bundle, importValue, rawPayload = "";
+    try {
+      if (slug && /^[a-z0-9][a-z0-9-]{0,60}$/.test(slug)) {
+        var response = await fetch("../teammates/" + slug + ".json", { cache: "no-cache" });
+        if (!response.ok) throw new Error("gone");
+        var text = await response.text();
+        if (text.length > MAX_BUNDLE) throw new Error("big");
+        bundle = JSON.parse(text);
+        importValue = "https://openbots.foundation/teammates/" + slug + ".json";
+        rawPayload = location.href;
+      } else if (hash) {
+        rawPayload = decodeURIComponent(hash);
+        bundle = await decode(rawPayload);
+        importValue = rawPayload;
+      } else { return problem("There's no teammate in this link."); }
+      render(bundle);
+    } catch (error) {
+      return problem(error && error.message === "gone" ? "That teammate isn't in the gallery anymore." : error && error.message === "big" ? "This link is too large to open." : "It may be incomplete. Ask whoever sent it to share it again.");
+    }
+    $("add").href = "http://127.0.0.1:4311/?panel=team&import=" + encodeURIComponent(importValue);
+    $("copy").addEventListener("click", function () {
+      var link = location.href;
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { $("copy").textContent = "Copied"; }, function () { window.prompt("Copy this link:", link); });
+      setTimeout(function () { $("copy").textContent = "Copy link"; }, 2200);
+    });
+    $("download").addEventListener("click", function () {
+      var url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+      var a = document.createElement("a"); a.href = url; a.download = "teammate-" + (bundle.bot.name || "teammate").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".openbot.json";
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
+    show("card");
+  }
+  $("copy-install").addEventListener("click", function () {
+    var line = "curl -fsSL https://openbots.foundation/install.sh | sh";
+    (navigator.clipboard ? navigator.clipboard.writeText(line) : Promise.reject()).then(function () { $("copy-install").textContent = "Copied"; }, function () { window.prompt("Copy this:", line); });
+    setTimeout(function () { $("copy-install").textContent = "Copy"; }, 2200);
+  });
+  main();
+})();
+</script>
+</body>
+</html>

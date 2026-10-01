@@ -1,6 +1,8 @@
 import { ExistingAgentsCard } from "../components/ExistingAgentsCard";
-import { useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, ChevronRight, Plus, Upload } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ArrowUpRight, ChevronRight, Link2, Plus, Upload } from "lucide-react";
+import { TeammatePreviewCard, readTeammate, type TeammatePreview } from "../components/TeammatePreviewCard";
+import { decodeTeammate, payloadFromLink } from "../shared/teammate-link";
 import type { AppState, Bot } from "../shared/types";
 import { Character } from "./Character";
 
@@ -14,25 +16,48 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
 }) {
   const file = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
-  const [preview, setPreview] = useState<{ raw: unknown; name: string; role: string; instructions: string; skills: number; routines: number } | null>(null);
+  const [preview, setPreview] = useState<TeammatePreview | null>(null);
   const [error, setError] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false), [linkText, setLinkText] = useState("");
+  const previewAnchor = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (preview) previewAnchor.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [preview]);
   async function perform(action: () => Promise<void>) {
     if (pending) return;
     setPending(true); setError("");
     try { await action(); } catch (error) { setError(error instanceof Error ? error.message : "Could not save. Your existing team is unchanged."); }
     finally { setPending(false); }
   }
+  /** A shared teammate arrives as a file, a pasted link, a gallery address or
+   * ?import= from the website. All of them end in the same preview. */
+  async function fromLink(text: string) {
+    const trimmed = text.trim();
+    if (/^https:\/\/(?:www\.)?openbots\.foundation\/teammates\//.test(trimmed)) {
+      const response = await fetch(`/api/teammate-source?url=${encodeURIComponent(trimmed)}`, { credentials: "same-origin" });
+      const value = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(value.error || "That teammate couldn't be loaded.");
+      setPreview(readTeammate(value)); return;
+    }
+    const payload = payloadFromLink(trimmed);
+    if (!payload) throw new Error("This doesn't look like an OpenBot teammate link.");
+    setPreview(readTeammate(await decodeTeammate(payload)));
+  }
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("import");
+    if (!wanted) return;
+    const url = new URL(window.location.href); url.searchParams.delete("import"); window.history.replaceState(null, "", url);
+    void perform(() => fromLink(wanted));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <div className="team-overview">
-    <div className="workspace-page-actions"><button className="button-primary" onClick={onCreate}><Plus size={16} /> New teammate</button><button disabled={pending} onClick={() => file.current?.click()}><Upload size={16} /> Import a profile</button></div>
+    <div className="workspace-page-actions"><button className="button-primary" onClick={onCreate}><Plus size={16} /> New teammate</button><button disabled={pending} onClick={() => file.current?.click()}><Upload size={16} /> Import a profile</button><button disabled={pending} onClick={() => setLinkOpen((open) => !open)}><Link2 size={16} /> Add from a link</button></div>
+    {linkOpen && <form className="teammate-link-form" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await fromLink(linkText); setLinkOpen(false); setLinkText(""); }); }}><input value={linkText} onChange={(event) => setLinkText(event.target.value)} placeholder="Paste a teammate link" aria-label="Teammate link" autoFocus /><button type="submit" className="button-primary" disabled={pending || !linkText.trim()}>Preview</button></form>}
     <input ref={file} className="visually-hidden" type="file" accept=".json,application/json" aria-label="Import a teammate profile" onChange={event => {
       const selected = event.target.files?.[0]; event.target.value = "";
-      if (selected) void perform(async () => { if (selected.size > 256000) throw new Error("Choose a profile under 256 KB."); const raw = JSON.parse(await selected.text());
-        if (raw?.kind !== "openbot-teammate" || raw?.version !== 1 || typeof raw.bot?.name !== "string" || typeof raw.bot?.role !== "string" || typeof raw.bot?.instructions !== "string") throw new Error("This is not an OpenBot teammate profile.");
-        setPreview({raw, name: raw.bot.name, role: raw.bot.role, instructions: raw.bot.instructions, skills: Array.isArray(raw.skills) ? raw.skills.length : 0, routines: Array.isArray(raw.routines) ? raw.routines.length : 0}); });
+      if (selected) void perform(async () => { if (selected.size > 256000) throw new Error("Choose a profile under 256 KB."); setPreview(readTeammate(JSON.parse(await selected.text()))); });
     }} />
+    {preview && <div ref={previewAnchor}><TeammatePreviewCard preview={preview} pending={pending} macAccess={state.settings.macAccessEnabled} onCancel={() => setPreview(null)} onAdd={() => void perform(async () => { await onImport(preview.raw); setPreview(null); })} /></div>}
     <ExistingAgentsCard onOpen={(botId) => { const bot = state.bots.find((item) => item.id === botId); if (bot) onEdit(bot.threadId); }} />
     {error && <p role="alert" className="panel-error">{error}</p>}
-    {preview && <section className="workspace-import-preview" aria-label="Profile preview"><h3>Bring a familiar face.</h3><strong>{preview.name}</strong><p>{preview.role}</p><details><summary>Read instructions</summary><p>{preview.instructions}</p></details><p>{preview.skills} skill references · {preview.routines} routines, imported paused</p><WorkspaceNote title="Your workspace keeps its boundaries.">This imports a new profile. Accounts, keys, history, memory and access grants are not imported. Choose an AI connection before starting work.</WorkspaceNote><div className="workspace-page-actions"><button disabled={pending} className="button-primary" onClick={() => void perform(async () => { await onImport(preview.raw); setPreview(null); })}>{pending ? "Importing…" : "Import teammate"}</button><button disabled={pending} onClick={() => setPreview(null)}>Cancel import</button></div></section>}
     <div className="workspace-team-grid">{state.bots.map(bot => <article key={bot.id} className="workspace-teammate">
       <button className="workspace-teammate-identity" onClick={() => onEdit(bot.threadId)} aria-label={`Edit ${bot.name}`}><Character name={bot.name} color={bot.color} variant={bot.mascot} size={60} /><span><strong>{bot.name}</strong><small>{bot.role}</small></span><ChevronRight size={16} /></button>
       <button className="workspace-teammate-chat" onClick={() => onThread(bot.threadId)}>Open conversation <ArrowUpRight size={14} /></button>
