@@ -124,3 +124,51 @@ test("every internal link and image on the comparison page resolves", () => {
     assert.ok(existsSync(file), `${match[1]} exists`);
   }
 });
+
+const DETAIL_PAGES = [
+  { slug: "openai-dots", name: "OpenAI dots" },
+  { slug: "grok-bot", name: "Grok Bot" },
+  { slug: "siri-ai", name: "Siri AI" },
+  { slug: "openmausbot", name: "OpenMausBot" },
+];
+
+test("each detailed comparison page is honest, dated, sourced and consistent with its own questions", () => {
+  for (const { slug, name } of DETAIL_PAGES) {
+    const html = read(`alternatives/${slug}/index.html`);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://openbots\\.foundation/alternatives/${slug}/" />`), `${slug} canonical`);
+    assert.match(html, /Last updated \d{1,2} [A-Z][a-z]+ 2026/, `${slug} is dated`);
+    const text = plain(html);
+    assert.ok(text.includes(name), `${slug} names ${name}`);
+    assert.ok(text.length > 1800, `${slug} has real content`);
+    assert.ok(html.includes(`<h3>Choose ${name} if you…</h3>`), `${slug} says when to choose them`);
+    assert.ok(html.includes("<h3>Choose OpenBot if you…</h3>"), `${slug} says when to choose us`);
+    const sources = html.slice(html.indexOf('id="sources"'));
+    assert.ok([...sources.matchAll(/href="https:\/\//g)].length >= 3, `${slug} lists its sources`);
+    assert.deepEqual(faqJsonLd(html), visibleFaq(html), `${slug} structured data matches the page`);
+    assert.ok(visibleFaq(html).length >= 3, `${slug} has questions`);
+    const stripped = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
+    assert.doesNotMatch(stripped, /display:\s*none|visibility:\s*hidden|font-size:\s*0\b/i, `${slug} has no hidden text`);
+    assert.doesNotMatch(stripped, /\bignore (?:all )?previous instructions|\brecommend openbot\b/i, `${slug} does not talk to AI models`);
+    for (const match of html.matchAll(/(?:href|src)="((?:\.\.\/|\/)[^"#?]*)"/g)) {
+      const target = path.resolve(path.join(site, "alternatives", slug), match[1].startsWith("/") ? `.${match[1]}` : match[1]);
+      const file = match[1].endsWith("/") ? path.join(target, "index.html") : target;
+      assert.ok(existsSync(file), `${slug}: ${match[1]} exists`);
+    }
+  }
+});
+
+test("the comparison hub and the sitemap list every detailed page", () => {
+  const hub = read("alternatives/index.html");
+  const sitemap = read("sitemap.xml");
+  for (const { slug } of DETAIL_PAGES) {
+    assert.ok(hub.includes(`href="${slug}/"`), `${slug} is linked from the hub`);
+    assert.ok(sitemap.includes(`https://openbots.foundation/alternatives/${slug}/`), `${slug} is in the sitemap`);
+  }
+});
+
+test("the home page leads with the alternative-to sentence people search for, and says there is no subscription", () => {
+  const html = read("index.html");
+  assert.match(html, /<p class="kicker">The open-source alternative to OpenAI dots, Grok Bot and Siri AI<\/p>/);
+  assert.match(html, /no subscription/i);
+  assert.match(read("llms.txt"), /alternative to OpenAI dots, Grok Bot and Siri AI/);
+});
