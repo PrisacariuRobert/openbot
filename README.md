@@ -126,12 +126,7 @@ OpenBot 0.41.0 is a public beta ([release notes](https://github.com/PrisacariuRo
 - **Autopilot.** Turn it on for a teammate you trust and it acts like a person: it sends, books, posts and buys without asking first. It's off until you switch it on, one teammate at a time (or for everyone in Control center → Advanced). You see a clear warning first, a note appears in the teammate's chat, a chip shows who is on Autopilot, and every action is logged in the activity feed. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, and it is never part of a shared teammate.
 - A new [comparison page](https://openbots.foundation/alternatives/) and plain-text facts for AI assistants, so OpenBot is easy to find and quote accurately.
 
-## Earlier: 0.40.0
-
-- **Share a teammate.** Tap *Copy share link* on a teammate and send it to anyone. They see exactly what it is told to do before adding it, and it starts with the browser and private computer off, on their own AI. Or start from the [gallery](https://openbots.foundation/teammates/) of ready-made teammates: receipts, inbox triage, trip planning, meeting prep and more.
-- **Share a result.** Turn a finished answer into one web page. Emails, phone numbers, keys and your home folder are hidden first, and you see what was hidden before you share it.
-
-Full notes in the [changelog](CHANGELOG.md).
+Everything earlier is in the [changelog](CHANGELOG.md) and the [releases](https://github.com/PrisacariuRobert/openbot/releases).
 
 ## For developers
 
