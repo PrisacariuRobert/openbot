@@ -46,11 +46,11 @@ export function MorningBriefCard({ onOpenThread }: { onOpenThread?: (threadId: s
   const form = (
     <div className="brief-form">
       {state.bots.length > 1 && (
-        <label>Who writes it<select value={botId} onChange={(event) => setBotId(event.target.value)}>{state.bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
+        <label><span>Who writes it</span><select value={botId} onChange={(event) => setBotId(event.target.value)}>{state.bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
       )}
-      <label>At<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
-      <label>On<select value={weekdaysOnly ? "weekdays" : "daily"} onChange={(event) => setWeekdaysOnly(event.target.value === "weekdays")}><option value="weekdays">Weekdays</option><option value="daily">Every day</option></select></label>
-      <label>Weather for <small>(optional)</small><input value={city} maxLength={60} placeholder="A city, like Vienna" onChange={(event) => setCity(event.target.value)} /></label>
+      <label><span>At</span><input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
+      <label><span>On</span><select value={weekdaysOnly ? "weekdays" : "daily"} onChange={(event) => setWeekdaysOnly(event.target.value === "weekdays")}><option value="weekdays">Weekdays</option><option value="daily">Every day</option></select></label>
+      <label><span>Weather</span><input value={city} maxLength={60} placeholder="City, like Vienna (optional)" onChange={(event) => setCity(event.target.value)} /></label>
     </div>
   );
   return (
