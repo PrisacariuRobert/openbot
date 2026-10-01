@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open-source alternatives to cloud AI agents (OpenAI dots, Grok Bot, Meta Muse) — OpenBot</title>
+  <meta name="description" content="An honest comparison of OpenBot with OpenAI dots, Grok Bot, Meta Muse, Apple Siri AI, Hermes Desktop and OpenClaw: where each runs, what it costs, what it can reach on your Mac, and when to choose something else." />
+  <link rel="canonical" href="https://openbots.foundation/alternatives/" />
+  <meta property="og:title" content="Open-source alternatives to cloud AI agents — OpenBot" />
+  <meta property="og:description" content="An honest, dated comparison of OpenBot with OpenAI dots, Grok Bot, Meta Muse, Siri AI, Hermes Desktop and OpenClaw." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://openbots.foundation/alternatives/" />
+  <meta property="og:image" content="https://openbots.foundation/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "headline": "Open-source alternatives to cloud AI agents (OpenAI dots, Grok Bot, Meta Muse)",
+        "description": "An honest comparison of OpenBot with the big AI agents: where each runs, what it costs, what it can reach on your Mac, and when to choose something else.",
+        "dateModified": "2026-10-01",
+        "author": { "@type": "Organization", "name": "OpenBot" },
+        "mainEntityOfPage": "https://openbots.foundation/alternatives/"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "What is a free, open-source alternative to OpenAI dots or Grok Bot?", "acceptedAnswer": { "@type": "Answer", "text": "OpenBot is a free, MIT-licensed app for macOS that gives you a team of AI teammates running on your own Mac instead of a rented cloud computer. It works with the AI you already have (ChatGPT, Claude, Grok or GitHub Copilot subscriptions, a free Gemini key, Nous Portal, OpenCode Go, or a model on your Mac)." } },
+          { "@type": "Question", "name": "Is there an AI agent that can use my Mac's Mail, Calendar and Notes?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. OpenBot teammates can read your Apple Mail, Calendar, Reminders, Notes, Contacts and Messages and search your chosen folders, and can add reminders, notes and calendar events or save mail attachments after you approve each change. Cloud agents such as OpenAI dots, Grok Bot and Meta Muse run on their own cloud computers and cannot reach these apps on your Mac." } },
+          { "@type": "Question", "name": "Does OpenBot work on Windows, Linux or iPhone?", "acceptedAnswer": { "@type": "Answer", "text": "OpenBot installs on macOS 13 or later, on Apple silicon and Intel Macs. There is no Windows or Linux desktop app yet (a Linux runner exists for an always-on server). On iPhone you pair a Home Screen web app with one scan, and can use Siri and the Share menu through shortcuts. For Windows and Linux, Hermes Desktop is an open-source option." } },
+          { "@type": "Question", "name": "How much does OpenBot cost?", "acceptedAnswer": { "@type": "Answer", "text": "OpenBot is free, open-source software. You pay only for the AI you connect, and free options exist: a free Google Gemini key or a free Nous Portal plan. OpenBot never adds a fee or resells tokens." } },
+          { "@type": "Question", "name": "Does my data leave my Mac?", "acceptedAnswer": { "@type": "Answer", "text": "Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms; choose a model running on your Mac to keep everything local." } },
+          { "@type": "Question", "name": "Does OpenBot ask before it acts?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval." } }
+        ]
+      }
+    ]
+  }
+  </script>
+  <style>
+    :root { --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #fff; --cloud: #f4f3f0; --line: #e7e5e0; --nova: #6757d9; --scout: #299575; --sun: #ffc83d; --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif; --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cloud); color: var(--ink); font: 18px/1.65 var(--text); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+    a { color: inherit; text-underline-offset: 3px; }
+    header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; max-width: 1040px; margin: 0 auto; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 900 22px/1 var(--round); letter-spacing: -.03em; text-decoration: none; }
+    .brand svg { width: 32px; height: 32px; }
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 16px; border: 0; border-radius: 13px; background: var(--face); color: var(--label); font: 800 15px/1 var(--round); text-decoration: none; box-shadow: 0 4px 0 var(--edge); }
+    .btn.ghost { --face: #fff; --edge: var(--line); --label: var(--ink); }
+    main { max-width: 1040px; margin: 0 auto; padding: 16px 24px 90px; }
+    h1 { font-size: clamp(36px, 6vw, 58px); margin: 12px 0 14px; }
+    .lede { font-size: 21px; color: var(--ink-2); max-width: 760px; margin: 0 0 8px; }
+    .updated { color: var(--muted); font-size: 15px; margin: 0 0 30px; }
+    section { background: #fff; border-radius: 28px; padding: 32px 34px; margin: 0 0 22px; box-shadow: 0 2px 0 rgba(0,0,0,.04); }
+    section h2 { font-size: 30px; margin: 0 0 12px; }
+    section h3 { font-size: 21px; margin: 24px 0 6px; }
+    section p { margin: 0 0 12px; }
+    ul { margin: 0 0 12px; padding-left: 22px; } li { margin: 4px 0; }
+    .table { overflow-x: auto; margin: 8px -6px 0; padding: 0 6px; }
+    table { border-collapse: collapse; width: 100%; min-width: 880px; font-size: 15px; line-height: 1.45; }
+    th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    th { font: 800 14px/1.2 var(--round); color: var(--muted); }
+    td:first-child, th:first-child { position: sticky; left: 0; background: #fff; font-weight: 800; color: var(--ink); min-width: 150px; }
+    .us { background: #f1eefd; } td.us:first-child { background: #fff; }
+    .cmd { display: block; background: var(--ink); color: #fff; border-radius: 14px; padding: 14px 18px; font: 15px/1.5 var(--mono); overflow-wrap: anywhere; margin: 12px 0; }
+    details { border-top: 1px solid var(--line); padding: 14px 0; } details:first-of-type { border-top: 0; }
+    summary { cursor: pointer; font: 800 19px/1.3 var(--round); }
+    details p { margin: 10px 0 0; color: var(--ink-2); }
+    .sources { font-size: 14.5px; color: var(--ink-2); } .sources li { margin: 3px 0; }
+    footer { text-align: center; color: var(--muted); font-size: 14.5px; padding: 0 24px 50px; }
+    @media (max-width: 700px) { section { padding: 24px 20px; border-radius: 22px; } body { font-size: 17px; } }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } section, td:first-child, th:first-child { background: #1c1c22; } .us { background: #26233a; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .cmd { background: #0c0c10; } }
+  </style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
+  <a class="btn ghost" href="../#install">Get OpenBot</a>
+</header>
+<main>
+  <h1>Open-source alternatives to cloud AI agents</h1>
+  <p class="lede">If you want an AI agent that does real work but you'd rather not rent a cloud computer for it, here is how OpenBot compares with OpenAI dots, Grok Bot, Meta Muse, Apple's Siri AI, Hermes Desktop and OpenClaw — including when you should pick something else.</p>
+  <p class="updated">Last updated 1 October 2026. Details about other products come from their public pages (linked below) and change quickly. If something is out of date, <a href="https://github.com/PrisacariuRobert/openbot/issues/new">tell us</a>.</p>
+
+  <section id="short-answer">
+    <h2>The short answer</h2>
+    <p><strong>OpenBot</strong> is a free, open-source (MIT) app for macOS that gives you a small team of named AI teammates running on <em>your own Mac</em>. They work in your Mail, Calendar, Reminders, Notes, Messages and folders, browse the web in their own private browsers, and ask before anything important. You bring the AI you already have: a ChatGPT, Claude, Grok or GitHub Copilot subscription, a free Gemini key, a free Nous Portal plan, OpenCode Go, or a model running on your Mac.</p>
+    <p>Choose it if you want an agent that can use your Mac's apps and files, don't want to pay for or depend on a cloud computer, and want to be asked before it sends, buys or changes anything. Choose something else if you need an agent that keeps working while your computer is off, runs on Windows or Linux, or needs a native phone app — see below.</p>
+  </section>
+
+  <section id="comparison">
+    <h2>Side by side</h2>
+    <div class="table">
+    <table>
+      <thead><tr><th></th><th class="us">OpenBot</th><th>OpenAI dots</th><th>Grok Bot</th><th>Meta Muse</th><th>Apple Siri AI</th><th>Hermes Desktop</th><th>OpenClaw</th></tr></thead>
+      <tbody>
+        <tr><td>Runs on</td><td class="us">Your Mac</td><td>Its own cloud computer with a virtual browser</td><td>A managed cloud computer shared by the teammates</td><td>Meta's cloud (a secure VM and browser)</td><td>Your Mac, with Apple's cloud for larger requests</td><td>Your computer</td><td>Your machine or a server</td></tr>
+        <tr><td>Price</td><td class="us">Free software; you pay only your AI (free options exist)</td><td>Included with ChatGPT Pro and Business Premium; one dot on Pro</td><td>Bundled with $120–300 a month plans</td><td>Free, $20 and $100 a month tiers</td><td>Free beta with daily usage limits; paid access planned</td><td>Free software; optional Nous Portal sign-in</td><td>Free software plus your models</td></tr>
+        <tr><td>Works in your Mac's Mail, Calendar, Notes and files</td><td class="us">Yes</td><td>No (cloud apps through plugins)</td><td>No</td><td>No</td><td>Yes, for quick requests and in-app actions</td><td>Files and scripts; no deep Mac app tools that we know of</td><td>Through skills you install</td></tr>
+        <tr><td>A team of named teammates</td><td class="us">Yes, each with its own browser and workspace</td><td>One agent per dot</td><td>Yes, sharing one computer</td><td>One agent</td><td>One assistant</td><td>Named bots (Bot Mode)</td><td>Partly</td></tr>
+        <tr><td>Open source</td><td class="us">Yes (MIT)</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Yes (MIT)</td><td>Yes (MIT)</td></tr>
+        <tr><td>Where you use it</td><td class="us">macOS 13+ (Apple silicon and Intel); iPhone through a Home Screen app, Siri and the Share menu</td><td>Cloud, through ChatGPT</td><td>Desktop and iOS</td><td>Phone-first</td><td>macOS 27 on Apple silicon</td><td>macOS, Windows, Linux</td><td>Your machine or a server</td></tr>
+        <tr><td>Good to know</td><td class="us">Works while your Mac is on; asks before it sends, buys or changes anything</td><td>Not offered in the EEA, UK or Switzerland at launch; read-only until you approve</td><td>Allow, deny or always-allow for actions</td><td>—</td><td>English first; beta</td><td>Free models with a Nous sign-in, no key needed</td><td>Large skill marketplace</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="when">
+    <h2>When to choose which</h2>
+    <h3>Choose OpenBot if you…</h3>
+    <ul>
+      <li>want an agent that works in <strong>your own Mail, Calendar, Notes, Messages and folders</strong> ("find the receipt in my Mail and save the PDF", "what did Anna say about the trip?");</li>
+      <li>want <strong>a team</strong> — a researcher, a writer, a checker — each with its own browser, instead of one assistant;</li>
+      <li>want to be <strong>asked first</strong> and shown the exact button or change;</li>
+      <li>prefer <strong>free, open-source</strong> software on your own hardware, with the AI of your choice;</li>
+      <li>live in a region where cloud agents aren't offered yet.</li>
+    </ul>
+    <h3>Choose a cloud agent (OpenAI dots, Grok Bot, Meta Muse) if you…</h3>
+    <ul>
+      <li>need it to <strong>keep working while your computer is off</strong> — OpenBot works while your Mac is awake (and keeps it awake for scheduled jobs), or on a computer that stays on;</li>
+      <li>want everything managed for you with no install, and don't mind your work running on the provider's servers;</li>
+      <li>want a <strong>native phone app</strong> (OpenBot's phone side is a Home Screen web app plus Siri and the Share menu).</li>
+    </ul>
+    <h3>Choose Siri AI if you…</h3>
+    <ul><li>want help that is already built into your Mac for quick questions and in-app actions, with nothing to install. OpenBot works alongside it: "Hey Siri, ask OpenBot" hands longer jobs to your team.</li></ul>
+    <h3>Choose Hermes Desktop or OpenClaw if you…</h3>
+    <ul><li>use <strong>Windows or Linux</strong>, want the widest range of chat-app gateways, or like a terminal-first, highly configurable setup. OpenBot can import a Hermes or OpenClaw profile, so switching is one click.</li></ul>
+  </section>
+
+  <section id="try">
+    <h2>Try OpenBot</h2>
+    <p>On a Mac (macOS 13 or later), one line installs it. No administrator password; the installer checks the download's fingerprint. <a href="https://github.com/PrisacariuRobert/openbot/blob/main/scripts/install.sh">Read the installer</a> first if you like.</p>
+    <code class="cmd">curl -fsSL https://openbots.foundation/install.sh | sh</code>
+    <p>Then connect an AI (a free Gemini key is enough to start), make your first teammate, or <a href="../teammates/">add a ready-made one from the gallery</a>. Source code and docs: <a href="https://github.com/PrisacariuRobert/openbot">github.com/PrisacariuRobert/openbot</a>.</p>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details open><summary>What is a free, open-source alternative to OpenAI dots or Grok Bot?</summary><p>OpenBot is a free, MIT-licensed app for macOS that gives you a team of AI teammates running on your own Mac instead of a rented cloud computer. It works with the AI you already have (ChatGPT, Claude, Grok or GitHub Copilot subscriptions, a free Gemini key, Nous Portal, OpenCode Go, or a model on your Mac).</p></details>
+    <details><summary>Is there an AI agent that can use my Mac's Mail, Calendar and Notes?</summary><p>Yes. OpenBot teammates can read your Apple Mail, Calendar, Reminders, Notes, Contacts and Messages and search your chosen folders, and can add reminders, notes and calendar events or save mail attachments after you approve each change. Cloud agents such as OpenAI dots, Grok Bot and Meta Muse run on their own cloud computers and cannot reach these apps on your Mac.</p></details>
+    <details><summary>Does OpenBot work on Windows, Linux or iPhone?</summary><p>OpenBot installs on macOS 13 or later, on Apple silicon and Intel Macs. There is no Windows or Linux desktop app yet (a Linux runner exists for an always-on server). On iPhone you pair a Home Screen web app with one scan, and can use Siri and the Share menu through shortcuts. For Windows and Linux, Hermes Desktop is an open-source option.</p></details>
+    <details><summary>How much does OpenBot cost?</summary><p>OpenBot is free, open-source software. You pay only for the AI you connect, and free options exist: a free Google Gemini key or a free Nous Portal plan. OpenBot never adds a fee or resells tokens.</p></details>
+    <details><summary>Does my data leave my Mac?</summary><p>Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms; choose a model running on your Mac to keep everything local.</p></details>
+    <details><summary>Does OpenBot ask before it acts?</summary><p>Yes. Reading and searching happen on their own. Sending, buying, signing in, submitting or changing something shows you the exact action and waits for your approval.</p></details>
+  </section>
+
+  <section id="sources">
+    <h2>Sources</h2>
+    <ul class="sources">
+      <li>OpenAI dots: <a href="https://www.androidheadlines.com/2026/09/openai-launches-dots-always-on-ai-agents.html">Android Headlines</a>, <a href="https://pasqualepillitteri.it/en/news/19302/openai-dots-personal-ai-agent-devday-2026">DevDay coverage</a></li>
+      <li>Grok Bot: <a href="https://x.ai/news/introducing-grok-bot">xAI</a>, <a href="https://www.digitalapplied.com/blog/grok-bot-ai-teammates-launch-cloud-computer-2026">overview</a></li>
+      <li>Meta Muse: <a href="https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/">Meta</a></li>
+      <li>Apple Siri AI: <a href="https://www.apple.com/newsroom/2026/09/siri-ai-a-profoundly-more-capable-and-personal-assistant-is-here/">Apple Newsroom</a>, <a href="https://appleinsider.com/articles/26/09/09/siri-ai-will-launch-in-beta-complicated-by-daily-usage-caps-future-paid-access">AppleInsider</a></li>
+      <li>Hermes Desktop: <a href="https://hermes-agent.nousresearch.com/desktop">Nous Research</a>, <a href="https://the-decoder.com/nous-research-releases-hermes-desktop-an-open-source-ai-agent-for-every-platform/">The Decoder</a></li>
+      <li>OpenBot: <a href="https://github.com/PrisacariuRobert/openbot">source code</a>, <a href="https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md">changelog</a>, <a href="https://github.com/PrisacariuRobert/openbot/blob/main/docs/COMPETITIVE_SCORECARD_2026-09-23.md">scorecard</a></li>
+    </ul>
+  </section>
+</main>
+<footer>OpenBot — free, open-source AI teammates for your Mac. <a href="../">Home</a> · <a href="../teammates/">Teammate gallery</a> · <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a></footer>
+</body>
+</html>

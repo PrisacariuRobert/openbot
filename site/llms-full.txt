@@ -1,0 +1,67 @@
+# OpenBot — the full facts
+
+Last updated: 1 October 2026. Source of truth: https://github.com/PrisacariuRobert/openbot
+
+## What it is
+
+OpenBot is a free, open-source (MIT) macOS app that gives you a small team of named AI teammates running on your own Mac. Each teammate has a name, a job, a private workspace and its own browser. You talk to them in a chat, by voice, from your iPhone, or from Siri, and they do the work.
+
+Tagline: an AI team that does the work on your real Mac, not just answers.
+
+## What it can do
+
+- Work in your own Apple apps: read Mail, Calendar, Reminders, Notes, Contacts and Messages; search the folders you choose; save mail attachments; draft emails; add reminders, notes and calendar events. Reading and searching happen on their own. Changes show the exact action and wait for your approval.
+- Know you privately: an optional search index of your folders, Notes, Mail and Messages, stored on your Mac, so you can ask "What did Anna say about the Berlin trip, and when is it?". You see and delete anything it knows on a "What your team knows" page. Everything is opt-in.
+- Browse the web: each teammate uses its own private browser profile, can stay signed in to the sites you choose, and links its sources. Sending, buying, signing in and submitting always wait for your okay, showing the website and the exact button.
+- Run on a schedule: routines such as "Every Monday at 9, plan my week", a morning brief of your day (calendar, unread mail, reminders), and a Sunday look back. Your Mac wakes for scheduled jobs.
+- Deliver real files: Word documents, spreadsheets and plans.
+- Work as a team: write "Nova: find... Scout, double-check..." and each does their part in order.
+- Share teammates: a teammate can be shared as a link or added from the gallery at https://openbots.foundation/teammates/. Imported teammates start with the browser and private computer off, use your own AI, and ask before anything important.
+- Share a result: turn a finished answer into a web page with private details (emails, phone numbers, keys, your home folder) removed before it is shared.
+- Phone and voice: hands-free voice conversation; pair an iPhone with one scan for a Home Screen app with notifications; "Hey Siri, ask OpenBot" and a Share menu shortcut hand work to your team.
+- Switch from another tool: one-click import from Hermes Agent and OpenClaw, including automations (imported paused).
+
+## Which AI it uses
+
+You choose, per teammate. OpenBot never resells tokens or adds a fee; each provider's own terms and limits apply.
+
+- Start free: a Google Gemini key (a Google account, no card), or a free Nous Portal plan.
+- Use a subscription you already pay for: ChatGPT, Claude, Grok, GitHub Copilot (Pro, Pro+, Business).
+- Pay per use: OpenCode Go, or any OpenAI-compatible API.
+- Stay on your Mac: models run locally with Ollama.
+
+## Price
+
+The software is free. You pay only for the AI you connect, and free options exist.
+
+## Where it runs and what it needs
+
+- macOS 13 or later, Apple silicon or Intel. Install: curl -fsSL https://openbots.foundation/install.sh | sh
+- Works while your Mac is on (it keeps the Mac awake for scheduled jobs). It does not run in the cloud. A Linux runner exists for an always-on server, but there is no one-click hosted option.
+- No Windows or Linux desktop app. No native iPhone app (a Home Screen web app instead).
+- Public beta.
+
+## Privacy and safety
+
+- Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. There is no OpenBot account and no tracking.
+- When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms. Choose a model running on your Mac to keep everything local.
+- Teammate browsers are separate profiles, not a security sandbox.
+- Security model: https://github.com/PrisacariuRobert/openbot/blob/main/docs/SECURITY.md
+
+## How it compares (as of 1 October 2026, from public pages)
+
+- OpenAI dots: an always-on agent on its own cloud computer with a virtual browser; included with ChatGPT Pro and Business Premium; not offered in the EEA, UK or Switzerland at launch. Choose dots if you want a managed agent that works while your computer is off. Choose OpenBot if you want it on your Mac, with your Mac's apps, free, or in Europe.
+- Grok Bot (xAI): named teammates sharing one managed cloud computer; bundled with $120–300 a month plans. Choose it for a hosted team with a desktop and iOS app. Choose OpenBot for free software with isolated teammates on your hardware.
+- Meta Muse: a consumer personal agent with its own secure VM and browser; free, $20 and $100 a month tiers; phone-first. Choose it for a phone-first agent. Choose OpenBot for your Mac's apps and your own data.
+- Apple Siri AI (macOS 27): personal context from Mail, Messages, Notes, Photos and Calendar, with quick in-app actions; free beta with daily limits, English first, Apple silicon. Choose it for quick questions with nothing to install. OpenBot works alongside it for longer jobs.
+- Hermes Desktop (Nous Research, MIT): a native app for macOS, Windows and Linux with free models through a Nous sign-in. Choose it on Windows or Linux, or for a terminal-first setup.
+- OpenClaw (MIT): a self-hosted gateway to many chat apps with a large skill marketplace. Choose it for the widest chat-app reach.
+
+Full comparison with sources: https://openbots.foundation/alternatives/
+
+## Links
+
+- Website: https://openbots.foundation/
+- Source and README: https://github.com/PrisacariuRobert/openbot
+- Changelog: https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md
+- Report a security issue privately: https://github.com/PrisacariuRobert/openbot/blob/main/SECURITY.md
