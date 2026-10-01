@@ -124,6 +124,14 @@
     h1, h2, h3, .chunky { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; }
 
     /* Tactile buttons: they sit on a ledge and press down. */
+    .share-card { background: #fff; color: var(--ink); border-radius: 28px; padding: 26px; max-width: 420px; margin: 0 auto; transform: rotate(var(--tilt, 0deg)); box-shadow: 0 24px 50px -24px rgba(0,0,0,.35); }
+    .share-head { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+    .share-head .face { width: 64px; height: 64px; flex: none; }
+    .share-head small { display: block; font: 800 12.5px/1.3 var(--round); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .share-head b { display: block; font: 900 24px/1.15 var(--round); letter-spacing: -.02em; }
+    .share-head span { color: var(--ink-2); font-size: 15px; }
+    .share-card p { margin: 0 0 18px; font-size: 16px; line-height: 1.55; color: var(--ink-2); }
+    .share-add { display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 14px; background: var(--ink); color: #fff; font: 800 16px/1 var(--round); box-shadow: 0 4px 0 #000; }
     .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 58px; padding: 0 28px; border: 0; border-radius: 18px; background: var(--face); color: var(--label) !important; font: 800 19px/1 var(--round); text-decoration: none; cursor: pointer; box-shadow: 0 6px 0 var(--edge); transform: translateY(0); transition: transform .08s ease, box-shadow .08s ease, filter .2s ease; }
     .btn:hover { filter: brightness(1.08); }
     .btn:active { transform: translateY(6px); box-shadow: 0 0 0 var(--edge); }
@@ -518,6 +526,25 @@
           <div class="m me">What did Anna say about the Berlin trip?</div>
           <div class="m bot">She booked the tickets and asked to move dinner to 8. The hotel is near the station.<br /><small style="opacity:.7">From Messages with Anna, 10 Sept · and your note “Berlin trip plan”</small></div>
           <div class="ok">Searched on your Mac in 0.01 s</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band pixel share" id="share">
+    <div class="wrap band-grid">
+      <div class="words rise">
+        <div class="hostline"><div class="actor" data-cast="pixel" aria-hidden="true"></div><span>New in 0.40</span></div>
+        <h2>Share a teammate. Add one in a tap.</h2>
+        <p>Made a teammate that works well? Send it as a link. Whoever opens it sees exactly what it is told to do, and adds it to their own OpenBot. Or start from our gallery of ready-made teammates.</p>
+        <ul class="ticks"><li>Starts with the browser and private computer off</li><li>Uses their own AI; your accounts and memory never travel</li><li>Routines arrive paused</li></ul>
+        <p><a class="btn white" href="teammates/">Browse the gallery</a></p>
+      </div>
+      <div class="picture rise">
+        <div class="share-card" style="--tilt: 1.5deg" aria-label="An example shared teammate">
+          <div class="share-head"><div class="face" data-face="scout" aria-hidden="true"></div><div><small>A teammate someone shared</small><b>Receipt keeper</b><span>Finds receipts and files them</span></div></div>
+          <p>Finds the receipts and invoices in your Mail, saves the PDFs where you can find them, and keeps a simple spreadsheet.</p>
+          <div class="share-add">Add Receipt keeper</div>
         </div>
       </div>
     </div>

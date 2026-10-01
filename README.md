@@ -119,9 +119,14 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.39.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.39.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+OpenBot 0.40.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.40.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
-## What's new in 0.39.0
+## What's new in 0.40.0
+
+- **Share a teammate.** Tap *Copy share link* on a teammate and send it to anyone. They see exactly what it is told to do before adding it, and it starts with the browser and private computer off, on their own AI. Or start from the [gallery](https://openbots.foundation/teammates/) of ready-made teammates: receipts, inbox triage, trip planning, meeting prep and more.
+- **Share a result.** Turn a finished answer into one web page. Emails, phone numbers, keys and your home folder are hidden first, and you see what was hidden before you share it.
+
+## Earlier: 0.39.0
 
 - **Knows you, privately.** Your team can search your own Notes, Mail, Messages and the folders you choose: “what did Anna say about the Berlin trip?”, “find my note about the Antwerp visit”. The index lives in OpenBot's folder on your Mac, is readable only by you, and **What they know** lets you turn each source off or forget everything.
 - **A morning brief in one tap.** Each morning your teammate writes what's on your calendar, the mail that needs you and what's due. It only reads.
