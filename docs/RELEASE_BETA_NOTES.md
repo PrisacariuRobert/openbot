@@ -1,4 +1,4 @@
-**OpenBot 0.41 — Autopilot.** For the teammates you trust completely: let them act like a person, without asking first.
+**OpenBot 0.41.1 — tidier screens, easier install.** A small update after Autopilot.
 
 ## Install or update (macOS 13+, Apple silicon or Intel)
 
@@ -6,21 +6,18 @@
 curl -fsSL https://openbots.foundation/install.sh | sh
 ```
 
-Already on 0.40? Tap **Update** in OpenBot's sidebar, or run the same line. Your teammates, chats and files stay.
+Already on 0.41? Tap **Update** in OpenBot's sidebar, or run the same line. Your teammates, chats and files stay.
 
-## New
+## What changed
 
-- **Autopilot.** Open a teammate → **Autopilot** → switch it on. From then on that teammate sends, books, posts and buys without waiting for your okay. It is **off until you turn it on**, one teammate at a time (or for everyone in Control center → Advanced).
-  - You get a clear warning first, a note appears in the teammate's chat, a chip shows who is on Autopilot, and every action is logged in the activity feed.
-  - It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions.
-  - It never travels: a shared teammate, an imported profile or a copy always starts with it off.
-  - Switch back to **Ask first** any time from the same place, or from the **+** menu next to the message box.
-- **Easier to find.** A new [comparison page](https://openbots.foundation/alternatives/) and plain-text facts for AI assistants.
+- **The morning brief card is fixed.** Its fields lined up badly, a label wrapped and the notice broke across lines. It is now a clean two-column form in light and dark, and on a phone.
+- **Tidier new screens.** "What they know", the preview you get when someone shares a teammate with you, and "Add from a link" got the same cleanup.
+- **An easier install.** The installer shows a progress bar and how long to expect, and downloads through openbots.foundation (about five times faster in our testing), falling back to GitHub if needed. The fingerprint check is unchanged.
 
-## Good to know
+## Still true from 0.41
 
-- **Autopilot is for teammates you trust.** Like any assistant, a teammate can be misled by a hostile web page or email. Keep Autopilot off for teammates that can reach accounts or money you wouldn't hand to a stranger.
-- **Mail and Messages need Full Disk Access** for OpenBot (System Settings → Privacy & Security → Full Disk Access). The app explains this and opens the right page.
+- **Autopilot** (off by default, per teammate) lets a teammate act like a person without asking first. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions.
+- **Mail and Messages need Full Disk Access** for OpenBot. The app explains this and opens the right page.
 - **This is still a beta.** The Mac app is ad-hoc signed, not notarized; the one-line installer is the supported way to install it.
 
 Full details are in the [changelog](https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md).

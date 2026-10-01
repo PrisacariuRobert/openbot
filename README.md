@@ -119,9 +119,14 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 ## Status
 
-OpenBot 0.41.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.41.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+OpenBot 0.41.1 is a public beta ([release notes](https://github.com/PrisacariuRobert/openbot/releases/tag/v0.41.1)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
-## What's new in 0.41.0
+## What's new in 0.41.1
+
+- **Tidier screens.** The morning brief card, the "What they know" notice, shared-teammate previews and "Add from a link" are cleaned up.
+- **An easier install.** A progress bar while the download runs, and a faster route for it.
+
+### Since 0.41.0
 
 - **Autopilot.** Turn it on for a teammate you trust and it acts like a person: it sends, books, posts and buys without asking first. It's off until you switch it on, one teammate at a time (or for everyone in Control center → Advanced). You see a clear warning first, a note appears in the teammate's chat, a chip shows who is on Autopilot, and every action is logged in the activity feed. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, and it is never part of a shared teammate.
 - A new [comparison page](https://openbots.foundation/alternatives/) and plain-text facts for AI assistants, so OpenBot is easy to find and quote accurately.
