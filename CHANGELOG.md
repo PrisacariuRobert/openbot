@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.39.0 — Knows you, privately (1 October 2026)
+
+- A private index of your own material, so a teammate can answer "what did Anna say about the Berlin trip?" without scanning everything:
+  - Sources, each opt-in: Apple Notes, Mail, Messages and documents in folders you choose (PDF, Word, Excel, PowerPoint, text).
+  - Messages are grouped by conversation and day, and phone numbers and emails are turned back into names from Contacts.
+  - Search is instant (a few milliseconds) and ranked, with accents ignored. A new `search_my_mac` tool gives the source, title, date and a snippet, and says which tool opens the full item.
+  - The index is a file in OpenBot's data folder on this Mac, readable only by you. Only the few snippets a teammate finds for a question reach the AI that answers it.
+  - Workspace → What they know: turn sources on or off, see counts and freshness, add folders, and Forget everything. Forgetting also compacts the file, so the text is gone from disk, not just from search.
+  - Mail and Messages need Full Disk Access for OpenBot (explained in the app, with a button to the right settings page).
+- Morning brief: Automations → "Start your day with a brief". Pick who writes it, a time, weekdays or every day, and an optional city. It reads your calendar, the unread mail that needs you and reminders due, and only reads. "Try it now" runs it straight away.
+- New read tools for any teammate: `mac_calendar_events` (the next two weeks are cached and kept warm because Calendar answers slowly, about 40 seconds for 17 calendars) and `mac_mail_unread` (Gmail accounts keep mail in "All Mail", so junk, spam, trash, sent, drafts and archive are excluded by name).
+- Teammates prefer these direct tools over the older `work_collect` report for a morning brief on a Mac.
+
 ## 0.38.0 — Your Mac, your apps (1 October 2026)
 
 - Teammates work in your own Apple apps on this Mac, through fixed scripts (never model-written code):
