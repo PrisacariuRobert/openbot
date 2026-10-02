@@ -276,15 +276,24 @@ export class ComputerManager {
   }
 }
 
-export function chromePath(): string | undefined {
-  const candidates = [
-    process.env.OPENBOT_CHROME_PATH,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium",
-  ].filter((value): value is string => Boolean(value));
-  return candidates.find(existsSync);
+/** Where a Chromium-based browser usually lives on this computer, best choice first. Every Windows PC has
+ * Microsoft Edge (Chromium-based), so there is always a fallback there. The first path that exists wins;
+ * OPENBOT_CHROME_PATH always wins when it is set. */
+export function chromeCandidates(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string[] {
+  const custom = env.OPENBOT_CHROME_PATH ? [env.OPENBOT_CHROME_PATH] : [];
+  if (platform === "win32") {
+    const roots = [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA, "C:\\Program Files", "C:\\Program Files (x86)"].filter((value): value is string => Boolean(value));
+    const apps = ["Google\\Chrome\\Application\\chrome.exe", "Chromium\\Application\\chrome.exe", "Microsoft\\Edge\\Application\\msedge.exe", "BraveSoftware\\Brave-Browser\\Application\\brave.exe"];
+    return [...custom, ...apps.flatMap((app) => roots.map((root) => `${root.replace(/[\\/]+$/, "")}\\${app}`))];
+  }
+  if (platform === "darwin") {
+    return [...custom, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"];
+  }
+  return [...custom, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium", "/usr/bin/microsoft-edge"];
+}
+
+export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
+  return chromeCandidates(platform, env).find((candidate) => exists(candidate));
 }
 
 /** Multi-label public suffixes where the last two labels are NOT the
