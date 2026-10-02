@@ -80,10 +80,10 @@ export function renderResultPage(input: ResultInput): ResultPage {
 ${question ? `<div class="q">${escapeHtml(question.text)}</div>` : ""}
 <article class="a">${markdown(answer.text)}</article>
 ${files.length ? `<p class="files">Files delivered: ${files.map((file) => escapeHtml(file.text)).join(", ")}</p>` : ""}
-<footer>Made with <a href="https://openbots.foundation" target="_blank" rel="noopener">OpenBot</a> — free AI teammates on your Mac</footer>
+<footer>Made with <a href="https://openbots.foundation/?ref=result" target="_blank" rel="noopener">OpenBot</a> — free, open-source AI teammates on your Mac</footer>
 </main></body></html>`;
 
   const filename = `${(title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "result")}.html`;
-  const text = `${question ? `${question.text}\n\n` : ""}${answer.text}\n\n— ${input.teammate.name}, ${date}. Made with OpenBot (https://openbots.foundation)`;
+  const text = `${question ? `${question.text}\n\n` : ""}${answer.text}\n\n— ${input.teammate.name}, ${date}. Made with OpenBot (https://openbots.foundation/?ref=result-text)`;
   return { title, html, hidden, total, summary: describeHidden(hidden), filename, text };
 }
