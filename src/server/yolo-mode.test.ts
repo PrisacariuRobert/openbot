@@ -50,7 +50,9 @@ test("YOLO mode auto-approves fresh pauses and records them", { timeout: 90_000 
     }
     assert.equal(approved, true);
     assert.notEqual(db.getRun(autoRun.id)?.status, "awaiting_approval");
-    assert.ok(db.getRun(autoRun.id)!.activities.some((activity) => activity.label === "Auto-approved by Autopilot"));
+    let logged = false;
+    for (let attempt = 0; attempt < 100 && !logged; attempt++) { logged = db.getRun(autoRun.id)!.activities.some((activity) => activity.label === "Auto-approved by Autopilot"); if (!logged) await delay(100); }
+    assert.ok(logged, "the decision is recorded in the activity feed");
     assert.equal((await post("/api/settings", { yoloMode: false }, "PATCH")).status, 200);
     const pausedAgain = await (await ask()).json() as { runs: Array<{ id: string; approvalId: string | null }> };
     assert.equal(db.getRun(pausedAgain.runs[0]!.id)?.status, "awaiting_approval");
