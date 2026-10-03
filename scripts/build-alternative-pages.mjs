@@ -208,7 +208,7 @@ ${brand}
     <ul class="sources">${page.sources.map(([label, href]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}<li><a href="https://github.com/PrisacariuRobert/openbot">OpenBot source code</a>, <a href="https://github.com/PrisacariuRobert/openbot/blob/main/CHANGELOG.md">changelog</a></li></ul>
   </section>
 </main>
-<footer>OpenBot — free, open-source AI teammates for your Mac. <a href="../../">Home</a> · <a href="../">All comparisons</a> · <a href="../../teammates/">Teammate gallery</a> · <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a></footer>
+<footer>OpenBot — free, open-source AI teammates for your Mac. This website counts visits with Cloudflare Web Analytics (no cookies, no personal data). <a href="../../">Home</a> · <a href="../">All comparisons</a> · <a href="../../teammates/">Teammate gallery</a> · <a href="https://github.com/PrisacariuRobert/openbot">GitHub</a></footer>
 </body>
 </html>
 `;
