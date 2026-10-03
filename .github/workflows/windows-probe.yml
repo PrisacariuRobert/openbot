@@ -1,0 +1,59 @@
+name: Windows probe
+
+# Informational. Boots the real server and runs the unit tests on a Windows runner so we know exactly what
+# works and what does not before we ship a Windows beta. It never blocks a release or a pull request.
+on:
+  workflow_dispatch:
+  push:
+    branches: [chore/windows-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: The server starts and answers
+        shell: bash
+        run: |
+          export OPENBOT_LOAD_ENV=0 OPENBOT_DATA_DIR="$RUNNER_TEMP/openbot-data" OPENBOT_PORT=4399 OPENBOT_HOST=127.0.0.1 OPENBOT_DEPLOYMENT_MODE=local NODE_ENV=production
+          mkdir -p "$OPENBOT_DATA_DIR"
+          node --import tsx src/server/index.ts > server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4399/api/healthz; then echo; echo "healthz ok after $attempt tries"; break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:4399/api/healthz || { echo "SERVER DID NOT START"; tail -40 server.log; exit 1; }
+          curl --silent -o /dev/null -w "studio page: %{http_code}\n" http://127.0.0.1:4399/
+          tail -5 server.log
+      - name: Unit tests (informational)
+        shell: bash
+        continue-on-error: true
+        run: npx tsx --test --test-concurrency=2 "src/**/*.test.ts" 2>&1 | tee test-output.txt
+      - name: What failed on Windows
+        if: always()
+        shell: bash
+        run: |
+          echo "## Windows probe" >> "$GITHUB_STEP_SUMMARY"
+          grep -E "^ℹ (tests|pass|fail|cancelled|skipped)" test-output.txt | tee -a "$GITHUB_STEP_SUMMARY" || true
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Failing tests (first 80):" >> "$GITHUB_STEP_SUMMARY"
+          grep -E "^✖ " test-output.txt | sort -u | head -80 | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: windows-probe-output
+          path: |
+            test-output.txt
+            server.log

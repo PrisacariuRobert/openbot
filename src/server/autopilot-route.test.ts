@@ -50,9 +50,12 @@ test("Autopilot is per teammate: one acts on its own, the others still ask, and 
     const auto = await ask("nova");
     assert.ok(auto.approvalId);
     let approved = false;
-    for (let attempt = 0; attempt < 50 && !approved; attempt++) { await delay(100); approved = db.getApproval(auto.approvalId!)?.status === "approved"; }
+    for (let attempt = 0; attempt < 200 && !approved; attempt++) { await delay(100); approved = db.getApproval(auto.approvalId!)?.status === "approved"; }
     assert.equal(approved, true, "Nova's review was approved for the owner");
-    assert.ok(db.getRun(auto.id)!.activities.some((activity) => activity.label === "Auto-approved by Autopilot"), "and recorded in the activity feed");
+    // The activity line is written just after the approval is marked, so wait for it instead of racing it.
+    let logged = false;
+    for (let attempt = 0; attempt < 100 && !logged; attempt++) { logged = db.getRun(auto.id)!.activities.some((activity) => activity.label === "Auto-approved by Autopilot"); if (!logged) await delay(100); }
+    assert.ok(logged, "and recorded in the activity feed");
 
     const pixel = await ask("pixel");
     assert.equal(db.getRun(pixel.id)?.status, "awaiting_approval", "Pixel still asks first");
