@@ -22,7 +22,10 @@ Run the official searches yourself (they block automated visits). Search **OPENB
 Send Claude screenshots or the owner names. A search summary we found (not yet confirmed by us) lists OPENBOTS, Reg. No. 6413358, registered 6 July 2021 for software and software development services (class 42), owned by OpenBots, Inc., and a pending OPENBOT application from 2023 for robotics hardware and education (class 9). If the official record matches, our name is too close to a registered mark in our own field, and Claude's recommendation is to rename before the Product Hunt launch on 17 October.
 
 ## 6. Windows  ·  decision only
-See the Windows probe results in the PR and the options in the chat: GitHub's Windows machines are free and already run our server; a VM on your Mac is possible (Apple silicon, 24 GB, 105 GB free). Tell Claude "go" for the VM and it will ask before each download.
+Measured on GitHub's free Windows machine (workflow "Windows probe"): install, build and server start work and 1,021 of 1,128 tests pass; the browser gap is fixed. What a beta still needs is in `docs/ROADMAP.md` (0.43). A VM on your Mac is possible (Apple silicon, 24 GB, 105 GB free) for the installer and desktop pass: tell Claude "go" and it asks before each download (UTM is free; Microsoft's Windows 11 Arm ISO is free to download, about 5 GB, and needs a product key to activate).
 
 ## 7. Apple Developer Program ($99 a year)  ·  later, when the first setup job pays
 Enroll at developer.apple.com/programs with your identity. It lets the app install without warnings and unlocks a Homebrew install. Not needed for the one-line installer.
+
+## 8. GitHub link preview image  ·  2 minutes
+Repository Settings → General → **Social preview** → upload `site/social.png` (already 1280×640). It is what people see when someone shares the repository link. Web-only setting.
