@@ -47,4 +47,5 @@ __MACOSX/
 dist-release/
 
 # Generated demo clips (scripts/record-demo.mjs)
-marketing/queue/media/
+# Marketing plans, drafts and reports are private to the maintainer: never commit them.
+/marketing/
