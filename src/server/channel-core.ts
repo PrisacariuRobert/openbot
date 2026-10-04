@@ -50,14 +50,14 @@ export class ChannelConversation {
   }
 
   greeting() {
-    return `Connected to OpenBot. Message me and ${this.defaultTeammate()?.name || "your teammate"} will help. Start with @Name to ask another teammate; /who lists them.`;
+    return `Connected to Sidemates. Message me and ${this.defaultTeammate()?.name || "your teammate"} will help. Start with @Name to ask another teammate; /who lists them.`;
   }
 
   /** A message the channel has already verified comes from the paired owner. */
   async handleOwnerText(chatId: string, text: string, requestId: string) {
     const trimmed = text.trim();
     if (trimmed === "/start" || trimmed === "/help") {
-      await this.transport.send(chatId, `Message me and ${this.defaultTeammate()?.name || "your teammate"} will take care of it. Start with @Name to ask another teammate. /who lists teammates; /use Name changes who answers by default. Approvals are reviewed in OpenBot.`);
+      await this.transport.send(chatId, `Message me and ${this.defaultTeammate()?.name || "your teammate"} will take care of it. Start with @Name to ask another teammate. /who lists teammates; /use Name changes who answers by default. Approvals are reviewed in Sidemates.`);
       return;
     }
     if (trimmed === "/who") {
@@ -77,13 +77,13 @@ export class ChannelConversation {
     const named = mention ? this.findTeammate(mention[1]!) : null;
     const bot = named || this.defaultTeammate();
     const body = named ? mention![2]!.trim() : trimmed;
-    if (!bot) { await this.transport.send(chatId, "There are no teammates in your studio yet. Create one in OpenBot first."); return; }
+    if (!bot) { await this.transport.send(chatId, "There are no teammates in your studio yet. Create one in Sidemates first."); return; }
     const result = await this.host.localApi("POST", "/api/messages", {
       threadId: bot.threadId, body, targetBotIds: [bot.id], requestId,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
     if (result.status >= 400) {
-      await this.transport.send(chatId, `OpenBot couldn't start that: ${String(result.body.error || "please try again in the studio.")}`);
+      await this.transport.send(chatId, `Sidemates couldn't start that: ${String(result.body.error || "please try again in the studio.")}`);
       return;
     }
     const runs = Array.isArray(result.body.runs) ? result.body.runs as Array<{ id?: string }> : [];
@@ -104,14 +104,14 @@ export class ChannelConversation {
       if (!run) continue;
       if (run.status === "awaiting_approval" && run.approvalId && !item.notifiedApprovalIds.includes(run.approvalId)) {
         const approval = this.host.db.getApproval(run.approvalId);
-        await this.transport.send(item.chatId, `${run.botName} needs your okay: ${approval?.actionLabel || "an action"}.\nReview it in OpenBot: ${this.host.appUrl.replace(/\/$/, "")}/?thread=${encodeURIComponent(run.threadId)}`);
+        await this.transport.send(item.chatId, `${run.botName} needs your okay: ${approval?.actionLabel || "an action"}.\nReview it in Sidemates: ${this.host.appUrl.replace(/\/$/, "")}/?thread=${encodeURIComponent(run.threadId)}`);
         item.notifiedApprovalIds.push(run.approvalId);
       }
       if (["completed", "failed", "cancelled"].includes(run.status)) {
         const reply = this.host.db.listMessages(run.threadId).filter((message) => message.runId === run.id && message.senderType === "bot" && message.kind === "text").at(-1);
         const text = run.status === "completed"
           ? reply?.body || run.summary || `${run.botName} finished.`
-          : run.status === "cancelled" ? `${run.botName} stopped this task.` : `${run.botName} couldn't finish: ${run.error || "open OpenBot to see what happened."}`;
+          : run.status === "cancelled" ? `${run.botName} stopped this task.` : `${run.botName} couldn't finish: ${run.error || "open Sidemates to see what happened."}`;
         await this.transport.send(item.chatId, text);
         continue;
       }

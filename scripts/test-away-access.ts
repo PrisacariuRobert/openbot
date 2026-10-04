@@ -1,4 +1,4 @@
-// Actual OpenBot HTTP API -> built-in tunnel -> disposable relay. No account,
+// Actual Sidemates HTTP API -> built-in tunnel -> disposable relay. No account,
 // personal studio, model request, external exposure or Tailscale process used.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";

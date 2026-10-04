@@ -50,7 +50,7 @@ export function deriveChromeSafeStorageKey(password: Buffer): Buffer {
 }
 
 /** macOS guards Chrome's password with the Keychain. Access may ask the
- * owner for approval; OpenBot never changes the Keychain access policy. */
+ * owner for approval; Sidemates never changes the Keychain access policy. */
 export async function readChromeSafeStorageKey(): Promise<Buffer> {
   if (process.platform !== "darwin") throw new Error("The own-browser bridge currently works on macOS.");
   try {

@@ -14,4 +14,4 @@ license: MIT
 
 ## Provenance
 
-Original OpenBot method. Instructions are bundled with OpenBot and do not grant tool or account permissions. See LICENSE for reuse terms.
+Original Sidemates method. Instructions are bundled with Sidemates and do not grant tool or account permissions. See LICENSE for reuse terms.

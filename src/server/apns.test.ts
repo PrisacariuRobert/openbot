@@ -11,7 +11,7 @@ function config() {
   };
 }
 
-test("creates a bounded private APNs request for the registered OpenBot app", async () => {
+test("creates a bounded private APNs request for the registered Sidemates app", async () => {
   const sent: Array<Parameters<ApnsTransport>[0]> = [];
   const transport: ApnsTransport = async (request) => { sent.push(request); return { status: 200, body: "" }; };
   const client = new ApnsClient(config(), transport);
@@ -32,7 +32,7 @@ test("marks invalid APNs device tokens as permanent delivery failures", async ()
   const transport: ApnsTransport = async () => ({ status: 410, body: JSON.stringify({ reason: "Unregistered" }) });
   const client = new ApnsClient(config(), transport);
   await assert.rejects(
-    () => client.send({ deviceToken: "cd".repeat(32), environment: "production", bundleId: "app.openbot.mobile" }, { title: "OpenBot", body: "Ready", url: "/", kind: "completed" }),
+    () => client.send({ deviceToken: "cd".repeat(32), environment: "production", bundleId: "app.openbot.mobile" }, { title: "Sidemates", body: "Ready", url: "/", kind: "completed" }),
     (error) => error instanceof ApnsDeliveryError && error.permanent,
   );
 });

@@ -25,7 +25,7 @@ export class ApprovalReviewChangedError extends Error {
 
 export class ApprovedConnectorOutcomeUncertainError extends Error {
   constructor() {
-    super("The approved request may have completed, but OpenBot could not confirm or record the full result. Its outcome is uncertain. Check the destination before preparing another action.");
+    super("The approved request may have completed, but Sidemates could not confirm or record the full result. Its outcome is uncertain. Check the destination before preparing another action.");
   }
 }
 

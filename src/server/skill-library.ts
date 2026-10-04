@@ -121,7 +121,7 @@ export function createSkillPackage(input: Omit<SkillDefinition, "version"> & { v
 
 export function parseSkillPackage(input: unknown): SkillDefinition {
   const parsed = packageSchema.safeParse(input);
-  if (!parsed.success) throw new Error("That file is not an OpenBot skill package.");
+  if (!parsed.success) throw new Error("That file is not a Sidemates skill package.");
   if (parsed.data.integrity !== digest(parsed.data.skill)) throw new Error("This skill file changed after it was exported.");
   const findings = skillSecretFindings(parsed.data.skill);
   if (findings.length) throw new Error(`Remove private information before importing: ${findings.join(", ")}. Use placeholders such as {{secret}} instead.`);

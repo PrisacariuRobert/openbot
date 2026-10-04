@@ -18,4 +18,4 @@ Use the teammate's own persistent browser profile at app.todoist.com. Every writ
 
 ## Provenance
 
-OpenBot maintained built-in method. Proven in a signed-in teammate browser: create, edit, complete, reopen and delete, each read back, inbox restored. Instructions grant no tool or account permissions.
+Sidemates maintained built-in method. Proven in a signed-in teammate browser: create, edit, complete, reopen and delete, each read back, inbox restored. Instructions grant no tool or account permissions.

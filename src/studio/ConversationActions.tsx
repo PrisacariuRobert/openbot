@@ -68,7 +68,7 @@ export function ConversationActions({
       const response = await fetch(`/api/bots/${encodeURIComponent(target.id)}/retire`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const result = await response.json().catch(() => ({})) as { error?: string; bot?: { id?: string } };
       if (!response.ok) throw new Error(result.error || `Could not remove ${target.name}.`);
-      if (result.bot?.id !== target.id) throw new Error(`OpenBot did not confirm removing ${target.name}. Refresh before trying again.`);
+      if (result.bot?.id !== target.id) throw new Error(`Sidemates did not confirm removing ${target.name}. Refresh before trying again.`);
       if (!mounted.current) return;
       close();
       onRemoved(target.id);

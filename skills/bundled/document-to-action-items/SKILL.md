@@ -16,4 +16,4 @@ This method adds document reasoning, not new PDF/OCR/Office software.
 
 ## Provenance
 
-Reviewed OpenBot adaptation of [document-to-action-items](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/document-to-action-items/SKILL.md). Instructions are bundled with OpenBot and do not grant tool or account permissions. See LICENSE for reuse terms.
+Reviewed Sidemates adaptation of [document-to-action-items](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/document-to-action-items/SKILL.md). Instructions are bundled with Sidemates and do not grant tool or account permissions. See LICENSE for reuse terms.

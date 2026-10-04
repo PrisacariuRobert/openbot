@@ -192,11 +192,11 @@ export class AppleApps {
   constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail(), private readonly cacheStore: CalendarCacheStore | null = null, private readonly now: () => number = Date.now) { this.available = platform === "darwin"; }
 
   private async script(app: string, script: string, input: object): Promise<Record<string, unknown>> {
-    if (!this.available) throw new Error("Apple apps are only available when OpenBot runs on a Mac.");
+    if (!this.available) throw new Error("Apple apps are only available when Sidemates runs on a Mac.");
     let raw: string;
     try { raw = await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", script, JSON.stringify(input)], 30_000); }
     catch (error) {
-      if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error(`Allow OpenBot to use ${app} in System Settings → Privacy & Security → Automation, then try again. Nothing was changed.`);
+      if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error(`Allow Sidemates to use ${app} in System Settings → Privacy & Security → Automation, then try again. Nothing was changed.`);
       if ((error as { killed?: boolean })?.killed || /-600|-1712|isn.t running|timed out|ETIMEDOUT/i.test(String(error))) throw new Error(`${app} took too long to answer — it may be busy syncing. Try again in a minute, or narrow the request. Nothing was changed.`);
       throw new Error(`${app} couldn't be reached on this Mac. Nothing was changed.`);
     }
@@ -256,7 +256,7 @@ export class AppleApps {
         const result = eventSchema.parse(raw);
         for (const event of result.events) events.push({ calendar: result.name, ...event });
       } catch (error) {
-        if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error("Allow OpenBot to use Calendar in System Settings → Privacy & Security → Automation, then try again. Nothing was read.");
+        if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error("Allow Sidemates to use Calendar in System Settings → Privacy & Security → Automation, then try again. Nothing was read.");
         slow.push(calendars[index]!.name);
       }
     }
@@ -343,7 +343,7 @@ export class AppleApps {
     return { saved: target, bytes: bytes.length };
   }
   async listShortcuts(): Promise<string[]> {
-    if (!this.available) throw new Error("Shortcuts are only available when OpenBot runs on a Mac.");
+    if (!this.available) throw new Error("Shortcuts are only available when Sidemates runs on a Mac.");
     const out = await this.execute("/usr/bin/shortcuts", ["list"], 20_000);
     return out.split("\n").map((name) => name.trim()).filter(Boolean).slice(0, 300);
   }

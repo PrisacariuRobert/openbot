@@ -46,7 +46,7 @@ export async function readNotes(run: ScriptRunner = runJxa): Promise<IndexItem[]
   let raw: string;
   try { raw = await run(NOTES_SCRIPT); }
   catch (error) {
-    if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error("Allow OpenBot to use Notes in System Settings → Privacy & Security → Automation, then try again.");
+    if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error("Allow Sidemates to use Notes in System Settings → Privacy & Security → Automation, then try again.");
     throw new Error("Notes didn't answer. Open Notes once, then try again.");
   }
   const notes = JSON.parse(raw) as Array<{ id: string; title: string; at: string; text: string; folder: string }>;

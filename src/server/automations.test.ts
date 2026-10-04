@@ -50,7 +50,7 @@ test("filters proactive Todoist and Dropbox events without trusting their conten
   const todoist = routine("todoist", normalizedTriggerConfig("todoist", { todoistEvent: "completed" }));
   assert.equal(automationEventMatches(todoist, { eventType: "completed", content: "Ship" }, {}).matches, true);
   assert.equal(automationEventMatches(todoist, { eventType: "updated", content: "Ship" }, {}).matches, false);
-  assert.match(summarizeAutomationPayload("todoist", { eventType: "completed", content: "Ship OpenBot" }), /Ship OpenBot · completed/);
+  assert.match(summarizeAutomationPayload("todoist", { eventType: "completed", content: "Ship Sidemates" }), /Ship Sidemates · completed/);
 
   const dropbox = routine("dropbox", normalizedTriggerConfig("dropbox", { dropboxPath: "Projects/Launch/" }));
   assert.equal(dropbox.triggerConfig.dropboxPath, "/Projects/Launch");

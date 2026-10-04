@@ -12,7 +12,7 @@ test("iOS connection links carry the server origin without credentials", () => {
 });
 
 test("iOS connection links reject embedded URL credentials", () => {
-  assert.throws(() => iosConnectURL("https://owner:secret@example.com"), /Invalid OpenBot server URL/);
+  assert.throws(() => iosConnectURL("https://owner:secret@example.com"), /Invalid Sidemates server URL/);
 });
 
 test("recognizes only Tailscale's private CGNAT addresses", () => {

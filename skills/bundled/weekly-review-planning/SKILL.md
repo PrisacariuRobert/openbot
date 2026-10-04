@@ -18,4 +18,4 @@ Finish with priorities, next actions, waiting items and coverage gaps. A plan is
 
 ## Provenance
 
-Reviewed OpenBot adaptation of [weekly-review-planning](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/weekly-review-planning/SKILL.md). Instructions are bundled with OpenBot and do not grant tool or account permissions. See LICENSE for reuse terms.
+Reviewed Sidemates adaptation of [weekly-review-planning](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/weekly-review-planning/SKILL.md). Instructions are bundled with Sidemates and do not grant tool or account permissions. See LICENSE for reuse terms.

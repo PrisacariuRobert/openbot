@@ -1,4 +1,4 @@
-// Opt-in Spark acceptance: full OpenBot HTTP API -> real model/runtime ->
+// Opt-in Spark acceptance: full Sidemates HTTP API -> real model/runtime ->
 // scoped tool gateway -> actual MCP HTTP fixture. Never uses the owner's data.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -42,7 +42,7 @@ try {
   const connection = await api<McpConnection>("/api/extensions/mcp", { name: "Cedar project service", url: fixture.url, token: "fixture-private-token", allowLoopback: true });
   await api(`/api/extensions/mcp/${connection.id}/check`, {});
   await api(`/api/extensions/mcp/${connection.id}/access`, { botId: "nova", grants: { read_project: "read" } }, "PATCH");
-  const bundle = { source: "OpenBot synthetic acceptance skill", files: {
+  const bundle = { source: "Sidemates synthetic acceptance skill", files: {
     "SKILL.md": "---\nname: project-brief\ndescription: Prepare an evidence-based project brief\nlicense: MIT\n---\nUse the current project connector, not assumptions. Load [format](references/format.md). Look up writing preferences with memory_search. Save the result to brief.md and link it. Never send anything.",
     "references/format.md": "Use headings: Owner, Review time, Blocker, Source. State the exact source reference. Include a final line: Prepared from a current project service read.",
   } };

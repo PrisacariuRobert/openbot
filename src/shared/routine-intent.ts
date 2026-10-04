@@ -55,10 +55,10 @@ export function parseRoutineIntent(input: string, timeZone?: string): RoutineInt
   const reminder = /^remind\s+me\s+(?:to\s+)?(.+)$/i.exec(task);
   if (localText) {
     friendlyTask = localText[1]!.trim();
-    prompt = `Post this exact update in the current OpenBot conversation: ${friendlyTask}`;
+    prompt = `Post this exact update in the current Sidemates conversation: ${friendlyTask}`;
   } else if (reminder) {
     friendlyTask = reminder[1]!.trim();
-    prompt = `Post a short reminder in the current OpenBot conversation: ${friendlyTask}`;
+    prompt = `Post a short reminder in the current Sidemates conversation: ${friendlyTask}`;
   } else {
     friendlyTask = task.replace(/^to\s+/i, "").trim();
     if (!friendlyTask) return null;

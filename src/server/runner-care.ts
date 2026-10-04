@@ -104,7 +104,7 @@ function storageCheck(dataDir: string): RunnerCareCheck {
       detail: healthy ? "Enough room for studio history and bot work" : "Free space is running low; clear or expand this volume",
     };
   } catch {
-    return { id: "storage", label: "Storage", status: "attention", value: "Could not check", detail: "OpenBot could not read the durable data volume" };
+    return { id: "storage", label: "Storage", status: "attention", value: "Could not check", detail: "Sidemates could not read the durable data volume" };
   }
 }
 
@@ -124,13 +124,13 @@ function backupCheck(dataDir: string, now: number): RunnerCareCheck {
 
 function softwareCheck(dataDir: string, version: string): RunnerCareCheck {
   const record = updateRecord(dataDir);
-  if (!record) return { id: "software", label: "Software", status: "ready", value: `OpenBot ${version}`, detail: "Ready for a guided update with a backup first" };
+  if (!record) return { id: "software", label: "Software", status: "ready", value: `Sidemates ${version}`, detail: "Ready for a guided update with a backup first" };
   const updateDay = new Date(record.lastUpdateAt).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
   return {
     id: "software",
     label: "Software",
     status: "ready",
-    value: `OpenBot ${version}`,
+    value: `Sidemates ${version}`,
     detail: `${record.fromVersion} → ${record.toVersion} updated ${updateDay} after a successful backup`,
   };
 }
@@ -167,7 +167,7 @@ export async function inspectRunnerCare(input: {
     softwareCheck(input.dataDir, version),
     toolCheck("opencode", "OpenCode", openCode, "Model runtime is available", "Reconnect or reinstall OpenCode on this host"),
     toolCheck("browser", "Browser", browser, "Chromium is available for browser work", "Chromium is missing or cannot start on this host"),
-    toolCheck("computers", "Bot computers", docker, "Docker can create isolated teammate computers", "Docker is unavailable to the OpenBot service"),
+    toolCheck("computers", "Bot computers", docker, "Docker can create isolated teammate computers", "Docker is unavailable to the Sidemates service"),
   ];
   const attention = checks.filter((check) => check.status === "attention").length;
   return {

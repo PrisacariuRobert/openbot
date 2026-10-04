@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>A teammate for you — OpenBot</title>
-  <meta name="description" content="Someone shared an OpenBot teammate with you. See what it does, then add it to OpenBot on your Mac." />
+  <title>A teammate for you — Sidemates</title>
+  <meta name="description" content="Someone shared a Sidemates teammate with you. See what it does, then add it to Sidemates on your Mac." />
   <meta name="robots" content="noindex" />
   <meta name="referrer" content="no-referrer" />
   <link rel="icon" href="../icon.svg" type="image/svg+xml" />
@@ -69,8 +69,8 @@
 </head>
 <body>
 <header>
-  <a class="brand" href="../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
-  <a class="btn small ghost" href="../#install">Get OpenBot</a>
+  <a class="brand" href="../" aria-label="Sidemates"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>sidemates</a>
+  <a class="btn small ghost" href="../#install">Get Sidemates</a>
 </header>
 <main>
   <section id="loading" class="error"><p>Opening your teammate…</p></section>
@@ -92,17 +92,17 @@
       <div class="box" id="routines-box" hidden><h2 id="routines-title"></h2><ul id="routines"></ul></div>
       <p class="safe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 8.3 8 9 4.8-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span><strong>Starts with the browser and private computer off.</strong> No accounts, history or memory come with it. It uses the AI you already chose, and anything it does that matters still asks you first.</span></p>
       <div class="actions">
-        <a class="btn" id="add" href="#">Add to OpenBot</a>
+        <a class="btn" id="add" href="#">Add to Sidemates</a>
         <button class="btn ghost small" id="copy" type="button">Copy link</button>
         <button class="btn ghost small" id="download" type="button">Download file</button>
       </div>
-      <p class="actions" style="margin-top:12px"><small>“Add to OpenBot” opens OpenBot on this Mac and shows you this teammate to confirm. Not installed yet? Scroll down.</small></p>
+      <p class="actions" style="margin-top:12px"><small>“Add to Sidemates” opens Sidemates on this Mac and shows you this teammate to confirm. Not installed yet? Scroll down.</small></p>
     </div>
   </article>
 
   <section class="install" id="install">
-    <div><h2>New to OpenBot?</h2><p>A free team of AI teammates on your Mac. One line to install.</p></div>
-    <div class="cmd"><code>curl -fsSL https://openbots.foundation/install.sh | sh</code><button class="btn small ghost" id="copy-install" type="button">Copy</button></div>
+    <div><h2>New to Sidemates?</h2><p>A free team of AI teammates on your Mac. One line to install.</p></div>
+    <div class="cmd"><code>curl -fsSL https://sidemates.app/install.sh | sh</code><button class="btn small ghost" id="copy-install" type="button">Copy</button></div>
   </section>
 </main>
 <script src="../cast.js"></script>
@@ -148,7 +148,7 @@
     var color = /^#[0-9a-f]{6}$/i.test(bot.color || "") ? bot.color : "#6757d9";
     $("name").textContent = bot.name.slice(0, 30);
     $("job").textContent = bot.role.slice(0, 60);
-    document.title = bot.name.slice(0, 30) + " — a teammate for you · OpenBot";
+    document.title = bot.name.slice(0, 30) + " — a teammate for you · Sidemates";
     if (typeof bundle.about === "string" && bundle.about.trim()) { $("about").textContent = bundle.about.slice(0, 240); $("about").hidden = false; }
     $("instructions").textContent = bot.instructions.slice(0, 2000);
     var routines = (Array.isArray(bundle.routines) ? bundle.routines : []).filter(function (r) { return r && typeof r.name === "string" && typeof r.prompt === "string"; }).slice(0, 20);
@@ -176,7 +176,7 @@
         var text = await response.text();
         if (text.length > MAX_BUNDLE) throw new Error("big");
         bundle = JSON.parse(text);
-        importValue = "https://openbots.foundation/teammates/" + slug + ".json";
+        importValue = "https://sidemates.app/teammates/" + slug + ".json";
         rawPayload = location.href;
       } else if (hash) {
         rawPayload = decodeURIComponent(hash);
@@ -195,13 +195,13 @@
     });
     $("download").addEventListener("click", function () {
       var url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
-      var a = document.createElement("a"); a.href = url; a.download = "teammate-" + (bundle.bot.name || "teammate").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".openbot.json";
+      var a = document.createElement("a"); a.href = url; a.download = "teammate-" + (bundle.bot.name || "teammate").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".sidemates.json";
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     });
     show("card");
   }
   $("copy-install").addEventListener("click", function () {
-    var line = "curl -fsSL https://openbots.foundation/install.sh | sh";
+    var line = "curl -fsSL https://sidemates.app/install.sh | sh";
     (navigator.clipboard ? navigator.clipboard.writeText(line) : Promise.reject()).then(function () { $("copy-install").textContent = "Copied"; }, function () { window.prompt("Copy this:", line); });
     setTimeout(function () { $("copy-install").textContent = "Copy"; }, 2200);
   });

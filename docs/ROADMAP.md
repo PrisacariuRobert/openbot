@@ -1,18 +1,18 @@
-# OpenBot working roadmap
+# Sidemates working roadmap
 
 ## Next releases (from 2 October 2026)
 
-**Promise: an AI team that does the work on your real Mac — not just answers. And it costs no subscription.** Where we stand: the product is ahead of its reach. OpenMausBot (open source, runs everywhere, 3.9k stars) is far better known; we win on Mac depth, a one-line install and ordinary-user simplicity, so the next releases remove every reason a person would not try us, and every reason they would not tell a friend. Plan and numbers: the company plan and `marketing/MARKETING_PLAN_90D.md`.
+**Promise: an AI team that does the work on your real Mac — not just answers. And the app is free.** Where we stand: the product is ahead of its reach. OpenMausBot (open source, runs everywhere, 3.9k stars) is far better known; we win on Mac depth, a one-line install and ordinary-user simplicity, so the next releases remove every reason a person would not try us, and every reason they would not tell a friend. Plan and numbers: the company plan and `marketing/MARKETING_PLAN_90D.md`.
 
 | Release | Theme | Highlights |
 | :--- | :--- | :--- |
-| ✅ 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; Shortcuts; "Send to OpenBot"; "Hey Siri, ask Nova to…" |
+| ✅ 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; Shortcuts; "Send to Sidemates"; "Hey Siri, ask Nova to…" |
 | ✅ 0.39 | Knows you, privately | On-device index of Notes, Mail, Messages and files; morning brief; "What they know" page |
 | ✅ 0.40 | Share your teammates | Share links, a teammate gallery, shareable result pages |
 | ✅ 0.41 | Autopilot | Per-teammate "act like a person" with hard stops, chat notes and a log |
-| **0.42** | **Ready for anyone** | Shared pages already carry a "Made with OpenBot" link: tag it so we can measure the growth loop; opt-in anonymous usage counts (only with the owner's go-ahead, since we promise no tracking) so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
+| **0.42** | **Ready for anyone** | Shared pages already carry a "Made with Sidemates" link: tag it so we can measure the growth loop; opt-in anonymous usage counts (only with the owner's go-ahead, since we promise no tracking) so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
 | **0.43** | **Everywhere** | Windows beta and Linux packages (our CI already builds the installers; Mac-only tools stay Mac-only). Measured 3 October 2026 with the Windows probe workflow on a real Windows runner: install, build and server start work, and 1,021 of 1,128 tests pass. Remaining: the test fixtures fake the AI runtime with a Unix script (about 30 tests), `tar` with drive letters in home export, file-lock cleanup in tests, and a real installer test on a Windows VM (browser discovery is already fixed); a Docker image for an always-on server; `npx` and Homebrew installs once the Apple signing and the name are settled |
-| **0.44** | **Packs, no subscription** | One-time teammate packs for a profession (freelancer, accountant, agent); prepaid pay-as-you-go credits for people who do not want to find an AI key (after reading each provider's terms) |
+| **0.44** | **Packs and credits** | One-time teammate packs for a profession (freelancer, accountant, agent); prepaid pay-as-you-go credits for people who do not want to find an AI key (after reading each provider's terms) |
 | Later | Always there | Run on a second Mac or home server; business invoices with a shared library and policies; a marketplace; native iPhone app if users ask |
 
 Quality bar for every release: weekly cadence, `npm test` and the live Muse Spark cases pass, installer update tested from the previous version in an isolated folder, no new "always asks" claim without a test. Left over from 0.38 and worth finishing when there is room: the quick-ask hotkey and a single permissions screen.
@@ -44,7 +44,7 @@ Owner-approved sequencing after the Hermes (NousResearch) and sign-in pattern st
 ## Tracks in detail
 
 ### Track A — Sign-in & browser trust
-OpenBot's private per-bot browser is an important foundation, not demonstrated superiority over Hermes. Hermes documents local browser sessions and opt-in real-profile snapshots. Prove our narrower site-scoped import, owner handoff and recovery with real accounts.
+Sidemates' private per-bot browser is an important foundation, not demonstrated superiority over Hermes. Hermes documents local browser sessions and opt-in real-profile snapshots. Prove our narrower site-scoped import, owner handoff and recovery with real accounts.
 
 - **A1 · Own-browser cookie bridge.** An owner-controlled normal-browser sign-in and site-scoped cookie import into a teammate profile. This is not guaranteed to satisfy every provider: profile encryption, storage mechanisms, account policy and browser detection vary. The macOS path may need Keychain consent and Chrome closed for import. Done when: a real Google account signs in, the teammate's next run is authenticated, a restart preserves the intended session, and fixtures reject unsupported/cross-origin input without exposing cookie values. The live-account portion is not yet certified.
 - **A2 · Per-site data controls.** Per teammate: list sites with stored session data and a per-site "sign out & clear data" action (cookie + storage eviction for that origin only), plus clear-all. Mirrors OpenAI's cloud-browser data controls. Done when: clearing one site's data leaves other sites' sessions intact, and the UI shows what is stored without showing values.
@@ -59,7 +59,7 @@ OpenBot's private per-bot browser is an important foundation, not demonstrated s
 ### Track C — Skills & provable learning (the stand-out)
 - **C1 · Skill proposals from completed runs.** The owner requests a draft from the Work Receipt; completion is not assumed to mean verification. The draft now preserves an exact source-run association, receipt snapshot and explicit failures/limits. Existing workflow validation requires two distinct owner-reviewed tool runs before a referenced saved skill can be scheduled; saving a draft does not count. Hermes also offers approval-gated skill writes, so approvals alone are not unique. Next proof: a pilot user refines a reusable recipe, checks new inputs and schedules it without copying the original task's private or one-off details.
 - **C2 · Hermes/OpenClaw profile importer.** The New teammate UI and owner API preview/apply paths map persona, curated memory and supported text skills. Credentials, sessions, cron jobs and arbitrary scripts/plugins do not migrate. A proposed import CLI is not a shipped command. Done when: a real Hermes profile imports into a teammate whose next supervised run succeeds, and the migration guide lists every unsupported dependency. Current tests create synthetic profiles; they do not prove a real profile or model run.
-- **C3 · agentskills.io compatibility.** Export OpenBot skills in the agentskills.io manifest shape and import theirs where the semantics match, with honest unsupported-field reporting. Done when: round-trip fixtures pass and docs state exactly what translates.
+- **C3 · agentskills.io compatibility.** Export Sidemates skills in the agentskills.io manifest shape and import theirs where the semantics match, with honest unsupported-field reporting. Done when: round-trip fixtures pass and docs state exactly what translates.
 
 ### Track D — Quality, review and release debt
 - **D1 · Fixture tests.** The current full verification command passes. Keep the checks meaningful: fixture coverage is not a substitute for rendered UI, real-account or clean-install tests.

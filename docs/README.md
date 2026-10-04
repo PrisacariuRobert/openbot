@@ -1,6 +1,6 @@
-# OpenBot documentation
+# Sidemates documentation
 
-## Using OpenBot
+## Using Sidemates
 
 - [Browser sign-ins and app connections](BROWSER_AND_CONNECTORS.md)
 - [Reach your Mac from your phone](AWAY_ACCESS_PERSONAL_MAC.md)
@@ -13,7 +13,7 @@
 - [Authentication and data-flow matrix](AUTH_DATA_MATRIX.md)
 - Report a vulnerability privately: [SECURITY.md](../SECURITY.md)
 
-## Building on OpenBot
+## Building on Sidemates
 
 - [Connector contract](CONNECTOR_CONTRACT.md)
 - [Plugin interoperability](PLUGIN_INTEROPERABILITY.md)

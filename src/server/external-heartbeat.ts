@@ -56,7 +56,7 @@ export async function sendExternalHeartbeat(raw: string, options: {
   await new Promise<void>((resolve, reject) => {
     const heartbeat = request(url, {
       method: "GET",
-      headers: { "User-Agent": "OpenBot-private-home/1" },
+      headers: { "User-Agent": "Sidemates-private-home/1" },
       lookup: (_hostname, lookupOptions, callback) => lookupOptions.all
         ? callback(null, [target])
         : callback(null, target.address, target.family),

@@ -1,10 +1,10 @@
 # Security reporting
 
-OpenBot is a development beta, not an audited security product. Its tools can read private information and act on external accounts when authorized. Please read the [security model and known limitations](docs/SECURITY.md) before granting access.
+Sidemates is a development beta, not an audited security product. Its tools can read private information and act on external accounts when authorized. Please read the [security model and known limitations](docs/SECURITY.md) before granting access.
 
 ## Report privately
 
-Use the repository's **Security → Report a vulnerability** control when available: [private report](https://github.com/PrisacariuRobert/openbot/security/advisories/new).
+Use the repository's **Security → Report a vulnerability** control when available: [private report](https://github.com/PrisacariuRobert/sidemates/security/advisories/new).
 
 Private vulnerability reporting was **enabled on 2026-09-06** and the repository API confirmed it is enabled. Use the private report link above; no test report was submitted. If the control is unavailable to you, do not post an exploit, token, database, browser profile or private conversation in a public issue. You may open a minimal issue titled “Request a private security contact,” containing no technical or personal details, and wait for a private route from the repository owner.
 

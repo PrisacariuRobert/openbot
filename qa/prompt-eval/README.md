@@ -1,6 +1,6 @@
 # Live teammate prompt eval
 
-`scripts/prompt-eval.ts` starts a throwaway OpenBot on a fresh data folder, sends six fixed requests to one teammate through the real API and model runtime, and checks the outcome (greeting, per-currency CSV totals, weekday routine, saved preference, no false "email sent" claim, saved 5-item checklist). It records time, model steps and context tokens (input + cache reads, summed over steps).
+`scripts/prompt-eval.ts` starts a throwaway Sidemates on a fresh data folder, sends six fixed requests to one teammate through the real API and model runtime, and checks the outcome (greeting, per-currency CSV totals, weekday routine, saved preference, no false "email sent" claim, saved 5-item checklist). It records time, model steps and context tokens (input + cache reads, summed over steps).
 
 ```sh
 node --import tsx scripts/prompt-eval.ts --repeat 2 --label my-change
@@ -24,17 +24,17 @@ Context per model step (input + cache reads ÷ steps) is the stable comparison: 
 
 The 8-case set adds `teammate-help` (ask Scout; exactly one consultation; answer relayed) and `learn-skill` (/learn ends in a skill proposal waiting for review). Before this session's fixes, `learn-skill` was 0/2 and `teammate-help` took ~100s with repeated asks.
 
-A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The default model is `opencode-go/muse-spark-1.3-contributor`. The free-tier `opencode/…-free` models return 403 for OpenBot's restricted tool configuration and cannot be evaluated.
+A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The default model is `opencode-go/muse-spark-1.3-contributor`. The free-tier `opencode/…-free` models return 403 for Sidemates' restricted tool configuration and cannot be evaluated.
 
 ## Fixed prompt budget next to Hermes (offline, 23 Sep 2026)
 
 What a model receives before the owner's first word, in a fresh chat with the default setup:
 
-| | OpenBot (9eeeae5, fresh teammate) | Hermes Agent CLI (`hermes prompt-size`) |
+| | Sidemates (9eeeae5, fresh teammate) | Hermes Agent CLI (`hermes prompt-size`) |
 | :--- | :--- | :--- |
 | System prompt + instructions | 14,280 chars (teammate prompt + AGENTS.md) | 21,935 chars system prompt + 5,881 skills index + 616 user profile |
 | Per-message wrapper | 3,631 chars | — |
 | Tools | 24 enabled tools | 20 tools, 35,772 bytes of JSON schema |
 | Measured context for "hi" | 8,140 tokens (Muse Spark, one step) | not measured live |
 
-Limits: Hermes was measured with its own `prompt-size` command on this Mac's install (41 installed skills feed its skills index; model gpt-5.6-sol), OpenBot with a live one-step run on Muse Spark. Different tokenizers and tool sets, and no live Hermes run on the same model, so this compares fixed overhead only — not answer quality, speed, or cost.
+Limits: Hermes was measured with its own `prompt-size` command on this Mac's install (41 installed skills feed its skills index; model gpt-5.6-sol), Sidemates with a live one-step run on Muse Spark. Different tokenizers and tool sets, and no live Hermes run on the same model, so this compares fixed overhead only — not answer quality, speed, or cost.

@@ -42,14 +42,14 @@ async function fixture(
 }
 
 const createdTask = {
-  id: "task-9", content: "Ship OpenBot", description: "Final review",
+  id: "task-9", content: "Ship Sidemates", description: "Final review",
   project_id: "project-1", priority: 4, due: { date: "2026-09-18" },
   url: "https://app.todoist.com/app/task/task-9",
 };
 
 test("complete create response verifies with one POST and no readback", async () => {
   await fixture(async (connector, requests) => {
-    const result = await connector.create({ content: "Ship OpenBot", description: "Final review", projectId: "project-1", priority: 4, dueString: "tomorrow" });
+    const result = await connector.create({ content: "Ship Sidemates", description: "Final review", projectId: "project-1", priority: 4, dueString: "tomorrow" });
     assert.equal(result.recovered, false);
     assert.equal(result.task.id, "task-9");
     assert.equal(result.task.url, "https://app.todoist.com/app/task/task-9");
@@ -62,7 +62,7 @@ test("complete create response verifies with one POST and no readback", async ()
 
 test("truncated create response recovers with exactly one readback GET", async () => {
   await fixture(async (connector, requests) => {
-    const result = await connector.create({ content: "Ship OpenBot", description: "Final review", projectId: "project-1", priority: 4, dueString: "tomorrow" });
+    const result = await connector.create({ content: "Ship Sidemates", description: "Final review", projectId: "project-1", priority: 4, dueString: "tomorrow" });
     assert.equal(result.recovered, true);
     assert.equal(result.task.id, "task-9");
     assert.deepEqual(requests.map((entry) => entry.method), ["POST", "GET"]);
@@ -75,7 +75,7 @@ test("truncated create response recovers with exactly one readback GET", async (
 
 test("lost create response stays uncertain with no repeat and no blind readback", async () => {
   await fixture(async (connector, requests) => {
-    await assert.rejects(connector.create({ content: "Ship OpenBot" }), ApprovedConnectorOutcomeUncertainError);
+    await assert.rejects(connector.create({ content: "Ship Sidemates" }), ApprovedConnectorOutcomeUncertainError);
     assert.deepEqual(requests.map((entry) => entry.method), ["POST"]);
   }, () => {
     throw new Error("Socket closed after Todoist accepted the task");
@@ -84,7 +84,7 @@ test("lost create response stays uncertain with no repeat and no blind readback"
 
 test("mismatched readback never completes and never re-posts", async () => {
   await fixture(async (connector, requests) => {
-    await assert.rejects(connector.create({ content: "Ship OpenBot" }), ApprovedConnectorOutcomeUncertainError);
+    await assert.rejects(connector.create({ content: "Ship Sidemates" }), ApprovedConnectorOutcomeUncertainError);
     assert.deepEqual(requests.map((entry) => entry.method), ["POST", "GET"]);
   }, (method) => {
     if (method === "POST") return Response.json({ id: "task-9", content: "Something else" });
@@ -94,7 +94,7 @@ test("mismatched readback never completes and never re-posts", async () => {
 
 test("missing readback stays uncertain instead of failing closed or retrying", async () => {
   await fixture(async (connector, requests) => {
-    await assert.rejects(connector.create({ content: "Ship OpenBot" }), ApprovedConnectorOutcomeUncertainError);
+    await assert.rejects(connector.create({ content: "Ship Sidemates" }), ApprovedConnectorOutcomeUncertainError);
     assert.deepEqual(requests.map((entry) => entry.method), ["POST", "GET"]);
   }, (method) => {
     if (method === "POST") return Response.json({ id: "task-9", content: "Something else" });
@@ -104,7 +104,7 @@ test("missing readback stays uncertain instead of failing closed or retrying", a
 
 test("account replacement mid-flight aborts before any readback", async () => {
   await fixture(async (connector, requests) => {
-    await assert.rejects(connector.create({ content: "Ship OpenBot" }), ApprovalReviewChangedError);
+    await assert.rejects(connector.create({ content: "Ship Sidemates" }), ApprovalReviewChangedError);
     assert.deepEqual(requests.map((entry) => entry.method), ["POST"]);
   }, (_method, _url, _body, db) => {
     db.completeOAuthConnector(
@@ -120,7 +120,7 @@ test("account replacement mid-flight aborts before any readback", async () => {
 test("getTask maps a missing task to null and surfaces other failures", async () => {
   await fixture(async (connector, requests) => {
     assert.equal(await connector.getTask("gone"), null);
-    assert.equal((await connector.getTask("task-9"))?.content, "Ship OpenBot");
+    assert.equal((await connector.getTask("task-9"))?.content, "Ship Sidemates");
     await assert.rejects(connector.getTask("flaky"), /could not complete/);
     assert.deepEqual(requests.map((entry) => entry.method), ["GET", "GET", "GET"]);
   }, (_method, url) => {
@@ -131,8 +131,8 @@ test("getTask maps a missing task to null and surfaces other failures", async ()
 });
 
 test("matcher binds requested fields and tolerates server defaults", () => {
-  const requested = { content: "Ship OpenBot", description: "", dueString: "", projectId: "", priority: 1 };
-  const task = { id: "t", content: "Ship OpenBot", description: "", projectId: "inbox", priority: 1, due: null, completed: false, url: "u" };
+  const requested = { content: "Ship Sidemates", description: "", dueString: "", projectId: "", priority: 1 };
+  const task = { id: "t", content: "Ship Sidemates", description: "", projectId: "inbox", priority: 1, due: null, completed: false, url: "u" };
   assert.equal(todoistTaskMatchesCreate(task, requested), true, "unspecified project takes the server default");
   assert.equal(todoistTaskMatchesCreate({ ...task, content: "Other" }, requested), false);
   assert.equal(todoistTaskMatchesCreate({ ...task, priority: 4 }, requested), false);
@@ -152,12 +152,12 @@ test("task reference binds scope and survives restart with a refreshable state",
     seedConnected(db);
     const version = db.connectorAuthorizationVersion("todoist");
     const run = db.createRun({ threadId: "team-room", botId: "nova", prompt: "Create the follow-up", status: "running" });
-    const reviewedFields = { content: "Ship OpenBot", description: "", dueString: "", projectId: "", priority: 4 };
+    const reviewedFields = { content: "Ship Sidemates", description: "", dueString: "", projectId: "", priority: 4 };
     const saved = db.saveConnectorTaskRef({
       connectorId: "todoist", resourceId: "task-9", account: "robert@example.com", authorizationVersion: version,
       threadId: "team-room", runId: run.id, botId: "nova",
       reviewedFields,
-      lastState: { id: "task-9", content: "Ship OpenBot", description: "", projectId: "inbox", priority: 4, due: null, completed: false, url: "https://app.todoist.com/app/task/task-9" },
+      lastState: { id: "task-9", content: "Ship Sidemates", description: "", projectId: "inbox", priority: 4, due: null, completed: false, url: "https://app.todoist.com/app/task/task-9" },
     });
     assert.equal(saved.account, "robert@example.com");
     assert.equal(saved.authorizationVersion, version);
@@ -168,7 +168,7 @@ test("task reference binds scope and survives restart with a refreshable state",
     db = new OpenBotDatabase(root);
     const after = db.getConnectorTaskRef("todoist", "task-9")!;
     assert.equal(after.runId, run.id);
-    assert.equal(after.lastState.content, "Ship OpenBot");
+    assert.equal(after.lastState.content, "Ship Sidemates");
     const refreshed = db.saveConnectorTaskRef({
       connectorId: "todoist", resourceId: "task-9", account: "robert@example.com", authorizationVersion: version,
       threadId: "team-room", runId: run.id, botId: "nova",

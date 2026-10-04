@@ -54,7 +54,7 @@ export async function deliverCodeChange(db: OpenBotDatabase, manager: Pick<CodeP
     review: { id: snapshot.review.id, reviewerName: snapshot.review.reviewerBotName, headCommit: snapshot.review.headCommit },
   };
   try { db.recordCodeDeliveryResult(receipt); }
-  catch { throw new GitHubWriteUncertainError("GitHub confirmed the change but OpenBot could not save its local receipt. Check the repository before trying again."); }
+  catch { throw new GitHubWriteUncertainError("GitHub confirmed the change but Sidemates could not save its local receipt. Check the repository before trying again."); }
   // The visible result and its link are already durable. An attachment failure
   // cannot turn a confirmed publication into a retryable external action.
   try { await new AttachmentService(db).captureCodeDelivery(receipt); }

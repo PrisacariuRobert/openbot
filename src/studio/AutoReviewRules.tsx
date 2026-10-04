@@ -62,7 +62,7 @@ export function AutoReviewRules() {
           <small>
             Rules decided before actions run. <b>Require approval</b> always stops
             matching work for your decision. <b>Always allow</b> can skip one of
-            OpenBot’s own review prompts for a narrowly matched isolated command;
+            Sidemates’s own review prompts for a narrowly matched isolated command;
             it never waives a detector or creates new permission. If both match,
             Require approval wins. Patterns are case-insensitive text with <code>*</code> as any run of characters.
           </small>

@@ -6,9 +6,9 @@ import path from "node:path";
 /** Once a day, ask GitHub for the newest release. Installed copies (from the
  * one-line installer) update in one tap: the installer runs again in the
  * background, verifies the download, switches versions and restarts
- * OpenBot. Source checkouts are only told that a new version exists. */
+ * Sidemates. Source checkouts are only told that a new version exists. */
 
-const REPO = "PrisacariuRobert/openbot";
+const REPO = "PrisacariuRobert/sidemates";
 const DAY = 24 * 60 * 60_000;
 
 export interface UpdateStatus {
@@ -36,10 +36,13 @@ export function newerVersion(latest: string, current: string): boolean {
   return a.preNumber > b.preNumber;
 }
 
-/** True when this process runs from the installer's versions folder. */
+/** True when this process runs from the installer's versions folder. The old
+ * "OpenBot" folder counts too, for a copy that has not been moved yet. */
 export function installedCopy(cwd = process.cwd(), home = homedir()): boolean {
-  const current = path.join(home, "Library", "Application Support", "OpenBot", "current");
-  try { return existsSync(current) && realpathSync(cwd).startsWith(realpathSync(current)); } catch { return false; }
+  return ["Sidemates", "OpenBot"].some((name) => {
+    const current = path.join(home, "Library", "Application Support", name, "current");
+    try { return existsSync(current) && realpathSync(cwd).startsWith(realpathSync(current)); } catch { return false; }
+  });
 }
 
 export class UpdateChecker {
@@ -69,7 +72,7 @@ export class UpdateChecker {
   async check(): Promise<UpdateStatus> {
     try {
       const response = await (this.options.fetchImpl || fetch)(`https://api.github.com/repos/${REPO}/releases/latest`, {
-        headers: { accept: "application/vnd.github+json", "user-agent": "OpenBot" }, signal: AbortSignal.timeout(15_000),
+        headers: { accept: "application/vnd.github+json", "user-agent": "Sidemates" }, signal: AbortSignal.timeout(15_000),
       });
       if (response.ok) {
         const release = await response.json() as { tag_name?: string; html_url?: string; draft?: boolean };
@@ -93,10 +96,10 @@ export class UpdateChecker {
    * the restart it causes. */
   install(spawnImpl: typeof spawn = spawn): UpdateStatus {
     const status = this.status();
-    if (!status.canInstall) throw new Error(status.available ? "This copy runs from source. Update it with git pull." : "OpenBot is already up to date.");
+    if (!status.canInstall) throw new Error(status.available ? "This copy runs from source. Update it with git pull." : "Sidemates is already up to date.");
     if (this.installing) return status;
     this.installing = true;
-    const child = spawnImpl("/bin/sh", ["-c", "curl -fsSL https://openbots.foundation/install.sh | sh"], {
+    const child = spawnImpl("/bin/sh", ["-c", "curl -fsSL https://sidemates.app/install.sh | sh"], {
       detached: true, stdio: "ignore",
       env: { ...process.env, OPENBOT_INSTALL_NO_OPEN: "1", OPENBOT_INSTALL_NO_DOCK: "1" },
     });

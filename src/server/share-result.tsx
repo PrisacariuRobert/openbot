@@ -6,7 +6,7 @@ import { describeHidden, redact, type Redaction } from "../shared/redact.js";
 
 /** A finished result as one self-contained page you can send to anyone: the
  * teammate's face, the question (if you keep it), the answer, and a quiet
- * "Made with OpenBot". No scripts, no remote images, no tracking. Personal
+ * "Made with Sidemates". No scripts, no remote images, no tracking. Personal
  * details are hidden first (see shared/redact.ts), and the owner reads the
  * page before saving it. */
 
@@ -64,7 +64,7 @@ export function renderResultPage(input: ResultInput): ResultPage {
 
   // The question if it's kept, else the answer's first line (never several lines run together).
   const firstLine = ((question?.text || answer.text).split("\n").map((line) => line.replace(/^[\s#>*_`-]+/, "").replace(/[*_`]/g, "").trim()).find(Boolean) || "").replace(/\s+/g, " ");
-  const title = (firstLine.slice(0, 70) + (firstLine.length > 70 ? "…" : "")) || "A result from OpenBot";
+  const title = (firstLine.slice(0, 70) + (firstLine.length > 70 ? "…" : "")) || "A result from Sidemates";
   const mascot = MASCOTS.includes(input.teammate.mascot) ? input.teammate.mascot : "nova";
   const color = /^#[0-9a-f]{6}$/i.test(input.teammate.color) ? input.teammate.color : "#6757d9";
   const face = renderToStaticMarkup(<Character name={input.teammate.name} color={color} variant={mascot as never} size={64} mood="happy" />);
@@ -80,10 +80,10 @@ export function renderResultPage(input: ResultInput): ResultPage {
 ${question ? `<div class="q">${escapeHtml(question.text)}</div>` : ""}
 <article class="a">${markdown(answer.text)}</article>
 ${files.length ? `<p class="files">Files delivered: ${files.map((file) => escapeHtml(file.text)).join(", ")}</p>` : ""}
-<footer>Made with <a href="https://openbots.foundation/?ref=result" target="_blank" rel="noopener">OpenBot</a> — free, open-source AI teammates on your Mac</footer>
+<footer>Made with <a href="https://sidemates.app/?ref=result" target="_blank" rel="noopener">Sidemates</a> — free, open-source AI teammates on your Mac</footer>
 </main></body></html>`;
 
   const filename = `${(title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "result")}.html`;
-  const text = `${question ? `${question.text}\n\n` : ""}${answer.text}\n\n— ${input.teammate.name}, ${date}. Made with OpenBot (https://openbots.foundation/?ref=result-text)`;
+  const text = `${question ? `${question.text}\n\n` : ""}${answer.text}\n\n— ${input.teammate.name}, ${date}. Made with Sidemates (https://sidemates.app/?ref=result-text)`;
   return { title, html, hidden, total, summary: describeHidden(hidden), filename, text };
 }

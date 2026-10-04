@@ -42,7 +42,7 @@ export function pageWatchText(body: string, contentType: string, selector = ""):
 
 export async function fetchWatchedPage(config: ReturnType<typeof pageWatchConfig>, signal: AbortSignal): Promise<string> {
   const response = await extensionFetch(config.pageUrl, false, signal)(config.pageUrl, {
-    signal, redirect: "error", headers: { "User-Agent": "OpenBot-PageWatch/0.35 (owner-requested public page check)", Accept: "text/html,application/rss+xml,application/atom+xml,text/plain,application/json" },
+    signal, redirect: "error", headers: { "User-Agent": "Sidemates-PageWatch/0.35 (owner-requested public page check)", Accept: "text/html,application/rss+xml,application/atom+xml,text/plain,application/json" },
   });
   if (!response.ok) { await response.body?.cancel(); throw new Error(`The page returned HTTP ${response.status}. Nothing was treated as a content change.`); }
   return pageWatchText(await response.text(), response.headers.get("content-type") || "", config.pageSelector);

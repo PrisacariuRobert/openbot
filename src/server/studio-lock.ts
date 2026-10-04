@@ -7,7 +7,7 @@ export interface StudioLock {
   release(): void;
 }
 
-/** One OpenBot server per data directory. A second boot must stop instead of
+/** One Sidemates server per data directory. A second boot must stop instead of
  * silently sharing the database: two servers would both claim jobs and each
  * would reject the other's runtime tool tokens ("Internal tool access
  * denied."). A lock left behind by a crashed process is detected as stale and

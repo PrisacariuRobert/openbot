@@ -68,7 +68,7 @@ export function renderWorkReport(snapshot: WorkSnapshot, report: Pick<WorkReport
   }
   if (!report.items.length) lines.push("No priorities were proposed. This is not a claim that your entire inbox needs no attention.");
   if (report.drafts.length) {
-    lines.push("## Reply drafts — not sent", "Review names, dates and promises before sending. These are saved only in OpenBot, not in Gmail Drafts.");
+    lines.push("## Reply drafts — not sent", "Review names, dates and promises before sending. These are saved only in Sidemates, not in Gmail Drafts.");
     for (const draft of report.drafts) lines.push(`### ${md(draft.subject)}\nTo: ${md(draft.to)}\n\n${md(draft.body)}\n\nSource: ${sourceLink(sources.get(draft.sourceRef)!)}`);
   }
   lines.push("## Source receipt", "The app matched every reference and draft recipient to this saved snapshot. Browser pages were cited by the teammate, not fetched by the host. It did not independently fact-check the model’s interpretation.");

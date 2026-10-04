@@ -1,12 +1,29 @@
-// Serves the Mac bundle through openbots.foundation so installs don't depend on how fast a visitor's
+// Serves the Mac bundle through sidemates.app so installs don't depend on how fast a visitor's
 // connection is to GitHub's release servers. Everything is fetched from our own GitHub releases and
 // cached at Cloudflare's edge; anything else on the site is served as static files.
 //   /download/latest/<file>   → redirects to the newest release's file
 //   /download/v0.41.0/<file>  → that release's file (immutable, cached for a long time)
+// The product used to be called OpenBot and lived at openbots.foundation. That host keeps serving the
+// installer and downloads (copies installed under the old name update through it) and sends every
+// other page to sidemates.app.
 
-const REPO = "PrisacariuRobert/openbot";
-const FILES = /^openbot-darwin-(?:arm64|x64)\.tar\.gz(?:\.sha256)?$/;
+const REPO = "PrisacariuRobert/sidemates";
+// New releases publish sidemates-*; openbot-* stays valid for releases published under the old name.
+const FILES = /^(?:sidemates|openbot)-darwin-(?:arm64|x64)\.tar\.gz(?:\.sha256)?$/;
 const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
+
+const HOME_HOST = "sidemates.app";
+const OLD_HOSTS = new Set(["openbots.foundation", "www.openbots.foundation"]);
+const STAYS_ON_OLD_HOST = /^\/(?:install\.sh|download\/.*)$/;
+
+/** Where this request should be sent instead of served, or null to serve it here. */
+export function redirectTarget(url) {
+  const oldHost = OLD_HOSTS.has(url.hostname);
+  if ((oldHost && !STAYS_ON_OLD_HOST.test(url.pathname)) || url.hostname === `www.${HOME_HOST}`) {
+    return `https://${HOME_HOST}${url.pathname}${url.search}`;
+  }
+  return null;
+}
 
 /** Maps a request path to what we serve, or null when it is not a download path. */
 export function routeDownload(pathname) {
@@ -23,8 +40,12 @@ const githubFile = (tag, file) => `https://github.com/${REPO}/releases/download/
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const readOnly = request.method === "GET" || request.method === "HEAD";
+    const target = readOnly ? redirectTarget(url) : null;
+    if (target) return new Response(null, { status: 301, headers: { location: target, "cache-control": "public, max-age=3600" } });
+
     const route = routeDownload(url.pathname);
-    if (!route || (request.method !== "GET" && request.method !== "HEAD")) return env.ASSETS.fetch(request);
+    if (!route || !readOnly) return env.ASSETS.fetch(request);
 
     if (route.kind === "latest") {
       // GitHub answers /releases/latest with a redirect to the newest tag's page. Remember that for a minute.

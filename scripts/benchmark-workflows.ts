@@ -1,5 +1,5 @@
 // Opt-in live-model acceptance checks. The model may incur provider usage.
-// Always starts an isolated OpenBot database; never targets the user's studio.
+// Always starts an isolated Sidemates database; never targets the user's studio.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
@@ -23,7 +23,7 @@ assert.ok(
 );
 const codeOnly = process.env.OPENBOT_BENCHMARK_CODE === "1";
 // Docker's default Colima mounts include this project, not macOS /var/folders.
-const fixtureBase = codeOnly ? path.join(homedir(), "Library/Caches/OpenBot Acceptance") : tmpdir();
+const fixtureBase = codeOnly ? path.join(homedir(), "Library/Caches/Sidemates Acceptance") : tmpdir();
 mkdirSync(fixtureBase, { recursive: true });
 const root = mkdtempSync(path.join(fixtureBase, "openbot-live-benchmark-"));
 const evidence = mkdtempSync(path.join(tmpdir(), "openbot-workflow-evidence-"));

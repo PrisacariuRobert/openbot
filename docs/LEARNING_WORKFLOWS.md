@@ -4,7 +4,7 @@ Ask your teammate to **learn this workflow**, or start a message with `/learn`:
 
 > /learn Turn our invoice reconciliation process into a reusable skill. Ask for the invoice folder and currency each time; keep originals unchanged and verify the totals in the saved workbook.
 
-You can refer to the current conversation, attach permitted source material, or ask the teammate to inspect an accessible source. If the procedure or essential context is unclear, it should ask a focused question. It uses the model already selected for that teammate; OpenBot does not switch providers to learn a skill.
+You can refer to the current conversation, attach permitted source material, or ask the teammate to inspect an accessible source. If the procedure or essential context is unclear, it should ask a focused question. It uses the model already selected for that teammate; Sidemates does not switch providers to learn a skill.
 
 ## Review, then reuse
 

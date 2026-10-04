@@ -1,13 +1,18 @@
-// The install page at openbots.foundation: static files from site/, plus /download/* which serves the
-// Mac bundle from our GitHub releases through Cloudflare's cache (see download-worker.mjs).
+// The website at sidemates.app: static files from site/, plus /download/* which serves the Mac bundle
+// from our GitHub releases through Cloudflare's cache (see download-worker.mjs). The Worker also sends
+// the old OpenBot host (openbots.foundation) to sidemates.app, except /install.sh and /download/*, which
+// keep working there so copies installed as OpenBot can still update.
 //   npx wrangler deploy -c deploy/install-site.wrangler.jsonc
+// Every pattern below needs its domain added to this Cloudflare account first.
 {
   "name": "openbot-install-site",
   "main": "./download-worker.mjs",
   "compatibility_date": "2026-09-23",
-  "assets": { "directory": "../site", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/download/*"] },
+  "assets": { "directory": "../site", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": true },
   "workers_dev": true,
   "routes": [
+    { "pattern": "sidemates.app", "custom_domain": true },
+    { "pattern": "www.sidemates.app", "custom_domain": true },
     { "pattern": "openbots.foundation", "custom_domain": true },
     { "pattern": "www.openbots.foundation", "custom_domain": true }
   ]

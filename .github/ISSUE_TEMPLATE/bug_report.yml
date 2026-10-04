@@ -8,7 +8,7 @@ body:
     id: version
     attributes:
       label: Version and environment
-      description: OpenBot version or commit, operating system, and web/Mac/iPhone client.
+      description: Sidemates version or commit, operating system, and web/Mac/iPhone client.
     validations:
       required: true
   - type: textarea

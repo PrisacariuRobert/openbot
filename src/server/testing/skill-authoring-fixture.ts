@@ -33,7 +33,7 @@ async function main() {
     const malformed = await call({...body,args:{...body.args,execute:true}});
     const secret = await call({...body,args:{...body.args,instructions:'Use api_key=private-fixture-value'}});
     const response = await call(body), result = await response.json();
-    fs.writeFileSync(record, JSON.stringify({badToken:badToken.status,wrongBot:wrongBot.status,malformed:malformed.status,secret:secret.status,status:response.status,result,learning:prompt.includes('OpenBot command:'),modelArgs:process.argv.slice(2,-1)}));
+    fs.writeFileSync(record, JSON.stringify({badToken:badToken.status,wrongBot:wrongBot.status,malformed:malformed.status,secret:secret.status,status:response.status,result,learning:prompt.includes('Sidemates command:'),modelArgs:process.argv.slice(2,-1)}));
     // Remain active until the host's approval pause cancels this child.
     setInterval(()=>{},1000);
   } else console.log(JSON.stringify({type:'text',text:'The reviewed skill is saved. Nothing was scheduled.'}));

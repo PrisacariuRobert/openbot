@@ -11,7 +11,7 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
   const localOnly = (req: Request, res: Response, next: NextFunction) => {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Referrer-Policy", "no-referrer");
-    if (!trustedLocalRequest(req)) return res.status(403).json({ error: "Manage phone connections from OpenBot on this host." });
+    if (!trustedLocalRequest(req)) return res.status(403).json({ error: "Manage phone connections from Sidemates on this host." });
     next();
   };
   app.get("/api/auth/pairing-probe", (_req, res) => { res.setHeader("Cache-Control", "no-store"); res.json({ studio: away.probeIdentity }); });
@@ -57,7 +57,7 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
     res.json({ link, appLink, browser, qr, expiresAt: invitation.expiresAt });
   });
   app.delete("/api/access/pairing", localOnly, (_req, res) => { devices.cancel(); res.json({ ok: true }); });
-  // "Hey Siri, Ask OpenBot": a one-time link the iPhone opens to import a
+  // "Hey Siri, Ask Sidemates": a one-time link the iPhone opens to import a
   // signed Shortcut carrying its own device key (listed as "Siri", revocable).
   app.post("/api/access/siri", localOnly, async (req, res) => {
     const kind = req.body?.kind === "share" ? "share" : "ask";
@@ -81,7 +81,7 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
     if (!result) { gate.failed(peer); return res.status(401).send("This link has expired or was already used. Make a new one on your Mac."); }
     gate.succeeded(peer);
     try {
-      const askUrl = `${state.url.replace(/\/$/, "")}/api/ask`, name = share ? "Send to OpenBot" : "Ask OpenBot";
+      const askUrl = `${state.url.replace(/\/$/, "")}/api/ask`, name = share ? "Send to Sidemates" : "Ask Sidemates";
       const file = await signedShortcut(share ? shareShortcutPlist({ askUrl, deviceKey: key }) : shortcutPlist({ askUrl, deviceKey: key }), name);
       res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader("Content-Disposition", `attachment; filename="${name}.shortcut"`);
@@ -98,7 +98,7 @@ export function registerPairingRoutes(app: Express, devices: DevicePairing, away
     if (process.platform !== "darwin") return res.status(409).json({ error: "This only works on a Mac." });
     const share = req.body?.kind === "share";
     const port = Number(process.env.OPENBOT_PORT || new URL(`http://${req.headers.host || "127.0.0.1:4310"}`).port || 4310);
-    const askUrl = `http://127.0.0.1:${port}/api/ask`, name = share ? "Send to OpenBot" : "Ask OpenBot";
+    const askUrl = `http://127.0.0.1:${port}/api/ask`, name = share ? "Send to Sidemates" : "Ask Sidemates";
     const key = newBrowserDeviceKey(), invitation = devices.invite();
     const result = devices.redeem(invitation.ticket, key, share ? "Mac Share menu" : "Mac shortcut");
     if (!result) return res.status(500).json({ error: "The shortcut couldn't be made." });

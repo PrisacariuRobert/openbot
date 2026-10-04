@@ -2,7 +2,7 @@
  * the phone welcome, so both paths behave the same. */
 export async function enablePushNotifications(): Promise<{ ok: boolean; message: string }> {
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    return { ok: false, message: isIOS() && !isStandalone() ? "On iPhone, add OpenBot to your Home Screen first, then turn on notifications there." : "Background notifications are unavailable in this browser." };
+    return { ok: false, message: isIOS() && !isStandalone() ? "On iPhone, add Sidemates to your Home Screen first, then turn on notifications there." : "Background notifications are unavailable in this browser." };
   }
   if (await Notification.requestPermission() !== "granted") return { ok: false, message: "Notifications stayed off." };
   const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");

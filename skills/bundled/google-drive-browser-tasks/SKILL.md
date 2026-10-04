@@ -15,4 +15,4 @@ Use the teammate's own persistent browser profile at drive.google.com. This meth
 
 ## Provenance
 
-OpenBot maintained built-in method. Proven in a signed-in teammate browser: document created, renamed, body typed, persistence proven across reload by screenshot, moved to bin, deleted forever with exact-name confirmation, Drive verified clean. Instructions are bundled with OpenBot and do not grant tool or account permissions.
+Sidemates maintained built-in method. Proven in a signed-in teammate browser: document created, renamed, body typed, persistence proven across reload by screenshot, moved to bin, deleted forever with exact-name confirmation, Drive verified clean. Instructions are bundled with Sidemates and do not grant tool or account permissions.

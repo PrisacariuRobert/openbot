@@ -15,6 +15,6 @@ export const SKILL_AUTHORING_GUIDANCE = "When the owner asks you to learn or sav
 /** Explicit command only; an existing owner-created /learn skill wins in routing. */
 export function learningCommandDirection(body: string): string {
   return /^\/learn(?:\s|$)/i.test(body.trim())
-    ? `\n\nOpenBot command: the owner wants to turn the requested topic, source material or this conversation into a reusable skill, not immediately execute its effects. ${SKILL_AUTHORING_GUIDANCE} If the request has no clear workflow or missing essential context, ask one focused question before proposing a skill.`
+    ? `\n\nSidemates command: the owner wants to turn the requested topic, source material or this conversation into a reusable skill, not immediately execute its effects. ${SKILL_AUTHORING_GUIDANCE} If the request has no clear workflow or missing essential context, ask one focused question before proposing a skill.`
     : "";
 }

@@ -47,23 +47,24 @@ test("teammate sharing blocks credentials and retired teammates", () => {
   }
 });
 
-test("the studio fetches teammates only from the OpenBot gallery", async () => {
+test("the studio fetches teammates only from the Sidemates gallery", async () => {
   const { galleryUrl, fetchGalleryTeammate } = await import("./sharing.js");
-  assert.equal(galleryUrl("https://openbots.foundation/teammates/receipt-keeper.json")?.href, "https://openbots.foundation/teammates/receipt-keeper.json");
-  assert.equal(galleryUrl("https://www.openbots.foundation/teammates/receipt-keeper.json")?.hostname, "openbots.foundation");
-  for (const bad of ["http://openbots.foundation/teammates/a.json", "https://evil.example/teammates/a.json", "https://openbots.foundation.evil.example/teammates/a.json", "https://openbots.foundation/teammates/../secret.json", "https://openbots.foundation/other/a.json", "https://openbots.foundation:8443/teammates/a.json", "https://user@openbots.foundation/teammates/a.json", "https://openbots.foundation/teammates/a.json?x=1", "http://127.0.0.1:4311/api/state", "not a url"]) assert.equal(galleryUrl(bad), null, bad);
+  assert.equal(galleryUrl("https://sidemates.app/teammates/receipt-keeper.json")?.href, "https://sidemates.app/teammates/receipt-keeper.json");
+  assert.equal(galleryUrl("https://www.sidemates.app/teammates/receipt-keeper.json")?.hostname, "sidemates.app");
+  assert.equal(galleryUrl("https://openbots.foundation/teammates/receipt-keeper.json")?.href, "https://sidemates.app/teammates/receipt-keeper.json", "links shared under the old name still work");
+  for (const bad of ["http://sidemates.app/teammates/a.json", "https://evil.example/teammates/a.json", "https://sidemates.app.evil.example/teammates/a.json", "https://sidemates.app/teammates/../secret.json", "https://sidemates.app/other/a.json", "https://sidemates.app:8443/teammates/a.json", "https://user@sidemates.app/teammates/a.json", "https://sidemates.app/teammates/a.json?x=1", "http://127.0.0.1:4311/api/state", "not a url"]) assert.equal(galleryUrl(bad), null, bad);
   const bundle = { kind: "openbot-teammate", version: 1, about: "Keeps your receipts in order.", bot: { name: "Receipt keeper", emoji: "🧾", color: "#299575", role: "Files your receipts", instructions: "Find receipts in Mail and save the PDFs." } };
   const seen: string[] = [];
   const ok: typeof fetch = async (url) => { seen.push(String(url)); return new Response(JSON.stringify(bundle), { status: 200 }); };
-  const loaded = await fetchGalleryTeammate("https://openbots.foundation/teammates/receipt-keeper.json", ok);
+  const loaded = await fetchGalleryTeammate("https://sidemates.app/teammates/receipt-keeper.json", ok);
   assert.equal(loaded.bot.name, "Receipt keeper");
   assert.equal(loaded.about, "Keeps your receipts in order.");
-  assert.deepEqual(seen, ["https://openbots.foundation/teammates/receipt-keeper.json"]);
-  await assert.rejects(() => fetchGalleryTeammate("https://evil.example/teammates/a.json", ok), /isn't a teammate from the OpenBot gallery/);
-  await assert.rejects(() => fetchGalleryTeammate("https://openbots.foundation/teammates/gone.json", async () => new Response("", { status: 404 })), /isn't in the gallery anymore/);
-  await assert.rejects(() => fetchGalleryTeammate("https://openbots.foundation/teammates/x.json", async () => { throw new Error("offline"); }), /couldn't be reached/);
+  assert.deepEqual(seen, ["https://sidemates.app/teammates/receipt-keeper.json"]);
+  await assert.rejects(() => fetchGalleryTeammate("https://evil.example/teammates/a.json", ok), /isn't a teammate from the Sidemates gallery/);
+  await assert.rejects(() => fetchGalleryTeammate("https://sidemates.app/teammates/gone.json", async () => new Response("", { status: 404 })), /isn't in the gallery anymore/);
+  await assert.rejects(() => fetchGalleryTeammate("https://sidemates.app/teammates/x.json", async () => { throw new Error("offline"); }), /couldn't be reached/);
   const leaky = { ...bundle, bot: { ...bundle.bot, instructions: "Use key sk-abcdefghijklmnopqrstuvwxyz123456 for everything" } };
-  await assert.rejects(() => fetchGalleryTeammate("https://openbots.foundation/teammates/x.json", async () => new Response(JSON.stringify(leaky))), /Remove the credential/);
+  await assert.rejects(() => fetchGalleryTeammate("https://sidemates.app/teammates/x.json", async () => new Response(JSON.stringify(leaky))), /Remove the credential/);
 });
 
 test("a teammate from someone else starts with the browser and computer off, on your own AI", () => {

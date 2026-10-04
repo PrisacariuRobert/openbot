@@ -232,7 +232,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
     <fieldset disabled={busy || !botId}>
     {tab === "connections" && <>
       <p>Use a service’s own sign-in or access token, or run a community MCP server as a local command on the host. Browser sign-in works with MCP services that offer public-client registration. Other services may require their own integration. A local command server starts when this connection is used and can read the files it is given; choose those commands carefully.</p>
-      {state.oauth?.hostOnly && <p>For this local studio, finish browser sign-in on the Mac running OpenBot. The phone can use the connection once you share its tools.</p>}
+      {state.oauth?.hostOnly && <p>For this local studio, finish browser sign-in on the Mac running Sidemates. The phone can use the connection once you share its tools.</p>}
       {state.connections.length > 0 && <SettingsGroup title="Connections">
         <SettingsCard>
           {state.connections.map((connection) => <SettingsRow
@@ -486,7 +486,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                             );
                             const link = document.createElement("a");
                             link.href = url;
-                            link.download = `${shared.name}.openbot-skill.json`;
+                            link.download = `${shared.name}.sidemates-skill.json`;
                             document.body.appendChild(link);
                             link.click();
                             link.remove();
@@ -675,7 +675,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
 
               <div className="skill-import-card">
                 <h5>Open Skill Package</h5>
-                <p>Import a verified .openbot-skill.json exported from another studio.</p>
+                <p>Import a verified .sidemates-skill.json (or an older .openbot-skill.json) exported from another studio.</p>
                 <input
                   ref={skillFile}
                   type="file"
@@ -695,7 +695,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                         bundle?: unknown;
                       };
                       if (shared.kind !== "openbot-skill" || !shared.bundle)
-                        throw new Error("That file is not an OpenBot skill file.");
+                        throw new Error("That file is not a Sidemates skill file.");
                       showImportPreview(
                         await request<Preview>("/skills/inspect", "POST", shared.bundle)
                       );

@@ -16,7 +16,7 @@ test("flags data folders a sync service would copy while the database changes", 
 });
 
 test("leaves unsynced folders alone, including Documents when iCloud does not sync it", () => {
-  assert.equal(syncedFolderProvider(`${home}/Library/Application Support/OpenBot`, home, exists), null);
+  assert.equal(syncedFolderProvider(`${home}/Library/Application Support/Sidemates`, home, exists), null);
   assert.equal(syncedFolderProvider(`${home}/Developer/openbot/.openbot`, home, exists), null);
   assert.equal(syncedFolderProvider(`${home}/Desktop/openbot`, home, exists), null, "Desktop is not linked in this fixture");
   assert.equal(syncedFolderProvider(`${home}/Documents-archive/openbot`, home, exists), null, "a sibling prefix is not inside Documents");

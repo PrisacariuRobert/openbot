@@ -1,4 +1,4 @@
-# OpenBot desktop and phones
+# Sidemates desktop and phones
 
 One React UI (`src/studio/`), one backend (`src/server/`). Electron is the desktop application for macOS, Windows and Linux. Phones use the responsive web client. The retired SwiftUI clients remain in Git history before this migration; historical QA documents describe those earlier candidates.
 
@@ -38,7 +38,7 @@ Open the same Studio URL through an authenticated HTTPS connection to your host.
 
 ## Existing data
 
-This source migration never moves or deletes a data home. Keep your existing server running and use `OPENBOT_DEV_URL` to attach. For a packaged runner, set `OPENBOT_DATA_DIR` to the existing absolute data-home path; the default for a new Electron home is `~/.openbot`. An earlier native Mac package may use `~/Library/Application Support/OpenBot/Data`, while source installations may use the checkout's `.openbot` directory. Do not assume those are interchangeable.
+This source migration never moves or deletes a data home. Keep your existing server running and use `OPENBOT_DEV_URL` to attach. For a packaged runner, set `OPENBOT_DATA_DIR` to the existing absolute data-home path; the default for a new Electron home is `~/.openbot`. An earlier native Mac package may use `~/Library/Application Support/Sidemates/Data`, while source installations may use the checkout's `.openbot` directory. Do not assume those are interchangeable.
 
 Before changing hosts or data locations, finish active work and stop the runner normally. Back up the complete data home, including the database with its WAL/SHM files, matching `keys/vault.key`, attachments, profiles and `.desktop-instance-id`. Restore into a separate folder and check it before replacing an existing home. Never copy only a live database or create a new vault key for existing encrypted data. There is no automatic data migration in this change.
 

@@ -40,15 +40,15 @@ jobs:
       - name: Stable names for the installer
         run: |
           cd dist-release
-          cp openbot-*-${{ matrix.platform }}.tar.gz openbot-${{ matrix.platform }}.tar.gz
-          shasum -a 256 openbot-${{ matrix.platform }}.tar.gz > openbot-${{ matrix.platform }}.tar.gz.sha256
+          cp sidemates-*-${{ matrix.platform }}.tar.gz sidemates-${{ matrix.platform }}.tar.gz
+          shasum -a 256 sidemates-${{ matrix.platform }}.tar.gz > sidemates-${{ matrix.platform }}.tar.gz.sha256
           cp ../scripts/install.sh install.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: openbot-desktop-terminal-${{ matrix.platform }}
           path: |
-            dist-release/openbot-${{ matrix.platform }}.tar.gz
-            dist-release/openbot-${{ matrix.platform }}.tar.gz.sha256
+            dist-release/sidemates-${{ matrix.platform }}.tar.gz
+            dist-release/sidemates-${{ matrix.platform }}.tar.gz.sha256
             dist-release/install.sh
           if-no-files-found: error
   publish:
@@ -67,7 +67,7 @@ jobs:
           merge-multiple: true
           path: release-artifacts
       - name: Create a draft for owner review (publish it as Latest so the installer finds it)
-        run: gh release create "$RELEASE_TAG" --verify-tag --draft --title "OpenBot $RELEASE_TAG" --notes-file docs/RELEASE_BETA_NOTES.md release-artifacts/*
+        run: gh release create "$RELEASE_TAG" --verify-tag --draft --title "Sidemates $RELEASE_TAG" --notes-file docs/RELEASE_BETA_NOTES.md release-artifacts/*
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

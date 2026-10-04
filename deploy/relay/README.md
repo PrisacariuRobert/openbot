@@ -1,7 +1,7 @@
-# OpenBot relay (private pilot)
+# Sidemates relay (private pilot)
 
 This runs on the **operator's server**, not as another application installed by
-Mac or iPhone users. End users install only OpenBot. It is a tested development
+Mac or iPhone users. End users install only Sidemates. It is a tested development
 transport, not an operated public service or a security-certified release.
 
 ## Self-hosted with the private runner (simplest)
@@ -36,7 +36,7 @@ Run `npm run relay:serve` under your server supervisor. By default it listens on
 connection and request-rate limits at the edge. Do not log Authorization headers
 or request/response bodies. Bind the TLS certificate only to your actual domain.
 
-For a privately provisioned studio, configure its OpenBot runner once:
+For a privately provisioned studio, configure its Sidemates runner once:
 
 ```text
 OPENBOT_RELAY_URL=https://your-relay.onrender.com
@@ -44,7 +44,7 @@ OPENBOT_RELAY_ENROLLMENT_TOKEN=<operator provisioning secret>
 ```
 
 After initial enrollment, the enrollment token can be removed from the studio;
-its private relay identity remains in its data directory. Restart OpenBot and open
+its private relay identity remains in its data directory. Restart Sidemates and open
 Away access. It checks its stable HTTPS address before offering a phone QR code.
 Do not distribute an operator enrollment token in a public app or public repo.
 
@@ -77,7 +77,7 @@ not whether a particular Mac is online. Keep one replica: this SQLite/live-tunne
 pilot is not horizontally distributed. Back up its durable database. Restarts
 briefly disconnect phones; clients reconnect, but uncertain writes are not replayed.
 
-This hostname is **native API only**, not a hosted browser version of OpenBot.
+This hostname is **native API only**, not a hosted browser version of Sidemates.
 Cookie authentication, browser-origin requests, web assets and active HTML are
 blocked/sandboxed on the shared origin. Use the native iPhone app; connect provider
 accounts and complete browser OAuth flows on the Mac. Each studio's bearer keys

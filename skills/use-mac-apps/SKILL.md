@@ -1,6 +1,6 @@
 ---
 name: use-mac-apps
-description: Inspect and operate visible macOS apps through OpenBot's approved computer-use tools. Use when the user asks to open an app, read visible controls or window state, click a control, enter text, press a key, scroll, or complete a workflow across Mac apps. Do not use for websites already handled by the private browser or ordinary file organization handled by the Mac file tools.
+description: Inspect and operate visible macOS apps through Sidemates' approved computer-use tools. Use when the user asks to open an app, read visible controls or window state, click a control, enter text, press a key, scroll, or complete a workflow across Mac apps. Do not use for websites already handled by the private browser or ordinary file organization handled by the Mac file tools.
 ---
 
 # Use Mac Apps

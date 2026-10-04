@@ -185,9 +185,9 @@ export class MacAppControl {
       return JSON.parse(stdout.trim() || "null") as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/assistive access|not authorized|accessibility/i.test(message)) throw new Error("OpenBot needs Accessibility permission in System Settings → Privacy & Security → Accessibility before it can use Mac apps.");
+      if (/assistive access|not authorized|accessibility/i.test(message)) throw new Error("Sidemates needs Accessibility permission in System Settings → Privacy & Security → Accessibility before it can use Mac apps.");
       const stopped = error as { killed?: boolean; signal?: string | null };
-      if (stopped.killed || stopped.signal === "SIGTERM") throw new Error("OpenBot could not read that app before the safety timeout. Check Accessibility permission in System Settings → Privacy & Security, then try the app again.");
+      if (stopped.killed || stopped.signal === "SIGTERM") throw new Error("Sidemates could not read that app before the safety timeout. Check Accessibility permission in System Settings → Privacy & Security, then try the app again.");
       throw error;
     }
   }
@@ -220,16 +220,16 @@ export class MacAppControl {
   async type(app: string, text: string, clear = false): Promise<void> {
     if (text.length > 8_000) throw new Error("Mac text entry is limited to 8,000 characters at a time.");
     const result = await this.run<{ ok?: boolean; error?: string }>(typeScript, [app.trim(), text, clear ? "1" : "0"]);
-    if (!result?.ok) throw new Error("OpenBot could not enter text in that Mac app.");
+    if (!result?.ok) throw new Error("Sidemates could not enter text in that Mac app.");
   }
 
   async key(app: string, key: string, modifiers: string[] = []): Promise<void> {
     const result = await this.run<{ ok?: boolean }>(keyScript, [app.trim(), key, JSON.stringify(modifiers)]);
-    if (!result?.ok) throw new Error("OpenBot could not press that key in the Mac app.");
+    if (!result?.ok) throw new Error("Sidemates could not press that key in the Mac app.");
   }
 
   async scroll(app: string, amount: number): Promise<void> {
     const result = await this.run<{ ok?: boolean }>(scrollScript, [app.trim(), String(Math.round(amount))]);
-    if (!result?.ok) throw new Error("OpenBot could not scroll that Mac app.");
+    if (!result?.ok) throw new Error("Sidemates could not scroll that Mac app.");
   }
 }

@@ -1,6 +1,6 @@
-# OpenBot Connector Contract v2
+# Sidemates Connector Contract v2
 
-OpenBot 0.28 uses this contract to decide whether a connector belongs in the trusted built-in catalog. It is both a product checklist and a security boundary. Passing the contract does not make third-party code executable: connector code still ships through normal source review, tests, and a signed OpenBot release.
+Sidemates 0.28 uses this contract to decide whether a connector belongs in the trusted built-in catalog. It is both a product checklist and a security boundary. Passing the contract does not make third-party code executable: connector code still ships through normal source review, tests, and a signed Sidemates release.
 
 ## Required manifest
 
@@ -49,4 +49,4 @@ A connector is release-ready only after it has:
 
 ## Deliberate non-goals in 0.28
 
-OpenBot does not download or execute arbitrary connector packages, accept remote JavaScript, or advertise a public connector marketplace. A future package system needs signed provenance, dependency isolation, explicit network allowlists, a permission diff before installation, update/revocation policy, and a reproducible review record. Until then, adding a connector means adding reviewed source to OpenBot itself.
+Sidemates does not download or execute arbitrary connector packages, accept remote JavaScript, or advertise a public connector marketplace. A future package system needs signed provenance, dependency isolation, explicit network allowlists, a permission diff before installation, update/revocation policy, and a reproducible review record. Until then, adding a connector means adding reviewed source to Sidemates itself.

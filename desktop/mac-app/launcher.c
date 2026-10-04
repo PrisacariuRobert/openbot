@@ -1,9 +1,9 @@
-// OpenBot.app's main executable. It starts the OpenBot service as a child
-// process and waits for it, so macOS treats OpenBot.app as the responsible
+// Sidemates.app's main executable. It starts the Sidemates service as a child
+// process and waits for it, so macOS treats Sidemates.app as the responsible
 // app: privacy permissions (Full Disk Access for Messages, Automation) are
-// listed and granted as "OpenBot", and the service inherits them.
+// listed and granted as "Sidemates", and the service inherits them.
 //
-// It runs Contents/Resources/openbot-launch with /bin/sh, passing its own
+// It runs Contents/Resources/sidemates-launch with /bin/sh, passing its own
 // arguments through. That script decides what to do: `--serve` runs the
 // service in the foreground (for launchd); no arguments opens the studio.
 #include <limits.h>
@@ -27,14 +27,14 @@ int main(int argc, char *argv[]) {
   char self[PATH_MAX], resolved[PATH_MAX], script[PATH_MAX + 64];
   uint32_t size = sizeof(self);
   if (_NSGetExecutablePath(self, &size) != 0 || !realpath(self, resolved)) return 70;
-  // .../OpenBot.app/Contents/MacOS/OpenBot -> .../OpenBot.app/Contents
+  // .../Sidemates.app/Contents/MacOS/Sidemates -> .../Sidemates.app/Contents
   char *slash = strrchr(resolved, '/');
   if (!slash) return 70;
   *slash = '\0';
   slash = strrchr(resolved, '/');
   if (!slash) return 70;
   *slash = '\0';
-  snprintf(script, sizeof(script), "%s/Resources/openbot-launch", resolved);
+  snprintf(script, sizeof(script), "%s/Resources/sidemates-launch", resolved);
 
   char bundle[PATH_MAX];
   snprintf(bundle, sizeof(bundle), "%s", resolved);

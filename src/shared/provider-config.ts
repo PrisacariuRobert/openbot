@@ -190,7 +190,7 @@ export function apiRuntimeEnvironment(
   };
 }
 
-/** Models known to run OpenBot teammates well, best first. The first one a
+/** Models known to run Sidemates teammates well, best first. The first one a
  * connection offers is shown first and preselected. */
 export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash", "google/gemini-flash-lite-latest"] as const;
 

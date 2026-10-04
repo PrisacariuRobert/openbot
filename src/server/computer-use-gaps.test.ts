@@ -514,7 +514,7 @@ test("B05 native control needs separate grants; protected apps refused", () => {
   assert.equal(ok.allowed, true);
   assert.equal(nativeAppProtected("com.apple.Terminal"), true);
   assert.equal(nativeAppProtected("com.example.app"), false);
-  assert.equal(nativeDialogRequiresOwner("OpenBot wants Screen Recording permission"), true);
+  assert.equal(nativeDialogRequiresOwner("Sidemates wants Screen Recording permission"), true);
   const focus = { windowId: "w1", appId: "a1", displayId: "d1", focusEpoch: "f1", title: "t" };
   assert.equal(nativeFocusValid(focus, { ...focus }), true);
   assert.equal(nativeFocusValid(focus, { ...focus, focusEpoch: "f2" }), false);

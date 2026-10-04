@@ -27,5 +27,5 @@ export function syncedFolderProvider(dir: string, home = os.homedir(), exists: (
 }
 
 export function syncedFolderWarning(dir: string, provider: string): string {
-  return `OpenBot's data folder (${dir}) is inside ${provider}. Syncing a live database can create conflict copies and corrupt your studio. Move the data folder somewhere that is not synced (for example ~/Library/Application Support/OpenBot), or set OPENBOT_DATA_DIR, then restart.`;
+  return `Sidemates' data folder (${dir}) is inside ${provider}. Syncing a live database can create conflict copies and corrupt your studio. Move the data folder somewhere that is not synced (for example ~/Library/Application Support/Sidemates), or set OPENBOT_DATA_DIR, then restart.`;
 }

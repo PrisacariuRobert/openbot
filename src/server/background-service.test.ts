@@ -4,8 +4,8 @@ import { backgroundServicePlist, BACKGROUND_SERVICE_LABEL } from "./background-s
 
 test("builds a bounded macOS background service without shell interpolation", () => {
   const plist = backgroundServicePlist({
-    rootDir: "/Users/Test Person/OpenBot & Friends",
-    dataDir: "/Users/Test Person/OpenBot & Friends/.openbot",
+    rootDir: "/Users/Test Person/Sidemates & Friends",
+    dataDir: "/Users/Test Person/Sidemates & Friends/.openbot",
     nodePath: "/opt/local/bin/node",
     port: 4311,
   });
@@ -15,7 +15,7 @@ test("builds a bounded macOS background service without shell interpolation", ()
   assert.match(plist, /OPENBOT_PORT/);
   assert.match(plist, /OPENBOT_DATA_DIR/);
   assert.match(plist, /<string>4311<\/string>/);
-  assert.match(plist, /OpenBot &amp; Friends/);
+  assert.match(plist, /Sidemates &amp; Friends/);
   assert.doesNotMatch(plist, /<key>WorkingDirectory<\/key>/);
   assert.doesNotMatch(plist, /<string>\/bin\/(?:zsh|bash|sh)<\/string>/);
 });

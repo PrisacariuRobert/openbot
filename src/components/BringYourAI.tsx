@@ -5,7 +5,7 @@ import "./bring-your-ai.css";
 
 /** Choosing the AI behind the team, in the order that costs people least:
  * free first, then subscriptions they already pay for, then a paid key.
- * OpenBot itself never adds a bill. */
+ * Sidemates itself never adds a bill. */
 export function BringYourAI({ onConnected, compact = false }: { onConnected: (connectionId: string) => Promise<void> | void; compact?: boolean }) {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [attempt, setAttempt] = useState<ProviderLoginAttempt | null>(null);
@@ -77,7 +77,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
   return (
     <section className={`byo${compact ? " is-compact" : ""}`} aria-labelledby="byo-title">
       <h3 id="byo-title">Choose the AI behind your team</h3>
-      <p className="byo-lead">Use one you already have. OpenBot never adds another bill.</p>
+      <p className="byo-lead">Use one you already have. Sidemates never adds another bill.</p>
 
       <h4>Start free</h4>
       <ul className="byo-list">

@@ -2,11 +2,11 @@
  * paused routines — never history, memory or access) is deflated and put in
  * the part of the address after "#", which browsers never send to a server:
  *
- *   https://openbots.foundation/t/#1.<base64url>
+ *   https://sidemates.app/t/#1.<base64url>
  *
  * The same codec runs in the studio (browser), the website and the tests. */
 
-export const LINK_BASE = "https://openbots.foundation/t/#";
+export const LINK_BASE = "https://sidemates.app/t/#";
 const VERSION = "1.";
 export const MAX_PAYLOAD_CHARS = 60_000;
 export const MAX_BUNDLE_BYTES = 64_000;
@@ -46,7 +46,7 @@ export async function encodeTeammate(bundle: unknown): Promise<string> {
 
 export async function decodeTeammate(payload: string): Promise<unknown> {
   const text = payload.trim();
-  if (!text.startsWith(VERSION) || text.length > MAX_PAYLOAD_CHARS || !/^[A-Za-z0-9_-]+$/.test(text.slice(VERSION.length))) throw new Error("This doesn't look like an OpenBot teammate link.");
+  if (!text.startsWith(VERSION) || text.length > MAX_PAYLOAD_CHARS || !/^[A-Za-z0-9_-]+$/.test(text.slice(VERSION.length))) throw new Error("This doesn't look like a Sidemates teammate link.");
   let bytes: Uint8Array;
   try { bytes = fromBase64Url(text.slice(VERSION.length)); } catch { throw new Error("This teammate link is damaged."); }
   try {

@@ -44,8 +44,8 @@ try {
   // and personal tasks are never changed by this acceptance test.
   f.db.updateBot('nova', { weeklyTokenBudget: 1 });
   const stopped = f.db.createRun({ threadId: 'bot-nova', botId: 'nova', prompt: 'Fixture budget stop', status: 'failed' });
-  f.db.updateRun(stopped.id, { inputTokens: 2, error: 'Nova reached the weekly token limit configured in OpenBot.' });
-  f.db.finishRunTask(stopped.id, 'failed', 'Nova reached the weekly token limit configured in OpenBot.');
+  f.db.updateRun(stopped.id, { inputTokens: 2, error: 'Nova reached the weekly token limit configured in Sidemates.' });
+  f.db.finishRunTask(stopped.id, 'failed', 'Nova reached the weekly token limit configured in Sidemates.');
   await page.reload();
   await page.getByText('Weekly budget reached', { exact: true }).waitFor();
   await page.getByText(/Your provider’s allowance is separate/).waitFor();

@@ -58,7 +58,7 @@ function open(file: string) {
   try { return new DatabaseSync(file, { readOnly: true }); }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/authorization denied|not authorized|operation not permitted|unable to open/i.test(message)) throw new FullDiskAccessError("To search your Messages, give OpenBot Full Disk Access: System Settings → Privacy & Security → Full Disk Access → turn on OpenBot. Nothing was read.");
+    if (/authorization denied|not authorized|operation not permitted|unable to open/i.test(message)) throw new FullDiskAccessError("To search your Messages, give Sidemates Full Disk Access: System Settings → Privacy & Security → Full Disk Access → turn on Sidemates. Nothing was read.");
     throw error;
   }
 }

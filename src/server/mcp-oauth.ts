@@ -46,7 +46,7 @@ export class McpOAuth {
     const bound = <T extends { issuer?: string }>(stored: T | undefined, issuer?: string): T | undefined => !issuer || !stored?.issuer || stored.issuer === issuer ? stored : undefined;
     return {
       redirectUrl: this.redirectUrl,
-      clientMetadata: { client_name: "OpenBot", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" },
+      clientMetadata: { client_name: "Sidemates", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" },
       state: () => { if (!value.state) throw new Error("This sign-in attempt has expired."); return value.state; },
       clientInformation: (ctx) => bound(value.client, ctx?.issuer),
       saveClientInformation: (client, ctx) => { value.client = { ...client, ...(ctx ? { issuer: ctx.issuer } : {}) }; this.save(value); },
@@ -100,12 +100,12 @@ export class McpOAuth {
   }
 
   async complete(state: string, code: string, iss?: string) {
-    if (!/^[A-Za-z0-9_-]{43}$/.test(state) || !code || code.length > 4096) throw new Error("This sign-in link is invalid. Start again from OpenBot.");
+    if (!/^[A-Za-z0-9_-]{43}$/.test(state) || !code || code.length > 4096) throw new Error("This sign-in link is invalid. Start again from Sidemates.");
     const attempt = this.db.extensionRecord<{ id: string; revision: string; expiresAt: number }>("mcp-oauth-attempt", stateKey(state));
-    if (!attempt || attempt.expiresAt < Date.now() || !this.db.claimDedupe(`mcp-oauth:${stateKey(state)}`)) throw new Error("This sign-in link expired or was already used. Return to OpenBot.");
+    if (!attempt || attempt.expiresAt < Date.now() || !this.db.claimDedupe(`mcp-oauth:${stateKey(state)}`)) throw new Error("This sign-in link expired or was already used. Return to Sidemates.");
     this.db.deleteExtensionRecord("mcp-oauth-attempt", stateKey(state));
     const value = this.db.extensionRecord<State>(KIND, attempt.id);
-    if (!value || value.state !== state || value.revision !== attempt.revision) throw new Error("This sign-in was replaced. Start again from OpenBot.");
+    if (!value || value.state !== state || value.revision !== attempt.revision) throw new Error("This sign-in was replaced. Start again from Sidemates.");
     this.guard(value);
     const connection = this.connection(value.connectionId);
     try {
@@ -115,7 +115,7 @@ export class McpOAuth {
       return connection.id;
     } catch {
       if (this.db.extensionRecord<StoredConnection>("mcp", attempt.id)?.authRevision === value.revision) { value.state = null; delete value.verifier; delete value.tokens; this.save(value); }
-      throw new Error("Sign-in could not be verified. Return to OpenBot and try again; no tools were authorized.");
+      throw new Error("Sign-in could not be verified. Return to Sidemates and try again; no tools were authorized.");
     }
   }
 

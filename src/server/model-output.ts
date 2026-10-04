@@ -100,7 +100,7 @@ export class ModelOutput {
       const data = record(error?.data);
       const message = String(data?.message ?? error?.message ?? "").slice(0, 4000);
       const status = data?.statusCode;
-      if (status === 403 && /free tier can only be used from within OpenCode/i.test(message)) this.failureDescription = "This OpenCode free-tier model is restricted to use inside OpenCode and could not run this OpenBot teammate. Your work is saved. Choose another model available to your connection.";
+      if (status === 403 && /free tier can only be used from within OpenCode/i.test(message)) this.failureDescription = "This OpenCode free-tier model is restricted to use inside OpenCode and could not run this Sidemates teammate. Your work is saved. Choose another model available to your connection.";
       else if (/no longer available|has been (?:deprecated|retired|shut ?down)|model[^.]{0,60}not found|not_found_error/i.test(message)) this.failureDescription = "Your AI provider has retired this model. Your work is saved. Pick a newer model for this teammate in its settings and try again.";
       else if (/free_tier|free tier/i.test(message) && (status === 429 || /quota/i.test(message))) this.failureDescription = "Your free AI allowance is used up for now. Your progress is saved. It refills over time — or connect another AI, or turn on billing with your provider for higher limits.";
       else if (status === 429 || /rate.limit|quota|usage.limit|insufficient.credit/i.test(message)) this.failureDescription = "Your AI provider reached a usage or rate limit. Your progress is saved. Wait for its allowance to reset or choose another connected model in Settings.";

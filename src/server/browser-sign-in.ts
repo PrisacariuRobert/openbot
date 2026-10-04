@@ -69,7 +69,7 @@ export class BrowserSignIns {
       ? ` You signed in here ${Math.max(1, Math.round((Date.now() - lastDone) / 60_000))} min ago and the page still shows a wall — if this repeats, the site may be dropping the session.`
       : "";
     const approval = this.db.createApproval({ botId, runId, kind: "browser",
-      reason: `${bot.name} needs you to sign in at ${site}. ${evidenceLine}${repeatLine} Your task is saved and will wait. A visible Chrome window opens for this sign-in on the Mac running OpenBot — finish it there or on the private screen below; both drive the same browser.`,
+      reason: `${bot.name} needs you to sign in at ${site}. ${evidenceLine}${repeatLine} Your task is saved and will wait. A visible Chrome window opens for this sign-in on the Mac running Sidemates — finish it there or on the private screen below; both drive the same browser.`,
       actionLabel: `Sign in to ${site}`,
       action: { type: "browser_sign_in", botId, args: { siteOrigin, evidence: evidence ? { source: evidence.source, observedUrl: (evidence.observedUrl || "").slice(0, 300), observedText: (evidence.observedText || "").slice(0, 300) } : null } },
     });

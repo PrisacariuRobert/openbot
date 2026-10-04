@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.42.0 — OpenBot is now Sidemates (8 October 2026)
+
+- **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.
+- **Updating keeps everything.** Tap Update, or run the same one-line installer (the old openbots.foundation/install.sh link still works). The first start after updating moves your data folder from Application Support/OpenBot to Application Support/Sidemates, replaces the OpenBot app in Applications and the Dock with Sidemates, and stops the old background job. Nothing is deleted.
+- **macOS asks for permissions again** (Mail, Calendar, Full Disk Access and so on), because the app now has a new name and identity. It is the same app asking once more.
+- Shared teammates and skills are saved as `.sidemates.json` and `.sidemates-skill.json`. Files and links from before, including teammate links on openbots.foundation, still import.
+- The old website address sends visitors to sidemates.app. The installer and downloads keep working there, so copies installed as OpenBot can still update.
+- The website no longer promises "no subscription"; it says what is true today: the app is free and open source, and you pay only for the AI you connect.
+- Behind the scenes: finds Chrome, Edge or Brave on Windows (Windows is not supported yet), and the link at the bottom of a shared result carries a small tag so visits from shares can be counted, with no personal information.
+- Internal names such as the `OPENBOT_*` settings, the database file and the share-file format keep their old names for now, so nothing that is saved breaks.
+
 ## 0.41.1 — Tidier screens, easier install (1 October 2026)
 
 - The morning brief card is fixed: its fields lined up badly (different heights and borders), a label wrapped, the dropdowns had no arrow and the Mac-access notice broke across three lines. It is now a clean two-column form that looks the same in light and dark and on a phone.

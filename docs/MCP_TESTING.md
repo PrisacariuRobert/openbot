@@ -1,4 +1,4 @@
-# Testing OpenBot through MCP — the direction check
+# Testing Sidemates through MCP — the direction check
 
 `mcp/openbot.ts` exposes the owner's local studio as MCP tools so an AI
 assistant can drive the whole app end to end and judge whether it is going
@@ -19,7 +19,7 @@ harness behind "test absolutely everything".
 
 ## Setup (2 minutes)
 
-The OpenBot server must be running (`http://127.0.0.1:4311` by default).
+The Sidemates server must be running (`http://127.0.0.1:4311` by default).
 No new accounts, no new keys — the MCP server reads the studio's own
 `access.token` next to it, exactly like the benchmark harness does.
 

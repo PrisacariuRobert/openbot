@@ -102,7 +102,7 @@ export class NotificationService {
           }
         }
         if (this.db.notificationDeliveriesComplete(notification.id)) this.db.markNotificationSent(notification.id);
-        else this.db.markNotificationFailed(notification.id, "A push service could not be reached. OpenBot will retry only the unfinished delivery.");
+        else this.db.markNotificationFailed(notification.id, "A push service could not be reached. Sidemates will retry only the unfinished delivery.");
       }
     } finally { this.flushing = false; }
   }

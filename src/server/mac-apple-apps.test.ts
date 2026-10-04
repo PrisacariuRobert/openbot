@@ -44,7 +44,7 @@ test("shortcuts run only by exact existing name", async () => {
 
 test("off a Mac, nothing is attempted", async () => {
   const apps = new AppleApps(async () => { throw new Error("should not run"); }, "linux");
-  await assert.rejects(() => apps.searchNotes({ query: "trip" }), /only available when OpenBot runs on a Mac/);
+  await assert.rejects(() => apps.searchNotes({ query: "trip" }), /only available when Sidemates runs on a Mac/);
 });
 
 test("every change reads as one plain sentence for the approval", () => {

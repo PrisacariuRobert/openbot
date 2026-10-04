@@ -43,8 +43,8 @@ const failures = [];
 if (packageLock.version !== version || packageLock.packages?.[""]?.version !== version) {
   failures.push(`package-lock.json must use version ${version}.`);
 }
-if (!readme.includes(`OpenBot ${version}`)) {
-  failures.push(`README.md must name the current version, “OpenBot ${version}”.`);
+if (!readme.includes(`Sidemates ${version}`)) {
+  failures.push(`README.md must name the current version, “Sidemates ${version}”.`);
 }
 if (!readme.includes(`## What's new in ${version}\n`)) {
   failures.push(`README.md must contain “## What's new in ${version}”.`);
@@ -118,7 +118,7 @@ if (!server.includes("dispatchConnectorEvents") || !server.includes("todoist.act
 if (!server.includes('/api/connector-hooks/slack/') || !server.includes('/api/connector-hooks/notion/') || !connectorEvents.includes('verifySlackEventRequest') || !connectorEvents.includes('verifyNotionEventRequest')) {
   failures.push("Signed Slack and Notion event ingress is incomplete.");
 }
-if (!connectorManifests.includes('schemaVersion: 2') || !connectorManifests.includes('eventAuth: "provider_hmac"') || !connectorContract.includes("OpenBot Connector Contract v2") || !connectorContract.includes("does not download or execute arbitrary connector packages")) {
+if (!connectorManifests.includes('schemaVersion: 2') || !connectorManifests.includes('eventAuth: "provider_hmac"') || !connectorContract.includes("Sidemates Connector Contract v2") || !connectorContract.includes("does not download or execute arbitrary connector packages")) {
   failures.push("Connector manifest v2 or its reviewed admission boundary is incomplete.");
 }
 if (!app.includes('triggerType === "slack"') || !app.includes('triggerType === "notion"') || !styles.includes(".connector-event-setup")) {
@@ -127,7 +127,7 @@ if (!app.includes('triggerType === "slack"') || !app.includes('triggerType === "
 if (!dropbox.includes("code_challenge_method") || !dropbox.includes("code_verifier") || !dropbox.includes('body.set("client_id"')) {
   failures.push("Managed Dropbox OAuth must retain PKCE and public-client support.");
 }
-if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep OpenBot running")) {
+if (!app.includes("runner-card") || !styles.includes(".runner-presence") || !app.includes("Keep Sidemates running")) {
   failures.push("The user-facing runner health and one-click protection experience is incomplete.");
 }
 if (!deployment.includes('requestedMode === "private_runner"') || !deployment.includes('url.protocol !== "https:"') || !deployment.includes("path.isAbsolute") || !server.includes("deploymentCallbackUrl")) {
@@ -137,7 +137,7 @@ if (!server.includes('/api/healthz') || !server.includes('app.set("trust proxy",
   failures.push("Private-host health, proxy-aware Secure cookies, or login throttling is incomplete.");
 }
 if (!privateRunnerDockerfile.includes("USER node") || !privateRunnerDockerfile.includes("opencode-ai@") || !privateRunnerDockerfile.includes("chromium") || !privateRunnerCompose.includes("caddy:2.10.2-alpine") || !privateRunnerCompose.includes("/var/run/docker.sock") || privateRunnerCompose.includes('4311:4311')) {
-  failures.push("The private runner must package its tools, run OpenBot without root, persist work, and keep the plain app port private.");
+  failures.push("The private runner must package its tools, run Sidemates without root, persist work, and keep the plain app port private.");
 }
 if (!packageJson.dependencies?.tsx || packageJson.devDependencies?.tsx || !privateRunnerDockerfile.includes("npm prune --omit=dev") || !verifyWorkflow.includes("Smoke test private runner image") || !verifyWorkflow.includes("/api/healthz") || !verifyWorkflow.includes("/api/runner/diagnostics") || !verifyWorkflow.includes('require("./package.json").version')) {
   failures.push("The pruned private-runner image must keep its TypeScript launcher and pass a real container startup smoke test in CI.");
@@ -185,4 +185,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Release documentation matches OpenBot ${version}.`);
+console.log(`Release documentation matches Sidemates ${version}.`);

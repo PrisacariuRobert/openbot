@@ -123,7 +123,7 @@ test("pull request approval shows the complete immutable change and pinned desti
   assert.equal(result.canApprove, true);
   for (const label of ["Connected account", "GitHub host", "Repository", "Project", "Publish branch", "Into branch", "Exact code commit", "Required base commit", "Pull request title", "Pull request description", "Pull request state", "Files in outgoing history", "Commits to upload", "Complete outgoing patch history", "Check 1", "Independent reviewer", "Review of this commit", "Review findings", "Access", "Effect"]) assert(result.fields.some((field) => field.label === label), label);
   assert.equal(result.fields.find((field) => field.label === "Complete outgoing patch history")?.value, action.args.publicationReview.diff);
-  assert.match(result.fields.at(-1)!.value, /OpenBot does not merge or deploy; the repository's own automations may run/);
+  assert.match(result.fields.at(-1)!.value, /Sidemates does not merge or deploy; the repository's own automations may run/);
   assert.doesNotMatch(JSON.stringify(result), /\/private\/|ownerId|workspaceRoot/);
 });
 

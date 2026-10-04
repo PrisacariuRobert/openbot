@@ -355,7 +355,7 @@ test("verified code delivery stays visible if model continuation fails or the ta
         assert.equal(visible.senderType, "system");
         assert.ok(visible.body.includes(receipt.url));
         assert.ok(visible.body.includes(receipt.headCommit.slice(0, 12)));
-        assert.match(visible.body, /OpenBot did not merge or deploy it; repository automations may run/);
+        assert.match(visible.body, /Sidemates did not merge or deploy it; repository automations may run/);
         assert.equal(visible.attachments.filter(artifact => artifact.name === "code-delivery.md").length, 1);
         assert.deepEqual(reopened.extensionRecord("code-delivery", f.run.id), receipt);
       } finally { reopened.close(); }

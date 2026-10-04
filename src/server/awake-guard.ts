@@ -7,7 +7,7 @@ const OVERDUE_GRACE_MS = 10 * 60_000;
 /** Keeps a Mac from idle-sleeping while teammates have work: a task is
  * active, or a clock routine is due within a few minutes. It holds the
  * standard `caffeinate -i` assertion (what downloads and calls use), tied
- * to this process so it can never outlive OpenBot, and releases it when
+ * to this process so it can never outlive Sidemates, and releases it when
  * idle. It changes no system setting; closing the lid still sleeps the Mac.
  * Set OPENBOT_KEEP_AWAKE=0 to turn it off. */
 export class AwakeGuard {

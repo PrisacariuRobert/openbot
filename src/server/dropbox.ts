@@ -53,7 +53,7 @@ export class DropboxConnector {
   async completeOAuth(state: string, code: string) {
     this.pruneAttempts();
     const attempt = this.attempts.get(state);
-    if (!attempt) throw new Error("That Dropbox sign-in expired. Start it again from OpenBot.");
+    if (!attempt) throw new Error("That Dropbox sign-in expired. Start it again from Sidemates.");
     this.attempts.delete(state);
     const configured = this.db.oauthConnectorCredentials<DropboxCredentials>("dropbox");
     if (!configured) throw new Error("The Dropbox connection is missing.");

@@ -6,7 +6,7 @@ import { chromePath } from "./runtime.js";
 
 /** Dedicated tester browser sessions for independent evaluation.
  *
- * Each session is its own incognito browser context pointed at the OpenBot
+ * Each session is its own incognito browser context pointed at the Sidemates
  * app itself. Sessions belong to no teammate, start no tasks, and cannot
  * leave the studio: only loopback http(s) URLs are reachable, enforced
  * before anything loads. The evaluator drives the real UI while teammates

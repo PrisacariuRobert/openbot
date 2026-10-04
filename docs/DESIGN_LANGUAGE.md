@@ -1,4 +1,4 @@
-# OpenBot design language
+# Sidemates design language
 
 **Intent:** a quiet place to work with a teammate, with personality in the characters—not a dashboard decorated with AI feature cards.
 
@@ -22,7 +22,7 @@ Apple’s principles favor familiar behavior, clear feedback and recovery that d
 
 Web authority: [`design-tokens.css`](../src/studio/design-tokens.css). Native authority: [`StudioPalette.swift`](../ios/OpenBotMobile/Models/StudioPalette.swift), shared by Mac and iPhone. Legacy names such as `purple` and `green` can resolve to neutral semantic colors; they are not permission to reintroduce purple buttons or green status panels.
 
-Apple recommends appearance-aware semantic colors and testing contrast across appearances. Our monochrome palette is an OpenBot choice, not an Apple rule. [Apple color](https://developer.apple.com/design/human-interface-guidelines/color), [Apple Dark Mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode).
+Apple recommends appearance-aware semantic colors and testing contrast across appearances. Our monochrome palette is a Sidemates choice, not an Apple rule. [Apple color](https://developer.apple.com/design/human-interface-guidelines/color), [Apple Dark Mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode).
 
 ## 3. Type and spacing
 

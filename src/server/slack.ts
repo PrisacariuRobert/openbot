@@ -43,7 +43,7 @@ export class SlackConnector {
 
   async completeOAuth(state: string, code: string) {
     this.pruneAttempts();
-    if (!this.attempts.delete(state)) throw new Error("That Slack sign-in expired. Start it again from OpenBot.");
+    if (!this.attempts.delete(state)) throw new Error("That Slack sign-in expired. Start it again from Sidemates.");
     const configured = this.db.oauthConnectorCredentials<SlackCredentials>("slack");
     if (!configured) throw new Error("The Slack app configuration is missing.");
     const result = await this.oauthRequest(configured.clientId, configured.clientSecret, {

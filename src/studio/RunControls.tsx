@@ -156,7 +156,7 @@ export function RunControls({
             result.runId !== run.id ||
             result.status !== action
       )
-        throw new Error("OpenBot did not confirm the requested decision.");
+        throw new Error("Sidemates did not confirm the requested decision.");
       setNotice(
         action === "cancel"
           ? "Stop requested. Completed actions are not undone."
@@ -168,7 +168,7 @@ export function RunControls({
       if (current === generation.current) {
         setNeedsRefresh(true);
         setError(
-          "We couldn’t confirm the latest result. Refresh status before another decision; the first request may already have reached OpenBot.",
+          "We couldn’t confirm the latest result. Refresh status before another decision; the first request may already have reached Sidemates.",
         );
       }
     } finally {

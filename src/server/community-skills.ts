@@ -37,7 +37,7 @@ export function inspectCommunitySkill(raw: unknown) {
   const blockers: string[] = [];
   if (!metadata.license) warnings.push("No license is declared. Check reuse rights with the author before sharing this skill.");
   if (metadata.compatibility) warnings.push(`Requirements to check: ${metadata.compatibility}`);
-  if (metadata["allowed-tools"]) blockers.push("This skill declares a tool policy. Translate and review it before importing; OpenBot does not silently ignore or auto-approve those tools.");
+  if (metadata["allowed-tools"]) blockers.push("This skill declares a tool policy. Translate and review it before importing; Sidemates does not silently ignore or auto-approve those tools.");
   if (metadata.metadata?.hermes || Object.keys(metadata).some((key) => !["name", "description", "license", "compatibility", "metadata", "allowed-tools"].includes(key))) blockers.push("This bundle uses runtime-specific metadata. Adapt it to portable instructions before enabling it.");
   const combined = entries.map(([, content]) => content).join("\n");
   if (/\bscripts\/|\b(?:pip install|npm install|curl\s.+\|\s*(?:sh|bash))\b/i.test(combined)) blockers.push("This skill depends on executable scripts or installation steps. Script execution is not supported by this importer.");
@@ -57,7 +57,7 @@ export function inspectCommunitySkill(raw: unknown) {
 const included = bundledSkillBundles.map(({ id, ...bundle }) => {
   const inspected = inspectCommunitySkill(bundle);
   if (inspected.blockers.length) throw new Error(`Invalid bundled skill ${id}: ${inspected.blockers.join(" ")}`);
-  return { ...inspected, id, bundled: true, installedAt: "2026-09-05T00:00:00.000Z", warnings: ["Included with OpenBot. This method does not grant tool or account permissions."] };
+  return { ...inspected, id, bundled: true, installedAt: "2026-09-05T00:00:00.000Z", warnings: ["Included with Sidemates. This method does not grant tool or account permissions."] };
 });
 
 export class CommunitySkills {
@@ -112,7 +112,7 @@ export class CommunitySkills {
     const entries: SkillCatalogEntry[] = [];
     for (const source of SKILL_CATALOGS) {
       const listing = `https://api.github.com/repos/${source.repo}/contents/${source.dir}`;
-      const response = await extensionFetch(listing, false, AbortSignal.timeout(15_000))(listing, { headers: { accept: "application/vnd.github+json", "user-agent": "OpenBot-skills/1" } });
+      const response = await extensionFetch(listing, false, AbortSignal.timeout(15_000))(listing, { headers: { accept: "application/vnd.github+json", "user-agent": "Sidemates-skills/1" } });
       if (!response.ok) throw new Error(`${source.label}'s skill list is unavailable right now. Try again later.`);
       const folders = (await response.json() as Array<{ name?: string; type?: string }>).filter((item) => item.type === "dir" && item.name && /^[a-z0-9][a-z0-9-]{0,63}$/.test(item.name)).slice(0, 60);
       const results = await mapLimited(folders, 4, async ({ name }) => {
@@ -216,7 +216,7 @@ const CATALOG_TTL_MS = 6 * 60 * 60_000;
 let catalogCache: { at: number; entries: SkillCatalogEntry[] } | null = null;
 
 function catalogReason(message: string) {
-  if (/script|install/i.test(message)) return "Runs its own programs, which OpenBot doesn’t do for imported skills.";
+  if (/script|install/i.test(message)) return "Runs its own programs, which Sidemates doesn’t do for imported skills.";
   if (/exceeds|larger|maximum|40 text files/i.test(message)) return "Too large to review here.";
   if (/Only SKILL\.md|file types|hidden/i.test(message)) return "Includes files other than text instructions.";
   if (/credential/i.test(message)) return "Contains something that looks like a password or key.";

@@ -1,5 +1,5 @@
 /**
- * Live teammate eval: starts a throwaway OpenBot on a fresh data folder,
+ * Live teammate eval: starts a throwaway Sidemates on a fresh data folder,
  * sends fixed requests to one teammate through the real API and runtime,
  * and records outcome checks, prompt size and latency.
  *

@@ -58,7 +58,7 @@ export class ApnsClient {
 
   async send(device: ApnsDevice, notification: ApnsNotification) {
     if (!this.config) throw new ApnsDeliveryError("Native push is not configured on this Mac.", false);
-    if (device.bundleId !== this.config.bundleId) throw new ApnsDeliveryError("This device belongs to a different OpenBot app identifier.", true);
+    if (device.bundleId !== this.config.bundleId) throw new ApnsDeliveryError("This device belongs to a different Sidemates app identifier.", true);
     const token = device.deviceToken.toLowerCase();
     if (!/^[a-f0-9]{64,200}$/.test(token)) throw new ApnsDeliveryError("This iPhone provided an invalid push token.", true);
     const host = device.environment === "production" ? "https://api.push.apple.com" : "https://api.sandbox.push.apple.com";

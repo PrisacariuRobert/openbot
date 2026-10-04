@@ -101,9 +101,9 @@ test("Telegram: owner-only pairing, messages become tasks, replies come back onc
     // A wrong code and a stranger get silence; the owner's code pairs.
     telegram.message(99, "/start 000000");
     telegram.message(7, `/start ${connected.pairingCode}`);
-    await until(() => telegram.sent.some((item) => item.chat_id === 7 && /Connected to OpenBot/.test(item.text)), "pairing confirmation");
+    await until(() => telegram.sent.some((item) => item.chat_id === 7 && /Connected to Sidemates/.test(item.text)), "pairing confirmation");
     assert.equal((await api("/api/channels/telegram/test", { method: "POST" })).status, 200);
-    await until(() => telegram.sent.some((item) => item.chat_id === 7 && /OpenBot is connected/.test(item.text)), "test message");
+    await until(() => telegram.sent.some((item) => item.chat_id === 7 && /Sidemates is connected/.test(item.text)), "test message");
     assert.equal(telegram.sent.filter((item) => item.chat_id === 99).length, 0);
     assert.equal(((await (await api("/api/channels/telegram")).json()) as { paired: boolean }).paired, true);
 

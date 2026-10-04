@@ -15,9 +15,9 @@ submission gate.
 
 | Provider kind | Auth modes | Credential storage | What reaches the provider | Who pays |
 |---|---|---|---|---|
-| opencode (OpenCode account) | cli, subscription | Owner's OpenCode CLI state, never in OpenBot storage | Prompts, tool results, attached file previews, browser content the teammate reads | Owner's OpenCode allowance |
+| opencode (OpenCode account) | cli, subscription | Owner's OpenCode CLI state, never in Sidemates storage | Prompts, tool results, attached file previews, browser content the teammate reads | Owner's OpenCode allowance |
 | claude (Claude Code) | cli, subscription | Owner's Claude CLI state | Same as above | Owner's Claude allowance |
-| openai / xai / custom (API) | api_key | Vault-encrypted in OpenBot storage (`secret_ciphertext`); projections expose only `hasSecret` | Same as above, sent to the configured `baseUrl` | Owner's API key |
+| openai / xai / custom (API) | api_key | Vault-encrypted in Sidemates storage (`secret_ciphertext`); projections expose only `hasSecret` | Same as above, sent to the configured `baseUrl` | Owner's API key |
 | local (e.g. Ollama-style URL) | api_key with local URL, key optional | Same vault; key omitted for loopback | Same as above, stays on the owner's machine/network | Owner's hardware |
 
 Rules enforced in code: discovering or saving a provider is not consent to

@@ -29,7 +29,7 @@ export function SidebarExtras() {
   return <div className="sidebar-extras">
     {update?.available && <div className="update-pill">
       <ArrowUpCircle size={16} aria-hidden="true" />
-      <span><strong>OpenBot {update.latest}</strong><small>{update.installing ? "Updating… back in a minute" : "A new version is ready"}</small></span>
+      <span><strong>Sidemates {update.latest}</strong><small>{update.installing ? "Updating… back in a minute" : "A new version is ready"}</small></span>
       {update.canInstall
         ? <button type="button" disabled={update.installing} onClick={() => void install()}>{update.installing ? <LoaderCircle className="spinner" size={14} /> : "Update"}</button>
         : update.notesUrl && <a href={update.notesUrl} target="_blank" rel="noreferrer">What's new</a>}
@@ -47,10 +47,10 @@ function FeedbackSheet({ version, onClose }: { version: string; onClose: () => v
     if (details) {
       const provider = await fetch("/api/provider", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null) as { instances?: Array<{ id: string; connected: boolean }> } | null;
       const connected = (provider?.instances || []).filter((item) => item.connected).map((item) => item.id.replace(/^local-/, "")).join(", ") || "none";
-      facts = `\n\n---\nOpenBot ${version || "?"} · ${navigator.platform} · ${navigator.userAgent.match(/Mac OS X [\d_]+/)?.[0]?.replace(/_/g, ".") || ""}\nAI connected: ${connected}`;
+      facts = `\n\n---\nSidemates ${version || "?"} · ${navigator.platform} · ${navigator.userAgent.match(/Mac OS X [\d_]+/)?.[0]?.replace(/_/g, ".") || ""}\nAI connected: ${connected}`;
     }
     const firstLine = text.trim().split("\n")[0]!.slice(0, 80) || "Feedback";
-    const url = `https://github.com/PrisacariuRobert/openbot/issues/new?title=${encodeURIComponent(firstLine)}&body=${encodeURIComponent(text.trim() + facts)}&labels=feedback`;
+    const url = `https://github.com/PrisacariuRobert/sidemates/issues/new?title=${encodeURIComponent(firstLine)}&body=${encodeURIComponent(text.trim() + facts)}&labels=feedback`;
     window.open(url, "_blank", "noopener,noreferrer");
     onClose();
   };
