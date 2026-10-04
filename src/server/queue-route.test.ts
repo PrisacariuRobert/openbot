@@ -31,6 +31,8 @@ test("the queue routes list, skip and refuse repeats, and the app state carries 
       db.queueItemTransition(made.id, ["ready"], { status: "done", decidedBy: "person", result: { id: `r-${n}`, list: "Bills", title: proposal.title, due: null } });
     }
   };
+  const filed = db.queueItemInsert({ kind: "file_attachment", title: "File the Acme invoice", why: "Acme sent an invoice.", sourceKey: "mail:77", botId: null, runId: null, action: { id: "77", attachment: "invoice-1042.pdf", folder: "Documents/Receipts/2026-10" }, preview: "Save the file.", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), pattern: "file_attachment|acme.com|Documents/Receipts/YYYY-MM", meta: { vendor: "Acme", amount: "84.20", currency: "EUR" } })!;
+  db.queueItemTransition(filed.id, ["ready"], { status: "done", decidedBy: "person", result: { saved: "/Users/test/Documents/Receipts/2026-10/invoice-1042.pdf", bytes: 1 } });
   const keep = "reminder|acme.com|bills", notNow = "reminder|school.example|bills";
   approvedFive(keep); approvedFive(notNow);
   db.close();
@@ -61,7 +63,7 @@ test("the queue routes list, skip and refuse repeats, and the app state carries 
     const listed = await (await fetch(base + "/api/queue")).json() as { ready: Array<{ id: string; preview: string }>; recent: unknown[] };
     assert.equal(listed.ready.length, 2);
     assert.match(listed.ready[0]!.preview, /Reminders/, "each card says exactly what approving will do");
-    assert.equal(listed.recent.length, 10, "the ten earlier approvals show under Done for you, none of them waiting");
+    assert.equal(listed.recent.length, 11, "the ten earlier approvals show under Done for you, none of them waiting");
 
     const skipped = await post(`/api/queue/${first.id}/skip`);
     assert.equal(skipped.status, 200);
@@ -74,6 +76,16 @@ test("the queue routes list, skip and refuse repeats, and the app state carries 
     assert.equal(after.queueReady, 1);
 
     assert.equal((await post("/api/queue/scan")).status, 409, "the look-through needs Mac access turned on first, and says so");
+
+    // The accountant's list: JSON for the screen and a spreadsheet file to download.
+    const receipts = await (await fetch(base + "/api/queue/receipts")).json() as { month: string; rows: Array<{ vendor: string; amount: string }>; totals: Array<{ currency: string; amount: string }> };
+    assert.equal(receipts.rows.length, 1);
+    assert.deepEqual(receipts.totals, [{ currency: "EUR", amount: "84.20", count: 1 }]);
+    const csv = await fetch(`${base}/api/queue/receipts.csv?month=${receipts.month}`);
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers.get("content-type") ?? "", /text\/csv/);
+    assert.match(csv.headers.get("content-disposition") ?? "", new RegExp(`attachment; filename="receipts-${receipts.month}\\.csv"`));
+    assert.match(await csv.text(), /Acme,,,84\.20,EUR,invoice-1042\.pdf/);
 
     // Earned trust: two offers (five approvals each), accept one, decline the other, then pause, resume and remove.
     const json = (route: string, body: unknown, method = "POST") => fetch(`${base}${route}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

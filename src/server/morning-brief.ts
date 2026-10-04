@@ -22,7 +22,7 @@ export function morningBriefPrompt(city?: string | null): string {
 
 Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.
 
-Then, if you have queue_propose, prepare cards for me from the mail you looked at in step 2: at most five, one per email, the most useful first. Each card needs a short title and one plain line saying why. Kinds:
+Then, if you have queue_propose, prepare cards for me from the mail you looked at in step 2: at most five, usually one per email (an invoice with a due date may get two: a reminder and a file card), the most useful first. Each card needs a short title and one plain line saying why. Kinds:
 ${QUEUE_CARD_GUIDE}
 Skip anything that doesn't need me. A card runs nothing: I decide each one. End with one line saying how many cards you prepared.`;
 }

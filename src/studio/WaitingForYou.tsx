@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, CalendarPlus, Check, ChevronRight, Inbox, Paperclip, Reply, Sparkles, Undo2 } from "lucide-react";
-import type { QueueCard, QueueOffer, QueueRuleCard } from "../shared/types";
+import { Bell, CalendarPlus, Check, ChevronRight, Download, Inbox, Paperclip, Reply, Sparkles, Undo2 } from "lucide-react";
+import type { QueueCard, QueueOffer, QueueRuleCard, ReceiptsSummary } from "../shared/types";
 import "./waiting.css";
 
 /** The front door: things your teammates prepared, one card each. Approving does exactly what the
@@ -35,9 +35,14 @@ function CardDetails({ card }: { card: QueueCard }) {
     </div>;
   }
   if (card.kind === "file_attachment") {
+    const m = card.meta ?? {};
     return <div className="waiting-detail">
       <p className="waiting-meta"><span>File</span> {String(a.attachment ?? "")}</p>
       <p className="waiting-meta"><span>Into</span> ~/{String(a.folder ?? "").replace(/\/+$/, "")}</p>
+      {Boolean(m.vendor) && <p className="waiting-meta"><span>Vendor</span> {m.vendor}</p>}
+      {Boolean(m.amount) && <p className="waiting-meta"><span>Amount</span> {m.amount} {m.currency}</p>}
+      {Boolean(m.invoiceDate) && <p className="waiting-meta"><span>Dated</span> {m.invoiceDate}</p>}
+      {Boolean(m.reference) && <p className="waiting-meta"><span>Reference</span> {m.reference}</p>}
     </div>;
   }
   return <div className="waiting-detail">
@@ -73,6 +78,8 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
   const [offers, setOffers] = useState<QueueOffer[]>([]);
   const [rules, setRules] = useState<QueueRuleCard[]>([]);
   const [alone, setAlone] = useState(0);
+  const [receipts, setReceipts] = useState<ReceiptsSummary | null>(null);
+  const [receiptMonth, setReceiptMonth] = useState("");
   const [scan, setScan] = useState<{ state: "idle" | "starting" | "started" | "error"; text: string }>({ state: "idle", text: "" });
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -88,6 +95,17 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
     } finally { setLoaded(true); }
   }, []);
   useEffect(() => { void load(); }, [load, queueReady]);
+  // The accountant's list for a month: reloaded whenever the queue changes (an approval or an Undo changes it).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/queue/receipts${receiptMonth ? `?month=${receiptMonth}` : ""}`, { credentials: "same-origin" });
+        if (response.ok && !cancelled) setReceipts(await response.json() as ReceiptsSummary);
+      } catch { /* the list is optional; the page still works */ }
+    })();
+    return () => { cancelled = true; };
+  }, [receiptMonth, queueReady, recent]);
 
   const act = async (card: QueueCard, action: "approve" | "skip" | "undo") => {
     setBusy((items) => ({ ...items, [card.id]: action }));
@@ -196,6 +214,22 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
         })}
       </ul>
       {undoable.length > 0 && <p className="waiting-footnote">Undo is available for 7 days.</p>}
+    </section>}
+
+    {receipts && receipts.months.length > 0 && <section className="waiting-receipts" aria-label="Receipts for your accountant">
+      <h3>For your accountant</h3>
+      <div className="waiting-receipts-head">
+        <select aria-label="Month" value={receipts.month} onChange={(event) => setReceiptMonth(event.target.value)}>
+          {receipts.months.map((month) => <option key={month} value={month}>{new Date(`${month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</option>)}
+        </select>
+        <a className="waiting-undo" href={`/api/queue/receipts.csv?month=${receipts.month}`} download><Download size={14} aria-hidden="true" /> Download the list</a>
+      </div>
+      <p className="waiting-footnote">
+        {receipts.rows.length} {receipts.rows.length === 1 ? "file" : "files"} filed
+        {receipts.totals.length > 0 && <> · {receipts.totals.map((total) => `${total.amount} ${total.currency}`).join(" + ")}</>}
+        {receipts.withoutAmount > 0 && <> · {receipts.withoutAmount} without an amount (the email didn't state one)</>}.
+        {" "}It only lists files you approved, and only what the email says. A spreadsheet that opens in Excel, Numbers or Google Sheets.
+      </p>
     </section>}
 
     {rules.length > 0 && <section className="waiting-rules" aria-label="Things done on their own">

@@ -393,3 +393,58 @@ test("doing things alone has a daily limit, and trusted cards do not use up the 
     assert.equal(queue.list().ready.length, 3);
   } finally { done(); }
 });
+
+// ---- Receipts for the accountant ---------------------------------------
+
+test("flat teammate fields carry receipt details, but only for a filed file", () => {
+  const card = proposalFromFlatArgs({ kind: "file_attachment", title: "File it", why: "Acme invoice", sourceKey: "mail:1", id: "1", attachment: "a.pdf", folder: "Documents/Receipts/2026-10", vendor: "Acme", amount: "84.20", currency: "EUR", invoiceDate: "2026-10-01", reference: "1042", notes: "ignored" });
+  assert.deepEqual((card as { receipt: unknown }).receipt, { vendor: "Acme", amount: "84.20", currency: "EUR", invoiceDate: "2026-10-01", reference: "1042" });
+  assert.equal(queueProposalInput.safeParse(card).success, true);
+  const reminderCard = proposalFromFlatArgs({ kind: "reminder", title: "x", why: "y", sourceKey: "mail:2", vendor: "Acme", amount: "1" });
+  assert.equal("receipt" in reminderCard, false);
+});
+
+test("the accountant's list holds only approved files, with what the email said, and sums per currency", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    const file = (n: number, receipt: Record<string, string> | undefined, sender = ACME) => ({ proposal: { ...fileCard(`mail:${n}`), action: { id: String(n), attachment: `invoice-${n}.pdf`, folder: "Documents/Receipts/2026-10" }, ...(receipt ? { receipt } : {}) }, ctx: { botId: "nova", runId: `run-${n}`, sender } });
+    const approve = async (n: number, receipt?: Record<string, string>, sender = ACME) => { const c = file(n, receipt, sender); const made = queue.propose(c.proposal, c.ctx); assert.ok(made.ok); if (made.ok) return queue.approve(made.item.id); throw new Error("not added"); };
+    await approve(1, { vendor: "Acme", amount: "84.20", currency: "EUR", invoiceDate: "2026-10-01", reference: "INV-1042" });
+    await approve(2, { vendor: "Acme", amount: "1240,50", currency: "EUR" });
+    await approve(3, { vendor: "Globex", amount: "10.00", currency: "USD" }, "Globex <ar@globex.example>");
+    await approve(4, undefined, "Pixel Print <hello@pixelprint.example>");
+    const skipped = file(5, { vendor: "Skipped", amount: "999.00", currency: "EUR" }); const waiting = queue.propose(skipped.proposal, skipped.ctx);
+    assert.ok(waiting.ok); if (waiting.ok) queue.skip(waiting.item.id);
+    const undone = await approve(6, { vendor: "Undone", amount: "555.00", currency: "EUR" }); await queue.undo(undone.id);
+    const pending = file(7, { vendor: "Pending", amount: "777.00", currency: "EUR" }); assert.ok(queue.propose(pending.proposal, pending.ctx).ok);
+
+    const summary = queue.receipts();
+    assert.equal(summary.rows.length, 4, "approved files only: not skipped, undone or still waiting");
+    assert.deepEqual(summary.rows.map((row) => row.vendor), ["Acme", "Acme", "Globex", "pixelprint.example"], "a missing vendor falls back to the sender's company");
+    assert.deepEqual(summary.totals, [{ currency: "EUR", amount: "1324.70", count: 2 }, { currency: "USD", amount: "10.00", count: 1 }], "sums per currency, in whole cents");
+    assert.equal(summary.withoutAmount, 1);
+    assert.equal(summary.rows[1]!.amount, "1240.50", "1240,50 is written plainly");
+    assert.match(summary.rows[0]!.savedTo, /^~\/Documents\/Receipts\/2026-10\/invoice-1\.pdf$/);
+    assert.deepEqual(summary.months, [summary.month]);
+    assert.equal(queue.receipts("2001-02").rows.length, 0, "another month is empty");
+    assert.equal(queue.receipts("not-a-month").month, summary.month, "a bad month falls back instead of failing");
+
+    const { csv } = queue.receiptsCsv(summary.month);
+    assert.ok(csv.startsWith("\uFEFFDate filed,Vendor,Invoice date,Reference,Amount,Currency,File,Saved to\r\n"));
+    assert.match(csv, /Acme,2026-10-01,INV-1042,84\.20,EUR,invoice-1\.pdf,~\/Documents\/Receipts\/2026-10\/invoice-1\.pdf/);
+    assert.equal(csv.trim().split("\r\n").length, 5, "a header and four rows");
+  } finally { done(); }
+});
+
+test("a vendor that looks like a spreadsheet formula, or holds a comma or quote, is made safe in the file", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    const c = { kind: "file_attachment", title: "File it", why: "An invoice.", sourceKey: "mail:9", action: { id: "9", attachment: "a.pdf", folder: "Documents/Receipts/2026-10" }, receipt: { vendor: '=HYPERLINK("http://evil.example","x"), Inc', reference: "+1-555" } };
+    const made = queue.propose(c, { botId: null, runId: null, sender: ACME });
+    assert.ok(made.ok); if (!made.ok) return;
+    await queue.approve(made.item.id);
+    const { csv } = queue.receiptsCsv();
+    assert.match(csv, /"'=HYPERLINK\(""http:\/\/evil\.example"",""x""\), Inc"/, "a leading = becomes text, quotes are doubled");
+    assert.match(csv, /,'\+1-555,/, "a leading + becomes text");
+  } finally { done(); }
+});

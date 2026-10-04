@@ -161,6 +161,8 @@ export type QueueItemRecord = {
   undoneAt: string | null;
   /** The narrow kind of thing this card is ("reminder|billing@acme.com|Bills"), or null when it can never be automatic. */
   pattern: string | null;
+  /** Receipt details for a filed attachment (vendor, amount, currency, date, reference), checked against the email; otherwise null. */
+  meta: Record<string, string> | null;
 };
 
 /** A person's standing "yes" to one narrow pattern. Active rules run matching cards by themselves;
@@ -709,7 +711,8 @@ export class OpenBotDatabase {
         decided_at TEXT,
         decided_by TEXT,
         undone_at TEXT,
-        pattern TEXT
+        pattern TEXT,
+        meta_json TEXT
       );
       CREATE INDEX IF NOT EXISTS queue_items_status ON queue_items(status, created_at);
       CREATE TABLE IF NOT EXISTS queue_rules (
@@ -1180,7 +1183,8 @@ export class OpenBotDatabase {
       effect_digest TEXT, approval_id TEXT, created_at TEXT NOT NULL
     )`);
     this.addColumn("mutation_tokens", "effect_digest TEXT");
-    this.addColumn("queue_items", "pattern TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.addColumn("queue_items", "pattern TEXT");
+    this.addColumn("queue_items", "meta_json TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -3031,12 +3035,12 @@ export class OpenBotDatabase {
 
   /** Adds a card. Returns null when an active card for the same source
    * already exists (the same email never makes two cards). */
-  queueItemInsert(input: { kind: string; title: string; why: string; sourceKey: string; botId: string | null; runId: string | null; action: Record<string, unknown>; preview: string; expiresAt: string; pattern?: string | null }): QueueItemRecord | null {
+  queueItemInsert(input: { kind: string; title: string; why: string; sourceKey: string; botId: string | null; runId: string | null; action: Record<string, unknown>; preview: string; expiresAt: string; pattern?: string | null; meta?: Record<string, string> | null }): QueueItemRecord | null {
     const id = `q-${randomUUID().slice(0, 12)}`;
     try {
       this.db.prepare(
-        "INSERT INTO queue_items (id,kind,status,title,why,source_key,bot_id,run_id,action_json,preview,created_at,expires_at,pattern) VALUES (?,?,'ready',?,?,?,?,?,?,?,?,?,?)",
-      ).run(id, input.kind, input.title, input.why, input.sourceKey, input.botId, input.runId, JSON.stringify(input.action), input.preview, now(), input.expiresAt, input.pattern ?? null);
+        "INSERT INTO queue_items (id,kind,status,title,why,source_key,bot_id,run_id,action_json,preview,created_at,expires_at,pattern,meta_json) VALUES (?,?,'ready',?,?,?,?,?,?,?,?,?,?,?)",
+      ).run(id, input.kind, input.title, input.why, input.sourceKey, input.botId, input.runId, JSON.stringify(input.action), input.preview, now(), input.expiresAt, input.pattern ?? null, input.meta ? JSON.stringify(input.meta) : null);
     } catch (error) {
       if (/UNIQUE/i.test(String(error))) return null;
       throw error;
@@ -3104,6 +3108,7 @@ export class OpenBotDatabase {
       decidedBy: row.decided_by == null ? null : String(row.decided_by),
       undoneAt: row.undone_at == null ? null : String(row.undone_at),
       pattern: row.pattern == null ? null : String(row.pattern),
+      meta: row.meta_json == null ? null : JSON.parse(String(row.meta_json)) as Record<string, string>,
     };
   }
 
@@ -3127,6 +3132,17 @@ export class OpenBotDatabase {
   /** Cards a rule ran by itself since a moment, newest first (the weekly "what I did alone"). */
   queueItemsDecidedByRulesSince(iso: string): QueueItemRecord[] {
     return (this.db.prepare("SELECT * FROM queue_items WHERE decided_by LIKE 'rule:%' AND status IN ('done','undone') AND decided_at>=? ORDER BY decided_at DESC LIMIT 200").all(iso) as Row[]).map((row) => this.queueItemFromRow(row));
+  }
+
+  /** Files a person approved and nobody undid, filed within a time range (oldest first): the receipts ledger. */
+  queueFilesFiledBetween(startIso: string, endIso: string): QueueItemRecord[] {
+    return (this.db.prepare("SELECT * FROM queue_items WHERE kind='file_attachment' AND status='done' AND decided_at>=? AND decided_at<? ORDER BY decided_at ASC LIMIT 2000").all(startIso, endIso) as Row[]).map((row) => this.queueItemFromRow(row));
+  }
+
+  /** Every month (local time) that has at least one filed file, newest first. */
+  queueFileMonths(): string[] {
+    const stamps = (this.db.prepare("SELECT decided_at FROM queue_items WHERE kind='file_attachment' AND status='done' AND decided_at IS NOT NULL ORDER BY decided_at DESC LIMIT 5000").all() as Row[]).map((row) => new Date(String(row.decided_at)));
+    return [...new Set(stamps.map((date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`))];
   }
 
   queueRuleList(): QueueRuleRecord[] {
