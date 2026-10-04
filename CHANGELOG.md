@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.42.0 — OpenBot is now Sidemates (8 October 2026)
+## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
 - **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.
 - **Updating keeps everything.** Tap Update, or run the same one-line installer (the old openbots.foundation/install.sh link still works). The first start after updating moves your data folder from Application Support/OpenBot to Application Support/Sidemates, replaces the OpenBot app in Applications and the Dock with Sidemates, and stops the old background job. Nothing is deleted.
