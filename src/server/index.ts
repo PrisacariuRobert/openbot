@@ -28,6 +28,8 @@ import { summarizeTable } from "./table-summary.js";
 import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
+import { QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput } from "./queue.js";
+import { MailSeen } from "./queue-grounding.js";
 import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
 import { describeMorningBrief, findMorningBrief, morningBriefPrompt, removeMorningBrief, setupMorningBrief } from "./morning-brief.js";
 import { PersonalIndexer, type IndexerConfig } from "./personal-indexer.js";
@@ -182,6 +184,9 @@ const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.da
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
 const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
+/** "Waiting for you": cards a teammate prepared. Proposing runs nothing; a person approves, skips or undoes. */
+const workQueue = new WorkQueue(db, () => appleApps);
+const mailSeen = new MailSeen();
 // Calendar answers slowly; while it's being used, keep the next two weeks warm.
 setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
 const personalIndex = new PersonalIndex(path.join(db.dataDir, "personal-index.sqlite"));
@@ -494,7 +499,25 @@ function compactRuns<T extends { status: string; startedAt: string | null; activ
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap() });
+  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap(), queueReady: workQueue.list().ready.length });
+});
+
+const queueFailure = (response: express.Response, error: unknown) => {
+  if (error instanceof QueueError) return response.status(error.code === "not_found" ? 404 : error.code === "already_handled" ? 409 : 422).json({ error: error.message });
+  return response.status(500).json({ error: "That didn't work. Nothing was changed." });
+};
+app.get("/api/queue", (_request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.json(workQueue.list());
+});
+app.post("/api/queue/:id/approve", async (request, response) => {
+  try { const item = await workQueue.approve(request.params.id); broadcast(); response.json({ item }); } catch (error) { queueFailure(response, error); }
+});
+app.post("/api/queue/:id/skip", (request, response) => {
+  try { const item = workQueue.skip(request.params.id); broadcast(); response.json({ item }); } catch (error) { queueFailure(response, error); }
+});
+app.post("/api/queue/:id/undo", async (request, response) => {
+  try { const item = await workQueue.undo(request.params.id); broadcast(); response.json({ item }); } catch (error) { queueFailure(response, error); }
 });
 
 app.get("/api/runner", (_request, response) => {
@@ -3747,7 +3770,7 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "queue_propose", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3783,6 +3806,20 @@ app.post("/api/internal/tools", async (request, response) => {
       } catch (error) {
         return response.status(400).json({ error: error instanceof z.ZodError ? "Provide a skill name, short description and complete instructions (up to 5000 characters), with an optional starting website. No extra fields are accepted." : error instanceof Error ? error.message : "This skill could not be proposed." });
       }
+    }
+    if (action === "queue_propose") {
+      if (!db.getStudioSettings().macAccessEnabled) return response.status(403).json({ error: "Mac files and apps are turned off for the studio. The user can turn them on in Control center." });
+      const card = proposalFromFlatArgs(args);
+      const checked = queueProposalInput.safeParse(card);
+      if (checked.success) {
+        const reason = mailSeen.check(checked.data, runId);
+        if (reason) return response.status(400).json({ error: reason });
+      }
+      const result = workQueue.propose(card, { botId, runId });
+      if (!result.ok) return response.status(result.reason === "invalid" ? 400 : 409).json({ error: result.message });
+      db.addActivity({ runId, botId, kind: "tool", label: `Prepared for review: ${result.item.title}`, detail: result.item.why });
+      broadcast();
+      return response.json({ added: true, id: result.item.id, message: "Added to the owner's Waiting for you list. Nothing has been done yet: the owner approves each card, and nothing is ever sent. Do not describe it as done." });
     }
     if (action === "work_collect") {
       const snapshot = await workReports.collect(botId, runId, args);
@@ -4200,9 +4237,9 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "mac_calendar_events" || action === "mac_mail_unread" || action === "mac_mail_search" || action === "mac_mail_read" || action === "mac_mail_save_attachment" || action === "mac_reminders" || action === "mac_notes_search" || action === "mac_note_read" || action === "mac_contacts_find" || action === "mac_calendars" || action === "mac_shortcuts_list" || action === "mac_mail_draft" || action === "mac_reminder_create" || action === "mac_note_create" || action === "mac_event_create" || action === "mac_shortcut_run") {
         try {
           if (action === "mac_calendar_events") return response.json(await appleApps.calendarEvents(args as never));
-          if (action === "mac_mail_unread") return response.json(await appleApps.unreadMail(args as never));
-          if (action === "mac_mail_search") return response.json(await appleApps.searchMail(args as never));
-          if (action === "mac_mail_read") return response.json(await appleApps.readMail(args as never));
+          if (action === "mac_mail_unread") { const found = await appleApps.unreadMail(args as never); mailSeen.remember(runId, found.messages); return response.json(found); }
+          if (action === "mac_mail_search") { const found = await appleApps.searchMail(args as never); mailSeen.remember(runId, found.messages); return response.json(found); }
+          if (action === "mac_mail_read") { const message = await appleApps.readMail(args as never); mailSeen.remember(runId, [message]); return response.json(message); }
           if (action === "mac_reminders") return response.json(await appleApps.reminders(args as never));
           if (action === "mac_notes_search") return response.json(await appleApps.searchNotes(args as never));
           if (action === "mac_note_read") return response.json(await appleApps.readNote(args as { id: string }));

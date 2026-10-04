@@ -1090,6 +1090,8 @@ export interface StudioDraft {
 export interface AppState {
   /** The last 7 days of finished work, when there is any (see weekly-recap). */
   weeklyRecap?: import("./weekly-recap").WeeklyRecap | null;
+  /** How many "Waiting for you" cards need a decision. */
+  queueReady?: number;
   bots: Bot[];
   threads: Thread[];
   messages: Message[];
@@ -1110,4 +1112,22 @@ export interface AppState {
   draft: StudioDraft;
   usage: UsageSummary;
   activeThreadId: string;
+}
+
+/** One card in "Waiting for you": something a teammate prepared that a person approves, skips or undoes. */
+export interface QueueCard {
+  id: string;
+  kind: "reminder" | "calendar_event" | "reply_draft" | "file_attachment";
+  status: "ready" | "done" | "skipped" | "undone" | "failed" | "expired";
+  title: string;
+  why: string;
+  preview: string;
+  action: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  undoneAt: string | null;
+  botId: string | null;
 }

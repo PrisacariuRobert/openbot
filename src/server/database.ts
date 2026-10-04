@@ -138,6 +138,29 @@ export type MessageSubmissionReceipt = {
   createdAt: string;
 };
 
+/** One card in the "Waiting for you" queue: a typed, reviewable proposal
+ * that a person approves, skips or undoes. Cards never run on their own. */
+export type QueueItemStatus = "ready" | "done" | "skipped" | "undone" | "failed" | "expired";
+export type QueueItemRecord = {
+  id: string;
+  kind: string;
+  status: QueueItemStatus;
+  title: string;
+  why: string;
+  sourceKey: string;
+  botId: string | null;
+  runId: string | null;
+  action: Record<string, unknown>;
+  preview: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  undoneAt: string | null;
+};
+
 /** One durable action-journal row (R02). Renderer-independent companion to
  * approved_actions: DOM, visual and native dispatches admit here first. */
 export type ActionJournalRecord = {
@@ -651,6 +674,27 @@ export class OpenBotDatabase {
         updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS action_journal_run_stage ON action_journal(run_id, stage);
+      CREATE TABLE IF NOT EXISTS queue_items (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ready',
+        title TEXT NOT NULL,
+        why TEXT NOT NULL,
+        source_key TEXT NOT NULL,
+        bot_id TEXT,
+        run_id TEXT,
+        action_json TEXT NOT NULL,
+        preview TEXT NOT NULL,
+        result_json TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        decided_at TEXT,
+        decided_by TEXT,
+        undone_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS queue_items_status ON queue_items(status, created_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS queue_items_active_source ON queue_items(kind, source_key) WHERE status IN ('ready','done');
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -2946,6 +2990,82 @@ export class OpenBotDatabase {
       detail: row.detail == null ? null : String(row.detail),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
+    };
+  }
+
+  /** Adds a card. Returns null when an active card for the same source
+   * already exists (the same email never makes two cards). */
+  queueItemInsert(input: { kind: string; title: string; why: string; sourceKey: string; botId: string | null; runId: string | null; action: Record<string, unknown>; preview: string; expiresAt: string }): QueueItemRecord | null {
+    const id = `q-${randomUUID().slice(0, 12)}`;
+    try {
+      this.db.prepare(
+        "INSERT INTO queue_items (id,kind,status,title,why,source_key,bot_id,run_id,action_json,preview,created_at,expires_at) VALUES (?,?,'ready',?,?,?,?,?,?,?,?,?)",
+      ).run(id, input.kind, input.title, input.why, input.sourceKey, input.botId, input.runId, JSON.stringify(input.action), input.preview, now(), input.expiresAt);
+    } catch (error) {
+      if (/UNIQUE/i.test(String(error))) return null;
+      throw error;
+    }
+    return this.queueItemGet(id);
+  }
+
+  queueItemGet(id: string): QueueItemRecord | null {
+    const row = this.db.prepare("SELECT * FROM queue_items WHERE id=?").get(id) as Row | undefined;
+    return row ? this.queueItemFromRow(row) : null;
+  }
+
+  /** Newest first. Pass the statuses to include. */
+  queueItemsList(statuses: QueueItemStatus[], limit = 50): QueueItemRecord[] {
+    if (!statuses.length) return [];
+    const marks = statuses.map(() => "?").join(",");
+    const rows = this.db.prepare(`SELECT * FROM queue_items WHERE status IN (${marks}) ORDER BY created_at DESC LIMIT ?`).all(...statuses, limit) as Row[];
+    return rows.map((row) => this.queueItemFromRow(row));
+  }
+
+  /** The latest card for a source in any state, so a card someone skipped or undid is not offered again. */
+  queueItemFindBySource(kind: string, sourceKey: string): QueueItemRecord | null {
+    const row = this.db.prepare("SELECT * FROM queue_items WHERE kind=? AND source_key=? ORDER BY created_at DESC LIMIT 1").get(kind, sourceKey) as Row | undefined;
+    return row ? this.queueItemFromRow(row) : null;
+  }
+
+  queueItemsCreatedSince(iso: string): number {
+    return Number((this.db.prepare("SELECT COUNT(*) AS n FROM queue_items WHERE created_at>=?").get(iso) as Row).n);
+  }
+
+  /** Moves one card between states. `from` makes the change conditional, so
+   * two quick taps cannot approve the same card twice. */
+  queueItemTransition(id: string, from: QueueItemStatus[], patch: { status: QueueItemStatus; result?: Record<string, unknown> | null; error?: string | null; decidedBy?: string | null; undone?: boolean }): QueueItemRecord | null {
+    const marks = from.map(() => "?").join(",");
+    const stamp = now();
+    const changed = this.db.prepare(
+      `UPDATE queue_items SET status=?, result_json=COALESCE(?, result_json), error=?, decided_at=COALESCE(decided_at, ?), decided_by=COALESCE(?, decided_by), undone_at=? WHERE id=? AND status IN (${marks})`,
+    ).run(patch.status, patch.result === undefined ? null : JSON.stringify(patch.result), patch.error ?? null, stamp, patch.decidedBy ?? null, patch.undone ? stamp : null, id, ...from).changes;
+    return changed === 1 ? this.queueItemGet(id) : null;
+  }
+
+  /** Cards nobody decided in time stop being offered. Returns how many. */
+  queueItemsExpire(beforeIso: string): number {
+    return Number(this.db.prepare("UPDATE queue_items SET status='expired' WHERE status='ready' AND expires_at<?").run(beforeIso).changes);
+  }
+
+  private queueItemFromRow(row: Row): QueueItemRecord {
+    return {
+      id: String(row.id),
+      kind: String(row.kind),
+      status: String(row.status) as QueueItemStatus,
+      title: String(row.title),
+      why: String(row.why),
+      sourceKey: String(row.source_key),
+      botId: row.bot_id == null ? null : String(row.bot_id),
+      runId: row.run_id == null ? null : String(row.run_id),
+      action: JSON.parse(String(row.action_json)) as Record<string, unknown>,
+      preview: String(row.preview),
+      result: row.result_json == null ? null : JSON.parse(String(row.result_json)) as Record<string, unknown>,
+      error: row.error == null ? null : String(row.error),
+      createdAt: String(row.created_at),
+      expiresAt: String(row.expires_at),
+      decidedAt: row.decided_at == null ? null : String(row.decided_at),
+      decidedBy: row.decided_by == null ? null : String(row.decided_by),
+      undoneAt: row.undone_at == null ? null : String(row.undone_at),
     };
   }
 
