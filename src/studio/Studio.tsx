@@ -79,6 +79,7 @@ import { ConnectorIcon } from "../ConnectorIcon";
 import { Character } from "./Character";
 import { CreateTeammate } from "./CreateTeammate";
 import { WeeklyRecapEntry } from "./WeeklyRecap";
+import { WaitingEntry, WaitingForYou } from "./WaitingForYou";
 import { VoiceMode, voiceModeSupported } from "./VoiceMode";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
@@ -113,7 +114,7 @@ import "./character-context.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
-type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
+type Page = "home" | "waiting" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
   | { kind: "new" }
   | { kind: "create" }
@@ -946,6 +947,15 @@ export function Studio() {
       window.history.pushState(null, "", url);
     }
   };
+  // The front door: when something is waiting, open there once, unless a conversation or panel was asked for.
+  // Read what was asked for at load time: the app itself adds ?thread= to the address later.
+  const asked = useRef(new URLSearchParams(window.location.search));
+  const landed = useRef(false);
+  useEffect(() => {
+    if (landed.current || !state) return;
+    landed.current = true;
+    if ((state.queueReady ?? 0) > 0 && !asked.current.get("thread") && !asked.current.get("panel") && page === "chat") navigate("waiting");
+  }, [state]);
   const startPrompt = (text: string) => {
     setPage("chat");
     if (draft.trim())
@@ -1140,6 +1150,7 @@ export function Studio() {
       ? threadTitle
       : {
           home: "Chats",
+          waiting: "Waiting for you",
           activity: "Activity",
           schedule: "Schedule",
           library: "Library",
@@ -1967,6 +1978,7 @@ export function Studio() {
               ))}
             </div>
           )}
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WaitingEntry count={state?.queueReady ?? 0} active={page === "waiting"} onOpen={() => navigate("waiting")} />}
           {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
           {conversationRows}
@@ -2136,6 +2148,7 @@ export function Studio() {
                 onRefresh={() => setRefresh((n) => n + 1)}
               />
             )}
+            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} onChanged={() => setRefresh((value) => value + 1)} />}
             {page === "home" && (
               <div className="page-content conversations-page">
                 <div className="page-heading">
@@ -2173,6 +2186,7 @@ export function Studio() {
                   ))}
                 </div>
                 <div className="inbox-conversations">
+          {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WaitingEntry count={state?.queueReady ?? 0} active={false} onOpen={() => navigate("waiting")} />}
           {!needsYouOnly && !conversationQuery && Boolean(state?.bots.length) && <WeeklyRecapEntry recap={state?.weeklyRecap} bots={allBots} face={(bot, size) => <Face bot={bot} size={size} />} />}
           {pinnedThreads.length > 0 && <section className="pinned-zone"><span className="conversation-section-label">Pinned</span>{pinnedThreads.map(threadRow)}</section>}
                   {conversationRows}
