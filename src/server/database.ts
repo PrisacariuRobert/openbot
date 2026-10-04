@@ -2424,7 +2424,11 @@ export class OpenBotDatabase {
       const bot = this.getBot(String(current.bot_id));
       const title = patch.status === "completed" ? `${bot?.name || "A teammate"} finished` : patch.status === "failed" ? `${bot?.name || "A teammate"} needs a hand` : `${bot?.name || "A teammate"} needs your okay`;
       const body = patch.status === "completed" ? "Your result is ready to review." : patch.status === "failed" ? (patch.error || "Sidemates could not finish this task.") : (patch.approvalReason || String(current.approval_reason || "Sidemates is waiting for your decision."));
-      this.enqueueNotification({ dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title, body, url: `/?thread=${encodeURIComponent(String(current.thread_id))}` });
+      // A run that prepared cards says so, and the tap opens the list instead of the chat.
+      const cards = patch.status === "completed" ? (this.db.prepare("SELECT title FROM queue_items WHERE run_id=? AND status='ready' ORDER BY created_at ASC").all(id) as Row[]).map((row) => String(row.title)) : [];
+      this.enqueueNotification(cards.length
+        ? { dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title: cards.length === 1 ? "One thing is waiting for you" : `${cards.length} things are waiting for you`, body: `${cards[0]}${cards.length > 1 ? ` and ${cards.length - 1} more` : ""}. Nothing happens until you say so.`, url: "/?waiting=1" }
+        : { dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title, body, url: `/?thread=${encodeURIComponent(String(current.thread_id))}` });
     }
     if (statusChanged && current.automation_event_id) {
       const eventStatus: AutomationEventStatus | null = patch.status === "awaiting_approval" ? "waiting" : ["queued", "running", "completed", "failed", "cancelled"].includes(patch.status!) ? patch.status as AutomationEventStatus : null;
