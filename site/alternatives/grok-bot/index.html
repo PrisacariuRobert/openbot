@@ -107,10 +107,11 @@
       td.us { background: #f1eefd; border-radius: 14px; padding: 10px 14px; margin: 4px 0 6px; }
       td.us::before { color: var(--nova); }
     }
+    @media (max-width: 380px) { header { padding: 14px 16px; gap: 10px; } .brand { font-size: 19px; gap: 8px; } .brand svg { width: 28px; height: 28px; } header .btn { padding: 0 14px; font-size: 15px; } section a, footer a { overflow-wrap: anywhere; } }
     @media (max-width: 700px) { section { padding: 24px 20px; border-radius: 22px; } body { font-size: 17px; } }
     @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } section, td:first-child, th:first-child { background: #1c1c22; } .us, td.us { background: #26233a; } td.us::before { color: #b9b0ff; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .cmd { background: #0c0c10; } }
   </style>
-  <style>.table table { min-width: 560px; }</style>
+  <style>@media (min-width: 761px) { .table table { min-width: 560px; } }</style>
 </head>
 <body>
 <header>

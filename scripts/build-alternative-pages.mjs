@@ -164,7 +164,7 @@ for (const page of PAGES) {
 ${JSON.stringify(ld, null, 2)}
   </script>
   ${style}
-  <style>.table table { min-width: 560px; }</style>
+  <style>@media (min-width: 761px) { .table table { min-width: 560px; } }</style>
 </head>
 <body>
 ${brand}

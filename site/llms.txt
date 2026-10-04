@@ -1,6 +1,6 @@
 # Sidemates
 
-> Sidemates is the free, open-source (MIT) alternative to OpenAI dots, Grok Bot and Siri AI: an app for macOS that gives you a small team of AI teammates running on your own Mac. They work in your Mail, Calendar, Reminders, Notes, Messages and folders, browse the web in their own private browsers, run scheduled routines, and ask before they send, buy, sign in or change anything (an opt-in Autopilot mode, off by default, lets a teammate act without asking). You bring the AI you already use: ChatGPT, Claude, Grok or GitHub Copilot subscriptions, a free Gemini key, a free Nous Portal plan, OpenCode Go, any OpenAI-compatible API, or a model on your Mac.
+> Sidemates is the free, open-source (MIT) alternative to OpenAI dots, Grok Bot and Siri AI: an app for macOS that gives you a small team of AI teammates running on your own Mac. They work in your Mail, Calendar, Reminders, Notes, Messages and folders, browse the web in their own private browsers, run scheduled routines, and ask before they send, buy, sign in or change anything (an opt-in Autopilot mode, off by default, lets a teammate act without asking). You bring the AI you already use: ChatGPT, Grok or GitHub Copilot subscriptions, a Claude API key, a free Gemini key, a free Nous Portal plan, OpenCode Go, any OpenAI-compatible API, or a model on your Mac.
 
 Sidemates was called OpenBot until October 2026. The old site, openbots.foundation, now redirects to sidemates.app.
 
