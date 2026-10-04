@@ -510,6 +510,17 @@ app.get("/api/queue", (_request, response) => {
   response.setHeader("Cache-Control", "no-store");
   response.json(workQueue.list());
 });
+// The month's filed receipts for the accountant, only from files a person approved.
+app.get("/api/queue/receipts", (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.json(workQueue.receipts(typeof request.query.month === "string" ? request.query.month : undefined));
+});
+app.get("/api/queue/receipts.csv", (request, response) => {
+  const { month, csv } = workQueue.receiptsCsv(typeof request.query.month === "string" ? request.query.month : undefined);
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Disposition", `attachment; filename="receipts-${month}.csv"`);
+  response.type("text/csv; charset=utf-8").send(csv);
+});
 // "Look at my last few days": a first useful list on day one, from the same cards as the morning review.
 app.post("/api/queue/scan", async (_request, response) => {
   if (process.platform !== "darwin") return response.status(409).json({ error: "This looks through Mail on a Mac." });

@@ -54,9 +54,11 @@ const scripted = [
   { name: "mac_mail_unread", arguments: JSON.stringify({ days: 3, limit: 10 }) },
   { name: "queue_propose", arguments: JSON.stringify({ kind: "reply_draft", title: "Reply to Anna about Friday", why: "Anna asked if Friday evening works.", sourceKey: "mail:5001", to: ["anna.berg@example.com"], subject: "Re: Berlin trip: does Friday work?", body: "Hi Anna, Friday evening works for me. See you then!" }) },
   { name: "queue_propose", arguments: JSON.stringify({ kind: "reminder", title: "Pay the October energy bill", why: "The bill is due on 9 October.", sourceKey: "mail:5002", due: "2026-10-09T09:00:00+03:00" }) },
-  { name: "queue_propose", arguments: JSON.stringify({ kind: "file_attachment", title: "File the energy invoice", why: "The bill came with an invoice PDF.", sourceKey: "mail:5002:invoice-1042.pdf", id: "5002", attachment: "invoice-1042.pdf", folder: "Documents/Receipts/2026-10" }) },
+  { name: "queue_propose", arguments: JSON.stringify({ kind: "file_attachment", title: "File the energy invoice", why: "The bill came with an invoice PDF.", sourceKey: "mail:5002:invoice-1042.pdf", id: "5002", attachment: "invoice-1042.pdf", folder: "Documents/Receipts/2026-10", vendor: "Energy Co", amount: "84.20", currency: "EUR", invoiceDate: "2026-10-01", reference: "1042" }) },
   { name: "queue_propose", arguments: JSON.stringify({ kind: "calendar_event", title: "School autumn concert", why: "The school invited families.", sourceKey: "mail:5003", start: "2026-10-14T18:00:00+03:00", end: "2026-10-14T19:30:00+03:00", location: "School hall" }) },
   { name: "queue_propose", arguments: JSON.stringify({ kind: "reply_draft", title: "Reply to the boss", why: "Made up.", sourceKey: "mail:5001", to: ["boss@example.com"], subject: "x", body: "y" }) },
+  // an amount the email never states must be refused, so the accountant's list can only say what the email says
+  { name: "queue_propose", arguments: JSON.stringify({ kind: "file_attachment", title: "File the energy invoice again", why: "Made up amount.", sourceKey: "mail:5002:other.pdf", id: "5002", attachment: "invoice-1042.pdf", folder: "Documents/Receipts/2026-10", vendor: "Energy Co", amount: "999.00", currency: "EUR" }) },
 ];
 
 const server = createServer(async (request, response) => {
@@ -154,16 +156,19 @@ try {
     for (const card of cards) { assert.ok(card.why.length > 3 && card.preview.length > 3, "Every card says why and what approving does."); }
     if (!liveModel) {
       assert.deepEqual(kinds.sort(), ["calendar_event", "file_attachment", "reminder", "reply_draft"].sort());
-      assert.equal(rejected.length, 1, `The made-up recipient must be refused: ${rejected.join(" | ")}`);
+      assert.equal(rejected.length, 2, `The made-up recipient and the made-up amount must be refused: ${rejected.join(" | ")}`);
       assert.match(rejected[0]!, /only go to the sender/);
-      assert.ok(toolCalls.includes("mac_mail_unread") && toolCalls.filter((name) => name === "queue_propose").length === 5);
+      assert.match(rejected[1]!, /amount 999\.00 is not written in the email/);
+      assert.ok(toolCalls.includes("mac_mail_unread") && toolCalls.filter((name) => name === "queue_propose").length === 6);
+      const filed = cards.find((card) => card.kind === "file_attachment");
+      assert.deepEqual(filed?.meta, { vendor: "Energy Co", amount: "84.20", currency: "EUR", invoiceDate: "2026-10-01", reference: "1042" }, "The receipt details are kept on the card, as the email states them.");
     } else {
       assert.ok(cards.length >= 2 && cards.length <= 5, `Expected 2 to 5 cards, got ${cards.length}: ${kinds.join(", ")}`);
       assert.ok(kinds.includes("reply_draft") || kinds.includes("reminder"), "At least one useful card (a reply or a reminder).");
     }
     const message = db.listMessages("bot-nova").find((item) => item.runId === run.id);
     console.log(JSON.stringify({ result: "PASS", model: liveModel || "scripted local fixture", elapsedMs: Date.now() - started, cards: cards.length, kinds, refused: rejected.length, macTouched: executed, toolsCalled: toolCalls, steps: finished.modelSteps, inputTokens: finished.inputTokens, outputTokens: finished.outputTokens, answer: (message?.body || "").slice(0, 280) }));
-    if (liveModel) for (const card of cards) console.log(JSON.stringify({ card: card.kind, title: card.title, why: card.why, source: card.sourceKey }));
+    if (liveModel) for (const card of cards) console.log(JSON.stringify({ card: card.kind, title: card.title, why: card.why, source: card.sourceKey, meta: card.meta }));
   }
   console.log(liveModel ? "Used only the owner-approved model and synthetic mail. A few runs do not establish model quality." : "No real model, inbox or Mac was used. These scripted replies verify the wiring and the safety checks, not reasoning quality.");
 } finally {

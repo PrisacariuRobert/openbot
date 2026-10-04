@@ -64,6 +64,11 @@
 .waiting-offer-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .waiting-offer-actions .waiting-approve, .waiting-offer-actions .waiting-skip { min-height: 44px; }
 
+.waiting-receipts { margin-top: 34px; }
+.waiting-receipts h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--label-tertiary); }
+.waiting-receipts-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.waiting-receipts select { min-height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--secondary-system-background); color: var(--label-primary); font: inherit; font-size: 14.5px; }
+.waiting-receipts a.waiting-undo { text-decoration: none; }
 .waiting-rules { margin-top: 34px; }
 .waiting-rules h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--label-tertiary); }
 .waiting-rules ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }

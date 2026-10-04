@@ -1130,6 +1130,14 @@ export interface QueueCard {
   decidedBy: string | null;
   undoneAt: string | null;
   botId: string | null;
+  meta?: Record<string, string> | null;
+}
+
+/** The month's filed receipts, for the accountant. */
+export interface ReceiptsSummary {
+  month: string; months: string[];
+  rows: Array<{ filedAt: string; vendor: string; invoiceDate: string; reference: string; amount: string; currency: string; file: string; savedTo: string }>;
+  totals: Array<{ currency: string; amount: string; count: number }>; withoutAmount: number;
 }
 
 /** "You approved this kind of thing five times in a row. Do it automatically?" */
