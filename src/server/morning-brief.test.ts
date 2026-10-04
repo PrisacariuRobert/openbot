@@ -56,3 +56,13 @@ test("bad input is refused plainly, and turning it off removes it", () => {
     assert.equal(removeMorningBrief(db), false);
   });
 });
+
+test("the look-through prompt prepares cards, runs nothing, and cannot hold a run for approval", async () => {
+  const { queueScanPrompt } = await import("./queue.js");
+  const prompt = queueScanPrompt();
+  assert.match(prompt, /last three days/);
+  assert.match(prompt, /queue_propose/);
+  assert.match(prompt, /A card runs nothing/);
+  for (const kind of ["reminder", "calendar_event", "reply_draft", "file_attachment"]) assert.match(prompt, new RegExp(`- ${kind},`));
+  assert.equal(approvalReason(prompt), null, "nobody may be needed at the keyboard for the look-through to run");
+});

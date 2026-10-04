@@ -17,6 +17,8 @@
 .waiting-page { max-width: 720px; margin: 0 auto; padding-bottom: 80px; }
 .waiting-promise { margin: 0 0 22px; font-size: 15px; line-height: 1.45; color: var(--label-secondary); }
 .waiting-empty { display: grid; justify-items: start; gap: 6px; padding: 22px 22px; border-radius: 20px; background: var(--secondary-system-background); }
+.waiting-empty .waiting-scan { margin-top: 10px; background: var(--system-background); }
+.waiting-empty .waiting-scan-note { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--system-background); color: var(--label-primary); font-size: 14px; }
 .waiting-empty svg { color: var(--success); }
 .waiting-empty strong { font-size: 17px; }
 .waiting-empty span { font-size: 14.5px; line-height: 1.45; color: var(--label-secondary); }
