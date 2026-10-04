@@ -41,7 +41,7 @@
 
 Hosted AI agents rent you their computer for $20–300 a month. Sidemates gives you the same kind of team on **your** Mac, for free.
 
-- **No new bill.** Sign in with the ChatGPT, Grok or GitHub Copilot plan you already pay for, start free with a Gemini key, use a Claude API key, or run a model on your Mac.
+- **No new bill.** Sign in with the ChatGPT, Grok or GitHub Copilot plan you already pay for, use Claude through the Claude Code you already have installed (or an API key), start free with a Gemini key, or run a model on your Mac.
 - **A real team, not one bot.** Every teammate has a name, a job, a private workspace and its own browser. When one builds on another’s work, it waits for the answer.
 - **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting waits for your okay by default — with the website and the exact button. Trust a teammate completely? Turn on **Autopilot** for it.
 - **Nothing hidden.** No account, no tracking. Your studio is a folder on your Mac, and every line of Sidemates is here.
@@ -93,10 +93,11 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
 | :--- | :--- |
 | **Start free** | Google Gemini (free key — a Google account, no card) |
 | **Use your subscription** | ChatGPT · Grok · GitHub Copilot (Pro, Pro+, Business) |
-| **Pay per use** | Claude API key · OpenCode Go · any OpenAI-compatible API |
+| **Use Claude** | Through the Claude Code you already have installed and signed in, or with an API key |
+| **Pay per use** | OpenCode Go · any OpenAI-compatible API |
 | **Stay private** | Models on your Mac with Ollama |
 
-Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, use an API key from the Claude Console: Anthropic’s terms limit Claude Free, Pro and Max logins to its own apps, so check them before connecting a subscription.
+Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, Sidemates starts your own `claude` command and never sees your login. Anthropic’s terms restrict using Claude subscription logins in other products, and how that applies to a tool that starts your own Claude Code is not settled, so check them before relying on it.
 
 ## How it compares
 

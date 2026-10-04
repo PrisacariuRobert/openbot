@@ -28,7 +28,8 @@ You choose, per teammate. Sidemates never resells tokens or adds a fee; each pro
 
 - Start free: a Google Gemini key (a Google account, no card), or a free Nous Portal plan.
 - Use a subscription you already pay for: ChatGPT, Grok, GitHub Copilot (Pro, Pro+, Business).
-- Pay per use: a Claude API key (from the Claude Console), OpenCode Go, or any OpenAI-compatible API. Anthropic's terms limit Claude Free, Pro and Max logins to its own apps, so check them before connecting a Claude subscription.
+- Claude: works through the Claude Code you already have installed and signed in (Sidemates starts your own `claude` command and never sees your login), or with an API key. Anthropic restricts the use of Claude subscription logins in other products, and how that applies here is not settled, so check its terms before relying on it.
+- Pay per use: OpenCode Go, any OpenAI-compatible API, or a Claude API key (from the Claude Console).
 - Stay on your Mac: models run locally with Ollama.
 
 ## Price
