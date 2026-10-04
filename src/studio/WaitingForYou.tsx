@@ -73,6 +73,7 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
   const [offers, setOffers] = useState<QueueOffer[]>([]);
   const [rules, setRules] = useState<QueueRuleCard[]>([]);
   const [alone, setAlone] = useState(0);
+  const [scan, setScan] = useState<{ state: "idle" | "starting" | "started" | "error"; text: string }>({ state: "idle", text: "" });
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
@@ -117,6 +118,16 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
       await load(); onChanged();
     }
   };
+  const startScan = async () => {
+    setScan({ state: "starting", text: "" });
+    try {
+      const response = await fetch("/api/queue/scan", { method: "POST", credentials: "same-origin" });
+      const body = await response.json().catch(() => ({})) as { error?: string; teammate?: string };
+      setScan(response.ok
+        ? { state: "started", text: `${body.teammate ?? "A teammate"} is reading your last three days of mail. Cards appear here as they're ready, usually within a few minutes.` }
+        : { state: "error", text: body.error || "That couldn't start. Nothing was changed." });
+    } catch { setScan({ state: "error", text: "Couldn't reach your studio. Nothing was changed." }); }
+  };
   const post = (url: string, body?: unknown) => fetch(url, { method: "POST", credentials: "same-origin", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const undoable = recent.filter((card) => card.status === "done");
   return <div className="page-content waiting-page">
@@ -146,6 +157,10 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
       <Check size={22} aria-hidden="true" />
       <strong>You're all caught up</strong>
       <span>When a teammate notices something that needs you, such as a reply, a bill or an invitation, it shows up here as a card.</span>
+      {scan.state === "started"
+        ? <span className="waiting-scan-note" role="status">{scan.text}</span>
+        : <button type="button" className="waiting-skip waiting-scan" disabled={scan.state === "starting"} onClick={() => void startScan()}>{scan.state === "starting" ? "Starting…" : "Look at my last few days"}</button>}
+      {scan.state === "error" && <span className="waiting-error" role="alert">{scan.text}</span>}
     </div>}
 
     <ul className="waiting-list" aria-label="Cards waiting for you">

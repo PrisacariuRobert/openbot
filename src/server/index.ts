@@ -28,7 +28,7 @@ import { summarizeTable } from "./table-summary.js";
 import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
-import { QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput } from "./queue.js";
+import { QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput, queueScanPrompt } from "./queue.js";
 import { MailSeen } from "./queue-grounding.js";
 import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
 import { describeMorningBrief, findMorningBrief, morningBriefPrompt, removeMorningBrief, setupMorningBrief } from "./morning-brief.js";
@@ -509,6 +509,17 @@ const queueFailure = (response: express.Response, error: unknown) => {
 app.get("/api/queue", (_request, response) => {
   response.setHeader("Cache-Control", "no-store");
   response.json(workQueue.list());
+});
+// "Look at my last few days": a first useful list on day one, from the same cards as the morning review.
+app.post("/api/queue/scan", async (_request, response) => {
+  if (process.platform !== "darwin") return response.status(409).json({ error: "This looks through Mail on a Mac." });
+  if (!db.getStudioSettings().macAccessEnabled) return response.status(409).json({ error: "Turn on Files & apps on this Mac in Permissions first, so a teammate can read your mail." });
+  const routine = findMorningBrief(db);
+  const bot = (routine ? db.getBot(routine.botId) : null) ?? db.listBots().find((item) => !item.retiredAt);
+  if (!bot || bot.retiredAt) return response.status(409).json({ error: "Create a teammate first." });
+  const sent = await channelLocalApi("POST", "/api/messages", { threadId: bot.threadId, body: queueScanPrompt(), requestId: `scan-${randomUUID()}`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (sent.status >= 400) return response.status(sent.status).json({ error: typeof sent.body.error === "string" ? sent.body.error : "The look-through couldn't start." });
+  response.json({ started: true, teammate: bot.name, threadId: bot.threadId });
 });
 app.post("/api/queue/:id/approve", async (request, response) => {
   try { const item = await workQueue.approve(request.params.id); broadcast(); response.json({ item }); } catch (error) { queueFailure(response, error); }

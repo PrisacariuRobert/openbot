@@ -8,6 +8,23 @@ import { describeAppleChange, eventCreateInput, mailDraftInput, mailSaveAttachme
  * Apple-app tools. Proposing never runs anything, approving runs fixed scripts,
  * and every change keeps what it needs to be undone. Nothing is ever sent. */
 
+/** What a teammate is told about the four kinds of card. Shared by the morning brief and the first-run scan.
+ * Kept free of words that would hold an unattended run for approval. */
+export const QUEUE_CARD_GUIDE = `- reminder, for something with a due date (a bill, a form, an appointment to book). Give the due date and time with my timezone offset.
+- calendar_event, for an invitation or a dated plan. Give the start and end.
+- reply_draft, for a short answer that someone is waiting for. Write it in my voice, brief and polite. It goes only to the sender and is saved as a draft that I open myself.
+- file_attachment, for an invoice or receipt attached to an email. Use the folder Documents/Receipts/<year>-<month>.`;
+
+/** "Look at my last few days": the same cards as the morning review, on request, so the list is useful
+ * on the first day instead of the next morning. */
+export function queueScanPrompt(): string {
+  return `Look through my mail from the last three days, read and unread, and prepare cards for me. Only look things up; don't change anything.
+
+List the recent mail with the mail tools and read the ones that look like they need me. Skip newsletters and automatic notifications. Then, if you have queue_propose, prepare at most six cards: one per email, the most useful first. Each card needs a short title and one plain line saying why. Kinds:
+${QUEUE_CARD_GUIDE}
+Skip anything that doesn't need me. A card runs nothing: I decide each one. Finish with one sentence saying how many cards you prepared; I will find them under "Waiting for you" in the sidebar.`;
+}
+
 export const QUEUE_CARDS_PER_DAY = 8;
 export const QUEUE_CARD_DAYS = 7;
 export const QUEUE_UNDO_DAYS = 7;

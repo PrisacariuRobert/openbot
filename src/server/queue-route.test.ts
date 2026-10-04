@@ -73,6 +73,8 @@ test("the queue routes list, skip and refuse repeats, and the app state carries 
     const after = await (await fetch(base + "/api/state")).json() as { queueReady: number };
     assert.equal(after.queueReady, 1);
 
+    assert.equal((await post("/api/queue/scan")).status, 409, "the look-through needs Mac access turned on first, and says so");
+
     // Earned trust: two offers (five approvals each), accept one, decline the other, then pause, resume and remove.
     const json = (route: string, body: unknown, method = "POST") => fetch(`${base}${route}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const view = async () => await (await fetch(base + "/api/queue")).json() as { offers: Array<{ pattern: string; approvals: number }>; rules: Array<{ id: string; status: string; label: string }>; automaticThisWeek: number };

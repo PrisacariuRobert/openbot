@@ -1,5 +1,6 @@
 import type { Bot, Routine } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { QUEUE_CARD_GUIDE } from "./queue.js";
 import { approvalReason } from "./safety.js";
 
 /** A ready-made morning brief: a routine that looks at today's calendar, the
@@ -22,10 +23,7 @@ export function morningBriefPrompt(city?: string | null): string {
 Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.
 
 Then, if you have queue_propose, prepare cards for me from the mail you looked at in step 2: at most five, one per email, the most useful first. Each card needs a short title and one plain line saying why. Kinds:
-- reminder, for something with a due date (a bill, a form, an appointment to book). Give the due date and time with my timezone offset.
-- calendar_event, for an invitation or a dated plan. Give the start and end.
-- reply_draft, for a short answer that someone is waiting for. Write it in my voice, brief and polite. It goes only to the sender and is saved as a draft that I open myself.
-- file_attachment, for an invoice or receipt attached to an email. Use the folder Documents/Receipts/<year>-<month>.
+${QUEUE_CARD_GUIDE}
 Skip anything that doesn't need me. A card runs nothing: I decide each one. End with one line saying how many cards you prepared.`;
 }
 
