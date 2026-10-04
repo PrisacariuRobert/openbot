@@ -11,16 +11,16 @@ export function studioIdentity(dataDir) {
   const file = path.join(dataDir, FILE_NAME);
   const databaseFiles = ["openbot.sqlite", "openbot.sqlite-wal", "openbot.sqlite-shm"];
   if (databaseFiles.some(name => existsSync(path.join(dataDir, name))) && !existsSync(path.join(dataDir, "keys", "vault.key"))) {
-    throw new Error("The data home has a database but no matching vault key. Restore the complete backup before opening OpenBot.");
+    throw new Error("The data home has a database but no matching vault key. Restore the complete backup before opening Sidemates.");
   }
   if (!existsSync(file)) {
     try { writeFileSync(file, `${randomUUID()}\n`, { flag: "wx", mode: 0o600 }); }
     catch (error) { if (error?.code !== "EEXIST") throw error; }
   }
   const stat = lstatSync(file);
-  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("The desktop studio identity is not a regular file. Check the data home before opening OpenBot.");
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("The desktop studio identity is not a regular file. Check the data home before opening Sidemates.");
   const identity = readFileSync(file, "utf8").trim();
-  if (!UUID.test(identity)) throw new Error("The desktop studio identity is invalid. Restore the matching data home before opening OpenBot.");
+  if (!UUID.test(identity)) throw new Error("The desktop studio identity is invalid. Restore the matching data home before opening Sidemates.");
   return identity;
 }
 

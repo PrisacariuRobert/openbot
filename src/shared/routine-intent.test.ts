@@ -22,7 +22,7 @@ test("understands a natural five-minute in-app message routine", () => {
   assert.deepEqual(parseRoutineIntent("every 5 min text my hello"), {
     intervalMinutes: 5,
     name: "Hello",
-    prompt: "Post this exact update in the current OpenBot conversation: hello",
+    prompt: "Post this exact update in the current Sidemates conversation: hello",
     confirmation: "I’ll post “hello” here every 5 minutes. You can test, pause or change it anytime in Automations.",
   });
 });

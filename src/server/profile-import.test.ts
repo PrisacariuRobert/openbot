@@ -125,7 +125,7 @@ test("junk input fails with a clear message and changes nothing", () => {
   } finally { f.close(); }
 });
 
-test("Hermes schedules convert only when OpenBot can express them exactly", () => {
+test("Hermes schedules convert only when Sidemates can express them exactly", () => {
   const tz = "Europe/Brussels";
   const label = (schedule: unknown) => { const result = convertHermesSchedule(schedule, tz); return "label" in result ? result.label : `no: ${result.reason}`; };
   assert.equal(label({ kind: "cron", expr: "0 9 * * *" }), "Daily at 09:00");

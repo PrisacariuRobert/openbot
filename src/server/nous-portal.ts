@@ -1,5 +1,5 @@
 /** Nous Portal: a free plan (no card) with free models behind an
- * OpenAI-compatible API. The owner pastes a key; OpenBot checks it, finds the
+ * OpenAI-compatible API. The owner pastes a key; Sidemates checks it, finds the
  * free models that can call tools, and saves an ordinary API connection. */
 
 export const NOUS_BASE_URL = "https://inference-api.nousresearch.com/v1";

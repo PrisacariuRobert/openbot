@@ -64,17 +64,17 @@ export function PhoneWelcome() {
   return <dialog ref={dialog} className="phone-welcome" aria-labelledby="phone-welcome-title" onCancel={close}>
     <div className="phone-welcome-grabber" aria-hidden="true" />
     <span className="phone-welcome-mark"><img src="/design/openbot-face.svg" width="30" height="30" alt="" /></span>
-    <h2 id="phone-welcome-title" tabIndex={-1} autoFocus>{justPaired ? "You’re connected." : "Welcome to OpenBot."}</h2>
+    <h2 id="phone-welcome-title" tabIndex={-1} autoFocus>{justPaired ? "You’re connected." : "Welcome to Sidemates."}</h2>
     <p className="phone-welcome-lead">Your team is on this phone now. Ask for anything; the answer comes back here.</p>
     <ol className="phone-welcome-steps">
       {!installed && <li>
         <span className="phone-welcome-icon"><Plus size={17} /></span>
         <div>
-          <strong>Put OpenBot on your Home Screen</strong>
+          <strong>Put Sidemates on your Home Screen</strong>
           {isIOS()
             ? <small>Tap <Share size={13} aria-label="Share" className="inline-icon" /> Share at the bottom of Safari, then <b>Add to Home Screen</b>. It opens like any other app.</small>
             : installPrompt
-              ? <button type="button" className="phone-welcome-action" onClick={() => void installPrompt!.prompt().then(() => installPrompt!.userChoice).then((choice) => { if (choice.outcome === "accepted") setInstalled(true); })}>Install OpenBot</button>
+              ? <button type="button" className="phone-welcome-action" onClick={() => void installPrompt!.prompt().then(() => installPrompt!.userChoice).then((choice) => { if (choice.outcome === "accepted") setInstalled(true); })}>Install Sidemates</button>
               : <small>Open your browser’s menu and choose <b>Add to Home screen</b> or <b>Install app</b>.</small>}
         </div>
       </li>}
@@ -88,7 +88,7 @@ export function PhoneWelcome() {
               <button type="button" className="phone-welcome-action" disabled={notify === "busy"} onClick={() => void turnOn()}>{notify === "busy" ? <LoaderCircle size={15} className="spin" /> : null}Turn on notifications</button>
               {notify !== "idle" && notify !== "busy" && <small className="phone-welcome-note" role="status">{notify}</small>}
             </>
-            : <small>Once OpenBot is on your Home Screen, open it from there to turn these on.</small>}
+            : <small>Once Sidemates is on your Home Screen, open it from there to turn these on.</small>}
         </div>
       </li>
     </ol>

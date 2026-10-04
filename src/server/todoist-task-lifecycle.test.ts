@@ -51,7 +51,7 @@ async function fixture(
 
 function taskRow(overrides: TaskRow = {}): TaskRow {
   return {
-    id: "task-7", content: "Ship OpenBot", description: "Final review",
+    id: "task-7", content: "Ship Sidemates", description: "Final review",
     project_id: "project-1", priority: 2, due: { date: "2026-09-18" }, is_completed: false,
     url: "https://app.todoist.com/app/task/task-7",
     ...overrides,
@@ -71,13 +71,13 @@ function applyUpdate(state: TaskRow, body: string): TaskRow {
 test("update sends only requested fields and verifies the readback", async () => {
   let state = taskRow();
   await fixture(async (connector, requests) => {
-    const result = await connector.update("task-7", { content: "Ship OpenBot v2", dueString: "tomorrow" });
+    const result = await connector.update("task-7", { content: "Ship Sidemates v2", dueString: "tomorrow" });
     assert.equal(result.task.id, "task-7");
-    assert.equal(result.task.content, "Ship OpenBot v2");
-    assert.equal(result.base.content, "Ship OpenBot");
+    assert.equal(result.task.content, "Ship Sidemates v2");
+    assert.equal(result.base.content, "Ship Sidemates");
     const posts = requests.filter((entry) => entry.method === "POST");
     assert.equal(posts.length, 1);
-    assert.deepEqual(JSON.parse(posts[0]!.body), { content: "Ship OpenBot v2", due_string: "tomorrow" });
+    assert.deepEqual(JSON.parse(posts[0]!.body), { content: "Ship Sidemates v2", due_string: "tomorrow" });
     assert.deepEqual(requests.map((entry) => entry.method), ["GET", "POST", "GET"]);
   }, (method, url, body) => {
     if (method === "GET") return Response.json(state);
@@ -147,19 +147,19 @@ test("update on an already-completed task refuses without writing", async () => 
 test("a lost update response stays uncertain and is never repeated", async () => {
   let calls = 0;
   await fixture(async (connector, requests) => {
-    await assert.rejects(connector.update("task-7", { content: "Ship OpenBot v2" }), ApprovedConnectorOutcomeUncertainError);
+    await assert.rejects(connector.update("task-7", { content: "Ship Sidemates v2" }), ApprovedConnectorOutcomeUncertainError);
     assert.equal(requests.filter((entry) => entry.method === "POST").length, 1);
   }, (method) => {
     if (method === "GET") return Response.json(taskRow());
     calls += 1;
     if (calls === 1) throw new TypeError("fetch failed");
-    return Response.json(taskRow({ content: "Ship OpenBot v2" }));
+    return Response.json(taskRow({ content: "Ship Sidemates v2" }));
   });
 });
 
 test("a mismatched readback after update is uncertain, not success", async () => {
   await fixture(async (connector) => {
-    await assert.rejects(connector.update("task-7", { content: "Ship OpenBot v2" }), ApprovedConnectorOutcomeUncertainError);
+    await assert.rejects(connector.update("task-7", { content: "Ship Sidemates v2" }), ApprovedConnectorOutcomeUncertainError);
   }, (method, url, body) => {
     if (method === "GET") return Response.json(taskRow());
     return Response.json(applyUpdate(taskRow({ content: "Something else" }), body));
@@ -185,8 +185,8 @@ test("a 401 refresh during update retries once without duplicating the change", 
   let state = taskRow();
   let posts = 0;
   await fixture(async (connector, requests) => {
-    const result = await connector.update("task-7", { content: "Ship OpenBot v2" });
-    assert.equal(result.task.content, "Ship OpenBot v2");
+    const result = await connector.update("task-7", { content: "Ship Sidemates v2" });
+    assert.equal(result.task.content, "Ship Sidemates v2");
     assert.equal(posts, 2, "expired token refresh plus exactly one logical update");
     const bodies = requests.filter((entry) => entry.method === "POST" && entry.url.includes("/tasks/")).map((entry) => entry.body);
     assert.equal(bodies.length, 2);
@@ -277,7 +277,7 @@ test("journey: create, correct and complete refer to one task id in one account"
   let state: TaskRow | null = null;
   let posts = 0;
   await fixture(async (connector, requests) => {
-    const created = await connector.create({ content: "Ship OpenBot", description: "Draft", dueString: "tomorrow" });
+    const created = await connector.create({ content: "Ship Sidemates", description: "Draft", dueString: "tomorrow" });
     assert.equal(created.recovered, false);
     const id = created.task.id;
     const edited = await connector.update(id, { dueString: "next week", priority: 4 });

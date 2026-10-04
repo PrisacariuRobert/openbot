@@ -13,7 +13,7 @@ test("a result becomes one self-contained page with the teammate's face", () => 
   assert.match(page.html, /<strong>8<\/strong>/);
   assert.match(page.html, /<li>Hotel: near the station<\/li>/);
   assert.match(page.html, /Files delivered: trip\.docx/);
-  assert.match(page.html, /Made with <a href="https:\/\/openbots\.foundation\/\?ref=result"/);
+  assert.match(page.html, /Made with <a href="https:\/\/sidemates\.app\/\?ref=result"/);
   assert.equal(page.filename, "what-did-anna-say-about-the-berlin-trip.html");
   assert.equal(page.total, 0);
 });

@@ -60,9 +60,9 @@ export type ExecutionStop =
  * accounted usage. The blocked/stopped messages say so explicitly. S3-P03. */
 export const WEEKLY_BUDGET_STEP_RESERVE = 5_000;
 export const executionStopMessage: Record<ExecutionStop, string> = {
-  job_budget: "This job reached its shared token limit, including teammate consultations and follow-ups. OpenBot stopped the remaining work. Your files and progress are kept for review.",
+  job_budget: "This job reached its shared token limit, including teammate consultations and follow-ups. Sidemates stopped the remaining work. Your files and progress are kept for review.",
   time: "This task reached its time limit. Your saved files and progress are kept. Review them before asking for a smaller next step.",
-  idle: "The model stopped making progress, so OpenBot stopped the run. Your saved work is kept. Check the connection before trying again.",
+  idle: "The model stopped making progress, so Sidemates stopped the run. Your saved work is kept. Check the connection before trying again.",
   steps:
     "This task reached its step limit. Your saved work is kept. Review the result so far and ask for a focused next step.",
   tokens:
@@ -70,7 +70,7 @@ export const executionStopMessage: Record<ExecutionStop, string> = {
   weekly_budget:
     "This teammate reached the weekly token limit. Your saved work is kept. Review the budget in teammate settings before continuing. Provider usage is reported after each model step, so the limit applies to accounted usage and a final in-flight step can land just past it.",
   output:
-    "The model returned too much output, so OpenBot stopped the run. Your saved files are kept. Try a more focused request.",
+    "The model returned too much output, so Sidemates stopped the run. Your saved files are kept. Try a more focused request.",
   tester_fault:
     "A tester-injected fault stopped this run after a verified artifact (source=tester_fault). Your saved work is kept.",
 };

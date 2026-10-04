@@ -52,14 +52,14 @@ export function KnowsPanel() {
   const addFolder = async () => { if (folder.trim() && await call("folder", "/api/personal-index/folders", "POST", { path: folder.trim() })) setFolder(""); };
 
   if (!status) return <p className="capability-notice">Loading…</p>;
-  if (!status.available) return <p className="panel-note">Searching your own files, notes and mail works when OpenBot runs on a Mac.</p>;
+  if (!status.available) return <p className="panel-note">Searching your own files, notes and mail works when Sidemates runs on a Mac.</p>;
   const source = (id: SourceId) => status.sources.find((item) => item.id === id)!;
 
   return (
     <div className="knows-panel">
       <div className="knows-intro">
         <strong>What your team can find</strong>
-        <p>Choose what a teammate may search on this Mac — “what did Anna say about the trip?”, “find my note about…”. The index stays in OpenBot's folder on this Mac; nothing is uploaded. When you ask a question, only the few matching snippets go to your AI, like any other message.</p>
+        <p>Choose what a teammate may search on this Mac — “what did Anna say about the trip?”, “find my note about…”. The index stays in Sidemates' folder on this Mac; nothing is uploaded. When you ask a question, only the few matching snippets go to your AI, like any other message.</p>
         {!status.macAccess && <p className="knows-warning" role="status">Turn on <strong>Files &amp; apps on this Mac</strong> in Permissions first.</p>}
       </div>
 
@@ -82,7 +82,7 @@ export function KnowsPanel() {
         {[source("mail"), source("messages")].some((item) => item.problem?.needsFullDiskAccess) && (
           <div className="knows-fda" role="status">
             <strong>Mail and Messages need Full Disk Access.</strong>
-            <p>In System Settings → Privacy &amp; Security → Full Disk Access, switch on <strong>OpenBot</strong>, then come back here.</p>
+            <p>In System Settings → Privacy &amp; Security → Full Disk Access, switch on <strong>Sidemates</strong>, then come back here.</p>
             <button type="button" onClick={() => void fetch("/api/channels/imessage/open-privacy", { method: "POST", credentials: "same-origin" })}>Open that page</button>
             <button type="button" className="secondary" disabled={busy !== null} onClick={() => void call("retry", "/api/personal-index/refresh", "POST")}>Try again</button>
           </div>
@@ -107,7 +107,7 @@ export function KnowsPanel() {
         <SettingsGroup title="Forget">
           <SettingsCard>
             <SettingsRow title="Forget everything" description={`Deletes the index of ${status.total.toLocaleString()} items and turns every source off. Your files, notes and mail are not touched.`}
-              control={<button type="button" className="knows-forget" disabled={busy !== null} onClick={() => { if (window.confirm("Forget everything OpenBot has indexed on this Mac? Your files, notes and mail stay exactly as they are.")) void call("forget", "/api/personal-index", "DELETE"); }}><Trash2 size={14} /> Forget</button>} />
+              control={<button type="button" className="knows-forget" disabled={busy !== null} onClick={() => { if (window.confirm("Forget everything Sidemates has indexed on this Mac? Your files, notes and mail stay exactly as they are.")) void call("forget", "/api/personal-index", "DELETE"); }}><Trash2 size={14} /> Forget</button>} />
           </SettingsCard>
         </SettingsGroup>
       )}

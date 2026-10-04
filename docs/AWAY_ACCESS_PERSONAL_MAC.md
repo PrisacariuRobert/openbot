@@ -1,6 +1,6 @@
 # Personal Mac away access
 
-OpenBot can serve its production web UI and native iPhone API through an outbound
+Sidemates can serve its production web UI and native iPhone API through an outbound
 HTTPS tunnel. The computer remains the host: this does not make work run while it
 is shut down or offline. A locked Mac can serve conversations, but individual
 computer-control tasks may need an unlocked desktop.

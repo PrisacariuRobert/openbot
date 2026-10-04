@@ -56,7 +56,7 @@ test("the runtime gets a short teammate identity instead of its coding-assistant
   try {
     const config = JSON.parse(readFileSync(path.join(prepareWorkspace(db, db.getBot("nova")!), "opencode.json"), "utf8"));
     const prompt = config.agent.openbot.prompt as string;
-    assert.match(prompt, /You are Nova, a persistent OpenBot teammate/);
+    assert.match(prompt, /You are Nova, a persistent Sidemates teammate/);
     assert.match(prompt, /never claim an action happened unless a tool confirmed it/);
     assert.ok(prompt.length < 400);
     assert.deepEqual(config.instructions, ["AGENTS.md"], "the full instructions still load");

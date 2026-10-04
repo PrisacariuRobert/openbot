@@ -20,11 +20,11 @@ const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "ut
 const version = appleMarketingVersion(packageJson.version);
 
 function stageApp(dir) {
-  const app = path.join(dir, "OpenBot.app");
+  const app = path.join(dir, "Sidemates.app");
   mkdirSync(path.join(app, "Contents/MacOS"), { recursive: true });
   mkdirSync(path.join(app, "Contents/Resources"), { recursive: true });
   writeFileSync(path.join(app, "Contents/Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>${version}</string></dict></plist>\n`);
-  writeFileSync(path.join(app, "Contents/MacOS/OpenBot"), "#!/bin/sh\nexit 0\n");
+  writeFileSync(path.join(app, "Contents/MacOS/Sidemates"), "#!/bin/sh\nexit 0\n");
   writeFileSync(path.join(app, "Contents/Resources/marker.txt"), "staged-fixture\n");
   return app;
 }
@@ -52,8 +52,8 @@ test("unsigned dmg carries the staged app with a verifiable checksum", () => {
     try {
       const attached = spawnSync("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-mountpoint", mount, manifest.dmg], { encoding: "utf8" });
       assert.equal(attached.status, 0, attached.stderr);
-      assert.ok(existsSync(path.join(mount, "OpenBot.app", "Contents", "MacOS", "OpenBot")), "mounted image contains the app");
-      assert.equal(readFileSync(path.join(mount, "OpenBot.app", "Contents", "Resources", "marker.txt"), "utf8"), "staged-fixture\n");
+      assert.ok(existsSync(path.join(mount, "Sidemates.app", "Contents", "MacOS", "Sidemates")), "mounted image contains the app");
+      assert.equal(readFileSync(path.join(mount, "Sidemates.app", "Contents", "Resources", "marker.txt"), "utf8"), "staged-fixture\n");
     } finally {
       spawnSync("/usr/bin/hdiutil", ["detach", mount, "-force"]);
       rmSync(mount, { recursive: true, force: true });

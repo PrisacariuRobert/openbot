@@ -25,7 +25,7 @@ export function buildReadinessSteps(input: {
       : input.compatibility === "compatible"
         ? `OpenCode ${input.detectedVersion || ""} is ready on this host (a newer patch of verified ${VERIFIED_OPENCODE_VERSION}).`
       : input.compatibility === "unsupported"
-        ? `OpenCode ${input.detectedVersion || "unknown version"} is not verified with this OpenBot release (verified: ${VERIFIED_OPENCODE_VERSION}). Update OpenBot or switch runtimes; files, results, settings and receipts remain available.`
+        ? `OpenCode ${input.detectedVersion || "unknown version"} is not verified with this Sidemates release (verified: ${VERIFIED_OPENCODE_VERSION}). Update Sidemates or switch runtimes; files, results, settings and receipts remain available.`
         : "OpenCode did not report a version just now, so execution readiness is unknown. If this persists, reinstall the runtime and try again.";
   return [
     { id: "runtime", ready: runtimeReady, label: "Model runtime", detail: runtimeDetail },

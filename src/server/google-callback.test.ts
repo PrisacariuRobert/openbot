@@ -19,7 +19,7 @@ test("extracts a Google Cloud project number from a desktop client ID", () => {
   assert.equal(googleCloudProjectFromClientId("not-a-google-client"), null);
 });
 
-test("returns to OpenBot with the connectors panel open", () => {
+test("returns to Sidemates with the connectors panel open", () => {
   assert.equal(googleReturnUrl("http://127.0.0.1:4310/", "connected"), "http://127.0.0.1:4310/?panel=connectors&google=connected");
 });
 

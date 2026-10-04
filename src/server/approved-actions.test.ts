@@ -124,7 +124,7 @@ test("an approved but not-yet-started action survives restart and detects change
 test("a runtime version stop says what to fix instead of a generic stop", () => {
   const f = fixture();
   try {
-    const reason = "OpenCode runtime not verified. OpenBot detected an unsupported OpenCode version. Detected: 2.0.0 (unsupported).";
+    const reason = "OpenCode runtime not verified. Sidemates detected an unsupported OpenCode version. Detected: 2.0.0 (unsupported).";
     f.db.updateRun(f.run.id, { status: "failed", error: reason });
     f.db.finishRunTask(f.run.id, "failed", reason);
     const stopped = f.db.listMessages("team-room").filter((message) => message.eventType === "run_stopped");

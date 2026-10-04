@@ -4,14 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-// openbots.foundation should be easy for people and for AI assistants to find and cite.
+// sidemates.app should be easy for people and for AI assistants to find and cite.
 // These checks keep the crawler files honest and in step with the pages they describe.
 
 const site = fileURLToPath(new URL("../../site/", import.meta.url));
-const ORIGIN = "https://openbots.foundation";
+const ORIGIN = "https://sidemates.app";
 const read = (relative: string) => readFileSync(path.join(site, relative), "utf8");
 
-/** Maps an openbots.foundation URL to the file the site would serve for it. */
+/** Maps an sidemates.app URL to the file the site would serve for it. */
 function fileFor(url: string) {
   const pathname = new URL(url).pathname;
   return path.join(site, pathname.endsWith("/") ? `${pathname}index.html` : pathname);
@@ -42,7 +42,7 @@ function faqJsonLd(html: string) {
 
 test("robots.txt welcomes crawlers, including the ones behind AI assistants, and points at the sitemap", () => {
   const robots = read("robots.txt");
-  assert.match(robots, /^Sitemap: https:\/\/openbots\.foundation\/sitemap\.xml$/m);
+  assert.match(robots, /^Sitemap: https:\/\/sidemates\.app\/sitemap\.xml$/m);
   for (const agent of ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended"]) {
     assert.match(robots, new RegExp(`User-agent: ${agent}\\nAllow: /`), `${agent} is allowed`);
   }
@@ -61,11 +61,11 @@ test("every sitemap address is a real page on the site", () => {
 
 test("llms.txt and llms-full.txt follow the format and only link to things that exist", () => {
   const short = read("llms.txt");
-  assert.match(short, /^# OpenBot\n\n> /, "title then a one-paragraph summary");
+  assert.match(short, /^# Sidemates\n\n> /, "title then a one-paragraph summary");
   assert.match(short, /free, open-source/i);
-  assert.match(short, /not the right answer/i, "says when OpenBot is the wrong choice");
+  assert.match(short, /not the right answer/i, "says when Sidemates is the wrong choice");
   for (const file of ["llms.txt", "llms-full.txt"]) {
-    for (const match of read(file).matchAll(/https:\/\/openbots\.foundation\/[^\s)>`]*/g)) {
+    for (const match of read(file).matchAll(/https:\/\/sidemates\.app\/[^\s)>`]*/g)) {
       const url = match[0].replace(/[.,]+$/, "");
       if (url.endsWith("/install.sh") || url.includes("|")) { assert.ok(existsSync(path.join(site, "install.sh"))); continue; }
       assert.ok(existsSync(fileFor(url)), `${file} links to ${url}`);
@@ -76,13 +76,13 @@ test("llms.txt and llms-full.txt follow the format and only link to things that 
 
 test("the home page has a canonical address, a description and structured data that matches what people read", () => {
   const html = read("index.html");
-  assert.match(html, /<link rel="canonical" href="https:\/\/openbots\.foundation\/" \/>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/sidemates\.app\/" \/>/);
   const description = html.match(/<meta name="description" content="([^"]+)"/)?.[1] ?? "";
   assert.ok(description.length > 80 && description.length < 320, "a description sized for search results");
   assert.match(description, /free, open-source/i);
   const app = graph(html).find(node => node["@type"] === "SoftwareApplication");
   assert.ok(app, "describes the software");
-  assert.equal(app.name, "OpenBot");
+  assert.equal(app.name, "Sidemates");
   assert.equal((app.offers as { price: string }).price, "0");
   assert.match(String(app.operatingSystem), /macOS/);
   assert.equal(app.aggregateRating, undefined, "no invented ratings");
@@ -91,7 +91,7 @@ test("the home page has a canonical address, a description and structured data t
 
 test("the comparison page is honest, dated, sourced and consistent with its own questions", () => {
   const html = read("alternatives/index.html");
-  assert.match(html, /<link rel="canonical" href="https:\/\/openbots\.foundation\/alternatives\/" \/>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/sidemates\.app\/alternatives\/" \/>/);
   assert.match(html, /Last updated \d{1,2} [A-Z][a-z]+ 2026/);
   const text = plain(html);
   for (const product of ["OpenAI dots", "Grok Bot", "Meta Muse", "Siri", "Hermes Desktop", "OpenClaw", "OpenMausBot"]) {
@@ -135,13 +135,13 @@ const DETAIL_PAGES = [
 test("each detailed comparison page is honest, dated, sourced and consistent with its own questions", () => {
   for (const { slug, name } of DETAIL_PAGES) {
     const html = read(`alternatives/${slug}/index.html`);
-    assert.match(html, new RegExp(`<link rel="canonical" href="https://openbots\\.foundation/alternatives/${slug}/" />`), `${slug} canonical`);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://sidemates\\.app/alternatives/${slug}/" />`), `${slug} canonical`);
     assert.match(html, /Last updated \d{1,2} [A-Z][a-z]+ 2026/, `${slug} is dated`);
     const text = plain(html);
     assert.ok(text.includes(name), `${slug} names ${name}`);
     assert.ok(text.length > 1800, `${slug} has real content`);
     assert.ok(html.includes(`<h3>Choose ${name} if you…</h3>`), `${slug} says when to choose them`);
-    assert.ok(html.includes("<h3>Choose OpenBot if you…</h3>"), `${slug} says when to choose us`);
+    assert.ok(html.includes("<h3>Choose Sidemates if you…</h3>"), `${slug} says when to choose us`);
     const sources = html.slice(html.indexOf('id="sources"'));
     assert.ok([...sources.matchAll(/href="https:\/\//g)].length >= 3, `${slug} lists its sources`);
     assert.deepEqual(faqJsonLd(html), visibleFaq(html), `${slug} structured data matches the page`);
@@ -162,13 +162,13 @@ test("the comparison hub and the sitemap list every detailed page", () => {
   const sitemap = read("sitemap.xml");
   for (const { slug } of DETAIL_PAGES) {
     assert.ok(hub.includes(`href="${slug}/"`), `${slug} is linked from the hub`);
-    assert.ok(sitemap.includes(`https://openbots.foundation/alternatives/${slug}/`), `${slug} is in the sitemap`);
+    assert.ok(sitemap.includes(`https://sidemates.app/alternatives/${slug}/`), `${slug} is in the sitemap`);
   }
 });
 
-test("the home page leads with the alternative-to sentence people search for, and says there is no subscription", () => {
+test("the home page leads with the alternative-to sentence people search for, and says it is free", () => {
   const html = read("index.html");
   assert.match(html, /<p class="kicker">The open-source alternative to OpenAI dots, Grok Bot and Siri AI<\/p>/);
-  assert.match(html, /no subscription/i);
+  assert.match(html, /free to use/i);
   assert.match(read("llms.txt"), /alternative to OpenAI dots, Grok Bot and Siri AI/);
 });

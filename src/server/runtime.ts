@@ -121,8 +121,8 @@ export function run(command: string, args: string[], timeoutMs = 30_000, extraEn
       settled = true;
       clearTimeout(timer);
       if (killTimer.current) clearTimeout(killTimer.current);
-      if (droppedOut > 0) stderr += `\n[OpenBot truncated stdout at 4 MiB; ${droppedOut} further bytes were dropped, not executed.]`;
-      if (droppedErr > 0) stderr += `\n[OpenBot truncated stderr at 4 MiB; ${droppedErr} further bytes were dropped.]`;
+      if (droppedOut > 0) stderr += `\n[Sidemates truncated stdout at 4 MiB; ${droppedOut} further bytes were dropped, not executed.]`;
+      if (droppedErr > 0) stderr += `\n[Sidemates truncated stderr at 4 MiB; ${droppedErr} further bytes were dropped.]`;
       resolve({ code, stdout, stderr: `${stderr}${extraError}` });
     };
     const append = (text: string, stream: "out" | "err") => {
@@ -153,7 +153,7 @@ export function run(command: string, args: string[], timeoutMs = 30_000, extraEn
 
 export function safeHostEnvironment(extra: Record<string, string> = {}, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const allowed = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM", "SHELL", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "SSH_AUTH_SOCK"];
-  // OpenBot pins the runtime it verified; a self-update mid-studio would
+  // Sidemates pins the runtime it verified; a self-update mid-studio would
   // swap the binary under running teammates.
   const env: NodeJS.ProcessEnv = { NO_COLOR: "1", OPENCODE_DISABLE_AUTOUPDATE: "true" };
   for (const key of allowed) if (source[key]) env[key] = source[key];
@@ -939,7 +939,7 @@ export class BrowserManager {
         args: ["--disable-blink-features=AutomationControlled", "--disable-background-networking", "--disable-sync", "--no-default-browser-check", ...containerArgs],
       });
     } catch (error) {
-      throw new Error(`A visible window needs a display on the Mac running OpenBot. ${error instanceof Error ? error.message : String(error)}`.slice(0, 300));
+      throw new Error(`A visible window needs a display on the Mac running Sidemates. ${error instanceof Error ? error.message : String(error)}`.slice(0, 300));
     }
     await this.installBrowserRoutes(context, botId);
     context.on("close", () => { if (this.contexts.get(botId) === context) { this.contexts.delete(botId); this.contextHeadless.delete(botId); this.contextArgsVersions.delete(botId); } });
@@ -1476,7 +1476,7 @@ export class BrowserManager {
         this.assertPageAccess(botId, page);
         return { url: page.url(), title: await page.title() };
       } catch {
-        throw new BrowserUploadUncertainError("The website may have received the file selection, but OpenBot could not confirm the final page state. Check the website before trying again.");
+        throw new BrowserUploadUncertainError("The website may have received the file selection, but Sidemates could not confirm the final page state. Check the website before trying again.");
       }
     } finally { await input.dispose().catch(() => undefined); }
   }

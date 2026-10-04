@@ -272,7 +272,7 @@ export function CreateTeammate({
         </div>
       )}
       {connection && isFreeTierModel(model) && (
-        <p className="boundary-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
+        <p className="boundary-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
       )}
       {providers && !hasConnectedAI && (
         <div className="connection-onramp" role="status">

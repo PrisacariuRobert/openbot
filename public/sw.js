@@ -6,7 +6,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(event.request).then((response) => { const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put(event.request, copy)); return response; }).catch(() => caches.match(event.request)));
 });
 self.addEventListener("push", (event) => {
-  let message = { title: "OpenBot", body: "Your studio has an update.", url: "/", tag: "openbot-update", icon: "/icon.svg", badge: "/icon.svg" };
+  let message = { title: "Sidemates", body: "Your studio has an update.", url: "/", tag: "openbot-update", icon: "/icon.svg", badge: "/icon.svg" };
   try { if (event.data) message = { ...message, ...event.data.json() }; } catch { /* Keep the safe default. */ }
   event.waitUntil(self.registration.showNotification(message.title, {
     body: message.body, icon: message.icon, badge: message.badge, tag: message.tag,

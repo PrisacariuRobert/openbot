@@ -145,7 +145,7 @@ export class DiscordChannel {
   async sendTest() {
     const config = this.config();
     if (!config?.ownerChannelId) throw new Error("Link your Discord account first.");
-    await this.send(config.ownerChannelId, "✅ OpenBot is connected. Message me here any time — your team will answer.");
+    await this.send(config.ownerChannelId, "✅ Sidemates is connected. Message me here any time — your team will answer.");
   }
 
   disconnect() {
@@ -221,7 +221,7 @@ export class DiscordChannel {
   }
 
   private async send(channelId: string, text: string) {
-    const content = text.length > DISCORD_TEXT_LIMIT ? `${text.slice(0, DISCORD_TEXT_LIMIT - 60)}…\n\n(Open OpenBot for the full reply.)` : text;
+    const content = text.length > DISCORD_TEXT_LIMIT ? `${text.slice(0, DISCORD_TEXT_LIMIT - 60)}…\n\n(Open Sidemates for the full reply.)` : text;
     await this.rest("POST", `/channels/${channelId}/messages`, { content, allowed_mentions: { parse: [] } });
   }
 

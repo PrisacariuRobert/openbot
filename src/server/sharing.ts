@@ -121,20 +121,21 @@ export function importBot(db: OpenBotDatabase, raw: unknown): { bot: Bot; skills
 
 /** Where gallery teammates live. The studio only ever fetches from here, so a
  * link can't make it request an arbitrary address. */
-export const GALLERY_ORIGIN = "https://openbots.foundation";
+export const GALLERY_ORIGIN = "https://sidemates.app";
 const GALLERY_PATH = /^\/teammates\/[a-z0-9][a-z0-9-]{0,60}\.json$/;
 
 export function galleryUrl(raw: string): URL | null {
   try {
     const url = new URL(raw);
-    const host = url.hostname === "www.openbots.foundation" ? "openbots.foundation" : url.hostname;
-    return url.protocol === "https:" && host === "openbots.foundation" && !url.port && !url.username && !url.search && !url.hash && GALLERY_PATH.test(url.pathname) ? new URL(`${GALLERY_ORIGIN}${url.pathname}`) : null;
+    // Links shared while the product was called OpenBot (openbots.foundation) still work; the fetch always goes to the new address.
+    const host = ["www.sidemates.app", "openbots.foundation", "www.openbots.foundation"].includes(url.hostname) ? "sidemates.app" : url.hostname;
+    return url.protocol === "https:" && host === "sidemates.app" && !url.port && !url.username && !url.search && !url.hash && GALLERY_PATH.test(url.pathname) ? new URL(`${GALLERY_ORIGIN}${url.pathname}`) : null;
   } catch { return null; }
 }
 
 export async function fetchGalleryTeammate(raw: string, fetcher: typeof fetch = fetch): Promise<BotShareBundle> {
   const url = galleryUrl(raw);
-  if (!url) throw new Error("That isn't a teammate from the OpenBot gallery.");
+  if (!url) throw new Error("That isn't a teammate from the Sidemates gallery.");
   let response: Response;
   try { response = await fetcher(url, { redirect: "error", signal: AbortSignal.timeout(10_000), headers: { accept: "application/json" } }); }
   catch { throw new Error("The gallery couldn't be reached. Check your internet connection and try again."); }

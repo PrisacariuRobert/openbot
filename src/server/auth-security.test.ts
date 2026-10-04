@@ -45,10 +45,10 @@ test("bounds tracked clients during a distributed failure flood", () => {
 });
 
 test("a remote browser cannot mutate a studio from a sibling domain or a forged origin", () => {
-  const url = "https://app.openbots.foundation", request = { method: "POST", socket: { remoteAddress: "127.0.0.1" }, headers: { host: "app.openbots.foundation", "cf-connecting-ip": "192.0.2.1" } };
+  const url = "https://app.sidemates.app", request = { method: "POST", socket: { remoteAddress: "127.0.0.1" }, headers: { host: "app.sidemates.app", "cf-connecting-ip": "192.0.2.1" } };
   assert.ok(browserWriteAllowed({ ...request, headers: { ...request.headers, origin: url } }, url));
   assert.ok(browserWriteAllowed(request, url), "Native bearer clients are still supported");
-  for (const origin of ["https://openbots.foundation", "https://evil.example", "null", `${url}.evil.example`]) {
+  for (const origin of ["https://sidemates.app", "https://evil.example", "null", `${url}.evil.example`]) {
     assert.equal(browserWriteAllowed({ ...request, headers: { ...request.headers, origin } }, url), false);
   }
   assert.equal(browserWriteAllowed({ ...request, headers: { ...request.headers, "sec-fetch-site": "same-site" } }, url), false);
@@ -56,7 +56,7 @@ test("a remote browser cannot mutate a studio from a sibling domain or a forged 
 });
 
 test("a configured HTTPS tunnel always issues Secure session cookies without trusting forwarded headers", () => {
-  assert.equal(useSecureSessionCookie("https://app.openbots.foundation", false, false), true);
+  assert.equal(useSecureSessionCookie("https://app.sidemates.app", false, false), true);
   assert.equal(useSecureSessionCookie("http://127.0.0.1:4311", false, false), false);
   assert.equal(useSecureSessionCookie("http://127.0.0.1:4311", false, true), true);
 });

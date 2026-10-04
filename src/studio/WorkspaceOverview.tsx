@@ -31,14 +31,14 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
    * ?import= from the website. All of them end in the same preview. */
   async function fromLink(text: string) {
     const trimmed = text.trim();
-    if (/^https:\/\/(?:www\.)?openbots\.foundation\/teammates\//.test(trimmed)) {
+    if (/^https:\/\/(?:www\.)?(?:sidemates\.app|openbots\.foundation)\/teammates\//.test(trimmed)) {
       const response = await fetch(`/api/teammate-source?url=${encodeURIComponent(trimmed)}`, { credentials: "same-origin" });
       const value = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(value.error || "That teammate couldn't be loaded.");
       setPreview(readTeammate(value)); return;
     }
     const payload = payloadFromLink(trimmed);
-    if (!payload) throw new Error("This doesn't look like an OpenBot teammate link.");
+    if (!payload) throw new Error("This doesn't look like a Sidemates teammate link.");
     setPreview(readTeammate(await decodeTeammate(payload)));
   }
   useEffect(() => {

@@ -88,7 +88,7 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
   return <section className="away-pairing" aria-label={copy.name}>
     <div className="away-pairing-heading"><span className="away-pairing-icon brand"><BrandIcon brand={channel} /></span><div>
       <h3>{status?.paired ? `Your team is on ${copy.name}` : `Message your team from ${copy.name}`}</h3>
-      <p>Ask from your phone, get the answer back in the same chat. Approvals stay in OpenBot.</p>
+      <p>Ask from your phone, get the answer back in the same chat. Approvals stay in Sidemates.</p>
     </div></div>
 
     {!status?.configured && <SettingsGroup title="Connect a bot">
@@ -153,7 +153,7 @@ function ChannelSection({ channel, bots }: { channel: Channel; bots: Bot[] }) {
       <SettingsCard>
         <SettingsRow
           title={`Disconnect ${copy.name}`}
-          description="Forgets the token and your linked account. Tasks already started keep running in OpenBot."
+          description="Forgets the token and your linked account. Tasks already started keep running in Sidemates."
           control={<button onClick={() => { if (window.confirm(`Disconnect ${copy.name}? You can connect again with the same or a new bot.`)) void run(() => request<Status>(channel, "", "DELETE")); }} disabled={busy}>Disconnect</button>}
         />
       </SettingsCard>
@@ -196,22 +196,22 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
   return <section className="away-pairing" aria-label="iMessage">
     <div className="away-pairing-heading"><span className="away-pairing-icon brand"><BrandIcon brand="imessage" /></span><div>
       <h3>{status?.paired ? "Your team is on iMessage" : "Text your team from iMessage"}</h3>
-      <p>Use Messages on your iPhone. Works best when this Mac uses its own Apple ID, so your team shows up as a separate contact. With your own number, Messages shows every text twice — the OpenBot app on your Home Screen or Siri is nicer then.</p>
+      <p>Use Messages on your iPhone. Works best when this Mac uses its own Apple ID, so your team shows up as a separate contact. With your own number, Messages shows every text twice — the Sidemates app on your Home Screen or Siri is nicer then.</p>
     </div></div>
 
-    {needsAccess && !status?.paired && <SettingsGroup title="First, let OpenBot read Messages">
+    {needsAccess && !status?.paired && <SettingsGroup title="First, let Sidemates read Messages">
       <SettingsCard>
         <SettingsRow title="1. Open Full Disk Access" description="macOS protects your messages, so you choose to allow this."
           control={<button onClick={() => void call("/open-privacy", "POST")}>Open System Settings</button>} />
-        <SettingsRow title="2. Add OpenBot" description={<>Tap <strong>Show OpenBot</strong>, then drag the highlighted <strong>OpenBot</strong> app into the Full Disk Access list and switch it on. Come back and connect below.</>}
-          control={<button onClick={() => void call("/reveal-app", "POST")}>Show OpenBot</button>} />
+        <SettingsRow title="2. Add Sidemates" description={<>Tap <strong>Show Sidemates</strong>, then drag the highlighted <strong>Sidemates</strong> app into the Full Disk Access list and switch it on. Come back and connect below.</>}
+          control={<button onClick={() => void call("/reveal-app", "POST")}>Show Sidemates</button>} />
       </SettingsCard>
     </SettingsGroup>}
 
     {!status?.paired && <SettingsGroup title={status?.configured ? "Reply to the text we sent" : "Connect"}>
       <SettingsCard>
         {status?.configured && status.pairingExpiresAt
-          ? <SettingsRow title={`Check Messages on your iPhone`} description={<>OpenBot texted <strong>{status.ownerHandle}</strong> a 6-digit code. Reply with it. The first time, your Mac asks to let OpenBot use Messages — choose <strong>OK</strong>.</>} control={<LoaderCircle className="spinner" size={19} aria-label="Waiting for your reply" />} />
+          ? <SettingsRow title={`Check Messages on your iPhone`} description={<>Sidemates texted <strong>{status.ownerHandle}</strong> a 6-digit code. Reply with it. The first time, your Mac asks to let Sidemates use Messages — choose <strong>OK</strong>.</>} control={<LoaderCircle className="spinner" size={19} aria-label="Waiting for your reply" />} />
           : <SettingsRow title="Your iPhone number or iMessage email" description="Only messages from this number or email are read. To text the Mac, message yourself (or the Mac's own Apple ID).">
               <form className="telegram-token" onSubmit={(event) => { event.preventDefault(); void run(() => call<IMessageStatus>("", "POST", { handle })); }}>
                 <input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder="+43 664 123 4567" aria-label="Your iPhone number or iMessage email" autoComplete="off" />
@@ -224,7 +224,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
     {status?.paired && <SettingsGroup title="Connected">
       <SettingsCard>
         <SettingsRow title={status.ownerHandle || "You"} description={`${defaultName} answers by default. Start a text with @Name to ask someone else.`} control={<CheckCircle2 size={19} />} />
-        {status.paused && <SettingsRow title="Paused" description="OpenBot paused iMessage after too many messages in a minute." control={<button onClick={() => void run(() => call<IMessageStatus>("/resume", "POST"))} disabled={busy}>Turn back on</button>} />}
+        {status.paused && <SettingsRow title="Paused" description="Sidemates paused iMessage after too many messages in a minute." control={<button onClick={() => void run(() => call<IMessageStatus>("/resume", "POST"))} disabled={busy}>Turn back on</button>} />}
         {teammates.length > 1 && <SettingsRow title="Answers by default" description="Who replies when you don't name anyone.">
           <select value={status.defaultBotId || teammates[0]?.id || ""} disabled={busy} aria-label="Default teammate on iMessage"
             onChange={(event) => void run(() => call<IMessageStatus>("/default-teammate", "POST", { botId: event.target.value }))}>
@@ -236,7 +236,7 @@ function IMessageSection({ bots }: { bots: Bot[] }) {
 
     {status?.configured && <SettingsGroup title="Manage">
       <SettingsCard>
-        <SettingsRow title="Disconnect iMessage" description="OpenBot stops reading Messages. Tasks already started keep running."
+        <SettingsRow title="Disconnect iMessage" description="Sidemates stops reading Messages. Tasks already started keep running."
           control={<button onClick={() => { if (window.confirm("Disconnect iMessage?")) void run(() => call<IMessageStatus>("", "DELETE")); }} disabled={busy}>Disconnect</button>} />
       </SettingsCard>
     </SettingsGroup>}

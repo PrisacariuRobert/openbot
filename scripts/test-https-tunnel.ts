@@ -15,7 +15,7 @@ const socket = createServer();
 await new Promise<void>(resolve => socket.listen(0, "127.0.0.1", resolve));
 const port = (socket.address() as { port: number }).port;
 await new Promise<void>(resolve => socket.close(() => resolve()));
-const base = `http://127.0.0.1:${port}`, origin = "https://app.openbots.foundation";
+const base = `http://127.0.0.1:${port}`, origin = "https://app.sidemates.app";
 const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
   stdio: "ignore", env: { ...process.env, OPENBOT_LOAD_ENV: "0", OPENBOT_DATA_DIR: data,
     OPENBOT_HOST: "127.0.0.1", OPENBOT_PORT: String(port), OPENBOT_APP_URL: origin,
@@ -44,7 +44,7 @@ try {
   assert.equal((await remote("/api/access/away", { headers: auth })).status, 403);
   assert.equal((await remote("/api/access/pairing", { method: "POST", headers: auth })).status, 403);
   const loginBody = JSON.stringify({ token: deviceKey });
-  for (const forbidden of ["https://openbots.foundation", "https://evil.example", "null"]) {
+  for (const forbidden of ["https://sidemates.app", "https://evil.example", "null"]) {
     assert.equal((await remote("/api/auth/login", { method: "POST", headers: { origin: forbidden, "Content-Type": "application/json" }, body: loginBody })).status, 403);
   }
   const login = await remote("/api/auth/login", { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: loginBody });

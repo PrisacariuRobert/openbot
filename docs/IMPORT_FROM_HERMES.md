@@ -1,6 +1,6 @@
 # Importing a Hermes or OpenClaw profile
 
-Bring an agent you already raised in [Hermes](https://github.com/NousResearch/hermes-agent) or OpenClaw into OpenBot as a teammate: their persona, curated memories, and text skills move; your secrets stay yours.
+Bring an agent you already raised in [Hermes](https://github.com/NousResearch/hermes-agent) or OpenClaw into Sidemates as a teammate: their persona, curated memories, and text skills move; your secrets stay yours.
 
 ## What it is
 
@@ -16,17 +16,17 @@ Supported sources:
 
 ## What moves
 
-- **Persona** — `SOUL.md` becomes the teammate's job and instructions. OpenBot adds a short adaptation note so the teammate knows which of its old habits name tools it no longer has, and asks instead of pretending.
-- **Curated memories** — `MEMORY.md` (the agent's notes) and `USER.md` (your profile) become private memory notes owned by the teammate. `§`-separated and line-based entries both parse. Notes longer than OpenBot's per-note size are listed for hand review instead of silently trimmed.
-- **Text skills** — every `skills/**/SKILL.md` bundle is copied (with `references/`, `templates/`, `assets/`, `examples/` text files) into the teammate's skill directories for both runtimes. Scripts, hidden files, and parent paths are not imported — the same safety line as OpenBot's community-skill importer.
+- **Persona** — `SOUL.md` becomes the teammate's job and instructions. Sidemates adds a short adaptation note so the teammate knows which of its old habits name tools it no longer has, and asks instead of pretending.
+- **Curated memories** — `MEMORY.md` (the agent's notes) and `USER.md` (your profile) become private memory notes owned by the teammate. `§`-separated and line-based entries both parse. Notes longer than Sidemates' per-note size are listed for hand review instead of silently trimmed.
+- **Text skills** — every `skills/**/SKILL.md` bundle is copied (with `references/`, `templates/`, `assets/`, `examples/` text files) into the teammate's skill directories for both runtimes. Scripts, hidden files, and parent paths are not imported — the same safety line as Sidemates' community-skill importer.
 
-- **Cron jobs** — Hermes jobs with a prompt become OpenBot automations, **always paused**, when their schedule has an exact equivalent: daily or chosen weekdays at a fixed time, every N minutes (5 or more), hourly, or once. Others (day-of-month, month, hour ranges) are listed as not converted, with the reason. Script-only jobs are skipped.
+- **Cron jobs** — Hermes jobs with a prompt become Sidemates automations, **always paused**, when their schedule has an exact equivalent: daily or chosen weekdays at a fixed time, every N minutes (5 or more), hourly, or once. Others (day-of-month, month, hour ranges) are listed as not converted, with the reason. Script-only jobs are skipped.
 
 ## What never moves
 
-- **Credentials and API keys** — never copied. If the profile contains credential-looking settings, the preview says so and the plan carries no secret values. Connect the model in OpenBot yourself.
+- **Credentials and API keys** — never copied. If the profile contains credential-looking settings, the preview says so and the plan carries no secret values. Connect the model in Sidemates yourself.
 - **Chat history and sessions** (`state.db`) — they stay in the original tool.
-- **Messaging platform settings** (Telegram, Discord, Slack, …) — reconnect those through OpenBot's connectors.
+- **Messaging platform settings** (Telegram, Discord, Slack, …) — reconnect those through Sidemates' connectors.
 
 
 ## How to use it
@@ -45,10 +45,10 @@ POST /api/imports/profile/preview   { "path": "~/.hermes/profiles/researcher" }
 POST /api/imports/profile/apply     { "path": "~/.hermes/profiles/researcher" }
 ```
 
-The preview endpoint changes nothing on disk; the apply endpoint only writes inside OpenBot's own data directory.
+The preview endpoint changes nothing on disk; the apply endpoint only writes inside Sidemates' own data directory.
 
 ## Honest limits
 
 - Imported skills are plain instruction documents. Hermes skills that assume Hermes-specific tools (its memory tool, messaging gateway, terminal backends) will still run — the adaptation note tells the teammate to ask you instead of faking those tools.
-- Chat history is not re-indexed. OpenBot memory retrieval works on what the teammate remembers from here on, plus anything you ask them to remember.
+- Chat history is not re-indexed. Sidemates memory retrieval works on what the teammate remembers from here on, plus anything you ask them to remember.
 - The import is one-way. It never writes to your Hermes or OpenClaw folders.

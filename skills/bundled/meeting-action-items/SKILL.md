@@ -19,4 +19,4 @@ No account is necessary for notes pasted into chat. If attachment text is unavai
 
 ## Provenance
 
-Reviewed OpenBot adaptation of [meeting-action-items](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/meeting-action-items/SKILL.md). Instructions are bundled with OpenBot and do not grant tool or account permissions. See LICENSE for reuse terms.
+Reviewed Sidemates adaptation of [meeting-action-items](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/productivity/meeting-action-items/SKILL.md). Instructions are bundled with Sidemates and do not grant tool or account permissions. See LICENSE for reuse terms.

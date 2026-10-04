@@ -13,8 +13,8 @@ license: MIT
 6. When the workflow requires review/publishing, commit the intended files, rerun meaningful checks against that exact commit and use code_request_review with another teammate. Publishing remains approval-gated.
 7. Report the cause, the change, checks actually run and unresolved risks. Do not call an untested workaround a verified fix. If several attempts fail, revisit the causal model instead of stacking more patches.
 
-This is an OpenBot tool adaptation of the Hermes/superpowers method; it does not require their command runner or delegation API.
+This is a Sidemates tool adaptation of the Hermes/superpowers method; it does not require their command runner or delegation API.
 
 ## Provenance
 
-Reviewed OpenBot adaptation of [systematic-debugging](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/software-development/systematic-debugging/SKILL.md). Instructions are bundled with OpenBot and do not grant tool or account permissions. See LICENSE for reuse terms.
+Reviewed Sidemates adaptation of [systematic-debugging](https://github.com/NousResearch/hermes-agent/blob/622883bad7f55f56a6393cd994e36c65fbdff253/skills/software-development/systematic-debugging/SKILL.md). Instructions are bundled with Sidemates and do not grant tool or account permissions. See LICENSE for reuse terms.

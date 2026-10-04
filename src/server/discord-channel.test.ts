@@ -112,7 +112,7 @@ test("Discord: owner-only DM pairing, DMs become tasks, servers and strangers ar
     await delay(1_000);
     assert.equal(discord.sent.length, 0);
     discord.message("42", `pair ${connected.pairingCode}`);
-    await until(() => discord.sent.some((item) => item.channel === "742" && /Connected to OpenBot/.test(item.content)), "pairing confirmation");
+    await until(() => discord.sent.some((item) => item.channel === "742" && /Connected to Sidemates/.test(item.content)), "pairing confirmation");
 
     discord.message("13", "hi from a stranger");
     discord.message("42", "hi from a server", { guild: "777", channel: "555" });

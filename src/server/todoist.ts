@@ -115,7 +115,7 @@ export class TodoistConnector {
       const response = await this.fetcher("https://api.todoist.com/oauth/register", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          client_name: "OpenBot", redirect_uris: [this.redirectUri], scope: SCOPE,
+          client_name: "Sidemates", redirect_uris: [this.redirectUri], scope: SCOPE,
           grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "client_secret_post",
         }),
       });
@@ -136,7 +136,7 @@ export class TodoistConnector {
 
   async completeOAuth(state: string, code: string) {
     this.pruneAttempts();
-    if (!this.attempts.delete(state)) throw new Error("That Todoist sign-in expired. Start it again from OpenBot.");
+    if (!this.attempts.delete(state)) throw new Error("That Todoist sign-in expired. Start it again from Sidemates.");
     const configured = this.db.oauthConnectorCredentials<TodoistCredentials>("todoist");
     if (!configured) throw new Error("The Todoist connection is missing.");
     const result = await this.tokenRequest(configured.clientId, configured.clientSecret, { grant_type: "authorization_code", code, redirect_uri: this.redirectUri });

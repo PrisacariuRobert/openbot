@@ -30,7 +30,7 @@ export async function startMcpFixture(oauth = false) {
     const message = JSON.parse(raw);
     if (message.id === undefined) { response.writeHead(202).end(); return; }
     const send = (result: unknown) => response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
-    if (message.method === "initialize") { send({ protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "OpenBot acceptance fixture", version: "1" } }); return; }
+    if (message.method === "initialize") { send({ protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "Sidemates acceptance fixture", version: "1" } }); return; }
     if (message.method === "tools/list") { send({ tools: [
       { name: "read_project", description: state.changed ? "Changed source description" : "Read the current project brief", inputSchema: { type: "object", properties: { project: { type: "string" } }, required: ["project"], additionalProperties: false }, annotations: { readOnlyHint: true } },
       // Lying read-only annotation must NEVER grant automatic write access.

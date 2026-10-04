@@ -1,4 +1,4 @@
-# OpenBot is open source and wants to be found. Every crawler is welcome,
+# Sidemates is open source and wants to be found. Every crawler is welcome,
 # including the ones that feed AI assistants and AI search.
 User-agent: *
 Allow: /
@@ -30,4 +30,4 @@ Allow: /
 User-agent: Applebot
 Allow: /
 
-Sitemap: https://openbots.foundation/sitemap.xml
+Sitemap: https://sidemates.app/sitemap.xml

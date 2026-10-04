@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-/** "Hey Siri, Ask OpenBot": a signed Shortcut that asks for a request (spoken
+/** "Hey Siri, Ask Sidemates": a signed Shortcut that asks for a request (spoken
  * through Siri or typed), sends it to this studio with its own device key,
  * and speaks the answer. The Mac signs it with its own `shortcuts` tool so
  * the iPhone imports it without any App Store app. */
@@ -25,7 +25,7 @@ const variable = (uuid: string, name: string): Plist => ({ Value: { string: "￼
 const field = (key: string, value: Plist): Plist => ({ WFItemType: 0, WFKey: text(key), WFValue: value });
 const shortcutInput: Plist = { Value: { string: "￼", attachmentsByRange: { "{0, 1}": { Type: "ExtensionInput" } } }, WFSerializationType: "WFTextTokenString" };
 
-/** "Send to OpenBot": in the share sheet of any app. Whatever is shared (a
+/** "Send to Sidemates": in the share sheet of any app. Whatever is shared (a
  * page, link or text) goes to the team with one short question about what to
  * do with it; naming a teammate ("Nova, summarize it") reaches that one. */
 export function shareShortcutPlist(input: { askUrl: string; deviceKey: string; source?: "share" | "share-mac" }): string {
@@ -85,7 +85,7 @@ const run = (command: string, args: string[]) => new Promise<void>((resolve, rej
 });
 
 /** Binary plist, signed for anyone to import. Needs macOS with Shortcuts. */
-export async function signedShortcut(xml: string, name = "Ask OpenBot"): Promise<Buffer> {
+export async function signedShortcut(xml: string, name = "Ask Sidemates"): Promise<Buffer> {
   if (process.platform !== "darwin") throw new Error("Siri shortcuts are made on a Mac.");
   const dir = mkdtempSync(path.join(tmpdir(), "openbot-siri-"));
   try {

@@ -16,4 +16,4 @@ Use the teammate's own persistent browser profile at mail.google.com. Draft prep
 
 ## Provenance
 
-OpenBot maintained built-in method. Proven in a signed-in teammate browser: private self-draft composed, auto-saved (Drafts 40 to 41), reopened with all values read back, discarded (Drafts back to 40), Sent verified clean. Sending proven separately: approved message to an approved address, Sent row with recipient, subject and time read back. Instructions are bundled with OpenBot and do not grant tool or account permissions.
+Sidemates maintained built-in method. Proven in a signed-in teammate browser: private self-draft composed, auto-saved (Drafts 40 to 41), reopened with all values read back, discarded (Drafts back to 40), Sent verified clean. Sending proven separately: approved message to an approved address, Sent row with recipient, subject and time read back. Instructions are bundled with Sidemates and do not grant tool or account permissions.

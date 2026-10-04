@@ -184,7 +184,7 @@ export function approvalPreview(
     field("subject", "Subject", true);
     field("body", "Your reply", true);
     field("threadId", "Gmail conversation", true);
-    preview.fields.push({ label: "Effect", value: "Send one plain-text reply in the original conversation. The recipient follows the original message's Reply-To header when present. This is not reply-all: no Cc, Bcc or attachments. OpenBot checks for intervening messages before sending, then checks the sent copy. It will not resend automatically if the result is uncertain." });
+    preview.fields.push({ label: "Effect", value: "Send one plain-text reply in the original conversation. The recipient follows the original message's Reply-To header when present. This is not reply-all: no Cc, Bcc or attachments. Sidemates checks for intervening messages before sending, then checks the sent copy. It will not resend automatically if the result is uncertain." });
   } else if (object.type === "gmail_send") {
     field("to", "To", true);
     field("cc", "Cc");
@@ -247,7 +247,7 @@ export function approvalPreview(
       show("Review of this commit", `${snapshot.review.summary}\nReviewed: ${snapshot.review.createdAt}`);
       show("Review findings", snapshot.review.findings.join("\n") || "No findings recorded");
       show("Access", "This teammate has project read, write and command access. The independent reviewer has project read access. Both permissions are checked again before publishing.");
-      show("Effect", "Upload this exact commit to a new branch and create one pull request. Existing branches and pull requests are not updated. OpenBot does not merge or deploy; the repository's own automations may run. GitHub readback must confirm the result; uncertain writes are not automatically retried.");
+      show("Effect", "Upload this exact commit to a new branch and create one pull request. Existing branches and pull requests are not updated. Sidemates does not merge or deploy; the repository's own automations may run. GitHub readback must confirm the result; uncertain writes are not automatically retried.");
     }
   } else if (object.type === "notion_update") {
     boundedText("pageId", "Page ID or link", 200, true);
@@ -290,7 +290,7 @@ export function approvalPreview(
     field("capability", "Missing capability", true);
     field("plan", "Plan for the new tool", true);
     field("toolName", "New tool file", true);
-    preview.fields.push({ label: "Effect", value: "Approving restarts this same task with the studio's coding model and lets the teammate write exactly one new tool file in its own private workspace. The tool is self-contained and runs in OpenBot's control. Review or delete the file in Files any time." });
+    preview.fields.push({ label: "Effect", value: "Approving restarts this same task with the studio's coding model and lets the teammate write exactly one new tool file in its own private workspace. The tool is self-contained and runs in Sidemates' control. Review or delete the file in Files any time." });
   } else if (object.type === "mac_mail_save_attachment" || object.type === "mac_reminder_create" || object.type === "mac_note_create" || object.type === "mac_event_create" || object.type === "mac_shortcut_run" || object.type === "mac_app_click" || object.type === "mac_app_type" || object.type === "mac_app_key" || object.type === "mac_app_scroll") {
     const exactTime = (key: string, label: string, required: boolean) => {
       const value = args[key];
@@ -298,7 +298,7 @@ export function approvalPreview(
       if (typeof value !== "string" || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || !Number.isFinite(Date.parse(value))) { incomplete = true; return; }
       preview.fields.push({ label, value: new Date(value).toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }) });
     };
-    preview.fields.push({ label: "Computer", value: "The Mac running this OpenBot studio" });
+    preview.fields.push({ label: "Computer", value: "The Mac running this Sidemates studio" });
     if (object.type === "mac_mail_save_attachment") {
       preview.fields.push({ label: "App", value: "Mail" });
       boundedText("attachment", "Attachment", 300, true);
@@ -339,7 +339,7 @@ export function approvalPreview(
       if (object.type === "mac_app_key") boundedText("key", "Key", 40, true);
       preview.fields.push({ label: "Effect", value: object.type === "mac_app_type" ? "Type this text into the focused field of that app." : object.type === "mac_app_scroll" ? "Move through the app with navigation keys." : "Act once in that app, exactly as described above." });
     }
-  } else if (object.type === "mac_organize") {    preview.fields.push({ label: "Computer", value: "The Mac running this OpenBot studio" });
+  } else if (object.type === "mac_organize") {    preview.fields.push({ label: "Computer", value: "The Mac running this Sidemates studio" });
     preview.fields.push({ label: "Path base", value: "Relative paths and ~/ start in the host user's home folder. Absolute paths are shown exactly as requested." });
     const moves = args.moves;
     if (!Array.isArray(moves) || moves.length < 1 || moves.length > 100) incomplete = true;

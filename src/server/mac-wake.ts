@@ -2,9 +2,9 @@ import { execFile } from "node:child_process";
 import type { Routine } from "../shared/types.js";
 
 /** Wake a sleeping Mac for scheduled routines. macOS keeps one repeating
- * power event (`pmset repeat`); OpenBot sets it a few minutes before the
+ * power event (`pmset repeat`); Sidemates sets it a few minutes before the
  * earliest routine of the day. Changing it needs the owner's password in
- * macOS's own prompt — OpenBot never sees or stores it. A MacBook with its
+ * macOS's own prompt — Sidemates never sees or stores it. A MacBook with its
  * lid closed and no power may still stay asleep; routines then run as soon
  * as the Mac wakes. */
 

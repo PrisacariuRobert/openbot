@@ -23,7 +23,7 @@ test("connects through Notion OAuth, reads selected pages, and appends bounded b
       if (url.includes(`/v1/blocks/${pageId}/children`) && method === "PATCH") return new Response(JSON.stringify({ results: [] }), { status: 200 });
       if (url.includes(`/v1/blocks/${pageId}/children`)) return new Response(JSON.stringify({ results: [{ id: "block-1", type: "heading_2", heading_2: { rich_text: [{ plain_text: "Decisions" }] } }, { id: "block-2", type: "paragraph", paragraph: { rich_text: [{ plain_text: "Ship on Friday." }] } }] }), { status: 200 });
       if (url.includes(`/v1/pages/${pageId}`)) return new Response(JSON.stringify(page), { status: 200 });
-      if (url.endsWith("/v1/users/me")) return new Response(JSON.stringify({ id: "bot", name: "OpenBot", type: "bot" }), { status: 200 });
+      if (url.endsWith("/v1/users/me")) return new Response(JSON.stringify({ id: "bot", name: "Sidemates", type: "bot" }), { status: 200 });
       return new Response(JSON.stringify({ code: "unexpected_endpoint" }), { status: 400 });
     }) as typeof fetch;
     const connector = new NotionConnector(db, "http://127.0.0.1:4311/api/connectors/notion/callback", fakeFetch);
@@ -40,7 +40,7 @@ test("connects through Notion OAuth, reads selected pages, and appends bounded b
     assert.match(detail.content, /Ship on Friday/);
     const update = await connector.append(pageId, "Ready for review.\n\nShip after approval.", "Update");
     assert.equal(update.blocksAdded, 3);
-    assert.equal((await connector.health()).name, "OpenBot");
+    assert.equal((await connector.health()).name, "Sidemates");
     assert.ok(requests.filter((item) => item.url.startsWith("https://api.notion.com/v1/")).every((item) => item.version === "2026-03-11"));
     const patch = requests.find((item) => item.method === "PATCH");
     assert.match(patch?.body || "", /Ready for review/);

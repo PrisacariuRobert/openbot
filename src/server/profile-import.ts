@@ -4,7 +4,7 @@ import path from "node:path";
 import type { OpenBotDatabase } from "./database.js";
 import type { RoutineSchedule } from "../shared/calendar-schedule.js";
 
-/** Import a Hermes or OpenClaw agent profile into an OpenBot teammate.
+/** Import a Hermes or OpenClaw agent profile into a Sidemates teammate.
  * What moves: the persona (SOUL.md → role + instructions), curated memories
  * (MEMORY.md/USER.md → private notes), and text skills (SKILL.md bundles →
  * the teammate's skill directories). What never moves: credentials and API
@@ -31,7 +31,7 @@ export interface ProfileImportPlan {
   memories: Array<{ kind: "agent" | "owner"; text: string }>;
   skills: ProfileImportSkill[];
   hints: { provider: string | null; model: string | null };
-  /** Hermes cron jobs. Convertible ones become paused OpenBot routines. */
+  /** Hermes cron jobs. Convertible ones become paused Sidemates routines. */
   jobs: ProfileImportJob[];
   skipped: string[];
   warnings: string[];
@@ -40,7 +40,7 @@ export interface ProfileImportPlan {
 export interface ProfileImportJob {
   name: string;
   scheduleDisplay: string;
-  /** Null when the schedule has no faithful OpenBot equivalent. */
+  /** Null when the schedule has no faithful Sidemates equivalent. */
   schedule: ConvertedSchedule | null;
   reason: string | null;
   prompt: string;
@@ -63,7 +63,7 @@ const MAX_MEMORY_CHARS = 700;
 const MAX_SKILLS = 40;
 const MAX_SKILL_FILE_CHARS = 256_000;
 const MAX_SKILL_FILES = 24;
-const ADAPTATION_NOTE = `Imported persona — the original was written for a different agent tool. Some of its habits may name tools you do not have here. Your real capabilities in OpenBot: browser work with owner sign-in takeover, connectors the owner grants, files, and scheduled routines. Never claim a Hermes/OpenClaw tool you do not have; ask the owner instead.`;
+const ADAPTATION_NOTE = `Imported persona — the original was written for a different agent tool. Some of its habits may name tools you do not have here. Your real capabilities in Sidemates: browser work with owner sign-in takeover, connectors the owner grants, files, and scheduled routines. Never claim a Hermes/OpenClaw tool you do not have; ask the owner instead.`;
 
 function expandHome(input: string): string {
   const trimmed = input.trim();
@@ -110,7 +110,7 @@ function parseMemoryFile(file: string, kind: "agent" | "owner", plan: ProfileImp
       return;
     }
     if (text.length > MAX_MEMORY_CHARS) {
-      plan.warnings.push("One memory entry was longer than OpenBot's note size and was kept out — review it by hand.");
+      plan.warnings.push("One memory entry was longer than Sidemates' note size and was kept out — review it by hand.");
       continue;
     }
     plan.memories.push({ kind, text });
@@ -174,7 +174,7 @@ const MAX_JOBS = 20;
 const MAX_JOB_PROMPT_CHARS = 8_000;
 const DAY_NAMES: Record<string, number> = { sun: 7, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
-/** Map a Hermes schedule onto an OpenBot one only when it is exact:
+/** Map a Hermes schedule onto a Sidemates one only when it is exact:
  * daily or weekday clock times, every N minutes, hourly, or a single time.
  * Anything else (day-of-month, month, ranges of hours…) is left for the
  * owner rather than approximated. */
@@ -191,7 +191,7 @@ export function convertHermesSchedule(schedule: unknown, timeZone: string): Conv
     if (Number.isFinite(Date.parse(at))) return { intervalMinutes: 24 * 60, schedule: { kind: "once", timeZone, at: new Date(at).toISOString() }, label: `Once at ${at}` };
     return { reason: "Its one-time run has no readable date." };
   }
-  if (kind !== "cron") return { reason: `Its "${kind || "unknown"}" schedule type has no OpenBot equivalent.` };
+  if (kind !== "cron") return { reason: `Its "${kind || "unknown"}" schedule type has no Sidemates equivalent.` };
   const fields = String(value.expr || "").trim().split(/\s+/);
   if (fields.length !== 5) return { reason: "Its cron expression is not the standard five fields." };
   const [minute, hour, dayOfMonth, month, dayOfWeek] = fields as [string, string, string, string, string];
@@ -291,10 +291,10 @@ export function previewProfileImport(rawPath: string): ProfileImportPlan {
     instructionsTruncated: instructionsRaw.length > MAX_INSTRUCTION_CHARS,
     memories, skills, hints, warnings,
     skipped: [
-      "Credentials and API keys (config.yaml, .env) — never copied. Connect the model in OpenBot; the owner re-enters any key.",
+      "Credentials and API keys (config.yaml, .env) — never copied. Connect the model in Sidemates; the owner re-enters any key.",
       "Chat history and sessions (state.db) — they stay in the original tool.",
       "Messaging platform settings (Telegram, Discord, Slack, …).",
-      "Cron jobs with schedules OpenBot cannot express exactly — listed below; recreate those by hand.",
+      "Cron jobs with schedules Sidemates cannot express exactly — listed below; recreate those by hand.",
     ],
   };
   parseMemoryFile(path.join(source, kind === "hermes" ? path.join("memories", "MEMORY.md") : "MEMORY.md"), "agent", plan);

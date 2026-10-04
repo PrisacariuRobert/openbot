@@ -9,7 +9,7 @@ export type AutoReviewDecision = { rule: AutoReviewRule; effect: AutoReviewEffec
  * case-insensitive with `*` (any run) and `?` (any character); a plain pattern
  * is a substring match. One matching Require-Approval rule always wins over
  * matching Always-Allow rules; neither kind invents a permission that does not
- * exist — Always-Allow only softens OpenBot's own risk detector. */
+ * exist — Always-Allow only softens Sidemates' own risk detector. */
 
 export function autoReviewPatternMatches(pattern: string, text: string): boolean {
   const trimmed = pattern.trim().replace(/\s+/g, " ");
@@ -33,7 +33,7 @@ export function findAutoReviewRule(rules: AutoReviewRule[], scope: AutoReviewSco
 
 /** Commands run in the owner's isolated Docker computer. A Require-Approval
  * rule forces review even when the base detector stays quiet. An Always-Allow
- * rule can skip OpenBot's review of a sandboxed command — never a host action. */
+ * rule can skip Sidemates' review of a sandboxed command — never a host action. */
 export function commandAutoDecision(rules: AutoReviewRule[], command: string, baseReason: string | null) {
   const matched = findAutoReviewRule(rules, "command", command);
   if (!matched) return { reason: baseReason, matched: null as AutoReviewDecision | null };

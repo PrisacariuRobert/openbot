@@ -35,7 +35,7 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => {
   setTimeout(() => { stopAll("SIGKILL"); process.exit(143); }, 3_000).unref();
 });
 
-/** Only the argument shapes OpenBot sends; anything else runs plain `run`. */
+/** Only the argument shapes Sidemates sends; anything else runs plain `run`. */
 function parse(args) {
   if (args[0] !== "run") return null;
   const out = { auto: false, files: [] };

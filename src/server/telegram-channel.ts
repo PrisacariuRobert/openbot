@@ -148,7 +148,7 @@ export class TelegramChannel {
   async sendTest() {
     const config = this.config();
     if (!config?.ownerChatId) throw new Error("Link your Telegram account first.");
-    await this.send(Number(config.ownerChatId), "✅ OpenBot is connected. Message me here any time — your team will answer.");
+    await this.send(Number(config.ownerChatId), "✅ Sidemates is connected. Message me here any time — your team will answer.");
   }
 
   disconnect() {
@@ -210,7 +210,7 @@ export class TelegramChannel {
   private async send(chatId: number, text: string) {
     const config = this.config();
     if (!config?.token) return;
-    const body = text.length > TELEGRAM_TEXT_LIMIT ? `${text.slice(0, TELEGRAM_TEXT_LIMIT - 60)}…\n\n(Open OpenBot for the full reply.)` : text;
+    const body = text.length > TELEGRAM_TEXT_LIMIT ? `${text.slice(0, TELEGRAM_TEXT_LIMIT - 60)}…\n\n(Open Sidemates for the full reply.)` : text;
     await this.call(config.token, "sendMessage", { chat_id: chatId, text: body, disable_web_page_preview: true });
   }
 

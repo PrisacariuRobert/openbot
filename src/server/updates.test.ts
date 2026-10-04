@@ -20,7 +20,7 @@ test("an installed copy can update in one tap; a source checkout is only told", 
   let command = "";
   const spawned = installed.install(((_file: string, args: string[]) => { command = args[1]!; return { on() {}, unref() {} }; }) as never);
   assert.equal(spawned.installing, true);
-  assert.match(command, /openbots\.foundation\/install\.sh \| sh$/);
+  assert.match(command, /sidemates\.app\/install\.sh \| sh$/);
 
   const source = new UpdateChecker({ current: "0.37.0-beta.1", fetchImpl: release("v0.38.0-beta.1"), installed: () => false });
   assert.equal((await source.check()).canInstall, false);

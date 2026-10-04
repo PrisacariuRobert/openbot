@@ -22,5 +22,5 @@ test("odd values fall back safely and text is clipped", () => {
 });
 
 test("things that are not teammates are refused", () => {
-  for (const bad of [null, {}, { kind: "openbot-teammate", version: 2, bot: {} }, { kind: "other", version: 1, bot: good.bot }, { kind: "openbot-teammate", version: 1, bot: { name: 1, role: "x", instructions: "y" } }]) assert.throws(() => readTeammate(bad), /not an OpenBot teammate/);
+  for (const bad of [null, {}, { kind: "openbot-teammate", version: 2, bot: {} }, { kind: "other", version: 1, bot: good.bot }, { kind: "openbot-teammate", version: 1, bot: { name: 1, role: "x", instructions: "y" } }]) assert.throws(() => readTeammate(bad), /not a Sidemates teammate/);
 });

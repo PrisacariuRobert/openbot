@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * OpenBot MCP test harness.
+ * Sidemates MCP test harness.
  *
- * Exposes the owner's local OpenBot studio as MCP tools so an AI assistant
+ * Exposes the owner's local Sidemates studio as MCP tools so an AI assistant
  * can drive the whole app end to end — roster, tasks, approvals, receipts,
  * routines, skills, imports, browser live views — and judge whether the
  * product is going in the right direction. See docs/MCP_TESTING.md for the
@@ -38,7 +38,7 @@ const dataDir = process.env.OPENBOT_DATA_DIR
 let token: string | null = null;
 function readToken(): string {
   if (!token) token = readFileSync(path.join(dataDir, "access.token"), "utf8").trim();
-  if (!token) throw new Error(`No access token at ${path.join(dataDir, "access.token")}. Is the OpenBot server running with this data dir?`);
+  if (!token) throw new Error(`No access token at ${path.join(dataDir, "access.token")}. Is the Sidemates server running with this data dir?`);
   return token;
 }
 
@@ -590,13 +590,13 @@ server.tool("browser_live_frame", "A live JPEG of a teammate's private browser (
   return { content: [{ type: "image" as const, data: bytes.toString("base64"), mimeType: contentType }] };
 });
 
-server.tool("review_sign_in_url", "Run OpenBot's real sign-in-address review (embedded credentials, https, punycode, look-alike domains). Advisory only.", {
+server.tool("review_sign_in_url", "Run Sidemates' real sign-in-address review (embedded credentials, https, punycode, look-alike domains). Advisory only.", {
   url: z.string(),
 }, async ({ url }) => {
   return { content: [{ type: "text", text: JSON.stringify(reviewSignInRequest(url), null, 1) }] };
 });
 
-server.tool("validate_skill_markdown", "Run OpenBot's real agentskills.io SKILL.md parser: frontmatter name/description, body, start URL.", {
+server.tool("validate_skill_markdown", "Run Sidemates' real agentskills.io SKILL.md parser: frontmatter name/description, body, start URL.", {
   markdown: z.string().max(256_000),
 }, async ({ markdown }) => {
   try {
@@ -607,7 +607,7 @@ server.tool("validate_skill_markdown", "Run OpenBot's real agentskills.io SKILL.
   }
 });
 
-server.tool("app_screenshot", "Screenshot the OpenBot app interface itself (home, chat, or any settings panel) and return the PNG as an image you can SEE. Use it to visually verify layouts, check your own work, and report UI issues with evidence.", {
+server.tool("app_screenshot", "Screenshot the Sidemates app interface itself (home, chat, or any settings panel) and return the PNG as an image you can SEE. Use it to visually verify layouts, check your own work, and report UI issues with evidence.", {
   target: z.enum(["home", "chat", "provider", "connectors", "projects", "bot", "files", "artifacts", "routines", "control", "computer", "teach", "remote", "live", "search"]).describe("Which screen to capture. live is the Activity & recovery drawer."),
   width: z.number().int().min(320).max(1920).default(1440),
   height: z.number().int().min(400).max(1600).default(900),
@@ -918,7 +918,7 @@ if (process.env.OPENBOT_MCP_FULL === "1") {
     return { content: [{ type: "text", text: JSON.stringify(result, null, 1).slice(0, 2_000) }] };
   });
 
-  server.tool("tester_open_app", "[FULL] Open the dedicated tester browser on the OpenBot studio (its own session — no teammate, no task started). Loopback only.", {
+  server.tool("tester_open_app", "[FULL] Open the dedicated tester browser on the Sidemates studio (its own session — no teammate, no task started). Loopback only.", {
     url: z.string().max(2_048).optional().describe("Studio address; omit for the studio home."),
   }, async ({ url }) => {
     const result = await call("/api/tester/browser/open", url ? { url } : {});

@@ -1367,7 +1367,7 @@ export function Studio() {
       )}
       {budgetReached && !sendError && (
         <p className="send-error" role="status">
-          {budgetBot.name} has reached the weekly budget configured in OpenBot. Your provider’s allowance is separate.{" "}
+          {budgetBot.name} has reached the weekly budget configured in Sidemates. Your provider’s allowance is separate.{" "}
           <button type="button" onClick={() => openCapability("bot", budgetBot.threadId)}>Review budget</button>
         </p>
       )}
@@ -1925,7 +1925,7 @@ export function Studio() {
       <aside className="sidebar">
         <a className="wordmark" href="/">
           <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
-          openbot
+          sidemates
         </a>
         <label className="conversation-search">
           <Search size={16} />

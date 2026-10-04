@@ -57,7 +57,7 @@ export class BackgroundServiceManager {
 
   status(health?: RunnerHealth): { backgroundService: BackgroundServiceStatus; backgroundServiceDetail: string } {
     if (process.platform !== "darwin") return { backgroundService: "unsupported", backgroundServiceDetail: "Automatic background launch is currently available on macOS." };
-    if (!existsSync(this.plistPath)) return { backgroundService: "not_installed", backgroundServiceDetail: "OpenBot is awake only while its current server session is running." };
+    if (!existsSync(this.plistPath)) return { backgroundService: "not_installed", backgroundServiceDetail: "Sidemates is awake only while its current server session is running." };
     const active = health?.status === "online";
     return {
       backgroundService: "installed",
@@ -81,7 +81,7 @@ export class BackgroundServiceManager {
     const domain = `gui/${typeof process.getuid === "function" ? process.getuid() : 501}`;
     await launchctl(["bootout", domain, this.plistPath]);
     const loaded = await launchctl(["bootstrap", domain, this.plistPath]);
-    if (loaded.code !== 0) throw new Error(loaded.output || "macOS could not start OpenBot background protection.");
+    if (loaded.code !== 0) throw new Error(loaded.output || "macOS could not start Sidemates background protection.");
   }
 
   async uninstall(): Promise<void> {

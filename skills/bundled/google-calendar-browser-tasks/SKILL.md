@@ -16,4 +16,4 @@ Use the teammate's own persistent browser profile at calendar.google.com. This m
 
 ## Provenance
 
-OpenBot maintained built-in method. Proven in a signed-in teammate browser: private probe event created on Sep 19 and read back, rescheduled to Sep 20 and read back on the new day, deleted and verified absent. Guest flow proven separately: private event with one approved guest, invitation dialog Send, guest present on the saved event, then delete with cancellation Send and verified absent. Instructions are bundled with OpenBot and do not grant tool or account permissions.
+Sidemates maintained built-in method. Proven in a signed-in teammate browser: private probe event created on Sep 19 and read back, rescheduled to Sep 20 and read back on the new day, deleted and verified absent. Guest flow proven separately: private event with one approved guest, invitation dialog Send, guest present on the saved event, then delete with cancellation Send and verified absent. Instructions are bundled with Sidemates and do not grant tool or account permissions.

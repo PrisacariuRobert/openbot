@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Teammates ready to go — OpenBot</title>
+  <title>Teammates ready to go — Sidemates</title>
   <meta name="description" content="Ready-made AI teammates for your Mac: a receipt keeper, an inbox sorter, a trip planner and more. Read what each one is told to do, then add it in one click." />
-  <meta property="og:title" content="Teammates ready to go — OpenBot" />
+  <meta property="og:title" content="Teammates ready to go — Sidemates" />
   <meta property="og:description" content="Ready-made AI teammates for your Mac. Read what each one is told to do, then add it in one click." />
   <link rel="icon" href="../icon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -62,13 +62,13 @@
 </head>
 <body>
 <header>
-  <a class="brand" href="../" aria-label="OpenBot"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>openbot</a>
-  <a class="btn small ghost" href="../#install">Get OpenBot</a>
+  <a class="brand" href="../" aria-label="Sidemates"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>sidemates</a>
+  <a class="btn small ghost" href="../#install">Get Sidemates</a>
 </header>
 <main>
   <section class="hero">
     <h1>Teammates, ready to go.</h1>
-    <p>Pick one, read exactly what it's told to do, and add it to OpenBot in a click. It starts with the browser off and uses the AI you already chose.</p>
+    <p>Pick one, read exactly what it's told to do, and add it to Sidemates in a click. It starts with the browser off and uses the AI you already chose.</p>
   </section>
   <section class="grid" id="grid" aria-label="Ready-made teammates"></section>
 
@@ -77,15 +77,15 @@
       <h2>Made a good one? Share it.</h2>
       <p>Any teammate you build can become a link. Send it to a friend, post it, or add it here for everyone.</p>
       <ol>
-        <li>In OpenBot, open a teammate's settings.</li>
+        <li>In Sidemates, open a teammate's settings.</li>
         <li>Tap <strong>Copy share link</strong>.</li>
         <li>Paste it anywhere. It opens a page like these.</li>
       </ol>
-      <a class="btn small" href="https://github.com/PrisacariuRobert/openbot/blob/main/CONTRIBUTING.md#add-a-teammate-to-the-gallery">Add yours to the gallery</a>
+      <a class="btn small" href="https://github.com/PrisacariuRobert/sidemates/blob/main/CONTRIBUTING.md#add-a-teammate-to-the-gallery">Add yours to the gallery</a>
     </div>
     <div class="install">
-      <p>New to OpenBot? One line installs it:</p>
-      <div class="cmd"><code>curl -fsSL https://openbots.foundation/install.sh | sh</code></div>
+      <p>New to Sidemates? One line installs it:</p>
+      <div class="cmd"><code>curl -fsSL https://sidemates.app/install.sh | sh</code></div>
     </div>
   </section>
 </main>
@@ -107,8 +107,8 @@
       var cover = el("a", "cover"); cover.href = "../t/?g=" + item.slug; cover.setAttribute("aria-label", "See " + item.name);
       var actions = el("div", "actions"), see = el("a", "btn small ghost", "Details"), add = el("a", "btn small", "Add to my Mac");
       see.href = "../t/?g=" + item.slug;
-      add.href = "http://127.0.0.1:4311/?panel=team&import=" + encodeURIComponent("https://openbots.foundation/teammates/" + item.slug + ".json");
-      add.title = "Opens OpenBot on this Mac and shows you this teammate to confirm";
+      add.href = "http://127.0.0.1:4311/?panel=team&import=" + encodeURIComponent("https://sidemates.app/teammates/" + item.slug + ".json");
+      add.title = "Opens Sidemates on this Mac and shows you this teammate to confirm";
       actions.appendChild(see); actions.appendChild(add);
       card.appendChild(face); card.appendChild(el("h2", "", item.name)); card.appendChild(el("p", "job", item.role)); card.appendChild(el("p", "about", item.about)); card.appendChild(actions); card.appendChild(cover);
       grid.appendChild(card);

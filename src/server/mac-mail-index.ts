@@ -4,9 +4,9 @@ import path from "node:path";
 
 /** Mail on this Mac, read from Mail's own message files. Scripting Mail
  * walks the whole inbox (tens of thousands of messages can take minutes) and
- * Spotlight may not index Mail at all, so OpenBot reads the newest message
+ * Spotlight may not index Mail at all, so Sidemates reads the newest message
  * files directly, within a date window and a fixed cap. Needs Full Disk
- * Access for OpenBot (the same switch iMessage uses). */
+ * Access for Sidemates (the same switch iMessage uses). */
 
 
 export class MailAccessError extends Error {}
@@ -129,8 +129,8 @@ export class MacMail {
   private get root() { return path.join(this.home, "Library", "Mail"); }
 
   private checkAccess() {
-    if (this.platform !== "darwin") throw new MailAccessError("Mail is only available when OpenBot runs on a Mac.");
-    try { readdirSync(this.root); } catch { throw new MailAccessError("To search your Mail, give OpenBot Full Disk Access: System Settings → Privacy & Security → Full Disk Access → turn on OpenBot. Nothing was read."); }
+    if (this.platform !== "darwin") throw new MailAccessError("Mail is only available when Sidemates runs on a Mac.");
+    try { readdirSync(this.root); } catch { throw new MailAccessError("To search your Mail, give Sidemates Full Disk Access: System Settings → Privacy & Security → Full Disk Access → turn on Sidemates. Nothing was read."); }
   }
 
   /** Every message file, newest first, within the window. Listing and

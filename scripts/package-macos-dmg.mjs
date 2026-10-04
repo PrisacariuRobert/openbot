@@ -1,7 +1,7 @@
 // Website disk image for the unsigned Mac beta (D02, free Apple account).
 //
-// Takes a staged /absolute/path/to/OpenBot.app (built by Electron)
-// and produces OpenBot-<marketing>-macos-<arch>.dmg plus a .sha256 sidecar
+// Takes a staged /absolute/path/to/Sidemates.app (built by Electron)
+// and produces Sidemates-<marketing>-macos-<arch>.dmg plus a .sha256 sidecar
 // in the output directory. Read-only compressed (UDZO), verified after
 // creation, and smoke-mounted to confirm the bundle and its version.
 //
@@ -21,7 +21,7 @@ const root = path.resolve(import.meta.dirname, "..");
 const app = path.resolve(process.argv[2] || "");
 const outDir = path.resolve(process.argv[3] || path.join(root, "dist-release"));
 if (!process.argv[2] || !app.endsWith(".app")) {
-  throw new Error("Usage: node scripts/package-macos-dmg.mjs /absolute/path/to/OpenBot.app [/absolute/path/to/out-dir]");
+  throw new Error("Usage: node scripts/package-macos-dmg.mjs /absolute/path/to/Sidemates.app [/absolute/path/to/out-dir]");
 }
 if (process.platform !== "darwin") throw new Error("Disk images can only be built on macOS.");
 if (!existsSync(path.join(app, "Contents", "Info.plist"))) throw new Error("That .app has no Contents/Info.plist. Build it with package:desktop first.");
@@ -35,14 +35,14 @@ if (version !== appleMarketingVersion(packageJson.version)) {
 const arch = { arm64: "arm64", x64: "x64" }[process.arch];
 if (!arch) throw new Error(`macOS disk images do not support ${process.arch}.`);
 mkdirSync(outDir, { recursive: true });
-const base = `OpenBot-${version}-macos-${arch}`;
+const base = `Sidemates-${version}-macos-${arch}`;
 const dmg = path.join(outDir, `${base}.dmg`);
 const run = (command, args, label) => {
   const result = spawnSync(command, args, { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${label} failed: ${(result.stderr || result.stdout || "").trim().slice(0, 400)}`);
   return result;
 };
-run("/usr/bin/hdiutil", ["create", "-volname", `OpenBot ${version}`, "-srcfolder", app, "-ov", "-format", "UDZO", dmg], "Disk image creation");
+run("/usr/bin/hdiutil", ["create", "-volname", `Sidemates ${version}`, "-srcfolder", app, "-ov", "-format", "UDZO", dmg], "Disk image creation");
 run("/usr/bin/hdiutil", ["verify", dmg], "Disk image verification");
 const mount = mkdtempSync(path.join(tmpdir(), "openbot-dmg-verify-"));
 try {

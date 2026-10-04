@@ -19,7 +19,7 @@ test("uses Slack user authority for search and bot authority for approved postin
       if (url.endsWith("/search.messages")) return new Response(JSON.stringify({ ok: true, messages: { matches: [{ channel_id: "C1", channel_name: "launch", ts: "1700.1", username: "Ada", text: "Launch review is ready", permalink: "https://example.slack.com/archives/C1/p17001" }] } }), { status: 200 });
       if (url.endsWith("/conversations.history")) return new Response(JSON.stringify({ ok: true, messages: [{ ts: "1700.1", user: "U2", text: "Launch review is ready" }] }), { status: 200 });
       if (url.endsWith("/chat.postMessage")) return new Response(JSON.stringify({ ok: true, channel: "C1", ts: "1700.2" }), { status: 200 });
-      if (url.endsWith("/auth.test")) return new Response(JSON.stringify({ ok: true, team: "Launch room", user: "OpenBot", team_id: "T1", user_id: "B1" }), { status: 200 });
+      if (url.endsWith("/auth.test")) return new Response(JSON.stringify({ ok: true, team: "Launch room", user: "Sidemates", team_id: "T1", user_id: "B1" }), { status: 200 });
       return new Response(JSON.stringify({ ok: false, error: "unexpected_endpoint" }), { status: 400 });
     }) as typeof fetch;
     const connector = new SlackConnector(db, "http://127.0.0.1:4311/api/connectors/slack/callback", fakeFetch);

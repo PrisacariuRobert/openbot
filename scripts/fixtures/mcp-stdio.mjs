@@ -1,7 +1,7 @@
 import readline from "node:readline";
 
 // Tiny hand-written MCP-over-stdio server for transport tests. Speaks only the
-// messages OpenBot's client needs: initialize, tools/list, tools/call.
+// messages Sidemates' client needs: initialize, tools/list, tools/call.
 const state = { calls: [], envSeen: {} };
 const tools = [
   { name: "read_project", description: "Read the current project brief over stdio", inputSchema: { type: "object", properties: { project: { type: "string" } }, required: ["project"], additionalProperties: false } },
@@ -12,7 +12,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
   let message;
   try { message = JSON.parse(line); } catch { return; }
   if (message.method === "initialize") {
-    send(message.id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "OpenBot stdio fixture", version: "1" } });
+    send(message.id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "Sidemates stdio fixture", version: "1" } });
     return;
   }
   if (message.method === "notifications/initialized") return;

@@ -10,4 +10,4 @@
 | Enter text | `mac_app_type` | Types up to 8,000 characters; waits for approval |
 | Press a key | `mac_app_key` | Supports Return, Escape, Tab, arrows, deletion, and modifiers; waits for approval |
 
-If macOS blocks access, tell the user to enable the app running OpenBot under **System Settings → Privacy & Security → Accessibility**. Screen Recording is not required for the accessibility-tree version of this skill. Some apps expose few or no accessible controls; say so plainly instead of clicking blindly.
+If macOS blocks access, tell the user to enable the app running Sidemates under **System Settings → Privacy & Security → Accessibility**. Screen Recording is not required for the accessibility-tree version of this skill. Some apps expose few or no accessible controls; say so plainly instead of clicking blindly.

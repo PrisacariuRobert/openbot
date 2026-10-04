@@ -477,7 +477,7 @@ export function ControlPanel({
                   const bundle = JSON.parse(await file.text()) as unknown;
                   const imported = await onImportTeammate(bundle);
                   window.alert(`Imported ${imported.name} as a new teammate${imported.routines ? ` with ${imported.routines} paused routine${imported.routines === 1 ? "" : "s"}` : ""}. Choose an AI connection for them before starting work.`);
-                })().catch((error: Error) => window.alert(error instanceof SyntaxError ? "That file is not an OpenBot teammate file." : error.message || "This teammate could not be imported."));
+                })().catch((error: Error) => window.alert(error instanceof SyntaxError ? "That file is not a Sidemates teammate file." : error.message || "This teammate could not be imported."));
               }}
             />
           </SettingsRow>
@@ -925,7 +925,7 @@ export function SearchPanel({
         <kbd>⌘ K</kbd>
       </label>
       <p className="studio-search-help">
-        Everything stays on this OpenBot. Search opens the original
+        Everything stays on this Sidemates. Search opens the original
         conversation, not a copied result.
       </p>
       {loading ? (
@@ -1301,7 +1301,7 @@ export function LiveStudioPanel({
                 <CircleAlert size={15} />
               </span>
               <span>
-                <strong>Check before OpenBot continues</strong>
+                <strong>Check before Sidemates continues</strong>
                 <small>{action.actionLabel} may have completed during a restart. It will not be repeated automatically.</small>
               </span>
               <button
@@ -1800,7 +1800,7 @@ export function CodeProjectsPanel({
                     <small>
                       {project.projectKind} ·{" "}
                       {project.managedClone
-                        ? "Managed by OpenBot"
+                        ? "Managed by Sidemates"
                         : project.gitRepository
                           ? "Git repository"
                           : "Local folder"}
@@ -2137,7 +2137,7 @@ export function CodeProjectsPanel({
             <div>
               <h3>Connect a folder on this Mac</h3>
               <p>
-                OpenBot will leave the folder where it is and never claim access
+                Sidemates will leave the folder where it is and never claim access
                 outside it.
               </p>
             </div>
@@ -2595,14 +2595,14 @@ function OAuthConnectorPanel({
           connectedCopy:
             "Find current pages, read useful context, and review every note before it is added.",
           setupCopy:
-            "Create a public Notion integration once, then choose exactly which pages OpenBot may use.",
+            "Create a public Notion integration once, then choose exactly which pages Sidemates may use.",
           docs: "https://www.notion.so/my-integrations",
           readLabel: "Read",
           writeLabel: "Add notes",
           searchPlaceholder: "Search shared pages…",
           defaultQuery: "",
           boundary:
-            "OpenBot sees only the pages selected or shared during Notion sign-in. Updates append content; they never replace a page.",
+            "Sidemates sees only the pages selected or shared during Notion sign-in. Updates append content; they never replace a page.",
           resultName: "pages",
           canWrite: true,
           oneClick: false,
@@ -2612,13 +2612,13 @@ function OAuthConnectorPanel({
           kicker: "TASKS & PRIORITIES",
           connectTitle: "Bring Todoist into the studio",
           connectedCopy: "See what is due, plan around your real workload, and review every new task before it is created.",
-          setupCopy: "Connect in one click. OpenBot securely creates its local OAuth client for this Mac.",
+          setupCopy: "Connect in one click. Sidemates securely creates its local OAuth client for this Mac.",
           docs: "https://developer.todoist.com/api/v1/",
           readLabel: "See tasks",
           writeLabel: "Create tasks",
           searchPlaceholder: "Search active tasks…",
           defaultQuery: "",
-          boundary: "OpenBot reads active tasks only. Creating a task always pauses for your approval of the exact title and due date.",
+          boundary: "Sidemates reads active tasks only. Creating a task always pauses for your approval of the exact title and due date.",
           resultName: "tasks",
           canWrite: true,
           oneClick: true,
@@ -2634,7 +2634,7 @@ function OAuthConnectorPanel({
           writeLabel: "",
           searchPlaceholder: "Search Dropbox files…",
           defaultQuery: "",
-          boundary: "Dropbox is read-only in OpenBot. Only file metadata and bounded supported text enter a teammate task.",
+          boundary: "Dropbox is read-only in Sidemates. Only file metadata and bounded supported text enter a teammate task.",
           resultName: "files",
           canWrite: false,
           oneClick: false,
@@ -3024,7 +3024,7 @@ function OAuthConnectorPanel({
                     </form>
                   )}
                   {kind === "slack" && connector.events.secretConfigured && !connector.events.verified && (
-                    <p className="event-setup-note">Add the event address under <strong>Event Subscriptions</strong> in Slack. OpenBot will answer Slack’s signed verification check automatically.</p>
+                    <p className="event-setup-note">Add the event address under <strong>Event Subscriptions</strong> in Slack. Sidemates will answer Slack’s signed verification check automatically.</p>
                   )}
                   {kind === "notion" && !connector.events.verificationTokenReady && (
                     <p className="event-setup-note">Create a webhook subscription in Notion using this event address. Return here after Notion sends its verification token.</p>
@@ -3036,7 +3036,7 @@ function OAuthConnectorPanel({
                     </div>
                   )}
                   {kind === "notion" && connector.events.verified && (
-                    <p className="event-setup-note event-setup-verified"><Check size={13} /> A signed Notion event reached OpenBot successfully.</p>
+                    <p className="event-setup-note event-setup-verified"><Check size={13} /> A signed Notion event reached Sidemates successfully.</p>
                   )}
                   <div className="event-setup-footer">
                     <small>The private address and signing material never enter teammate prompts.</small>
@@ -3098,7 +3098,7 @@ function OAuthConnectorPanel({
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Disconnect ${details.name} from OpenBot? The app details stay saved so you can reconnect later.`,
+                        `Disconnect ${details.name} from Sidemates? The app details stay saved so you can reconnect later.`,
                       )
                     )
                       void disconnect();
@@ -3410,7 +3410,7 @@ export function ConnectorPanel({
       <section className="browser-app-onramp">
         <span className="browser-app-eyebrow"><Globe2 size={15} /> No app developer account needed</span>
         <h3>Use the apps you already have</h3>
-        <p>Give a teammate browser access, then sign in yourself when a website asks. That browser session stays with the teammate on this Mac. No Google Cloud or OpenBot OAuth setup is needed for this path.</p>
+        <p>Give a teammate browser access, then sign in yourself when a website asks. That browser session stays with the teammate on this Mac. No Google Cloud or Sidemates OAuth setup is needed for this path.</p>
         <div className="browser-app-examples">
           {([
             { id: "gmail", name: "Gmail", description: "Find a message or prepare a reply draft. Sending still needs your approval." },
@@ -3622,7 +3622,7 @@ export function ConnectorPanel({
             >
               <div className="google-connection-intro">
                 <span>1</span><p>Turn on the Google apps and create a Desktop OAuth client in Google Cloud. Add your account as a test user.</p>
-                <span>2</span><p>Choose its downloaded JSON file below. OpenBot then opens Google sign-in.</p>
+                <span>2</span><p>Choose its downloaded JSON file below. Sidemates then opens Google sign-in.</p>
               </div>
               <input
                 ref={credentialsFile}
@@ -3701,7 +3701,7 @@ export function ConnectorPanel({
                   <span>
                     <strong>Choose the file above</strong>
                     <small>
-                      OpenBot saves it privately and opens Google’s official sign-in
+                      Sidemates saves it privately and opens Google’s official sign-in
                       screen.
                     </small>
                   </span>
@@ -4134,7 +4134,7 @@ export function ConnectorPanel({
                   onClick={() => {
                     if (
                       window.confirm(
-                        "Disconnect Google Workspace from OpenBot? Your client details will stay saved so you can reconnect later.",
+                        "Disconnect Google Workspace from Sidemates? Your client details will stay saved so you can reconnect later.",
                       )
                     )
                       void run("disconnect", async () => {
@@ -4335,10 +4335,10 @@ export function RemotePanel({ bots, runner, installPrompt, onInstalled, onNotice
       <div className="remote-orbit"><RoomCluster bots={bots} large /><Smartphone size={22} /></div>
       <span className="control-kicker">One studio. All your devices.</span>
       <h3>Your team comes with you.</h3>
-      <p>Send a task, see what changed, and approve work from your iPhone. Just OpenBot—no extra networking apps.</p>
+      <p>Send a task, see what changed, and approve work from your iPhone. Just Sidemates—no extra networking apps.</p>
     </div>
     {local && <SiriCard />}
-    {local ? <AwayAccessPanel /> : <div className="remote-status good"><Check size={18} /><span><strong>Connected to your studio</strong><small>Manage paired phones from OpenBot on your host.</small></span></div>}
+    {local ? <AwayAccessPanel /> : <div className="remote-status good"><Check size={18} /><span><strong>Connected to your studio</strong><small>Manage paired phones from Sidemates on your host.</small></span></div>}
     {local && (
       <Advanced title="Advanced connection settings" summary="Owner access key, direct network URLs, and host notifications">
         <SettingsGroup title="Direct Network Addresses">
@@ -4405,7 +4405,7 @@ export function RemotePanel({ bots, runner, installPrompt, onInstalled, onNotice
         )}
       </Advanced>
     )}
-    <div className="security-footnote"><ShieldCheck size={16} /><p>{runner.deployment?.mode === "private_runner" ? "This studio runs on your private host." : "Your studio runs on this Mac. Keep it awake and online for away access."} Dictation does not save microphone audio in OpenBot.</p></div>
+    <div className="security-footnote"><ShieldCheck size={16} /><p>{runner.deployment?.mode === "private_runner" ? "This studio runs on your private host." : "Your studio runs on this Mac. Keep it awake and online for away access."} Dictation does not save microphone audio in Sidemates.</p></div>
   </div>;
 }
 
@@ -5022,7 +5022,7 @@ export function BotPanel({
                   const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
                   const link = document.createElement("a");
                   link.href = url;
-                  link.download = `teammate-${bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "teammate"}.openbot.json`;
+                  link.download = `teammate-${bot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "teammate"}.sidemates.json`;
                   document.body.appendChild(link);
                   link.click();
                   link.remove();
@@ -5524,7 +5524,7 @@ export function RoutinesPanel({
     setRunnerBusy(true);
     setRunnerError(null);
     try { await action(); }
-    catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not change the runner."); }
+    catch (error) { setRunnerError(error instanceof Error ? error.message : "Sidemates could not change the runner."); }
     finally { setRunnerBusy(false); }
   };
   const checkPrivateHome = useCallback(async () => {
@@ -5532,7 +5532,7 @@ export function RoutinesPanel({
     setRunnerCareBusy(true);
     setRunnerError(null);
     try { setRunnerCare(await api<RunnerCareStatus>("/api/runner/diagnostics")); }
-    catch (error) { setRunnerError(error instanceof Error ? error.message : "OpenBot could not check this private home."); }
+    catch (error) { setRunnerError(error instanceof Error ? error.message : "Sidemates could not check this private home."); }
     finally { setRunnerCareBusy(false); }
   }, []);
   const setHealthAlerts = async (enabled: boolean) => {
@@ -5544,7 +5544,7 @@ export function RoutinesPanel({
       await api("/api/runner/diagnostics/alerts", { method: "PATCH", body: JSON.stringify({ enabled }) });
       setRunnerCare(await api<RunnerCareStatus>("/api/runner/diagnostics"));
     } catch (error) {
-      setRunnerError(error instanceof Error ? error.message : "OpenBot could not change private-home alerts.");
+      setRunnerError(error instanceof Error ? error.message : "Sidemates could not change private-home alerts.");
     } finally {
       setRunnerCareBusy(false);
     }
@@ -5567,7 +5567,7 @@ export function RoutinesPanel({
       setHeartbeatAddress("");
       setHeartbeatEditing(false);
     } catch (error) {
-      setRunnerError(error instanceof Error ? error.message : "OpenBot could not connect that outside heartbeat.");
+      setRunnerError(error instanceof Error ? error.message : "Sidemates could not connect that outside heartbeat.");
     } finally {
       setRunnerCareBusy(false);
     }
@@ -5617,11 +5617,11 @@ export function RoutinesPanel({
         </div>
         <div className="runner-actions">
           {!privateRunner && runner.backgroundService === "not_installed" && managingFromThisMac && (
-            <button className="primary" disabled={runnerBusy} onClick={() => void runRunnerAction(onProtectRunner)}>{runnerBusy ? <LoaderCircle className="spinner" size={13} /> : <ShieldCheck size={13} />} Keep OpenBot running</button>
+            <button className="primary" disabled={runnerBusy} onClick={() => void runRunnerAction(onProtectRunner)}>{runnerBusy ? <LoaderCircle className="spinner" size={13} /> : <ShieldCheck size={13} />} Keep Sidemates running</button>
           )}
           {!privateRunner && runner.backgroundService === "installed" && managingFromThisMac && (
             <button disabled={runnerBusy} onClick={() => {
-              if (!window.confirm("Turn off background protection? Saved automations stay in place, but OpenBot will only run while you start it yourself.")) return;
+              if (!window.confirm("Turn off background protection? Saved automations stay in place, but Sidemates will only run while you start it yourself.")) return;
               void runRunnerAction(onUnprotectRunner);
             }}><Power size={13} /> Turn off protection</button>
           )}
@@ -5637,7 +5637,7 @@ export function RoutinesPanel({
             <span className="runner-care-mark">{runnerCare.overall === "ready" ? <Check size={16} /> : <CircleAlert size={16} />}</span>
             <div>
               <b>{runnerCare.summary}</b>
-              <small>OpenBot {runnerCare.version} · awake for {compactDuration(runnerCare.uptimeSeconds)} · checked just now</small>
+              <small>Sidemates {runnerCare.version} · awake for {compactDuration(runnerCare.uptimeSeconds)} · checked just now</small>
             </div>
             <button disabled={runnerCareBusy} onClick={() => void checkPrivateHome()} aria-label="Check private home again"><RefreshCw className={runnerCareBusy ? "spinner" : ""} size={14} /></button>
           </header>
@@ -5670,7 +5670,7 @@ export function RoutinesPanel({
               <b>{runnerCare.heartbeat.enabled ? "Offline protection is checking in" : "Know if this whole home goes offline"}</b>
               <small>{runnerCare.heartbeat.enabled
                 ? `A private pulse goes to ${runnerCare.heartbeat.provider || "your outside service"} every ${runnerCare.heartbeat.intervalMinutes} minutes. It can alert you even if this host loses power.`
-                : "Connect a private heartbeat address. Only an empty check-in leaves OpenBot; no studio names, files, prompts, or health details are sent."}</small>
+                : "Connect a private heartbeat address. Only an empty check-in leaves Sidemates; no studio names, files, prompts, or health details are sent."}</small>
               {runnerCare.heartbeat.lastError && <em><CircleAlert size={10} /> {runnerCare.heartbeat.lastError}</em>}
               {!runnerCare.heartbeat.lastError && runnerCare.heartbeat.lastSuccessAt && <em className="success"><Check size={10} /> Last check-in {relativeTime(runnerCare.heartbeat.lastSuccessAt) === "Now" ? "just now" : `${relativeTime(runnerCare.heartbeat.lastSuccessAt)} ago`}</em>}
             </div>
@@ -5709,10 +5709,10 @@ export function RoutinesPanel({
             <ChevronDown size={15} />
           </summary>
           <div className="private-runner-guide-body">
-            <p>Run OpenBot on a small Linux server you control. Your Mac stays local unless you deliberately move the studio.</p>
+            <p>Run Sidemates on a small Linux server you control. Your Mac stays local unless you deliberately move the studio.</p>
             <ol>
               <li><b>Choose a host</b><span>A private VPS or home server with Docker</span></li>
-              <li><b>Point a domain</b><span>OpenBot sets up encrypted HTTPS</span></li>
+              <li><b>Point a domain</b><span>Sidemates sets up encrypted HTTPS</span></li>
               <li><b>Start your home</b><span>Follow the reviewed private-runner guide</span></li>
             </ol>
             <label className="private-domain-field">
@@ -5805,7 +5805,7 @@ export function RoutinesPanel({
             <div>
               <strong>{createdHook.name} is ready</strong>
               <small>
-                Copy this secret now. OpenBot will not show it again.
+                Copy this secret now. Sidemates will not show it again.
               </small>
             </div>
             <button onClick={() => setCreatedHook(null)} aria-label="Close">
@@ -6301,7 +6301,7 @@ export function RoutinesPanel({
                   </select>
                 </label>
               </div>
-              <small className="routine-help">OpenBot checks Todoist in the background and keeps an event receipt, so a repeated delivery cannot start duplicate work.</small>
+              <small className="routine-help">Sidemates checks Todoist in the background and keeps an event receipt, so a repeated delivery cannot start duplicate work.</small>
             </fieldset>
           )}
           {triggerType === "dropbox" && (
@@ -6313,7 +6313,7 @@ export function RoutinesPanel({
                   <input value={dropboxPath} onChange={(event) => setDropboxPath(event.target.value)} placeholder="/Projects/Launch (optional)" />
                 </label>
               </div>
-              <small className="routine-help">OpenBot starts from a fresh Dropbox cursor, so turning this on never floods the studio with old files.</small>
+              <small className="routine-help">Sidemates starts from a fresh Dropbox cursor, so turning this on never floods the studio with old files.</small>
             </fieldset>
           )}
           {triggerType === "slack" && (
@@ -6779,7 +6779,7 @@ export function TeachPanel({
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${workflow.skillSlug}.openbot-skill.json`;
+      link.download = `${workflow.skillSlug}.sidemates-skill.json`;
       link.click();
       URL.revokeObjectURL(url);
       onNotice("Safe skill file exported");
@@ -6806,7 +6806,7 @@ export function TeachPanel({
     } catch (e) {
       setError(
         e instanceof SyntaxError
-          ? "That file is not a valid OpenBot skill."
+          ? "That file is not a valid Sidemates skill."
           : e instanceof Error
             ? e.message
             : String(e),
@@ -6863,7 +6863,7 @@ export function TeachPanel({
   const rollback = async (workflow: TaughtWorkflow, version: number) => {
     if (
       !window.confirm(
-        `Restore version ${version}? OpenBot will keep the current version in history too.`,
+        `Restore version ${version}? Sidemates will keep the current version in history too.`,
       )
     )
       return;
@@ -6919,7 +6919,7 @@ export function TeachPanel({
         <p>
           {recording
             ? `${stepCount} meaningful action${stepCount === 1 ? "" : "s"} captured. Secrets are replaced with placeholders.`
-            : "Demonstrate a browser task, install a safe starter, or bring in a reviewed OpenBot skill file."}
+            : "Demonstrate a browser task, install a safe starter, or bring in a reviewed Sidemates skill file."}
         </p>
       </div>
       <ol className="teaching-journey" aria-label="How teaching works">
@@ -6985,7 +6985,7 @@ export function TeachPanel({
           ref={importInput}
           type="file"
           className="visually-hidden"
-          accept=".json,.openbot-skill.json,application/json"
+          accept=".json,.sidemates-skill.json,.openbot-skill.json,application/json"
           onChange={(event) => void importSkill(event.target.files?.[0])}
         />
         <button

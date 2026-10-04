@@ -35,7 +35,7 @@ test("pairing needs the texted code back; history and strangers are never read",
     f.add({ text: code, handle: "06641234567" });
     await f.channel.pollOnce();
     assert.equal(f.channel.status().paired, true, "the owner's number, written another way, pairs");
-    assert.match(f.sent.at(-1)!, /Connected to OpenBot/);
+    assert.match(f.sent.at(-1)!, /Connected to Sidemates/);
   } finally { f.close(); }
 });
 

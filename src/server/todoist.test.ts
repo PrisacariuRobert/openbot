@@ -17,7 +17,7 @@ test("registers a private Todoist client, reads tasks, and creates only through 
       if (url.endsWith("/api/v1/user")) return new Response(JSON.stringify({ full_name: "Robert", email: "robert@example.com" }), { status: 200 });
       if (url.includes("/api/v1/tasks?") && method === "GET") return new Response(JSON.stringify({ results: [{ id: "task-1", content: "Prepare launch", description: "Final review", project_id: "project-1", priority: 3, due: { date: "2026-09-04" } }] }), { status: 200 });
       if (url.includes("/api/v1/activities?") && method === "GET") return new Response(JSON.stringify({ results: [{ id: "activity-1", event_type: "completed", object_id: "task-1", event_date: "2026-09-04T10:00:00Z", parent_project_id: "project-1", extra_data: { content: "Prepare launch" } }] }), { status: 200 });
-      if (url.endsWith("/api/v1/tasks") && method === "POST") return new Response(JSON.stringify({ id: "task-2", content: "Ship OpenBot", description: "", project_id: "project-1", priority: 4, url: "https://app.todoist.com/app/task/task-2" }), { status: 200 });
+      if (url.endsWith("/api/v1/tasks") && method === "POST") return new Response(JSON.stringify({ id: "task-2", content: "Ship Sidemates", description: "", project_id: "project-1", priority: 4, url: "https://app.todoist.com/app/task/task-2" }), { status: 200 });
       return new Response(JSON.stringify({ error: "unexpected" }), { status: 400 });
     }) as typeof fetch;
     const connector = new TodoistConnector(db, "http://localhost:4311/api/connectors/todoist/callback", fakeFetch);
@@ -29,8 +29,8 @@ test("registers a private Todoist client, reads tasks, and creates only through 
     assert.equal(db.getConnector("todoist")?.accountEmail, "Robert");
     assert.equal((await connector.tasks("launch"))[0]?.due, "2026-09-04");
     assert.deepEqual((await connector.activities())[0], { id: "activity-1", eventType: "completed", objectId: "task-1", content: "Prepare launch", occurredAt: "2026-09-04T10:00:00Z", projectId: "project-1" });
-    const created = await connector.create({ content: "Ship OpenBot", priority: 4 });
-    assert.equal(created.task.content, "Ship OpenBot");
+    const created = await connector.create({ content: "Ship Sidemates", priority: 4 });
+    assert.equal(created.task.content, "Ship Sidemates");
     assert.equal(created.recovered, false);
     assert.equal((await connector.health()).email, "robert@example.com");
     await assert.rejects(() => connector.completeOAuth(oauth.state, "replay"), /sign-in expired/);

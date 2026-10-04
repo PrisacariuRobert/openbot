@@ -77,7 +77,7 @@ export class MacProductivity implements MacProductivityReader {
     signal.throwIfAborted();
     try { return JSON.parse(await this.execute(script, [JSON.stringify(args)], signal)); }
     catch (error) {
-      if (/-1743|not authorized|not permitted|authorization/i.test(String(error))) throw new Error("Allow OpenBot to read this app in System Settings → Privacy & Security → Automation, then try again. Nothing was read.");
+      if (/-1743|not authorized|not permitted|authorization/i.test(String(error))) throw new Error("Allow Sidemates to read this app in System Settings → Privacy & Security → Automation, then try again. Nothing was read.");
       throw new Error("The Mac app could not be read. Check that this Mac is available, the app has your account, and Automation permission is allowed. Nothing was sent or changed.");
     }
   }

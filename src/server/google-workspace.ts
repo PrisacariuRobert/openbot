@@ -218,10 +218,10 @@ export class GoogleWorkspaceConnector {
     if (!attempt) {
       const existing = this.db.restoreGoogleConnectorAfterStaleCallback();
       if (existing?.connected && existing.accountEmail) return existing;
-      throw new Error("That Google sign-in expired. Start it again from OpenBot.");
+      throw new Error("That Google sign-in expired. Start it again from Sidemates.");
     }
     this.attempts.delete(state);
-    if (Date.now() - attempt.createdAt > 10 * 60_000) throw new Error("That Google sign-in expired. Start it again from OpenBot.");
+    if (Date.now() - attempt.createdAt > 10 * 60_000) throw new Error("That Google sign-in expired. Start it again from Sidemates.");
     if (!credentials) throw new Error("Google Workspace is no longer configured.");
     const params: Record<string, string> = {
       client_id: credentials.clientId, code, code_verifier: attempt.verifier, grant_type: "authorization_code", redirect_uri: this.redirectUri,
@@ -231,7 +231,7 @@ export class GoogleWorkspaceConnector {
     if (!token.access_token) throw new Error(token.error_description || token.error || "Google did not return an access token.");
     const profileResponse = await this.fetcher("https://gmail.googleapis.com/gmail/v1/users/me/profile", { headers: { authorization: `Bearer ${token.access_token}` } });
     const profile = await profileResponse.json().catch(() => ({})) as { emailAddress?: string; error?: { message?: string } };
-    if (!profileResponse.ok || !profile.emailAddress) throw new Error(profile.error?.message || "OpenBot could not read the connected Gmail profile.");
+    if (!profileResponse.ok || !profile.emailAddress) throw new Error(profile.error?.message || "Sidemates could not read the connected Gmail profile.");
     const connection = this.db.completeGoogleConnector({
       accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: expiresAt(token.expires_in),
       scopes: token.scope?.split(/\s+/).filter(Boolean) || GOOGLE_SCOPES, accountEmail: profile.emailAddress,
@@ -369,7 +369,7 @@ export class GoogleWorkspaceConnector {
     let url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
     if (mimeType === "application/vnd.google-apps.document") url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent("text/plain")}`;
     else if (mimeType === "application/vnd.google-apps.spreadsheet") url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent("text/csv")}`;
-    else if (!mimeType.startsWith("text/") && !["application/json", "application/xml"].includes(mimeType)) throw new Error("OpenBot can find this file, but this format needs a dedicated viewer. Use its Google Drive link instead.");
+    else if (!mimeType.startsWith("text/") && !["application/json", "application/xml"].includes(mimeType)) throw new Error("Sidemates can find this file, but this format needs a dedicated viewer. Use its Google Drive link instead.");
     const content = (await this.requestText(url, false, signal)).slice(0, 100_000);
     return { id: file.id, name: file.name || "Untitled", mimeType, modifiedTime: file.modifiedTime || "", webViewLink: file.webViewLink || "", size: file.size ? Number(file.size) : null, content };
   }

@@ -32,8 +32,8 @@ test("grants bounded per-teammate coding access and records focused edits", () =
     assert.throws(() => manager.read("nova", project.id, ".env"), /Hidden project files/);
     assert.throws(() => manager.read("nova", project.id, "../outside.txt"), /leaves the allowed code project/);
     assert.throws(() => manager.write("pixel", project.id, "src/main.ts", "no"), /does not have write access/);
-    manager.replace("nova", project.id, "src/main.ts", "'hello'", "'hello from OpenBot'");
-    assert.match(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8"), /hello from OpenBot/);
+    manager.replace("nova", project.id, "src/main.ts", "'hello'", "'hello from Sidemates'");
+    assert.match(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8"), /hello from Sidemates/);
     assert.equal(db.listCodeProjectEdits(project.id).length, 1);
     const unsafe = manager.write("nova", project.id, "src/advisory.ts", "eval(userInput);\n");
     assert.equal(unsafe.securityGuidance.warnings[0]?.rule, "dynamic-code");
@@ -42,7 +42,7 @@ test("grants bounded per-teammate coding access and records focused edits", () =
     assert.equal(db.deleteCodeProject(project.id), true);
     assert.equal(db.listCodeProjects().length, 0);
     assert.equal(db.listCodeProjectEdits(project.id).length, 3);
-    assert.equal(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8").includes("OpenBot"), true);
+    assert.equal(readFileSync(path.join(projectRoot, "src", "main.ts"), "utf8").includes("Sidemates"), true);
     const reconnected = db.createCodeProject({ name: "Sample app again", ...inspected, access: [{ botId: "pixel", canRead: true, canWrite: false, canRun: false }] });
     assert.equal(reconnected.id, project.id);
     assert.equal(db.listCodeProjectEdits(project.id).length, 3);
@@ -208,7 +208,7 @@ test("creates separate branches, reviews diffs, and commits only named files", (
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Initial");
     const db = new OpenBotDatabase(root), manager = new CodeProjectManager(db, root);
     const project = db.createCodeProject({ name: "Git app", ...manager.inspectRoot(projectRoot), access: [{ botId: "nova", canRead: true, canWrite: true, canRun: true }] });
-    assert.throws(() => manager.commit("nova", project.id, "Unsafe main commit", ["app.ts"]), /separate OpenBot branch/);
+    assert.throws(() => manager.commit("nova", project.id, "Unsafe main commit", ["app.ts"]), /separate Sidemates branch/);
     assert.equal(manager.branch("nova", project.id, "openbot/fix-answer").branch, "openbot/fix-answer");
     manager.write("nova", project.id, "app.ts", "export const answer = 42;\n");
     writeFileSync(path.join(projectRoot, "notes.md"), "unrelated user work\n", "utf8");

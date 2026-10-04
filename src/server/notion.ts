@@ -61,7 +61,7 @@ export class NotionConnector {
 
   async completeOAuth(state: string, code: string) {
     this.pruneAttempts();
-    if (!this.attempts.delete(state)) throw new Error("That Notion sign-in expired. Start it again from OpenBot.");
+    if (!this.attempts.delete(state)) throw new Error("That Notion sign-in expired. Start it again from Sidemates.");
     const configured = this.db.oauthConnectorCredentials<NotionCredentials>("notion");
     if (!configured) throw new Error("The Notion connection configuration is missing.");
     const result = await this.oauthRequest(configured.clientId, configured.clientSecret, { grant_type: "authorization_code", code, redirect_uri: this.redirectUri });

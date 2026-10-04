@@ -9,7 +9,7 @@ import { prepareWorkspace } from "./workspace.js";
 import { toolAvailability } from "./tool-availability.js";
 
 const markdown = "---\nname: project-brief\ndescription: Prepare a concise project brief\nlicense: MIT\n---\nRead the current sources and use [the format](references/format.md).";
-const bundle = { source: "Fixture created for OpenBot tests", files: { "SKILL.md": markdown, "references/format.md": "Include Owner, Deadline, Blocker, Source." } };
+const bundle = { source: "Fixture created for Sidemates tests", files: { "SKILL.md": markdown, "references/format.md": "Include Owner, Deadline, Blocker, Source." } };
 
 test("portable skill bundles preserve provenance and explicit references without a browser URL", () => {
   const inspected = inspectCommunitySkill(bundle);

@@ -109,7 +109,7 @@ export function RecommendedAI({ onConnected, compact = false }: { onConnected: (
         </li>
         <li>
           <span>2</span>
-          <div><strong>Paste it here</strong><small>It goes straight to OpenCode on this Mac. OpenBot never shows it again.</small></div>
+          <div><strong>Paste it here</strong><small>It goes straight to OpenCode on this Mac. Sidemates never shows it again.</small></div>
         </li>
       </ol>
       <form onSubmit={(event) => void submit(event)}>
@@ -405,12 +405,12 @@ export function ProviderPanel({
               }
             >
               {isFreeTierModel(initialModel) && (
-                <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
+                <p className="settings-row-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
               )}
             </SettingsRow>
             <SettingsRow
               title="Unconfigured teammates"
-              description="Uses your account’s limits or API billing. OpenBot will not silently switch providers. The first task checks actual model access."
+              description="Uses your account’s limits or API billing. Sidemates will not silently switch providers. The first task checks actual model access."
               control={
                 <button className="button-primary" disabled={busy !== null || !initial?.connected || !initial?.models?.includes(initialModel)} onClick={() => void act("initial", () => onChooseInitial(initialConnection, initialModel))}>
                   Use this AI for unconfigured teammates
@@ -616,7 +616,7 @@ export function ProviderPanel({
                   title="API address"
                   description={
                     isLocalModelUrl(baseUrl)
-                      ? "Localhost means the computer running OpenBot, not your phone. Start your model server there first."
+                      ? "Localhost means the computer running Sidemates, not your phone. Start your model server there first."
                       : "Use the API address supplied by your provider, not its chat website."
                   }
                   control={
@@ -685,7 +685,7 @@ export function ProviderPanel({
                 </label>
               </details>
               <p className="ai-help ai-key-note">
-                <KeyRound size={14} /> Keys are encrypted in OpenBot’s local
+                <KeyRound size={14} /> Keys are encrypted in Sidemates’s local
                 data. Saving won’t send a test request or charge your account.
               </p>
               <div className="ai-form-actions">
@@ -792,7 +792,7 @@ export function ProviderPanel({
                   {isBlockedFreeTierModel(bot.model) ? (
                     <p className="settings-row-note">{bot.name} can't work on this model: OpenCode's free tier only answers inside OpenCode's own app. Choose another model.</p>
                   ) : isFreeTierModel(bot.model) && (
-                    <p className="settings-row-note">Free-tier access may not allow OpenBot teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
+                    <p className="settings-row-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
                   )}
                 </SettingsRow>
               </div>
@@ -802,7 +802,7 @@ export function ProviderPanel({
       </SettingsGroup>
       <p className="ai-footnote">
         OpenCode {provider?.version || "not detected"} · Connections belong to
-        this OpenBot host.
+        this Sidemates host.
       </p>
     </div>
   );

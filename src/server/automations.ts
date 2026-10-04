@@ -146,8 +146,8 @@ export function automationRepairHint(error: string | null | undefined): string |
   const text = error.toLowerCase();
   if (/token limit|budget/.test(text)) return "Raise this teammate’s weekly token limit or choose a lighter model, then retry.";
   if (/connect|sign.?in|auth|credential|401|403/.test(text)) return "Reconnect the required app or model account, then retry this event.";
-  if (/approval|waiting for you/.test(text)) return "Review the waiting action in OpenBot. The automation will continue only after your decision.";
-  if (/timeout|timed out|network|temporar|unavailable|rate/.test(text)) return "Check the connection and retry. OpenBot will keep the original event input.";
+  if (/approval|waiting for you/.test(text)) return "Review the waiting action in Sidemates. The automation will continue only after your decision.";
+  if (/timeout|timed out|network|temporar|unavailable|rate/.test(text)) return "Check the connection and retry. Sidemates will keep the original event input.";
   return "Open the failed run, check the saved input and permissions, then retry safely.";
 }
 

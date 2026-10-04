@@ -1,13 +1,13 @@
 {
-  "name": "openbot-desktop",
-  "productName": "OpenBot",
-  "version": "0.41.1",
-  "description": "OpenBot desktop shell \u2014 your AI team, on the computer you own.",
+  "name": "sidemates-desktop",
+  "productName": "Sidemates",
+  "version": "0.42.0",
+  "description": "Sidemates desktop shell \u2014 your AI team, on the computer you own.",
   "author": {
     "name": "Robert Prisacariu",
     "email": "145539911+PrisacariuRobert@users.noreply.github.com"
   },
-  "homepage": "https://github.com/PrisacariuRobert/openbot",
+  "homepage": "https://github.com/PrisacariuRobert/sidemates",
   "license": "MIT",
   "private": true,
   "main": "main.mjs",
@@ -21,8 +21,8 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "app.openbot.desktop",
-    "productName": "OpenBot",
+    "appId": "app.sidemates.desktop",
+    "productName": "Sidemates",
     "directories": {
       "output": "release"
     },
@@ -74,7 +74,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "artifactName": "OpenBot-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Sidemates-${version}-${os}-${arch}.${ext}"
   },
   "allowScripts": {
     "electron@44.4.4": true

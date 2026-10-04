@@ -3,14 +3,14 @@ import { safeHostEnvironment } from "./runtime.js";
 
 /** Gate 1a: pin the verified OpenCode runtime. The runtime version is part of
  * the security boundary, so an unverified version fails closed for model
- * execution without disabling the rest of OpenBot.
+ * execution without disabling the rest of Sidemates.
  *
  * Verified 1.18.31 (2026-09-19) against the 1.18.30 baseline: upstream
  * changelog is ACP session-option restore, TUI auth-error display, Copilot
  * thinking summarization, console batch endpoints and a gateway dep bump —
  * no permission-model, tool-dispatch, agent-allowlist, MCP-config or CLI
- * flag-surface change affecting OpenBot's boundary. `opencode run` flags
- * OpenBot uses (--auto, --format, --model, --dir, --agent, --file,
+ * flag-surface change affecting Sidemates' boundary. `opencode run` flags
+ * Sidemates uses (--auto, --format, --model, --dir, --agent, --file,
  * --session, --title) verified present on the installed 1.18.31 binary,
  * plus a live routine run on this host. */
 export const VERIFIED_OPENCODE_VERSION = "1.18.31";
@@ -23,7 +23,7 @@ export interface RuntimeCompatibility {
 
 /** A newer patch in the verified major.minor line is compatible: OpenCode
  * ships patches often (and self-updates), and failing closed on each one
- * stopped every teammate until OpenBot itself was re-released. A different
+ * stopped every teammate until Sidemates itself was re-released. A different
  * major/minor, an older patch or an unparseable version still fails closed. */
 export function classifyOpencodeVersion(version: string): RuntimeCompatibility["compatibility"] {
   if (version === VERIFIED_OPENCODE_VERSION) return "verified";
@@ -39,7 +39,7 @@ export function runtimeMayExecute(compatibility: RuntimeCompatibility["compatibi
 }
 
 export const RUNTIME_INCOMPATIBLE_MESSAGE =
-  "OpenCode runtime not verified. OpenBot detected an unsupported OpenCode version; this release is verified with 1.18.31. Teammate execution is paused because runtime permission behavior may have changed. Update OpenBot or use the supported runtime. Files, results, settings and receipts remain available.";
+  "OpenCode runtime not verified. Sidemates detected an unsupported OpenCode version; this release is verified with 1.18.31. Teammate execution is paused because runtime permission behavior may have changed. Update Sidemates or use the supported runtime. Files, results, settings and receipts remain available.";
 
 let cached: RuntimeCompatibility | null = null;
 

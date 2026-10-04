@@ -36,7 +36,7 @@ const receiptText = (value: string) => value.replace(/[\r\n]+/g, " ").replace(/[
 function renderCodeDelivery(receipt: CodeDeliveryReceipt): string {
   return [
     "# Change delivered for review",
-    `Host-verified at ${receiptText(receipt.verifiedAt)}. This is a pull request, not a merge or deployment by OpenBot. The repository's own automations may run.`,
+    `Host-verified at ${receiptText(receipt.verifiedAt)}. This is a pull request, not a merge or deployment by Sidemates. The repository's own automations may run.`,
     `## ${receiptText(receipt.title)}`, receipt.url,
     `Repository: ${receiptText(receipt.repository)}\n\nAccount: ${receiptText(receipt.accountLogin)} on ${receiptText(receipt.host)}\n\nBranch: ${receiptText(receipt.branch)} → ${receiptText(receipt.base)}\n\nExact commit: ${receipt.headCommit}\n\nPull request: ${receipt.draft ? "Draft" : "Ready for review"}`,
     "## Recorded checks", "These commands passed against this commit. They are evidence of execution, not a guarantee that every case is covered.",
@@ -80,7 +80,7 @@ const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".css", ".scss",
 
 function boundedText(value: string, limit = MAX_EXTRACTED_CHARS): string {
   const clean = value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/\n{5,}/g, "\n\n\n\n").trim();
-  return clean.length > limit ? `${clean.slice(0, limit)}\n\n[Preview shortened by OpenBot]` : clean;
+  return clean.length > limit ? `${clean.slice(0, limit)}\n\n[Preview shortened by Sidemates]` : clean;
 }
 
 function secondsLabel(value: number | undefined): string | null {
@@ -413,7 +413,7 @@ export class AttachmentService {
     if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink() || sourceInfo.size <= 0 || sourceInfo.size > MAX_FILE_BYTES) throw new Error("The download is empty, unsafe, or exceeds the 25 MB result limit.");
     const name = path.basename(input.suggestedName.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/^\.+/, "").slice(0, 120) || "download.bin";
     const bytes = await readFile(input.sourcePath);
-    if (bytes.length !== sourceInfo.size) throw new Error("The download changed while OpenBot copied it.");
+    if (bytes.length !== sourceInfo.size) throw new Error("The download changed while Sidemates copied it.");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const id = randomBytes(16).toString("hex"), directory = path.join(this.db.attachmentsDir, id), destination = path.join(directory, name);
     await mkdir(directory, { recursive: true });

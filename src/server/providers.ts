@@ -171,7 +171,7 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
 
   const catalog: ProviderCatalogEntry[] = [
     { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "Free and Go models through your OpenCode account.", badge: "Free + Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? "Sign-in found on this Mac; model access is checked when a task runs." : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
-    { id: "claude", name: "Claude", shortName: "Claude", description: "Use the official Claude Code login with Pro, Max, Team, Enterprise, or Console.", badge: "Official login", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with OpenBot." : "Install Claude Code first." },
+    { id: "claude", name: "Claude", shortName: "Claude", description: "Use the official Claude Code login with Pro, Max, Team, Enterprise, or Console.", badge: "Official login", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with Sidemates." : "Install Claude Code first." },
     { id: "openai", name: "ChatGPT / OpenAI", shortName: "ChatGPT", description: "Use ChatGPT Plus/Pro OAuth or your existing OpenAI connection.", badge: "Subscription", connected: openAIConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: openAIConnected ? "local-openai" : null, models: modelsFor("openai", allModels), note: openAIConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Browser sign-in through OpenCode." },
     { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with Copilot Pro, Pro+ or Business. Copilot Free and Student plans can't be used by apps right now.", badge: "Subscription", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? (modelsFor("github-copilot", allModels).length ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Signed in, but this Copilot plan doesn't offer models to apps (Free and Student plans). Use Gemini's free key or another account.") : "Connect a GitHub.com account." },
     { id: "gitlab", name: "GitLab Duo", shortName: "GitLab", description: "Connect a GitLab Duo seat for agent work.", badge: "Experimental", connected: gitlabConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: gitlabConnected ? "local-gitlab" : null, models: modelsFor("gitlab", allModels), note: gitlabConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "GitLab support in OpenCode is experimental." },
@@ -188,7 +188,7 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
     return { ...instance, connected, models: instanceModels, defaultModel: preferredModel(instance.provider, instanceModels), note };
   });
   return {
-    id: "opencode", name: "OpenBot connections", connected: instances.some((instance) => instance.connected), cliAvailable: openCodeInstalled,
+    id: "opencode", name: "Sidemates connections", connected: instances.some((instance) => instance.connected), cliAvailable: openCodeInstalled,
     version: openCodeInstalled ? openCodeVersion.stdout.trim() : null, defaultModel: "", models: allModels,
     note: instances.some((instance) => instance.connected) ? "Model connections found. Availability and account limits are checked when a task runs." : "Connect one model account to wake your teammates.",
     instances, catalog, loginAttempts,
@@ -268,7 +268,7 @@ export class ProviderConnectionManager {
   constructor(private readonly onChange: () => void, private readonly bridge: Pick<OpenCodeAuthBridge, "authorize" | "callback" | "stop" | "setApiKey"> = new OpenCodeAuthBridge()) {}
 
   /** Paste-a-key setup (OpenCode Go). The key goes straight to OpenCode's
-   * credential store; OpenBot never keeps or shows it. */
+   * credential store; Sidemates never keeps or shows it. */
   async saveKey(providerId: "opencode-go" | "google", key: string): Promise<ProviderLoginAttempt> {
     const trimmed = key.trim();
     if (!/^[A-Za-z0-9_\-.]{20,300}$/.test(trimmed)) throw new Error(providerId === "google" ? "That doesn't look like a Gemini API key. Copy it again from aistudio.google.com." : "That doesn't look like an OpenCode key. Copy it again from opencode.ai.");

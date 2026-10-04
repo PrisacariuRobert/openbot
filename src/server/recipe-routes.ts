@@ -13,7 +13,7 @@ export function registerRecipeRoutes(app: Express, db: OpenBotDatabase, onChange
   const route = (work: (req: Request) => unknown | Promise<unknown>) => async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-store");
     try { res.json(await work(req)); }
-    catch (error) { res.status(400).json({ error: error instanceof z.ZodError ? "Use a current OpenBot recipe file containing only recipe settings." : error instanceof Error ? error.message : "This recipe could not be opened." }); }
+    catch (error) { res.status(400).json({ error: error instanceof z.ZodError ? "Use a current Sidemates recipe file containing only recipe settings." : error instanceof Error ? error.message : "This recipe could not be opened." }); }
   };
   app.get("/api/recipes", route((req) => library.list(z.string().min(1).parse(req.query.botId))));
   app.post("/api/recipes/export", route((req) => { const input = z.object({ recipeId, preferences: recipePreferences }).strict().parse(req.body); return exportRecipe(input.recipeId, input.preferences); }));

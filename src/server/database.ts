@@ -312,7 +312,7 @@ export class OpenBotDatabase {
       this.saveExtensionRecord("code-delivery", receipt.runId, receipt);
       const message = this.addMessage({
         threadId: run.threadId, senderType: "system", senderId: null,
-        body: `Your ${receipt.draft ? "draft pull request" : "pull request"} is ready for review.\n\n[View the change](${receipt.url})\n\nChecked version \`${receipt.headCommit.slice(0, 12)}\`. OpenBot did not merge or deploy it; repository automations may run.`,
+        body: `Your ${receipt.draft ? "draft pull request" : "pull request"} is ready for review.\n\n[View the change](${receipt.url})\n\nChecked version \`${receipt.headCommit.slice(0, 12)}\`. Sidemates did not merge or deploy it; repository automations may run.`,
       });
       this.saveExtensionRecord("code-delivery-notification", receipt.runId, { messageId: message.id });
       this.db.exec("COMMIT");
@@ -1683,7 +1683,7 @@ export class OpenBotDatabase {
     const senderType = row.sender_type as Message["senderType"];
     return {
       id: String(row.id), threadId: String(row.thread_id), senderType, senderId: row.sender_id ? String(row.sender_id) : null,
-      senderName: senderType === "user" ? "You" : senderType === "system" ? "OpenBot" : String(row.bot_name),
+      senderName: senderType === "user" ? "You" : senderType === "system" ? "Sidemates" : String(row.bot_name),
       senderEmoji: row.bot_emoji ? String(row.bot_emoji) : null, senderColor: row.bot_color ? String(row.bot_color) : null,
       senderMascot: row.bot_mascot ? String(row.bot_mascot) as MascotKind : null,
       body: String(row.body), createdAt: String(row.created_at), runId: row.run_id ? String(row.run_id) : null,
@@ -1695,7 +1695,7 @@ export class OpenBotDatabase {
       eventData: row.event_data ? (() => { try { const parsed = JSON.parse(String(row.event_data)); return typeof parsed === "object" && parsed !== null ? parsed as Record<string, string | number | boolean | null> : null; } catch { return null; } })() : null,
       replyTo: row.reply_id ? {
         id: String(row.reply_id),
-        senderName: row.reply_sender_type === "user" ? "You" : row.reply_sender_type === "system" ? "OpenBot" : String(row.reply_bot_name || "Teammate"),
+        senderName: row.reply_sender_type === "user" ? "You" : row.reply_sender_type === "system" ? "Sidemates" : String(row.reply_bot_name || "Teammate"),
         body: String(row.reply_body || "").replace(/\s+/g, " ").trim().slice(0, 220),
       } : null,
       reactions: (this.db.prepare("SELECT emoji,COUNT(*) count,MAX(CASE WHEN actor='owner' THEN 1 ELSE 0 END) reacted FROM message_reactions WHERE message_id=? GROUP BY emoji ORDER BY MIN(created_at)").all(String(row.id)) as Row[]).map((reaction) => ({ emoji: String(reaction.emoji), count: Number(reaction.count), reactedByYou: asBoolean(reaction.reacted) })),
@@ -1749,7 +1749,7 @@ export class OpenBotDatabase {
       FROM messages m LEFT JOIN bots b ON b.id=m.sender_id JOIN threads t ON t.id=m.thread_id
       WHERE m.body LIKE ? ESCAPE '\\' ORDER BY m.created_at DESC LIMIT 18`).all(pattern) as Row[];
     for (const row of messages) results.push({
-      id: String(row.id), kind: "message", title: row.sender_type === "user" ? "You" : row.sender_type === "system" ? "OpenBot" : String(row.bot_name || "Teammate"),
+      id: String(row.id), kind: "message", title: row.sender_type === "user" ? "You" : row.sender_type === "system" ? "Sidemates" : String(row.bot_name || "Teammate"),
       subtitle: String(row.thread_title), snippet: String(row.body).replace(/\s+/g, " ").trim().slice(0, 220), threadId: String(row.thread_id),
       botId: row.bot_id ? String(row.bot_id) : null, createdAt: String(row.created_at),
     });
@@ -2194,7 +2194,7 @@ export class OpenBotDatabase {
         this.updateRun(run.id, { status: "awaiting_approval", taskStage: "waiting", error: null, finishedAt: null, approvalReason: "This task needs your permission to use more tokens." });
         this.db.prepare("UPDATE runs SET approval_id=NULL WHERE id=?").run(run.id);
       }
-      const approval = this.createApproval({ runId: owner.id, botId: owner.botId, kind: "budget", reason: "OpenBot paused this task at its token limit. Saved work and completed actions are kept. You decide whether it can use more.", actionLabel: `Allow ${TASK_TOKEN_TOP_UP.toLocaleString()} more tokens for this task`, action: { type: "task_tokens", botId: owner.botId, args: { rootRunId: usage.rootRunId, additionalTokens: TASK_TOKEN_TOP_UP, revision: policy.revision } } });
+      const approval = this.createApproval({ runId: owner.id, botId: owner.botId, kind: "budget", reason: "Sidemates paused this task at its token limit. Saved work and completed actions are kept. You decide whether it can use more.", actionLabel: `Allow ${TASK_TOKEN_TOP_UP.toLocaleString()} more tokens for this task`, action: { type: "task_tokens", botId: owner.botId, args: { rootRunId: usage.rootRunId, additionalTokens: TASK_TOKEN_TOP_UP, revision: policy.revision } } });
       policy.pendingApprovalId = approval.id;
       this.saveExtensionRecord("task-token-budget", usage.rootRunId, policy);
       this.addActivity({ runId: owner.id, botId: owner.botId, kind: "status", label: "Paused for more tokens", detail: "This task is waiting for a bounded allowance. Other tasks, weekly limits and action permissions are unchanged." });
@@ -2347,7 +2347,7 @@ export class OpenBotDatabase {
     if (statusChanged && !current.parent_run_id && ["completed", "failed", "awaiting_approval"].includes(String(patch.status))) {
       const bot = this.getBot(String(current.bot_id));
       const title = patch.status === "completed" ? `${bot?.name || "A teammate"} finished` : patch.status === "failed" ? `${bot?.name || "A teammate"} needs a hand` : `${bot?.name || "A teammate"} needs your okay`;
-      const body = patch.status === "completed" ? "Your result is ready to review." : patch.status === "failed" ? (patch.error || "OpenBot could not finish this task.") : (patch.approvalReason || String(current.approval_reason || "OpenBot is waiting for your decision."));
+      const body = patch.status === "completed" ? "Your result is ready to review." : patch.status === "failed" ? (patch.error || "Sidemates could not finish this task.") : (patch.approvalReason || String(current.approval_reason || "Sidemates is waiting for your decision."));
       this.enqueueNotification({ dedupeKey: `run:${id}:${patch.status}`, kind: String(patch.status), title, body, url: `/?thread=${encodeURIComponent(String(current.thread_id))}` });
     }
     if (statusChanged && current.automation_event_id) {
@@ -2832,7 +2832,7 @@ export class OpenBotDatabase {
     if (!rows.length) return [];
     const recoveredAt = now();
     this.db.prepare("UPDATE approved_actions SET status='uncertain',last_error=?,finished_at=? WHERE status='running'")
-      .run("OpenBot restarted while the approved action was in progress. It will not be repeated until you confirm what happened.", recoveredAt);
+      .run("Sidemates restarted while the approved action was in progress. It will not be repeated until you confirm what happened.", recoveredAt);
     return rows.map((row) => this.getApprovedAction(String(row.id))!).filter(Boolean);
   }
 
@@ -3085,7 +3085,7 @@ export class OpenBotDatabase {
     if (!rows.length) return [];
     const at = now();
     this.db.prepare("UPDATE action_journal SET stage='outcome_uncertain',detail=?,updated_at=? WHERE stage IN ('dispatch_started','effect_observed')")
-      .run("OpenBot restarted while the action may have taken effect. It will not be repeated until you confirm what happened.", at);
+      .run("Sidemates restarted while the action may have taken effect. It will not be repeated until you confirm what happened.", at);
     return rows.map((row) => this.journalActionGet(String(row.action_id))!).filter(Boolean);
   }
 
@@ -4260,7 +4260,7 @@ export class OpenBotDatabase {
       dispatch(routine);
       this.markRoutineDispatched(routine, true);
       const delayedMs = Date.now() - Date.parse(expectedAt);
-      if (delayedMs > 120_000) this.createAutomationAlert({ routineId: id, kind: "missed", message: `${routine.name} was queued ${Math.round(delayedMs / 60_000)} minutes late. OpenBot caught up once and will return to the saved schedule.` });
+      if (delayedMs > 120_000) this.createAutomationAlert({ routineId: id, kind: "missed", message: `${routine.name} was queued ${Math.round(delayedMs / 60_000)} minutes late. Sidemates caught up once and will return to the saved schedule.` });
       return true;
     });
   }
@@ -4363,7 +4363,7 @@ export class OpenBotDatabase {
       id, input.routineId, routine?.name || "Deleted automation", input.runId || null, input.eventId || null, input.kind, input.message.slice(0, 1_000), now(),
     );
     if (!input.runId || input.kind === "missed" || input.kind === "rate_limit") this.enqueueNotification({
-      dedupeKey: `automation-alert:${id}`, kind: `automation_${input.kind}`, title: routine?.name || "OpenBot automation",
+      dedupeKey: `automation-alert:${id}`, kind: `automation_${input.kind}`, title: routine?.name || "Sidemates automation",
       body: input.message, url: "/?panel=routines",
     });
     return this.listAutomationAlerts().find((alert) => alert.id === id)!;
@@ -4677,7 +4677,7 @@ export class OpenBotDatabase {
       queuedRuns: Number(counts.queued || 0), runningRuns: Number(counts.running || 0), waitingRuns: Number(counts.waiting || 0),
       nextRoutineAt: next.next_at ? String(next.next_at) : null, lastError: row?.last_error ? String(row.last_error) : null,
       backgroundService: process.platform === "darwin" ? "not_installed" : "unsupported",
-      backgroundServiceDetail: process.platform === "darwin" ? "OpenBot is running in this app session." : "Background launch is currently available on macOS.",
+      backgroundServiceDetail: process.platform === "darwin" ? "Sidemates is running in this app session." : "Background launch is currently available on macOS.",
     };
   }
 

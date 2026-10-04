@@ -43,9 +43,9 @@ export function googleApiRecovery(message: string): GoogleApiRecovery | null {
 export function friendlyGoogleError(message: string) {
   const recovery = googleApiRecovery(message);
   if (recovery) return `${recovery.serviceName} is turned off in Google Cloud. Turn it on, wait a minute, then connect again.`;
-  if (/redirect_uri_mismatch/i.test(message)) return "Google needs the exact OpenBot callback address. Check the OAuth client, then connect again.";
+  if (/redirect_uri_mismatch/i.test(message)) return "Google needs the exact Sidemates callback address. Check the OAuth client, then connect again.";
   if (/access_denied|org_internal/i.test(message)) return "This Google app is limited to certain accounts. Allow your account in the OAuth consent settings, then connect again.";
-  if (/expired|invalid_grant/i.test(message)) return "That Google sign-in expired. Start the connection again from OpenBot.";
+  if (/expired|invalid_grant/i.test(message)) return "That Google sign-in expired. Start the connection again from Sidemates.";
   return "Google couldn’t finish the connection. Try connecting again.";
 }
 
@@ -68,7 +68,7 @@ export function googleCallbackPage(success: boolean, message: string) {
     ? `<a class="primary" href="${escapeHtml(recovery.enableUrl)}" target="_blank" rel="noreferrer">Open Google Cloud <span aria-hidden="true">↗</span></a>`
     : "";
   const steps = recovery
-    ? `<ol><li><b>Open Google Cloud</b><span>Press <strong>Enable</strong> for ${escapeHtml(recovery.serviceName)}.</span></li><li><b>Give it a moment</b><span>Google can take a minute to apply the change.</span></li><li><b>Connect once more</b><span>Return to OpenBot and choose <strong>Connect Google</strong> again.</span></li></ol>`
+    ? `<ol><li><b>Open Google Cloud</b><span>Press <strong>Enable</strong> for ${escapeHtml(recovery.serviceName)}.</span></li><li><b>Give it a moment</b><span>Google can take a minute to apply the change.</span></li><li><b>Connect once more</b><span>Return to Sidemates and choose <strong>Connect Google</strong> again.</span></li></ol>`
     : "";
   const details = !success && !recovery
     ? `<details><summary>Show technical details</summary><p>${escapeHtml(message)}</p></details>`

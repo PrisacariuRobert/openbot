@@ -54,7 +54,7 @@ export class MacAppReader {
     if(this.platform !== "darwin") throw new Error("This runner cannot read Mac apps. Use your Mac runner or an available connector/browser.");
     let raw: unknown;
     try { raw=JSON.parse(await this.execute(APP_READ_SCRIPT,[JSON.stringify(parsed)])); }
-    catch { throw new Error("The app could not be read. Unlock your Mac and allow OpenBot in Privacy & Security → Accessibility and Automation, then try again."); }
+    catch { throw new Error("The app could not be read. Unlock your Mac and allow Sidemates in Privacy & Security → Accessibility and Automation, then try again."); }
     const error = (raw as {error?: string} | null)?.error;
     if(error === "sensitive_app") throw new Error("Password managers and authentication apps are excluded from general app reading. Complete secret steps yourself.");
     if(error) throw new Error("No readable window was found. Open the intended app and document on your Mac, then retry. Nothing was clicked or typed.");

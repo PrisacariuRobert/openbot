@@ -31,7 +31,7 @@ export interface IMessageConfig {
   lastRowId: number;
   defaultBotId?: string;
   pairing?: { code: string; expiresAt: number } | null;
-  /** Hashes of texts OpenBot sent recently: in a note-to-self thread our own
+  /** Hashes of texts Sidemates sent recently: in a note-to-self thread our own
    * replies come back as "from me" and must not be read as commands. */
   sent?: Array<{ hash: string; at: number }>;
   /** Texts already read: note-to-self delivers every message twice. */
@@ -96,7 +96,7 @@ export function macMessagesStore(file = path.join(homedir(), "Library", "Message
     try { return new DatabaseSync(file, { readOnly: true }); }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/authorization denied|not authorized|operation not permitted|unable to open/i.test(message)) throw new FullDiskAccessError("OpenBot needs Full Disk Access to read your Messages.");
+      if (/authorization denied|not authorized|operation not permitted|unable to open/i.test(message)) throw new FullDiskAccessError("Sidemates needs Full Disk Access to read your Messages.");
       throw error;
     }
   };
@@ -122,7 +122,7 @@ export const messagesAppSender: IMessageSender = (handle, text) => new Promise((
   execFile("osascript", [...script.flatMap((line) => ["-e", line]), handle, text], { timeout: 20_000 }, (error, _stdout, stderr) => {
     if (!error) return resolve();
     const detail = String(stderr || error.message);
-    reject(new Error(/not authori[sz]ed|-1743/i.test(detail) ? "macOS hasn't allowed OpenBot to use Messages yet. Allow it in System Settings → Privacy & Security → Automation." : `Messages couldn't send the text: ${detail.trim().slice(0, 160)}`));
+    reject(new Error(/not authori[sz]ed|-1743/i.test(detail) ? "macOS hasn't allowed Sidemates to use Messages yet. Allow it in System Settings → Privacy & Security → Automation." : `Messages couldn't send the text: ${detail.trim().slice(0, 160)}`));
   });
 });
 
@@ -183,7 +183,7 @@ export class IMessageChannel {
     catch (error) { if (error instanceof FullDiskAccessError) { this.needsAccess = true; throw error; } throw error; }
     const pairing = { code: String(randomInt(100_000, 1_000_000)), expiresAt: this.now() + PAIRING_MINUTES * 60_000 };
     this.saveConfig({ ownerHandle: handle, paired: false, lastRowId, pairing, defaultBotId: this.config()?.defaultBotId, sent: [], connectedAt: new Date(this.now()).toISOString() });
-    await this.send(`OpenBot: reply with ${pairing.code} to connect your team to iMessage. (Ignore this if you didn't ask for it.)`);
+    await this.send(`Sidemates: reply with ${pairing.code} to connect your team to iMessage. (Ignore this if you didn't ask for it.)`);
     this.lastError = null;
     this.start();
     return this.status();
@@ -231,7 +231,7 @@ export class IMessageChannel {
   private async send(text: string) {
     const config = this.config();
     if (!config?.ownerHandle) return;
-    const body = text.length > TEXT_LIMIT ? `${text.slice(0, TEXT_LIMIT - 60)}…\n\n(Open OpenBot for the full reply.)` : text;
+    const body = text.length > TEXT_LIMIT ? `${text.slice(0, TEXT_LIMIT - 60)}…\n\n(Open Sidemates for the full reply.)` : text;
     const recent = (config.sent || []).filter((item) => this.now() - item.at < 6 * 60 * 60_000);
     this.saveConfig({ ...config, sent: [...recent, { hash: hash(body), at: this.now() }].slice(-100) });
     await this.sender(config.ownerHandle, body);
@@ -253,7 +253,7 @@ export class IMessageChannel {
       const fromOwner = row.fromMe ? sameHandle(row.chat, config.ownerHandle) : sameHandle(row.handle, config.ownerHandle);
       if (!fromOwner) continue;
       const key = hash(text), now = this.now();
-      // Never read OpenBot's own texts back, in either copy.
+      // Never read Sidemates' own texts back, in either copy.
       if ((config.sent || []).some((item) => item.hash === key)) continue;
       // Note-to-self shows each message as sent and as received: read once.
       const seen = (config.seen || []).filter((item) => now - item.at < 5 * 60_000);
@@ -264,7 +264,7 @@ export class IMessageChannel {
       if (lastMinute >= 6) {
         this.saveConfig({ ...this.config()!, paused: true });
         this.lastError = "iMessage paused: too many messages in a minute. Turn it back on in Chat apps.";
-        await this.send("OpenBot paused iMessage because it received too many messages at once. Turn it back on in OpenBot → Chat apps.").catch(() => {});
+        await this.send("Sidemates paused iMessage because it received too many messages at once. Turn it back on in Sidemates → Chat apps.").catch(() => {});
         return;
       }
       if (!config.paired) {

@@ -57,7 +57,7 @@ export function deploymentStatus(config: DeploymentConfig, runner: RunnerHealth)
       publicUrl: null,
       dataLocation: "this_mac",
       checks: [
-        { id: "runner", label: "Studio runner", status: runner.status === "online" ? "ready" : "action", detail: runner.status === "online" ? "Working while this Mac is awake" : "Start OpenBot on this Mac" },
+        { id: "runner", label: "Studio runner", status: runner.status === "online" ? "ready" : "action", detail: runner.status === "online" ? "Working while this Mac is awake" : "Start Sidemates on this Mac" },
       ],
     };
   }

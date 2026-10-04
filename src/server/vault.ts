@@ -24,12 +24,12 @@ export class SecretVault {
       // not permission to generate a new encryption identity for this studio.
       const existingStudio = ["openbot.sqlite", "openbot.sqlite-wal", "openbot.sqlite-shm"]
         .some((filename) => entryExists(path.join(dataDir, filename)));
-      if (existingStudio) throw new Error("This studio's encryption key is missing. Restore keys/vault.key from the same backup as openbot.sqlite before restarting. OpenBot has not generated a replacement key.");
+      if (existingStudio) throw new Error("This studio's encryption key is missing. Restore keys/vault.key from the same backup as openbot.sqlite before restarting. Sidemates has not generated a replacement key.");
       mkdirSync(keysDir, { recursive: true, mode: 0o700 });
       writeFileSync(keyPath, randomBytes(32), { mode: 0o600, flag: "wx" });
     }
     this.key = readFileSync(keyPath);
-    if (this.key.length !== 32) throw new Error("OpenBot's local vault key is invalid.");
+    if (this.key.length !== 32) throw new Error("Sidemates' local vault key is invalid.");
     chmodSync(keyPath, 0o600);
   }
 

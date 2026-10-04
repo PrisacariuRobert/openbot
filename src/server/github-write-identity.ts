@@ -75,7 +75,7 @@ export async function withPinnedGitHubWriteIdentity<T>(expected: GitHubWriteIden
     assertActive();
     let response: Response;
     try {
-      response = await transport(`${apiBase}${endpoint}`, { method: body === undefined ? "GET" : "POST", redirect: "manual", signal: AbortSignal.timeout(30_000), headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "OpenBot" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      response = await transport(`${apiBase}${endpoint}`, { method: body === undefined ? "GET" : "POST", redirect: "manual", signal: AbortSignal.timeout(30_000), headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Sidemates" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     } catch { throw body === undefined ? new Error("GitHub could not verify this request.") : new GitHubWriteUncertainError(); }
     if (!response.ok) {
       if (body !== undefined && (response.status >= 500 || (response.status >= 300 && response.status < 400))) throw new GitHubWriteUncertainError();

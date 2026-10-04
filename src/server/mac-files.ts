@@ -77,7 +77,7 @@ export class MacFileAccess {
   read(requested: string): { path: string; content: string; characters: number } {
     const { target, relative } = this.resolve(requested);
     if (!existsSync(target) || !statSync(target).isFile()) throw new Error("That Mac file was not found.");
-    if (!TEXT_EXTENSIONS.has(path.extname(target).toLowerCase())) throw new Error("OpenBot can only read bounded text files directly. Other files can still be organized without opening them.");
+    if (!TEXT_EXTENSIONS.has(path.extname(target).toLowerCase())) throw new Error("Sidemates can only read bounded text files directly. Other files can still be organized without opening them.");
     if (statSync(target).size > 500_000) throw new Error("That text file is larger than the 500 KB reading limit.");
     const content = readFileSync(target, "utf8");
     return { path: relative, content, characters: content.length };

@@ -7,10 +7,10 @@ import { OpenBotDatabase } from "./testing/database.js";
 import { buildRawEmail, connectorCatalog, decodeGmailMessage, GOOGLE_SCOPES, GoogleWorkspaceConnector } from "./google-workspace.js";
 
 test("builds a safe Gmail message and rejects header injection", () => {
-  const raw = buildRawEmail({ to: "friend@example.com", subject: "A useful update", body: "Hello from OpenBot." });
+  const raw = buildRawEmail({ to: "friend@example.com", subject: "A useful update", body: "Hello from Sidemates." });
   const message = Buffer.from(raw, "base64url").toString("utf8");
   assert.match(message, /^To: friend@example\.com\r\nSubject: A useful update/m);
-  assert.match(message, /\r\n\r\nHello from OpenBot\.$/);
+  assert.match(message, /\r\n\r\nHello from Sidemates\.$/);
   assert.throws(() => buildRawEmail({ to: "friend@example.com\r\nBcc: hidden@example.com", subject: "Hello", body: "No" }));
   assert.throws(() => buildRawEmail({ to: "not-an-address", subject: "Hello", body: "No" }));
 });
@@ -149,7 +149,7 @@ test("treats a refreshed successful OAuth callback as already connected", async 
     const db = new OpenBotDatabase(root);
     db.configureGoogleConnector({ clientId: "desktop-client.apps.googleusercontent.com" });
     db.completeGoogleConnector({ accessToken: "access", refreshToken: "refresh", expiresAt: new Date(Date.now() + 3_600_000).toISOString(), scopes: GOOGLE_SCOPES, accountEmail: "owner@example.com" });
-    db.markConnectorError("google-workspace", "That Google sign-in expired. Start it again from OpenBot.");
+    db.markConnectorError("google-workspace", "That Google sign-in expired. Start it again from Sidemates.");
     const connector = new GoogleWorkspaceConnector(db, "http://127.0.0.1:4311/api/connectors/google/callback", async () => { throw new Error("A refreshed callback must not call Google again."); });
     const connection = await connector.completeOAuth("already-used-state", "already-used-code");
     assert.equal(connection.accountEmail, "owner@example.com");

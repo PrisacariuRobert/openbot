@@ -103,7 +103,7 @@ export class CodeProjectManager {
     const remoteHead = gitRepository ? spawnSync("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], { cwd: rootPath, encoding: "utf8", timeout: 5_000 }) : null;
     const current = gitRepository ? spawnSync("git", ["branch", "--show-current"], { cwd: rootPath, encoding: "utf8", timeout: 5_000 }) : null;
     const defaultBranch = remoteHead?.status === 0 ? String(remoteHead.stdout || "").trim().replace(/^origin\//, "") : String(current?.stdout || "").trim() || null;
-    return { rootPath, gitRepository, projectKind, remoteUrl, defaultBranch, managedClone: rootPath.startsWith(`${path.join(this.allowedRoot, "Documents", "OpenBot Projects")}${path.sep}`) };
+    return { rootPath, gitRepository, projectKind, remoteUrl, defaultBranch, managedClone: rootPath.startsWith(`${path.join(this.allowedRoot, "Documents", "Sidemates Projects")}${path.sep}`) };
   }
 
   private safeRemoteUrl(value: string): string | null {
@@ -131,9 +131,9 @@ export class CodeProjectManager {
   }
 
   async cloneGitHub(input: string, access: ProjectAccessInput): Promise<CodeProject> {
-    const repository = parseGitHubRepository(input), base = path.join(this.allowedRoot, "Documents", "OpenBot Projects"), destination = path.join(base, repository.name);
+    const repository = parseGitHubRepository(input), base = path.join(this.allowedRoot, "Documents", "Sidemates Projects"), destination = path.join(base, repository.name);
     mkdirSync(base, { recursive: true });
-    if (existsSync(destination)) throw new Error(`${repository.name} already exists in OpenBot Projects. Connect that folder instead.`);
+    if (existsSync(destination)) throw new Error(`${repository.name} already exists in Sidemates Projects. Connect that folder instead.`);
     const temporary = path.join(base, `.openbot-clone-${randomUUID()}`);
     try {
       await this.command("git", ["clone", "--origin", "origin", "--", repository.url, temporary], { cwd: base, timeout: 180_000 });
@@ -346,7 +346,7 @@ export class CodeProjectManager {
     for (const workspace of workspaces) {
       if (!existsSync(workspace.rootPath)) continue;
       const resolved = realpathSync(workspace.rootPath), relative = path.relative(this.worktreesRoot, resolved);
-      if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error("A task workspace moved outside OpenBot's private code area.");
+      if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error("A task workspace moved outside Sidemates' private code area.");
       if (this.git({ ...project, rootPath: resolved }, ["status", "--porcelain"]).trim()) throw new Error(`Review, commit, or restore the unfinished work on ${workspace.branch} before disconnecting this project.`);
     }
     for (const workspace of workspaces) {
@@ -398,7 +398,7 @@ export class CodeProjectManager {
     if (!project.gitRepository) throw new Error("This project is not a Git repository.");
     const branch = this.git(project, ["branch", "--show-current"]).trim();
     if (!branch) throw new Error("Create a named branch before committing changes.");
-    if (branch === (project.defaultBranch || "main") || branch === "main" || branch === "master") throw new Error("Create a separate OpenBot branch before committing changes.");
+    if (branch === (project.defaultBranch || "main") || branch === "main" || branch === "master") throw new Error("Create a separate Sidemates branch before committing changes.");
     const message = requestedMessage.trim().replace(/[\r\n]+/g, " ");
     if (!message || message.length > 120) throw new Error("Use a clear commit message up to 120 characters.");
     const paths = [...new Set(requestedPaths)].slice(0, 50).map((item) => this.resolveFile(project, item, true).relative).filter((item) => item !== ".");
@@ -406,7 +406,7 @@ export class CodeProjectManager {
     this.git(project, ["add", "--", ...paths]);
     const selected = this.git(project, ["diff", "--cached", "--name-only", "--", ...paths]).trim();
     if (!selected) throw new Error("Those files do not contain changes to commit.");
-    this.git(project, ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", `user.name=OpenBot ${this.db.getBot(botId)?.name || "Agent"}`, "-c", "user.email=openbot@localhost", "commit", "--only", "--no-verify", "-m", message, "--", ...paths], 30_000);
+    this.git(project, ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", `user.name=Sidemates ${this.db.getBot(botId)?.name || "Agent"}`, "-c", "user.email=openbot@localhost", "commit", "--only", "--no-verify", "-m", message, "--", ...paths], 30_000);
     const commit = this.git(project, ["rev-parse", "--short", "HEAD"]).trim();
     return { projectId, branch, commit, files: selected.split(/\r?\n/).filter(Boolean), message };
   }
@@ -528,7 +528,7 @@ export class CodeProjectManager {
       project = { ...project, rootPath: workspace.rootPath };
     }
     const file = this.resolveFile(project, edit.path);
-    if (!statSync(file.target).isFile() || contentHash(readFileSync(file.target)) !== edit.afterHash) throw new Error("That file changed again, so OpenBot left the newer work untouched.");
+    if (!statSync(file.target).isFile() || contentHash(readFileSync(file.target)) !== edit.afterHash) throw new Error("That file changed again, so Sidemates left the newer work untouched.");
     if (edit.operation === "created") unlinkSync(file.target);
     else {
       const temporary = path.join(path.dirname(file.target), `.openbot-restore-${randomUUID()}`), mode = statSync(file.target).mode;

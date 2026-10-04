@@ -63,8 +63,8 @@ export function AwayAccessPanel() {
         {status?.ready && <SettingsRow
           title={invitation && seconds > 0 ? "Scan. Connect. You’re in." : "Connect my phone"}
           description={invitation && seconds > 0
-            ? <>{invitation.browser === false ? <>On your iPhone, open OpenBot and choose <strong>Scan my Mac’s QR code</strong>.</> : <>Point your phone’s camera at the code and tap the link. No app to download.</>}<br /><span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
-            : <>Scan one code with your phone’s camera. OpenBot opens, signed in, ready to add to your Home Screen.</>}
+            ? <>{invitation.browser === false ? <>On your iPhone, open Sidemates and choose <strong>Scan my Mac’s QR code</strong>.</> : <>Point your phone’s camera at the code and tap the link. No app to download.</>}<br /><span>Single-use invitation · expires in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span></>
+            : <>Scan one code with your phone’s camera. Sidemates opens, signed in, ready to add to your Home Screen.</>}
           control={invitation && seconds > 0
             ? <button onClick={() => void (async () => { setBusy(true); setError(""); try { await request("/pairing", "DELETE"); setInvitation(null); } catch (error) { setError(error instanceof Error ? error.message : "That code could not be cancelled."); } finally { setBusy(false); } })()} disabled={busy}>Hide and cancel code</button>
             : <button className="away-pairing-primary" onClick={() => void showCode()} disabled={busy}><QrCode size={18} />{invitation ? "Show a new QR code" : "Connect my phone"}</button>}

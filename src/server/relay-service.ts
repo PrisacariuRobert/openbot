@@ -52,7 +52,7 @@ export function createRelayService(options: { enrollmentToken: string; database:
     const route = relayRoute(req.url || "");
     if (!route) { res.writeHead(404).end(); return; }
     const connection = studios.get(route.studio);
-    if (!connection || connection.socket.readyState !== WebSocket.OPEN) { res.writeHead(503, { "Content-Type": "application/json" }).end('{"error":"Your studio is offline. Keep OpenBot running on your Mac."}'); return; }
+    if (!connection || connection.socket.readyState !== WebSocket.OPEN) { res.writeHead(503, { "Content-Type": "application/json" }).end('{"error":"Your studio is offline. Keep Sidemates running on your Mac."}'); return; }
     if (connection.pending.size >= RELAY_PENDING_LIMIT || bufferedUploads >= 4) { res.writeHead(429).end(); return; }
     if (!req.url?.startsWith("/") || req.url.startsWith("//") || req.url.length > 8192 || !["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(req.method || "")) { res.writeHead(400).end(); return; }
     const requestId = randomUUID();

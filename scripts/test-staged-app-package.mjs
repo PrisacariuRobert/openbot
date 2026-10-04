@@ -7,7 +7,7 @@ import { stageAppPackage } from "./lib/staged-app-package.mjs";
 
 async function fixture(run) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-package-transaction-test-"));
-  const app = path.join(root, "OpenBot.app");
+  const app = path.join(root, "Sidemates.app");
   mkdirSync(app);
   writeFileSync(path.join(app, "runtime.txt"), "previous release");
   symlinkSync("runtime.txt", path.join(app, "relative-link"));
@@ -24,7 +24,7 @@ test("packaging publishes only after validation and preserves relative links", (
   });
   assert.equal(readFileSync(path.join(app, "runtime.txt"), "utf8"), "new release");
   assert.equal(readlinkSync(path.join(app, "relative-link")), "runtime.txt");
-  assert.deepEqual(readdirSync(root), ["OpenBot.app"]);
+  assert.deepEqual(readdirSync(root), ["Sidemates.app"]);
 }));
 
 for (const phase of ["copy", "signature"]) test(`a ${phase} failure leaves the original app unchanged`, () => fixture(async ({ root, app }) => {
@@ -33,7 +33,7 @@ for (const phase of ["copy", "signature"]) test(`a ${phase} failure leaves the o
     if (phase === "copy") throw new Error("Simulated copy failure");
   }, async () => { throw new Error("Simulated signature failure"); }), /Simulated/);
   assert.equal(readFileSync(path.join(app, "runtime.txt"), "utf8"), "previous release");
-  assert.deepEqual(readdirSync(root), ["OpenBot.app"]);
+  assert.deepEqual(readdirSync(root), ["Sidemates.app"]);
 }));
 
 test("concurrent packaging cannot replace an in-progress build", () => fixture(async ({ app }) => {

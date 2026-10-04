@@ -10,7 +10,7 @@ import { installNavigationGuards } from "./navigation.mjs";
 import { studioHealth, studioIdentity } from "./studio-identity.mjs";
 
 // One shell, one web client, every platform: the window renders the same
-// conversation-first OpenBot UI the browser and relay serve, so the design
+// conversation-first Sidemates UI the browser and relay serve, so the design
 // stays identical everywhere. The shell's job is the machine around it:
 // start or reuse the owner's local server, then get out of the way.
 const PORT = Number(process.env.OPENBOT_PORT || 4311);
@@ -46,14 +46,14 @@ function main() {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       if (process.env.OPENBOT_QA_SCREENSHOT) {
-        console.error("OpenBot startup failed:", detail);
+        console.error("Sidemates startup failed:", detail);
         app.exit(1);
         return;
       }
       dialog.showMessageBoxSync({
         type: "error",
-        title: "OpenBot",
-        message: "OpenBot could not start its local studio.",
+        title: "Sidemates",
+        message: "Sidemates could not start its local studio.",
         detail,
       });
       app.quit();
@@ -78,7 +78,7 @@ function main() {
     const nestedRunner = path.join(bundle, "app", "scripts", "background-runner.mjs");
     const runnerScript = existsSync(flatRunner) ? flatRunner : nestedRunner;
     if (!existsSync(node) || !existsSync(runnerScript)) {
-      throw new Error(`The OpenBot runtime was not found next to the app (looked in ${bundle}). Reinstall the app, or start the studio once from a terminal so the shell can attach to it.`);
+      throw new Error(`The Sidemates runtime was not found next to the app (looked in ${bundle}). Reinstall the app, or start the studio once from a terminal so the shell can attach to it.`);
     }
     const appRoot = runnerScript === flatRunner ? bundle : path.join(bundle, "app");
     const dataDir = process.env.OPENBOT_DATA_DIR || path.join(os.homedir(), ".openbot");
@@ -104,7 +104,7 @@ function main() {
           response.resume();
           const state = studioHealth(response.statusCode, response.headers, !DEV_URL);
           if (state === "ready") resolve();
-          else if (state === "wrong-studio") reject(new Error(`Another studio or service is using ${BASE}. Close it or choose a free OPENBOT_PORT; OpenBot will not open a different data home.`));
+          else if (state === "wrong-studio") reject(new Error(`Another studio or service is using ${BASE}. Close it or choose a free OPENBOT_PORT; Sidemates will not open a different data home.`));
           else retry();
         });
         request.on("error", retry);
@@ -127,7 +127,7 @@ function main() {
       frame: !process.env.OPENBOT_QA_HEIGHT,
       minWidth: 980,
       minHeight: 640,
-      title: "OpenBot",
+      title: "Sidemates",
       backgroundColor: "#f5f5f7",
       autoHideMenuBar: true,
       show: false,
@@ -136,7 +136,7 @@ function main() {
     window.once("ready-to-show", () => window.show());
     installNavigationGuards(window.webContents, BASE, (url) => shell.openExternal(url), () => {
       // URLs can contain sensitive query parameters; do not log them or errors.
-      console.warn("OpenBot could not open that web link.");
+      console.warn("Sidemates could not open that web link.");
     });
     void window.loadURL(BASE);
     if (process.env.OPENBOT_QA_SCREENSHOT) {

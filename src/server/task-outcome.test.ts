@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { decideTaskOutcome } from "./task-outcome.js";
 
-const WITH_FILES = "Do the reconciliation.\n\nFiles attached by the user are available in your workspace. OpenBot has prepared bounded previews below.";
+const WITH_FILES = "Do the reconciliation.\n\nFiles attached by the user are available in your workspace. Sidemates has prepared bounded previews below.";
 const PLAIN = "What is 17 + 25? Reply with the number only.";
 
 test("delivered artifacts count as delivered, with or without inputs", () => {

@@ -6,7 +6,7 @@ test("preserves historical failures even after capabilities change", () => {
   for (const body of [
     "I work inside my isolated workspace and can't reach your desktop directly.",
     "I can't start a recurring 'text every 5 minutes' on my own — that's a sensitive automation.",
-    "Nova now has the new capability in current OpenBot data. I’m doing one read-only live check against the actual Desktop.",
+    "Nova now has the new capability in current Sidemates data. I’m doing one read-only live check against the actual Desktop.",
   ]) assert.equal(presentBotMessage(body, { macAccessEnabled: true }), body);
 });
 

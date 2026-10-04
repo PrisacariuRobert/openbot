@@ -4,7 +4,7 @@
  *
  *   node --import tsx scripts/record-demo.mjs --fresh --prompt "Plan my week: three things that matter most." \
  *     --out marketing/queue/media/demo-plan.mp4 [--vertical] [--speed 8] [--hold 3] [--browser] \
- *     [--model opencode-go/muse-spark-1.3-contributor] [--end-card "openbots.foundation · free · open source · no subscription"]
+ *     [--model opencode-go/muse-spark-1.3-contributor] [--end-card "sidemates.app · free · open source"]
  *
  *   --fresh starts a throwaway studio with an empty conversation for this one clip (recommended: no leftovers on screen,
  *   nothing real to leak) and removes it afterwards. To record in a studio you already run, pass
@@ -39,7 +39,7 @@ const out = path.resolve(root, arg("out", "marketing/queue/media/demo.mp4"));
 const vertical = flag("vertical");
 const speed = Math.max(1, Number(arg("speed", "8")));
 const hold = Number(arg("hold", "3"));
-const endCard = arg("end-card", "openbots.foundation  ·  free  ·  open source  ·  no subscription");
+const endCard = arg("end-card", "sidemates.app  ·  free  ·  open source");
 const waitMax = Number(arg("wait-max", "240")) * 1000;
 const chrome = arg("chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
 if (!prompt) { console.error("Give the demo a --prompt."); process.exit(2); }

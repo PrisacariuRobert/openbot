@@ -27,7 +27,7 @@ export class AwayAccess {
     const url = securePublicOrigin(this.configuredUrl());
     const transport: AwayStatus["transport"] = url ? (this.relayConfigured ? "builtin_relay" : "https") : null;
     const base = { ready: false, url, checkedAt: Date.now(), transport };
-    if (!url) return { ...base, detail: "The OpenBot relay is not set up yet. Once it is online, scan a QR code to connect—no extra apps on your Mac or phone." };
+    if (!url) return { ...base, detail: "The Sidemates relay is not set up yet. Once it is online, scan a QR code to connect—no extra apps on your Mac or phone." };
     try {
       const check = (path: string) => {
         const endpoint = `${url}${path}`;

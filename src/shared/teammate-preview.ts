@@ -13,7 +13,7 @@ const MASCOTS = ["nova", "blob", "sprout", "orbit", "pebble", "sunny"];
 export function readTeammate(raw: unknown): TeammatePreview {
   const item = raw as { kind?: unknown; version?: unknown; about?: unknown; bot?: Record<string, unknown>; skills?: unknown; routines?: unknown } | null;
   const bot = item?.bot;
-  if (item?.kind !== "openbot-teammate" || item?.version !== 1 || typeof bot?.name !== "string" || typeof bot?.role !== "string" || typeof bot?.instructions !== "string") throw new Error("This is not an OpenBot teammate.");
+  if (item?.kind !== "openbot-teammate" || item?.version !== 1 || typeof bot?.name !== "string" || typeof bot?.role !== "string" || typeof bot?.instructions !== "string") throw new Error("This is not a Sidemates teammate.");
   const color = typeof bot.color === "string" && /^#[0-9a-f]{6}$/i.test(bot.color) ? bot.color : "#6757d9";
   const routines = Array.isArray(item.routines) ? item.routines.filter((routine): routine is { name: string; prompt: string } => typeof routine?.name === "string" && typeof routine?.prompt === "string").slice(0, 20) : [];
   return {

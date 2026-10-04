@@ -30,7 +30,7 @@ test("the link works whole, as a fragment, or as the bare payload", async () => 
 });
 
 test("damaged and hostile links are refused with a plain sentence", async () => {
-  await assert.rejects(() => decodeTeammate("2.abc"), /doesn't look like an OpenBot teammate link/);
+  await assert.rejects(() => decodeTeammate("2.abc"), /doesn't look like a Sidemates teammate link/);
   await assert.rejects(() => decodeTeammate("1.!!!"), /doesn't look like/);
   await assert.rejects(() => decodeTeammate("1.AAAA"), /damaged/);
   // A small link that would expand to far more than the limit.

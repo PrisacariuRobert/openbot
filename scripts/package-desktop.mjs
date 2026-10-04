@@ -23,7 +23,7 @@ function run(command, args, cwd = root) {
 run(npm, ['run', 'build']);
 run(process.execPath, ['scripts/package-runtime-bundle.mjs', '--platform', platform, '--node', process.env.OPENBOT_NODE_VERSION || '22.21.0', '--opencode', process.env.OPENBOT_OPENCODE_VERSION || '1.18.31', '--stage-only', '--out', 'dist-release']);
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
-const source = path.join(root, 'dist-release', `openbot-${version}-${platform}`);
+const source = path.join(root, 'dist-release', `sidemates-${version}-${platform}`);
 if (!existsSync(path.join(source, 'runtime-manifest.json'))) throw new Error('Runtime manifest is missing.');
 mkdirSync(path.join(root, 'desktop/runtime'), { recursive: true });
 // Copy to fresh staging before replacing generated packaging input.
@@ -36,7 +36,7 @@ renameSync(pending, runtime);
 run(npm, ['ci'], path.join(root, 'desktop'));
 run(npm, ['run', 'dist', '--', ...(process.argv.includes('--dir') ? ['--dir'] : []), `--${process.arch}`, '--publish', 'never', ...signedArgs], path.join(root, 'desktop'));
 if (signed) {
-  const app = path.join(root, 'desktop/release', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'OpenBot.app');
+  const app = path.join(root, 'desktop/release', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Sidemates.app');
   if (!existsSync(app)) throw new Error('Signed app is missing from the builder output.');
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]);
   run('/usr/sbin/spctl', ['--assess', '--verbose', '--type', 'exec', app]);
