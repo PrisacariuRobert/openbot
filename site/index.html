@@ -343,7 +343,7 @@
     @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
     footer .made { font: 900 24px/1.2 var(--round); margin: 0 0 8px; }
     footer .small { color: var(--muted); font: 700 15px/1.4 var(--round); }
-    footer nav { display: flex; gap: 22px; justify-content: center; margin-top: 18px; font: 800 16px/1 var(--round); }
+    footer nav { display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: center; margin-top: 18px; font: 800 16px/1 var(--round); }
     footer nav a { text-decoration: none; }
 
     .rise { opacity: 0; transform: translateY(34px); transition: opacity .7s ease, transform .9s var(--pop); }
@@ -595,10 +595,10 @@
     <div class="wrap">
       <div class="rise" style="max-width:760px">
         <h2>Bring the AI you <span class="squiggle" style="color:var(--scout)">already have.<svg aria-hidden="true"><use href="#squiggle" /></svg></span></h2>
-        <p class="lead">Sign in once and the whole team can use it. Or give each teammate a different one.</p>
+        <p class="lead">Sign in once, or paste a key, and the whole team can use it. Or give each teammate a different one.</p>
       </div>
       <div class="chips rise">
-        <span class="chip" style="--r:-2deg">ChatGPT</span><span class="chip" style="--r:1.5deg">Claude</span><span class="chip" style="--r:-1deg">Grok</span><span class="chip" style="--r:2deg">GitHub Copilot</span><span class="chip free" style="--r:-2.5deg">Gemini<small>free key</small></span><span class="chip" style="--r:1deg">OpenCode Go</span><span class="chip local" style="--r:-1.5deg">Your own Mac<small>private</small></span>
+        <span class="chip" style="--r:-2deg">ChatGPT</span><span class="chip" style="--r:1.5deg">Claude<small>API key</small></span><span class="chip" style="--r:-1deg">Grok</span><span class="chip" style="--r:2deg">GitHub Copilot</span><span class="chip free" style="--r:-2.5deg">Gemini<small>free key</small></span><span class="chip" style="--r:1deg">OpenCode Go</span><span class="chip local" style="--r:-1.5deg">Your own Mac<small>private</small></span>
       </div>
     </div>
   </section>
@@ -787,5 +787,6 @@
   });
 })();
 </script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8f2032f0ecba495292edb586086c935b"}'></script>
 </body>
 </html>

@@ -37,7 +37,7 @@
     .hero { padding: 24px 0 36px; max-width: 720px; }
     .hero h1 { margin: 0 0 12px; font-size: clamp(40px, 7vw, 68px); line-height: 1; }
     .hero p { margin: 0; font-size: 20px; color: var(--ink-2); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 22px; }
     .card { position: relative; background: #fff; border-radius: 28px; padding: 26px; display: grid; gap: 14px; align-content: start; box-shadow: 0 24px 50px rgba(40,30,80,.07), 0 2px 0 rgba(0,0,0,.04); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1); }
     .card:hover { transform: translateY(-4px); }
     .card .face { width: 96px; height: 96px; margin-bottom: 2px; }
@@ -116,5 +116,6 @@
   }).catch(function () { grid.appendChild(el("p", "about", "The gallery couldn't be loaded. Try again in a moment.")); });
 })();
 </script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8f2032f0ecba495292edb586086c935b"}'></script>
 </body>
 </html>

@@ -164,7 +164,7 @@ for (const page of PAGES) {
 ${JSON.stringify(ld, null, 2)}
   </script>
   ${style}
-  <style>.table table { min-width: 560px; }</style>
+  <style>@media (min-width: 761px) { .table table { min-width: 560px; } }</style>
 </head>
 <body>
 ${brand}
@@ -209,6 +209,7 @@ ${brand}
   </section>
 </main>
 <footer>Sidemates — free, open-source AI teammates for your Mac. This website counts visits with Cloudflare Web Analytics (no cookies, no personal data). <a href="../../">Home</a> · <a href="../">All comparisons</a> · <a href="../../teammates/">Teammate gallery</a> · <a href="https://github.com/PrisacariuRobert/sidemates">GitHub</a></footer>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8f2032f0ecba495292edb586086c935b"}'></script>
 </body>
 </html>
 `;
