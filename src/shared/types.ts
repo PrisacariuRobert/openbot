@@ -1131,3 +1131,8 @@ export interface QueueCard {
   undoneAt: string | null;
   botId: string | null;
 }
+
+/** "You approved this kind of thing five times in a row. Do it automatically?" */
+export interface QueueOffer { pattern: string; kind: QueueCard["kind"]; label: string; approvals: number; }
+/** A standing yes to one narrow pattern. Paused means it waits for a person again. */
+export interface QueueRuleCard { id: string; kind: QueueCard["kind"]; label: string; status: "active" | "paused"; pausedReason: string | null; uses: number; lastUsedAt: string | null; }

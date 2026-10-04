@@ -4,12 +4,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
-import { QUEUE_CARDS_PER_DAY, QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput, type QueueExecutor } from "./queue.js";
+import { QUEUE_AUTO_PER_DAY, QUEUE_CARDS_PER_DAY, QUEUE_OFFER_AFTER, QueueError, WorkQueue, patternLabel, proposalFromFlatArgs, queuePattern, queueProposalInput, senderKey, type QueueExecutor } from "./queue.js";
 
 /** A Mac that records what it was asked to do. */
 function fakeMac(options: { failOn?: string } = {}) {
   const calls: string[] = [];
-  const maybeFail = (name: string) => { if (options.failOn === name) throw new Error(`${name} failed. Nothing was changed.`); };
+  const state = { failOn: options.failOn };
+  const maybeFail = (name: string) => { if (state.failOn === name) throw new Error(`${name} failed. Nothing was changed.`); };
   const executor: QueueExecutor = {
     async createReminder(input) { maybeFail("createReminder"); calls.push(`createReminder:${input.title}`); return { id: "rem-1", list: "Reminders", title: input.title, due: input.due ?? null }; },
     async deleteReminder(id) { maybeFail("deleteReminder"); calls.push(`deleteReminder:${id}`); },
@@ -20,16 +21,18 @@ function fakeMac(options: { failOn?: string } = {}) {
     async saveMailAttachment(input) { maybeFail("saveMailAttachment"); calls.push(`saveMailAttachment:${input.attachment}`); return { saved: `/Users/test/${input.folder}/${input.attachment}`, bytes: 1234 }; },
     async trashFile(filePath) { maybeFail("trashFile"); calls.push(`trashFile:${filePath}`); },
   };
-  return { executor, calls };
+  return { executor, calls, state };
 }
 
-function setup(options: { failOn?: string; now?: () => Date } = {}) {
+function setup(options: { failOn?: string; now?: () => Date; cardsPerDay?: number } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "sidemates-queue-test-"));
   const db = new OpenBotDatabase(root);
   const mac = fakeMac(options);
-  const queue = new WorkQueue(db, () => mac.executor, options.now);
+  const queue = new WorkQueue(db, () => mac.executor, options.now, { cardsPerDay: options.cardsPerDay });
   return { db, queue, mac, done: () => rmSync(root, { recursive: true, force: true }) };
 }
+/** Trust tests make many cards in one test day; a day's real limit of eight is covered on its own. */
+const trustSetup = () => setup({ cardsPerDay: 1000 });
 
 const reminder = (sourceKey: string) => ({ kind: "reminder", title: "Pay the electricity bill", why: "The bill in your mail is due Friday.", sourceKey, action: { title: "Pay the electricity bill", due: "2026-10-09T09:00:00+03:00" } });
 const eventCard = (sourceKey: string) => ({ kind: "calendar_event", title: "School concert", why: "The school asked families to come.", sourceKey, action: { title: "School concert", start: "2026-10-14T18:00:00+03:00", end: "2026-10-14T19:30:00+03:00" } });
@@ -204,4 +207,189 @@ test("flat teammate fields become a valid card and stray fields are not forwarde
   assert.deepEqual((reminderFlat as { action: object }).action, { title: "Pay the bill", due: "2026-10-09T09:00:00+03:00" });
   const nested = { kind: "reminder", title: "x", why: "y", sourceKey: "mail:7", action: { title: "x" } };
   assert.equal(proposalFromFlatArgs(nested), nested);
+});
+
+// ---- Earned trust -------------------------------------------------------
+
+const ACME = "Acme Billing <billing@acme.com>";
+/** An invoice card from one sender, one per number, so each is its own source. */
+const invoice = (n: number, from = ACME) => ({ proposal: { ...fileCard(`mail:${n}`), action: { id: String(n), attachment: `invoice-${n}.pdf`, folder: "Documents/Receipts/2026-10" } }, ctx: { botId: "nova", runId: `run-${n}`, sender: from } });
+/** Propose and approve as a person, `count` times. */
+async function approveInvoices({ queue }: { queue: WorkQueue }, from: number, count: number, sender = ACME) {
+  for (let n = from; n < from + count; n++) {
+    const { proposal, ctx } = invoice(n, sender);
+    const made = queue.propose(proposal, ctx);
+    assert.ok(made.ok);
+    if (made.ok) await queue.approve(made.item.id);
+  }
+}
+
+test("a pattern is the sender's company plus the place, and the month does not split it", () => {
+  const parsed = queueProposalInput.parse(fileCard("mail:1"));
+  assert.equal(queuePattern(parsed, ACME), "file_attachment|acme.com|Documents/Receipts/YYYY-MM");
+  const nextMonth = queueProposalInput.parse({ ...fileCard("mail:2"), action: { id: "2", attachment: "b.pdf", folder: "Documents/Receipts/2026-11/" } });
+  assert.equal(queuePattern(nextMonth, "Acme <ar@ACME.com>"), queuePattern(parsed, ACME), "another month, same company: same pattern");
+  const elsewhere = queueProposalInput.parse({ ...fileCard("mail:3"), action: { id: "3", attachment: "b.pdf", folder: "Documents/Taxes" } });
+  assert.notEqual(queuePattern(elsewhere, ACME), queuePattern(parsed, ACME), "another folder is another pattern");
+  assert.equal(senderKey("Anna <anna@gmail.com>"), "anna@gmail.com", "a personal mailbox is the whole address, never 'anyone at gmail.com'");
+  assert.equal(queuePattern(queueProposalInput.parse(draftCard("mail:4")), "anna@example.com"), null, "replies can never be automatic");
+  assert.equal(queuePattern(parsed, null), null, "no known sender, no pattern");
+  assert.match(patternLabel("file_attachment|acme.com|Documents/Receipts/YYYY-MM"), /Files from acme\.com saved to ~\/Documents\/Receipts\/<year>-<month>/);
+});
+
+test("five approvals in a row of one pattern make an offer; four do not", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER - 1);
+    assert.deepEqual(queue.offers(), []);
+    await approveInvoices(env, 100, 1);
+    const offers = queue.offers();
+    assert.equal(offers.length, 1);
+    assert.equal(offers[0]!.approvals, QUEUE_OFFER_AFTER);
+    assert.match(offers[0]!.label, /acme\.com/);
+    assert.equal(queue.list().offers.length, 1, "the screen gets the offer with the list");
+  } finally { done(); }
+});
+
+test("a skip or an Undo breaks the streak, and another sender's cards do not count", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    await approveInvoices(env, 1, 3);
+    const skipMe = invoice(50); const skipped = queue.propose(skipMe.proposal, skipMe.ctx);
+    assert.ok(skipped.ok); if (skipped.ok) queue.skip(skipped.item.id);
+    await approveInvoices(env, 60, 2);
+    assert.deepEqual(queue.offers(), [], "3 approvals, a skip, then 2: the streak is 2");
+    await approveInvoices(env, 70, 3, "Other <ap@other.org>");
+    assert.deepEqual(queue.offers(), [], "another company is a different pattern");
+    // an Undo in the middle of a run also resets it
+    const undoMe = invoice(80); const made = queue.propose(undoMe.proposal, undoMe.ctx);
+    assert.ok(made.ok);
+    if (made.ok) { await queue.approve(made.item.id); await queue.undo(made.item.id); }
+    await approveInvoices(env, 90, 4);
+    assert.deepEqual(queue.offers(), [], "an undone approval counts against the streak");
+    await approveInvoices(env, 95, 1);
+    assert.equal(queue.offers().length, 1, "five clean approvals after it make the offer");
+  } finally { done(); }
+});
+
+test("accepting an offer makes a rule; the next matching card runs by itself and can be undone", async () => {
+  const env = trustSetup(); const { queue, mac, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER);
+    const offer = queue.offers()[0]!;
+    const rule = queue.acceptOffer(offer.pattern);
+    assert.equal(rule.status, "active");
+    assert.deepEqual(queue.offers(), [], "an answered offer is not offered again");
+    mac.calls.length = 0;
+    const next = invoice(200); const made = queue.propose(next.proposal, next.ctx);
+    assert.ok(made.ok); if (!made.ok) return;
+    assert.equal(made.item.status, "ready", "proposing alone still runs nothing");
+    assert.deepEqual(mac.calls, []);
+    const ran = await queue.runRules(made.item);
+    assert.equal(ran.status, "done");
+    assert.equal(ran.decidedBy, `rule:${rule.id}`);
+    assert.deepEqual(mac.calls, ["saveMailAttachment:invoice-200.pdf"]);
+    assert.equal(queue.list().automaticThisWeek, 1);
+    assert.equal(queue.rules()[0]!.uses, 1);
+    // Undo works on automatic work and switches the rule off
+    await queue.undo(ran.id);
+    assert.deepEqual(mac.calls.slice(-1), ["trashFile:/Users/test/Documents/Receipts/2026-10/invoice-200.pdf"]);
+    const paused = queue.rules()[0]!;
+    assert.equal(paused.status, "paused");
+    assert.match(paused.pausedReason ?? "", /undid/);
+    // a paused rule runs nothing: the next card waits for a person again
+    const after = invoice(201); const waiting = queue.propose(after.proposal, after.ctx);
+    assert.ok(waiting.ok); if (!waiting.ok) return;
+    assert.equal((await queue.runRules(waiting.item)).status, "ready");
+    // turning it back on is the person's call
+    queue.resumeRule(rule.id);
+    assert.equal((await queue.runRules(waiting.item)).status, "done");
+  } finally { done(); }
+});
+
+test("a rule never covers a different sender, folder, or kind, and replies are never automatic", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER);
+    queue.acceptOffer(queue.offers()[0]!.pattern);
+    const other = invoice(300, "Other <ap@other.org>"); const otherCard = queue.propose(other.proposal, other.ctx);
+    assert.ok(otherCard.ok); if (otherCard.ok) assert.equal((await queue.runRules(otherCard.item)).status, "ready", "another sender still needs a person");
+    const elsewhere = queue.propose({ ...fileCard("mail:301"), action: { id: "301", attachment: "x.pdf", folder: "Documents/Taxes" } }, { botId: null, runId: null, sender: ACME });
+    assert.ok(elsewhere.ok); if (elsewhere.ok) assert.equal((await queue.runRules(elsewhere.item)).status, "ready", "another folder still needs a person");
+    const aReminder = queue.propose(reminder("mail:302"), { botId: null, runId: null, sender: ACME });
+    assert.ok(aReminder.ok); if (aReminder.ok) assert.equal((await queue.runRules(aReminder.item)).status, "ready", "another kind still needs a person");
+    const reply = queue.propose(draftCard("mail:303"), { botId: null, runId: null, sender: "anna@example.com" });
+    assert.ok(reply.ok); if (reply.ok) { assert.equal(reply.item.pattern, null); assert.equal((await queue.runRules(reply.item)).status, "ready"); }
+  } finally { done(); }
+});
+
+test("'Not now' and removing a rule are remembered, so the same offer does not nag", async () => {
+  const env = trustSetup(); const { queue, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER);
+    const pattern = queue.offers()[0]!.pattern;
+    queue.declineOffer(pattern);
+    assert.deepEqual(queue.offers(), []);
+    assert.deepEqual(queue.rules(), [], "a declined offer is not a rule");
+    await approveInvoices(env, 40, QUEUE_OFFER_AFTER);
+    assert.deepEqual(queue.offers(), [], "more approvals do not bring it back");
+    assert.throws(() => queue.acceptOffer(pattern), (error) => error instanceof QueueError && error.code === "already_handled");
+
+    const second = trustSetup();
+    try {
+      await approveInvoices(second, 1, QUEUE_OFFER_AFTER);
+      const rule = second.queue.acceptOffer(second.queue.offers()[0]!.pattern);
+      second.queue.removeRule(rule.id);
+      assert.deepEqual(second.queue.rules(), []);
+      assert.deepEqual(second.queue.offers(), [], "a removed rule does not come straight back as an offer");
+      assert.throws(() => second.queue.removeRule(rule.id), (error) => error instanceof QueueError && error.code === "not_found");
+    } finally { second.done(); }
+  } finally { done(); }
+});
+
+test("an offer can only be accepted for a pattern that is being offered", () => {
+  const { queue, done } = trustSetup();
+  try {
+    assert.throws(() => queue.acceptOffer("file_attachment|made-up.com|anywhere"), (error) => error instanceof QueueError && error.code === "not_found");
+    assert.throws(() => queue.declineOffer("file_attachment|made-up.com|anywhere"), (error) => error instanceof QueueError && error.code === "not_found");
+    assert.throws(() => queue.pauseRule("qr-missing"), (error) => error instanceof QueueError && error.code === "not_found");
+  } finally { done(); }
+});
+
+test("when a rule's action fails, the card says so, the rule pauses, and nothing is hidden", async () => {
+  const env = trustSetup(); const { queue, mac, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER);
+    const rule = queue.acceptOffer(queue.offers()[0]!.pattern);
+    mac.state.failOn = "saveMailAttachment";
+    const { proposal, ctx } = invoice(500);
+    const made = queue.propose(proposal, ctx);
+    assert.ok(made.ok); if (!made.ok) return;
+    const result = await queue.runRules(made.item);
+    assert.equal(result.status, "failed");
+    assert.match(result.error ?? "", /Nothing was changed/);
+    const after = queue.rules().find((entry) => entry.id === rule.id)!;
+    assert.equal(after.status, "paused");
+    assert.match(after.pausedReason ?? "", /couldn't finish/);
+    assert.equal(after.uses, 0, "a failure is not counted as work done");
+  } finally { done(); }
+});
+
+test("doing things alone has a daily limit, and trusted cards do not use up the day's eight", async () => {
+  const env = setup(); const { queue, done } = env;
+  try {
+    await approveInvoices(env, 1, QUEUE_OFFER_AFTER);
+    queue.acceptOffer(queue.offers()[0]!.pattern);
+    let alone = 0, waiting = 0;
+    for (let n = 1000; n < 1000 + QUEUE_AUTO_PER_DAY + 3; n++) {
+      const { proposal, ctx } = invoice(n);
+      const made = queue.propose(proposal, ctx);
+      assert.ok(made.ok, "a trusted pattern is not stopped by the day's eight cards");
+      if (!made.ok) return;
+      if ((await queue.runRules(made.item)).status === "done") alone++; else waiting++;
+    }
+    assert.equal(alone, QUEUE_AUTO_PER_DAY, "exactly the daily limit happens on its own");
+    assert.equal(waiting, 3, "the rest wait for a person like any other card");
+    assert.equal(queue.list().ready.length, 3);
+  } finally { done(); }
 });

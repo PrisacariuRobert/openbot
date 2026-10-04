@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, CalendarPlus, Check, ChevronRight, Inbox, Paperclip, Reply, Undo2 } from "lucide-react";
-import type { QueueCard } from "../shared/types";
+import { Bell, CalendarPlus, Check, ChevronRight, Inbox, Paperclip, Reply, Sparkles, Undo2 } from "lucide-react";
+import type { QueueCard, QueueOffer, QueueRuleCard } from "../shared/types";
 import "./waiting.css";
 
 /** The front door: things your teammates prepared, one card each. Approving does exactly what the
@@ -70,6 +70,9 @@ export function WaitingEntry({ count, active, onOpen }: { count: number; active:
 export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; onChanged: () => void }) {
   const [ready, setReady] = useState<QueueCard[]>([]);
   const [recent, setRecent] = useState<QueueCard[]>([]);
+  const [offers, setOffers] = useState<QueueOffer[]>([]);
+  const [rules, setRules] = useState<QueueRuleCard[]>([]);
+  const [alone, setAlone] = useState(0);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
@@ -78,8 +81,9 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
     try {
       const response = await fetch("/api/queue", { credentials: "same-origin" });
       if (!response.ok) return;
-      const body = await response.json() as { ready: QueueCard[]; recent: QueueCard[] };
+      const body = await response.json() as { ready: QueueCard[]; recent: QueueCard[]; offers?: QueueOffer[]; rules?: QueueRuleCard[]; automaticThisWeek?: number };
       setReady(body.ready); setRecent(body.recent);
+      setOffers(body.offers ?? []); setRules(body.rules ?? []); setAlone(body.automaticThisWeek ?? 0);
     } finally { setLoaded(true); }
   }, []);
   useEffect(() => { void load(); }, [load, queueReady]);
@@ -99,6 +103,21 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
     }
   };
 
+  /** Offers, rules and their buttons. Same shape as a card action: ask, show what went wrong, reload. */
+  const trust = async (key: string, request: () => Promise<Response>) => {
+    setBusy((items) => ({ ...items, [key]: "trust" }));
+    setErrors((items) => { const { [key]: _gone, ...rest } = items; return rest; });
+    try {
+      const response = await request();
+      if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; setErrors((items) => ({ ...items, [key]: body.error || "That didn't work. Nothing was changed." })); }
+    } catch {
+      setErrors((items) => ({ ...items, [key]: "Couldn't reach your studio. Nothing was changed." }));
+    } finally {
+      setBusy((items) => { const { [key]: _gone, ...rest } = items; return rest; });
+      await load(); onChanged();
+    }
+  };
+  const post = (url: string, body?: unknown) => fetch(url, { method: "POST", credentials: "same-origin", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const undoable = recent.filter((card) => card.status === "done");
   return <div className="page-content waiting-page">
     <div className="page-heading">
@@ -108,6 +127,20 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
       </div>
     </div>
     <p className="waiting-promise">Nothing happens until you say so. Replies are saved as drafts you send yourself, and anything done on your Mac can be undone.</p>
+
+    {offers.map((offer) => <section key={offer.pattern} className="waiting-offer" aria-label="Make this automatic?">
+      <span className="waiting-offer-icon" aria-hidden="true"><Sparkles size={16} /></span>
+      <div>
+        <strong>Do this for you from now on?</strong>
+        <p className="waiting-offer-what">{offer.label}</p>
+        <p>You've approved this {offer.approvals} times in a row. If you say yes, only this exact kind happens on its own, it shows up under Done for you with an Undo, and one Undo switches it off.</p>
+        {errors[offer.pattern] && <p className="waiting-error" role="alert">{errors[offer.pattern]}</p>}
+        <div className="waiting-offer-actions">
+          <button type="button" className="waiting-approve" disabled={Boolean(busy[offer.pattern])} onClick={() => void trust(offer.pattern, () => post("/api/queue/rules", { pattern: offer.pattern }))}>Yes, do these automatically</button>
+          <button type="button" className="waiting-skip" disabled={Boolean(busy[offer.pattern])} onClick={() => void trust(offer.pattern, () => post("/api/queue/offers/dismiss", { pattern: offer.pattern }))}>Not now</button>
+        </div>
+      </div>
+    </section>)}
 
     {loaded && ready.length === 0 && <div className="waiting-empty">
       <Check size={22} aria-hidden="true" />
@@ -142,12 +175,30 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
         {recent.map((card) => {
           const working = busy[card.id];
           return <li key={card.id} className={`waiting-done-row status-${card.status}`}>
-            <span className="waiting-done-text"><strong>{card.title}</strong><small>{outcome(card)}</small>{errors[card.id] && <small className="waiting-error" role="alert">{errors[card.id]}</small>}</span>
+            <span className="waiting-done-text"><strong>{card.title}{card.decidedBy?.startsWith("rule:") && <em className="waiting-auto">On its own</em>}</strong><small>{outcome(card)}</small>{errors[card.id] && <small className="waiting-error" role="alert">{errors[card.id]}</small>}</span>
             {card.status === "done" && <button type="button" className="waiting-undo" disabled={Boolean(working)} onClick={() => void act(card, "undo")}><Undo2 size={14} aria-hidden="true" /> {working === "undo" ? "Undoing…" : "Undo"}</button>}
           </li>;
         })}
       </ul>
       {undoable.length > 0 && <p className="waiting-footnote">Undo is available for 7 days.</p>}
+    </section>}
+
+    {rules.length > 0 && <section className="waiting-rules" aria-label="Things done on their own">
+      <h3>Done on its own</h3>
+      <p className="waiting-footnote">{alone === 0 ? "Nothing has happened on its own this week." : `${alone} ${alone === 1 ? "thing was" : "things were"} done on their own this week. Each one is listed above with an Undo.`}</p>
+      <ul>
+        {rules.map((rule) => <li key={rule.id} className={`waiting-rule status-${rule.status}`}>
+          <span className="waiting-done-text">
+            <strong>{rule.label}</strong>
+            <small>{rule.status === "paused" ? `Paused. ${rule.pausedReason ?? ""} Nothing happens on its own until you turn it back on.` : `On. Done ${rule.uses} ${rule.uses === 1 ? "time" : "times"}.`}</small>
+            {errors[rule.id] && <small className="waiting-error" role="alert">{errors[rule.id]}</small>}
+          </span>
+          {rule.status === "paused"
+            ? <button type="button" className="waiting-undo" disabled={Boolean(busy[rule.id])} onClick={() => void trust(rule.id, () => post(`/api/queue/rules/${rule.id}/resume`))}>Turn back on</button>
+            : <button type="button" className="waiting-undo" disabled={Boolean(busy[rule.id])} onClick={() => void trust(rule.id, () => post(`/api/queue/rules/${rule.id}/pause`))}>Pause</button>}
+          <button type="button" className="waiting-undo" disabled={Boolean(busy[rule.id])} onClick={() => void trust(rule.id, () => fetch(`/api/queue/rules/${rule.id}`, { method: "DELETE", credentials: "same-origin" }))}>Remove</button>
+        </li>)}
+      </ul>
     </section>}
   </div>;
 }
