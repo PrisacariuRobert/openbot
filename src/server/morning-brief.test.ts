@@ -21,6 +21,8 @@ test("the brief asks for nothing that would need approval, so it can run unatten
   // "morning brief" would steer a teammate to the older report workflow.
   assert.doesNotMatch(morningBriefPrompt(), /morning brief/i);
   assert.match(morningBriefPrompt(), /mac_calendar_events/);
+  assert.match(morningBriefPrompt(), /queue_propose/, "the brief also prepares cards for Waiting for you");
+  assert.match(morningBriefPrompt(), /A card runs nothing/);
 });
 
 test("setting it up creates one enabled routine; setting it up again changes it, never duplicates", () => {
