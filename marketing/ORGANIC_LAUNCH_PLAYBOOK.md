@@ -1,10 +1,10 @@
-# OpenBot: a zero-budget launch that earns trust
+# Sidemates: a zero-budget launch that earns trust
 
 Prepared 8 September 2026. This is an execution plan, not a promise of reach. No posts, messages, account changes or public releases were made as part of preparing it.
 
 ## The recommendation
 
-Make OpenBot known for **a team you can shape, work you can inspect, and AI you can choose**. Lead with one useful result per post. Use the polished film to make people curious, then a real screen recording to answer “does it actually work?”
+Make Sidemates known for **a team you can shape, work you can inspect, and AI you can choose**. Lead with one useful result per post. Use the polished film to make people curious, then a real screen recording to answer “does it actually work?”
 
 Start with Mac-using independent developers, technical freelancers and small-team builders who already use AI and can tolerate an early open-source beta. They can test it, explain what broke and contribute. “For everyone” is a longer-term product goal, not an effective first audience.
 
@@ -16,7 +16,7 @@ The first campaign should earn **five qualified pilot volunteers**, not chase a 
 
 **Short promise:** Your team. Your AI. Work you can inspect.
 
-**Plain explanation:** OpenBot brings customizable AI teammates into a conversation-first app. Give them a task, choose a supported provider, review sensitive actions and inspect the work they return.
+**Plain explanation:** Sidemates brings customizable AI teammates into a conversation-first app. Give them a task, choose a supported provider, review sensitive actions and inspect the work they return.
 
 **Why it is interesting:** the combination of approachable teammates, inspectable work and an open codebase—not a claim that mascots or tool use are unique inventions.
 
@@ -34,7 +34,7 @@ The reviewed snapshot has release-blocking account-import/signing issues. Consul
 | Pilot: after critical fixes and safe install proof | Real, consented recordings of bounded tasks; limitations and recovery | Volunteer for a small pilot |
 | Public beta: after the release gate | A usable version, supported-platform instructions, known limitations and real outcomes | Try one example task and report the outcome |
 
-There are currently no published GitHub release assets. The new website is **owner-private and requires sign-in**; do not use its private URL as an acquisition link. Until the public site and download are explicitly released, link to [the public repository](https://github.com/PrisacariuRobert/openbot). Do not imply a consumer download exists. GitHub Issues is enabled; Discussions is not enabled at the time of this check. Use social replies for interest, Issues for reproducible bugs—not an invented sign-up funnel or an issue per prospective user.
+There are currently no published GitHub release assets. The new website is **owner-private and requires sign-in**; do not use its private URL as an acquisition link. Until the public site and download are explicitly released, link to [the public repository](https://github.com/PrisacariuRobert/sidemates). Do not imply a consumer download exists. GitHub Issues is enabled; Discussions is not enabled at the time of this check. Use social replies for interest, Issues for reproducible bugs—not an invented sign-up funnel or an issue per prospective user.
 
 ## Use two channels well
 
@@ -50,7 +50,7 @@ This channel choice is my recommendation for the initial audience, not a claim a
 
 Do not start a Discord, newsletter, TikTok account and Instagram account simultaneously. Add a channel only when the existing loop produces useful conversations without exhausting development time. If your existing network is stronger on a different channel, replace a primary channel rather than adding a sixth obligation.
 
-Reddit is not a link-distribution service: disclose that you built OpenBot, answer questions, respect each community’s current rules and do not mass-post or send unsolicited promotional DMs. `r/opensource` and `r/SideProject` are **candidates to check**, not permission to post. Their rules pages did not expose enough detail through the research tool; inspect them manually before writing a community-specific post. Reddit’s [spam policy](https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam) explicitly covers repeated manual as well as automated promotion.
+Reddit is not a link-distribution service: disclose that you built Sidemates, answer questions, respect each community’s current rules and do not mass-post or send unsolicited promotional DMs. `r/opensource` and `r/SideProject` are **candidates to check**, not permission to post. Their rules pages did not expose enough detail through the research tool; inspect them manually before writing a community-specific post. Reddit’s [spam policy](https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam) explicitly covers repeated manual as well as automated promotion.
 
 ## The content engine: one task, several useful pieces
 
@@ -115,7 +115,7 @@ Track these separately:
 - **Attention:** views/impressions where available, meaningful replies, visits. Platform view definitions differ; compare within a channel.
 - **Intent:** people who describe a task and willingly ask to try it.
 - **Activation:** a tester finishes one useful bounded task and can show the result.
-- **Return:** a tester uses OpenBot again the next week, confirmed voluntarily.
+- **Return:** a tester uses Sidemates again the next week, confirmed voluntarily.
 - **Contribution:** a reproducible bug, docs correction, useful recipe or reviewed PR.
 
 Initial working targets for the first four weeks: 10 substantive conversations → 5 willing pilots → 3 first useful tasks → 2 returning testers. These numbers are assumptions to guide effort, not promised conversions or industry benchmarks. Before safe installation is ready, evaluate conversations only.
@@ -124,7 +124,7 @@ Initial working targets for the first four weeks: 10 substantive conversations �
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | — | — | — | — | — | — | — | — | — |
 
-**Decision rules:** after two weeks, if three task-specific posts receive no useful response, narrow the audience/task before increasing volume. If people visit but cannot explain OpenBot, simplify the first sentence and example. If they volunteer but cannot finish setup, stop broad promotion and fix onboarding. If the same task earns repeat use, make it the next campaign’s lead story. Do not manufacture testimonials to fill a gap.
+**Decision rules:** after two weeks, if three task-specific posts receive no useful response, narrow the audience/task before increasing volume. If people visit but cannot explain Sidemates, simplify the first sentence and example. If they volunteer but cannot finish setup, stop broad promotion and fix onboarding. If the same task earns repeat use, make it the next campaign’s lead story. Do not manufacture testimonials to fill a gap.
 
 ## Recording and publishing checklist
 

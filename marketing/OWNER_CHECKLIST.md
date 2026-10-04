@@ -1,31 +1,36 @@
-# Robert's checklist: only you can do these (each about 10 minutes)
+# Robert's checklist: only you can do these
 
-Claude can prepare, write and verify. These need your accounts, your identity or your money.
+Claude can prepare, write and verify. These need your accounts, your identity or your money. Updated 4 October 2026, after the rename to Sidemates.
 
-## 1. Start Cowork on the plan  ·  2 minutes
-Paste the contents of `marketing/COWORK_NEXT_PROMPT.md` (between the dashes) into the Head of Marketing chat. It will create its scheduled tasks and write today's approval queue in `marketing/queue/`. Nothing posts until you set an item to `approved`.
+## 1. Put sidemates.app on Cloudflare  ·  10 minutes  ·  **first, it blocks the release**
+You bought the domain at Namecheap, so its DNS is there. The website and installer run on Cloudflare, so the domain's nameservers must point to Cloudflare:
+1. Cloudflare dashboard → **Add a domain** (or "Onboard a domain") → enter `sidemates.app` → choose the **Free** plan. Cloudflare shows two nameservers (names like `xxx.ns.cloudflare.com`).
+2. Namecheap → Domain List → **Manage** `sidemates.app` → **Nameservers** → **Custom DNS** → paste the two Cloudflare names → save.
+3. Tell Claude. Cloudflare says "Active" within minutes to a few hours; Claude then adds the domain to the website and checks it.
+Keep `openbots.foundation` registered and renewed: it redirects to the new site, serves the update installer for copies installed as OpenBot, and your away-from-home access (`app.openbots.foundation`) lives on it.
 
-## 2. Discord server  ·  15 minutes
-Follow `marketing/community/DISCORD_SETUP.md`. Send Claude the permanent invite link afterwards.
+## 2. Cowork  ·  2 minutes
+On Thursday 8 October, once Claude says the release is live, paste the text between the dashes in `marketing/COWORK_NEXT_PROMPT.md` into the Head of Marketing chat. Until then, if you ever pasted the old prompt, paste only this: *"Pause. The product is being renamed (OpenBot becomes Sidemates), so do not queue, schedule or post anything public until I send the new brief. Pause the recurring tasks you created. Keep existing drafts but mark them old name."* Nothing posts until you set an item to `approved`.
 
-## 3. Cloudflare Web Analytics (free, no cookies)  ·  5 minutes
-Cloudflare dashboard → your account → **Analytics & Logs → Web Analytics** (it may be called "Web analytics" in the left menu) → **Add a site** → choose `openbots.foundation` → enable the automatic setup. Claude then checks that the page carries the beacon and that visits from `?ref=` links show up. Without this we cannot measure website visits.
+## 3. Discord  ·  15 minutes
+- Rename the server to **Sidemates · AI teammates on your Mac** (Server Settings → Overview).
+- Delete the two stray messages in #general (Claude is not allowed to delete messages).
+- After the release: post the welcome and rules from `marketing/community/DISCORD_SETUP.md`, create a permanent invite link (never expires, no use limit) and send it to Claude for the site and README.
 
-## 4. Let AI training crawlers in (your call)  ·  3 minutes
-Today Cloudflare answers GPTBot, ClaudeBot and CCBot with 403 even though our `robots.txt` allows them. To change it: Cloudflare dashboard → the `openbots.foundation` zone → **Security → Bots** (in newer dashboards: **AI Crawl Control**) → turn **Block AI bots** off, or allow GPTBot and ClaudeBot individually. Security settings are yours to change. Afterwards Claude checks with `curl -A "GPTBot/1.1" https://openbots.foundation/` (200 means open).
+## 4. Cloudflare Web Analytics for the new domain (free, no cookies)  ·  5 minutes
+After step 1: Cloudflare → **Analytics & Logs → Web Analytics** → **Add a site** → `sidemates.app` → enable it. Choose the option that counts all visitors (the default skips the EU).
 
-## 5. The name  ·  20 minutes, free
-Run the official searches yourself (they block automated visits). Search **OPENBOT** and **OPENBOTS**, and look at software classes **9** and **42**, live and pending marks:
-- US: the USPTO trademark search at uspto.gov/trademarks (search for "OPENBOT").
-- EU and many countries at once: **TMview** (tmdn.org/tmview).
-- World: **WIPO Global Brand Database** (branddb.wipo.int).
-Send Claude screenshots or the owner names. A search summary we found (not yet confirmed by us) lists OPENBOTS, Reg. No. 6413358, registered 6 July 2021 for software and software development services (class 42), owned by OpenBots, Inc., and a pending OPENBOT application from 2023 for robotics hardware and education (class 9). If the official record matches, our name is too close to a registered mark in our own field, and Claude's recommendation is to rename before the Product Hunt launch on 17 October.
+## 5. Let AI crawlers in (your call)  ·  3 minutes
+Cloudflare answers GPTBot, ClaudeBot and CCBot with 403 even though our `robots.txt` allows them. In the `sidemates.app` zone: **Security → Bots** (newer dashboards: **AI Crawl Control**) → turn **Block AI bots** off, or allow GPTBot and ClaudeBot one by one. Security settings are yours; Claude checks the result with `curl -A "GPTBot/1.1" https://sidemates.app/`.
 
-## 6. Windows  ·  decision only
-Measured on GitHub's free Windows machine (workflow "Windows probe"): install, build and server start work and 1,021 of 1,128 tests pass; the browser gap is fixed. What a beta still needs is in `docs/ROADMAP.md` (0.43). A VM on your Mac is possible (Apple silicon, 24 GB, 105 GB free) for the installer and desktop pass: tell Claude "go" and it asks before each download (UTM is free; Microsoft's Windows 11 Arm ISO is free to download, about 5 GB, and needs a product key to activate).
+## 6. GitHub  ·  3 minutes
+- Claude renames the repository to `sidemates` after your yes (GitHub redirects the old address).
+- You upload the link preview image: Repository Settings → General → **Social preview** → `site/social.png` (1280×640).
 
-## 7. Apple Developer Program ($99 a year)  ·  later, when the first setup job pays
-Enroll at developer.apple.com/programs with your identity. It lets the app install without warnings and unlocks a Homebrew install. Not needed for the one-line installer.
+## 7. Decisions, when asked
+- **Windows**: a VM on your Mac is possible (Apple silicon, 24 GB, 105 GB free). Say "go" and Claude asks before each download.
+- **Apple Developer Program ($99 a year)**: at Gate 1 (17 Nov) or the first paid job, earlier only for a "Download for Mac" launch button. Needs your identity.
+- **Telemetry**: not approved; the README promises no tracking.
 
-## 8. GitHub link preview image  ·  2 minutes
-Repository Settings → General → **Social preview** → upload `site/social.png` (already 1280×640). It is what people see when someone shares the repository link. Web-only setting.
+## Done
+- **The name.** USPTO shows OPENBOTS registered twice for OpenBots, Inc. (classes 9 and 42), so OpenBot was too close to a registered mark in our own field. Sidemates searched clean on 3 October (USPTO, TMview; RIDEMATES is the one to watch). Consider filing a trademark after the first paid job. Not legal advice.

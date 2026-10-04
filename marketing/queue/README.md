@@ -7,9 +7,9 @@ Format for each item:
 ```
 ### 18:00 · X · demo clip 4
 status: draft            # draft → approved → posted (or rejected)
-text: "Tidy my Downloads. One sentence, and my team did it. Free, open source, no subscription. openbots.foundation"
+text: "Tidy my Downloads. One sentence, and my team did it. Free and open source. sidemates.app"
 media: marketing/queue/media/2026-10-06-downloads.mp4
-link: https://openbots.foundation/
+link: https://sidemates.app/
 risk: demo studio data only; no personal data on screen
 url:                     # filled in after posting
 ```

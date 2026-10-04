@@ -3,7 +3,7 @@
 Only Robert can create it (it lives on his account). Everything to paste is below. When it exists, send Claude the permanent invite link and it goes on the website, README and `llms.txt`.
 
 ## 1. Create it
-Discord → "+" → Create My Own → For a club or community. Name: **OpenBot · AI teammates on your Mac** (the second half stops people confusing us with the other OpenBots). Icon: `site/icon.svg` exported as a PNG, or one of the characters in `site/characters/`.
+Discord → "+" → Create My Own → For a club or community. Name: **Sidemates · AI teammates on your Mac** (the second half says what it is). If the server still has the old OpenBot name, rename it in Server Settings → Overview. Icon: `site/icon.svg` exported as a PNG, or one of the characters in `site/characters/`.
 Server Settings → **Enable Community** (needed for announcement channels and onboarding). Verification level: **Medium**. Turn on **AutoMod** (block spam links and mass mentions). Turn on 2FA requirement for moderators.
 
 ## 2. Channels
@@ -26,9 +26,9 @@ Roles: **Founder** (Robert), **Contributor** (anyone with a merged pull request 
 ## 3. Text to paste
 
 **#welcome**
-> Welcome to OpenBot: a free, open-source team of AI teammates that works in your own Mac apps and asks before it acts. No subscription. 
-> • Get it: https://openbots.foundation
-> • Code: https://github.com/PrisacariuRobert/openbot
+> Welcome to Sidemates: a free, open-source team of AI teammates that works in your own Mac apps and asks before it acts. Free to use; you only pay for the AI you connect. 
+> • Get it: https://sidemates.app
+> • Code: https://github.com/PrisacariuRobert/sidemates
 > • New here? Say hi in #start-here and tell us what you'd like your team to do.
 > • Something broken? #help. A bug you can reproduce? #bugs.
 > Rules: be kind and specific. No spam, no self-promotion outside #show-your-team, no personal data in screenshots (check your mail and messages are not visible). We are a small project run by one person; replies can take a few hours, and we read everything.

@@ -1,13 +1,12 @@
-Paste this into Cowork (the Head of Marketing chat):
+Paste this into Cowork (the Head of Marketing chat) on Thursday 8 October, once Robert has confirmed that the Sidemates release is live.
 
 ---
-New plan, effective now. Read `marketing/MARKETING_PLAN_90D.md` in full, then `marketing/COWORK_HEAD_OF_MARKETING.md` (updated positioning), `VOICE.md` and `DISCOVERY_PLAYBOOK.md`.
+New plan, effective now. The product is now called **Sidemates** (it was OpenBot). Read `marketing/MARKETING_PLAN_90D.md` (version 2) in full, then `marketing/COWORK_HEAD_OF_MARKETING.md`, `VOICE.md` and `DISCOVERY_PLAYBOOK.md`. The old plan and every draft written under the old name are void.
 
 Do this today:
-1. Create the five scheduled tasks in §10 of the plan (daily 08:30 scan, Tue/Fri proposals, Monday report, Sunday queue, Wednesday directories).
-2. Write today's approval queue file in `marketing/queue/` (format in its README): announce the new hero and the four comparison pages on X and the LinkedIn company page, and queue demo clips 1–3 as scripts (I will record them).
-3. Start `marketing/directories.csv` and `marketing/outreach.csv`; draft the first five directory submissions and ten creator emails, rules checked, into the queue for my approval.
-4. Draft the Discord welcome message and rules for the server I am creating.
+1. Mark every file in `marketing/queue/` that says OpenBot "old name, do not use". Delete the recurring tasks from the old plan and create the three in §8 of the new plan.
+2. Build `marketing/outreach.csv` for the 10-day test (§3 A): 10 people per job, starting from my network, and one short message draft per person for my approval. I send them; you never do.
+3. Write today's queue file in `marketing/queue/`: the Discord welcome post and #rules; one plain LinkedIn post that announces the rename (what changed, what stays, how to update); and the first five community answers (§3 C), each checked against that community's rules.
+4. Start the Product Hunt kit for Sat 17 Oct (§3 D): tagline, description, maker comment, first reply, image list.
 
 Same rules as before: nothing public and nothing that costs money without my "approved" on that exact item; demos use sample data only; no upvote requests, no fake accounts, no attacks on competitors; honest limits, always. Report in `marketing/reports/` each morning.
----
