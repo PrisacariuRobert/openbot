@@ -954,7 +954,9 @@ export function Studio() {
   useEffect(() => {
     if (landed.current || !state) return;
     landed.current = true;
-    if ((state.queueReady ?? 0) > 0 && !asked.current.get("thread") && !asked.current.get("panel") && page === "chat") navigate("waiting");
+    // ?waiting=1 is what a "things are waiting for you" notification opens.
+    if (asked.current.get("waiting") !== null && page === "chat") navigate("waiting");
+    else if ((state.queueReady ?? 0) > 0 && !asked.current.get("thread") && !asked.current.get("panel") && page === "chat") navigate("waiting");
   }, [state]);
   const startPrompt = (text: string) => {
     setPage("chat");
