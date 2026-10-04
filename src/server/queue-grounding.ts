@@ -34,9 +34,19 @@ export class MailSeen {
 
   forget(runId: string) { this.runs.delete(runId); }
 
+  private idOf(proposal: QueueProposal): string | undefined {
+    return proposal.kind === "file_attachment" ? proposal.action.id : /^mail:(\d{1,15})(?::.*)?$/.exec(proposal.sourceKey)?.[1];
+  }
+
+  /** The "From" line of the email a card came from, as read in this run. */
+  sender(proposal: QueueProposal, runId: string): string | null {
+    const id = this.idOf(proposal);
+    return id ? this.runs.get(runId)?.get(id)?.from ?? null : null;
+  }
+
   /** null when the card is grounded; otherwise a plain reason the teammate can act on. */
   check(proposal: QueueProposal, runId: string): string | null {
-    const id = proposal.kind === "file_attachment" ? proposal.action.id : /^mail:(\d{1,15})(?::.*)?$/.exec(proposal.sourceKey)?.[1];
+    const id = this.idOf(proposal);
     if (!id) return "A card must start from an email you read. Use a sourceKey like mail:<id> with the id from the mail tools.";
     const mail = this.runs.get(runId)?.get(id);
     if (!mail) return "You have not read that email in this task. Read it first with the mail tools, then propose the card.";

@@ -519,6 +519,27 @@ app.post("/api/queue/:id/skip", (request, response) => {
 app.post("/api/queue/:id/undo", async (request, response) => {
   try { const item = await workQueue.undo(request.params.id); broadcast(); response.json({ item }); } catch (error) { queueFailure(response, error); }
 });
+// Earned trust: a person's standing "yes" to one narrow pattern, always revocable.
+const queuePatternBody = z.object({ pattern: z.string().min(3).max(400) }).strict();
+app.post("/api/queue/rules", (request, response) => {
+  const body = queuePatternBody.safeParse(request.body);
+  if (!body.success) return response.status(400).json({ error: "Say which offer you mean." });
+  try { const rule = workQueue.acceptOffer(body.data.pattern); broadcast(); response.json({ rule }); } catch (error) { queueFailure(response, error); }
+});
+app.post("/api/queue/offers/dismiss", (request, response) => {
+  const body = queuePatternBody.safeParse(request.body);
+  if (!body.success) return response.status(400).json({ error: "Say which offer you mean." });
+  try { workQueue.declineOffer(body.data.pattern); broadcast(); response.json({ ok: true }); } catch (error) { queueFailure(response, error); }
+});
+app.post("/api/queue/rules/:id/pause", (request, response) => {
+  try { const rule = workQueue.pauseRule(request.params.id); broadcast(); response.json({ rule }); } catch (error) { queueFailure(response, error); }
+});
+app.post("/api/queue/rules/:id/resume", (request, response) => {
+  try { const rule = workQueue.resumeRule(request.params.id); broadcast(); response.json({ rule }); } catch (error) { queueFailure(response, error); }
+});
+app.delete("/api/queue/rules/:id", (request, response) => {
+  try { workQueue.removeRule(request.params.id); broadcast(); response.json({ ok: true }); } catch (error) { queueFailure(response, error); }
+});
 
 app.get("/api/runner", (_request, response) => {
   const health = db.getRunnerHealth();
@@ -3815,11 +3836,16 @@ app.post("/api/internal/tools", async (request, response) => {
         const reason = mailSeen.check(checked.data, runId);
         if (reason) return response.status(400).json({ error: reason });
       }
-      const result = workQueue.propose(card, { botId, runId });
+      const result = workQueue.propose(card, { botId, runId, sender: checked.success ? mailSeen.sender(checked.data, runId) : null });
       if (!result.ok) return response.status(result.reason === "invalid" ? 400 : 409).json({ error: result.message });
-      db.addActivity({ runId, botId, kind: "tool", label: `Prepared for review: ${result.item.title}`, detail: result.item.why });
+      // If the owner already trusts this narrow kind of card, it is done now and shows under "Done for you" with Undo.
+      const item = await workQueue.runRules(result.item);
+      const byRule = item.status === "done";
+      db.addActivity({ runId, botId, kind: "tool", label: byRule ? `Done on its own (a rule you set): ${item.title}` : `Prepared for review: ${item.title}`, detail: item.why });
       broadcast();
-      return response.json({ added: true, id: result.item.id, message: "Added to the owner's Waiting for you list. Nothing has been done yet: the owner approves each card, and nothing is ever sent. Do not describe it as done." });
+      return response.json({ added: true, id: item.id, message: byRule
+        ? "Done: a rule the owner set for this exact kind of card handled it, and it appears under Done for you with an Undo. Nothing was sent."
+        : "Added to the owner's Waiting for you list. Nothing has been done yet: the owner approves each card, and nothing is ever sent. Do not describe it as done." });
     }
     if (action === "work_collect") {
       const snapshot = await workReports.collect(botId, runId, args);

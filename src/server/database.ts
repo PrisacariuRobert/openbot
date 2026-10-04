@@ -159,6 +159,23 @@ export type QueueItemRecord = {
   decidedAt: string | null;
   decidedBy: string | null;
   undoneAt: string | null;
+  /** The narrow kind of thing this card is ("reminder|billing@acme.com|Bills"), or null when it can never be automatic. */
+  pattern: string | null;
+};
+
+/** A person's standing "yes" to one narrow pattern. Active rules run matching cards by themselves;
+ * paused ones wait for the person; declined ones are never offered again. */
+export type QueueRuleStatus = "active" | "paused" | "declined";
+export type QueueRuleRecord = {
+  id: string;
+  kind: string;
+  pattern: string;
+  status: QueueRuleStatus;
+  pausedReason: string | null;
+  uses: number;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt: string | null;
 };
 
 /** One durable action-journal row (R02). Renderer-independent companion to
@@ -691,9 +708,21 @@ export class OpenBotDatabase {
         expires_at TEXT NOT NULL,
         decided_at TEXT,
         decided_by TEXT,
-        undone_at TEXT
+        undone_at TEXT,
+        pattern TEXT
       );
       CREATE INDEX IF NOT EXISTS queue_items_status ON queue_items(status, created_at);
+      CREATE TABLE IF NOT EXISTS queue_rules (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        pattern TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused','declined')),
+        paused_reason TEXT,
+        uses INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_used_at TEXT
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS queue_items_active_source ON queue_items(kind, source_key) WHERE status IN ('ready','done');
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY,
@@ -1150,7 +1179,8 @@ export class OpenBotDatabase {
       token TEXT PRIMARY KEY, run_id TEXT NOT NULL, bot_id TEXT NOT NULL,
       effect_digest TEXT, approval_id TEXT, created_at TEXT NOT NULL
     )`);
-    this.addColumn("mutation_tokens", "effect_digest TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
+    this.addColumn("mutation_tokens", "effect_digest TEXT");
+    this.addColumn("queue_items", "pattern TEXT");    this.db.exec("UPDATE taught_workflows SET updated_at=created_at WHERE updated_at IS NULL OR updated_at=''");
     this.db.exec(`INSERT OR IGNORE INTO workflow_versions (id,workflow_id,version,name,description,instructions,start_url,steps_json,created_at)
       SELECT lower(hex(randomblob(16))),id,COALESCE(version,1),name,COALESCE(description,''),COALESCE(instructions,''),start_url,steps_json,COALESCE(updated_at,created_at) FROM taught_workflows`);
     this.db.prepare("INSERT OR IGNORE INTO runner_state (id,mode,recovered_runs,dispatched_runs) VALUES ('primary','foreground',0,0)").run();
@@ -1972,6 +2002,8 @@ export class OpenBotDatabase {
       wipe("notification_outbox");
       wipe("notification_deliveries");
       wipe("auto_review_rules");
+      wipe("queue_items");
+      wipe("queue_rules");
       wipe("dedupe_keys");
       this.db.exec("COMMIT");
     } catch (error) {
@@ -2995,12 +3027,12 @@ export class OpenBotDatabase {
 
   /** Adds a card. Returns null when an active card for the same source
    * already exists (the same email never makes two cards). */
-  queueItemInsert(input: { kind: string; title: string; why: string; sourceKey: string; botId: string | null; runId: string | null; action: Record<string, unknown>; preview: string; expiresAt: string }): QueueItemRecord | null {
+  queueItemInsert(input: { kind: string; title: string; why: string; sourceKey: string; botId: string | null; runId: string | null; action: Record<string, unknown>; preview: string; expiresAt: string; pattern?: string | null }): QueueItemRecord | null {
     const id = `q-${randomUUID().slice(0, 12)}`;
     try {
       this.db.prepare(
-        "INSERT INTO queue_items (id,kind,status,title,why,source_key,bot_id,run_id,action_json,preview,created_at,expires_at) VALUES (?,?,'ready',?,?,?,?,?,?,?,?,?)",
-      ).run(id, input.kind, input.title, input.why, input.sourceKey, input.botId, input.runId, JSON.stringify(input.action), input.preview, now(), input.expiresAt);
+        "INSERT INTO queue_items (id,kind,status,title,why,source_key,bot_id,run_id,action_json,preview,created_at,expires_at,pattern) VALUES (?,?,'ready',?,?,?,?,?,?,?,?,?,?)",
+      ).run(id, input.kind, input.title, input.why, input.sourceKey, input.botId, input.runId, JSON.stringify(input.action), input.preview, now(), input.expiresAt, input.pattern ?? null);
     } catch (error) {
       if (/UNIQUE/i.test(String(error))) return null;
       throw error;
@@ -3027,8 +3059,9 @@ export class OpenBotDatabase {
     return row ? this.queueItemFromRow(row) : null;
   }
 
+  /** Cards made since a moment that needed a person's look. Things a rule did by itself do not crowd the list. */
   queueItemsCreatedSince(iso: string): number {
-    return Number((this.db.prepare("SELECT COUNT(*) AS n FROM queue_items WHERE created_at>=?").get(iso) as Row).n);
+    return Number((this.db.prepare("SELECT COUNT(*) AS n FROM queue_items WHERE created_at>=? AND (decided_by IS NULL OR decided_by NOT LIKE 'rule:%')").get(iso) as Row).n);
   }
 
   /** Moves one card between states. `from` makes the change conditional, so
@@ -3066,6 +3099,76 @@ export class OpenBotDatabase {
       decidedAt: row.decided_at == null ? null : String(row.decided_at),
       decidedBy: row.decided_by == null ? null : String(row.decided_by),
       undoneAt: row.undone_at == null ? null : String(row.undone_at),
+      pattern: row.pattern == null ? null : String(row.pattern),
+    };
+  }
+
+  /** How many times in a row a person approved this pattern, newest first, with nothing in between
+   * that they skipped or undid. Cards a rule ran by itself do not count. */
+  queuePatternStreak(pattern: string): number {
+    const rows = this.db.prepare(
+      "SELECT status FROM queue_items WHERE pattern=? AND ((status='done' AND decided_by='person') OR status IN ('skipped','undone')) ORDER BY COALESCE(decided_at, created_at) DESC, created_at DESC LIMIT 50",
+    ).all(pattern) as Row[];
+    let streak = 0;
+    for (const row of rows) { if (String(row.status) !== "done") break; streak++; }
+    return streak;
+  }
+
+  /** Patterns a person has approved at least once, with their kind: the candidates for an offer. */
+  queueApprovedPatterns(): { pattern: string; kind: string }[] {
+    return (this.db.prepare("SELECT DISTINCT pattern, kind FROM queue_items WHERE pattern IS NOT NULL AND status='done' AND decided_by='person'").all() as Row[])
+      .map((row) => ({ pattern: String(row.pattern), kind: String(row.kind) }));
+  }
+
+  /** Cards a rule ran by itself since a moment, newest first (the weekly "what I did alone"). */
+  queueItemsDecidedByRulesSince(iso: string): QueueItemRecord[] {
+    return (this.db.prepare("SELECT * FROM queue_items WHERE decided_by LIKE 'rule:%' AND status IN ('done','undone') AND decided_at>=? ORDER BY decided_at DESC LIMIT 200").all(iso) as Row[]).map((row) => this.queueItemFromRow(row));
+  }
+
+  queueRuleList(): QueueRuleRecord[] {
+    return (this.db.prepare("SELECT * FROM queue_rules ORDER BY created_at DESC").all() as Row[]).map((row) => this.queueRuleFromRow(row));
+  }
+
+  queueRuleGet(id: string): QueueRuleRecord | null {
+    const row = this.db.prepare("SELECT * FROM queue_rules WHERE id=?").get(id) as Row | undefined;
+    return row ? this.queueRuleFromRow(row) : null;
+  }
+
+  queueRuleFindByPattern(pattern: string): QueueRuleRecord | null {
+    const row = this.db.prepare("SELECT * FROM queue_rules WHERE pattern=?").get(pattern) as Row | undefined;
+    return row ? this.queueRuleFromRow(row) : null;
+  }
+
+  /** Returns null when a rule (in any state) already exists for the pattern. */
+  queueRuleInsert(kind: string, pattern: string, status: QueueRuleStatus): QueueRuleRecord | null {
+    const id = `qr-${randomUUID().slice(0, 12)}`;
+    const stamp = now();
+    try {
+      this.db.prepare("INSERT INTO queue_rules (id,kind,pattern,status,created_at,updated_at) VALUES (?,?,?,?,?,?)").run(id, kind, pattern, status, stamp, stamp);
+    } catch (error) {
+      if (/UNIQUE/i.test(String(error))) return null;
+      throw error;
+    }
+    return this.queueRuleGet(id);
+  }
+
+  /** Changes a rule's state only from the states given, so a late tap cannot undo a newer decision. */
+  queueRuleTransition(id: string, from: QueueRuleStatus[], status: QueueRuleStatus, pausedReason: string | null = null): QueueRuleRecord | null {
+    const marks = from.map(() => "?").join(",");
+    const changed = this.db.prepare(`UPDATE queue_rules SET status=?, paused_reason=?, updated_at=? WHERE id=? AND status IN (${marks})`).run(status, status === "paused" ? pausedReason : null, now(), id, ...from).changes;
+    return changed === 1 ? this.queueRuleGet(id) : null;
+  }
+
+  queueRuleRecordUse(id: string) {
+    const stamp = now();
+    this.db.prepare("UPDATE queue_rules SET uses=uses+1, last_used_at=?, updated_at=? WHERE id=?").run(stamp, stamp, id);
+  }
+
+  private queueRuleFromRow(row: Row): QueueRuleRecord {
+    return {
+      id: String(row.id), kind: String(row.kind), pattern: String(row.pattern), status: String(row.status) as QueueRuleStatus,
+      pausedReason: row.paused_reason == null ? null : String(row.paused_reason), uses: Number(row.uses),
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at), lastUsedAt: row.last_used_at == null ? null : String(row.last_used_at),
     };
   }
 
