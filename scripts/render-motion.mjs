@@ -23,6 +23,7 @@ const film = arg("film", "waiting-for-you");
 const format = arg("format", "vertical");
 const fps = Number(arg("fps", "30"));
 const preview = arg("preview", "");
+const audio = arg("audio", "");   // a WAV to lay under the film, e.g. from scripts/motion/make-audio.mjs
 const chrome = arg("chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
 const sizes = { vertical: { width: 1080, height: 1920 }, landscape: { width: 1920, height: 1080 }, square: { width: 1080, height: 1080 } };
 const size = sizes[format];
@@ -35,7 +36,9 @@ const work = mkdtempSync(path.join(tmpdir(), "sidemates-film-"));
 const character = (file) => readFileSync(path.join(root, "site/characters", file), "utf8").replace(/<svg /, '<svg aria-hidden="true" ');
 const html = readFileSync(path.join(root, "scripts/motion", `${film}.html`), "utf8")
   .replaceAll("{{nova}}", () => character("nova.svg"))
-  .replaceAll("{{pixel}}", () => character("blob.svg")).replaceAll("{{scout}}", () => character("sprout.svg"));
+  .replaceAll("{{pixel}}", () => character("blob.svg")).replaceAll("{{scout}}", () => character("sprout.svg"))
+  // Real pieces of the screen, captured by scripts/capture-queue-stills.mjs (node --import tsx scripts/capture-queue-stills.mjs).
+  .replaceAll("{{stills}}", () => `file://${path.resolve(root, arg("stills", "marketing/queue/media/stills"))}`);
 const page_file = path.join(work, "film.html");
 writeFileSync(page_file, html);
 
@@ -65,7 +68,9 @@ try {
       await shot(i / fps, path.join(work, `f${String(i).padStart(5, "0")}.png`));
       if (i % 90 === 0) console.log(`frame ${i}/${frames}`);
     }
-    const made = spawnSync("ffmpeg", ["-y", "-framerate", String(fps), "-i", path.join(work, "f%05d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "15", "-preset", "medium", "-movflags", "+faststart", out], { encoding: "utf8" });
+    const inputs = ["-framerate", String(fps), "-i", path.join(work, "f%05d.png"), ...(audio ? ["-i", path.resolve(audio)] : [])];
+    const codecs = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "15", "-preset", "medium", ...(audio ? ["-c:a", "aac", "-b:a", "192k", "-shortest"] : []), "-movflags", "+faststart"];
+    const made = spawnSync("ffmpeg", ["-y", ...inputs, ...codecs, out], { encoding: "utf8" });
     if (made.status !== 0) { console.error(String(made.stderr).slice(-1500)); process.exit(1); }
     console.log(`Wrote ${path.relative(root, out)} (${duration}s, ${size.width}x${size.height}, ${fps} fps).`);
   }
