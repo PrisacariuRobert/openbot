@@ -1092,6 +1092,8 @@ export interface AppState {
   weeklyRecap?: import("./weekly-recap").WeeklyRecap | null;
   /** How many "Waiting for you" cards need a decision. */
   queueReady?: number;
+  /** True only in a demo studio: Waiting for you answers with sample results and touches nothing. */
+  demoMac?: boolean;
   bots: Bot[];
   threads: Thread[];
   messages: Message[];

@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
+import { demoQueueExecutor } from "./demo-mac.js";
 import { QUEUE_AUTO_PER_DAY, QUEUE_CARDS_PER_DAY, QUEUE_OFFER_AFTER, QueueError, WorkQueue, patternLabel, proposalFromFlatArgs, queuePattern, queueProposalInput, senderKey, type QueueExecutor } from "./queue.js";
 
 /** A Mac that records what it was asked to do. */
@@ -447,4 +448,25 @@ test("a vendor that looks like a spreadsheet formula, or holds a comma or quote,
     assert.match(csv, /"'=HYPERLINK\(""http:\/\/evil\.example"",""x""\), Inc"/, "a leading = becomes text, quotes are doubled");
     assert.match(csv, /,'\+1-555,/, "a leading + becomes text");
   } finally { done(); }
+});
+
+test("sample Mac mode answers every kind of card and undoes it without touching any file", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sidemates-demo-mac-"));
+  const home = path.join(root, "home");
+  const db = new OpenBotDatabase(root);
+  try {
+    const sample = demoQueueExecutor(home);
+    const queue = new WorkQueue(db, () => sample, undefined, { cardsPerDay: 100 });
+    const cards = [reminder("mail:1"), eventCard("mail:2"), draftCard("mail:3"), fileCard("mail:4")];
+    for (const card of cards) {
+      const made = queue.propose(card, { botId: null, runId: null });
+      assert.ok(made.ok); if (!made.ok) return;
+      const done = await queue.approve(made.item.id);
+      assert.equal(done.status, "done");
+      assert.ok(done.result);
+      await queue.undo(done.id);
+    }
+    assert.equal(db.queueItemsList(["undone"]).length, 4);
+    assert.equal(existsSync(home), false, "sample mode never creates a folder or a file");
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });

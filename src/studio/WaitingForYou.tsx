@@ -72,7 +72,7 @@ export function WaitingEntry({ count, active, onOpen }: { count: number; active:
   </button>;
 }
 
-export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; onChanged: () => void }) {
+export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?: number; demoMac?: boolean; onChanged: () => void }) {
   const [ready, setReady] = useState<QueueCard[]>([]);
   const [recent, setRecent] = useState<QueueCard[]>([]);
   const [offers, setOffers] = useState<QueueOffer[]>([]);
@@ -155,6 +155,7 @@ export function WaitingForYou({ queueReady, onChanged }: { queueReady?: number; 
         <h1>{!loaded ? "Looking…" : ready.length === 0 ? "All clear" : ready.length === 1 ? "One thing needs a look" : `${ready.length} things need a look`}</h1>
       </div>
     </div>
+    {demoMac && <p className="waiting-demo" role="note"><strong>Sample data.</strong> This is a demo studio: approving shows what would happen, and nothing is changed on a real Mac.</p>}
     <p className="waiting-promise">Nothing happens until you say so. Replies are saved as drafts you send yourself, and anything done on your Mac can be undone.</p>
 
     {offers.map((offer) => <section key={offer.pattern} className="waiting-offer" aria-label="Make this automatic?">
