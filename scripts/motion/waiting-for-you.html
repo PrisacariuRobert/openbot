@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Waiting for you: motion film</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  A 30-second motion-graphics film about "Waiting for you". Everything is drawn in HTML and CSS and driven by one
+  timeline: window.__seek(seconds) puts every animation at that moment, so a renderer can take exact frames.
+  All names, amounts and files are sample data. The teammates (Nova, Pixel, Scout) and colours are the real ones.
+  Rendered by scripts/render-motion.mjs, which fills {{nova}}, {{pixel}} and {{scout}} with the character drawings.
+-->
+<style>
+  :root {
+    --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #ffffff; --cloud: #f4f3f0; --line: #e7e5e0;
+    --nova: #6757d9; --nova-dark: #4c3fb8; --nova-light: #e9e6fb;
+    --pixel: #d86889; --pixel-dark: #b44a6b; --pixel-light: #fbe6ed;
+    --scout: #299575; --scout-dark: #1c735a; --scout-light: #dcf2ea;
+    --sun: #ffc83d; --sun-dark: #e0a400;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    --pop: cubic-bezier(.34, 1.56, .64, 1);
+    --smooth: cubic-bezier(.22, 1, .36, 1);
+  }
+  @property --n { syntax: "<integer>"; inherits: false; initial-value: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--cloud); font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+  /* ---- the world behind the film: soft drifting colour ---- */
+  #world { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, var(--cloud) 70%); }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; animation: drift 14s ease-in-out infinite alternate; }
+  .blob.b1 { width: 62vmax; height: 62vmax; left: -22vmax; top: -18vmax; background: var(--nova-light); }
+  .blob.b2 { width: 54vmax; height: 54vmax; right: -20vmax; top: 22vmax; background: var(--pixel-light); animation-duration: 18s; animation-delay: -4s; }
+  .blob.b3 { width: 58vmax; height: 58vmax; left: 8vmax; bottom: -30vmax; background: var(--scout-light); animation-duration: 16s; animation-delay: -9s; }
+  @keyframes drift { from { translate: -3vmax -2vmax; } to { translate: 4vmax 3vmax; } }
+
+  /* ---- the fixed-size frame everything is designed in (1080 x 1350), scaled to fit ---- */
+  #frame { position: absolute; left: 50%; top: 50%; width: 1080px; height: 1350px; transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: 50% 50%; }
+  .layer { position: absolute; inset: 0; }
+
+  /* ---- the animation vocabulary: every element says when it arrives (--t) and leaves (--x), in seconds ---- */
+  .a { animation: pop .62s var(--pop) calc(var(--t, 0) * 1s) both, gone .35s ease calc(var(--x, 9999) * 1s) forwards; }
+  .a.rise { animation-name: rise, gone; animation-duration: .7s, .35s; animation-timing-function: var(--smooth), ease; }
+  .a.fade { animation-name: fade, gone; animation-duration: .6s, .35s; animation-timing-function: ease, ease; }
+  @keyframes pop  { from { opacity: 0; scale: .55; translate: 0 26px; } 55% { opacity: 1; } to { opacity: 1; scale: 1; translate: 0 0; } }
+  @keyframes rise { from { opacity: 0; translate: 0 70px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes gone { to { opacity: 0; } }
+  @keyframes slideaway { to { opacity: 0; translate: -120px -30px; scale: .94; rotate: -2deg; } }
+  @keyframes bob { 0%, 100% { translate: 0 0; scale: 1 1; } 50% { translate: 0 -14px; scale: 1.03 .97; } }
+  @keyframes wobble { 0%, 100% { rotate: calc(var(--r, 0deg) - 2deg); } 50% { rotate: calc(var(--r, 0deg) + 2deg); } }
+  @keyframes suck { 0% { opacity: 1; } 100% { opacity: 0; translate: var(--dx) var(--dy); scale: .15; } }
+  @keyframes draw { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+  @keyframes ring { 0% { opacity: .6; scale: .3; } 100% { opacity: 0; scale: 1.9; } }
+  @keyframes spin { to { rotate: -360deg; } }
+  @keyframes count { from { --n: 0; } to { --n: var(--to); } }
+  @keyframes swap-out { to { opacity: 0; translate: 0 -10px; } }
+  @keyframes swap-in { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes press { 0%, 100% { scale: 1; } 50% { scale: .94; filter: brightness(.92); } }
+  @keyframes tap { 0% { opacity: 0; translate: 90px 150px; scale: 1; } 25% { opacity: 1; } 60% { opacity: 1; translate: 0 0; scale: 1; } 72% { translate: 0 0; scale: .78; } 84% { translate: 0 0; scale: 1; opacity: 1; } 100% { opacity: 0; translate: 20px 40px; scale: 1; } }
+  @keyframes strike { from { width: 0; } to { width: 100%; } }
+  @keyframes streak { from { opacity: 0; translate: -40px 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes sparkle { 0% { opacity: 0; scale: .2; translate: 0 0; } 25% { opacity: 1; } 100% { opacity: 0; scale: 1; translate: var(--sx) var(--sy); } }
+
+  /* ---- type ---- */
+  .headline { position: absolute; left: 60px; right: 60px; text-align: center; font-weight: 900; letter-spacing: -.035em; line-height: .98; }
+  .headline em { font-style: normal; color: var(--nova); }
+  .sub { position: absolute; left: 90px; right: 90px; text-align: center; font-weight: 600; color: var(--ink-2); letter-spacing: -.01em; line-height: 1.25; }
+
+  /* ---- chips piling up in scene 1 ---- */
+  .chip { position: absolute; display: inline-flex; align-items: center; gap: 14px; padding: 18px 28px 18px 22px; border-radius: 999px; background: #fff; box-shadow: 0 14px 34px rgba(30, 30, 60, .13), 0 2px 0 rgba(0,0,0,.04); font-size: 36px; font-weight: 700; white-space: nowrap; }
+  .chip.a { animation: pop .62s var(--pop) calc(var(--t, 0) * 1s) both, suck .55s cubic-bezier(.6, 0, .9, .4) calc(var(--x, 9999) * 1s - .5s) forwards; }
+  .chip .ic { font-size: 40px; }
+  .chip.dot::after { content: ""; position: absolute; right: -6px; top: -6px; width: 22px; height: 22px; border-radius: 50%; background: #ff4d4f; border: 4px solid #fff; }
+  .chip .wob { display: inline-flex; animation: wobble 1.6s ease-in-out infinite; }
+
+  /* ---- characters ---- */
+  .who { position: absolute; width: 230px; height: 230px; }
+  .who svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .who .bobber { width: 100%; height: 100%; animation: bob 2.2s ease-in-out infinite; animation-delay: calc(var(--b, 0) * -1s); }
+  .tag { position: absolute; left: 50%; bottom: -18px; translate: -50% 0; padding: 6px 18px; border-radius: 999px; font-size: 28px; font-weight: 800; background: #fff; box-shadow: 0 6px 16px rgba(30,30,60,.12); }
+
+  /* ---- cards ---- */
+  .card { position: absolute; left: 90px; width: 900px; background: #fff; border-radius: 44px; padding: 40px 44px 40px; box-shadow: 0 30px 70px rgba(40, 30, 90, .16), 0 3px 0 rgba(0,0,0,.03); }
+  .kind { display: inline-flex; align-items: center; gap: 10px; padding: 8px 20px; border-radius: 999px; font-size: 26px; font-weight: 800; letter-spacing: .01em; }
+  .kind.reply { background: var(--pixel-light); color: var(--pixel-dark); }
+  .kind.rem { background: #fff2cf; color: #9a6b00; }
+  .kind.file { background: var(--scout-light); color: var(--scout-dark); }
+  .kind.nova { background: var(--nova-light); color: var(--nova-dark); }
+  .card h3 { margin: 18px 0 6px; font-size: 54px; font-weight: 900; letter-spacing: -.03em; line-height: 1.04; }
+  .card p.why { margin: 0; font-size: 31px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+  .quote { margin: 22px 0 0; padding: 20px 26px; border-radius: 26px; background: var(--cloud); font-size: 32px; line-height: 1.35; font-weight: 600; color: var(--ink-2); }
+  .meta { margin: 22px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 10px 22px; padding: 20px 26px; border-radius: 26px; background: var(--cloud); font-size: 30px; font-weight: 600; }
+  .meta b { color: var(--muted); font-weight: 700; }
+  .action { position: relative; margin-top: 28px; height: 104px; }
+  .btn { position: absolute; left: 0; top: 0; height: 104px; padding: 0 46px; display: inline-flex; align-items: center; border-radius: 30px; background: var(--nova); color: #fff; font-size: 40px; font-weight: 800; box-shadow: 0 10px 0 var(--nova-dark); }
+  .btn.skip { left: auto; background: var(--cloud); color: var(--ink); box-shadow: none; }
+  .done-line { position: absolute; left: 0; top: 0; height: 104px; display: inline-flex; align-items: center; gap: 18px; font-size: 38px; font-weight: 800; color: var(--scout-dark); }
+  .tick { width: 74px; height: 74px; border-radius: 50%; background: var(--scout); display: grid; place-items: center; position: relative; }
+  .tick svg { width: 44px; height: 44px; }
+  .tick svg path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: draw .4s ease calc(var(--t) * 1s + .1s) forwards; }
+  .tick::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 5px solid var(--scout); opacity: 0; animation: ring .7s ease-out calc(var(--t) * 1s) both; }
+  .cursor { position: absolute; width: 74px; height: 74px; z-index: 9; pointer-events: none; opacity: 0; }
+  .cursor svg { width: 100%; height: 100%; filter: drop-shadow(0 8px 10px rgba(0,0,0,.28)); }
+  .cursor.go { animation: tap 1.15s ease calc(var(--t) * 1s) both; }
+
+  /* ---- scene 4: trust ---- */
+  .dots { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 28px; }
+  .dot5 { width: 96px; height: 96px; border-radius: 50%; background: var(--scout); display: grid; place-items: center; color: #fff; font-size: 46px; font-weight: 900; }
+  .lock { display: inline-flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: var(--scout-light); color: var(--scout-dark); font-size: 32px; font-weight: 800; }
+
+  /* ---- scene 5: undo ---- */
+  .row { position: absolute; left: 90px; width: 900px; height: 150px; border-radius: 38px; background: #fff; box-shadow: 0 24px 56px rgba(40, 30, 90, .14); display: flex; align-items: center; padding: 0 40px; gap: 26px; font-size: 42px; font-weight: 800; }
+  .row .small { font-size: 28px; font-weight: 600; color: var(--muted); display: block; }
+  .undo-btn { margin-left: auto; height: 84px; padding: 0 34px; border-radius: 26px; background: var(--cloud); display: inline-flex; align-items: center; gap: 12px; font-size: 36px; font-weight: 800; }
+  .undo-btn svg { width: 38px; height: 38px; }
+  .strike { position: absolute; left: 40px; top: 50%; height: 6px; border-radius: 3px; background: var(--ink); width: 0; }
+
+  /* ---- scene 6: the list for the accountant ---- */
+  .sheet { position: absolute; left: 90px; width: 900px; border-radius: 38px; background: #fff; box-shadow: 0 30px 70px rgba(40, 30, 90, .16); overflow: hidden; }
+  .sheet .head, .sheet .line { display: grid; grid-template-columns: 1.1fr 1.4fr .9fr; padding: 0 36px; align-items: center; font-size: 31px; font-weight: 700; }
+  .sheet .head { height: 76px; background: var(--ink); color: #fff; font-size: 26px; letter-spacing: .06em; text-transform: uppercase; }
+  .sheet .line { height: 92px; border-bottom: 2px solid var(--line); }
+  .sheet .line span:last-child, .sheet .head span:last-child { text-align: right; }
+  .total { display: flex; justify-content: space-between; align-items: center; height: 118px; padding: 0 36px; background: var(--scout-light); color: var(--scout-dark); font-size: 40px; font-weight: 900; }
+  .counter { counter-reset: n var(--n); animation: count 1.3s cubic-bezier(.2,.7,.2,1) calc(var(--t) * 1s) both; }
+  .counter::after { content: counter(n) ".00 EUR"; }
+  .dl { display: inline-flex; align-items: center; gap: 14px; padding: 22px 38px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 38px; font-weight: 800; }
+
+  /* ---- finale ---- */
+  .big { position: absolute; left: 0; right: 0; text-align: center; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+  .brand { display: inline-flex; align-items: center; gap: 18px; font-weight: 900; letter-spacing: -.03em; }
+  .brand svg { width: 1em; height: 1em; }
+  .pill { display: inline-block; padding: 16px 34px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 34px; font-weight: 800; }
+  .sparkle { position: absolute; width: 22px; height: 22px; border-radius: 50%; animation: sparkle 1.1s ease-out calc(var(--t) * 1s) both; }
+
+  /* ---- a quiet wordmark outside the frame (the room that vertical video gives us) ---- */
+  #mark { position: absolute; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 900; letter-spacing: -.03em; color: var(--ink); opacity: .9; }
+  #mark svg { width: 44px; height: 44px; vertical-align: -9px; margin-right: 12px; }
+  #foot { position: absolute; left: 0; right: 0; text-align: center; font-size: 28px; font-weight: 700; color: var(--muted); }
+  body.vertical #mark { top: 96px; } body.vertical #foot { bottom: 92px; }
+  body.landscape #mark { left: 56px; right: auto; top: 44px; text-align: left; }
+  body.landscape #foot { left: auto; right: 56px; bottom: 40px; text-align: right; }
+  body.square #mark { top: 28px; font-size: 32px; } body.square #foot { display: none; }
+</style>
+</head>
+<body class="vertical">
+<div id="world"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<div id="mark"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>sidemates</div>
+<div id="foot">Sample names and amounts · free and open source</div>
+
+<div id="frame">
+
+  <!-- ============ 1. Your inbox keeps asking (0 – 3.6 s) ============ -->
+  <div class="layer" id="s1">
+    <div class="headline a rise" style="--t:.1; --x:3.5; top:150px; font-size:128px">Your inbox<br><em>keeps asking.</em></div>
+    <div class="chip dot a" style="--t:.55; --x:3.5; left:70px;  top:620px; --r:-6deg; rotate:-6deg; --dx:420px; --dy:-120px"><span class="ic">✉️</span><span class="wob">23 unread</span></div>
+    <div class="chip a" style="--t:.8;  --x:3.5; left:520px; top:560px; --r:5deg; rotate:5deg; --dx:-30px; --dy:-60px"><span class="ic">📅</span><span class="wob">RSVP?</span></div>
+    <div class="chip dot a" style="--t:1.05; --x:3.5; left:120px; top:780px; --r:4deg; rotate:4deg; --dx:380px; --dy:-280px"><span class="ic">🧾</span><span class="wob">Due Friday</span></div>
+    <div class="chip a" style="--t:1.3; --x:3.5; left:560px; top:760px; --r:-4deg; rotate:-4deg; --dx:-60px; --dy:-240px"><span class="ic">📎</span><span class="wob">invoice.pdf</span></div>
+    <div class="chip dot a" style="--t:1.55; --x:3.5; left:60px;  top:960px; --r:-3deg; rotate:-3deg; --dx:430px; --dy:-430px"><span class="ic">💬</span><span class="wob">Anna is waiting</span></div>
+    <div class="chip a" style="--t:1.8; --x:3.5; left:470px; top:960px; --r:6deg; rotate:6deg; --dx:-10px; --dy:-420px"><span class="ic">🏫</span><span class="wob">Concert 14 Oct</span></div>
+    <div class="chip a" style="--t:2.05; --x:3.5; left:250px; top:1120px; --r:-2deg; rotate:-2deg; --dx:290px; --dy:-560px"><span class="ic">🔔</span><span class="wob">3 reminders overdue</span></div>
+  </div>
+
+  <!-- ============ 2. Meet your sidemates (3.4 – 7.4 s) ============ -->
+  <div class="layer" id="s2">
+    <div class="headline a rise" style="--t:3.5; --x:7.3; top:130px; font-size:124px">Meet your<br><em>sidemates.</em></div>
+    <div class="who a" style="--t:3.9; --x:7.3; left:100px; top:560px; --b:0"><div class="bobber">{{nova}}</div><span class="tag" style="color:var(--nova-dark)">Nova</span></div>
+    <div class="who a" style="--t:4.15; --x:7.3; left:425px; top:520px; --b:.7"><div class="bobber">{{pixel}}</div><span class="tag" style="color:var(--pixel-dark)">Pixel</span></div>
+    <div class="who a" style="--t:4.4; --x:7.3; left:750px; top:560px; --b:1.4"><div class="bobber">{{scout}}</div><span class="tag" style="color:var(--scout-dark)">Scout</span></div>
+    <div class="card a" style="--t:5.1; --x:7.3; left:100px; width:260px; top:900px; padding:22px 24px; border-radius:30px"><span class="kind reply" style="font-size:22px">Reply</span><div style="font-size:30px;font-weight:900;margin-top:10px;letter-spacing:-.02em">Anna</div></div>
+    <div class="card a" style="--t:5.3; --x:7.3; left:410px; width:260px; top:900px; padding:22px 24px; border-radius:30px"><span class="kind rem" style="font-size:22px">Reminder</span><div style="font-size:30px;font-weight:900;margin-top:10px;letter-spacing:-.02em">Gas bill</div></div>
+    <div class="card a" style="--t:5.5; --x:7.3; left:720px; width:260px; top:900px; padding:22px 24px; border-radius:30px"><span class="kind file" style="font-size:22px">File</span><div style="font-size:30px;font-weight:900;margin-top:10px;letter-spacing:-.02em">Invoice</div></div>
+    <div class="sub a rise" style="--t:6.1; --x:7.3; top:1090px; font-size:50px">They prepare it<br>while you're away.</div>
+  </div>
+
+  <!-- ============ 3. You decide (7.2 – 14.6 s) ============ -->
+  <div class="layer" id="s3">
+    <div class="headline a rise" style="--t:7.3; --x:14.5; top:90px; font-size:148px">You <em>decide.</em></div>
+    <div class="sub a rise" style="--t:7.7; --x:14.5; top:260px; font-size:40px">Nothing happens until you say so.</div>
+
+    <!-- card A: a reply, saved as a draft, never sent -->
+    <div class="card a" style="--t:7.9; --x:9.95; top:380px; animation: pop .62s var(--pop) 7.9s both, slideaway .45s ease 9.55s forwards;">
+      <span class="kind reply">✉︎ Reply</span>
+      <h3>Reply to Anna about Friday</h3>
+      <p class="why">Anna asked on Tuesday. Nobody has answered yet.</p>
+      <div class="quote">“Hi Anna, Friday works for me. I can be at the station by 6 pm.”</div>
+      <div class="action">
+        <span class="btn" style="animation: swap-out .25s ease 8.95s forwards, press .3s ease 8.85s">Save draft</span><span class="btn skip" style="right:0; animation: swap-out .25s ease 8.95s forwards">Skip</span>
+        <span class="done-line" style="--t:9.05; opacity:0; animation: swap-in .3s ease 9.05s forwards"><span class="tick" style="--t:9.05"><svg viewBox="0 0 44 44" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 23l9 9 16-19"/></svg></span>Saved as a draft. Not sent.</span>
+        <span class="cursor go" style="--t:8.0; left:150px; top:30px"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#1b1b1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+
+    <!-- card B: a reminder -->
+    <div class="card a" style="--t:9.9; --x:12.3; top:380px; animation: pop .62s var(--pop) 9.9s both, slideaway .45s ease 11.85s forwards;">
+      <span class="kind rem">🔔 Reminder</span>
+      <h3>Pay the gas bill</h3>
+      <p class="why">Your provider's email says it is due this Friday.</p>
+      <div class="meta"><b>Reminder</b><span>Pay the gas bill</span><b>Due</b><span>Fri, 9 Oct, 09:00</span></div>
+      <div class="action">
+        <span class="btn" style="animation: swap-out .25s ease 11.2s forwards, press .3s ease 11.1s">Add reminder</span><span class="btn skip" style="right:0; animation: swap-out .25s ease 11.2s forwards">Skip</span>
+        <span class="done-line" style="--t:11.3; opacity:0; animation: swap-in .3s ease 11.3s forwards"><span class="tick" style="--t:11.3"><svg viewBox="0 0 44 44" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 23l9 9 16-19"/></svg></span>Added to Reminders</span>
+        <span class="cursor go" style="--t:10.3; left:150px; top:30px"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#1b1b1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+
+    <!-- card C: an invoice, filed with its amount -->
+    <div class="card a" style="--t:12.2; --x:14.45; top:380px; animation: pop .62s var(--pop) 12.2s both, slideaway .45s ease 14.1s forwards;">
+      <span class="kind file">📎 File</span>
+      <h3>File the Acme invoice</h3>
+      <p class="why">Acme sent invoice 1045. Invoices go in your Receipts folder.</p>
+      <div class="meta"><b>File</b><span>invoice-1045.pdf</span><b>Into</b><span>~/Documents/Receipts</span><b>Amount</b><span>125.00 EUR · Acme</span></div>
+      <div class="action">
+        <span class="btn" style="animation: swap-out .25s ease 13.45s forwards, press .3s ease 13.35s">Save file</span><span class="btn skip" style="right:0; animation: swap-out .25s ease 13.45s forwards">Skip</span>
+        <span class="done-line" style="--t:13.55; opacity:0; animation: swap-in .3s ease 13.55s forwards"><span class="tick" style="--t:13.55"><svg viewBox="0 0 44 44" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 23l9 9 16-19"/></svg></span>Filed. Amount noted.</span>
+        <span class="cursor go" style="--t:12.55; left:130px; top:30px"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#1b1b1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 4. It offers to take over (14.4 – 18.9 s) ============ -->
+  <div class="layer" id="s4">
+    <div class="headline a rise" style="--t:14.6; --x:18.8; top:110px; font-size:112px">Same thing,<br><em>five times?</em></div>
+    <div class="dots" style="top:470px">
+      <span class="dot5 a" style="--t:15.0; --x:18.8">1</span><span class="dot5 a" style="--t:15.25; --x:18.8">2</span><span class="dot5 a" style="--t:15.5; --x:18.8">3</span><span class="dot5 a" style="--t:15.75; --x:18.8">4</span><span class="dot5 a" style="--t:16.0; --x:18.8; background:var(--nova)">5</span>
+    </div>
+    <div class="card a" style="--t:16.15; --x:18.8; top:640px">
+      <span class="kind nova">✦ An offer</span>
+      <h3>Do this for you from now on?</h3>
+      <div class="meta" style="grid-template-columns:1fr"><span>Files from <b style="color:var(--ink)">acme.com</b> saved to <b style="color:var(--ink)">Receipts</b></span></div>
+      <div style="display:flex; gap:16px; margin-top:22px; flex-wrap:wrap">
+        <span class="lock a" style="--t:16.6; --x:18.8">🔒 Only this sender</span><span class="lock a" style="--t:16.8; --x:18.8">🔒 Only this folder</span>
+      </div>
+      <div class="action">
+        <span class="btn" style="animation: swap-out .25s ease 18.05s forwards, press .3s ease 17.85s">Yes, do these automatically</span>
+        <span class="done-line" style="--t:18.15; opacity:0; animation: swap-in .3s ease 18.15s forwards"><span class="tick" style="--t:18.15"><svg viewBox="0 0 44 44" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 23l9 9 16-19"/></svg></span>On. It does these for you now.</span>
+        <span class="cursor go" style="--t:16.95; left:230px; top:30px"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#1b1b1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+    <div class="sub a rise" style="--t:18.35; --x:18.8; top:1250px; font-size:40px; font-weight:800; color:var(--scout-dark)">It earns your trust. Then it takes over.</div>
+  </div>
+
+  <!-- ============ 5. Changed your mind? Undo. (18.7 – 21.9 s) ============ -->
+  <div class="layer" id="s5">
+    <div class="headline a rise" style="--t:18.9; --x:21.8; top:130px; font-size:128px">Changed<br>your mind?</div>
+    <div class="row a" style="--t:19.5; --x:21.8; top:520px">
+      <span class="tick" style="--t:19.6"><svg viewBox="0 0 44 44" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 23l9 9 16-19"/></svg></span>
+      <span style="position:relative"><span id="rowtext" style="animation: swap-out .3s ease 20.7s forwards">Pay the gas bill<span class="small">Added to Reminders</span></span><span style="position:absolute;left:0;top:0;white-space:nowrap;opacity:0;animation: swap-in .3s ease 20.85s forwards;color:var(--muted)">Undone<span class="small">It is gone from Reminders</span></span><span class="strike" style="animation: strike .3s ease 20.45s forwards, gone .2s ease 20.85s forwards"></span></span>
+      <span class="undo-btn" style="animation: press .3s ease 20.5s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</span>
+      <span class="cursor go" style="--t:19.85; right:120px; top:56px; left:auto"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#1b1b1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+    </div>
+    <div class="a" style="--t:20.7; --x:21.8; position:absolute; left:0; right:0; top:760px; display:grid; place-items:center">
+      <svg viewBox="0 0 120 120" width="300" height="300" fill="none" stroke="var(--nova)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s var(--smooth) 20.75s both"><path d="M30 52A34 34 0 1 1 28 76"/><path d="M26 28v26h26"/></svg>
+    </div>
+    <div class="sub a rise" style="--t:21.0; --x:21.8; top:1110px; font-size:52px; font-weight:800">Anything it does on your Mac,<br>you can take back.</div>
+  </div>
+
+  <!-- ============ 6. Month-end (21.6 – 25.4 s) ============ -->
+  <div class="layer" id="s6">
+    <div class="headline a rise" style="--t:21.8; --x:25.3; top:110px; font-size:128px">Month-end?<br><em>One list.</em></div>
+    <div class="sheet a" style="--t:22.3; --x:25.3; top:400px">
+      <div class="head"><span>Vendor</span><span>Reference</span><span>Amount</span></div>
+      <div class="line a rise" style="--t:22.45"><span>Acme</span><span>INV-1041</span><span>92.50</span></div>
+      <div class="line a rise" style="--t:22.65"><span>Acme</span><span>INV-1042</span><span>105.00</span></div>
+      <div class="line a rise" style="--t:22.85"><span>Acme</span><span>INV-1043</span><span>117.50</span></div>
+      <div class="line a rise" style="--t:23.05"><span>Acme</span><span>INV-1044</span><span>130.00</span></div>
+      <div class="line a rise" style="--t:23.25"><span>Acme</span><span>INV-1045</span><span>125.00</span></div>
+      <div class="total a fade" style="--t:23.45"><span>Total</span><span class="counter" style="--t:23.5; --to:570"></span></div>
+    </div>
+    <div class="sub a rise" style="--t:23.95; --x:25.3; top:1090px; font-size:44px">Only what you approved,<br>only what the email says.</div>
+    <div class="a" style="--t:24.3; --x:25.3; position:absolute; left:0; right:0; top:1225px; text-align:center"><span class="dl">⬇︎ Download for your accountant</span></div>
+  </div>
+
+  <!-- ============ 7. Finale (25.7 – 32.2 s) ============ -->
+  <div class="layer" id="s7">
+    <div class="big a" style="--t:25.75; top:150px; font-size:112px">Your team<br><span style="color:var(--nova)">prepares it.</span></div>
+    <div class="big a" style="--t:26.65; top:470px; font-size:112px">You <span style="color:var(--pixel)">decide.</span></div>
+    <div class="big a" style="--t:27.55; top:640px; font-size:112px"><span style="color:var(--scout)">Undo</span> anything.</div>
+    <div class="who a" style="--t:28.05; left:130px; top:860px; --b:0; width:200px; height:200px"><div class="bobber">{{nova}}</div></div>
+    <div class="who a" style="--t:28.2; left:440px; top:830px; --b:.7; width:200px; height:200px"><div class="bobber">{{pixel}}</div></div>
+    <div class="who a" style="--t:28.35; left:750px; top:860px; --b:1.4; width:200px; height:200px"><div class="bobber">{{scout}}</div></div>
+    <div class="a" style="--t:28.65; position:absolute; left:0; right:0; top:1090px; text-align:center"><span class="brand" style="font-size:96px"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>sidemates</span></div>
+    <div class="a" style="--t:29.15; position:absolute; left:0; right:0; top:1215px; text-align:center"><span class="pill">Free · open source · sidemates.app</span></div>
+  </div>
+
+</div>
+
+<script>
+  // The renderer fills in the format and asks for exact moments in time.
+  const params = new URLSearchParams(location.search);
+  const format = params.get("format") || "vertical";
+  document.body.className = format;
+  const fit = () => {
+    const w = innerWidth, h = innerHeight;
+    // Vertical keeps the frame full width; landscape and square fit the frame to the height.
+    const s = format === "vertical" ? Math.min(w / 1080, h / 1350) : Math.min(w / 1080, h / 1350) * (format === "square" ? 0.94 : 0.96);
+    document.getElementById("frame").style.setProperty("--s", s);
+  };
+  fit(); addEventListener("resize", fit);
+  window.__duration = 32.2;
+  window.__seek = (seconds) => {
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = seconds * 1000;
+    }
+    return seconds;
+  };
+  window.__seek(0);
+  document.fonts.ready.then(() => { window.__ready = true; });
+</script>
+</body>
+</html>
