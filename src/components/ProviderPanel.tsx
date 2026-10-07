@@ -12,6 +12,8 @@ import { SettingsCard, SettingsGroup, SettingsRow, SegmentedControl } from "../s
 import {
   isFreeTierModel,
   isBlockedFreeTierModel,
+  trainsOnPrompts,
+  TRAINING_NOTE,
   defaultModelChoice,
   modelChoices,
   isLocalModelUrl,
@@ -784,6 +786,7 @@ export function ProviderPanel({
                           {connection?.models?.includes(model)
                             ? isBlockedFreeTierModel(model) ? " · works only inside OpenCode" : isFreeTierModel(model) ? " · Free tier" : model === defaultModelChoice(connection.models || []) ? " · Recommended" : ""
                             : " · unavailable"}
+                          {trainsOnPrompts(model) && !isBlockedFreeTierModel(model) && ` · ${TRAINING_NOTE}`}
                         </option>
                       ))}
                     </select>
@@ -793,6 +796,9 @@ export function ProviderPanel({
                     <p className="settings-row-note">{bot.name} can't work on this model: OpenCode's free tier only answers inside OpenCode's own app. Choose another model.</p>
                   ) : isFreeTierModel(bot.model) && (
                     <p className="settings-row-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
+                  )}
+                  {trainsOnPrompts(bot.model) && !isBlockedFreeTierModel(bot.model) && (
+                    <p className="settings-row-note">With this model, what {bot.name} sends to the AI, including mail, notes or files it reads, may be used to train Meta's models. Choose another model to keep it out of training.</p>
                   )}
                 </SettingsRow>
               </div>

@@ -191,14 +191,26 @@ export function apiRuntimeEnvironment(
 }
 
 /** Models known to run Sidemates teammates well, best first. The first one a
- * connection offers is shown first and preselected. */
-export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash", "google/gemini-flash-lite-latest"] as const;
+ * connection offers is shown first and preselected. Models whose provider
+ * trains on prompts come last: teammates read mail, notes and files. */
+export const RECOMMENDED_MODELS = ["opencode-go/deepseek-v4.1-flash", "google/gemini-flash-lite-latest", "opencode-go/muse-spark-1.3-contributor"] as const;
+
+/** OpenCode Go's "Contributor" models are discounted in exchange for letting
+ * Meta train on prompts and completions (opencode.ai/docs/go, checked
+ * 7 October 2026). */
+export function trainsOnPrompts(model: string): boolean {
+  return /^opencode(?:-go)?\/muse-spark-[\w.]+-contributor(?:-free)?$/i.test(model);
+}
+
+export const TRAINING_NOTE = "prompts may be used to train Meta's models";
 
 /** OpenCode's free tier only answers requests from OpenCode's own app, so it
  * rejects teammate runs (HTTP 403). Offering it would be a first-run trap. */
 export function isBlockedFreeTierModel(model: string): boolean {
   return model.startsWith("opencode/") && isFreeTierModel(model);
 }
+
+export const BLOCKED_FREE_TIER_MESSAGE = "OpenCode's free models only work inside OpenCode's own app. Choose another model for this teammate.";
 
 const MODEL_WORDS: Record<string, string> = { gpt: "GPT", glm: "GLM", ai: "AI", llm: "LLM", vl: "VL", exp: "Experimental", hy: "HY" };
 
@@ -221,12 +233,15 @@ export interface ModelChoice { value: string; label: string; detail?: string; di
 export function modelChoices(models: string[]): ModelChoice[] {
   const recommended = RECOMMENDED_MODELS.find((id) => models.includes(id));
   const rank = (model: string) => model === recommended ? 0 : isBlockedFreeTierModel(model) ? 2 : 1;
-  return [...models].sort((a, b) => rank(a) - rank(b)).map((model) => ({
-    value: model,
-    label: friendlyModelName(model),
-    detail: model === recommended ? "Recommended" : isBlockedFreeTierModel(model) ? "Free tier · works only inside OpenCode's own app" : isFreeTierModel(model) ? "Free tier" : model.split("/")[0] === "opencode-go" ? "OpenCode Go" : undefined,
-    disabled: isBlockedFreeTierModel(model) || undefined,
-  }));
+  return [...models].sort((a, b) => rank(a) - rank(b)).map((model) => {
+    const detail = model === recommended ? "Recommended" : isBlockedFreeTierModel(model) ? "Free tier · works only inside OpenCode's own app" : isFreeTierModel(model) ? "Free tier" : model.split("/")[0] === "opencode-go" ? "OpenCode Go" : undefined;
+    return {
+      value: model,
+      label: friendlyModelName(model),
+      detail: trainsOnPrompts(model) && !isBlockedFreeTierModel(model) ? [detail, TRAINING_NOTE].filter(Boolean).join(" · ") : detail,
+      disabled: isBlockedFreeTierModel(model) || undefined,
+    };
+  });
 }
 
 export function defaultModelChoice(models: string[]): string {

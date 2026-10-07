@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Safer AI defaults:
+  - A model whose provider doesn't train on your prompts is now recommended first.
+  - The Muse Spark Contributor models are labelled, because Meta may train on their prompts.
+  - OpenCode's free models only work inside OpenCode's own app, so they can no longer be chosen for a teammate; you're told why up front instead of a failed task.
+  - The Claude card says it uses the Claude Code you installed, instead of showing an "Official login" badge.
 - The website and README now say only what is true today:
   - Phone access works through Telegram, or the Home Screen app with a relay you set up; pairing with one scan is on the way.
   - The install takes a few minutes and downloads about 140 MB.

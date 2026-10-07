@@ -10,7 +10,7 @@ import path from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { workSourcesInput, type WorkSourcesSettings } from "../shared/work-sources.js";
 import { memoryKeyIdentity, type PrivateMemory } from "../shared/private-memory.js";
-import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, modelBelongsToConnection, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
+import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, modelBelongsToConnection, isBlockedFreeTierModel, BLOCKED_FREE_TIER_MESSAGE, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
 import type {
   Activity,
   AgentMessage,
@@ -3172,6 +3172,7 @@ export class OpenBotDatabase {
   chooseInitialProvider(providerId: string, model: string): number {
     const provider = this.getProvider(providerId);
     if (!provider || !modelBelongsToConnection(model, provider)) throw new Error("Choose a model from your selected AI connection.");
+    if (isBlockedFreeTierModel(model)) throw new Error(BLOCKED_FREE_TIER_MESSAGE);
     return Number(this.db.prepare("UPDATE bots SET provider_instance_id=?, model=? WHERE provider_instance_id IS NULL AND model=''").run(providerId, model).changes);
   }
 

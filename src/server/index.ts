@@ -43,7 +43,7 @@ import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
-import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
+import { BLOCKED_FREE_TIER_MESSAGE, isBlockedFreeTierModel, modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
 import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
 import { modelCanReceiveBrowserImage } from "./browser-image-capability.js";
 import { TesterBrowser } from "./tester-browser.js";
@@ -2957,6 +2957,7 @@ app.post("/api/bots", (request, response) => {
   const connection = db.getProvider(parsed.data.providerInstanceId || "");
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   if (!parsed.data.model || !modelBelongsToConnection(parsed.data.model, connection)) return response.status(400).json({ error: "Choose a model from the selected connection." });
+  if (isBlockedFreeTierModel(parsed.data.model)) return response.status(400).json({ error: BLOCKED_FREE_TIER_MESSAGE });
   try {
     const bot = db.createBot(parsed.data);
     broadcast();
@@ -3098,6 +3099,7 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   const model = parsed.data.model ?? current.model;
   if (!modelBelongsToConnection(model, connection)) return response.status(400).json({ error: "That model does not belong to the selected connection." });
+  if (isBlockedFreeTierModel(model) && model !== current.model) return response.status(400).json({ error: BLOCKED_FREE_TIER_MESSAGE });
   const bot = db.updateBot(request.params.id, parsed.data);
   broadcast();
   response.json(bot);
