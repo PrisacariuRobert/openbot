@@ -2,6 +2,16 @@
 
 Where Sidemates stands against the four products people compare it with, after the competitive-plan work on branch `fix/runtime-pin-and-quiet-chat` ([#92](https://github.com/PrisacariuRobert/sidemates/pull/92)). Competitor facts come from their public pages and press as of this date; Sidemates facts come from this checkout and its live eval (`qa/prompt-eval/`). Nothing here is a head-to-head benchmark on equal models.
 
+## Update — 7 October 2026: facts that changed
+
+Each fact was re-checked on 7 October 2026. The rows below are corrected to match.
+
+- **Meta Muse has a Mac app.** Since 17 September 2026 it works in Mail, Messages, Calendar, Notes and files on the Mac, and asks before sensitive actions such as deleting files or sending messages. Muse is available in the US and, since 18 September, in Canada. So "uses your Mac's apps and files: no" is no longer true for every cloud agent. Sources: [Mac app](https://www.iphoneincanada.ca/2026/09/18/meta-launches-muse-on-macos-to-take-on-apple-intelligence/), [Canada](https://www.iphoneincanada.ca/2026/09/18/metas-muse-ai-agent-is-now-available-in-canada/), [AI Weekly](https://aiweekly.co/alerts/meta-ships-muse-for-mac-agent-now-acts-in-native-macos-apps).
+- **Grok Bot is cheaper.** Since 26 August 2026 it is included with SuperGrok (about $30 a month), Cursor Pro (about $20 a month) and Cursor Teams. It is xAI's product, distributed with Cursor. Sources: [xAI](https://x.ai/news/grok-bot-more-plans), [Cursor Pro route](https://cellcog.ai/blog/grok-bot-cursor-pro/).
+- **OpenAI dots can reach your computer.** With the owner's permission, a dot can also connect to the owner's own laptop. On the Pro plan it isn't offered in the EEA, UK or Switzerland; Business Premium has it in every region ChatGPT supports. Source: [The Next Web](https://thenextweb.com/news/openai-dots-always-on-ai-agents-cloud-computers-devday).
+- **Siri AI in the EU.** It is available on Macs in the EU, but not on iPhone and iPad there because of the Digital Markets Act. Source: [Apple Newsroom](https://www.apple.com/uk/newsroom/2026/06/due-to-dma-siri-ai-delayed-in-eu-for-ios-27-and-ipados-27/).
+- **Sidemates, corrected.** The phone web app needs an HTTPS address for the Mac that the owner sets up; the installed app listens only on the Mac itself. Routines run while the Mac is awake, and Sidemates can wake it once a day (macOS asks for the owner's password). Voice and phone access are beta.
+
 ## Update — 1 October 2026: the closest competitor we had missed
 
 | | What it is | Reach | Money | Where Sidemates differs |
@@ -14,7 +24,7 @@ Why it is better known: it named the enemy and launched the same day as Grok Bot
 
 | | What it is | Price / reach | Where Sidemates differs |
 | :--- | :--- | :--- | :--- |
-| **OpenAI dots** (DevDay, 29 Sep) | Always-on agent on its own cloud computer with a virtual browser (GPT-6 Astra); 4,000+ apps via plugins; read-only until approved | ChatGPT Pro and Business Premium; Pro gets one dot; not available in the EEA, UK or Switzerland | Runs on your Mac with your apps and files; a team, not one agent; any AI; available in Europe |
+| **OpenAI dots** (DevDay, 29 Sep) | Always-on agent on its own cloud computer with a virtual browser (GPT-6 Astra); 4,000+ apps via plugins; read-only until approved; can connect to the owner's laptop with permission | ChatGPT Pro and Business Premium; Pro gets one dot; Pro not available in the EEA, UK or Switzerland | Runs on your Mac with your apps and files; a team, not one agent; any AI; available in Europe |
 | **Apple Siri AI** (macOS 27, 14 Sep) | Rebuilt Siri with personal context (Mail, Messages, Notes, Photos, Calendar via Spotlight), on-screen awareness and in-app actions; on-device + Private Cloud Compute | Free beta, English first, daily usage caps, paid access planned; Apple silicon | Siri answers and does single actions; Sidemates runs long multi-step jobs across apps and websites, on schedules, with several teammates, and delivers files. Sidemates plugs into Siri ("Hey Siri, Ask Sidemates") |
 | **Hermes Desktop** (Nous, public preview 2 Jun, MIT) | Native app for macOS, Windows, Linux on the Hermes core: chat, file browser, voice, plugins, self-written skills; optional Nous Portal sign-in for free/discounted models and cloud agents | Free | Hermes is no longer terminal-only, so Sidemates competes on Mac depth (Mail, Calendar, iMessage, Siri, Shortcuts), exact action reviews, teammate isolation, phone pairing and routines. Hermes has a free model tier without a key; Sidemates needs a free Gemini key |
 
@@ -26,8 +36,8 @@ The plan that follows from this: **an AI team that does the work on your real Ma
 
 | | What it is | Price | Where it runs |
 | :--- | :--- | :--- | :--- |
-| **Grok Bot** (xAI, beta 11 Aug) | Named teammates sharing one managed cloud computer | Bundled with $120–300/mo plans | xAI cloud, desktop + iOS |
-| **Muse** (Meta, 8 Sep) | Consumer personal agent with its own secure VM and browser | Free, $20, $100/mo | Meta cloud, phone-first; 2.5M downloads in 13 days |
+| **Grok Bot** (xAI, beta 11 Aug) | Named teammates sharing one managed cloud computer | Included with SuperGrok (~$30/mo) and Cursor Pro (~$20/mo) since 26 Aug (was $120–300/mo plans) | xAI cloud, desktop + iOS |
+| **Muse** (Meta, 8 Sep) | Consumer personal agent with its own secure VM and browser | Free, $20, $100/mo | Meta cloud, phone and web, plus a Mac app since 17 Sep that works in Mail, Messages, Calendar, Notes and files; US and Canada; 2.5M downloads in 13 days |
 | **Hermes Agent + Bot Mode** (Nous, MIT) | Self-hosted agent with named bots, learning skills, many chat gateways | Free software + your models | Your machine or VPS |
 | **OpenClaw** (MIT) | Self-hosted gateway to many chat apps, large skill marketplace | Free software + your models | Your machine or VPS |
 | **Sidemates** (MIT) | Owner-hosted team of teammates with reviewed actions | Free software + your models | Your Mac (Linux runner optional) |
@@ -47,10 +57,10 @@ The plan that follows from this: **an AI team that does the work on your real Ma
 | Browser work | ✅ cloud VM | ✅ secure VM | ✅ | ✅ | ✅ own browser per teammate (live eval: read + honest decline) |
 | Reviewed actions / approvals | ✅ allow/deny/always | 🟡 | 🟡 config | ❌ history | ✅ exact review, host-verified; harmless navigation no longer asks; decline → finish honestly |
 | Learning / skills | ✅ show once | 🟡 | ✅ self-learning | ✅ 5,400 marketplace | ✅ /learn → reviewed skill; 11 bundled methods + Discover (public Agent Skills, reviewed one-tap add) + GitHub-link import |
-| Scheduled work | ✅ | ✅ | ✅ cron | ✅ heartbeat | ✅ routines; Mac stays awake when due |
+| Scheduled work | ✅ | ✅ | ✅ cron | ✅ heartbeat | ✅ routines while the Mac is awake; it stays awake when a job is due and can wake once a day |
 | Works while laptop is off | ✅ | ✅ | 🟡 needs VPS | 🟡 needs VPS | 🟡 Linux runner exists; no one-click hosted option — **owner decision** |
 | Chat-app reach | 🟡 Slack | ❌ | ✅ many | ✅ most | 🟡 Telegram + Discord (owner-only) |
-| Phone | ✅ iOS | ✅ iOS | 🟡 | 🟡 | 🟡 scan one QR with the camera → signed-in Home Screen app with notifications (no app store); native app not shipped |
+| Phone | ✅ iOS | ✅ iOS | 🟡 | 🟡 | 🟡 beta: once the Mac has an HTTPS address the owner sets up, scan one QR → signed-in Home Screen app (no app store); native app retired |
 | Voice | ❌ | ✅ | ✅ | 🟡 | ✅ hands-free voice conversation (listen → send on pause → spoken reply with captions), dictation, read-aloud |
 | Switch from a competitor | — | — | ✅ imports Claude Code/Codex | — | ✅ one-click Hermes/OpenClaw import incl. automations (paused) |
 | Own your data and models | ❌ | ❌ | ✅ | ✅ | ✅ |
@@ -60,7 +70,7 @@ The plan that follows from this: **an AI team that does the work on your real Ma
 
 ## Where Sidemates can win now
 
-1. **Price and ownership vs Grok Bot and Muse.** Both rent you a cloud computer; Sidemates is free software on your hardware with your chosen models. Pitch: *Grok Bot's teammates without the $300 bill or the shared computer.*
+1. **Price and ownership vs Grok Bot and Muse.** Both rent you a cloud computer; Sidemates is free software on your hardware with your chosen models. Pitch: *Grok Bot's teammates without a monthly plan or the shared computer.*
 2. **Ease vs Hermes and OpenClaw.** They are powerful but developer-first. Sidemates' app, preselected model, one-click Hermes import and quiet chat are aimed at non-developers. Pitch: *Hermes-level openness without the config file.*
 3. **Trust.** Per-teammate isolation, exact reviews and honest outcomes ("didn't submit it because the click was declined") are concrete and demonstrable — Grok Bot's docs say its bots share one computer, OpenClaw has an exposure history.
 

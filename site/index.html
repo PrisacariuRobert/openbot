@@ -64,7 +64,7 @@
           "name": "What do they do without asking?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Search, read, write and make files in their own workspace. Anything that sends, books, buys, signs in or submits waits for you, unless you turn on Autopilot for a teammate you trust."
+            "text": "Search, read, write and make files in their own workspace. Anything that sends, books, buys, signs in or submits waits for you, unless you turn on Autopilot for a teammate you trust. Autopilot still stops for sign-ins, CAPTCHAs, more AI spending and new instructions, but not for purchases or messages, so keep it for teammates you really trust."
           }
         },
         {
@@ -72,7 +72,7 @@
           "name": "Does it work while my Mac sleeps?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "They work while your Mac is on, and Sidemates keeps it awake when a scheduled job is due. It can also run on a computer that’s always on."
+            "text": "No. They work while your Mac is awake, and Sidemates keeps it from dozing off while a job runs. It can also wake your Mac once a day for your routines (macOS asks for your password to allow that), but a closed laptop lid still means sleep. For work around the clock, run it on a computer that’s always on."
           }
         },
         {
@@ -80,7 +80,7 @@
           "name": "Can I use it on my iPhone?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Pair your iPhone with one scan to chat, get notified and approve things from your Home Screen."
+            "text": "Yes, in beta, as a Home Screen web app. Your phone has to reach your Mac first: today that means a secure address you set up yourself, such as a tunnel on your own domain (our guide shows one free way). Then you pair with one scan and can chat and approve things from your Home Screen."
           }
         },
         {
@@ -498,7 +498,7 @@
       <div class="words rise">
         <div class="hostline"><div class="actor" data-cast="nova" aria-hidden="true"></div><span>Hands on your Mac</span></div>
         <h2>Works in your own apps.</h2>
-        <p>Cloud assistants can’t see your Mac. Your team can: it finds the email, saves the file, adds the reminder — in your own Mail, Calendar and Notes. And by default it asks before it changes anything.</p>
+        <p>Most AI agents work on someone else’s computer. Your team works on yours: it finds the email, saves the file, adds the reminder — in your own Mail, Calendar and Notes. And by default it asks before it changes anything.</p>
         <ul class="apps" aria-label="Apps your team can use"><li><span class="app-tile" style="background:linear-gradient(180deg,#3fa2ff,#1668e3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Mail</li><li><span class="app-tile" style="background:linear-gradient(180deg,#ff6a5f,#e8362c)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span>Calendar</li><li><span class="app-tile" style="background:linear-gradient(180deg,#ffa53a,#f27a12)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11"/><circle cx="4.5" cy="18" r="1.5"/></svg></span>Reminders</li><li><span class="app-tile" style="background:linear-gradient(180deg,#ffd84d,#f5b800)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span>Notes</li><li><span class="app-tile" style="background:linear-gradient(180deg,#a88b6e,#7d6247)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Contacts</li><li><span class="app-tile" style="background:linear-gradient(135deg,#ff5f8f,#7a5cff 60%,#2cb5ff)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></span>Shortcuts</li><li><span class="app-tile" style="background:radial-gradient(circle at 35% 35%,#ff5fa2,#7a5cff 55%,#1a1033)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>Siri</li></ul>
         <ul class="ticks"><li>“Hey Siri, ask Nova to…”</li><li>Emails are only drafted — you press Send</li></ul>
       </div>
@@ -582,7 +582,7 @@
       </div>
       <div class="rise">
         <h2>Free. Like, actually free.</h2>
-        <p style="opacity:1;color:var(--ink-2)">Other AI agents rent you their computer every month. Sidemates runs on yours and uses the AI you already have — even a free one.</p>
+        <p style="opacity:1;color:var(--ink-2)">Most AI agents rent you their computer by the month. Sidemates runs on yours and uses the AI you already have — even a free one.</p>
         <div class="vs">
           <div class="row"><span>Hosted AI agents</span><s>$20–300 / month</s></div>
           <div class="row us"><span>Sidemates</span><span>$0, forever</span></div>
@@ -606,11 +606,11 @@
   <section class="band night" id="install">
     <div class="wrap install">
       <div class="rise">
-        <h2>One line.<br />About a minute.</h2>
-        <p>No account and no password. Sidemates opens by itself and lives in your Dock.</p>
+        <h2>One line.<br />A few minutes.</h2>
+        <p>No account and no password. It downloads about 140&nbsp;MB, then Sidemates opens by itself and lives in your Dock.</p>
         <div class="command"><code id="cmd">curl -fsSL <wbr />https://sidemates.app/<wbr />install.sh <wbr />| sh</code><button class="btn small" id="copy" type="button">Copy</button></div>
         <ol class="steps"><li><b>1</b><span>Open Terminal: <kbd>⌘</kbd> <kbd>Space</kbd>, type “Terminal”, <kbd>↩</kbd></span></li><li><b>2</b><span>Paste with <kbd>⌘</kbd> <kbd>V</kbd>, press <kbd>↩</kbd></span></li><li><b>3</b><span>Say hi to your team 👋</span></li></ol>
-        <p class="fine">macOS 13 or later. Checks the download’s fingerprint, never asks for your password. <a href="install.sh">Read the installer</a> · remove any time with <code>uninstall.sh</code>.</p>
+        <p class="fine">macOS 13 or later. Web tasks need Chrome, Edge or Brave, and the private computer needs Docker. Checks the download’s fingerprint, never asks for your password. <a href="install.sh">Read the installer</a> · remove any time with <code>uninstall.sh</code>.</p>
       </div>
       <div class="rise">
         <div class="terminal" aria-label="What the installer prints">
@@ -638,9 +638,9 @@
       <div class="qa rise">
         <details><summary>Is it really free?</summary><p>Yes. Sidemates is free, open-source software. Your team uses an AI you connect, and Sidemates never charges anything on top.</p></details>
         <details><summary>Does my stuff leave my Mac?</summary><p>Your team, chats and files live on your Mac. When a teammate works, what it needs goes to the AI you picked. Choose a model on your Mac to keep everything local.</p></details>
-        <details><summary>What do they do without asking?</summary><p>Search, read, write and make files in their own workspace. Anything that sends, books, buys, signs in or submits waits for you, unless you turn on Autopilot for a teammate you trust.</p></details>
-        <details><summary>Does it work while my Mac sleeps?</summary><p>They work while your Mac is on, and Sidemates keeps it awake when a scheduled job is due. It can also run on a computer that’s always on.</p></details>
-        <details><summary>Can I use it on my iPhone?</summary><p>Yes. Pair your iPhone with one scan to chat, get notified and approve things from your Home Screen.</p></details>
+        <details><summary>What do they do without asking?</summary><p>Search, read, write and make files in their own workspace. Anything that sends, books, buys, signs in or submits waits for you, unless you turn on Autopilot for a teammate you trust. Autopilot still stops for sign-ins, CAPTCHAs, more AI spending and new instructions, but not for purchases or messages, so keep it for teammates you really trust.</p></details>
+        <details><summary>Does it work while my Mac sleeps?</summary><p>No. They work while your Mac is awake, and Sidemates keeps it from dozing off while a job runs. It can also wake your Mac once a day for your routines (macOS asks for your password to allow that), but a closed laptop lid still means sleep. For work around the clock, run it on a computer that’s always on.</p></details>
+        <details><summary>Can I use it on my iPhone?</summary><p>Yes, in beta, as a Home Screen web app. Your phone has to reach your Mac first: today that means a secure address you set up yourself, such as a tunnel on your own domain (our guide shows one free way). Then you pair with one scan and can chat and approve things from your Home Screen.</p></details>
         <details><summary>Why Terminal?</summary><p>It lets us give you a free Mac app without a paid Apple certificate. It downloads from our public GitHub releases, checks the fingerprint and never asks for your password.</p></details>
       </div>
     </div>
