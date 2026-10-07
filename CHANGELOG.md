@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
+
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
 - **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.

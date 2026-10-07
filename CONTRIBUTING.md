@@ -23,7 +23,7 @@ For the Electron desktop app and shared phone web client, follow [desktop/README
 
 ## Keep tests away from personal data
 
-Use temporary data directories and synthetic accounts. Never run acceptance tests against an owner's `.openbot` directory, saved browser profiles, inbox or live conversations. Live provider tests consume the owner's allowance and need explicit opt-in; ordinary CI must not need provider credentials or make external writes.
+Use temporary data directories and synthetic accounts. Never run acceptance tests against an owner's data folder (`.openbot` in a source checkout, `~/Library/Application Support/Sidemates/data` for the installed app), saved browser profiles, inbox or live conversations. Live provider tests consume the owner's allowance and need explicit opt-in; ordinary CI must not need provider credentials or make external writes.
 
 ```sh
 npm run verify
@@ -31,12 +31,12 @@ node --test .github/scripts/check-public-source.test.mjs
 node .github/scripts/check-public-source.mjs
 npm run test:conversation-flow
 npm run test:onboarding
-npm run test:legacy-approvals
+npm run test:app-approvals
 npm run test:studio-polish
 npm run test:browser-sessions
 ```
 
-The browser checks require Chrome/Chromium. Set `OPENBOT_CHROME_PATH` to its executable if it is not discovered automatically. `verify` runs release/source guards, unit tests, TypeScript checks and the web build; its native checks are source-contract checks, **not** Xcode builds. Run the native tests/build instructions when modifying Swift, entitlements or packaging. Use the relevant deterministic benchmark for workflow changes and retain its artifact, not just the model's success message.
+The browser checks require Chrome/Chromium. Set `OPENBOT_CHROME_PATH` to its executable if it is not discovered automatically. `verify` runs release/source guards, unit tests, TypeScript checks and the web build; its Mac checks are source-contract checks, **not** builds on a Mac. When you change the Mac app wrapper, entitlements or packaging, build and test it on a Mac with `npm run package:desktop`. Use the relevant deterministic benchmark for workflow changes and retain its artifact, not just the model's success message.
 
 ## Add a teammate to the gallery
 

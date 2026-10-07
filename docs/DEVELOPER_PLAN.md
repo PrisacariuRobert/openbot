@@ -70,7 +70,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 
 | ID | Task | Size | Release | Status |
 | :--- | :--- | :---: | :---: | :---: |
-| S1 | Make the contributor path work | S | 0.42.1 | ☐ |
+| S1 | Make the contributor path work | S | 0.42.1 | ✅ |
 | S2 | Patch vulnerable dependencies | S | 0.42.1 | ☐ |
 | S3 | Make every public sentence true | S | 0.42.1 | ☐ |
 | S4 | Safer default models | S | 0.42.1 | ☐ |

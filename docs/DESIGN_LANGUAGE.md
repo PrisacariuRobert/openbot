@@ -20,7 +20,7 @@ Apple’s principles favor familiar behavior, clear feedback and recovery that d
 - State is communicated with words and symbols: “Working,” “Needs your approval,” “Not connected,” or “Try again.” Never depend on a green/red dot alone.
 - Saturated identity color belongs to characters. A custom color picker may show the selected color; that is a control, not an interface accent. User attachments and live computer content are not recolored to enforce the theme.
 
-Web authority: [`design-tokens.css`](../src/studio/design-tokens.css). Native authority: [`StudioPalette.swift`](../ios/OpenBotMobile/Models/StudioPalette.swift), shared by Mac and iPhone. Legacy names such as `purple` and `green` can resolve to neutral semantic colors; they are not permission to reintroduce purple buttons or green status panels.
+Authority: [`design-tokens.css`](../src/studio/design-tokens.css). The native Mac and iPhone clients are retired; their palette remains in Git history. Legacy names such as `purple` and `green` can resolve to neutral semantic colors; they are not permission to reintroduce purple buttons or green status panels.
 
 Apple recommends appearance-aware semantic colors and testing contrast across appearances. Our monochrome palette is a Sidemates choice, not an Apple rule. [Apple color](https://developer.apple.com/design/human-interface-guidelines/color), [Apple Dark Mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode).
 
