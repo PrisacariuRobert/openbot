@@ -14,6 +14,12 @@
   - Routines run while your Mac is awake.
   - Voice and phone access are marked beta.
   - Competitor facts are updated to 7 October 2026.
+- Website:
+  - A new page compares Sidemates with Meta Muse.
+  - The Grok Bot and OpenAI dots pages have current prices and say that dots can use your computer through the ChatGPT desktop app.
+  - The site's font is served from sidemates.app, so a visit no longer contacts Google Fonts.
+  - The teammate gallery shows a title and picture when shared.
+  - The site and README say that Sidemates has no token or cryptocurrency.
 - Security: packages with known vulnerabilities are updated: proxy-addr, the MCP client and SDK, sharp, fast-uri, ip-address, and shell-quote, which the development tools use. `npm audit` now reports none.
 - Docs:
   - "Reach your Mac from your phone" is now a general guide, not one person's setup.

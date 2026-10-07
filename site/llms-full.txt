@@ -1,6 +1,6 @@
 # Sidemates — the full facts
 
-Last updated: 1 October 2026. Source of truth: https://github.com/PrisacariuRobert/sidemates
+Last updated: 7 October 2026. Source of truth: https://github.com/PrisacariuRobert/sidemates
 
 ## What it is
 
@@ -50,11 +50,11 @@ The software is free. You pay only for the AI you connect, and free options exis
 - Teammate browsers are separate profiles, not a security sandbox.
 - Security model: https://github.com/PrisacariuRobert/sidemates/blob/main/docs/SECURITY.md
 
-## How it compares (as of 1 October 2026, from public pages)
+## How it compares (from public sources: OpenAI dots, Grok Bot and Meta Muse as of 7 October 2026, the others as of 1 October 2026)
 
-- OpenAI dots: an always-on agent on its own cloud computer with a virtual browser; included with ChatGPT Pro and Business Premium; not offered in the EEA, UK or Switzerland at launch. Choose dots if you want a managed agent that works while your computer is off. Choose Sidemates if you want it on your Mac, with your Mac's apps, free, or in Europe.
-- Grok Bot (xAI): named teammates sharing one managed cloud computer; bundled with $120–300 a month plans. Choose it for a hosted team with a desktop and iOS app. Choose Sidemates for free software with isolated teammates on your hardware.
-- Meta Muse: a consumer personal agent with its own secure VM and browser; free, $20 and $100 a month tiers; phone-first. Choose it for a phone-first agent. Choose Sidemates for your Mac's apps and your own data.
+- OpenAI dots: an always-on agent on its own cloud computer with a virtual browser, which can also use your computer through the ChatGPT desktop app if you give it access; included with ChatGPT Pro (from $100 a month) and Business Premium; personal plans exclude the EEA, UK and Switzerland. Choose dots if you want a managed agent that works while your computer is off. Choose Sidemates if you want it free, with the AI you choose, or in Europe without a business plan. https://sidemates.app/alternatives/openai-dots/
+- Grok Bot (xAI, run with Cursor): named teammates sharing one managed cloud computer; included in every paid Cursor plan (from $20 a month) or a linked SuperGrok plan, with a weekly allowance that isn't published. Choose it for a hosted team with a desktop and iOS app. Choose Sidemates for free software with isolated teammates on your hardware. https://sidemates.app/alternatives/grok-bot/
+- Meta Muse: one personal agent on Meta's cloud computer with its own browser, using Meta's Muse Spark model, on iPhone, Android, the web and WhatsApp; its Mac app (17 September) also works in your files, Messages, Calendar, Notes and Mail. Free with a weekly allowance; $20 and $100 a month plans add usage; a card is needed to sign up. US and Canada only. Choose it for nothing to install and work that continues while your devices are off. Choose Sidemates outside the US and Canada, to choose your AI, for a team of teammates, or to keep your work on your Mac. https://sidemates.app/alternatives/meta-muse/
 - Apple Siri AI (macOS 27): personal context from Mail, Messages, Notes, Photos and Calendar, with quick in-app actions; free beta with daily limits, English first, Apple silicon. Choose it for quick questions with nothing to install. Sidemates works alongside it for longer jobs.
 - Hermes Desktop (Nous Research, MIT): a native app for macOS, Windows and Linux with free models through a Nous sign-in. Choose it on Windows or Linux, or for a terminal-first setup.
 - OpenMausBot (Apache-2.0): an open-source team of AI bots, aimed at developers, that runs on the Claude, Codex and Grok command-line tools you already have; macOS, Windows, Ubuntu, Android and iOS; a paid Pro plan adds an always-on cloud workspace. Far more widely used than Sidemates today. Choose it for Windows, Linux or phone apps. Choose Sidemates for Mac depth (your own Mail, Calendar, Notes and Messages) and a simpler setup.
