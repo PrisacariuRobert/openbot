@@ -73,7 +73,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | A3 | Sign in with ChatGPT, with Sidemates' own client | M | 0.43 | ☐ |
 | A4 | Apple Intelligence as the no-key starter | M–L | 0.43 | ☐ |
 | A5 | A free Gemini key in a few clicks; a browser for everyone | S–M | 0.43 | ☐ |
-| A6 | Approvals from your phone through Telegram | M | 0.43 | ☐ |
+| A6 | Phone access that works, safely | M | 0.43 | ☐ |
 | A7 | Lighter prompts and tool lists | M | 0.43 | ☐ |
 | A8 | A download button for people who don't use Terminal | S–M | 0.43 | ☐ |
 | J1 | Pick the hero jobs and build their fixtures | S | 0.44 | ☐ |
@@ -144,6 +144,8 @@ All have fixes without a major version change.
 - "One line. About a minute.": say it takes a few minutes and downloads about 140 MB.
 - Say that web tasks need Chrome, Edge or Brave (until A5 ships) and that the private computer needs Docker.
 - `README.md`: the same fixes. The Autopilot sentence must list the stops it really has, until T1 ships.
+- Say that routines run while the Mac is awake. The wake feature is one daily wake time and needs an admin password (`src/server/mac-wake.ts`).
+- Label what is still thin as "beta" in the studio and on the site: voice, phone access, and the Windows and Linux builds.
 - README "How it compares" and `docs/COMPETITIVE_SCORECARD_2026-09-23.md`: add a dated update and fix rows that are no longer true. As of early October 2026:
   - Meta's Muse for Mac (17 September) works in Mail, Messages, Calendar, Notes and files, in the US and Canada.
   - Grok Bot now starts at $20–30 a month.
@@ -166,6 +168,7 @@ All have fixes without a major version change.
   - Put models with no-training terms first for teammates that can read Mail, Messages, Notes or files.
   - Label training-allowed models in the model picker: "This provider may use your prompts to train its models."
 - `src/server/providers.ts` lines 9–15: the `FREE_MODELS` fallback offers `opencode/*-free` models, which return 403 for our restricted tool setup (`qa/prompt-eval/README.md`). Stop offering them automatically. Show a plain message that points to the options in A3–A5.
+- The Claude provider card's "Official login" badge (`src/server/providers.ts`, around line 174) can read as an endorsement by Anthropic, which [its terms](https://code.claude.com/docs/en/legal-and-compliance) don't allow. Say instead what happens: "Uses the Claude Code you installed and signed in to."
 
 **Done when.** Tests cover the order, the label and a fallback that never leads to a 403.
 
@@ -321,18 +324,22 @@ Today Sidemates borrows OpenCode's sign-in (`src/server/providers.ts`), so the c
 
 **Prompt.** `Do task A5 in docs/DEVELOPER_PLAN.md.`
 
-### A6 · Approvals from your phone through Telegram · M
+### A6 · Phone access that works, safely · M · plan first
 
-**Why.** The phone web app has no default way to reach the Mac: the server listens only on 127.0.0.1 and there is no default relay. Telegram already works owner-only and costs nothing, but approval notices only carry a link the phone may not be able to open.
+**Why.** The phone web app has no default way to reach the Mac: the server listens only on 127.0.0.1 and there is no default relay. Telegram already works owner-only and costs nothing, but its approval notices only carry a link the phone may not be able to open.
 
 **Do.**
-- Add approve and decline buttons to Telegram approval notices, with the same fingerprint checks as the studio.
-- Stream replies with Telegram's message drafts.
-- Keep the Home Screen app for people who set up their own relay or tunnel, and say that plainly in the app and on the site.
+- **Telegram.** Add approve and decline buttons to approval notices, with the same fingerprint checks as the studio, but only for actions that don't involve money, credentials or new recipients. Those still open the authenticated studio, so a hijacked chat account can't approve a payment. Stream replies with Telegram's message drafts.
+- **Away from home.** Document and test one free way for the Home Screen app to reach the Mac from anywhere. One candidate is a private network such as Tailscale's personal plan, which gives the Mac an HTTPS address only your own devices can reach (check its current terms first). That way, approvals can use [Declarative Web Push](https://webkit.org/?p=16535) on the iPhone.
+- **Fallback.** When neither is set up, the app and the site say so plainly.
 
-**Done when.** An approval can be granted or declined from Telegram, and tests against the fake Telegram API cover both answers and an expired request.
+**Done when.**
+- An approval can be granted or declined from Telegram.
+- A payment approval can't be granted from Telegram.
+- Tests against the fake Telegram API cover both answers, the blocked kinds and an expired request.
+- The away-from-home guide has been tested on a real iPhone (Owner).
 
-**Prompt.** `Do task A6 in docs/DEVELOPER_PLAN.md.`
+**Prompt.** `Do task A6 in docs/DEVELOPER_PLAN.md. Start in plan mode.`
 
 ### A7 · Lighter prompts and tool lists · M
 
@@ -340,6 +347,7 @@ Today Sidemates borrows OpenCode's sign-in (`src/server/providers.ts`), so the c
 
 **Do.**
 - Give each teammate only the tools its job needs: defined by its template, editable by the owner.
+- Send web pages to the model as compact text snapshots. Third-party measurements put a 10-step browser task at about 27,000 tokens with [Playwright's command-line snapshots](https://playwright.dev/agent-cli/introduction), against about 114,000 through Playwright's MCP server.
 - Shorten the base prompt.
 - Move long prompt text out of `src/server/workspace.ts` into versioned prompt files.
 - Target: a one-step "hi" at 3,000 tokens or fewer, with every live eval case still passing.
@@ -380,7 +388,12 @@ Research on 2026 agent use is consistent: people keep using agents for recurring
 
 Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:expenses`) and research with sources checked by a second teammate.
 
-**Do.** For each job, write synthetic data (no personal data), the checks for a correct result, and time and token budgets in `qa/hero-jobs/`.
+**Do.**
+- For each job, write synthetic data (no personal data), the checks for a correct result, and time and token budgets in `qa/hero-jobs/`.
+- Build each job to avoid the failures long-task benchmarks keep finding. Agents "lose track of constraints, miss information that arrives mid-task" and "skip verification" ([OSWorld 2.0](https://osworld-v2.xlang.ai/)). So each run:
+  - carries its written constraints from start to finish;
+  - looks at the inbox or calendar again just before acting;
+  - checks its own result before it reports done.
 
 **Prompt.** `Do task J1 in docs/DEVELOPER_PLAN.md.`
 
@@ -406,6 +419,7 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
   - each Mac tool against the real apps: Mail, Calendar, Notes, Reminders, Contacts, and reading Messages;
   - the permission prompts after a fresh install and after an update;
   - a routine waking the Mac.
+- Include the macOS 27 changes. Apps can no longer read the privacy-permission database directly, other apps' containers are closed by default, and launchd refuses property lists that carry the quarantine attribute. Check the permission checks, the Messages index and the routine launch agent against each one.
 - It writes a dated report in `qa/mac-acceptance/` with no personal data.
 
 **Prompt.** `Do task J3 in docs/DEVELOPER_PLAN.md.`
@@ -455,6 +469,7 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
   - **New recipients:** messages to people the owner hasn't approved before.
   - **Publishing:** public posts, `git push`, deploys.
   - **Credentials.**
+- Extend the owner's existing auto-review rules (`src/server/database.ts`, around line 786; `src/server/index.ts`, around lines 461–480) with a spending limit and an approved-recipients list. Only 5% of people are comfortable with an agent buying on its own, but 15% would let it buy within rules they set.
 - Update the warning, the README and the site the same day.
 
 **Done when.** There is a test per category, including a fixture page that tries to trick a "Pay now" click while Autopilot is on.
@@ -495,10 +510,14 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
 
 ### T5 · Memory you can see, edit and trace · M
 
+**Why.** Memories already carry an owner-or-task source, revisions and an edit path (`src/shared/private-memory.ts`). Meaning-based search, though, needs an embeddings service the owner configures.
+
 **Do.**
-- Extend "What they know" so every memory shows where it came from (a conversation, a file or a mail) and when.
-- Every memory can be edited or deleted.
-- Memories learned from untrusted content are marked.
+- Run local embeddings by default, so meaning-based search needs no cloud: a small model such as EmbeddingGemma-300M, with the existing keyword search.
+- Give memories finer sources ("from you", "from an email", "from a web page").
+- Put facts learned from untrusted content in a review queue before they become memories. Memory poisoning is a documented attack.
+- Add a plain "What <teammate> remembers" page.
+- Show a plain-language activity history with undo where macOS allows it: unsent drafts, the Trash, calendar history.
 
 **Prompt.** `Do task T5 in docs/DEVELOPER_PLAN.md.`
 
