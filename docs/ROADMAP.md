@@ -1,21 +1,32 @@
 # Sidemates working roadmap
 
-## Next releases (from 2 October 2026)
+## Next releases (from 7 October 2026)
 
-**Promise: an AI team that does the work on your real Mac — not just answers. And the app is free.** Where we stand: the product is ahead of its reach. OpenMausBot (open source, runs everywhere, 3.9k stars) is far better known; we win on Mac depth, a one-line install and ordinary-user simplicity, so the next releases remove every reason a person would not try us, and every reason they would not tell a friend. Plan and numbers: the company plan and `marketing/MARKETING_PLAN_90D.md`.
+**Promise: an AI team that does the work on your real Mac, not just answers. And the app is free.**
+
+Where we stand: the product is ahead of its reach, and its first run is the weakest part. The next releases remove the reasons a person would fail before a first useful answer, make three everyday jobs dependable, and make Sidemates the safest agent to give your Mac to.
+
+Every change has a task, a "done when" check and a prompt for Claude Code in the [developer plan](DEVELOPER_PLAN.md).
 
 | Release | Theme | Highlights |
 | :--- | :--- | :--- |
 | ✅ 0.38 | Your Mac, your apps | Mail, Calendar, Reminders, Notes, Contacts, Files and Messages as reviewed tools; Shortcuts; "Send to Sidemates"; "Hey Siri, ask Nova to…" |
 | ✅ 0.39 | Knows you, privately | On-device index of Notes, Mail, Messages and files; morning brief; "What they know" page |
 | ✅ 0.40 | Share your teammates | Share links, a teammate gallery, shareable result pages |
-| ✅ 0.41 | Autopilot | Per-teammate "act like a person" with hard stops, chat notes and a log |
-| **0.42** | **Ready for anyone** | Shared pages already carry a "Made with Sidemates" link: tag it so we can measure the growth loop; opt-in anonymous usage counts (only with the owner's go-ahead, since we promise no tracking) so we can see where people drop off; a faster first run (install to first useful answer in under three minutes); a demo recorder so a real-task video is a command, not an afternoon |
-| **0.43** | **Everywhere** | Windows beta and Linux packages (our CI already builds the installers; Mac-only tools stay Mac-only). Measured 3 October 2026 with the Windows probe workflow on a real Windows runner: install, build and server start work, and 1,021 of 1,128 tests pass. Remaining: the test fixtures fake the AI runtime with a Unix script (about 30 tests), `tar` with drive letters in home export, file-lock cleanup in tests, and a real installer test on a Windows VM (browser discovery is already fixed); a Docker image for an always-on server; `npx` and Homebrew installs once the Apple signing and the name are settled |
-| **0.44** | **Packs and credits** | One-time teammate packs for a profession (freelancer, accountant, agent); prepaid pay-as-you-go credits for people who do not want to find an AI key (after reading each provider's terms) |
-| Later | Always there | Run on a second Mac or home server; business invoices with a shared library and policies; a marketplace; native iPhone app if users ask |
+| ✅ 0.41 | Autopilot | Per-teammate "act like a person", with stops for sign-ins, CAPTCHAs, AI spending and new instructions, chat notes and a log |
+| ✅ 0.42 | OpenBot is now Sidemates | New name and home; the "Made with Sidemates" link is tagged; a demo recorder. First-run timing and opt-in counts move to 0.43 |
+| **0.42.1** | **Credibility fixes** | Contributor path works; vulnerable dependencies patched; every public claim true; safer default models; no personal infrastructure in docs; a Meta Muse comparison |
+| **0.43** | **First useful answer in three minutes** | Guided first run; Apple Intelligence as a no-key starter; Sign in with ChatGPT with our own client; a guided free Gemini key; a browser download when Chrome is missing; approvals from Telegram; lighter prompts; the first run timed |
+| **0.44** | **Three jobs that work every time** | Morning brief, "what's waiting on me" and meeting prep pass 9 of 10 runs on each kind of AI; a public reliability scoreboard; fast Calendar through EventKit |
+| **0.45** | **Safe by default** | Autopilot always asks before money, irreversible actions and new recipients; untrusted content can't trigger outward actions on its own; published attack tests; pinned skills; editable memory |
+| **0.46** | **Plays well with others** | Mac tools as an MCP server and Agent Skills; a Siri and Spotlight experiment; gallery submissions without Git; `npx sidemates` |
+| Later | When each gate is met | Windows preview (CI builds it; the Windows probe passed 1,021 of 1,128 tests on 3 October 2026), a signed app and Homebrew (the first $99), teammate packs and prepaid credits |
 
-Quality bar for every release: weekly cadence, `npm test` and the live Muse Spark cases pass, installer update tested from the previous version in an isolated folder, no new "always asks" claim without a test. Left over from 0.38 and worth finishing when there is room: the quick-ask hotkey and a single permissions screen.
+Quality bar for every release:
+- `npm run verify` passes;
+- the hero-job scoreboard doesn't drop;
+- the installer update is tested from the previous version in an isolated folder;
+- no new "always asks" claim ships without a test.
 
 The working order below is the earlier plan and stays for reference.
 
