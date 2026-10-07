@@ -2559,6 +2559,21 @@ export class OpenBotDatabase {
     return this.getRun(id)!.task;
   }
 
+  /** Setup timeline (A1): the earliest times the studio's own records prove. A
+   * finished job is a completed run in which a teammate used a tool or saved a file. */
+  setupMilestoneTimes(): import("./setup-timeline.js").SetupMilestoneTimes {
+    const earliest = (sql: string) => {
+      const at = (this.db.prepare(sql).get() as Row | undefined)?.at;
+      return typeof at === "string" && at ? at : null;
+    };
+    return {
+      installedAt: earliest("SELECT MIN(created_at) AS at FROM users"),
+      firstTeammateAt: earliest("SELECT MIN(created_at) AS at FROM bots"),
+      firstAnswerAt: earliest("SELECT MIN(finished_at) AS at FROM runs WHERE status='completed'"),
+      firstJobAt: earliest("SELECT MIN(finished_at) AS at FROM runs WHERE status='completed' AND id IN (SELECT run_id FROM activities WHERE kind IN ('tool','file'))"),
+    };
+  }
+
   addActivity(input: Omit<Activity, "id" | "createdAt">): Activity {
     const activity: Activity = { ...input, id: randomUUID(), createdAt: now() };
     this.db.prepare("INSERT INTO activities (id,run_id,bot_id,kind,label,detail,created_at) VALUES (?,?,?,?,?,?,?)").run(activity.id, activity.runId, activity.botId, activity.kind, activity.label, activity.detail, activity.createdAt);

@@ -1,4 +1,5 @@
 import { KnowsPanel } from "../components/KnowsPanel";
+import { SetupTimelinePanel } from "../components/SetupTimelinePanel";
 import { useCallback, useEffect, useState } from "react";
 import { enablePushNotifications } from "./push";
 import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
@@ -124,6 +125,7 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}
     {panel === "telegram" && <TelegramPanel bots={state.bots} />}
     {panel === "knows" && <KnowsPanel />}
+    {panel === "setup" && <SetupTimelinePanel />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
     {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} autopilotForEveryone={state.settings.yoloMode} onSave={saveBot}
       onUpdateThread={async (patch) => { await change(`/api/threads/${encodeURIComponent(bot.threadId)}`, "PATCH", patch); }}

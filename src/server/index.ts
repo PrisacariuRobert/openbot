@@ -15,6 +15,8 @@ import { tombstoneHttpMapping, validateReplayDisclosure } from "./message-admiss
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
+import { registerSetupRoutes } from "./setup-routes.js";
+import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
 import { ApprovedConnectorDispatch, ApprovedConnectorOutcomeUncertainError, ApprovalReviewChangedError, approvalReviewFingerprint, sameReviewFingerprint } from "./approval-review-binding.js";
 import { WorkReportService } from "./work-reports.js";
@@ -143,6 +145,10 @@ if (!studioLock.acquired) {
   process.exit(1);
 }
 process.on("exit", () => studioLock.release());
+// Start the setup timeline on the first boot, so a studio from before it is recognised as older.
+// It is a convenience: a problem with it never stops the studio.
+const setupTimeline = new SetupTimeline(db);
+try { setupTimeline.view(); } catch (error) { console.warn(`Setup timeline unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 const app = express();
 app.disable("x-powered-by");
 if (deployment.trustProxy) app.set("trust proxy", "loopback");
@@ -332,6 +338,7 @@ registerPairingRoutes(app, pairedDevices, awayAccess, (deviceId) => {
 
 const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callback: deploymentCallbackUrl(deployment, "/api/extensions/oauth/callback"), app: appUrl });
 registerRecipeRoutes(app, db, () => broadcast());
+registerSetupRoutes(app, setupTimeline);
 const interruptedApprovedActions = db.recoverInterruptedApprovedActions();
 for (const receipt of interruptedApprovedActions) {
   const detail = `${receipt.actionLabel} may or may not have completed before Sidemates restarted. It has not been repeated.`;
@@ -797,12 +804,19 @@ app.delete("/api/code-projects/:projectId", (request, response) => {
   } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
+/** Provider status for the studio; the first working connection is a setup milestone. */
+async function providerStatus() {
+  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  try { setupTimeline.noteConnections(status.instances); } catch { /* The timeline never blocks AI setup. */ }
+  return status;
+}
+
 app.get("/api/provider", async (_request, response) => {
-  response.json(await readProviderStatus(db, providerConnections.listAttempts()));
+  response.json(await providerStatus());
 });
 
 app.get("/api/readiness", async (_request, response) => {
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connected = status.instances.filter((instance) => instance.connected);
   const compatibility = opencodeCompatibility();
   const readyTeammates = db.listBots().filter((bot) => {
@@ -824,7 +838,7 @@ app.get("/api/readiness", async (_request, response) => {
 app.post("/api/provider/choose", async (request, response) => {
   const parsed = z.object({ providerInstanceId: z.string().min(1).max(80), model: z.string().min(1).max(300) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose your provider and a model first." });
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connection = status.instances.find((entry) => entry.id === parsed.data.providerInstanceId);
   if (!connection?.connected || !connection.models?.includes(parsed.data.model)) return response.status(409).json({ error: "Finish connecting this provider and choose one of its available models. Saving credentials alone does not test model access." });
   try {
@@ -854,7 +868,7 @@ app.post("/api/provider/key", async (request, response) => {
   }
   try {
     await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
-    const status = await readProviderStatus(db, providerConnections.listAttempts());
+    const status = await providerStatus();
     const instanceId = parsed.data.providerId === "google" ? "local-google" : "local-opencode";
     const instance = status.instances.find((item) => item.id === instanceId && item.connected);
     if (!instance) return response.status(400).json({ error: parsed.data.providerId === "google" ? "OpenCode saved the key but didn't list Gemini. Paste the key again." : "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
@@ -883,7 +897,7 @@ app.post("/api/provider/:id/test", async (request, response) => {
   if (!db.getProvider(request.params.id)) return response.status(404).json({ error: "That connection no longer exists." });
   const previous = db.extensionRecord<ProviderConnectionTest>("provider-test", request.params.id);
   if (!probeAllowed(previous?.testedAt || null)) return response.status(429).json({ error: `A test just ran for this connection. Wait ${Math.ceil(PROBE_COOLDOWN_MS / 1_000)} seconds between tests to protect your usage.` });
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connection = status.instances.find((entry) => entry.id === request.params.id);
   if (!connection) return response.status(404).json({ error: "That connection no longer exists." });
   if (!connection.connected) return response.status(409).json({ error: "Connect this provider first. Saved credentials alone are never shown as ready." });

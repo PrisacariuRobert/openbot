@@ -90,6 +90,8 @@ try {
   let hold = false;
   await page.route("**/api/**", async (route) => {
     const request = route.request();
+    // The studio notes its own visit for Settings → Your setup; that is not a decision.
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/setup/visit") return route.fulfill({ status: 204 });
     if (request.method() === "GET" && request.url().endsWith("/preview")) {
       const other = request.url().includes("/other-approval/");
       const currentRun = other ? { ...run, id: "other-run" } : run;

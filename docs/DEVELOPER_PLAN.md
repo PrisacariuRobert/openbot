@@ -78,7 +78,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | S6 | CLAUDE.md for every session | S | 0.42.1 | ✅ |
 | S7 | Website gaps (Meta Muse page, gallery tags, self-hosted font) | S | 0.42.1 | ✅ |
 | S8 | Rename leftovers developers see first | S | 0.42.1 | ✅ |
-| A1 | Measure the first run (local first, opt-in later) | M | 0.43 | ☐ |
+| A1 | Measure the first run (local first, opt-in later) | M | 0.43 | ✅ |
 | A2 | Guided first run | M | 0.43 | ☐ |
 | A3 | Sign in with ChatGPT, with Sidemates' own client | M | 0.43 | ☐ |
 | A4 | Apple Intelligence as the no-key starter | M–L | 0.43 | ☐ |
@@ -270,6 +270,8 @@ Keep `OPENBOT_*` variables, paths and file names working; aliases come in M6.
 - Document exactly what is sent in `docs/SECURITY.md` and on the site.
 
 **Owner decision.** The site promises no tracking. Ship the local part now. Turn on the sender only when you say yes, and update the privacy text the same day.
+
+**Status, 7 October 2026.** The local part shipped: Settings → Your setup (`src/server/setup-timeline.ts`, `src/components/SetupTimelinePanel.tsx`). The sharing setting exists and is off; the payload is built and tested; there is no endpoint and no switch, so the server refuses to turn it on. When you say yes: set `SETUP_COUNTS_ENDPOINT`, build the Worker and the sender, show the switch at the end of onboarding, and update `docs/SECURITY.md` (boundary 28) and the site the same day.
 
 **Done when.** Tests cover milestone recording, the switch's default (off) and the payload (no content), and Settings shows the local timeline.
 

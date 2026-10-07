@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Your setup** (Settings): a timeline of your first days with Sidemates: the first start, opening the studio, connecting an AI, your first teammate, first answer and first finished job, and coming back. It stays on your Mac and is never sent; Copy puts it in a note or a bug report.
 - Safer AI defaults:
   - A model whose provider doesn't train on your prompts is now recommended first.
   - The Muse Spark Contributor models are labelled, because Meta may train on their prompts.

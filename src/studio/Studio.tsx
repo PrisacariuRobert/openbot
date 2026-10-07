@@ -20,6 +20,7 @@ import { createSpring, rubberband } from "./spring";
 import {
   Activity,
   ArrowRight,
+  Flag,
   Boxes,
   Files,
   FolderGit2,
@@ -87,6 +88,7 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
+import { useSetupVisits } from "./setup-visits";
 import { conversationMatches } from "./conversation-filter";
 import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
@@ -433,7 +435,8 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
 { title: "Trust & usage", items: [
 { id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
 { id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
-{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] }
+{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] },
+{ id: "setup", title: "Your setup", description: "How your first days went. Kept on this Mac.", icon: Flag, keywords: ["onboarding", "first run", "timeline", "milestones", "getting started"] }
 ]}];
 
 function SettingsWorkspacePage({
@@ -647,6 +650,7 @@ function SettingsWorkspacePage({
 
 export function Studio() {
   const { appearance, setAppearance } = useAppearance();
+  useSetupVisits();
   const [page, setPage] = useState<Page>(() => {
     const p = new URLSearchParams(window.location.search).get("panel");
     if (p === "settings" || isCapabilityPanel(p)) return "settings";
