@@ -13,7 +13,9 @@ import {
   isFreeTierModel,
   isBlockedFreeTierModel,
   defaultModelChoice,
+  mayTrainOnPrompts,
   modelChoices,
+  TRAINING_NOTICE,
   isLocalModelUrl,
   providerInput,
   type ProviderInput,
@@ -407,6 +409,9 @@ export function ProviderPanel({
               {isFreeTierModel(initialModel) && (
                 <p className="settings-row-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
               )}
+              {mayTrainOnPrompts(initialModel) && (
+                <p className="settings-row-note">{TRAINING_NOTICE} Choose another model for teammates that read your mail, messages or files.</p>
+              )}
             </SettingsRow>
             <SettingsRow
               title="Unconfigured teammates"
@@ -782,7 +787,7 @@ export function ProviderPanel({
                         <option key={model} value={model} disabled={isBlockedFreeTierModel(model) && model !== bot.model}>
                           {modelLabel(model)}
                           {connection?.models?.includes(model)
-                            ? isBlockedFreeTierModel(model) ? " · works only inside OpenCode" : isFreeTierModel(model) ? " · Free tier" : model === defaultModelChoice(connection.models || []) ? " · Recommended" : ""
+                            ? isBlockedFreeTierModel(model) ? " · works only inside OpenCode" : mayTrainOnPrompts(model) ? " · may train on your prompts" : isFreeTierModel(model) ? " · Free tier" : model === defaultModelChoice(connection.models || []) ? " · Recommended" : ""
                             : " · unavailable"}
                         </option>
                       ))}
@@ -791,6 +796,8 @@ export function ProviderPanel({
                 >
                   {isBlockedFreeTierModel(bot.model) ? (
                     <p className="settings-row-note">{bot.name} can't work on this model: OpenCode's free tier only answers inside OpenCode's own app. Choose another model.</p>
+                  ) : mayTrainOnPrompts(bot.model) ? (
+                    <p className="settings-row-note">{TRAINING_NOTICE} Choose another model if {bot.name} reads your mail, messages or files.</p>
                   ) : isFreeTierModel(bot.model) && (
                     <p className="settings-row-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
                   )}

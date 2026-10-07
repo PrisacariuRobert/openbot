@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.42.1 — Credibility fixes (unreleased)
+
+- New teammates on OpenCode start on DeepSeek V4.1 Flash, whose provider doesn't train on prompts. Muse Spark Contributor is still there, but it is no longer recommended and says "may train on your prompts" wherever you pick it or use it. Teammates you already set up keep their model.
+- When OpenCode lists no models Sidemates can use, it says so and suggests what to connect, instead of offering free models that only work inside OpenCode's own app.
+- The Claude card says what happens ("Uses the Claude Code you installed and signed in to") instead of "Official login".
+
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
 - **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.
