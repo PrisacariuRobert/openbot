@@ -1,91 +1,48 @@
-# Personal Mac away access
+# Reach your Mac from your phone
 
-Sidemates can serve its production web UI and native iPhone API through an outbound
-HTTPS tunnel. The computer remains the host: this does not make work run while it
-is shut down or offline. A locked Mac can serve conversations, but individual
-computer-control tasks may need an unlocked desktop.
+Sidemates can serve its web studio through an outbound HTTPS tunnel that you set up, so the Home Screen web app on your phone reaches the studio on your Mac. The Mac stays the host: nothing runs while it is shut down, asleep or offline. A locked Mac can still serve conversations, but some computer-control tasks need an unlocked desktop.
 
-## Installed personal deployment — 9 September 2026
+This is an advanced setup. The simplest way to reach your team from a phone today is the Telegram channel in Settings. Pairing with one scan is on the roadmap.
 
-- Address: `https://app.openbots.foundation/`.
-- Domain registration stays at Namecheap; authoritative DNS moved to Cloudflare's
-  free plan (`javon.ns.cloudflare.com`, `june.ns.cloudflare.com`). Original MX,
-  SPF and parking records were retained. The apex is not a new marketing site.
-- Cloudflare Tunnel `openbot-mac` routes only this hostname to `127.0.0.1:4311`.
-  The final ingress rule returns 404. Vite on 4310 is not exposed.
-- `com.openbot.runner` starts the existing studio from this checkout at login;
-  `com.openbot.tunnel` starts the tunnel. Both are user LaunchAgents and restart
-  after a process failure. They do not run before the user logs into macOS.
-- The tunnel's `caffeinate -s` assertion prevents system sleep on AC power. Keep
-  the Mac plugged in, online and its lid open. This does not disable the lock screen.
-- Configuration: `~/.cloudflared/openbot.yml`; credentials in the same protected
-  directory, never in Git. Logs: `.openbot/logs/tunnel*.log`.
-- The checkout's ignored `.env` sets the public URL and loopback bind address.
-  The runner LaunchAgent also sets these, with **local** deployment mode retained.
-  Restart the runner after changing server code; rebuild web assets after UI edits.
-- With the owner's approval, this Mac's Wi-Fi DNS was changed from automatic to
-  `1.1.1.1` / `1.0.0.1` because the ISP cached the old delegation. The existing
-  Tailscale DNS integration was refreshed and restored enabled; the VPN was not
-  disconnected. To restore automatic Wi-Fi DNS, use
-  `networksetup -setdnsservers Wi-Fi Empty`.
-- Cloudflare terminates HTTPS and transports traffic to this Mac. It is trusted
-  infrastructure, not end-to-end encrypted application transport. No router port
-  forwarding, paid Cloudflare plan or phone VPN is required.
+## What you need
+
+- A domain you control, for example `example.com`, with its DNS on a provider that offers tunnels. Cloudflare's free plan works; no paid plan, router port forwarding or phone VPN is needed.
+- The tunnel client for that provider (for Cloudflare, `cloudflared`) on your Mac.
+- Sidemates running on the Mac (the installed app serves the studio on `127.0.0.1:4311`).
+
+## Set it up
+
+1. Create a tunnel that routes **only** one hostname, for example `app.example.com`, to `http://127.0.0.1:4311`. End the ingress rules with a 404 so nothing else is exposed. Never expose the development server on port 4310.
+2. Tell Sidemates its public address: set `OPENBOT_APP_URL=https://app.example.com/` for the studio, and keep it bound to loopback (`OPENBOT_HOST=127.0.0.1`, the default). Keep **local** deployment mode.
+3. Start the tunnel at login with a user LaunchAgent of your own (for example `com.example.sidemates-tunnel`). Keep the tunnel's configuration and credentials in your home folder, never in Git.
+4. Keep the Mac on power and online if you need it reachable. A closed lid still sleeps it.
+5. On the Mac, open **Settings → Your phone** and pair your phone. Each invitation expires after five minutes.
 
 ## Access protection
 
-The web shell is public, but private APIs, attachments and event streams require
-an access key or paired device credential. Tunnel requests cannot use the local
-owner bypass. Exact-origin browser write checks reject sibling-domain CSRF;
-HTTPS sessions use Secure, HttpOnly, SameSite=Strict cookies. API responses are
-not cacheable. Cloudflare redirects HTTP to HTTPS and requires TLS 1.2 or newer.
+The web shell is public, but private APIs, attachments and event streams need an access key or a paired device credential:
+- Requests through the tunnel can't use the local owner bypass.
+- Exact-origin checks reject cross-site writes.
+- HTTPS sessions use Secure, HttpOnly, SameSite=Strict cookies, and API responses are not cacheable.
+- Removing a device closes its open event streams at once.
+- Never publish QR codes or keys.
 
-Pairing is managed on the Mac only. Each QR invitation expires after five minutes;
-the phone generates its own credential and stores it in Keychain. Removing the
-device also closes its existing event streams. Do not publish QR codes or keys.
+The tunnel provider terminates HTTPS and carries traffic to your Mac. It is trusted infrastructure, not end-to-end encrypted application transport. The self-hosted relay in [`deploy/relay`](../deploy/relay/README.md) is the other option, with the same caveat.
 
-## Verification gates
+## Check it
 
-This installation passed the real public HTTPS identity/unauthenticated guard
-checks after DNS propagated. A temporary paired device then accessed the studio,
-received server events, was blocked from owner-only pairing controls, and lost
-access (including its open stream) on revocation. The temporary device was revoked.
-These tests did not send messages, invoke models or change connected accounts.
-The application verification passed 620 tests plus 14 packaging/desktop tests;
-signed iOS simulator tests passed 29 unit tests and the conversation/settings/
-routine visual workflow. Physical iPhone installation and launch succeeded.
-The owner's iPhone then appeared in the live paired-device list at 22:29:42 UTC
-on 8 September (00:29:42 local on 9 September); the unused follow-up QR was
-cancelled. A Wi-Fi-off cellular task remains the user's final field test.
+- `npm run test:https-tunnel` checks the security behavior on an isolated real HTTP server, without using any AI: proxy impersonation, pairing, secure cookies, browser-origin rejection, owner-only controls, event streaming and revocation.
+- Before you rely on it, make sure that over the public address:
+  - an unauthenticated request is refused;
+  - a paired phone can open the studio;
+  - removing that phone cuts it off;
+  - it works over mobile data with Wi-Fi off.
 
-- `npm run test:https-tunnel`: isolated real HTTP server checks proxy impersonation,
-  native pairing, secure cookies, browser-origin rejection, owner-only controls,
-  event streaming and revocation without model usage.
-- `npm run verify`: source contracts, packaging tests, application tests,
-  typechecks and production build.
-- Native simulator QA needs code signing for Keychain, even with ad-hoc identity
-  `CODE_SIGN_IDENTITY=-`. An unsigned simulator build can compile but cannot be
-  counted as a successful connection test.
-- The signed Personal Team iPhone preview was installed and launched. It has
-  in-app conversations and approvals, but no APNs or system Share-sheet delivery.
-  Its development profile expires and needs periodic renewal; it is not an App
-  Store or TestFlight release.
-- Do not call the setup fully accepted until public HTTPS passes the exact-studio
-  identity and unauthenticated guard checks, and the phone has paired and completed
-  a cellular-network test. A running tunnel alone is not enough.
+  A running tunnel alone is not enough.
 
 ## Stop or recover
 
-From this Mac, remove a phone in Away access to revoke it immediately. To stop
-all public access, unload `~/Library/LaunchAgents/com.openbot.tunnel.plist` using
-`launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.openbot.tunnel.plist`.
-Load it again with `launchctl bootstrap` after correcting configuration. Removing
-the `app` DNS record also removes the domain route; do not delete unrelated DNS
-records or tunnels. The former registrar nameservers were
-`dns1.registrar-servers.com` and `dns2.registrar-servers.com`; switching back needs
-DNS propagation and disables the Cloudflare domain route.
-
-After reboot: log into macOS, keep AC power connected, open Away access, and wait
-for a fresh check. If DNS is newly changed, a local resolver may temporarily retain
-the old address even when authoritative DNS and other networks already work.
-Never bypass a certificate warning or disable authentication to work around this.
+- **Remove a phone:** do it in **Settings → Your phone** to revoke it immediately.
+- **Stop all public access:** unload your tunnel's LaunchAgent with `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/<your-label>.plist`, or remove the hostname's DNS record. Don't touch unrelated DNS records or tunnels.
+- **After a reboot:** log in to macOS, keep power connected, and wait for a fresh check in Settings.
+- **If you just changed DNS:** a local resolver may briefly keep the old address. Never bypass a certificate warning or turn off authentication to work around it.

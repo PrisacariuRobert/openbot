@@ -15,6 +15,10 @@
   - Voice and phone access are marked beta.
   - Competitor facts are updated to 7 October 2026.
 - Security: packages with known vulnerabilities are updated: proxy-addr, the MCP client and SDK, sharp, fast-uri, ip-address, and shell-quote, which the development tools use. `npm audit` now reports none.
+- Docs:
+  - "Reach your Mac from your phone" is now a general guide, not one person's setup.
+  - The product audit is marked as a historical record.
+  - The security model says the native iPhone app is retired.
 - For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
