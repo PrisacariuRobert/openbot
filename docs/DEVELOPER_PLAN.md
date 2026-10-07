@@ -424,7 +424,9 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 - Extend `qa/prompt-eval` to run each hero job ten times per kind of AI. Record pass rate, median time and tokens.
   - Gemini's free Flash models.
   - The ChatGPT plan (A3).
-  - Claude through Claude Code.
+  - Claude through Claude Code: Haiku 5.5 and Sonnet 5.5. Record the full model name, not just the `haiku` alias, which follows the installed Claude Code version.
+    - Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output tokens for prompts up to 100,000 tokens, a tenth of Haiku 4.5 ([Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), read 7 October 2026).
+    - If it passes the hero jobs as often as Sonnet, make it the recommended Claude model (today `src/server/providers.ts` picks Sonnet).
   - As a stretch, a local Ollama model on a Mac with 24 GB or more.
 - Publish `docs/RELIABILITY.md` with dates, models and failures, and update it every release.
 - Live runs are manual and started by the owner, since they use the owner's allowance. CI runs the same jobs against a scripted fake model.
