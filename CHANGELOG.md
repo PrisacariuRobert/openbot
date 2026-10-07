@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Security: packages with known vulnerabilities are updated: proxy-addr, the MCP client and SDK, sharp, fast-uri, ip-address, and shell-quote, which the development tools use. `npm audit` now reports none.
 - For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)

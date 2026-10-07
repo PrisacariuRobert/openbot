@@ -68,7 +68,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/open-sans": "^5.3.0",
     "@js-temporal/polyfill": "0.5.1",
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "cheerio": "1.2.0",
     "express": "^5.2.1",
@@ -101,5 +101,8 @@
     "concurrently": "^10.0.5",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
+  },
+  "overrides": {
+    "shell-quote": "^1.11.0"
   }
 }
