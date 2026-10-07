@@ -83,7 +83,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
 - **Research with sources** — each teammate browses in its own private browser and links what it found; when something can’t be checked, it says so.
 - **Group chats** — write “Nova: find… Scout, double-check…” and each does their part, in order.
 - **Routines** — “Every Monday at 9, plan my week.” Plus a Sunday look back at what got done.
-- **Voice and phone** — talk hands-free, or pair your iPhone with one scan to chat and approve from your Home Screen.
+- **Voice and phone (beta)** — talk hands-free in the studio. From your phone, chat with your team through Telegram, or use the Home Screen app with a relay you set up; pairing with one scan is on the way.
 - **Skills** — teach a teammate a method once, or add reviewed skills from the community.
 - **Bring your setup** — one-click import from Hermes Agent and OpenClaw, including automations.
 
@@ -97,23 +97,23 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
 | **Pay per use** | OpenCode Go · any OpenAI-compatible API |
 | **Stay private** | Models on your Mac with Ollama |
 
-Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, Sidemates starts your own `claude` command and never sees your login. Anthropic’s terms restrict using Claude subscription logins in other products, and how that applies to a tool that starts your own Claude Code is not settled, so check them before relying on it.
+Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, Sidemates starts your own `claude` command and never sees your login. Anthropic’s terms allow signing in to the unmodified Claude Code program with your own subscription ([checked 7 October 2026](https://code.claude.com/docs/en/legal-and-compliance)). Use by tools that start it may count against your plan differently, so check your plan before relying on it.
 
 ## How it compares
 
 | | Cloud agents (OpenAI dots, Grok Bot, Meta Muse) | Siri AI (macOS 27) | Hermes Desktop, OpenClaw | **Sidemates** |
 | :--- | :--- | :--- | :--- | :--- |
-| Price | $0–300/month plans | Free, with daily limits | Free + your models | **Free + your models** |
-| Runs on | Their cloud computers | Your Mac + Apple's cloud | Your machine | **Your Mac** |
-| Uses your Mac's apps and files | No | Quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
+| Price | Free with caps (Muse) to $100+/month (dots); Grok Bot from $20–30 | Free, with daily limits | Free + your models | **Free + your models** |
+| Runs on | Their cloud computers; Muse for Mac and dots (if you turn it on) also act on your Mac | Your Mac + Apple's cloud | Your machine | **Your Mac** |
+| Uses your Mac's apps and files | Muse for Mac (US and Canada only); dots, if you turn it on; not Grok Bot | Personal context and quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
 | Long jobs on websites | Yes, in their browser | No | Yes | **Yes, each teammate in its own browser** |
 | A team of named teammates | Grok Bot only | No | Hermes Bot Mode | **Yes** |
-| Scheduled work | Yes | No | Yes | **Yes, and your Mac wakes for it** |
+| Scheduled work | Yes | No | Yes | **Yes, while your Mac is awake** |
 | Asks before acting | Yes | Yes | Configurable | **By default, with the exact button — or Autopilot** |
 | Choose your AI | No | No | Yes | **Yes — ChatGPT, Claude, Gemini, local…** |
 | Open source | No | No | Yes (MIT) | **Yes (MIT)** |
 
-Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots is not available in the EU, UK or Switzerland; Sidemates works wherever your Mac does. Competitor details as of 30 September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
+Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots’ personal plans aren’t offered in the EU, UK or Switzerland, and Meta’s Muse is available only in the US and Canada; Sidemates works wherever your Mac does. Competitor details as of 7 October 2026, from their public pages and press. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
 
 ## Privacy and safety
 

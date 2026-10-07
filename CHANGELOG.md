@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The website and README now say only what is true today:
+  - Phone access works through Telegram, or the Home Screen app with a relay you set up; pairing with one scan is on the way.
+  - The install takes a few minutes and downloads about 140 MB.
+  - Web tasks need Chrome, Edge or Brave.
+  - Routines run while your Mac is awake.
+  - Voice and phone access are marked beta.
+  - Competitor facts are updated to 7 October 2026.
 - Security: packages with known vulnerabilities are updated: proxy-addr, the MCP client and SDK, sharp, fast-uri, ip-address, and shell-quote, which the development tools use. `npm audit` now reports none.
 - For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
 

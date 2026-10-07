@@ -72,7 +72,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | :--- | :--- | :---: | :---: | :---: |
 | S1 | Make the contributor path work | S | 0.42.1 | ✅ |
 | S2 | Patch vulnerable dependencies | S | 0.42.1 | ✅ |
-| S3 | Make every public sentence true | S | 0.42.1 | ☐ |
+| S3 | Make every public sentence true | S | 0.42.1 | ✅ |
 | S4 | Safer default models | S | 0.42.1 | ☐ |
 | S5 | Personal infrastructure out of public docs; fix stale docs | S–M | 0.42.1 | ☐ |
 | S6 | CLAUDE.md for every session | S | 0.42.1 | ✅ |
