@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A guided first run.** After installing, Sidemates helps you choose your AI (ChatGPT, a free Gemini key, Claude Code, or Ollama on your Mac in one click), confirm a model and meet your first teammate, then suggests three things to try. Calendar and Reminders access is asked only when a suggestion needs it, and specialists (a researcher, a writer) can be added later with one click on the same AI.
+- The loading and phone pairing screens say Sidemates instead of OpenBot.
 - **Your setup** (Settings): a timeline of your first days with Sidemates: the first start, opening the studio, connecting an AI, your first teammate, first answer and first finished job, and coming back. It stays on your Mac and is never sent; Copy puts it in a note or a bug report.
 - Safer AI defaults:
   - A model whose provider doesn't train on your prompts is now recommended first.

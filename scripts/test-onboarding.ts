@@ -85,7 +85,7 @@ try {
   page.setDefaultTimeout(15_000);
   await page.goto(base + "/studio.html");
   await page.getByRole("heading", { name: "Good work starts with a conversation." }).waitFor();
-  await page.getByRole("button", { name: "Create your first teammate" }).click();
+  await page.getByRole("button", { name: "Create one teammate myself" }).click();
   const creation = page.getByRole("dialog");
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");

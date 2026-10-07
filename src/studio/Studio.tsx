@@ -89,6 +89,11 @@ import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { useSetupVisits } from "./setup-visits";
+import { GuidedFirstRun } from "./GuidedFirstRun";
+import { FirstRunTryOne } from "./FirstRunTryOne";
+import { AddSpecialist } from "./AddSpecialist";
+import { startsGuidedRun, withoutWelcome } from "./first-run-steps";
+import { dismissSpecialistCard, firstRunTeammate, rememberFirstRunTeammate, specialistCardDismissed } from "./first-run-memory";
 import { conversationMatches } from "./conversation-filter";
 import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
@@ -651,6 +656,12 @@ function SettingsWorkspacePage({
 export function Studio() {
   const { appearance, setAppearance } = useAppearance();
   useSetupVisits();
+  // The installer opens ?welcome=installed on every install and update: it starts the guided run only
+  // where the empty-studio welcome would show, and always leaves the address.
+  const [guided, setGuided] = useState(() => startsGuidedRun(window.location.search, 0));
+  useEffect(() => { const clean = withoutWelcome(window.location.href); if (clean) window.history.replaceState(null, "", clean); }, []);
+  const [firstRunBot, setFirstRunBot] = useState(() => firstRunTeammate());
+  const [specialistCardHidden, setSpecialistCardHidden] = useState(() => specialistCardDismissed());
   const [page, setPage] = useState<Page>(() => {
     const p = new URLSearchParams(window.location.search).get("panel");
     if (p === "settings" || isCapabilityPanel(p)) return "settings";
@@ -745,6 +756,8 @@ export function Studio() {
     setDraft = composerDraft.setBody;
   const [dictating, setDictating] = useState(false);
   const showsMic = dictating || (!draft.trim() && !attached.files.length && !sending && dictationSupported());
+  // The teammate the guided run made: its conversation offers the first things to try.
+  const firstRunThreadBot = state?.bots.find((bot) => bot.id === firstRunBot && bot.threadId === thread) ?? null;
   const pickStarter = (text: string) => {
     setDraft(text);
     window.setTimeout(() => { const box = document.getElementById("studio-message") as HTMLTextAreaElement | null; box?.focus(); box?.setSelectionRange(box.value.length, box.value.length); }, 0);
@@ -2556,10 +2569,15 @@ export function Studio() {
                 >
                   <div className="chat-messages">
                     {state.activeThreadId === thread && state.messages[0] && <div className="conversation-date">{dayKey(state.messages[0].createdAt) === dayKey(new Date()) ? "Today" : dateText(state.messages[0].createdAt)} · {timeText(state.messages[0].createdAt)}</div>}
-                    {!state.bots.length ? (
+                    {!state.bots.length && guided ? (
+                      <GuidedFirstRun onClose={() => setGuided(false)} onCreated={(bot) => {
+                        rememberFirstRunTeammate(bot.id); setFirstRunBot(bot.id); setGuided(false);
+                        setRecipient(bot.id); setThread(bot.threadId); setPage("chat"); setRefresh((value) => value + 1);
+                      }} />
+                    ) : !state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><p className="welcome-tagline">A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Choose the AI behind your team, meet your first teammate, and start with something small.</p><button className="primary" onClick={() => setGuided(true)}>Set up my team <ArrowRight size={16}/></button><button onClick={() => setDetail({ kind: "create" })}>Create one teammate myself</button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>
@@ -2577,7 +2595,7 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
-                        <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
+                        {firstRunThreadBot ? <FirstRunTryOne bot={firstRunThreadBot} macAccess={Boolean(state.settings.macAccessEnabled)} onPick={pickStarter} /> : <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
                       </div>
                     ) : (<>{
                       state.messages.map((message, index) => {
@@ -2735,7 +2753,8 @@ export function Studio() {
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
-                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
+                      {!state.messages.some((message) => message.senderType === "user") && (firstRunThreadBot ? <FirstRunTryOne bot={firstRunThreadBot} macAccess={Boolean(state.settings.macAccessEnabled)} onPick={pickStarter} /> : <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />)}
+                      {firstRunThreadBot && !specialistCardHidden && state.messages.some((message) => message.senderType === "bot") && <AddSpecialist teammates={state.bots} anchor={firstRunThreadBot} onAdded={() => setRefresh((value) => value + 1)} onDismiss={() => { dismissSpecialistCard(); setSpecialistCardHidden(true); }} />}
                     </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);

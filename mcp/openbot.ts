@@ -545,9 +545,11 @@ server.tool("run_export", "Complete redacted evidence pack for one task: run, ev
   return { content };
 });
 
-server.tool("list_team_templates", "Starter rosters (Studio/Research/Ops teams) installable in one step.", {}, async () => {
-  const templates = await call("/api/team-templates");
-  return { content: [{ type: "text", text: JSON.stringify(templates, null, 1).slice(0, 4_000) }] };
+server.tool("list_team_templates", "Starter rosters installable in one step.", {}, async () => {
+  const templates = await call("/api/team-templates") as Array<{ id: string; name: string; description: string; members: Array<{ key?: string; name: string; role: string }> }>;
+  // A summary, not the members' full instructions, so the list always fits.
+  const summary = templates.map(({ id, name, description, members }) => ({ id, name, description, members: members.map(({ key, name: member, role }) => ({ ...(key ? { key } : {}), name: member, role })) }));
+  return { content: [{ type: "text", text: JSON.stringify(summary, null, 1) }] };
 });
 
 server.tool("install_team_template", "Install a starter roster as ordinary teammates (no models connected, no access granted).", {

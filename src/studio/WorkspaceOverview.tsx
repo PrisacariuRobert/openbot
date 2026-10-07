@@ -1,4 +1,5 @@
 import { ExistingAgentsCard } from "../components/ExistingAgentsCard";
+import { AddSpecialist } from "./AddSpecialist";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, ChevronRight, Link2, Plus, Upload } from "lucide-react";
 import { TeammatePreviewCard, readTeammate, type TeammatePreview } from "../components/TeammatePreviewCard";
@@ -50,6 +51,7 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
   }, []);
   return <div className="team-overview">
     <div className="workspace-page-actions"><button className="button-primary" onClick={onCreate}><Plus size={16} /> New teammate</button><button disabled={pending} onClick={() => file.current?.click()}><Upload size={16} /> Import a profile</button><button disabled={pending} onClick={() => setLinkOpen((open) => !open)}><Link2 size={16} /> Add from a link</button></div>
+    {(() => { const anchor = state.bots.find((bot) => bot.providerInstanceId && bot.model); return anchor ? <AddSpecialist layout="row" teammates={state.bots} anchor={anchor} onAdded={() => undefined} /> : null; })()}
     {linkOpen && <form className="teammate-link-form" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await fromLink(linkText); setLinkOpen(false); setLinkText(""); }); }}><input value={linkText} onChange={(event) => setLinkText(event.target.value)} placeholder="Paste a teammate link" aria-label="Teammate link" autoFocus /><button type="submit" className="button-primary" disabled={pending || !linkText.trim()}>Preview</button></form>}
     <input ref={file} className="visually-hidden" type="file" accept=".json,application/json" aria-label="Import a teammate profile" onChange={event => {
       const selected = event.target.files?.[0]; event.target.value = "";

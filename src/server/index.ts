@@ -16,6 +16,8 @@ import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
 import { registerSetupRoutes } from "./setup-routes.js";
+import { registerOllamaRoutes } from "./ollama.js";
+import { openSettingsPane, probeFullDiskAccess, registerMacPermissionRoutes } from "./mac-permissions.js";
 import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
 import { ApprovedConnectorDispatch, ApprovedConnectorOutcomeUncertainError, ApprovalReviewChangedError, approvalReviewFingerprint, sameReviewFingerprint } from "./approval-review-binding.js";
@@ -83,7 +85,7 @@ import { proposeSkillFromRun } from "./skill-proposals.js";
 import { requestRunReview } from "./run-review.js";
 import { parseAuthoredSkill } from "./skill-authoring.js";
 import { learningCommandDirection, skillStartingUrlSchema } from "../shared/skill-authoring.js";
-import { TEAM_TEMPLATES, teamTemplate } from "./team-templates.js";
+import { registerTeamTemplateRoutes } from "./team-template-routes.js";
 import { acquireStudioLock } from "./studio-lock.js";
 import { WEEKLY_BUDGET_STEP_RESERVE } from "./execution-policy.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, todoistActivityWindow, verifyAutomationSignature } from "./automations.js";
@@ -339,6 +341,8 @@ registerPairingRoutes(app, pairedDevices, awayAccess, (deviceId) => {
 const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callback: deploymentCallbackUrl(deployment, "/api/extensions/oauth/callback"), app: appUrl });
 registerRecipeRoutes(app, db, () => broadcast());
 registerSetupRoutes(app, setupTimeline);
+registerOllamaRoutes(app);
+registerMacPermissionRoutes(app, { available: process.platform === "darwin", requestAccess: (target) => appleApps.requestAccess(target), fullDiskAccess: () => probeFullDiskAccess(), openPane: openSettingsPane });
 const interruptedApprovedActions = db.recoverInterruptedApprovedActions();
 for (const receipt of interruptedApprovedActions) {
   const detail = `${receipt.actionLabel} may or may not have completed before Sidemates restarted. It has not been repeated.`;
@@ -3648,23 +3652,8 @@ app.post("/api/bots/:id/browser/nav", async (request, response) => {
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
 app.get("/api/skill-templates", (_request, response) => response.json(SKILL_TEMPLATES.map(({ steps, ...template }) => ({ ...template, stepCount: steps.length }))));
-// Starter rosters: one request creates the whole team as ordinary teammates.
-app.get("/api/team-templates", (_request, response) => response.json(TEAM_TEMPLATES));
-app.post("/api/team-templates/:id/install", (request, response) => {
-  const template = teamTemplate(request.params.id);
-  if (!template) return response.status(404).json({ error: "That team template is not available." });
-  try {
-    const created = template.members.map((member) => db.createBot({
-      name: member.name, emoji: "●", mascot: member.mascot, color: member.color,
-      role: member.role, instructions: `${member.instructions}\n\nYou are a starting template, not a finished teammate: the owner will shape your job, connect your model and set your limits.`,
-      browserEnabled: false, computerEnabled: false,
-    }));
-    broadcast();
-    response.status(201).json({ template: template.name, bots: created });
-  } catch (error) {
-    return response.status(409).json({ error: error instanceof Error ? error.message : "The team could not be created completely. Teammates already created stay in the roster; retire them or free a slot and try again." });
-  }
-});
+// Starter rosters, installed as ordinary teammates (also used one member at a time by the guided first run).
+registerTeamTemplateRoutes(app, db, () => broadcast());
 app.get("/api/workflows/:id/versions", (request, response) => {
   if (!db.getWorkflowRecord(request.params.id)) return response.status(404).json({ error: "That skill is no longer available." });
   response.json(db.listWorkflowVersions(request.params.id));

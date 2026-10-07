@@ -101,6 +101,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | T3 | Publish the attack tests | M | 0.46 | ☐ |
 | AU2 | Real sending with an undo window and sandboxed replies | L | 0.46 | ☐ |
 | AU3 | Batch approvals and the daily digest | M | 0.46 | ☐ |
+| AU4 | A teammate proposes a specialist, and the owner approves it | S–M | 0.46 | ☐ |
 | F4 | Trust ladder: autonomy teammates earn | M | 0.46 | ☐ |
 | F5 | Triggers: your Mac reacts | M | 0.47 | ☐ |
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
@@ -278,6 +279,10 @@ Keep `OPENBOT_*` variables, paths and file names working; aliases come in M6.
 **Prompt.** `Do task A1 in docs/DEVELOPER_PLAN.md. Build the local timeline; keep the sender behind a setting that is off and say in the pull request what it would send.`
 
 ### A2 · Guided first run · M · plan first
+
+**Owner decision, 7 October 2026: one teammate, grow later.** The first run makes one general helper (Scout, a chief of staff the owner can rename), not a starter team of three. Specialists (Nova, researcher; Pixel, writer) are added later with one click, on the same AI: from a one-time card in the first conversation after the first answer, and from Settings → Your team. "Set up your Mac" opens only when the owner picks a suggestion that needs it. A teammate proposing a specialist itself is task AU4.
+
+**Status, 7 October 2026.** Built: `?welcome=installed`, the AI step in the order below (Apple Intelligence's slot waits for A4; ChatGPT signs in through OpenCode until A3), one-click Ollama, the model step, the first teammate, "Try one", the on-demand Mac setup and "Add a specialist". Waiting for the owner's timed runs in `qa/first-run/`, so it stays unticked.
 
 **Do.**
 - Handle `?welcome=installed`. `scripts/install.sh` opens it, but today only `welcome=phone` is handled (`src/studio/PhoneWelcome.tsx`).
@@ -717,6 +722,19 @@ The opposite failure exists too: a dot reportedly emailed a city office after be
 - On Smart, the hero jobs ask at most once per run.
 
 **Prompt.** `Do task AU3 in docs/DEVELOPER_PLAN.md.`
+
+### AU4 · A teammate proposes a specialist, and the owner approves it · S–M · 0.46
+
+**Why.** The owner decided on 7 October 2026 that the first run makes one teammate and the team grows when a job needs it (A2). Today the owner adds a specialist with one click; the teammate can only mention it in its reply.
+
+**Do.**
+- A tool, `propose_teammate`, that a teammate calls when a job would clearly go better with a specialist from the starter template (researcher or writer). It creates an approval card that names the specialist, why, and the AI it would use (the proposer's).
+- On approval, the server installs that one member through the existing template route; on decline, the same proposal isn't repeated in that conversation.
+- Adding a teammate is never automatic, at every autonomy level, and counts against the teammate limit.
+
+**Done when.** Tests cover proposing, approving, declining, the limit and the no-repeat rule, and a teammate can't add one without an approval.
+
+**Prompt.** `Do task AU4 in docs/DEVELOPER_PLAN.md.`
 
 ---
 
