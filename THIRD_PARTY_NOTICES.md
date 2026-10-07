@@ -18,6 +18,10 @@ These are Sidemates-specific adaptations. They do not bundle Hermes's Python run
 
 OpenCode, Claude Code, Chrome/Chromium, Docker, Xcode and provider services have their own licenses or terms. Some are installed separately; private-runner images may include additional tools. Review the exact artifact, not just this repository's root license. Choosing a model does not grant a subscription, API balance or third-party trademark rights.
 
+## Website font
+
+The website serves the Nunito typeface from `site/fonts/` (from the [Fontsource](https://fontsource.org/fonts/nunito) package `@fontsource-variable/nunito` 5.3.0). Nunito is Copyright 2014 The Nunito Project Authors and licensed under the [SIL Open Font License 1.1](site/fonts/OFL.txt); keep that file next to the fonts.
+
 ## Identity and references
 
 The native `ios/Shared/BrandAssets.xcassets` catalog bundles monochrome service artwork from [Simple Icons 15.15.0](https://github.com/simple-icons/simple-icons/tree/15.15.0/icons), distributed under [CC0-1.0](https://github.com/simple-icons/simple-icons/blob/15.15.0/LICENSE.md). Files are preserved as vector assets and render offline; this does not grant trademark rights. The OpenCode app mark is supplied separately by [OpenCode's official identity package](https://github.com/anomalyco/opencode/blob/dev/packages/identity/mark.svg), linked from its [brand resources](https://opencode.ai/brand); its original artwork is retained rather than replaced by a generic processor symbol. These marks identify user-selectable services, never Sidemates' own branding or an endorsement.

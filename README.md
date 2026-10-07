@@ -125,6 +125,8 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 
 Sidemates 0.42.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/sidemates/releases/tag/v0.42.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
 
+Sidemates has no token or cryptocurrency. Anything that claims otherwise isn’t us.
+
 ## What's new in 0.42.0
 
 - **OpenBot is now Sidemates.** A new name and a new home at [sidemates.app](https://sidemates.app). OpenBot was too close to other products' names, so we changed it early. Updating keeps your teammates, chats and files, and the old install link still works.

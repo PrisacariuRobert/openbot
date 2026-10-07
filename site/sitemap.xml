@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://sidemates.app/</loc><lastmod>2026-10-01</lastmod></url>
-  <url><loc>https://sidemates.app/alternatives/</loc><lastmod>2026-10-01</lastmod></url>
-  <url><loc>https://sidemates.app/alternatives/openai-dots/</loc><lastmod>2026-10-02</lastmod></url>
-  <url><loc>https://sidemates.app/alternatives/grok-bot/</loc><lastmod>2026-10-02</lastmod></url>
-  <url><loc>https://sidemates.app/alternatives/siri-ai/</loc><lastmod>2026-10-02</lastmod></url>
-  <url><loc>https://sidemates.app/alternatives/openmausbot/</loc><lastmod>2026-10-02</lastmod></url>
+  <url><loc>https://sidemates.app/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/openai-dots/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/grok-bot/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/meta-muse/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/siri-ai/</loc><lastmod>2026-10-07</lastmod></url>
+  <url><loc>https://sidemates.app/alternatives/openmausbot/</loc><lastmod>2026-10-07</lastmod></url>
   <url><loc>https://sidemates.app/teammates/</loc><lastmod>2026-10-01</lastmod></url>
   <url><loc>https://sidemates.app/llms.txt</loc><lastmod>2026-10-01</lastmod></url>
 </urlset>

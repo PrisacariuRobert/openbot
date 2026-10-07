@@ -61,7 +61,7 @@ The software is free. You pay only for the AI you connect, and free options exis
 - OpenMausBot (Apache-2.0): an open-source team of AI bots, aimed at developers, that runs on the Claude, Codex and Grok command-line tools you already have; macOS, Windows, Ubuntu, Android and iOS; a paid Pro plan adds an always-on cloud workspace. Far more widely used than Sidemates today. Choose it for Windows, Linux or phone apps. Choose Sidemates for Mac depth (your own Mail, Calendar, Notes and Messages) and a simpler setup.
 - OpenClaw (MIT): a self-hosted gateway to many chat apps with a large skill marketplace. Choose it for the widest chat-app reach.
 
-Full comparison with sources: https://sidemates.app/alternatives/
+Full comparison with sources: https://sidemates.app/alternatives/ (one page each for OpenAI dots, Grok Bot, Meta Muse, Siri AI and OpenMausBot)
 
 ## Links
 
