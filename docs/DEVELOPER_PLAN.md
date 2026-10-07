@@ -77,7 +77,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | S5 | Personal infrastructure out of public docs; fix stale docs | S–M | 0.42.1 | ✅ |
 | S6 | CLAUDE.md for every session | S | 0.42.1 | ✅ |
 | S7 | Website gaps (Meta Muse page, gallery tags, self-hosted font) | S | 0.42.1 | ✅ |
-| S8 | Rename leftovers developers see first | S | 0.42.1 | ☐ |
+| S8 | Rename leftovers developers see first | S | 0.42.1 | ✅ |
 | A1 | Measure the first run (local first, opt-in later) | M | 0.43 | ☐ |
 | A2 | Guided first run | M | 0.43 | ☐ |
 | A3 | Sign in with ChatGPT, with Sidemates' own client | M | 0.43 | ☐ |

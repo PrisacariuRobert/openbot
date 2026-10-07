@@ -8,7 +8,7 @@ body:
     id: version
     attributes:
       label: Version and environment
-      description: Sidemates version or commit, operating system, and web/Mac/iPhone client.
+      description: Sidemates version or commit, operating system, where you used it (the Mac app, a browser or the Home Screen app on a phone), and the AI and model the teammate uses.
     validations:
       required: true
   - type: textarea

@@ -26,6 +26,7 @@
   - The product audit is marked as a historical record.
   - The security model says the native iPhone app is retired.
 - For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
+- Private runner and CI: the runner's README, setup, update and transfer messages, the CI artifacts and the bug report form now say Sidemates. Server paths, `OPENBOT_*` settings, the `openbot` service and `.openbot-home` files keep their names, so existing servers keep working.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 

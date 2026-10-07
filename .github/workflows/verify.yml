@@ -36,10 +36,10 @@ jobs:
       - name: Validate private runner Compose bundle
         run: docker compose --env-file deploy/private-runner/.env.example -f deploy/private-runner/docker-compose.yml config --quiet
       - name: Build private runner image
-        run: docker build --file deploy/private-runner/Dockerfile --tag openbot-private-runner:verify .
+        run: docker build --file deploy/private-runner/Dockerfile --tag sidemates-private-runner:verify .
       - name: Smoke test private runner image
         run: |
-          docker run --detach --name openbot-private-runner-smoke \
+          docker run --detach --name sidemates-private-runner-smoke \
             --group-add "$(stat -c '%g' /var/run/docker.sock)" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --publish 127.0.0.1:4311:4311 \
@@ -47,19 +47,19 @@ jobs:
             --env OPENBOT_APP_URL=https://studio.example.com/ \
             --env OPENBOT_DATA_DIR=/srv/openbot/data \
             --env OPENBOT_HOST=0.0.0.0 \
-            openbot-private-runner:verify
+            sidemates-private-runner:verify
           cleanup() {
-            docker logs openbot-private-runner-smoke
-            docker rm --force openbot-private-runner-smoke >/dev/null
+            docker logs sidemates-private-runner-smoke
+            docker rm --force sidemates-private-runner-smoke >/dev/null
           }
           trap cleanup EXIT
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:4311/api/healthz; then
-              docker exec openbot-private-runner-smoke opencode --version
-              docker exec openbot-private-runner-smoke npx tsx scripts/test-provider-runtime.ts
-              docker exec openbot-private-runner-smoke chromium --version
-              docker exec openbot-private-runner-smoke docker info --format '{{.ServerVersion}}'
-              access_token="$(docker exec openbot-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"
+              docker exec sidemates-private-runner-smoke opencode --version
+              docker exec sidemates-private-runner-smoke npx tsx scripts/test-provider-runtime.ts
+              docker exec sidemates-private-runner-smoke chromium --version
+              docker exec sidemates-private-runner-smoke docker info --format '{{.ServerVersion}}'
+              access_token="$(docker exec sidemates-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"
               curl --fail --silent \
                 --header "Authorization: Bearer ${access_token}" \
                 http://127.0.0.1:4311/api/runner/diagnostics \
