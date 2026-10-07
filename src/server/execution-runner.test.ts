@@ -24,7 +24,7 @@ function assertNoFalseFinishedAnswer(db: OpenBotDatabase, run: { id: string; thr
 function fixture(script: string, limits: Partial<ExecutionLimits> = {}, expectedWorkKind?: "morning" | "inbox", runtimeCheck?: () => { runtime: "opencode"; detectedVersion: string | null; compatibility: "verified" | "unsupported" | "unknown" }) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-execution-test-"));
   const db = new OpenBotDatabase(root);
-  db.chooseInitialProvider("local-opencode", "opencode/muse-spark-1.2-contributor-free");
+  db.chooseInitialProvider("local-opencode", "opencode/fixture");
   let child: ChildProcess;
   const runner = new OpenCodeRunner({
     db,

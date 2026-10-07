@@ -20,11 +20,12 @@ import { z } from "zod";
 import { DEFAULT_EXECUTION_LIMITS } from "../src/server/execution-policy.js";
 
 // Opt-in only. Never silently substitute a paid model.
-// Owner-authorized live paths (2026-09-12): OpenCode provider with
-// DeepSeek 4.1 Flash or Muse Spark 1.3 Contributor (paid), plus the
-// existing free fixtures for CI. Browser-first for accounts; owner signs in on demand.
+// Owner-authorized live paths (2026-09-12): OpenCode Go with DeepSeek 4.1
+// Flash or Muse Spark 1.3 Contributor (paid). OpenCode's free models only work
+// inside OpenCode's own app, so they are not live paths. CI uses fixtures.
+// Browser-first for accounts; owner signs in on demand.
 const liveModel = process.env.OPENBOT_PRODUCTIVITY_LIVE_MODEL;
-assert.ok(!liveModel || ["opencode/muse-spark-1.2-contributor-free", "opencode/muse-spark-1.3-contributor-free", "opencode-go/deepseek-v4.1-flash", "opencode-go/muse-spark-1.3-contributor"].includes(liveModel), "Only an explicitly selected owner-authorized model is accepted by this small live check; no fallback is selected.");
+assert.ok(!liveModel || ["opencode-go/deepseek-v4.1-flash", "opencode-go/muse-spark-1.3-contributor"].includes(liveModel), "Only an explicitly selected owner-authorized model is accepted by this small live check; no fallback is selected.");
 
 const root = mkdtempSync(path.join(tmpdir(), "openbot-productivity-runtime-"));
 const db = new OpenBotDatabase(root);
