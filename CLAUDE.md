@@ -37,9 +37,11 @@ macOS-only pieces are mocked or skipped on Linux: the JXA app tools, the Full Di
 
 ## House rules
 
-- **Approvals stay human-owned.**
+- **The owner sets autonomy; the server enforces it.**
   - Never weaken a server-side check to make a prompt work; prompts are not permission checks.
-  - Spending, irreversible actions and messages to new people must ask.
+  - At every autonomy level, these always ask: money, the first message to a new person, anything gone for good, and credentials.
+  - Everything else follows the teammate's level (Ask first, Smart, Autopilot), as defined in the plan's Autonomy section.
+  - Autonomous sends use a sandboxed context, an undo window and daily caps.
 - **Every claim needs evidence.**
   - Write no "always asks", "private" or "works with X" in the README, the site or the UI without a test or a dated source.
   - If the product doesn't do it yet, change the words.

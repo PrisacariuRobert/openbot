@@ -4,7 +4,9 @@
 
 This plan replaces the release table in [ROADMAP.md](ROADMAP.md). It comes from a full audit of this repository on 7 October 2026 and from research into the personal-agent products people compare us with (Grok Bot, OpenAI dots, Meta Muse, Siri AI, Claude Cowork, OpenClaw, Hermes, MausBot).
 
-The short version: **Sidemates doesn't need more features. It needs a stranger to get one useful result in three minutes, three everyday jobs that work every time, and a safety record people can check.**
+The short version: **first, a stranger must get one useful result in three minutes. Then Sidemates must do real work on its own, ask only when it matters, and let you undo anything.**
+
+Eight signature features, approved on 7 October 2026, give each release a headline that cloud agents can't easily copy, because each needs your Mac, your apps or your data on your machine.
 
 ## How to run this plan with Claude Code
 
@@ -34,27 +36,35 @@ Tasks marked **Owner** need you: your Mac, your accounts or a decision. Claude C
 
 ## Rules every task follows
 
-1. **Activation before features.** No new connectors, chat channels or platforms until the hero jobs pass their reliability bar (task J2).
+1. **Activation before features.** No new connectors, chat channels or platforms until the hero jobs pass their reliability bar (task J2). The signature features build on existing code and add none.
 2. **Words follow the product.** If a public sentence isn't true yet, change the sentence first. No "always asks" claim without a test.
-3. **Safe by default.** Spending, irreversible actions and messages to new people always ask, on Autopilot too (task T1).
+3. **Useful by default, careful where it matters.**
+   - Teammates do whatever stays on the Mac or can be undone, without asking.
+   - At every level, these always ask: money, the first message to a new person, anything gone for good, and credentials.
+   - See [Autonomy](#autonomy-does-the-work-asks-only-when-it-matters).
 4. **Private by default.** Nothing leaves the Mac for analytics unless the owner opted in. Don't recommend models that train on prompts for teammates that read personal data.
 5. **$0.** No paid service in the critical path. The first money goes to Apple's $99 developer membership: a signed app and a Homebrew install.
 6. **Small changes to big files.** New code goes in new modules. One refactor slice a week (M1 to M6), never mixed with a feature.
 
 ## Release plan
 
-| Release | Target | Theme | Tasks |
-| :--- | :--- | :--- | :--- |
-| 0.42.1 | Mon 12 Oct | Credibility fixes | S1–S8 |
-| 0.43 | Mon 26 Oct | First useful answer in three minutes | A1–A8 |
-| 0.44 | Mon 9 Nov | Three jobs that work every time | J1–J6 |
-| 0.45 | Mon 23 Nov | Safe by default | T1–T6 |
-| 0.46 | Mon 7 Dec | Plays well with others | R1–R5 |
-| Later | When each gate is met | Windows preview, signed app, packs | See [Later](#later-only-when-the-gate-is-met) |
+| Release | Target | Theme | Headline feature | Tasks |
+| :--- | :--- | :--- | :--- | :--- |
+| 0.42.1 | Mon 12 Oct | Credibility fixes | — | S1–S8 |
+| 0.43 | Mon 26 Oct | First useful answer in three minutes | Text your Mac | A1–A8, F6 |
+| 0.44 | Mon 9 Nov | Three jobs that work every time | **Open Loops** | J1–J6, F1 |
+| 0.45 | Mon 23 Nov | Does the work, asks only when it matters | **Rewind** | T1, T2, F2, AU1 |
+| 0.46 | Mon 7 Dec | It sends for you, with an undo window | **Trust ladder** | T3, AU2, AU3, F4 |
+| 0.47 | Mon 21 Dec | Your Mac reacts | **Triggers** | F5, R1, R3, R5 |
+| 0.48 | Mon 11 Jan | Private and checkable | **Run receipts** | F3, T4, T5, T6 |
+| 0.49 | Mon 25 Jan | Ask and move | **Ask my Mac**, **Move in, move out** | F7, F8, R2, R4 |
+| Later | When each gate is met | Windows preview, signed app, packs | | See [Later](#later-only-when-the-gate-is-met) |
 
-Patch releases in between are fine. Dates are targets: a release ships when its "done when" checks pass, not on a date.
+Patch releases in between are fine. Dates are targets: a release ships when its "done when" checks pass, not on a date. If time runs short, the foundation tasks ship and the headline feature moves to the next patch, never the other way round.
 
-**Gate before any public launch push:** A2's clean-Mac timing (a median of three minutes or less over five owner runs) and J2's first scoreboard published.
+**Gates.**
+- **Before any public launch push:** A2's clean-Mac timing (a median of three minutes or less over five owner runs), and J2's first scoreboard published.
+- **Before autonomous sending (AU2):** T2 and T3 pass, and every injection fixture in AU2 ends as an approval, never a send.
 
 ## Task board
 
@@ -76,26 +86,37 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | A6 | Phone access that works, safely | M | 0.43 | ☐ |
 | A7 | Lighter prompts and tool lists | M | 0.43 | ☐ |
 | A8 | A download button for people who don't use Terminal | S–M | 0.43 | ☐ |
+| F6 | Text your Mac | S–M | 0.43 | ☐ |
 | J1 | Pick the hero jobs and build their fixtures | S | 0.44 | ☐ |
 | J2 | Reliability harness and a public scoreboard | M | 0.44 | ☐ |
 | J3 | Real-Mac acceptance kit | M | 0.44 | ☐ |
 | J4 | Fast Calendar and Reminders through EventKit | M | 0.44 | ☐ |
 | J5 | Gmail and Google Calendar without a Google Cloud project | S | 0.44 | ☐ |
 | J6 | Honest failure in every hero job | S–M | 0.44 | ☐ |
-| T1 | Autopilot always asks before money, irreversible actions and new recipients | M | 0.45 | ☐ |
+| F1 | Open Loops: everything waiting on you | M–L | 0.44 | ☐ |
+| T1 | Hard stops at every level: money, new people, gone for good, credentials | M | 0.45 | ☐ |
 | T2 | Untrusted content can't trigger outward actions on its own | M–L | 0.45 | ☐ |
-| T3 | Publish the attack tests | M | 0.45 | ☐ |
-| T4 | Skills you can trust | S–M | 0.45 | ☐ |
-| T5 | Memory you can see, edit and trace | M | 0.45 | ☐ |
-| T6 | The vault key in the Keychain | S–M | 0.45 | ☐ |
-| R1 | Mac tools as an MCP server and Agent Skills | M | 0.46 | ☐ |
-| R2 | Siri and Spotlight (experiment) | M–L | 0.46 | ☐ |
-| R3 | Gallery submissions without Git | S | 0.46 | ☐ |
-| R4 | A developer try-path (`npx`, container image) | S–M | 0.46 | ☐ |
-| R5 | Shared results that bring people back | S | 0.46 | ☐ |
+| F2 | Rewind: an undo button | M–L | 0.45 | ☐ |
+| AU1 | Autonomy levels and the Smart default | M | 0.45 | ☐ |
+| T3 | Publish the attack tests | M | 0.46 | ☐ |
+| AU2 | Real sending with an undo window and sandboxed replies | L | 0.46 | ☐ |
+| AU3 | Batch approvals and the daily digest | M | 0.46 | ☐ |
+| F4 | Trust ladder: autonomy teammates earn | M | 0.46 | ☐ |
+| F5 | Triggers: your Mac reacts | M | 0.47 | ☐ |
+| R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
+| R3 | Gallery submissions without Git | S | 0.47 | ☐ |
+| R5 | Shared results that bring people back | S | 0.47 | ☐ |
+| F3 | Run receipts and Private mode | M | 0.48 | ☐ |
+| T4 | Skills you can trust | S–M | 0.48 | ☐ |
+| T5 | Memory you can see, edit and trace | M | 0.48 | ☐ |
+| T6 | The vault key in the Keychain | S–M | 0.48 | ☐ |
+| F7 | Ask my Mac | M | 0.49 | ☐ |
+| F8 | Move in, move out | S–M | 0.49 | ☐ |
+| R2 | Siri and Spotlight (experiment) | M–L | 0.49 | ☐ |
+| R4 | A developer try-path (`npx`, container image) | S–M | 0.49 | ☐ |
 | M1–M6 | Maintainability, one slice a week | S each | ongoing | ☐ |
 
-Sizes: S is about half a day, M about two days, L more.
+The board is in build order: "the next task" is the first open row. Sizes: S is about half a day, M about two days, L more.
 
 ---
 
@@ -262,7 +283,7 @@ Keep `OPENBOT_*` variables, paths and file names working; aliases come in M6.
   1. **"How should your team think?"** Offer, in this order: Apple Intelligence on this Mac (A4, when available), Sign in with ChatGPT (A3), a free Google Gemini key (A5), Claude through Claude Code, Ollama on this Mac, other.
   2. **"Pick a starter team"** from the team templates: a chief of staff (morning brief, what's waiting on me), a researcher and a writer.
   3. **"Try one"**: two or three suggestions that J2 shows work on the chosen AI. The first needs no macOS permission.
-- Ask for macOS permissions (Automation, Full Disk Access, Accessibility) only when a task first needs them, with one line on why.
+- Ask for macOS permissions on one "Set up your Mac" screen, covering only what the chosen starter team needs (Automation, Full Disk Access, Accessibility), with one line each on why. Anything else is asked the first time a task needs it.
 - Extend `npm run test:onboarding`.
 
 **Done when (Owner).** On the demo account, a fresh install reaches a first useful answer in a median of three minutes or less over five runs. Record the timings in `qa/first-run/` with the date and macOS version.
@@ -452,13 +473,256 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 
 ---
 
-## Phase T: safe by default (0.45)
+## Signature features
+
+Approved on 7 October 2026. These are eight features that cloud agents can't easily copy, because each needs your Mac, your apps or your data on your machine. Each builds on code Sidemates already has and adds no connector or platform. Each is the headline of a release and ships after the foundation it needs.
+
+### F1 · Open Loops: everything waiting on you · M–L · 0.44 · plan first
+
+**What people see.** A board, a morning summary and a phone nudge listing every open loop:
+- emails that need a reply;
+- messages left unanswered;
+- invitations without a response;
+- promises the owner made in sent mail ("I'll send it Friday").
+
+Each has a draft ready in Mail, plus Done, Snooze and Remind me.
+
+**Why.** In a 125-question test of Siri AI, the standout question was "What are people waiting on me for?" ([Pogue](https://pogueman.substack.com/p/125-tests-of-the-new-ai-siri)). Recurring inbox and calendar work is what people keep using agents for. Siri answers once and forgets; Open Loops keeps the list.
+
+**Do.**
+- Build on the existing inbox follow-up tools, `work_collect` and `work_report` (see `src/server/workspace.ts`).
+- Add opt-in indexing of Sent mail, on the Mac only. Today `src/server/mac-mail-index.ts` skips Sent, Trash, Drafts and Archive.
+- Classify "needs a reply" and "is a promise". These are small jobs that suit the on-device model (A4).
+- Keep each loop's state (open, done, snoozed) in SQLite.
+- Show the board in the studio, put the summary in the morning brief (`src/server/morning-brief.ts`), and send the nudge through Telegram (A6).
+- Drafts only in 0.44. Sending follows the autonomy rules (AU2) once they ship.
+
+**Done when.**
+- On J1's synthetic mailbox, the board finds every planted open loop and promise, with at most one wrong item in twenty.
+- Tests cover state changes and the opt-in.
+
+**Prompt.** `Do task F1 in docs/DEVELOPER_PLAN.md. Start in plan mode.`
+
+### F2 · Rewind: an undo button · M–L · 0.45 · plan first
+
+**What people see.**
+- Every action has a receipt with its before and after.
+- Anything reversible has Undo: file moves, renames and edits; calendar, reminder and note changes; drafts.
+- "Rewind this task" undoes a whole run.
+- What can't be undone (a sent message, a payment) is labelled before it happens.
+
+**Why.** People burned by agents ask for exactly this: "There's no sandboxing snapshot in revision history, rollbacks, or anything" ([HN](https://news.ycombinator.com/item?id=46593628)). It is also what makes the Smart default (AU1) safe: actions that can be undone don't need to ask first.
+
+**Do.**
+- Add a local snapshot store. Copy files before a teammate changes them, and keep the previous state of any calendar event, reminder or note it edits.
+- Give each Mac and file tool an inverse, recorded with the action on the existing Work Receipts (`src/server/run-review.ts`). Today the app says "Completed actions are not undone."
+- Add Undo on receipts and "Rewind this task".
+- Snapshots expire after a set time and stay under a size limit.
+
+**Done when.**
+- For each reversible tool, a test performs the action, undoes it and checks the original state.
+- Irreversible actions carry their label.
+
+**Prompt.** `Do task F2 in docs/DEVELOPER_PLAN.md. Start in plan mode.`
+
+### F3 · Run receipts and Private mode · M · 0.48
+
+**What people see.**
+- **For every task, a receipt.** It shows which AI saw what (the exact text, with private details masked), how many tokens or requests the task used, and what it cost or how much of a free quota or plan allowance it took.
+- **Private mode, per teammate.** Personal data stays on the Mac (Apple Intelligence or Ollama), and cloud AIs get only masked text.
+
+**Why.** It turns "private" from a promise into something people can check, and it answers the worry about metered agents burning through allowances.
+
+**Do.**
+- Log, locally, what each run sends to each provider.
+- Mask names, emails, phone numbers and IBANs with placeholders, and restore them locally in the result. Build on `redactSecretsForProvider` in `src/server/observation-envelope.ts` and on the result-page redaction.
+- Estimate cost and quota from the existing usage tracking and `weeklyTokenBudget`.
+
+**Done when.**
+- Masked payloads never contain the planted personal details.
+- Results are restored correctly.
+- The receipt's numbers match the recorded usage.
+
+**Prompt.** `Do task F3 in docs/DEVELOPER_PLAN.md.`
+
+### F4 · Trust ladder: autonomy teammates earn · M · 0.46
+
+**What people see.**
+- After the owner approves the same kind of action several times without changing it, Sidemates offers a narrow rule. For example: "Let Nova send scheduling replies to people you've written to, at most 5 a day."
+- Each teammate shows its level and its rules.
+- Hard stops never become rules.
+
+**Why.** It matches what people say they want. 5% are comfortable with an agent buying on its own, 32% want it to propose and wait, and 15% would let it act within rules they set ([Cover Genius](https://covergenius.com/resources/blog/do-consumers-trust-ai-shopping-agents/)).
+
+**Do.**
+- Extend the `auto_review_rules` table, which today allows or requires approval for commands, prompts and browser actions. Add scopes for mail, messages, calendar and files, plus limits and counters.
+- Count unchanged approvals per kind of action, and offer the rule.
+- The owner can see, edit and revoke every rule.
+
+**Done when.**
+- Tests cover the counting, the offer, a rule's limits and revoking it.
+- No rule can cover a hard stop.
+
+**Prompt.** `Do task F4 in docs/DEVELOPER_PLAN.md.`
+
+### F5 · Triggers: your Mac reacts · M · 0.47
+
+**What people see.**
+- "When a PDF lands in Receipts, add it to expenses.xlsx."
+- "When my accountant emails an invoice, file it and remind me."
+- "Fifteen minutes before each meeting, prepare a one-pager."
+
+**Why.** It gives the "always working" feel of a cloud agent without a cloud computer, using events cloud agents can't see.
+
+**Do.**
+- Add two triggers: "a file lands in a folder" and "mail like this arrives". They sit next to the existing calendar, webhook, GitHub and Todoist triggers in `src/server/automations.ts`, and page watch.
+- Every triggered run follows its teammate's autonomy level.
+- Debounce bursts and cap runs per hour.
+
+**Done when.**
+- Tests cover both triggers, debouncing and the cap.
+- The receipts benchmark (`npm run benchmark:expenses`) runs from a folder trigger.
+
+**Prompt.** `Do task F5 in docs/DEVELOPER_PLAN.md.`
+
+### F6 · Text your Mac · S–M · 0.43
+
+**What people see.**
+- From any phone: "What's my day?", "Tell Anna Tuesday works", or a photo of a receipt.
+- The work happens on the Mac, with its apps.
+- Safe approvals come back as buttons; risky ones open the studio.
+
+**Why.** It is a phone assistant over your own Mac's data, and it works in the EU, where Siri AI isn't on iPhones and Muse isn't available.
+
+**Do.**
+- Build on A6.
+- Route photos and files to the right teammate, and keep replies phone-sized.
+- Later, send the Open Loops nudge (F1) and the digest (AU3) the same way.
+
+**Done when.** Tests with the fake Telegram API cover a question, a file hand-off and an approval.
+
+**Prompt.** `Do task F6 in docs/DEVELOPER_PLAN.md.`
+
+### F7 · Ask my Mac · M · 0.49
+
+**What people see.**
+- A keyboard shortcut opens a small box anywhere on the Mac.
+- Ask about your own stuff. Every answer cites the email, note or file it came from, one click away.
+
+**Why.** An answer people can check beats one that only sounds right, and a hotkey becomes a daily habit.
+
+**Do.**
+- Add a global hotkey, through the A4 helper or through the Electron shell when it runs.
+- Build a compact ask panel.
+- Answer from the on-device index with T5's local search by meaning.
+- Source links open Mail, Notes or Finder.
+
+**Done when.**
+- On the synthetic data, answers cite the right source for a fixed set of questions.
+- The panel works with the keyboard alone.
+
+**Prompt.** `Do task F7 in docs/DEVELOPER_PLAN.md.`
+
+### F8 · Move in, move out · S–M · 0.49
+
+**What people see.**
+- Bring memory from a ChatGPT or Claude data export into a teammate, reviewed fact by fact.
+- Take any teammate out as plain files (persona, memory, skills and routines) that work elsewhere through the Agent Skills format.
+
+**Why.** "Your teammates are files you own" makes the open-source promise concrete, and gives people a reason to switch.
+
+**Do.**
+- Write readers for the ChatGPT and Claude export formats, modelled on `src/server/profile-import.ts`.
+- Imported facts go through T5's review queue.
+- Export builds on `src/server/sharing.ts` and the skill library.
+
+**Done when.** A round trip works: import a synthetic export, export the teammate, and re-import it unchanged.
+
+**Prompt.** `Do task F8 in docs/DEVELOPER_PLAN.md.`
+
+---
+
+## Autonomy: does the work, asks only when it matters
+
+**Why.** People keep agents that finish real work and drop the ones that keep asking. One early dots user had to give three separate confirmations for a single shuttle booking ([eesel](https://www.eesel.ai/blog/openai-dots-review)). ChatGPT's agent lost about three quarters of its paying users, reportedly because people couldn't work out what to use it for ([The Decoder](https://the-decoder.com/chatgpt-agent-reportedly-lost-75-of-its-users-because-nobody-knew-what-it-was-actually-for/)).
+
+The opposite failure exists too: a dot reportedly emailed a city office after being asked only for "questions to ask" ([orcarouter](https://www.orcarouter.ai/blog/openai-dots-first-week-reception), unverified). And only 5% of people are comfortable with an agent spending on its own. So autonomy is designed, not just switched on.
+
+**The three levels the owner sets for each teammate.**
+
+| Level | Does without asking | Still asks |
+| :--- | :--- | :--- |
+| Ask first | Reads, searches, drafts | Everything that changes something |
+| **Smart** (new default) | Everything that stays on the Mac or can be undone: drafts, notes, reminders, calendar holds, organizing files (with Rewind) | Sending to people, plus the hard stops |
+| Autopilot | Also sends on its own within the rules below, and acts on websites | Only the hard stops |
+
+**Hard stops, at every level:**
+- money: buying, paying, subscribing, transfers;
+- the first message to someone the owner has never written to;
+- anything gone for good: permanent deletes, emptying the Trash, public posts, account and security settings;
+- passwords and card details.
+
+**How sending on its own stays safe.**
+- **Sandboxed replies.** A message a teammate sends on its own may use only the conversation itself and the calendar's free or busy times, never other mail, files or notes. If it needs more, it drafts and asks. Untrusted input and an outward action never meet private data, which keeps every autonomous send within Meta's [Rule of Two](https://ai.meta.com/blog/practical-ai-agent-security/).
+- **"Known" means the owner wrote to them first,** or saved them in Contacts. People who have only written to the owner count as new until the owner replies once, so a stranger can't email their way into autonomous replies.
+- **An undo window.** Every autonomous send waits 60 seconds by default (adjustable from 10 seconds to 10 minutes, or "send with the evening batch"). A notice says: "Nova will send this reply to Anna in 60 s — Stop · Edit".
+- **Caps.** A daily send limit per teammate (10 by default) and a limit per recipient.
+- **Review after, not before.** A daily digest of what the team did. When asking is needed, one batch question ("Send these 5 replies?") replaces five.
+
+### AU1 · Autonomy levels and the Smart default · M · 0.45 · plan first
+
+**Do.**
+- Classify every action the server mediates as one of three kinds: stays on the Mac and can be undone; reaches other people; hard stop. Store the class with each tool, and test that every tool has one.
+- Add the three levels per teammate.
+  - New teammates start on Smart.
+  - Existing teammates keep Ask first.
+  - Today's Autopilot becomes the new Autopilot, with T1's hard stops.
+- A reversible action runs without asking on Smart only once F2 can undo it. Until then, it asks.
+- Update the studio, README and site the same day.
+
+**Done when.**
+- Tests show each level allows and blocks the right kinds of action.
+- Hard stops ask at every level.
+- The onboarding test runs a hero job on Smart with at most one question.
+
+**Prompt.** `Do task AU1 in docs/DEVELOPER_PLAN.md. Start in plan mode.`
+
+### AU2 · Real sending with an undo window and sandboxed replies · L · 0.46 · plan first
+
+**Do.**
+- Add send tools for Mail and Messages. Today Mail only opens drafts (`src/server/mac-apple-apps.ts`: "nothing is ever sent from here").
+- Sending follows the teammate's level. Ask first and Smart ask; Autopilot sends within the rules above.
+- Build the hold queue: the undo window, the notice with Stop and Edit, and a receipt once sent.
+- Build the sandbox for autonomous replies, the "known person" check and the caps.
+- Add injection fixtures. For example, an email that asks the teammate to forward invoices to a new address must end as an approval, never a send.
+
+**Done when.**
+- Tests cover each level, Stop inside the window, the caps, the sandbox (a reply can't read other mail) and the injection fixtures.
+- **Owner:** the real-Mac kit (J3) sends to a test address on the demo account.
+
+**Prompt.** `Do task AU2 in docs/DEVELOPER_PLAN.md. Start in plan mode; T2 and T3 must pass first.`
+
+### AU3 · Batch approvals and the daily digest · M · 0.46
+
+**Do.**
+- When several actions are waiting, group them into one card ("Send these 5 replies?") with Approve all, Review each, or Decline.
+- Send a daily digest in the studio, the morning brief and Telegram: what each teammate did, with Undo wherever it still applies.
+
+**Done when.**
+- Tests cover grouping, partial approval and what the digest contains.
+- On Smart, the hero jobs ask at most once per run.
+
+**Prompt.** `Do task AU3 in docs/DEVELOPER_PLAN.md.`
+
+---
+
+## Phase T: safety foundations (0.45–0.48)
 
 **Goal.** The agent you can safely give your Mac to, with the tests published.
 
 In 2026 the best-known agents all had public safety incidents: injected instructions leaking files, malicious community skills, agents reading messages they shouldn't have. Being checkably safer is a feature.
 
-### T1 · Autopilot always asks before money, irreversible actions and new recipients · M
+### T1 · Hard stops at every level: money, new people, gone for good, credentials · M
 
 **Why.** `src/shared/autopilot.ts` always asks only for AI budget, saving skills and three upload and semantic actions. Its own warning says Autopilot can "buy or book on sites it is signed in to".
 
@@ -466,10 +730,12 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
 - Add always-ask categories, decided from structured facts rather than only the text patterns in `src/server/safety.ts`:
   - **Spending:** checkout and payment pages, card fields (`autocomplete="cc-*"`), and buttons labelled pay, buy, order, subscribe or transfer.
   - **Irreversible:** deleting files, mail or events; emptying the trash; account and security settings.
-  - **New recipients:** messages to people the owner hasn't approved before.
+  - **New people:** the first message to anyone the owner hasn't written to before and hasn't saved in Contacts.
   - **Publishing:** public posts, `git push`, deploys.
   - **Credentials.**
-- Extend the owner's existing auto-review rules (`src/server/database.ts`, around line 786; `src/server/index.ts`, around lines 461–480) with a spending limit and an approved-recipients list. Only 5% of people are comfortable with an agent buying on its own, but 15% would let it buy within rules they set.
+- Store who counts as known (people the owner has written to, plus Contacts) for AU2 and F4. The owner's rules live in `auto_review_rules` (`src/server/database.ts`, around line 786; `src/server/index.ts`, around lines 461–480).
+- Money always asks for now. Only 5% of people are comfortable with an agent buying on its own; a spending allowance can come later if users ask for one.
+- These stops apply at every autonomy level (AU1).
 - Update the warning, the README and the site the same day.
 
 **Done when.** There is a test per category, including a fixture page that tries to trick a "Pay now" click while Autopilot is on.
@@ -484,6 +750,8 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
 - The approval card says which content came before it.
 
 **Design references.** Meta's [Agents Rule of Two](https://ai.meta.com/blog/practical-ai-agent-security/), [CaMeL](https://css.csail.mit.edu/6.5660/2026/readings/camel.pdf) and the [prompt-injection design patterns](https://simonwillison.net/2025/Jun/13/prompt-injection-design-patterns/).
+
+AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 
 **Prompt.** `Do task T2 in docs/DEVELOPER_PLAN.md. Start in plan mode.`
 
@@ -531,7 +799,7 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
 
 ---
 
-## Phase R: plays well with others (0.46)
+## Phase R: plays well with others (0.47–0.49)
 
 **Goal.** Reach people inside the tools they already use, without building a platform.
 
@@ -614,8 +882,10 @@ Never mixed with a feature, and no change in behavior.
 
 ## How we'll know it's working
 
-| Measure | 7 October 2026 | Target by 0.46 |
+| Measure | 7 October 2026 | Target |
 | :--- | :--- | :--- |
+| Questions asked per finished hero job on Smart | Never measured | 1 or fewer (AU3) |
+| Autonomous sends stopped in the undo window | Not possible yet | Tracked from 0.46; look into any teammate above 1 in 20 |
 | Install to first useful answer | Never measured | A median of three minutes or less |
 | First-run success across AI choices | Never measured | 8 of 10 or better |
 | Hero jobs passed per kind of AI | Never run | 9 of 10 or better |
