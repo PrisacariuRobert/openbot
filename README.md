@@ -60,7 +60,7 @@ No administrator password. It checks the download’s fingerprint, runs Sidemate
 
 ```sh
 git clone https://github.com/PrisacariuRobert/sidemates.git
-cd openbot
+cd sidemates
 npm ci
 npm run dev
 ```
@@ -150,8 +150,8 @@ Web studio (desktop + phone)  →  Sidemates service  →  teammates' runtimes
 | `skills/`, `mcp/` | Bundled skills and the MCP interface |
 
 ```sh
-npm run verify     # guards, types, build and ~1,000 tests
-npm start          # production build on 127.0.0.1:4311
+npm run verify                # guards, types, build and ~1,000 tests
+npm run build && npm start   # production build on 127.0.0.1:4311
 ```
 
 More in the [docs](docs/README.md), [desktop guide](desktop/README.md) and [private runner guide](deploy/private-runner/README.md).

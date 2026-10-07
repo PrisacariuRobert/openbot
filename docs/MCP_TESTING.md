@@ -23,6 +23,10 @@ The Sidemates server must be running (`http://127.0.0.1:4311` by default).
 No new accounts, no new keys — the MCP server reads the studio's own
 `access.token` next to it, exactly like the benchmark harness does.
 
+The examples use the path `mcp/openbot.ts`, relative to the root of your
+Sidemates checkout, which is where both clients start project servers. If
+your client starts somewhere else, use the absolute path to that file.
+
 **opencode** (`opencode.json` in the project, or `~/.config/opencode/opencode.json`):
 
 ```json
@@ -30,7 +34,7 @@ No new accounts, no new keys — the MCP server reads the studio's own
   "mcp": {
     "openbot": {
       "type": "local",
-      "command": ["node", "--import", "tsx", "/Users/robert/Documents/openbot/mcp/openbot.ts"],
+      "command": ["node", "--import", "tsx", "mcp/openbot.ts"],
       "environment": { "OPENBOT_URL": "http://127.0.0.1:4311" },
       "enabled": true
     }
@@ -45,7 +49,7 @@ No new accounts, no new keys — the MCP server reads the studio's own
   "mcpServers": {
     "openbot": {
       "command": "node",
-      "args": ["--import", "tsx", "/Users/robert/Documents/openbot/mcp/openbot.ts"],
+      "args": ["--import", "tsx", "mcp/openbot.ts"],
       "env": { "OPENBOT_URL": "http://127.0.0.1:4311" }
     }
   }
@@ -73,7 +77,7 @@ skill switches, settings, and browser sign-outs. They register only with
   "mcp": {
     "openbot": {
       "type": "local",
-      "command": ["node", "--import", "tsx", "/Users/robert/Documents/openbot/mcp/openbot.ts"],
+      "command": ["node", "--import", "tsx", "mcp/openbot.ts"],
       "environment": {
         "OPENBOT_URL": "http://127.0.0.1:4311",
         "OPENBOT_MCP_FULL": "1"
