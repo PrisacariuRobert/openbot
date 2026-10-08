@@ -103,8 +103,11 @@ export function CreateTeammate({
   const connection = providers?.instances.find(
     (item) => item.id === providerId,
   );
-  const validSelection = Boolean(connection?.connected && connection.models?.includes(model));
   const hasConnectedAI = Boolean(providers?.instances.some((item) => item.connected));
+  const automatic = providerId === "automatic";
+  const validSelection = automatic ? hasConnectedAI : Boolean(connection?.connected && connection.models?.includes(model));
+  // Nobody has to pick an AI: start on Automatic once there is one to use.
+  useEffect(() => { if (hasConnectedAI && !providerId) setProviderId("automatic"); }, [hasConnectedAI, providerId]);
   async function create(event: FormEvent) {
     event.preventDefault();
     if (submitting.current || !validSelection) return;
@@ -249,9 +252,10 @@ export function CreateTeammate({
             providers ? "Choose your AI service" : "Loading your connections…"
           }
           disabled={!providers}
-          choices={(providers?.instances || [])
-            .filter((item) => item.connected)
-            .map((item) => ({ value: item.id, label: item.name }))}
+          choices={hasConnectedAI ? [
+            { value: "automatic", label: "Automatic", detail: "The best AI you have for each job" },
+            ...(providers?.instances || []).filter((item) => item.connected).map((item) => ({ value: item.id, label: item.name })),
+          ] : []}
           onChange={(value) => {
             setProviderId(value);
             // Preselect the recommended model so a new user has one decision fewer.
@@ -271,6 +275,9 @@ export function CreateTeammate({
             onChange={setModel}
           />
         </div>
+      )}
+      {automatic && hasConnectedAI && (
+        <p className="boundary-note">Sidemates picks the best AI you've connected for each job, and switches to another if one runs out.</p>
       )}
       {connection && isFreeTierModel(model) && (
         <p className="boundary-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
