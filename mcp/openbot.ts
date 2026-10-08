@@ -19,6 +19,7 @@
  *       OPENBOT_DATA_DIR (default: the server's own data dir next to this
  *       file, else ~/.openbot) — only to read access.token
  */
+import "../src/server/env-aliases.js"; // M6: SIDEMATES_* settings alongside OPENBOT_*
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";

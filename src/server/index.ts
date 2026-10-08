@@ -1,3 +1,5 @@
+// M6: SIDEMATES_* settings are read alongside OPENBOT_* before any other module looks.
+import { applyEnvAliases } from "./env-aliases.js";
 import { homedir } from "node:os";
 import express from "express";
 import { gzipSync } from "node:zlib";
@@ -152,6 +154,7 @@ const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), a
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appVersion = String(JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version);
 if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
+for (const name of applyEnvAliases()) console.warn(`${name} and its OPENBOT_ name are both set to different values; Sidemates uses the OPENBOT_ one.`);
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const deployment = readDeploymentConfig(process.env, { port, production: process.env.NODE_ENV === "production" });
 // Production hosts start empty: onboarding creates the first teammate.

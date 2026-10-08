@@ -14,6 +14,8 @@ import { studioHealth, studioIdentity } from "./studio-identity.mjs";
 // conversation-first Sidemates UI the browser and relay serve, so the design
 // stays identical everywhere. The shell's job is the machine around it:
 // start or reuse the owner's local server, then get out of the way.
+// M6: every OPENBOT_* setting can also be given as SIDEMATES_*; an OPENBOT_ value already set wins.
+for (const [key, value] of Object.entries(process.env)) if (key.startsWith("SIDEMATES_") && key.length > 10 && process.env[`OPENBOT_${key.slice(10)}`] === undefined) process.env[`OPENBOT_${key.slice(10)}`] = value;
 const PORT = Number(process.env.OPENBOT_PORT || 4311);
 const DEV_URL = process.env.OPENBOT_DEV_URL || "";
 const BASE = DEV_URL || `http://127.0.0.1:${PORT}`;

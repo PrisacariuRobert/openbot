@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Settings can now use Sidemates names: every `OPENBOT_*` environment variable can also be written `SIDEMATES_*` (for example `SIDEMATES_PORT`). Existing `OPENBOT_*` settings keep working and win if both are set.
 - **Try Sidemates without the app.** `node bin/sidemates.mjs` from a checkout (and `npx sidemates` once it's on npm) runs the studio on your computer, with your data in ~/.openbot. Each release also builds the always-on Linux runner as an image on GitHub's container registry.
 - **Move in, move out.** Take any teammate out as plain files: who it is (AGENTS.md, which other agents read as is), what it remembers, its skills in the Agent Skills format and its routines, in one .zip, without keys or conversations. Bring memory in from a ChatGPT or Claude data export: Sidemates suggests the sentences where you described yourself, and each waits for your review (or "Keep all"). A teammate's own files come back in as the same teammate.
 - **Ask my Mac.** In the Mac app, Option+Space (or Control+Option+Space if another app uses it) opens a small box anywhere. Ask about your own mail, notes and files and get the best matching sources from what Sidemates has indexed on your Mac, each one click from opening in Mail, Notes or Finder. With a model in Ollama, a short answer citing those sources is written on your Mac too. Nothing you ask there is sent to a cloud AI. It works with the keyboard alone.

@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// M6: every OPENBOT_* setting can also be given as SIDEMATES_*; an OPENBOT_ value already set wins.
+for (const [key, value] of Object.entries(process.env)) if (key.startsWith("SIDEMATES_") && key.length > 10 && process.env[`OPENBOT_${key.slice(10)}`] === undefined) process.env[`OPENBOT_${key.slice(10)}`] = value;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const help = `Usage: npx sidemates [--port 4311] [--data-dir <folder>]
 
