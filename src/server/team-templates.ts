@@ -21,6 +21,30 @@ export interface TeamTemplate {
 
 export const TEAM_TEMPLATES: TeamTemplate[] = [
   {
+    // The team a new studio starts with: each teammate looks after one part
+    // of running a small business.
+    id: "your-team",
+    name: "Your team",
+    description: "Inbox, invoices and receipts, and your calendar.",
+    members: [
+      {
+        name: "Nova", color: "#6757d9", mascot: "nova",
+        role: "Keeps your inbox under control",
+        instructions: "Look after the owner's inbox. Find the emails that need a reply, draft replies in the owner's voice and save them as drafts, and say what can be archived. Never send anything yourself.",
+      },
+      {
+        name: "Pixel", color: "#d86889", mascot: "blob",
+        role: "Handles invoices and receipts",
+        instructions: "Look after the owner's money paperwork. Find receipts and invoices in mail, file them where the owner keeps them, note vendor, amount and date, and flag invoices that are unpaid or overdue. Never pay or move money.",
+      },
+      {
+        name: "Scout", color: "#299575", mascot: "sprout",
+        role: "Looks after your calendar and plans",
+        instructions: "Look after the owner's calendar and plans. Spot clashes, prepare for upcoming meetings, and keep the week realistic. Add or move events only after the owner agrees, and never invite new people on your own.",
+      },
+    ],
+  },
+  {
     id: "studio-team",
     name: "Studio team",
     description: "Draft, polish and check published words.",

@@ -82,6 +82,7 @@ import { WeeklyRecapEntry } from "./WeeklyRecap";
 import { WaitingEntry, WaitingForYou } from "./WaitingForYou";
 import { VoiceMode, voiceModeSupported } from "./VoiceMode";
 import { startersFor } from "./starters";
+import { FirstRun } from "./FirstRun";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -1117,6 +1118,8 @@ export function Studio() {
   const threadTitle =
     state?.threads.find((item) => item.id === thread)?.title || "Conversation";
   const agentsToBringOver = useAgentsToBringOver();
+  // Set once the first team is created, so Waiting for you starts the first look by itself.
+  const [firstLook, setFirstLook] = useState(false);
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
@@ -2140,7 +2143,7 @@ export function Studio() {
                 onRefresh={() => setRefresh((n) => n + 1)}
               />
             )}
-            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} demoMac={state?.demoMac} onChanged={() => setRefresh((value) => value + 1)} />}
+            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} demoMac={state?.demoMac} firstLook={firstLook} onChanged={() => setRefresh((value) => value + 1)} />}
             {page === "home" && (
               <div className="page-content conversations-page">
                 <div className="page-heading">
@@ -2561,7 +2564,7 @@ export function Studio() {
                     {!state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><p className="welcome-tagline">A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
+                        <FirstRun onTeamReady={() => { setFirstLook(true); navigate("waiting"); }} onMakeOwn={() => setDetail({ kind: "create" })} onBringTeam={() => openCapability("team")} bringLabel={agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"} />
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>

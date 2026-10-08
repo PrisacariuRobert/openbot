@@ -80,11 +80,13 @@ try {
   await page.route("**/api/messages", () => {
     throw new Error("Creation must never start a model job");
   });
+  // This test covers making a teammate by hand, so the automatic first team is held back.
+  await page.route("**/api/team-templates/your-team/install", (route) => route.fulfill({ status: 503, json: { error: "Held back by the test." } }));
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(base + "/studio.html");
     await page
-      .getByRole("heading", { name: "Good work starts with a conversation." })
+      .getByRole("button", { name: "Make your own teammate" })
       .waitFor();
     assert.equal(
       await page.locator(".sidebar-conversations .character").count(),
@@ -96,7 +98,7 @@ try {
       animations: "disabled",
     });
     await page
-      .getByRole("button", { name: "Create your first teammate" })
+      .getByRole("button", { name: "Make your own teammate" })
       .click();
     const sheet = page.getByRole("dialog");
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
@@ -108,23 +110,24 @@ try {
       .fill("Find a realistic plan. Ask before changing my calendar.");
     await sheet.getByRole("button", { name: "Sprout shape" }).click();
     await sheet.getByRole("button", { name: "Leaf character" }).click();
-    await sheet.getByText("Choose your AI service", { exact: true }).waitFor();
-    assert.equal(
+    await sheet.getByRole("combobox", { name: "AI connection" }).filter({ hasText: "Automatic" }).waitFor();
+    assert.match(
       await sheet.getByRole("combobox", { name: "AI connection" }).innerText(),
-      "Choose your AI service",
-      "Even a sole connected provider needs an explicit choice",
+      /^Automatic/,
+      "Nobody has to pick an AI: Automatic is the starting choice",
     );
     assert.ok(
-      await sheet.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(),
-      "A teammate cannot be created before choosing the subscription and model",
+      await sheet.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
+      "Automatic is ready without choosing a model",
     );
     assert.equal(await sheet.getByRole("combobox", { name: /^Model/ }).count(), 0);
+    // Choosing an AI yourself still works.
     await sheet.getByRole("combobox", { name: "AI connection" }).click();
     await sheet.getByRole("option", { name: provider.name, exact: true }).click();
     assert.equal(
       await sheet.getByRole("combobox", { name: /^Model/ }).innerText(),
       "Choose a model",
-      "Choosing a provider still requires an explicit model",
+      "With no known-good model on this connection, the owner picks one",
     );
     assert.ok(await sheet.getByRole("button", { name: "Create teammate", exact: true }).isDisabled());
     await sheet
