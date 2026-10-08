@@ -1,10 +1,12 @@
 import type { Bot, Routine } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
+import { QUEUE_CARD_GUIDE } from "./queue.js";
 import { approvalReason } from "./safety.js";
 
 /** A ready-made morning brief: a routine that looks at today's calendar, the
  * unread mail that needs the owner, and reminders due, and writes a short
- * note in the teammate's chat at a set time. It only reads. The prompt is
+ * note in the teammate's chat at a set time. It only reads, and it prepares a few
+ * cards for "Waiting for you" (which run nothing until the owner decides). The prompt is
  * kept free of words that ask for approval (sending, replying, deleting…),
  * because nobody is at the keyboard when it runs. */
 
@@ -18,7 +20,11 @@ export function morningBriefPrompt(city?: string | null): string {
 2. Mail that needs me: from my unread mail of the last two days, pick at most five that look like they need an answer or an action. One line each: who, and what is asked. Skip newsletters and automatic notifications.
 3. Reminders due today or overdue.${weather}
 
-Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.`;
+Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.
+
+Then, if you have queue_propose, prepare cards for me from the mail you looked at in step 2: at most five, usually one per email (an invoice with a due date may get two: a reminder and a file card), the most useful first. Each card needs a short title and one plain line saying why. Kinds:
+${QUEUE_CARD_GUIDE}
+Skip anything that doesn't need me. A card runs nothing: I decide each one. End with one line saying how many cards you prepared.`;
 }
 
 export interface MorningBriefSetup { botId: string; time: string; weekdaysOnly: boolean; city?: string | null; timeZone: string }

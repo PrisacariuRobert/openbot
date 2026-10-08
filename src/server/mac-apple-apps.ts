@@ -178,6 +178,62 @@ function run(argv) {
   return JSON.stringify({ opened: true });
 }`;
 
+// Undo and queue helpers. Each is a fixed script: the model never writes one.
+export const REMINDER_DELETE_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), app = Application("Reminders");
+  try {
+    var reminder = app.reminders.byId(input.id), title = String(reminder.name());
+    app.delete(reminder);
+    return JSON.stringify({ deleted: true, title: title });
+  } catch (e) { return JSON.stringify({ error: "not_found" }); }
+}`;
+
+export const EVENT_DELETE_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), app = Application("Calendar"), calendars = app.calendars();
+  for (var c = 0; c < calendars.length; c++) {
+    if (input.calendar && String(calendars[c].name()).toLowerCase() !== input.calendar.toLowerCase()) continue;
+    var found = []; try { found = calendars[c].events.whose({ uid: input.id })(); } catch (e) {}
+    if (found.length) { var title = String(found[0].summary()); app.delete(found[0]); return JSON.stringify({ deleted: true, title: title }); }
+  }
+  return JSON.stringify({ error: "not_found" });
+}`;
+
+// Saves a reply into Mail's Drafts without opening a window or sending anything.
+export const MAIL_DRAFT_SAVE_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail");
+  var message = mail.OutgoingMessage({ subject: input.subject, content: input.body, visible: false });
+  mail.outgoingMessages.push(message);
+  input.to.forEach(function(address){ message.toRecipients.push(mail.Recipient({ address: address })); });
+  input.cc.forEach(function(address){ message.ccRecipients.push(mail.CcRecipient({ address: address })); });
+  message.save();
+  return JSON.stringify({ saved: true, subject: input.subject, at: new Date().toISOString() });
+}`;
+
+// Removes a draft this app saved: matched by subject and time, and only when exactly one draft fits.
+export const MAIL_DRAFT_DELETE_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail"), since = new Date(Date.parse(input.at) - 60000), found = [];
+  try {
+    var list = mail.draftsMailbox().messages.whose({ subject: input.subject })();
+    for (var i = 0; i < list.length; i++) { var received = list[i].dateReceived(); if (received >= since) found.push(list[i]); }
+  } catch (e) { return JSON.stringify({ error: "drafts_unreachable" }); }
+  if (found.length !== 1) return JSON.stringify({ error: found.length ? "ambiguous" : "not_found" });
+  mail.delete(found[0]);
+  return JSON.stringify({ deleted: true });
+}`;
+
+// Moves a file to the Trash the way Finder does (it can be put back); needs no Finder permission.
+export const FILE_TRASH_SCRIPT = `
+ObjC.import("Foundation");
+function run(argv) {
+  var input = JSON.parse(argv[0]), error = Ref();
+  var ok = $.NSFileManager.defaultManager.trashItemAtURLResultingItemURLError($.NSURL.fileURLWithPath(input.path), null, error);
+  return JSON.stringify(ok ? { trashed: true } : { error: "failed" });
+}`;
+
 type CalendarEvent = { calendar: string; title: string; start: string; end: string; allDay: boolean; location: string };
 export interface CalendarCache { at: number; from: string; until: string; events: CalendarEvent[]; incomplete: string[] }
 export interface CalendarCacheStore { load(): CalendarCache | null; save(cache: CalendarCache): void }
@@ -318,6 +374,34 @@ export class AppleApps {
     const args = mailDraftInput.parse(input);
     await this.script("Mail", MAIL_DRAFT_SCRIPT, args);
     return { opened: true };
+  }
+  /** Saves a reply into Mail's Drafts. Nothing opens and nothing is sent. */
+  async saveMailDraft(input: z.input<typeof mailDraftInput>) {
+    const args = mailDraftInput.parse(input);
+    const result = await this.script("Mail", MAIL_DRAFT_SAVE_SCRIPT, args);
+    return z.object({ saved: z.literal(true), subject: z.string(), at: z.string() }).parse(result);
+  }
+  async deleteMailDraft(ref: { subject: string; at: string }) {
+    const result = await this.script("Mail", MAIL_DRAFT_DELETE_SCRIPT, ref);
+    if (result.error === "ambiguous") throw new Error("More than one draft looks like this one, so none was removed. Open Drafts in Mail and delete the one you don't want.");
+    if (result.error) throw new Error("That draft isn't in Mail's Drafts any more (it may have been sent or deleted). Nothing else was changed.");
+  }
+  async deleteReminder(id: string) {
+    const result = await this.script("Reminders", REMINDER_DELETE_SCRIPT, { id });
+    if (result.error) throw new Error("That reminder is already gone.");
+  }
+  async deleteEvent(id: string, calendar?: string) {
+    const result = await this.script("Calendar", EVENT_DELETE_SCRIPT, { id, ...(calendar ? { calendar } : {}) });
+    if (result.error) throw new Error("That calendar event is already gone.");
+  }
+  /** Moves a file this app saved to the Trash. Only files inside the home folder. */
+  async trashFile(filePath: string, home = homedir()) {
+    const target = path.resolve(filePath);
+    if (!target.startsWith(home + path.sep)) throw new Error("Only files inside your home folder can be moved to the Trash.");
+    if (!existsSync(target)) throw new Error("That file is already gone.");
+    if (!this.available) throw new Error("Apple apps are only available when Sidemates runs on a Mac.");
+    const raw = await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", FILE_TRASH_SCRIPT, JSON.stringify({ path: target })], 15_000);
+    if ((JSON.parse(raw) as Record<string, unknown>).error) throw new Error("The file couldn't be moved to the Trash. Nothing else was changed.");
   }
   async searchMail(input: z.input<typeof mailSearchInput>) {
     const args = mailSearchInput.parse(input);

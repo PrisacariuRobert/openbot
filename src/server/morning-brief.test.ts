@@ -21,6 +21,8 @@ test("the brief asks for nothing that would need approval, so it can run unatten
   // "morning brief" would steer a teammate to the older report workflow.
   assert.doesNotMatch(morningBriefPrompt(), /morning brief/i);
   assert.match(morningBriefPrompt(), /mac_calendar_events/);
+  assert.match(morningBriefPrompt(), /queue_propose/, "the brief also prepares cards for Waiting for you");
+  assert.match(morningBriefPrompt(), /A card runs nothing/);
 });
 
 test("setting it up creates one enabled routine; setting it up again changes it, never duplicates", () => {
@@ -53,4 +55,14 @@ test("bad input is refused plainly, and turning it off removes it", () => {
     assert.equal(describeMorningBrief(db).routine, null);
     assert.equal(removeMorningBrief(db), false);
   });
+});
+
+test("the look-through prompt prepares cards, runs nothing, and cannot hold a run for approval", async () => {
+  const { queueScanPrompt } = await import("./queue.js");
+  const prompt = queueScanPrompt();
+  assert.match(prompt, /last three days/);
+  assert.match(prompt, /queue_propose/);
+  assert.match(prompt, /A card runs nothing/);
+  for (const kind of ["reminder", "calendar_event", "reply_draft", "file_attachment"]) assert.match(prompt, new RegExp(`- ${kind},`));
+  assert.equal(approvalReason(prompt), null, "nobody may be needed at the keyboard for the look-through to run");
 });

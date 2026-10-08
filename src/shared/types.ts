@@ -1090,6 +1090,10 @@ export interface StudioDraft {
 export interface AppState {
   /** The last 7 days of finished work, when there is any (see weekly-recap). */
   weeklyRecap?: import("./weekly-recap").WeeklyRecap | null;
+  /** How many "Waiting for you" cards need a decision. */
+  queueReady?: number;
+  /** True only in a demo studio: Waiting for you answers with sample results and touches nothing. */
+  demoMac?: boolean;
   bots: Bot[];
   threads: Thread[];
   messages: Message[];
@@ -1111,3 +1115,34 @@ export interface AppState {
   usage: UsageSummary;
   activeThreadId: string;
 }
+
+/** One card in "Waiting for you": something a teammate prepared that a person approves, skips or undoes. */
+export interface QueueCard {
+  id: string;
+  kind: "reminder" | "calendar_event" | "reply_draft" | "file_attachment";
+  status: "ready" | "done" | "skipped" | "undone" | "failed" | "expired";
+  title: string;
+  why: string;
+  preview: string;
+  action: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  undoneAt: string | null;
+  botId: string | null;
+  meta?: Record<string, string> | null;
+}
+
+/** The month's filed receipts, for the accountant. */
+export interface ReceiptsSummary {
+  month: string; months: string[];
+  rows: Array<{ filedAt: string; vendor: string; invoiceDate: string; reference: string; amount: string; currency: string; file: string; savedTo: string }>;
+  totals: Array<{ currency: string; amount: string; count: number }>; withoutAmount: number;
+}
+
+/** "You approved this kind of thing five times in a row. Do it automatically?" */
+export interface QueueOffer { pattern: string; kind: QueueCard["kind"]; label: string; approvals: number; }
+/** A standing yes to one narrow pattern. Paused means it waits for a person again. */
+export interface QueueRuleCard { id: string; kind: QueueCard["kind"]; label: string; status: "active" | "paused"; pausedReason: string | null; uses: number; lastUsedAt: string | null; }
