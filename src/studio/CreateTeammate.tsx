@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import type { Bot, MascotKind, ProviderStatus } from "../shared/types";
-import { defaultModelChoice, isFreeTierModel, modelChoices } from "../shared/provider-config";
+import { defaultModelChoice, isFreeTierModel, mayTrainOnPrompts, modelChoices, TRAINING_NOTICE } from "../shared/provider-config";
 import { Character } from "./Character";
 import { Advanced } from "./Advanced";
 import { AppearancePicker } from "./AppearancePicker";
@@ -273,6 +273,9 @@ export function CreateTeammate({
       )}
       {connection && isFreeTierModel(model) && (
         <p className="boundary-note">Free-tier access may not allow Sidemates teammate runs. A connection test only proves a short reply; try a real task before relying on this model.</p>
+      )}
+      {connection && mayTrainOnPrompts(model) && (
+        <p className="boundary-note">{TRAINING_NOTICE} Choose another model for a teammate that reads your mail, messages or files.</p>
       )}
       {providers && !hasConnectedAI && (
         <div className="connection-onramp" role="status">

@@ -4,15 +4,12 @@ import { createServer } from "node:net";
 import type { ProviderCatalogEntry, ProviderInstance, ProviderLoginAttempt, ProviderStatus } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
-import { configuredModels, legacyApiProviderId, isLocalModelUrl } from "../shared/provider-config.js";
+import { configuredModels, legacyApiProviderId, isBlockedFreeTierModel, isLocalModelUrl, mayTrainOnPrompts } from "../shared/provider-config.js";
 
-const FREE_MODELS = [
-  "opencode/muse-spark-1.2-contributor-free",
-  "opencode/ling-3.0-flash-fin-free",
-  "opencode/mimo-v2.5-free",
-  "opencode/nemotron-3-ultra-free",
-  "opencode/nemotron-3.5-lightning-free",
-];
+/** Shown when an OpenCode sign-in lists no models. OpenCode's own free models
+ * return 403 for teammate runs (qa/prompt-eval), so they are never offered
+ * as a stand-in. */
+export const OPENCODE_NO_MODELS_NOTE = "Signed in, but OpenCode lists no models Sidemates can use. OpenCode's free models only answer inside OpenCode's own app. Add OpenCode Go, or connect ChatGPT, a free Google Gemini key or Claude Code instead.";
 
 type CommandResult = { code: number; stdout: string; stderr: string };
 type OAuthAuthorization = { url: string; method: "auto" | "code"; instructions: string; methodIndex: number };
@@ -64,8 +61,14 @@ function agentModels(models: string[]): string[] {
   return models.filter((model) => !/(?:^|[-/])(image|embedding|realtime|audio|tts|transcri)/i.test(model));
 }
 
-function preferredModel(provider: ProviderInstance["provider"], models: string[]): string | undefined {
-  if (provider === "opencode") return models.find((model) => model === "opencode-go/deepseek-v4.1-flash") || models.find((model) => model === "opencode-go/muse-spark-1.3-contributor") || models.find((model) => model === "opencode-go/deepseek-v4-flash") || models.find((model) => model.endsWith("-free")) || models[0];
+/** The model a connection uses by default. Never a model that answers 403
+ * for teammate runs; a model that may train on prompts only when nothing
+ * else is offered. */
+export function preferredModel(provider: ProviderInstance["provider"], models: string[]): string | undefined {
+  if (provider === "opencode") {
+    const usable = models.filter((model) => !isBlockedFreeTierModel(model));
+    return usable.find((model) => model === "opencode-go/deepseek-v4.1-flash") || usable.find((model) => model === "opencode-go/deepseek-v4-flash") || usable.find((model) => !mayTrainOnPrompts(model)) || usable[0];
+  }
   if (provider === "claude") return models.find((model) => model.endsWith("/sonnet")) || models[0];
   // Google retires versions for new keys; the "latest" aliases follow the
   // current one. Flash-Lite first: a free key allows only ~20 Flash requests a
@@ -78,14 +81,13 @@ function preferredModel(provider: ProviderInstance["provider"], models: string[]
   return models[0];
 }
 
-function modelsFor(provider: ProviderInstance["provider"], allModels: string[]): string[] {
+export function modelsFor(provider: ProviderInstance["provider"], allModels: string[]): string[] {
   const prefixes: Record<ProviderInstance["provider"], string[]> = {
     opencode: ["opencode/", "opencode-go/"], claude: ["claude-code/"], openai: ["openai/"],
     "github-copilot": ["github-copilot/"], gitlab: ["gitlab/"], xai: ["xai/"], google: ["google/"], custom: [],
   };
   const selected = agentModels(allModels.filter((model) => prefixes[provider].some((prefix) => model.startsWith(prefix))));
   if (provider === "claude") return ["claude-code/sonnet", "claude-code/opus", "claude-code/haiku"];
-  if (provider === "opencode" && !selected.length) return FREE_MODELS;
   return selected;
 }
 
@@ -170,8 +172,8 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
   allModels = [...new Set([...allModels, ...[...apiModels.values()].flat()])];
 
   const catalog: ProviderCatalogEntry[] = [
-    { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "Free and Go models through your OpenCode account.", badge: "Free + Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? "Sign-in found on this Mac; model access is checked when a task runs." : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
-    { id: "claude", name: "Claude", shortName: "Claude", description: "Use the official Claude Code login with Pro, Max, Team, Enterprise, or Console.", badge: "Official login", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with Sidemates." : "Install Claude Code first." },
+    { id: "opencode", name: "OpenCode", shortName: "OpenCode", description: "OpenCode Go models through your OpenCode account.", badge: "OpenCode Go", connected: openCodeConnected, installed: openCodeInstalled, canConnect: false, connectionId: openCodeConnected ? "local-opencode" : null, models: modelsFor("opencode", allModels), note: openCodeConnected ? modelsFor("opencode", allModels).length ? "Sign-in found on this Mac; model access is checked when a task runs." : OPENCODE_NO_MODELS_NOTE : openCodeInstalled ? "Connect from OpenCode once, then come back here." : "Install OpenCode first." },
+    { id: "claude", name: "Claude", shortName: "Claude", description: "Uses the Claude Code you installed and signed in to, with your Pro, Max, Team, Enterprise or Console plan.", badge: "Claude Code", connected: claudeConnected, installed: claudeInstalled, canConnect: claudeInstalled, connectionId: claudeConnected ? "local-claude" : null, models: modelsFor("claude", allModels), note: claudeConnected ? "Signed in through Claude Code" : claudeInstalled ? "Sign in without sharing a password with Sidemates." : "Install Claude Code first." },
     { id: "openai", name: "ChatGPT / OpenAI", shortName: "ChatGPT", description: "Use ChatGPT Plus/Pro OAuth or your existing OpenAI connection.", badge: "Subscription", connected: openAIConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: openAIConnected ? "local-openai" : null, models: modelsFor("openai", allModels), note: openAIConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Browser sign-in through OpenCode." },
     { id: "github-copilot", name: "GitHub Copilot", shortName: "Copilot", description: "Use the models included with Copilot Pro, Pro+ or Business. Copilot Free and Student plans can't be used by apps right now.", badge: "Subscription", connected: copilotConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: copilotConnected ? "local-github-copilot" : null, models: modelsFor("github-copilot", allModels), note: copilotConnected ? (modelsFor("github-copilot", allModels).length ? "Sign-in found through OpenCode; model access is checked when a task runs." : "Signed in, but this Copilot plan doesn't offer models to apps (Free and Student plans). Use Gemini's free key or another account.") : "Connect a GitHub.com account." },
     { id: "gitlab", name: "GitLab Duo", shortName: "GitLab", description: "Connect a GitLab Duo seat for agent work.", badge: "Experimental", connected: gitlabConnected, installed: openCodeInstalled, canConnect: openCodeInstalled, connectionId: gitlabConnected ? "local-gitlab" : null, models: modelsFor("gitlab", allModels), note: gitlabConnected ? "Sign-in found through OpenCode; model access is checked when a task runs." : "GitLab support in OpenCode is experimental." },

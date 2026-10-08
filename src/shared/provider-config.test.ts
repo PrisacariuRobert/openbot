@@ -168,17 +168,36 @@ test("free-tier suffix detection names the tier without judging other models", (
 
 test("model choices lead with a recommendation and never offer OpenCode's app-only free tier", async () => {
   const { modelChoices, defaultModelChoice, friendlyModelName, isBlockedFreeTierModel } = await import("./provider-config.js");
-  const models = ["opencode/big-pickle", "opencode/muse-spark-1.3-contributor-free", "opencode-go/deepseek-v4.1-flash", "opencode-go/gpt-5.6-luna", "opencode-go/muse-spark-1.3-contributor"];
+  const models = ["opencode/big-pickle", "opencode/muse-spark-1.3-contributor-free", "opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash", "opencode-go/gpt-5.6-luna"];
   const choices = modelChoices(models);
-  assert.equal(choices[0]!.value, "opencode-go/muse-spark-1.3-contributor");
+  assert.equal(choices[0]!.value, "opencode-go/deepseek-v4.1-flash");
   assert.equal(choices[0]!.detail, "Recommended");
   assert.equal(choices.at(-1)!.value, "opencode/muse-spark-1.3-contributor-free");
   assert.equal(choices.at(-1)!.disabled, true);
-  assert.equal(defaultModelChoice(models), "opencode-go/muse-spark-1.3-contributor");
+  assert.equal(defaultModelChoice(models), "opencode-go/deepseek-v4.1-flash");
   assert.equal(defaultModelChoice(["anthropic/claude-x"]), "", "no guess for other connections");
   assert.equal(friendlyModelName("opencode-go/gpt-5.6-luna"), "GPT 5.6 Luna");
   assert.equal(friendlyModelName("opencode-go/muse-spark-1.3-contributor"), "Muse Spark 1.3 Contributor");
   assert.equal(friendlyModelName("opencode-go/glm-5.3-flash"), "GLM 5.3 Flash");
+  assert.equal(friendlyModelName("opencode-go/deepseek-v4.1-flash"), "DeepSeek V4.1 Flash");
   assert.equal(friendlyModelName("opencode/space-bunny-free"), "Space Bunny");
   assert.equal(isBlockedFreeTierModel("openrouter/some-model-free"), false, "only OpenCode's own free tier is app-locked");
+});
+
+test("models whose provider may train on prompts are labelled, ranked after the others and never recommended", async () => {
+  const { modelChoices, defaultModelChoice, mayTrainOnPrompts, RECOMMENDED_MODELS, TRAINING_NOTICE } = await import("./provider-config.js");
+  assert.equal(mayTrainOnPrompts("opencode-go/muse-spark-1.3-contributor"), true);
+  assert.equal(mayTrainOnPrompts("opencode-go/muse-spark-1.2-contributor"), true);
+  assert.equal(mayTrainOnPrompts("opencode/muse-spark-1.2-contributor-free"), true);
+  assert.equal(mayTrainOnPrompts("opencode-go/deepseek-v4.1-flash"), false);
+  assert.equal(mayTrainOnPrompts("opencode-go/muse-spark-1.3"), false, "only the Contributor version trades prompts for price");
+  assert.equal(mayTrainOnPrompts("openrouter/acme/contributor"), false);
+  assert.ok(RECOMMENDED_MODELS.every((model) => !mayTrainOnPrompts(model)));
+  assert.match(TRAINING_NOTICE, /may use your prompts to train/);
+
+  const choices = modelChoices(["opencode-go/muse-spark-1.3-contributor", "opencode-go/glm-5.3-flash", "opencode/mimo-v2.5-free"]);
+  assert.deepEqual(choices.map((choice) => choice.value), ["opencode-go/glm-5.3-flash", "opencode-go/muse-spark-1.3-contributor", "opencode/mimo-v2.5-free"]);
+  assert.equal(choices[1]!.detail, "May train on your prompts");
+  assert.equal(choices[1]!.disabled, undefined, "still selectable on purpose");
+  assert.equal(defaultModelChoice(["opencode-go/muse-spark-1.3-contributor"]), "", "never preselected");
 });

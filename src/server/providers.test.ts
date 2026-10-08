@@ -134,3 +134,47 @@ test("pasting an OpenCode Go key saves it through OpenCode and never keeps it", 
   assert.equal(changes, 1);
   assert.ok(!JSON.stringify(manager.listAttempts()).includes("sk-abcdef"), "the key is never kept in attempts");
 });
+
+test("an OpenCode connection never defaults to a model that answers 403 for teammate runs", async () => {
+  const { preferredModel, modelsFor } = await import("./providers.js");
+  assert.deepEqual(modelsFor("opencode", []), [], "no free-tier stand-ins when OpenCode lists nothing");
+  assert.deepEqual(modelsFor("opencode", ["opencode/mimo-v2.5-free", "openai/gpt-5.6"]), ["opencode/mimo-v2.5-free"]);
+  assert.equal(preferredModel("opencode", ["opencode/mimo-v2.5-free", "opencode/nemotron-3-ultra-free"]), undefined);
+  assert.equal(preferredModel("opencode", ["opencode/mimo-v2.5-free", "opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash"]), "opencode-go/deepseek-v4.1-flash");
+  assert.equal(preferredModel("opencode", ["opencode-go/muse-spark-1.3-contributor", "opencode-go/glm-5.3-flash"]), "opencode-go/glm-5.3-flash", "a model that doesn't train on prompts comes first");
+  assert.equal(preferredModel("opencode", ["opencode/mimo-v2.5-free", "opencode-go/muse-spark-1.3-contributor"]), "opencode-go/muse-spark-1.3-contributor", "the only usable model, labelled in the picker");
+});
+
+test("provider status explains an OpenCode sign-in with no usable models and describes Claude plainly", async () => {
+  const { mkdtempSync, rmSync, writeFileSync, mkdirSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const { OpenBotDatabase } = await import("./database.js");
+  const { readProviderStatus, OPENCODE_NO_MODELS_NOTE } = await import("./providers.js");
+  const root = mkdtempSync(path.join(tmpdir(), "sidemates-provider-status-")), bin = path.join(root, "bin");
+  mkdirSync(bin);
+  // Fake CLIs: OpenCode is signed in but lists no models; Claude Code is signed in.
+  writeFileSync(path.join(bin, "opencode"), '#!/bin/sh\ncase "$1" in\n  --version) echo 1.18.31 ;;\n  auth) echo "OpenCode Go api" ;;\nesac\n', { mode: 0o700 });
+  writeFileSync(path.join(bin, "claude"), '#!/bin/sh\ncase "$1" in\n  --version) echo "2.1.0 (Claude Code)" ;;\n  auth) echo \'{"loggedIn":true}\' ;;\nesac\n', { mode: 0o700 });
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+  const db = new OpenBotDatabase(root);
+  try {
+    const status = await readProviderStatus(db);
+    const opencode = status.instances.find((instance) => instance.id === "local-opencode");
+    assert.ok(opencode, "the OpenCode sign-in is found");
+    assert.deepEqual(opencode.models, []);
+    assert.equal(opencode.defaultModel, undefined);
+    assert.equal(opencode.note, OPENCODE_NO_MODELS_NOTE);
+    const claude = status.catalog.find((entry) => entry.id === "claude");
+    assert.ok(claude?.connected);
+    assert.doesNotMatch(`${claude.badge} ${claude.description}`, /official/i, "no wording that reads as Anthropic's endorsement");
+    assert.match(claude.description, /Claude Code you installed and signed in to/);
+    const card = status.catalog.find((entry) => entry.id === "opencode");
+    assert.doesNotMatch(`${card?.badge} ${card?.description}`, /free/i, "OpenCode's free models can't run teammates");
+  } finally {
+    process.env.PATH = previousPath;
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
