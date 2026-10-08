@@ -102,7 +102,6 @@ import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
 import { ConversationProgress } from "./ConversationProgress";
 import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
-import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
@@ -121,6 +120,8 @@ import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./cap
 import { FailureFixAction } from "./FailureFixAction";
 import { failureFix, failureFixById } from "../shared/failure-fixes";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
+// M5: the receipt comes with the panels, so their 7,500 lines stay out of the first download.
+const WorkReceipt = lazy(() => import("../CapabilityPanels").then((module) => ({ default: module.WorkReceipt })));
 
 type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
@@ -3084,7 +3085,7 @@ export function Studio() {
               )}
               {!detail.run.summary && detail.run.partialText && <details className="message-work-updates"><summary>Latest work update</summary><div className="prose"><MarkdownMessage body={detail.run.partialText} /></div></details>}
               <DeliveryReceipt run={detail.run} teammates={state?.bots} />
-              <WorkReceipt runId={detail.run.id} />
+              <Suspense fallback={<p className="work-receipt-missing">Assembling the receipt…</p>}><WorkReceipt runId={detail.run.id} /></Suspense>
               <button
                 className="primary full-width"
                 onClick={() => openThread(detail.run.threadId)}

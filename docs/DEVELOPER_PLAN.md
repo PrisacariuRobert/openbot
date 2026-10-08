@@ -989,7 +989,7 @@ Never mixed with a feature, and no change in behavior.
 | M2 | Split `src/CapabilityPanels.tsx` into one file per panel, with tests for the panels you touch |
 | M3 | Versioned SQLite migrations for new schema changes; today there are 53 `CREATE TABLE IF NOT EXISTS` and 105 add-if-missing column calls |
 | M4 | A linter (Biome or ESLint, minimal rules), and logged errors instead of silent catches (165 today) in the files you touch |
-| M5 | Lazy-load studio panels; the main bundle is 1.09 MB |
+| M5 | Lazy-load studio panels; the main bundle is 1.09 MB. ✅ 8 October 2026 (first slice): the work receipt in a run's details now loads with the panels, so `CapabilityPanels.tsx` is its own chunk; JavaScript on first load went from 1.17 MB to 0.87 MB (main 1.16 MB → 600 KB, measured with `npm run build`). More panels can follow |
 | M6 | `SIDEMATES_*` environment names read alongside `OPENBOT_*`, with nothing existing breaking. ✅ 8 October 2026: `src/server/env-aliases.ts` (imported first by the server and the MCP harness, applied again after `.env`), and the same three lines in the background runner, `bin/sidemates.mjs` and the desktop shell; the `OPENBOT_` value wins when both are set, with a warning |
 
 **Prompt.** `Do the next maintainability slice (M1–M6) in docs/DEVELOPER_PLAN.md. No behavior changes.`
