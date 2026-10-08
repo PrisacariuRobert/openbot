@@ -8,8 +8,14 @@
 - **Automatic AI.** Nobody has to pick a model. A new teammate uses the best AI you've connected for each job (a strong one for big jobs, a fast one for small ones) and moves to another when one runs out of allowance. You can still choose an AI yourself in settings.
 - **It just starts.** A new studio asks nothing: as soon as an AI is connected, your team appears (Nova for your inbox, Pixel for invoices and receipts, Scout for your calendar), and it takes a first look at your last few days. The one question is letting it read your Mail, asked when it's needed. Without an AI, the only step is connecting one. It also says plainly that AI can make mistakes.
 - **Never just "I can't".** When a job stops, the note says what fixes it, in one tap: connect an AI, let Sidemates pick another AI, let your team use this Mac's apps, open the right privacy setting, get a browser, or try again.
+- **"Used this week" tells the truth.** It now counts what Claude saves to re-read later, and re-reading at a tenth (how AI providers price it). Before, a brief that re-read 168,000 tokens showed as 5,400. A single task's allowance is unchanged, so jobs don't stop sooner.
+- **Your AIs don't vanish.** If checking an AI takes too long (OpenCode refreshing its list, or a busy Mac), Sidemates keeps the last answer instead of briefly showing only some of your AIs, or none.
 - **Start a group from New conversation.** Name it, pick two or more teammates, and you're in. Main buttons also stay solid when you point at them (they nearly disappeared in light mode).
 - **Sign in with ChatGPT.** Have ChatGPT Plus or Pro? Sign in once and your team uses your plan, with Sidemates' own sign-in (nothing to set up, no key). Your sign-in stays encrypted on your Mac, and when your plan's limit is reached your team moves to another AI.
+- **A free Gemini key in a minute.** A pasted key is checked with Google before it's saved, and Google's free-tier terms are stated in plain words.
+- **A browser for everyone.** If your Mac has no Chrome, Edge or Brave, one tap downloads a private browser just for your teammates (about 150 MB), and the stopped job runs again.
+- **Honest under every answer.** One quiet line under the latest teammate answer: AI can make mistakes, so check anything important.
+- **Your first minutes, timed.** A new studio notes when it opened, found an AI, made its team and first did something useful, under Usage & limits. It stays on your Mac.
 
 ## 0.42.1 — Credibility fixes (unreleased)
 
