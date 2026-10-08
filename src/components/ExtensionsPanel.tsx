@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SkillFlags, SkillTrustControls } from "./SkillTrust";
 import {
   BookOpen,
   Bug,
@@ -176,6 +177,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                     </li>
                   ))}
                 </ul>
+                <SkillFlags flags={preview.flags ?? []} />
                 <details>
                   <summary>Read bundle contents</summary>
                   {Object.entries(preview.files).map(([file, content]) => (
@@ -521,6 +523,8 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
                       </button>
                     </div>
                   </div>
+
+                  <SkillTrustControls skill={skill} botName={currentBot?.name || "this teammate"} request={request} run={run} />
 
                   {isInspecting && (
                     <div className="skill-inspector-box">

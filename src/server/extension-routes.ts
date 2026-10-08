@@ -61,6 +61,16 @@ export function registerExtensionRoutes(app: Express, db: OpenBotDatabase, onCha
   }));
   app.delete("/api/extensions/skills/:id", route((request) => { skills.remove(String(request.params.id)); return { removed: true }; }));
   app.get("/api/extensions/skills/:id/share", route((request) => skills.shareBundle(String(request.params.id))));
+  // Task T4: updates are shown as a diff and installed only by the owner; scripts stay off until turned on.
+  app.post("/api/extensions/skills/:id/check-update", route((request) => skills.checkUpdate(String(request.params.id))));
+  app.post("/api/extensions/skills/:id/update", route((request) => {
+    const input = z.object({ bundle: z.unknown(), digest: z.string().length(64) }).strict().parse(request.body);
+    return skills.update(String(request.params.id), input.bundle, input.digest);
+  }));
+  app.patch("/api/extensions/skills/:id/scripts", route((request) => {
+    const input = z.object({ enabled: z.boolean(), digest: z.string().length(64) }).strict().parse(request.body);
+    skills.setScripts(String(request.params.id), input.enabled, input.digest); return { saved: true };
+  }));
   app.get("/api/extensions/memory/:botId", route((request) => db.memoryEntries(String(request.params.botId), true)));
   app.patch("/api/extensions/memory/:botId", route((request) => {
     const input = memoryEdit.parse(request.body);

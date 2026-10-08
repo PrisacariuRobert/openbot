@@ -5,7 +5,7 @@ import type { Bot } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 import { toolAvailability } from "./tool-availability.js";
 import { googleServiceCapabilities } from "./google-workspace.js";
-import { CommunitySkills } from "./community-skills.js";
+import { CommunitySkills, syncSkillScripts } from "./community-skills.js";
 import { fragment, rules } from "./prompt-files.js";
 import { TOOL_GROUPS } from "../shared/tool-groups.js";
 import { autopilotOn } from "../shared/autopilot.js";
@@ -113,6 +113,8 @@ export function teammateSystemPrompt(bot: Bot) {
 export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = false, sendProfile: (profile: string) => string = (profile) => profile) {
   const root = path.join(db.workspacesDir, bot.id);
   const savedFilesText = new SavedFileLibrary(db).prepareWorkspace(bot.id, root);
+  // Task T4: only the scripts the owner turned on are in the teammate's computer.
+  syncSkillScripts(db, bot.id, root);
   const toolsDir = path.join(root, ".opencode", "tools");
   repairPluginInstall(path.join(root, ".opencode"));
   mkdirSync(toolsDir, { recursive: true });

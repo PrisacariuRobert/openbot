@@ -24,6 +24,7 @@
     "test:gallery-submit": "tsx scripts/test-gallery-submit.ts",
     "test:share-result": "tsx scripts/test-share-result.ts",
     "test:private-mode": "tsx scripts/test-private-mode.ts",
+    "test:skill-trust": "tsx scripts/test-skill-trust.ts",
     "test:calendar-routines": "tsx scripts/test-calendar-routines.ts",
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
     "test:recipes-memory-ui": "tsx scripts/test-recipes-memory-ui.ts",

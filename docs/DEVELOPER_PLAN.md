@@ -108,7 +108,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | R3 | Gallery submissions without Git | S | 0.47 | ✅ |
 | R5 | Shared results that bring people back | S | 0.47 | ✅ |
 | F3 | Run receipts and Private mode | M | 0.48 | ✅ |
-| T4 | Skills you can trust | S–M | 0.48 | ☐ |
+| T4 | Skills you can trust | S–M | 0.48 | ✅ |
 | T5 | Memory you can see, edit and trace | M | 0.48 | ☐ |
 | T6 | The vault key in the Keychain | S–M | 0.48 | ☐ |
 | F7 | Ask my Mac | M | 0.49 | ☐ |
@@ -886,6 +886,8 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 - Flag skill text that sends data out (links carrying data, `curl | sh`).
 
 **Prompt.** `Do task T4 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done. `src/shared/skill-trust.ts` (flags, scripts, line diff) and `src/server/community-skills.ts`: every use rechecks the pinned SHA-256, updates are a diff the owner installs, scripts come in off and are copied into the teammate's container only when turned on (`syncSkillScripts`), downloading-and-running lines and installation steps still block. UI in `src/components/SkillTrust.tsx` (skill cards, the review card and the catalog drawer). `npm run test:skill-trust` runs in CI.
 
 ### T5 · Memory you can see, edit and trace · M
 

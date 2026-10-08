@@ -1,3 +1,4 @@
+import type { SkillFlag } from "./skill-trust.js";
 export interface ExtensionTool {
   name: string;
   description: string;
@@ -40,4 +41,12 @@ export interface CommunitySkill {
   blockers: string[];
   botIds: string[];
   installedAt: string;
+  updatedAt?: string;
+  /** Task T4: lines worth reading (data sent out, code downloaded, hidden asks). */
+  flags?: SkillFlag[];
+  /** Script files, imported as text; they stay off until the owner turns them on. */
+  scripts?: string[];
+  scriptsEnabled?: boolean;
+  /** The files no longer match the hash pinned when the owner reviewed them. */
+  tampered?: boolean;
 }

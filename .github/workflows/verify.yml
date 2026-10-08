@@ -114,6 +114,8 @@ jobs:
         run: npm run test:share-result
       - name: Private mode and what the AI saw in the work receipt
         run: npm run test:private-mode
+      - name: Skills pinned, diffed before updates, scripts off until approved
+        run: npm run test:skill-trust
       - name: Attack tests (prompt injections against a scripted stand-in that obeys them)
         # Checks what the server lets through at Ask first and Autopilot against
         # the table published in docs/SECURITY.md. Credential-free.
