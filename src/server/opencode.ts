@@ -20,6 +20,7 @@ import { aiRest, classifyJob, isLimitError, rankAi, type AiConnection } from "./
 import { toolAvailability } from "./tool-availability.js";
 import { CommunitySkills } from "./community-skills.js";
 import { UsageEvidenceAccumulator, type UsageAttempt } from "./usage-ledger.js";
+import { returnHelperFiles } from "./handoff-files.js";
 import { currentMoment } from "./current-moment.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { ExecutionMeter, executionLimits, executionStopMessage, WEEKLY_BUDGET_STEP_RESERVE, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
@@ -847,7 +848,9 @@ export class OpenCodeRunner {
         this.options.db.finishRunTask(run.id, "completed");
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
         if (!shouldPublishRunMessage(run)) {
-          this.shareChildOutcome(run, bot, summary);
+          // The helper's saved files go back with its result, and the list of them is never cut off.
+          const files = await returnHelperFiles(this.options.db, run);
+          this.shareChildOutcome(run, bot, files ? summary.slice(0, Math.max(0, 4_000 - files.length)) + files : summary);
         } else {
           const message = this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id, replyToId: run.triggerMessageId || undefined });
           try {
