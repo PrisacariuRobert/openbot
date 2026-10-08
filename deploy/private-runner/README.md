@@ -1,5 +1,7 @@
 # Sidemates private runner
 
+From the first release built after 8 October 2026, each release tag also publishes this image as `ghcr.io/prisacariurobert/sidemates/runner:<tag>` (and `:latest` for a release without a pre-release suffix). Building it yourself, as below, still works.
+
 This optional deployment gives one owner an always-on Sidemates home on a Linux server they control. The local Mac mode remains the default. Nothing is copied to a server unless the owner chooses this mode and moves the data.
 
 Sidemates was called OpenBot until October 2026. Server paths (`/srv/openbot`), the Compose service (`openbot`), `OPENBOT_*` settings and `.openbot-home` transfer files keep their old names, so existing servers and transfers keep working.

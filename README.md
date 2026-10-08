@@ -138,6 +138,7 @@ These are in the code but not in a release yet. The [changelog](CHANGELOG.md) ha
 - **When a job can't finish**, you see what's missing and the one-click fix.
 - **Hard stops, even on Autopilot**: money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards always ask.
 - **Submit a teammate to the gallery** from its settings, without Git.
+- **A developer try-path**: `node bin/sidemates.mjs` (and `npx sidemates` after the first npm release) runs the studio without the app; the runner image is published to GitHub's container registry on each release.
 - **Move in, move out**: memories from a ChatGPT or Claude export (each one reviewed), and any teammate out as plain files that work elsewhere.
 - **Ask my Mac**: a shortcut from anywhere on the Mac to ask about your own mail, notes and files, with every answer citing its source and nothing sent to a cloud AI.
 - **Your saved secrets' key in the Keychain** on a Mac, instead of a file next to the data.
@@ -158,6 +159,16 @@ These are in the code but not in a release yet. The [changelog](CHANGELOG.md) ha
 Everything earlier is in the [changelog](CHANGELOG.md) and the [releases](https://github.com/PrisacariuRobert/sidemates/releases).
 
 ## For developers
+
+Run the studio without the Mac app, from a checkout (Node 22.13 or later):
+
+```sh
+npm ci && npm run build
+node bin/sidemates.mjs            # http://127.0.0.1:4311, data in ~/.openbot
+node bin/sidemates.mjs --help
+```
+
+Once the package is on npm, `npx sidemates` does the same. The always-on Linux runner image will be at `ghcr.io/prisacariurobert/sidemates/runner` from the first release built after this change ([deploy/private-runner](deploy/private-runner/README.md)).
 
 ```text
 Web studio (desktop + phone)  →  Sidemates service  →  teammates' runtimes

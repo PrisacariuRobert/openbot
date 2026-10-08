@@ -1,0 +1,44 @@
+name: Container image
+
+# Task R4: the private-runner image on GitHub's container registry, built from
+# each release tag. Plain docker commands; the only action is a pinned checkout.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build the private-runner image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/runner"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then tag="$GITHUB_REF_NAME"; else tag="manual-${GITHUB_SHA::12}"; fi
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          docker build -f deploy/private-runner/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.description=Sidemates private runner" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "$image:$tag" .
+      - name: Check that the image starts its studio
+        run: |
+          docker run --rm --entrypoint node "$IMAGE:$TAG" --version
+      - name: Push to GitHub's container registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$TAG"
+          # A release without a pre-release suffix is also "latest".
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$TAG" != *-* ]]; then
+            docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+          fi

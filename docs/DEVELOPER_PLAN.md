@@ -114,7 +114,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | F7 | Ask my Mac | M | 0.49 | ✅ |
 | F8 | Move in, move out | S–M | 0.49 | ✅ |
 | R2 | Siri and Spotlight (experiment) | M–L | 0.49 | ☐ |
-| R4 | A developer try-path (`npx`, container image) | S–M | 0.49 | ☐ |
+| R4 | A developer try-path (`npx`, container image) | S–M | 0.49 | ✅ |
 | M1–M6 | Maintainability, one slice a week | S each | ongoing | ☐ |
 
 The board is in build order: "the next task" is the first open row. Sizes: S is about half a day, M about two days, L more.
@@ -966,6 +966,8 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 - Publish the private-runner image on GitHub's container registry, which is free for public images.
 
 **Prompt.** `Do task R4 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Built: `bin/sidemates.mjs` (data in ~/.openbot by default, so npx's cache never holds it), the package's `files` list, `npm run test:npx` (packs, checks nothing private or test-only is inside, unpacks and starts the studio from it; in CI), `.github/workflows/npm-publish.yml` and `.github/workflows/container-image.yml` (plain docker, pinned checkout) on release tags. **Owner:** add an `NPM_TOKEN` secret (the name `sidemates` must be free on npm, or change it), and after the first image push set the `runner` package to public on GitHub.
 
 ### R5 · Shared results that bring people back · S
 

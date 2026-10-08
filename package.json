@@ -1,7 +1,31 @@
 {
   "name": "sidemates",
   "version": "0.42.0",
-  "private": true,
+  "private": false,
+  "bin": {
+    "sidemates": "bin/sidemates.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "src/server/",
+    "src/shared/",
+    "src/studio/Character.tsx",
+    "src/studio/mascot-catalog.ts",
+    "src/studio/capability-navigation.ts",
+    "skills/",
+    "qa/hero-jobs/",
+    "scripts/background-runner.mjs",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/**/*.browser.ts",
+    "!src/server/testing/",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
   "type": "module",
   "description": "A local-first, open-source home for persistent AI teammates.",
   "scripts": {
@@ -28,6 +52,8 @@
     "test:memory-review": "tsx scripts/test-memory-review.ts",
     "test:ask-my-mac": "tsx scripts/test-ask-my-mac.ts",
     "test:move-in": "tsx scripts/test-move-in.ts",
+    "test:npx": "tsx scripts/test-npx.ts",
+    "prepack": "npm run build",
     "test:calendar-routines": "tsx scripts/test-calendar-routines.ts",
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
     "test:recipes-memory-ui": "tsx scripts/test-recipes-memory-ui.ts",
