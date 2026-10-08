@@ -16,6 +16,7 @@
 - Competitor facts are re-checked and dated 7 October 2026, with sources: Meta Muse's Mac app, Grok Bot's new $20–30 plans, OpenAI dots reaching your own computer and its regions, and Siri AI on EU Macs.
 - The website has a Meta Muse comparison page, the teammate gallery gets proper share cards, and the site serves its own font instead of loading it from Google, so a visit reaches no font service.
 - Security updates for the libraries the app ships with: no high or critical warnings remain. Contributor docs work as written, and public docs no longer describe one person's private setup.
+- Conversation starters fit what each teammate is for (a researcher, a writer, a checker, your inbox, your receipts). Every AI connection starts on a sensible model, including Claude. The new-teammate form says plainly that Autopilot skips the questions.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 

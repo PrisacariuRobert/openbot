@@ -81,6 +81,7 @@ import { CreateTeammate } from "./CreateTeammate";
 import { WeeklyRecapEntry } from "./WeeklyRecap";
 import { WaitingEntry, WaitingForYou } from "./WaitingForYou";
 import { VoiceMode, voiceModeSupported } from "./VoiceMode";
+import { startersFor } from "./starters";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -374,24 +375,11 @@ function eventDetail(message: Message): string {
 
 
 
-const STARTER_PROMPTS = [
-  { label: "Plan my week", hint: "Three things that matter most", text: "Help me plan my week: ask what's on my plate, then pick the three things that matter most." },
-  { label: "Make sense of something", hint: "A document, notes or a long message", text: "Summarize this and tell me what I need to do: " },
-  { label: "Look something up", hint: "With sources you can check", text: "Research this and bring back a short answer with sources: " },
-] as const;
-
-/** With Files & apps on, lead with what only a team on your own Mac can do. */
-const MAC_STARTER_PROMPTS = [
-  { label: "What's on my plate?", hint: "Your reminders, calendar and notes", text: "What's on my plate today? Check my reminders, calendar and notes, and tell me the three things that matter most." },
-  { label: "Remind me", hint: "Added to Reminders after your okay", text: "Remind me to " },
-  { label: "Find that note", hint: "Searches your Apple Notes", text: "Find my note about " },
-] as const;
-
 /** Starters fill the message box without sending, so a blank page never
  * has to be solved alone. Shown until the owner sends a first message. */
-function ChatStarters({ onPick, mac = false }: { onPick: (text: string) => void; mac?: boolean }) {
+function ChatStarters({ onPick, jobs, mac = false }: { onPick: (text: string) => void; jobs: string[]; mac?: boolean }) {
   return <div className="chat-starters" aria-label="Ideas to start with">
-    {(mac ? MAC_STARTER_PROMPTS : STARTER_PROMPTS).map((starter) => (
+    {startersFor(jobs, mac).map((starter) => (
       <button key={starter.label} type="button" className="chat-starter" onClick={() => onPick(starter.text)}>
         <strong>{starter.label}</strong>
         <span>{starter.hint}</span>
@@ -1147,6 +1135,8 @@ export function Studio() {
       ? state?.bots.find((bot) => bot.threadId === thread)
       : undefined;
   const conversationThread = page === "chat" ? state?.threads.find((item) => item.id === thread) : undefined;
+  // What the teammates here are for, so the starters fit their jobs.
+  const conversationJobs = conversationBot ? [conversationBot.role] : (conversationThread?.botIds || []).map((id) => state?.bots.find((bot) => bot.id === id)?.role || "");
   const title =
     page === "chat"
       ? threadTitle
@@ -2589,7 +2579,7 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
-                        <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
+                        <ChatStarters onPick={pickStarter} jobs={conversationJobs} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
                       </div>
                     ) : (<>{
                       state.messages.map((message, index) => {
@@ -2747,7 +2737,7 @@ export function Studio() {
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
-                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
+                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} jobs={conversationJobs} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
                     </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);

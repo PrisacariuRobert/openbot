@@ -232,8 +232,15 @@ export interface ModelChoice { value: string; label: string; detail?: string; di
 
 /** Recommended first, usable models next, models that may train on prompts
  * after them, blocked free-tier models last. */
-export function modelChoices(models: string[]): ModelChoice[] {
-  const recommended = RECOMMENDED_MODELS.find((id) => models.includes(id));
+/** The model a connection should start on: a known-good one if it offers one,
+ * otherwise the connection's own default, never one that fails or trains on prompts. */
+function recommendedModel(models: string[], connectionDefault?: string): string | undefined {
+  return RECOMMENDED_MODELS.find((id) => models.includes(id))
+    || (connectionDefault && models.includes(connectionDefault) && !isBlockedFreeTierModel(connectionDefault) && !mayTrainOnPrompts(connectionDefault) ? connectionDefault : undefined);
+}
+
+export function modelChoices(models: string[], connectionDefault?: string): ModelChoice[] {
+  const recommended = recommendedModel(models, connectionDefault);
   const rank = (model: string) => model === recommended ? 0 : isBlockedFreeTierModel(model) ? 3 : mayTrainOnPrompts(model) ? 2 : 1;
   return [...models].sort((a, b) => rank(a) - rank(b)).map((model) => ({
     value: model,
@@ -243,6 +250,6 @@ export function modelChoices(models: string[]): ModelChoice[] {
   }));
 }
 
-export function defaultModelChoice(models: string[]): string {
-  return RECOMMENDED_MODELS.find((id) => models.includes(id)) || "";
+export function defaultModelChoice(models: string[], connectionDefault?: string): string {
+  return recommendedModel(models, connectionDefault) || "";
 }

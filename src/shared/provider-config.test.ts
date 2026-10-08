@@ -201,3 +201,15 @@ test("models whose provider may train on prompts are labelled, ranked after the 
   assert.equal(choices[1]!.disabled, undefined, "still selectable on purpose");
   assert.equal(defaultModelChoice(["opencode-go/muse-spark-1.3-contributor"]), "", "never preselected");
 });
+
+test("a connection without a known-good model starts on its own default, never a failing or training one", async () => {
+  const { defaultModelChoice, modelChoices } = await import("./provider-config.js");
+  const claude = ["claude-code/sonnet", "claude-code/opus", "claude-code/haiku"];
+  assert.equal(defaultModelChoice(claude), "", "no guess without a default");
+  assert.equal(defaultModelChoice(claude, "claude-code/sonnet"), "claude-code/sonnet");
+  assert.equal(modelChoices(claude, "claude-code/sonnet")[0]!.detail, "Recommended");
+  assert.equal(defaultModelChoice(["opencode-go/deepseek-v4.1-flash", "opencode-go/glm-5.3-flash"], "opencode-go/glm-5.3-flash"), "opencode-go/deepseek-v4.1-flash", "a known-good model still wins");
+  assert.equal(defaultModelChoice(["opencode/mimo-v2.5-free"], "opencode/mimo-v2.5-free"), "");
+  assert.equal(defaultModelChoice(["opencode-go/muse-spark-1.3-contributor"], "opencode-go/muse-spark-1.3-contributor"), "");
+  assert.equal(defaultModelChoice(claude, "claude-code/missing"), "");
+});
