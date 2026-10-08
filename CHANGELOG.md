@@ -6,6 +6,7 @@
 - **Earned trust.** After you approve the same kind of card several times in a row, the team offers to do that kind on its own, with Undo and a daily limit. Any Undo pauses it.
 - **Receipts for your accountant.** Filed receipts are collected with vendor, amount and date, ready to export.
 - **Automatic AI.** Nobody has to pick a model. A new teammate uses the best AI you've connected for each job (a strong one for big jobs, a fast one for small ones) and moves to another when one runs out of allowance. You can still choose an AI yourself in settings.
+- **It just starts.** A new studio asks nothing: as soon as an AI is connected, your team appears (Nova for your inbox, Pixel for invoices and receipts, Scout for your calendar), and it takes a first look at your last few days. The one question is letting it read your Mail, asked when it's needed. Without an AI, the only step is connecting one. It also says plainly that AI can make mistakes.
 
 ## 0.42.1 — Credibility fixes (unreleased)
 

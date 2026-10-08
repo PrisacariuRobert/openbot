@@ -329,7 +329,7 @@ export function CreateTeammate({
       </p>
       <details className="character-customize profile-import">
         <summary>Add starter teammates</summary>
-        <small className="panel-note">Add three teammates with starter jobs. They arrive without a model — pick one for each after. Nothing grants access by itself.</small>
+        <small className="panel-note">Add three teammates with starter jobs. They start on Automatic, so there is no model to pick. Nothing grants access by itself.</small>
         {teamTemplates && (
           <div className="team-template-list">
             {teamTemplates.map((template) => (

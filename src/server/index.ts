@@ -531,7 +531,7 @@ app.get("/api/queue/receipts.csv", (request, response) => {
 // "Look at my last few days": a first useful list on day one, from the same cards as the morning review.
 app.post("/api/queue/scan", async (_request, response) => {
   if (process.platform !== "darwin") return response.status(409).json({ error: "This looks through Mail on a Mac." });
-  if (!db.getStudioSettings().macAccessEnabled) return response.status(409).json({ error: "Turn on Files & apps on this Mac in Permissions first, so a teammate can read your mail." });
+  if (!db.getStudioSettings().macAccessEnabled) return response.status(409).json({ error: "Your team needs to read your Mail first.", code: "mac_access_off" });
   const routine = findMorningBrief(db);
   const bot = (routine ? db.getBot(routine.botId) : null) ?? db.listBots().find((item) => !item.retiredAt);
   if (!bot || bot.retiredAt) return response.status(409).json({ error: "Create a teammate first." });
@@ -3730,12 +3730,15 @@ app.get("/api/team-templates", (_request, response) => response.json(TEAM_TEMPLA
 app.post("/api/team-templates/:id/install", (request, response) => {
   const template = teamTemplate(request.params.id);
   if (!template) return response.status(404).json({ error: "That team template is not available." });
+  // The first team is created once, for an empty studio.
+  if (template.id === "your-team" && db.listBots().some((bot) => !bot.retiredAt)) return response.status(409).json({ error: "Your team is already here." });
   try {
-    const created = template.members.map((member) => db.createBot({
+    // Starter teammates work on Automatic: no model to pick for each.
+    const created = template.members.map((member) => withAutomaticAi(db.createBot({
       name: member.name, emoji: "●", mascot: member.mascot, color: member.color,
-      role: member.role, instructions: `${member.instructions}\n\nYou are a starting template, not a finished teammate: the owner will shape your job, connect your model and set your limits.`,
-      browserEnabled: false, computerEnabled: false,
-    }));
+      role: member.role, instructions: `${member.instructions}\n\nYou are a starting template, not a finished teammate: the owner may reshape your job and set your limits.`,
+      browserEnabled: false, computerEnabled: false, aiMode: "automatic",
+    })));
     broadcast();
     response.status(201).json({ template: template.name, bots: created });
   } catch (error) {

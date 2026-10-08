@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, CalendarPlus, Check, ChevronRight, Download, Inbox, Paperclip, Reply, Sparkles, Undo2 } from "lucide-react";
 import type { QueueCard, QueueOffer, QueueRuleCard, ReceiptsSummary } from "../shared/types";
 import "./waiting.css";
@@ -72,7 +72,7 @@ export function WaitingEntry({ count, active, onOpen }: { count: number; active:
   </button>;
 }
 
-export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?: number; demoMac?: boolean; onChanged: () => void }) {
+export function WaitingForYou({ queueReady, demoMac, firstLook = false, onChanged }: { queueReady?: number; demoMac?: boolean; firstLook?: boolean; onChanged: () => void }) {
   const [ready, setReady] = useState<QueueCard[]>([]);
   const [recent, setRecent] = useState<QueueCard[]>([]);
   const [offers, setOffers] = useState<QueueOffer[]>([]);
@@ -80,7 +80,7 @@ export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?:
   const [alone, setAlone] = useState(0);
   const [receipts, setReceipts] = useState<ReceiptsSummary | null>(null);
   const [receiptMonth, setReceiptMonth] = useState("");
-  const [scan, setScan] = useState<{ state: "idle" | "starting" | "started" | "error"; text: string }>({ state: "idle", text: "" });
+  const [scan, setScan] = useState<{ state: "idle" | "starting" | "started" | "error" | "needs-mail"; text: string }>({ state: "idle", text: "" });
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
@@ -140,11 +140,25 @@ export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?:
     setScan({ state: "starting", text: "" });
     try {
       const response = await fetch("/api/queue/scan", { method: "POST", credentials: "same-origin" });
-      const body = await response.json().catch(() => ({})) as { error?: string; teammate?: string };
+      const body = await response.json().catch(() => ({})) as { error?: string; teammate?: string; code?: string };
       setScan(response.ok
         ? { state: "started", text: `${body.teammate ?? "A teammate"} is reading your last three days of mail. Cards appear here as they're ready, usually within a few minutes.` }
-        : { state: "error", text: body.error || "That couldn't start. Nothing was changed." });
+        : body.code === "mac_access_off"
+          ? { state: "needs-mail", text: "" }
+          : { state: "error", text: body.error || "That couldn't start. Nothing was changed." });
     } catch { setScan({ state: "error", text: "Couldn't reach your studio. Nothing was changed." }); }
+  };
+  // A brand-new team looks at the last few days without being asked.
+  const looked = useRef(false);
+  useEffect(() => { if (firstLook && !looked.current) { looked.current = true; void startScan(); } }, [firstLook]);
+  // The one permission the first look needs, asked when it's needed.
+  const allowMail = async () => {
+    setScan({ state: "starting", text: "" });
+    try {
+      const response = await fetch("/api/settings", { method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ macAccessEnabled: true }) });
+      if (!response.ok) throw new Error();
+      await startScan();
+    } catch { setScan({ state: "error", text: "That didn't work. Nothing was changed." }); }
   };
   const post = (url: string, body?: unknown) => fetch(url, { method: "POST", credentials: "same-origin", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const undoable = recent.filter((card) => card.status === "done");
@@ -152,11 +166,11 @@ export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?:
     <div className="page-heading">
       <div>
         <p className="overline">WAITING FOR YOU</p>
-        <h1>{!loaded ? "Looking…" : ready.length === 0 ? "All clear" : ready.length === 1 ? "One thing needs a look" : `${ready.length} things need a look`}</h1>
+        <h1>{!loaded ? "Looking…" : ready.length === 0 ? (firstLook ? "Your team is ready" : "All clear") : ready.length === 1 ? "One thing needs a look" : `${ready.length} things need a look`}</h1>
       </div>
     </div>
     {demoMac && <p className="waiting-demo" role="note"><strong>Sample data.</strong> This is a demo studio: approving shows what would happen, and nothing is changed on a real Mac.</p>}
-    <p className="waiting-promise">Nothing happens until you say so. Replies are saved as drafts you send yourself, and anything done on your Mac can be undone.</p>
+    <p className="waiting-promise">Nothing happens until you say so. Replies are saved as drafts you send yourself, and anything done on your Mac can be undone. AI can make mistakes, so check anything important.</p>
 
     {offers.map((offer) => <section key={offer.pattern} className="waiting-offer" aria-label="Make this automatic?">
       <span className="waiting-offer-icon" aria-hidden="true"><Sparkles size={16} /></span>
@@ -174,11 +188,15 @@ export function WaitingForYou({ queueReady, demoMac, onChanged }: { queueReady?:
 
     {loaded && ready.length === 0 && <div className="waiting-empty">
       <Check size={22} aria-hidden="true" />
-      <strong>You're all caught up</strong>
-      <span>When a teammate notices something that needs you, such as a reply, a bill or an invitation, it shows up here as a card.</span>
+      <strong>{firstLook ? "First, a look at your last few days" : "You're all caught up"}</strong>
+      <span>{firstLook ? "Replies you owe, bills, invitations: anything that needs you shows up here as a card." : "When a teammate notices something that needs you, such as a reply, a bill or an invitation, it shows up here as a card."}</span>
+      {scan.state === "needs-mail" && <div className="waiting-mail-ask" role="group" aria-label="Let your team read your Mail">
+        <span>Your team needs to read your Mail, Calendar and Notes on this Mac to find what's waiting. macOS asks you once.</span>
+        <button type="button" className="waiting-approve" onClick={() => void allowMail()}>Let my team read them</button>
+      </div>}
       {scan.state === "started"
         ? <span className="waiting-scan-note" role="status">{scan.text}</span>
-        : <button type="button" className="waiting-skip waiting-scan" disabled={scan.state === "starting"} onClick={() => void startScan()}>{scan.state === "starting" ? "Starting…" : "Look at my last few days"}</button>}
+        : scan.state === "needs-mail" ? null : <button type="button" className="waiting-skip waiting-scan" disabled={scan.state === "starting"} onClick={() => void startScan()}>{scan.state === "starting" ? "Starting…" : "Look at my last few days"}</button>}
       {scan.state === "error" && <span className="waiting-error" role="alert">{scan.text}</span>}
     </div>}
 

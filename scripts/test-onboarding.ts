@@ -81,9 +81,17 @@ try {
   });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
+  // Start from a Mac with no AI connected, whatever this host has signed in to,
+  // until the test saves its own connection.
+  await page.route("**/api/provider", async (route) => {
+    if (connectionWrites > 0 || route.request().method() !== "GET") return route.fallback();
+    const response = await route.fetch();
+    const status = await response.json() as { instances?: Array<{ connected?: boolean }> };
+    await route.fulfill({ response, json: { ...status, instances: (status.instances || []).map((instance) => ({ ...instance, connected: false })) } });
+  });
   await page.goto(base + "/studio.html");
-  await page.getByRole("heading", { name: "Good work starts with a conversation." }).waitFor();
-  await page.getByRole("button", { name: "Create your first teammate" }).click();
+  await page.getByRole("heading", { name: "One step: connect an AI." }).waitFor();
+  await page.getByRole("button", { name: "Make your own teammate" }).click();
   const creation = page.getByRole("dialog");
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");

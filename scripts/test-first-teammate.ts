@@ -80,11 +80,13 @@ try {
   await page.route("**/api/messages", () => {
     throw new Error("Creation must never start a model job");
   });
+  // This test covers making a teammate by hand, so the automatic first team is held back.
+  await page.route("**/api/team-templates/your-team/install", (route) => route.fulfill({ status: 503, json: { error: "Held back by the test." } }));
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(base + "/studio.html");
     await page
-      .getByRole("heading", { name: "Good work starts with a conversation." })
+      .getByRole("button", { name: "Make your own teammate" })
       .waitFor();
     assert.equal(
       await page.locator(".sidebar-conversations .character").count(),
@@ -96,7 +98,7 @@ try {
       animations: "disabled",
     });
     await page
-      .getByRole("button", { name: "Create your first teammate" })
+      .getByRole("button", { name: "Make your own teammate" })
       .click();
     const sheet = page.getByRole("dialog");
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");
