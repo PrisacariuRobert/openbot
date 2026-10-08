@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { OpenBotDatabase } from "./testing/database.js";
-import { isHandoffPath, mediateHandoffArtifacts } from "./handoff-files.js";
+import { isHandoffPath, mediateHandoffArtifacts, returnHelperFiles } from "./handoff-files.js";
 
 /** Gate 1 mediated handoff: a teammate shares a specific result with another
  * teammate as an immutable, hash-stamped read-only copy — never by exposing
@@ -112,4 +112,38 @@ test("isHandoffPath marks the mediated area, including nested and dot forms", ()
   assert.equal(isHandoffPath("./handoff/abc/file.json"), true);
   assert.equal(isHandoffPath("reports/out.json"), false);
   assert.equal(isHandoffPath("handoffs/x"), false);
+});
+
+test("a helper's saved files go back to the teammate who asked, read-only", async () => {
+  const f = fixture();
+  try {
+    // Nova asked Pixel to check a draft; Pixel saved a corrected version and a note, and read something else.
+    const helper = f.db.createRun({ threadId: f.origin.threadId, botId: f.recipient.id, prompt: "Check the launch post", status: "running", parentRunId: f.run.id });
+    mkdirSync(path.join(f.recipientWorkspace, "drafts"), { recursive: true });
+    writeFileSync(path.join(f.recipientWorkspace, "drafts/post-checked.md"), "Sidemates asks before anything important.\n");
+    writeFileSync(path.join(f.recipientWorkspace, "notes.md"), "Cut the unsupported claim.\n");
+    writeFileSync(path.join(f.recipientWorkspace, "deleted-later.md"), "gone");
+    f.db.addActivity({ runId: helper.id, botId: f.recipient.id, kind: "file", label: "Updated a workspace file", detail: "drafts/post-checked.md" });
+    f.db.addActivity({ runId: helper.id, botId: f.recipient.id, kind: "file", label: "Edited a workspace file", detail: "drafts/post-checked.md" });
+    f.db.addActivity({ runId: helper.id, botId: f.recipient.id, kind: "file", label: "Updated a workspace file", detail: "notes.md" });
+    f.db.addActivity({ runId: helper.id, botId: f.recipient.id, kind: "file", label: "Updated a workspace file", detail: "deleted-later.md" });
+    f.db.addActivity({ runId: helper.id, botId: f.recipient.id, kind: "tool", label: "Reading the file", detail: "hero-reconciliation-v2.json" });
+    rmSync(path.join(f.recipientWorkspace, "deleted-later.md"));
+
+    const block = await returnHelperFiles(f.db, helper);
+    assert.match(block, /^\n\nFiles saved by pixel\./);
+    const returned = [...block.matchAll(/^- (handoff\/[^ ]+) · "([^"]+)"/gm)].map((match) => [match[1]!, match[2]!]);
+    assert.deepEqual(returned.map(([, name]) => name).sort(), ["notes.md", "post-checked.md"], "Each saved file once; deleted ones are skipped");
+    for (const [relative, name] of returned) {
+      const copy = path.join(f.originWorkspace, relative);
+      assert.equal(readFileSync(copy, "utf8"), readFileSync(path.join(f.recipientWorkspace, name === "notes.md" ? "notes.md" : "drafts/post-checked.md"), "utf8"));
+      assert.ok(isHandoffPath(relative), "The lead gets a read-only handoff copy, never the helper's workspace");
+    }
+
+    assert.equal(await returnHelperFiles(f.db, f.run), "", "A lead's own job has nobody to return files to");
+    const quiet = f.db.createRun({ threadId: f.origin.threadId, botId: f.recipient.id, prompt: "Just answer", status: "running", parentRunId: f.run.id });
+    assert.equal(await returnHelperFiles(f.db, quiet), "", "No saved files, nothing added");
+  } finally {
+    f.close();
+  }
 });

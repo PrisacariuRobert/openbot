@@ -119,6 +119,27 @@ export async function mediateHandoffArtifacts(
   return { records, promptBlock };
 }
 
+/** The way back: files a helper saved while doing its part go to the
+ * teammate who asked, as the same read-only copies, so the lead uses the
+ * helper's exact text (a checker's corrected drafts, say) instead of
+ * retyping it. Returns the lines to add to the helper's result, or "". */
+export async function returnHelperFiles(db: OpenBotDatabase, helperRun: { id: string; botId: string; parentRunId: string | null }): Promise<string> {
+  const parent = helperRun.parentRunId ? db.getRun(helperRun.parentRunId) : null;
+  if (!parent || parent.botId === helperRun.botId) return "";
+  const workspace = path.join(db.workspacesDir, helperRun.botId);
+  const saved = (db.getRun(helperRun.id)?.activities || [])
+    .filter((activity) => activity.kind === "file" && /^(?:Updated|Edited) a workspace file$/.test(activity.label) && activity.detail && !isHandoffPath(activity.detail))
+    .map((activity) => activity.detail!);
+  const paths = [...new Set(saved)].filter((relative) => existsSync(path.join(workspace, relative))).slice(-6);
+  if (!paths.length) return "";
+  try {
+    const { promptBlock } = await mediateHandoffArtifacts(db, { originBotId: helperRun.botId, originRunId: helperRun.id, recipientBotId: parent.botId, specs: paths.map((relative) => ({ path: relative })) });
+    return promptBlock.replace("Read-only handoff inputs from", "Files saved by");
+  } catch {
+    return "";
+  }
+}
+
 /** True when a workspace-relative path targets the immutable handoff area. */
 export function isHandoffPath(relative: string): boolean {
   const normalized = path.normalize(String(relative || "")).replace(/^[/\\]+/, "");

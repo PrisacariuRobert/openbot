@@ -68,12 +68,28 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
   </div>;
 }
 
+const clockText = (seconds: number) => seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+
+/** How long a new studio took to do something useful. Timed and kept on this Mac only. */
+function FirstMinutes() {
+  const [summary, setSummary] = useState<{ recorded: boolean; steps: Array<{ step: string; label: string; afterSeconds: number }>; usefulAfterSeconds: number | null } | null>(null);
+  useEffect(() => { void fetch("/api/first-run", { credentials: "same-origin" }).then((response) => response.ok ? response.json() : null).then(setSummary).catch(() => {}); }, []);
+  if (!summary?.recorded) return null;
+  return <section className="first-minutes" aria-label="Your first minutes">
+    <h3>Your first minutes</h3>
+    <p>{summary.usefulAfterSeconds === null ? "Your team hasn't finished its first job yet." : `Something useful after ${clockText(summary.usefulAfterSeconds)}.`}</p>
+    <ol>{summary.steps.map((step) => <li key={step.step}><span>{step.label}</span><small>{step.step === "opened" ? "start" : clockText(step.afterSeconds)}</small></li>)}</ol>
+    <p className="workspace-footnote">Timed on this Mac. Nothing is sent anywhere.</p>
+  </section>;
+}
+
 export function UsageOverview({ state, onEdit, onThread }: { state: AppState; onEdit: (thread: string) => void; onThread: (thread: string) => void }) {
   return <div className="usage-overview">
     <WorkspaceNote bot={state.bots[0]} title="No surprise “still working”.">When a task reaches its allowance, review what is already done before deciding whether to continue. Extra tokens require a separate decision.</WorkspaceNote>
     <div className="workspace-usage-totals"><div><strong>{state.usage.totalTokens.toLocaleString()}</strong><small>tokens · 7 days</small></div><div><strong>{state.usage.completedRuns}</strong><small>finished tasks</small></div><div><strong>{state.usage.activeRuns}</strong><small>active tasks</small></div></div>
     <h3>Teammate budgets</h3><div className="workspace-row-group">{state.bots.map(bot => <button className="workspace-list-row" key={bot.id} onClick={() => onEdit(bot.threadId)}><Character name={bot.name} color={bot.color} variant={bot.mascot} size={36} /><span><strong>{bot.name}</strong><small>{bot.tokensUsedThisWeek.toLocaleString()} tokens used this week</small></span><small>{bot.weeklyTokenBudget > 0 ? `${bot.weeklyTokenBudget.toLocaleString()} limit` : "No weekly limit"}</small><ChevronRight size={16} /></button>)}</div>
     <h3>Waiting for a decision</h3><div className="workspace-row-group">{state.approvals.length ? state.approvals.map(approval => <button key={approval.id} className="workspace-list-row" onClick={() => { const run = [...state.runs, ...state.studioRuns].find(item => item.id === approval.runId); if (run) onThread(run.threadId); }}><span><strong>{approval.botName}</strong><small>{approval.reason}</small></span><ChevronRight size={16} /></button>) : <p className="workspace-empty">No actions are waiting for your approval.</p>}</div>
-    <p className="workspace-footnote">Usage comes from host records. Token counts do not determine your provider’s subscription price.</p>
+    <FirstMinutes />
+    <p className="workspace-footnote">Usage comes from host records. When an AI re-reads what it already saw, that counts as a tenth, the way AI providers price it. Token counts do not determine your provider’s subscription price.</p>
   </div>;
 }

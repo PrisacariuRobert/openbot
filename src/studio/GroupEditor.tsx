@@ -2,8 +2,9 @@ import { useState } from "react";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import type { AppState } from "../shared/types";
 
-/** Existing multi-teammate conversations remain editable for recovery. New
- * work starts in a direct chat; teammates can coordinate there privately. */
+/** A group: some of your teammates in one conversation. With no threadId it
+ * starts a new one (from "New conversation"); otherwise it renames an
+ * existing group or changes who's in it. */
 export function GroupEditor({
   state,
   threadId,
@@ -15,6 +16,7 @@ export function GroupEditor({
   onDone?: () => void;
   onOpen: (threadId: string) => void;
 }) {
+  const creating = !threadId;
   const editing = state.threads.find((thread) => thread.id === threadId);
   const [title, setTitle] = useState(editing?.title || "");
   const [members, setMembers] = useState<string[]>(editing?.botIds || []);
@@ -24,12 +26,12 @@ export function GroupEditor({
     setMembers((current) => (current.includes(id) ? current.filter((member) => member !== id) : current.length >= 6 ? current : [...current, id]));
   };
   const save = async () => {
-    if (busy || !editing) return;
+    if (busy || (!editing && !creating)) return;
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}/group`, {
-        method: "PATCH",
+      const response = await fetch(creating ? "/api/threads" : `/api/threads/${encodeURIComponent(threadId)}/group`, {
+        method: creating ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, botIds: members }),
       });
@@ -45,16 +47,16 @@ export function GroupEditor({
   };
   return (
     <div className="group-editor">
-      {!editing ? <><p className="drawer-intro">This conversation is no longer available.</p><button onClick={onDone}>Back to chats</button></> : <>
-      <h2 className="detail-title">{editing.title}</h2>
-      <p className="drawer-intro">Rename this existing conversation or change who can join future work. Work already running keeps its current participants.</p>
+      {!editing && !creating ? <><p className="drawer-intro">This conversation is no longer available.</p><button onClick={onDone}>Back to chats</button></> : <>
+      {editing && <h2 className="detail-title">{editing.title}</h2>}
+      <p className="drawer-intro">{creating ? "Pick who's in it. Everyone in the group sees the conversation and can help." : "Rename this existing conversation or change who can join future work. Work already running keeps its current participants."}</p>
       <label className="group-name">
         <UsersRound size={15} />
         <input
           value={title}
           maxLength={48}
           required
-          placeholder="Chat name"
+          placeholder={creating ? "Name the group, for example Marketing" : "Chat name"}
           aria-label="Chat name"
           onChange={(event) => setTitle(event.target.value)}
         />
@@ -77,10 +79,10 @@ export function GroupEditor({
       {error && <p className="extension-error" role="alert">{error}</p>}
       <button
         className="primary full-width"
-        disabled={busy || !title.trim() || members.length < 1}
+        disabled={busy || !title.trim() || members.length < (creating ? 2 : 1)}
         onClick={() => void save()}
       >
-        Save conversation <ArrowRight size={15} />
+        {creating ? "Start the group" : "Save conversation"} <ArrowRight size={15} />
       </button>
       </>}
     </div>

@@ -20,6 +20,7 @@ import { aiRest, classifyJob, isLimitError, rankAi, type AiConnection } from "./
 import { toolAvailability } from "./tool-availability.js";
 import { CommunitySkills } from "./community-skills.js";
 import { UsageEvidenceAccumulator, type UsageAttempt } from "./usage-ledger.js";
+import { returnHelperFiles } from "./handoff-files.js";
 import { currentMoment } from "./current-moment.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
 import { ExecutionMeter, executionLimits, executionStopMessage, WEEKLY_BUDGET_STEP_RESERVE, type ExecutionLimits, type ExecutionStop } from "./execution-policy.js";
@@ -108,9 +109,9 @@ export function toolActivity(event: Record<string, unknown>): ToolActivity | nul
   return null;
 }
 
-export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number };
+export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number };
 
-const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0 });
+const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 });
 const usageNumber = (value: unknown): number => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 
 // OpenCode reports completed steps; Claude reports messages followed by one
@@ -154,7 +155,8 @@ export function eventUsage(event: Record<string, unknown>): Usage | null {
   const cache = tokens.cache as Record<string, unknown> | undefined;
   return {
     inputTokens: usageNumber(tokens.input ?? tokens.input_tokens), outputTokens: usageNumber(tokens.output ?? tokens.output_tokens), reasoningTokens: usageNumber(tokens.reasoning),
-    cacheReadTokens: usageNumber(cache?.read ?? tokens.cacheRead ?? tokens.cache_read_input_tokens), cost: usageNumber(event.cost ?? event.total_cost_usd ?? part?.cost),
+    cacheReadTokens: usageNumber(cache?.read ?? tokens.cacheRead ?? tokens.cache_read_input_tokens),
+    cacheWriteTokens: usageNumber(cache?.write ?? tokens.cacheWrite ?? tokens.cache_creation_input_tokens), cost: usageNumber(event.cost ?? event.total_cost_usd ?? part?.cost),
   };
 }
 
@@ -618,6 +620,7 @@ export class OpenCodeRunner {
       outputTokens: run.outputTokens + usage.outputTokens,
       reasoningTokens: run.reasoningTokens + usage.reasoningTokens,
       cacheReadTokens: run.cacheReadTokens + usage.cacheReadTokens,
+      cacheWriteTokens: run.cacheWriteTokens + usage.cacheWriteTokens,
       cost: run.cost + usage.cost,
       activeDurationMs: Math.floor(meter.activeMs), modelSteps: meter.steps,
       ...(sessionId ? { sessionId } : {}),
@@ -849,7 +852,9 @@ export class OpenCodeRunner {
         this.options.db.finishRunTask(run.id, "completed");
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finished", detail: null });
         if (!shouldPublishRunMessage(run)) {
-          this.shareChildOutcome(run, bot, summary);
+          // The helper's saved files go back with its result, and the list of them is never cut off.
+          const files = await returnHelperFiles(this.options.db, run);
+          this.shareChildOutcome(run, bot, files ? summary.slice(0, Math.max(0, 4_000 - files.length)) + files : summary);
         } else {
           const message = this.options.db.addMessage({ threadId: run.threadId, senderType: "bot", senderId: bot.id, body: summary, runId: run.id, replyToId: run.triggerMessageId || undefined });
           try {
