@@ -862,8 +862,10 @@ h2 {
   font-size: 12px;
   font-weight: 500;
 }
-.primary:hover {
-  background: var(--code-strong);
+/* A small lift toward the label colour, so the button stays solid on hover
+   in light and dark (the code-in-bubble tint made it nearly invisible). */
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--strong) 86%, var(--on-strong));
 }
 .primary:focus-visible {
   outline: 2px solid var(--focus);

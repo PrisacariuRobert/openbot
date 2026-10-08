@@ -108,9 +108,9 @@ export function toolActivity(event: Record<string, unknown>): ToolActivity | nul
   return null;
 }
 
-export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number };
+export type Usage = { inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number };
 
-const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0 });
+const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 });
 const usageNumber = (value: unknown): number => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 
 // OpenCode reports completed steps; Claude reports messages followed by one
@@ -154,7 +154,8 @@ export function eventUsage(event: Record<string, unknown>): Usage | null {
   const cache = tokens.cache as Record<string, unknown> | undefined;
   return {
     inputTokens: usageNumber(tokens.input ?? tokens.input_tokens), outputTokens: usageNumber(tokens.output ?? tokens.output_tokens), reasoningTokens: usageNumber(tokens.reasoning),
-    cacheReadTokens: usageNumber(cache?.read ?? tokens.cacheRead ?? tokens.cache_read_input_tokens), cost: usageNumber(event.cost ?? event.total_cost_usd ?? part?.cost),
+    cacheReadTokens: usageNumber(cache?.read ?? tokens.cacheRead ?? tokens.cache_read_input_tokens),
+    cacheWriteTokens: usageNumber(cache?.write ?? tokens.cacheWrite ?? tokens.cache_creation_input_tokens), cost: usageNumber(event.cost ?? event.total_cost_usd ?? part?.cost),
   };
 }
 
@@ -614,6 +615,7 @@ export class OpenCodeRunner {
       outputTokens: run.outputTokens + usage.outputTokens,
       reasoningTokens: run.reasoningTokens + usage.reasoningTokens,
       cacheReadTokens: run.cacheReadTokens + usage.cacheReadTokens,
+      cacheWriteTokens: run.cacheWriteTokens + usage.cacheWriteTokens,
       cost: run.cost + usage.cost,
       activeDurationMs: Math.floor(meter.activeMs), modelSteps: meter.steps,
       ...(sessionId ? { sessionId } : {}),
