@@ -1,6 +1,6 @@
 # Sidemates — the full facts
 
-Last updated: 1 October 2026. Source of truth: https://github.com/PrisacariuRobert/sidemates
+Last updated: 7 October 2026. Source of truth: https://github.com/PrisacariuRobert/sidemates
 
 ## What it is
 
@@ -13,13 +13,13 @@ Tagline: an AI team that does the work on your real Mac, not just answers.
 - Work in your own Apple apps: read Mail, Calendar, Reminders, Notes, Contacts and Messages; search the folders you choose; save mail attachments; draft emails; add reminders, notes and calendar events. Reading and searching happen on their own. Changes show the exact action and wait for your approval.
 - Know you privately: an optional search index of your folders, Notes, Mail and Messages, stored on your Mac, so you can ask "What did Anna say about the Berlin trip, and when is it?". You see and delete anything it knows on a "What your team knows" page. Everything is opt-in.
 - Browse the web: each teammate uses its own private browser profile, can stay signed in to the sites you choose, and links its sources. Sending, buying, signing in and submitting wait for your okay by default, showing the website and the exact button.
-- Run on a schedule: routines such as "Every Monday at 9, plan my week", a morning brief of your day (calendar, unread mail, reminders), and a Sunday look back. Your Mac wakes for scheduled jobs.
+- Run on a schedule: routines such as "Every Monday at 9, plan my week", a morning brief of your day (calendar, unread mail, reminders), and a Sunday look back. Routines run while your Mac is awake; Sidemates can wake it once a day for them (macOS asks for the owner's password to allow that).
 - Deliver real files: Word documents, spreadsheets and plans.
 - Work as a team: write "Nova: find... Scout, double-check..." and each does their part in order.
-- Autopilot: an opt-in mode, off by default and switched on per teammate (or for everyone), where a teammate acts like a person without asking first. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, every action is logged, it is never part of a shared teammate, and a teammate on Autopilot can be misled by hostile web pages or emails like any assistant, so use it for teammates you trust.
+- Autopilot: an opt-in mode, off by default and switched on per teammate (or for everyone), where a teammate acts like a person without asking first. It still stops for sign-ins, CAPTCHAs, more AI spending, saving new instructions and uploading saved files to a website, but not for purchases, payments, deletions or messages to new people. Every action is logged, it is never part of a shared teammate, and a teammate on Autopilot can be misled by hostile web pages or emails like any assistant, so use it for teammates you trust.
 - Share teammates: a teammate can be shared as a link or added from the gallery at https://sidemates.app/teammates/. Imported teammates start with the browser and private computer off, use your own AI, and ask before anything important.
 - Share a result: turn a finished answer into a web page with private details (emails, phone numbers, keys, your home folder) removed before it is shared.
-- Phone and voice: hands-free voice conversation; pair an iPhone with one scan for a Home Screen app with notifications; "Hey Siri, ask Sidemates" and a Share menu shortcut hand work to your team.
+- Phone and voice (beta): hands-free voice conversation; on iPhone, a Home Screen web app, plus "Hey Siri, ask Sidemates" and a Share menu shortcut. The phone has to reach the Mac first, which today means an HTTPS address the owner sets up (for example a tunnel on their own domain); then it pairs with one scan.
 - Switch from another tool: one-click import from Hermes Agent and OpenClaw, including automations (imported paused).
 
 ## Which AI it uses
@@ -38,8 +38,9 @@ The software is free. You pay only for the AI you connect, and free options exis
 
 ## Where it runs and what it needs
 
-- macOS 13 or later, Apple silicon or Intel. Install: curl -fsSL https://sidemates.app/install.sh | sh
-- Works while your Mac is on (it keeps the Mac awake for scheduled jobs). It does not run in the cloud. A Linux runner exists for an always-on server, but there is no one-click hosted option.
+- macOS 13 or later, Apple silicon or Intel. Install: curl -fsSL https://sidemates.app/install.sh | sh (a few minutes; it downloads about 140 MB).
+- Web tasks need Chrome, Edge or Brave on the Mac. The private computer needs Docker.
+- Works while your Mac is awake (it keeps it from dozing off while a job runs). It does not run in the cloud. A Linux runner exists for an always-on server, but there is no one-click hosted option.
 - No Windows or Linux desktop app. No native iPhone app (a Home Screen web app instead).
 - Public beta.
 
@@ -50,17 +51,17 @@ The software is free. You pay only for the AI you connect, and free options exis
 - Teammate browsers are separate profiles, not a security sandbox.
 - Security model: https://github.com/PrisacariuRobert/sidemates/blob/main/docs/SECURITY.md
 
-## How it compares (as of 1 October 2026, from public pages)
+## How it compares (as of 7 October 2026, from public pages)
 
-- OpenAI dots: an always-on agent on its own cloud computer with a virtual browser; included with ChatGPT Pro and Business Premium; not offered in the EEA, UK or Switzerland at launch. Choose dots if you want a managed agent that works while your computer is off. Choose Sidemates if you want it on your Mac, with your Mac's apps, free, or in Europe.
-- Grok Bot (xAI): named teammates sharing one managed cloud computer; bundled with $120–300 a month plans. Choose it for a hosted team with a desktop and iOS app. Choose Sidemates for free software with isolated teammates on your hardware.
-- Meta Muse: a consumer personal agent with its own secure VM and browser; free, $20 and $100 a month tiers; phone-first. Choose it for a phone-first agent. Choose Sidemates for your Mac's apps and your own data.
-- Apple Siri AI (macOS 27): personal context from Mail, Messages, Notes, Photos and Calendar, with quick in-app actions; free beta with daily limits, English first, Apple silicon. Choose it for quick questions with nothing to install. Sidemates works alongside it for longer jobs.
+- OpenAI dots: an always-on agent on its own cloud computer with a virtual browser; included with ChatGPT Pro and Business Premium; with permission it can also connect to the owner's own computer; the Pro plan isn't offered in the EEA, UK or Switzerland. Choose dots if you want a managed agent that works while your computer is off. Choose Sidemates if you want it on your Mac, with your Mac's apps, free, or in Europe.
+- Grok Bot (xAI, distributed with Cursor): named teammates sharing one managed cloud computer; included with SuperGrok (about $30 a month), Cursor Pro (about $20 a month) and Cursor Teams since 26 August 2026. Choose it for a hosted team with a desktop and iOS app. Choose Sidemates for free software with isolated teammates on your hardware.
+- Meta Muse: a consumer personal agent with its own secure VM and browser; free, $20 and $100 a month tiers; on the phone, the web and, since 17 September 2026, a Mac app that works in Mail, Messages, Calendar, Notes and files; available in the US and Canada. Choose it for a managed agent from Meta. Choose Sidemates for free, open-source software, the AI of your choice, or outside the US and Canada.
+- Apple Siri AI (macOS 27): personal context from Mail, Messages, Notes, Photos and Calendar, with quick in-app actions; free beta with daily limits, English first, Apple silicon; in the EU on Macs but not yet on iPhones. Choose it for quick questions with nothing to install. Sidemates works alongside it for longer jobs.
 - Hermes Desktop (Nous Research, MIT): a native app for macOS, Windows and Linux with free models through a Nous sign-in. Choose it on Windows or Linux, or for a terminal-first setup.
 - OpenMausBot (Apache-2.0): an open-source team of AI bots, aimed at developers, that runs on the Claude, Codex and Grok command-line tools you already have; macOS, Windows, Ubuntu, Android and iOS; a paid Pro plan adds an always-on cloud workspace. Far more widely used than Sidemates today. Choose it for Windows, Linux or phone apps. Choose Sidemates for Mac depth (your own Mail, Calendar, Notes and Messages) and a simpler setup.
 - OpenClaw (MIT): a self-hosted gateway to many chat apps with a large skill marketplace. Choose it for the widest chat-app reach.
 
-Full comparison with sources: https://sidemates.app/alternatives/
+Full comparison with sources: https://sidemates.app/alternatives/ (one page each for OpenAI dots, Grok Bot, Meta Muse, Siri AI and OpenMausBot)
 
 ## Links
 

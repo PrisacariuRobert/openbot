@@ -6,6 +6,9 @@
 - New teammates on OpenCode start on DeepSeek V4.1 Flash, whose provider doesn't train on prompts. Muse Spark Contributor is still there, but it is no longer recommended and says "may train on your prompts" wherever you pick it or use it. Teammates you already set up keep their model.
 - When OpenCode lists no models Sidemates can use, it says so and suggests what to connect, instead of offering free models that only work inside OpenCode's own app.
 - The Claude card says what happens ("Uses the Claude Code you installed and signed in to") instead of "Official login".
+- The website, README and comparison pages say what is true today: the install takes a few minutes and downloads about 140 MB; web tasks need Chrome, Edge or Brave and the private computer needs Docker; routines run while your Mac is awake (it can wake once a day); phone access needs an address for your Mac that you set up; Autopilot's real stops are listed, including what it doesn't stop for. Voice and phone access are marked beta, in the app too.
+- Competitor facts are re-checked and dated 7 October 2026, with sources: Meta Muse's Mac app, Grok Bot's new $20–30 plans, OpenAI dots reaching your own computer and its regions, and Siri AI on EU Macs.
+- The website has a Meta Muse comparison page, the teammate gallery gets proper share cards, and the site serves its own font instead of loading it from Google, so a visit reaches no font service.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 

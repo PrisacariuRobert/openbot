@@ -146,6 +146,6 @@ export function VoiceMode({ bot, messages, runs, onSend, onClose }: {
       }}>{phase === "paused" || phase === "waiting" ? <Mic size={24} /> : <MicOff size={24} />}</button>
       <button type="button" className="voice-mode-button end" aria-label="End voice conversation" onClick={end}><X size={26} /></button>
     </div>
-    <p className="voice-mode-foot">Everything you say appears in the chat. Anything that needs your okay stays in the app.</p>
+    <p className="voice-mode-foot">Voice is in beta. Everything you say appears in the chat. Anything that needs your okay stays in the app.</p>
   </div>;
 }
