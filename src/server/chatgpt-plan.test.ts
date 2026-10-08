@@ -69,7 +69,9 @@ async function readBody(request: IncomingMessage) {
 test("signing in registers Sidemates, connects the plan, renews tokens and signs out", { timeout: 30_000 }, async () => {
   const root = mkdtempSync(path.join(tmpdir(), "sidemates-chatgpt-plan-"));
   const db = new OpenBotDatabase(root);
-  let nonce = "", tokenRequests: URLSearchParams[] = [], revoked: URLSearchParams | null = null, lastResponsesBody: Record<string, unknown> | null = null, limited = false;
+  let nonce = "", limited = false;
+  const tokenRequests: URLSearchParams[] = [];
+  const seen: { revoked: URLSearchParams | null; body: Record<string, unknown> | null } = { revoked: null, body: null };
   const mock = createServer(async (request, response) => {
     const url = new URL(request.url || "/", "http://127.0.0.1");
     const json = (body: unknown, status = 200) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
@@ -81,10 +83,10 @@ test("signing in registers Sidemates, connects the plan, renews tokens and signs
       if (form.get("grant_type") === "refresh_token") return json({ access_token: "access-2", refresh_token: "refresh-2", expires_in: 3600 });
       return json({ access_token: "access-1", refresh_token: "refresh-1", expires_in: 3600, scope: "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct", id_token: sign({ iss: base, aud: "oaiapp_test", exp: Math.floor(Date.now() / 1000) + 600, nonce, email: "robert@example.com" }) });
     }
-    if (url.pathname === "/revoke") { revoked = new URLSearchParams(await readBody(request)); response.writeHead(200); return response.end(); }
+    if (url.pathname === "/revoke") { seen.revoked = new URLSearchParams(await readBody(request)); response.writeHead(200); return response.end(); }
     if (url.pathname === "/v1/models") return json({ models: [{ slug: "gpt-6.1-sol", visibility: "list" }, { slug: "internal-only", visibility: "hide" }, { slug: "gpt-5.6-mini", visibility: "list" }] });
     if (url.pathname === "/v1/responses") {
-      lastResponsesBody = JSON.parse(await readBody(request)) as Record<string, unknown>;
+      seen.body = JSON.parse(await readBody(request)) as Record<string, unknown>;
       if (limited) return json({ error: { code: "subscription_sharing_usage_limit_exceeded", message: "limit" } }, 429);
       response.writeHead(200, { "Content-Type": "text/event-stream" });
       response.write('data: {"type":"response.created"}\n\n');
@@ -131,8 +133,8 @@ test("signing in registers Sidemates, connects the plan, renews tokens and signs
     const streamed = await plan.respond({ model: "gpt-6.1-sol", input: [{ role: "system", content: "x" }], stream: true, temperature: 1 }, new AbortController().signal);
     assert.ok(streamed.stream);
     for await (const _chunk of streamed.stream!) { /* drained */ }
-    assert.equal(lastResponsesBody?.store, false);
-    assert.equal("temperature" in (lastResponsesBody || {}), false);
+    assert.equal(seen.body?.store, false);
+    assert.equal("temperature" in (seen.body || {}), false);
     const whole = await plan.respond({ model: "gpt-6.1-sol", input: "Hi" }, new AbortController().signal);
     assert.deepEqual(whole.json, { id: "r1", output_text: "Hello" });
     limited = true;
@@ -151,7 +153,7 @@ test("signing in registers Sidemates, connects the plan, renews tokens and signs
 
     // Signing out revokes at OpenAI and forgets the tokens, but keeps the registration.
     assert.deepEqual(await plan.signOut(), { revoked: true });
-    assert.equal(revoked!.get("token"), "refresh-2");
+    assert.equal(seen.revoked!.get("token"), "refresh-2");
     assert.equal(plan.status().signedIn, false);
     const again = new URL((await plan.start()).url);
     assert.equal(again.searchParams.get("client_id"), "oaiapp_test", "the next sign-in reuses the registration");
