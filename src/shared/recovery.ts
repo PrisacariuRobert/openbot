@@ -32,3 +32,12 @@ export function fixFor(reason: string, teammate: { automatic: boolean }): Fix {
   if (/runtime not verified|could not check the installed opencode/i.test(reason)) return { label: "Check your AI setup", action: { kind: "panel", panel: "provider" }, retryAfter: false };
   return { label: "Try again", action: { kind: "retry" }, retryAfter: false };
 }
+
+/** The Privacy & Security page an answer asks the owner to visit, so the
+ * studio can open it in one tap instead of leaving directions. */
+export type PrivacyPane = "files" | "automation";
+export function privacyPaneIn(text: string): PrivacyPane | null {
+  if (/Full Disk Access/i.test(text)) return "files";
+  if (/Privacy (?:&|and) Security\s*(?:→|>|->)\s*Automation/i.test(text)) return "automation";
+  return null;
+}

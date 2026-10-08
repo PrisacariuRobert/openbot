@@ -92,6 +92,7 @@ import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
 import { conversationMatches, recentTeammates } from "./conversation-filter";
+import { privacyPaneIn } from "../shared/recovery";
 import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
@@ -2718,6 +2719,7 @@ export function Studio() {
                               {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && (
                                 <MacAccessOffer name={message.senderName} threadId={message.threadId} onDone={() => setRefresh((n) => n + 1)} />
                               )}
+                              {message.senderType === "bot" && (() => { const pane = privacyPaneIn(message.body); return pane && <button type="button" className="text-action message-open-setting" onClick={() => void fetch("/api/mac/open-settings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pane }) })}>Open that setting</button>; })()}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
                                 <details className="message-work-updates">
                                   <summary>Work updates</summary>

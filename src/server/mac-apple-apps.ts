@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { MacMail } from "./mac-mail-index.js";
+import { MacMail, MailAccessError, type MailMessage, type MailSummary } from "./mac-mail-index.js";
 import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -212,6 +212,47 @@ function run(argv) {
   return JSON.stringify({ saved: true, subject: input.subject, at: new Date().toISOString() });
 }`;
 
+// Reading the inbox through the Mail app itself, for when Sidemates hasn't
+// been given Full Disk Access: macOS then asks once ("Sidemates wants to
+// control Mail", Allow) instead of sending the owner into System Settings.
+// Inbox only, newest first; one Apple event per property for the whole set.
+export const MAIL_INBOX_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail");
+  var filters = [{ dateReceived: { _greaterThan: new Date(Date.now() - input.days * 86400000) } }];
+  if (input.unread) filters.push({ readStatus: false });
+  if (input.words.length) filters.push({ _or: input.words.reduce(function(all, word){ return all.concat([{ subject: { _contains: word } }, { sender: { _contains: word } }]); }, []) });
+  var found = mail.inbox.messages.whose(filters.length === 1 ? filters[0] : { _and: filters });
+  var ids = found.id(), dates = found.dateReceived(), subjects = found.subject(), senders = found.sender(), read = found.readStatus();
+  var order = ids.map(function(_, i){ return i; }).sort(function(a, b){ return dates[b] - dates[a]; }).slice(0, input.limit);
+  var messages = order.map(function(i){
+    var message = found[i], text = "", attachments = [];
+    try { text = String(message.content() || ""); } catch (e) {}
+    try { attachments = message.mailAttachments.name().map(function(name){ return { name: name, size: 0 }; }); } catch (e) {}
+    return { id: String(ids[i]), subject: subjects[i] || "(no subject)", from: senders[i] || "", date: dates[i].toISOString(), snippet: text.replace(/\\s+/g, " ").slice(0, 600), attachments: attachments, unread: !read[i] };
+  });
+  return JSON.stringify({ messages: messages, matched: ids.length });
+}`;
+
+export const MAIL_MESSAGE_SCRIPT = `
+function run(argv) {
+  var input = JSON.parse(argv[0]), mail = Application("com.apple.mail");
+  var found = mail.inbox.messages.whose({ id: Number(input.id) });
+  if (!found.id().length) return JSON.stringify({ error: "missing" });
+  var message = found[0], text = "", attachments = [];
+  try { text = String(message.content() || ""); } catch (e) {}
+  try { attachments = message.mailAttachments.name().map(function(name){ return { name: name, size: 0 }; }); } catch (e) {}
+  return JSON.stringify({ id: String(input.id), subject: message.subject() || "(no subject)", from: message.sender() || "", date: message.dateReceived().toISOString(), text: text.slice(0, 20000), truncated: text.length > 20000, attachments: attachments, unread: !message.readStatus() });
+}`;
+
+// The smallest question each app can answer: enough for macOS to ask the
+// owner once, at the moment they said yes in Sidemates.
+const ACCESS_SCRIPTS: Record<"Mail" | "Calendar" | "Notes", string> = {
+  Mail: `function run(){ Application("com.apple.mail").inbox.unreadCount(); return JSON.stringify({ ok: true }); }`,
+  Calendar: `function run(){ Application("com.apple.iCal").calendars.name(); return JSON.stringify({ ok: true }); }`,
+  Notes: `function run(){ Application("com.apple.Notes").accounts.name(); return JSON.stringify({ ok: true }); }`,
+};
+
 // Removes a draft this app saved: matched by subject and time, and only when exactly one draft fits.
 export const MAIL_DRAFT_DELETE_SCRIPT = `
 function run(argv) {
@@ -247,10 +288,10 @@ export class AppleApps {
   readonly available: boolean;
   constructor(private readonly execute: Execute = defaultExecute, platform: NodeJS.Platform = process.platform, private readonly mail = new MacMail(), private readonly cacheStore: CalendarCacheStore | null = null, private readonly now: () => number = Date.now) { this.available = platform === "darwin"; }
 
-  private async script(app: string, script: string, input: object): Promise<Record<string, unknown>> {
+  private async script(app: string, script: string, input: object, timeoutMs = 30_000): Promise<Record<string, unknown>> {
     if (!this.available) throw new Error("Apple apps are only available when Sidemates runs on a Mac.");
     let raw: string;
-    try { raw = await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", script, JSON.stringify(input)], 30_000); }
+    try { raw = await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", script, JSON.stringify(input)], timeoutMs); }
     catch (error) {
       if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) throw new Error(`Allow Sidemates to use ${app} in System Settings → Privacy & Security → Automation, then try again. Nothing was changed.`);
       if ((error as { killed?: boolean })?.killed || /-600|-1712|isn.t running|timed out|ETIMEDOUT/i.test(String(error))) throw new Error(`${app} took too long to answer — it may be busy syncing. Try again in a minute, or narrow the request. Nothing was changed.`);
@@ -356,8 +397,30 @@ export class AppleApps {
   }
   async unreadMail(input: z.input<typeof mailUnreadInput>) {
     const args = mailUnreadInput.parse(input);
-    const messages = this.mail.unread(args.days, args.limit);
-    return { messages, count: messages.length };
+    try {
+      const messages = this.mail.unread(args.days, args.limit);
+      return { messages, count: messages.length };
+    } catch (error) {
+      if (!(error instanceof MailAccessError) || !this.available) throw error;
+    }
+    const { messages } = await this.inboxThroughMail({ unread: true, days: args.days, limit: args.limit, words: [] });
+    return { messages, count: messages.length, scope: "Inbox, read through the Mail app" };
+  }
+  /** Without Full Disk Access: the inbox through the Mail app (one "Allow"). */
+  private async inboxThroughMail(input: { unread: boolean; days: number; limit: number; words: string[] }): Promise<{ messages: MailSummary[]; matched: number }> {
+    const result = await this.script("Mail", MAIL_INBOX_SCRIPT, input, 60_000);
+    const summary = z.object({ id: z.string(), subject: z.string(), from: z.string(), date: z.string(), snippet: z.string(), attachments: z.array(z.object({ name: z.string(), size: z.number() })), unread: z.boolean() });
+    return z.object({ messages: z.array(summary), matched: z.number() }).parse(result);
+  }
+  /** Asks macOS for Mail, Calendar and Notes, one after another, right when
+   * the owner said yes. Each app asks once; the answer is remembered. */
+  async askAccess(): Promise<Array<{ app: string; allowed: boolean; detail?: string }>> {
+    const answers: Array<{ app: string; allowed: boolean; detail?: string }> = [];
+    for (const app of ["Mail", "Calendar", "Notes"] as const) {
+      try { await this.script(app, ACCESS_SCRIPTS[app], {}, 120_000); answers.push({ app, allowed: true }); }
+      catch (error) { answers.push({ app, allowed: false, detail: error instanceof Error ? error.message : String(error) }); }
+    }
+    return answers;
   }
   async listCalendars() {
     const result = await this.script("Calendar", CALENDARS_LIST_SCRIPT, {});
@@ -405,10 +468,19 @@ export class AppleApps {
   }
   async searchMail(input: z.input<typeof mailSearchInput>) {
     const args = mailSearchInput.parse(input);
-    return this.mail.search(args.query, args.days, args.limit);
+    try { return await this.mail.search(args.query, args.days, args.limit); }
+    catch (error) { if (!(error instanceof MailAccessError) || !this.available) throw error; }
+    const words = args.query.replace(/["*\\]/g, " ").trim().split(/\s+/).filter((word) => word.length > 1).slice(0, 6);
+    if (!words.length) return { messages: [], matched: 0 };
+    return { ...(await this.inboxThroughMail({ unread: false, days: args.days, limit: args.limit, words })), scope: "Inbox subjects and senders, read through the Mail app" };
   }
-  async readMail(input: z.input<typeof mailReadInput>) {
-    return this.mail.read(mailReadInput.parse(input).id);
+  async readMail(input: z.input<typeof mailReadInput>): Promise<MailMessage> {
+    const { id } = mailReadInput.parse(input);
+    try { return this.mail.read(id); }
+    catch (error) { if (!(error instanceof MailAccessError) || !this.available) throw error; }
+    const result = await this.script("Mail", MAIL_MESSAGE_SCRIPT, { id }, 60_000);
+    if (result.error) throw new Error("That email isn't in your Inbox anymore. Search again.");
+    return z.object({ id: z.string(), subject: z.string(), from: z.string(), date: z.string(), text: z.string(), truncated: z.boolean(), attachments: z.array(z.object({ name: z.string(), size: z.number() })), unread: z.boolean() }).transform((message) => ({ ...message, snippet: message.text.replace(/\s+/g, " ").slice(0, 600) })).parse(result);
   }
   /** Saves into a folder inside the owner's home, creating it if needed, and
    * never overwrites: an existing name gets " 2", " 3"… */

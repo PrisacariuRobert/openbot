@@ -15,6 +15,7 @@
 - **The faces at the top of Conversations are the teammates you talk to most,** not always the first three you made.
 - **The Mac app finds your AIs on its first start.** The very first check of an AI gets up to a minute, so a just-installed app no longer says OpenCode is missing while macOS is still looking it over.
 - **The Mac app opens.** A downloaded copy used to say "damaged and can't be opened", with only Move to Trash. It's now self-signed, so macOS offers Open Anyway in Privacy & Security (a paid Apple signature, later, removes even that step).
+- **Mac access in one click.** "Let my team read them" now has macOS ask right away (Allow, once for Mail, Calendar and Notes). Without Full Disk Access, teammates read your inbox through the Mail app instead of giving up. When an answer points to a setting, a button opens that exact page.
 - **Start a group from New conversation.** Name it, pick two or more teammates, and you're in. Main buttons also stay solid when you point at them (they nearly disappeared in light mode).
 - **Helpers hand back their files.** When a teammate asks another for help, the files the helper saved (a checker's corrected drafts, say) come back with the answer, so the lead uses the exact text instead of retyping it.
 - **Lighter Claude teammates.** Teammates on Claude get their own short identity instead of Claude Code's coding-assistant instructions, and your personal Claude Code settings (like an output style) no longer leak into their work. On Haiku, a small note job went from about 82,000 tokens to 49,000, and got faster.

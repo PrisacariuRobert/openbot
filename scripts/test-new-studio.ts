@@ -789,10 +789,21 @@ try {
   assert.notEqual(await startGroup.evaluate((el) => getComputedStyle(el).backgroundColor), "rgba(255, 255, 255, 0.24)", "The main button stays solid on hover");
   await startGroup.click();
   await page.waitForURL(/thread=group-/);
+  // The Mail ask: one click turns on Mac access, macOS is asked right then, and the look starts.
+  const order: string[] = [];
+  let macAllowed = false;
+  await page.route(/\/api\/queue\/scan$/, (route) => { order.push("scan"); return macAllowed ? route.fulfill({ json: { started: true, teammate: "Nova", threadId: "bot-nova" } }) : route.fulfill({ status: 409, json: { error: "Your team needs to read your Mail first.", code: "mac_access_off" } }); });
+  await page.route(/\/api\/mac\/ask-access$/, (route) => { order.push("ask"); macAllowed = true; return route.fulfill({ json: { answers: [{ app: "Mail", allowed: true }] } }); });
+  await page.goto(base + "/studio.html?waiting=1");
+  await page.getByRole("button", { name: "Look at my last few days" }).click();
+  await page.getByRole("button", { name: "Let my team read them" }).click();
+  await page.getByText(/Nova is reading your last three days of mail/).waitFor();
+  assert.deepEqual(order, ["scan", "ask", "scan"], "macOS is asked before the look starts, not halfway through it");
+  await page.unroute(/\/api\/queue\/scan$/); await page.unroute(/\/api\/mac\/ask-access$/);
   assert.deepEqual(errors, []);
   assert.deepEqual(visualFailures, [], "One or more screenshots violated the monochrome-except-mascots design contract");
   console.log(
-    `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards; starting a group; helper progress. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
+    `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards; starting a group; helper progress; Mail ask. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
   );
 } finally {
   // Drain intercepted polling before disposing its request context, so teardown

@@ -140,3 +140,49 @@ test("unread mail: inbox and Gmail All Mail, not junk, spam or archive", async (
     assert.match(result.messages[0]!.snippet, /Can you confirm/);
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+test("without Full Disk Access, the inbox is read through the Mail app (one Allow) instead of failing", async () => {
+  const { MailAccessError } = await import("./mac-mail-index.js");
+  const { MAIL_INBOX_SCRIPT, MAIL_MESSAGE_SCRIPT } = await import("./mac-apple-apps.js");
+  const noDiskAccess = { unread: () => { throw new MailAccessError("needs Full Disk Access"); }, search: async () => { throw new MailAccessError("needs Full Disk Access"); }, read: () => { throw new MailAccessError("needs Full Disk Access"); } } as unknown as import("./mac-mail-index.js").MacMail;
+  const calls: Array<{ script: string; input: Record<string, unknown> }> = [];
+  const inbox = { messages: [{ id: "4821", subject: "Invoice 1042", from: "Ana <ana@example.com>", date: "2026-10-07T09:00:00.000Z", snippet: "Please find attached", attachments: [{ name: "invoice.pdf", size: 0 }], unread: true }], matched: 1 };
+  const apps = new AppleApps(async (_command, args) => {
+    const input = JSON.parse(args[4]!); calls.push({ script: args[3]!, input });
+    if (args[3] === MAIL_MESSAGE_SCRIPT) return JSON.stringify(input.id === "4821" ? { ...inbox.messages[0], text: "Please find attached the invoice.", truncated: false } : { error: "missing" });
+    return JSON.stringify(inbox);
+  }, "darwin", noDiskAccess);
+
+  const unread = await apps.unreadMail({ days: 3, limit: 10 });
+  assert.equal(unread.count, 1);
+  assert.equal(unread.messages[0]!.subject, "Invoice 1042");
+  assert.deepEqual(calls[0], { script: MAIL_INBOX_SCRIPT, input: { unread: true, days: 3, limit: 10, words: [] } });
+
+  const found = await apps.searchMail({ query: "invoice \"Ana\"", days: 30, limit: 5 });
+  assert.equal(found.matched, 1);
+  assert.deepEqual(calls[1]!.input, { unread: false, days: 30, limit: 5, words: ["invoice", "Ana"] });
+
+  const message = await apps.readMail({ id: "4821" });
+  assert.equal(message.text, "Please find attached the invoice.");
+  assert.equal(message.snippet, "Please find attached the invoice.");
+  await assert.rejects(apps.readMail({ id: "9" }), /isn't in your Inbox anymore/);
+});
+
+test("other Mail errors are not hidden by the Mail-app route", async () => {
+  const broken = { unread: () => { throw new Error("That email isn't on this Mac anymore."); } } as unknown as import("./mac-mail-index.js").MacMail;
+  const apps = new AppleApps(async () => { throw new Error("should not run"); }, "darwin", broken);
+  await assert.rejects(apps.unreadMail({ days: 3, limit: 5 }), /isn't on this Mac anymore/);
+});
+
+test("asking for access asks Mail, Calendar and Notes once each, and reports each answer", async () => {
+  const asked: string[] = [];
+  const apps = new AppleApps(async (_command, args) => {
+    const script = args[3]!; const app = /com\.apple\.(\w+)/.exec(script)![1]!; asked.push(app);
+    if (app === "Notes") throw new Error("execution error: Not authorized to send Apple events to Notes. (-1743)");
+    return JSON.stringify({ ok: true });
+  }, "darwin");
+  const answers = await apps.askAccess();
+  assert.deepEqual(asked, ["mail", "iCal", "Notes"]);
+  assert.deepEqual(answers.map((answer) => [answer.app, answer.allowed]), [["Mail", true], ["Calendar", true], ["Notes", false]]);
+  assert.match(answers[2]!.detail || "", /Automation/);
+});

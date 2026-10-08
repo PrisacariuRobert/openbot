@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fixFor } from "./recovery.js";
+import { fixFor, privacyPaneIn } from "./recovery.js";
 
 const fix = (reason: string, automatic = false) => fixFor(reason, { automatic });
 
@@ -23,4 +23,10 @@ test("an AI that ran out leads to another AI, never a dead end", () => {
 
 test("anything else can at least be tried again", () => {
   assert.deepEqual(fix("The page could not be read."), { label: "Try again", action: { kind: "retry" }, retryAfter: false });
+});
+
+test("an answer that points to a Privacy & Security page gets a button that opens it", () => {
+  assert.equal(privacyPaneIn("To fix it, go to System Settings → Privacy & Security → Full Disk Access and turn on Sidemates."), "files");
+  assert.equal(privacyPaneIn("Allow Sidemates to use Mail in System Settings → Privacy & Security → Automation, then try again."), "automation");
+  assert.equal(privacyPaneIn("I saved the note."), null);
 });
