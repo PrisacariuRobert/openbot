@@ -29,6 +29,7 @@ import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
 import { demoMacEnabled, demoQueueExecutor } from "./demo-mac.js";
+import { FirstRunClock, type FirstRunTimeline } from "./first-run-timeline.js";
 import { QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput, queueScanPrompt } from "./queue.js";
 import { MailSeen } from "./queue-grounding.js";
 import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
@@ -197,6 +198,8 @@ const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => d
 const demoMac = demoMacEnabled();
 if (demoMac) console.warn("Sample Mac mode: Waiting for you will not touch this Mac's Reminders, Calendar, Mail or files.");
 const workQueue = new WorkQueue(db, demoMac ? (() => { const sample = demoQueueExecutor(homedir()); return () => sample; })() : () => appleApps);
+// The first minutes of a new studio, timed on this Mac only.
+const firstRun = new FirstRunClock({ read: () => db.extensionRecord<FirstRunTimeline>("first-run", "timeline"), write: (timeline) => db.saveExtensionRecord("first-run", "timeline", timeline) });
 const mailSeen = new MailSeen();
 // Calendar answers slowly; while it's being used, keep the next two weeks warm.
 setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
@@ -538,7 +541,20 @@ function compactRuns<T extends { status: string; startedAt: string | null; activ
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap(), queueReady: workQueue.list().ready.length, ...(demoMac ? { demoMac: true } : {}) });
+  const queueReady = workQueue.list().ready.length;
+  firstRun.observe({
+    aiReady: connectionsFrom(latestProviderStatus()).some((connection) => connection.connected && connection.models.length > 0),
+    teammates: state.bots.some((bot) => !bot.retiredAt),
+    jobStarted: state.studioRuns.length > 0,
+    listReady: queueReady > 0,
+    jobFinished: state.studioRuns.some((run) => run.status === "completed"),
+  });
+  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap(), queueReady, ...(demoMac ? { demoMac: true } : {}) });
+});
+
+app.get("/api/first-run", (_request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.json(firstRun.summary());
 });
 
 const queueFailure = (response: express.Response, error: unknown) => {
