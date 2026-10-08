@@ -50,7 +50,14 @@ export async function steadyCheck(key: string, run: () => Promise<CommandResult>
   if (!result.timedOut) { lastAnswers.set(key, result); return result; }
   return lastAnswers.get(key) ?? result;
 }
-const check = (command: string, args: string[]) => steadyCheck(`${command} ${args.join(" ")}`, () => execute(command, args));
+/** A fresh app's first check reported its own bundled OpenCode as "not
+ * installed"; a check a minute later found it. The first run of a newly
+ * installed program is slower while macOS inspects it (a fresh copy of the
+ * 144 MB OpenCode took 2 s here against 0.4 s after; a downloaded app is
+ * inspected more thoroughly) and start-up is busy. With no earlier answer to
+ * fall back on, the first check waits up to a minute instead of 15 seconds. */
+export const checkTimeout = (key: string) => lastAnswers.has(key) ? 15_000 : 60_000;
+const check = (command: string, args: string[]) => { const key = `${command} ${args.join(" ")}`; return steadyCheck(key, () => execute(command, args, checkTimeout(key))); };
 
 const apiModelCache = new Map<string, { expiresAt: number; models: string[] }>();
 
