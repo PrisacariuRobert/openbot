@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Bot, Thread } from "../shared/types.js";
-import { conversationMatches } from "./conversation-filter.js";
+import { conversationMatches, recentTeammates } from "./conversation-filter.js";
 
 const bot = (overrides: Partial<Bot> = {}): Bot => ({
   id: "nova",
@@ -77,4 +77,12 @@ test("matcher never filters on pinned or hidden state", () => {
   const bots = [bot()];
   assert.equal(conversationMatches(thread({ pinned: true }), bots, "nova"), true);
   assert.equal(conversationMatches(thread({ hidden: true }), bots, "nova"), true);
+});
+
+test("the faces row shows the teammates you talked to most recently", () => {
+  const bot = (name: string, retiredAt: string | null = null) => ({ id: name, name, threadId: `bot-${name}`, retiredAt } as Bot);
+  const thread = (name: string, updatedAt: string) => ({ id: `bot-${name}`, updatedAt } as Thread);
+  const bots = [bot("Nova"), bot("Pixel"), bot("Scout"), bot("Juno"), bot("Milo"), bot("Old", "2026-10-01T00:00:00Z")];
+  const threads = [thread("Nova", "2026-10-01T09:00:00Z"), thread("Pixel", "2026-10-02T09:00:00Z"), thread("Scout", "2026-10-03T09:00:00Z"), thread("Juno", "2026-10-08T09:00:00Z"), thread("Milo", "2026-10-07T09:00:00Z"), thread("Old", "2026-10-09T09:00:00Z")];
+  assert.deepEqual(recentTeammates(bots, threads).map((item) => item.name), ["Juno", "Milo", "Scout"]);
 });
