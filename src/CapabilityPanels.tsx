@@ -6,6 +6,7 @@ import { MorningBriefCard } from "./components/MorningBriefCard";
 import { CopyShareLink } from "./components/CopyShareLink";
 import { SubmitToGallery } from "./components/SubmitToGallery";
 import { PrivateModeCard } from "./components/PrivateModeCard";
+import { TakeOutFiles } from "./components/MoveInOut";
 import { AiReceiptSections } from "./components/AiReceiptSections";
 import { AutopilotCard } from "./components/AutopilotCard";
 import { AUTOPILOT_WARNING } from "./shared/autopilot";
@@ -5049,6 +5050,7 @@ export function BotPanel({
             </button>
             <CopyShareLink botId={bot.id} />
             <SubmitToGallery botId={bot.id} />
+            <TakeOutFiles bot={bot} />
             <button
               type="button"
               className="quiet-danger"

@@ -1,5 +1,6 @@
 import { ExistingAgentsCard } from "../components/ExistingAgentsCard";
 import { AddSpecialist } from "./AddSpecialist";
+import { MoveInCard } from "../components/MoveInOut";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, ChevronRight, Link2, Plus, Upload } from "lucide-react";
 import { TeammatePreviewCard, readTeammate, type TeammatePreview } from "../components/TeammatePreviewCard";
@@ -59,6 +60,7 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
     }} />
     {preview && <div ref={previewAnchor}><TeammatePreviewCard preview={preview} pending={pending} macAccess={state.settings.macAccessEnabled} onCancel={() => setPreview(null)} onAdd={() => void perform(async () => { await onImport(preview.raw); setPreview(null); })} /></div>}
     <ExistingAgentsCard onOpen={(botId) => { const bot = state.bots.find((item) => item.id === botId); if (bot) onEdit(bot.threadId); }} />
+    <MoveInCard bots={state.bots} onReview={(threadId) => { window.location.href = `/?panel=teach&thread=${encodeURIComponent(threadId)}`; }} />
     {error && <p role="alert" className="panel-error">{error}</p>}
     <div className="workspace-team-grid">{state.bots.map(bot => <article key={bot.id} className="workspace-teammate">
       <button className="workspace-teammate-identity" onClick={() => onEdit(bot.threadId)} aria-label={`Edit ${bot.name}`}><Character name={bot.name} color={bot.color} variant={bot.mascot} size={60} /><span><strong>{bot.name}</strong><small>{bot.role}</small></span><ChevronRight size={16} /></button>

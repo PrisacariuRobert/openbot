@@ -120,6 +120,8 @@ jobs:
         run: npm run test:memory-review
       - name: Ask my Mac answers from the on-device index by keyboard
         run: npm run test:ask-my-mac
+      - name: Move in from an export, take a teammate out as files and back
+        run: npm run test:move-in
       - name: Attack tests (prompt injections against a scripted stand-in that obeys them)
         # Checks what the server lets through at Ask first and Autopilot against
         # the table published in docs/SECURITY.md. Credential-free.

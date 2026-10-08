@@ -14,6 +14,17 @@ export function registerMemoryReviewRoutes(app: Express, db: OpenBotDatabase, on
       search: endpoint ? { mode: endpoint.connectionName === "Ollama on this Mac" ? "local" : "connection", model: endpoint.model, connection: endpoint.connectionName } : { mode: "keyword", model: null, connection: null },
     });
   });
+  // Task F8: an export brings many facts; the owner can keep them all after reading them.
+  app.post("/api/bots/:id/memory-review/keep-all", (request, response) => {
+    const items = pendingMemories(db, request.params.id);
+    let kept = 0;
+    const failed: string[] = [];
+    for (const item of items) {
+      try { decideMemory(db, item.id, "keep"); kept += 1; } catch (error) { failed.push(`${item.key}: ${error instanceof Error ? error.message : "not saved"}`); }
+    }
+    onChange();
+    response.json({ kept, failed });
+  });
   app.post("/api/memory-review/:id", (request, response) => {
     const parsed = z.object({ decision: z.enum(["keep", "discard"]), content: z.string().trim().min(1).max(1200).optional() }).strict().safeParse(request.body);
     if (!parsed.success) return response.status(400).json({ error: "Choose keep or discard; an edited memory is 1 to 1,200 characters." });

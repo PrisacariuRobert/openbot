@@ -138,6 +138,7 @@ These are in the code but not in a release yet. The [changelog](CHANGELOG.md) ha
 - **When a job can't finish**, you see what's missing and the one-click fix.
 - **Hard stops, even on Autopilot**: money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards always ask.
 - **Submit a teammate to the gallery** from its settings, without Git.
+- **Move in, move out**: memories from a ChatGPT or Claude export (each one reviewed), and any teammate out as plain files that work elsewhere.
 - **Ask my Mac**: a shortcut from anywhere on the Mac to ask about your own mail, notes and files, with every answer citing its source and nothing sent to a cloud AI.
 - **Your saved secrets' key in the Keychain** on a Mac, instead of a file next to the data.
 - **Memory you can trace**: every memory says where it came from, and facts learned from mail, web pages or files wait for your review before any task uses them.

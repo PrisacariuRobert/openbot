@@ -13,3 +13,4 @@
 .memory-review-actions button { min-height: 40px; }
 .memory-review textarea:focus-visible, .memory-review button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .memory-review-error { margin: 0; font-size: 13px; color: var(--danger); }
+.memory-review-all { justify-self: start; min-height: 40px; }

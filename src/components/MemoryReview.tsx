@@ -30,6 +30,18 @@ export function MemoryReviewQueue({ botId, botName, onDecided }: { botId: string
     } catch (cause) { setError(cause instanceof Error ? cause.message : "That couldn't be saved."); }
     finally { setBusy(null); }
   };
+  const keepAll = async () => {
+    if (!items?.length || !window.confirm(`Keep all ${items.length} memories for ${botName}? Read them first: from now on every task can use them.`)) return;
+    setBusy("all"); setError("");
+    try {
+      const response = await fetch(`/api/bots/${encodeURIComponent(botId)}/memory-review/keep-all`, { method: "POST" });
+      const value = await response.json() as { kept?: number; failed?: string[]; error?: string };
+      if (!response.ok) throw new Error(value.error || "They couldn't be saved.");
+      if (value.failed?.length) setError(`${value.failed.length} couldn't be saved: ${value.failed[0]}`);
+      load(); onDecided();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "They couldn't be saved."); }
+    finally { setBusy(null); }
+  };
   return (
     <section className="memory-review" aria-label={`What ${botName} remembers`}>
       <h4>What {botName} remembers</h4>
@@ -38,10 +50,11 @@ export function MemoryReviewQueue({ botId, botName, onDecided }: { botId: string
       {items && items.length > 0 && (
         <div className="memory-review-queue" role="group" aria-label="Waiting for your review">
           <h5>Waiting for your review · {items.length}</h5>
-          <p>{botName} learned these after reading something from outside. They aren't used until you keep them.</p>
+          <p>{items.some((item) => item.from) ? "Brought in from an export, or learned after reading something from outside." : `${botName} learned these after reading something from outside.`} They aren't used until you keep them.</p>
+          {items.length > 1 && <button type="button" className="memory-review-all" disabled={busy !== null} onClick={() => void keepAll()}>Keep all {items.length}</button>}
           {items.map((item) => (
             <article key={item.id} className="memory-review-item">
-              <header><strong>{item.key}</strong><span>{MEMORY_ORIGIN_TEXT[item.origin]}{item.origins.length > 1 ? ` and ${item.origins.length - 1} more` : ""} · {new Date(item.at).toLocaleString()}</span></header>
+              <header><strong>{item.key}</strong><span>{item.from ? `From ${item.from}` : MEMORY_ORIGIN_TEXT[item.origin]}{item.origins.length > 1 ? ` and ${item.origins.length - 1} more` : ""} · {new Date(item.at).toLocaleString()}</span></header>
               <label className="visually-hidden" htmlFor={`memory-review-${item.id}`}>What {botName} would remember</label>
               <textarea id={`memory-review-${item.id}`} rows={2} maxLength={1200} value={editing[item.id] ?? item.content} onChange={(event) => setEditing((current) => ({ ...current, [item.id]: event.target.value }))} />
               <div className="memory-review-actions">

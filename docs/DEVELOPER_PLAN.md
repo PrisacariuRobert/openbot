@@ -112,7 +112,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | T5 | Memory you can see, edit and trace | M | 0.48 | ✅ |
 | T6 | The vault key in the Keychain | S–M | 0.48 | ✅ |
 | F7 | Ask my Mac | M | 0.49 | ✅ |
-| F8 | Move in, move out | S–M | 0.49 | ☐ |
+| F8 | Move in, move out | S–M | 0.49 | ✅ |
 | R2 | Siri and Spotlight (experiment) | M–L | 0.49 | ☐ |
 | R4 | A developer try-path (`npx`, container image) | S–M | 0.49 | ☐ |
 | M1–M6 | Maintainability, one slice a week | S each | ongoing | ☐ |
@@ -722,6 +722,8 @@ Each has a draft ready in Mail, plus Done, Snooze and Remind me.
 **Done when.** A round trip works: import a synthetic export, export the teammate, and re-import it unchanged.
 
 **Prompt.** `Do task F8 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done (`src/server/move-in-out.ts`, `src/components/MoveInOut.tsx`). Out: a zip with AGENTS.md, memory.md, skills/ (Agent Skills), README and teammate.json, built on `exportBot` and the skill library. In: ChatGPT (`mapping`) and Claude (`chat_messages`) conversations.json, from the zip or on its own, plus a memories file when an export has one; suggestions are sentences where the person described themselves, all through T5's review queue. The round trip (import a synthetic export, export, re-import in another studio, export again) gives identical files. The readers follow the export formats as documented and seen in public samples; check them against a fresh real export of each.
 
 ---
 

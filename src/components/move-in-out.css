@@ -1,0 +1,12 @@
+/* Task F8: move in, move out. Design tokens only. */
+.take-out-files { text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+.move-in { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin: 12px 0; }
+.move-in h3 { margin: 0; font-size: 16px; }
+.move-in p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--secondary); }
+.move-in-target { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.move-in-target select { min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; padding: 0 8px; }
+.move-in > button { justify-self: start; display: inline-flex; gap: 6px; align-items: center; min-height: 40px; }
+.move-in button:focus-visible, .move-in select:focus-visible, .take-out-files:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.move-in-error { color: var(--danger) !important; }
+.move-in-done { color: var(--ink) !important; }
+.move-in .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

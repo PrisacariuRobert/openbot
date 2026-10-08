@@ -26,6 +26,7 @@ import { pruneSentLog } from "./sent-log.js";
 import { rememberFromTask, reviewMessage } from "./memory-review.js";
 import { registerMemoryReviewRoutes } from "./memory-review-routes.js";
 import { registerAskRoutes } from "./ask-routes.js";
+import { registerMoveRoutes } from "./move-routes.js";
 import { MacMail } from "./mac-mail-index.js";
 import { actionHardStop, browserHardStop, commandHardStop } from "./hard-stops.js";
 import { HARD_STOP_TEXT, hardStopLine, type HardStop } from "../shared/hard-stops.js";
@@ -367,6 +368,8 @@ registerMemoryReviewRoutes(app, db, () => broadcast());
 // Task F7: "Ask my Mac" answers from the on-device index; sources open in Mail, Notes or Finder.
 const askMail = new MacMail();
 registerAskRoutes(app, { db, index: personalIndex, mailFile: (id) => askMail.fileFor(id) });
+// Task F8: a teammate out as plain files, and memories in from ChatGPT or Claude exports.
+registerMoveRoutes(app, db, () => broadcast());
 // Task F3: what each run sent to its AI is kept for 30 days.
 try { pruneSentLog(db); } catch { /* A failed cleanup never stops the server. */ }
 setInterval(() => { try { pruneSentLog(db); } catch { /* retried tomorrow */ } }, 86_400_000).unref();
