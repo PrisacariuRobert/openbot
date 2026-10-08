@@ -85,6 +85,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
           <div className="byo-row-text">
             <strong>Google Gemini{!entry("google")?.connected && <span className="byo-free">Free key</span>}</strong>
             <small>A free key from Google AI Studio — a Google account is enough, no card. Free-tier limits apply.</small>
+            <small className="byo-terms">Free keys are for work use by adults. On the free tier Google may use your prompts to improve its products and people may read them, so keep private mail on another AI. In the EU, UK and Switzerland, Google's terms ask for a paid key.</small>
           </div>
           {entry("google")?.connected
             ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
