@@ -8,6 +8,7 @@
 - **Automatic AI.** Nobody has to pick a model. A new teammate uses the best AI you've connected for each job (a strong one for big jobs, a fast one for small ones) and moves to another when one runs out of allowance. You can still choose an AI yourself in settings.
 - **It just starts.** A new studio asks nothing: as soon as an AI is connected, your team appears (Nova for your inbox, Pixel for invoices and receipts, Scout for your calendar), and it takes a first look at your last few days. The one question is letting it read your Mail, asked when it's needed. Without an AI, the only step is connecting one. It also says plainly that AI can make mistakes.
 - **Never just "I can't".** When a job stops, the note says what fixes it, in one tap: connect an AI, let Sidemates pick another AI, let your team use this Mac's apps, open the right privacy setting, get a browser, or try again.
+- **Sign in with ChatGPT.** Have ChatGPT Plus or Pro? Sign in once and your team uses your plan, with Sidemates' own sign-in (nothing to set up, no key). Your sign-in stays encrypted on your Mac, and when your plan's limit is reached your team moves to another AI.
 - **Honest under every answer.** One quiet line under the latest teammate answer: AI can make mistakes, so check anything important.
 
 ## 0.42.1 — Credibility fixes (unreleased)

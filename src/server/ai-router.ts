@@ -40,9 +40,11 @@ export function bestModelFor(connection: AiConnection, job: AiJob): string | und
     case "claude":
       return heavy ? first(usable, /\/sonnet$/, /\/opus$/, /./) : first(usable, /\/haiku$/, /\/sonnet$/, /./);
     case "openai":
+      // ChatGPT through OpenCode ("openai/gpt-5.6") or through Sign in with
+      // ChatGPT ("openbot-chatgpt-plan/gpt-6.1-sol"): strong ones for big jobs.
       return heavy
-        ? first(usable, /^openai\/gpt-\d+(?:\.\d+)*$/, /codex/i, /./)
-        : first(usable, /^openai\/gpt-[\d.]+-mini$/, /mini/i, /^openai\/gpt-\d+(?:\.\d+)*$/, /./);
+        ? first(usable, /^openai\/gpt-\d+(?:\.\d+)*$/, /\/gpt-\d+(?:\.\d+)*(?:-(?!mini|nano|lite)[a-z]+)?$/, /codex/i, /./)
+        : first(usable, /^openai\/gpt-[\d.]+-mini$/, /\/gpt-[\d.]+-(?:mini|nano)$/, /mini/i, /^openai\/gpt-\d+(?:\.\d+)*$/, /\/gpt-\d+(?:\.\d+)*(?:-[a-z]+)?$/, /./);
     case "google":
       // A free key allows few requests a day on the bigger models; Flash-Lite lasts longest.
       return heavy ? first(usable, /gemini-flash-latest$/, /gemini-[\d.]+-flash$/, /flash-lite/, /./) : first(usable, /flash-lite/, /flash/, /./);

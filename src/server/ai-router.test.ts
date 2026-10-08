@@ -56,3 +56,9 @@ test("a connection that hit its limit rests, then comes back", () => {
   now += 60_001;
   assert.equal(rest.isResting("local-claude"), false);
 });
+
+test("ChatGPT through Sign in with ChatGPT gets its strong model for big jobs and its small one for small jobs", () => {
+  const plan: AiConnection = { id: "chatgpt-plan", provider: "openai", connected: true, models: ["openbot-chatgpt-plan/gpt-5.6-mini", "openbot-chatgpt-plan/gpt-6.1-sol", "openbot-chatgpt-plan/gpt-5.6-luna"] };
+  assert.equal(bestModelFor(plan, "heavy"), "openbot-chatgpt-plan/gpt-6.1-sol");
+  assert.equal(bestModelFor(plan, "light"), "openbot-chatgpt-plan/gpt-5.6-mini");
+});

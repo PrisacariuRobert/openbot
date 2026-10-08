@@ -42,6 +42,8 @@ import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus, latestProviderStatus } from "./providers.js";
+import { once } from "node:events";
+import { ChatGptPlan } from "./chatgpt-plan.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
@@ -249,6 +251,31 @@ function privateValueMatches(expected: string, value: string | null | undefined)
 }
 
 type RawBodyRequest = express.Request & { rawBody?: Buffer };
+// Sign in with ChatGPT: teammate runs reach the owner's ChatGPT plan through
+// this local endpoint, carrying the plan connection's own key. It comes before
+// the 2 MB JSON limit because a long task's context can be larger.
+const chatgptPlan = new ChatGptPlan({ db, internalUrl, onChange: () => broadcast() });
+app.post("/api/chatgpt/v1/responses", express.raw({ type: () => true, limit: "50mb" }), async (request, response) => {
+  if (!chatgptPlan.allowed(request.headers.authorization)) return response.status(401).json({ error: { message: "This endpoint is only for teammates using your ChatGPT plan." } });
+  let body: Record<string, unknown>;
+  try { body = JSON.parse(Buffer.from(request.body as Buffer).toString("utf8")) as Record<string, unknown>; } catch { return response.status(400).json({ error: { message: "That request wasn't valid JSON." } }); }
+  const abort = new AbortController();
+  response.on("close", () => abort.abort());
+  try {
+    const result = await chatgptPlan.respond(body, abort.signal);
+    if (!result.stream) return response.status(result.status).json(result.json);
+    response.status(200).setHeader("Content-Type", "text/event-stream");
+    response.setHeader("Cache-Control", "no-cache");
+    response.flushHeaders();
+    for await (const chunk of result.stream) if (!response.write(chunk)) await once(response, "drain");
+    response.end();
+  } catch (error) {
+    if (abort.signal.aborted) return;
+    const message = error instanceof Error ? error.message : "ChatGPT couldn't be reached.";
+    if (!response.headersSent) response.status(502).json({ error: { message } });
+    else response.end();
+  }
+});
 app.use(express.json({ limit: "2mb", verify: (request, _response, buffer) => { (request as RawBodyRequest).rawBody = Buffer.from(buffer); } }));
 // Large JSON (the studio state is a few hundred KB) goes out gzipped when the
 // client accepts it: about 5x smaller, which matters on a phone. Only
@@ -916,6 +943,13 @@ app.post("/api/provider/choose", async (request, response) => {
     response.json({ updated });
   } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "Could not save your choice." }); }
 });
+
+app.get("/api/chatgpt/status", (_request, response) => { response.json(chatgptPlan.status()); });
+app.post("/api/chatgpt/signin", async (_request, response) => {
+  try { response.json(await chatgptPlan.start()); }
+  catch (error) { response.status(503).json({ error: error instanceof Error ? error.message : "ChatGPT sign-in couldn't start." }); }
+});
+app.post("/api/chatgpt/signout", async (_request, response) => { response.json(await chatgptPlan.signOut()); broadcast(); });
 
 app.post("/api/provider/connect", async (request, response) => {
   const parsed = z.object({ providerId: z.enum(["claude", "openai", "github-copilot", "gitlab", "xai"]) }).safeParse(request.body);
