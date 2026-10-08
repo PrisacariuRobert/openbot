@@ -1,3 +1,4 @@
+import { AppleAccountsPath } from "./components/AppleAccountsPath";
 import { ToolGroupRows, toolGroupsPatch } from "./components/ToolGroupRows";
 import { TOOL_GROUP_IDS } from "./shared/tool-groups";
 import { MacWakeCard } from "./components/MacWakeCard";
@@ -3133,9 +3134,11 @@ export function ConnectorPanel({
   onOpenThread,
   onCreateTeammate,
   onReviewTeammate,
+  macAccessEnabled = false,
 }: {
   status: ConnectorStatus | null;
   bots: Bot[];
+  macAccessEnabled?: boolean;
   onRefresh: () => Promise<void>;
   onNotice: (message: string) => void;
   onStartWorkflow: (prompt: string, expectedWorkKind?: "morning" | "inbox" | "meeting" | "weekly", botId?: string) => Promise<void>;
@@ -3409,6 +3412,7 @@ export function ConnectorPanel({
   };
   return (
     <div className="connector-panel">
+      <AppleAccountsPath macAccessEnabled={macAccessEnabled} />
       <section className="browser-app-onramp">
         <span className="browser-app-eyebrow"><Globe2 size={15} /> No app developer account needed</span>
         <h3>Use the apps you already have</h3>
@@ -3613,7 +3617,7 @@ export function ConnectorPanel({
         <summary><Settings2 size={18} /><span>Direct connection settings<small>Optional account setup, permissions and recovery</small></span><ChevronDown size={16} /></summary>
         <div className="direct-connection-settings-body">
       <details className="purpose-disclosure" id="connector-settings-google" open={Boolean(error || serviceRecoveries.length || connection?.status === "needs_attention") || undefined}>
-        <summary><ConnectorIcon id="gmail" /><span>Google Workspace<small>Mail, files and calendar access</small></span><ChevronDown size={16} /></summary>
+        <summary><ConnectorIcon id="gmail" /><span>Google Workspace (advanced)<small>Your own Google Cloud project. Most people don't need this: add Google to the Mac's Mail and Calendar instead.</small></span><ChevronDown size={16} /></summary>
         <div className="purpose-disclosure-body">
       {!status ? null : !connection?.configured ? (
         <SettingsGroup title="Google Workspace">

@@ -91,7 +91,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | J2 | Reliability harness and a public scoreboard | M | 0.44 | ☐ |
 | J3 | Real-Mac acceptance kit | M | 0.44 | ☐ |
 | J4 | Fast Calendar and Reminders through EventKit | M | 0.44 | ☐ |
-| J5 | Gmail and Google Calendar without a Google Cloud project | S | 0.44 | ☐ |
+| J5 | Gmail and Google Calendar without a Google Cloud project | S | 0.44 | ✅ |
 | J6 | Honest failure in every hero job | S–M | 0.44 | ☐ |
 | F1 | Open Loops: everything waiting on you | M–L | 0.44 | ☐ |
 | T1 | Hard stops at every level: money, new people, gone for good, credentials | M | 0.45 | ☐ |
@@ -517,6 +517,15 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 - Move the OAuth path under Advanced.
 
 **Prompt.** `Do task J5 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- Apps & tools now opens with "Use the Mail and Calendar apps on this Mac", the recommended path for Gmail and Google Calendar. It has three steps:
+  1. "Open Internet Accounts" in System Settings (a new allowed page).
+  2. "Files & apps on this Mac", with its usual confirmation.
+  3. Full Disk Access.
+- Each step shows its state, refreshed when the window comes back. Away from the Mac, the card says to do this on the Mac that runs Sidemates.
+- The OAuth path is now "Google Workspace (advanced)" inside Direct connection settings, which stay collapsed.
+- Not verified here: the Internet Accounts link opening the right page on macOS 15, 26 and 27.
 
 ### J6 · Honest failure in every hero job · S–M
 
