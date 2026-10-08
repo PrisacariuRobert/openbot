@@ -151,13 +151,12 @@ try {
   assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(), "No teammate can start before choosing a model");
   await service.click();
   await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
+  // Choosing the connection is the only decision: its own model is preselected.
   const model = creation.getByRole("combobox", { name: "Model", exact: true });
-  assert.equal(await model.innerText(), "Choose a model");
-  await model.click();
-  await creation.getByRole("option", { name: friendlyModelName(modelId), exact: true }).click();
+  assert.equal(await model.innerText(), friendlyModelName(modelId), "The connection's model is preselected");
   assert.ok(
     await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
-    "The form is ready only after explicit provider and model selection",
+    "The form is ready once a connection is chosen",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));
