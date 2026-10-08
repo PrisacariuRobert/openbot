@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronDown, ExternalLink, LoaderCircle } from "lucide-react";
 import type { ProviderCatalogEntry, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
+import { connectGeminiKey, GEMINI_KEY_PAGE, GEMINI_TERMS, looksLikeGeminiKey } from "../shared/gemini";
 import "./bring-your-ai.css";
 
 /** Choosing the AI behind the team, in the order that costs people least:
  * free first, then subscriptions they already pay for, then a paid key.
- * Sidemates itself never adds a bill. */
-export function BringYourAI({ onConnected, compact = false }: { onConnected: (connectionId: string) => Promise<void> | void; compact?: boolean }) {
+ * Sidemates itself never adds a bill. The guided first run uses the same rows
+ * in the developer plan's order (`variant="first-run"`), and there a working
+ * connection can be picked with "Use this". */
+export function BringYourAI({ onConnected, compact = false, variant = "default" }: { onConnected: (connectionId: string) => Promise<void> | void; compact?: boolean; variant?: "default" | "first-run" }) {
+  const firstRun = variant === "first-run";
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [attempt, setAttempt] = useState<ProviderLoginAttempt | null>(null);
   const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState("");
@@ -58,6 +62,10 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
     finally { setBusy(null); }
   };
 
+  const connected = (connectionId: string | null | undefined, name: string) => firstRun && connectionId
+    ? <button type="button" className="byo-action byo-use" aria-label={`Use ${name}`} onClick={() => void onConnected(connectionId)}><Check size={14} aria-hidden="true" /> Use this</button>
+    : <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>;
+  const checking = <span className="byo-unavailable" role="status">Checking…</span>;
   const account = (id: string, name: string, plan: string, free = false) => {
     const item = entry(id);
     const waiting = attempt?.providerId === id && attempt.status === "waiting";
@@ -67,12 +75,89 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
           <strong>{name}{free && <span className="byo-free">Free plan</span>}</strong>
           <small>{plan}</small>
         </div>
-        {item?.connected ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
+        {!status ? checking : item?.connected ? connected(item.connectionId, name)
           : !item?.canConnect ? <span className="byo-unavailable">{id === "claude" ? "Needs Claude Code on this Mac" : "Not available here"}</span>
           : <button type="button" className="byo-action" disabled={busy !== null || waiting} onClick={() => void signIn(id)}>{busy === id || waiting ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}{waiting ? "Waiting…" : "Sign in"}</button>}
       </li>
     );
   };
+
+  const geminiRow = (
+    <li key="gemini" className="byo-row byo-key-row">
+      <div className="byo-row-text">
+        <strong>Google Gemini{!entry("google")?.connected && <span className="byo-free">Free key</span>}</strong>
+        <small>A free key from Google AI Studio — a Google account is enough, no card. Free-tier limits apply.</small>
+      </div>
+      {entry("google")?.connected
+        ? connected(entry("google")?.connectionId, "Google Gemini")
+        : <KeyPaste providerId="google" link={GEMINI_KEY_PAGE} linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={onConnected} />}
+    </li>
+  );
+  const nousRow = (
+    <li key="nous" className="byo-row byo-key-row">
+      <div className="byo-row-text">
+        <strong>Nous Portal{!nousConnected && <span className="byo-free">Free plan</span>}</strong>
+        <small>A free plan with a rotating set of free models, from the makers of Hermes Agent. An account is enough, no card. Free models may use your requests to improve their service.</small>
+      </div>
+      {nousConnected
+        ? connected("nous-portal", "Nous Portal")
+        : <KeyPaste providerId="nous" link="https://portal.nousresearch.com" linkLabel="Create a free account" placeholder="Paste your Nous Portal API key" onSaved={onConnected} />}
+    </li>
+  );
+  const openCodeRow = (
+    <li key="opencode-go" className="byo-row byo-key-row">
+      <div className="byo-row-text">
+        <strong>OpenCode Go</strong>
+        <small>No subscription? One key for fast, capable models — about $10 a month.</small>
+      </div>
+      {entry("opencode")?.connected
+        ? connected(entry("opencode")?.connectionId, "OpenCode Go")
+        : <KeyPaste providerId="opencode-go" link="https://opencode.ai/go" linkLabel="Get a key" placeholder="Paste your OpenCode Go key" onSaved={onConnected} />}
+    </li>
+  );
+  const attemptBlock = attempt && attempt.status !== "connected" && (
+    <div className="byo-attempt" role={attempt.status === "failed" ? "alert" : "status"}>
+      <strong>{attempt.status === "failed" ? "Sign-in wasn’t completed" : "Finish signing in, then come back"}</strong>
+      <p>{attempt.error || attempt.instructions}</p>
+      {attempt.url && <a href={attempt.url} target="_blank" rel="noopener noreferrer">Open the sign-in page again <ExternalLink size={13} /></a>}
+      {attempt.status === "waiting" && attempt.callbackMode === "code" && <CodeForm busy={busy === "code"} onSubmit={finishWithCode} />}
+    </div>
+  );
+  const errorBlock = error && <p className="byo-error" role="alert">{error}</p>;
+
+  if (firstRun) {
+    // The developer plan's order: ChatGPT, Gemini, Claude Code, a model on this Mac, then everything else.
+    // Apple Intelligence (task A4) takes the first slot when it ships.
+    const ollama = status?.instances?.find((item) => item.connected && item.apiConfig && /:11434(\/|$)/.test(item.apiConfig.baseUrl));
+    return (
+      <section className={`byo is-first-run${compact ? " is-compact" : ""}`} aria-label="Choose the AI behind your team">
+        <ul className="byo-list">
+          {account("openai", "ChatGPT", "Plus, Pro or Business. Signs in through OpenCode for now.")}
+          {geminiRow}
+          {account("claude", "Claude", "Through the Claude Code on this Mac, with Pro or Max.")}
+          <OllamaRow connectedId={ollama?.id} use={connected} onSaved={onConnected} />
+        </ul>
+        {attemptBlock}
+        {errorBlock}
+        <details className="byo-more">
+          <summary>Other options <ChevronDown size={14} aria-hidden="true" /></summary>
+          <ul className="byo-list">
+            {nousRow}
+            {account("github-copilot", "GitHub Copilot", "Pro, Pro+ or Business")}
+            {account("xai", "Grok", "SuperGrok")}
+            {openCodeRow}
+            <li className="byo-row">
+              <div className="byo-row-text">
+                <strong>Any compatible API</strong>
+                <small>OpenAI, Anthropic, OpenRouter, LM Studio or your own address, with your key.</small>
+              </div>
+              <a className="byo-action" href="/?panel=provider" target="_blank" rel="noreferrer">Set up</a>
+            </li>
+          </ul>
+        </details>
+      </section>
+    );
+  }
 
   return (
     <section className={`byo${compact ? " is-compact" : ""}`} aria-labelledby="byo-title">
@@ -81,24 +166,8 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
 
       <h4>Start free</h4>
       <ul className="byo-list">
-        <li className="byo-row byo-key-row">
-          <div className="byo-row-text">
-            <strong>Google Gemini{!entry("google")?.connected && <span className="byo-free">Free key</span>}</strong>
-            <small>A free key from Google AI Studio — a Google account is enough, no card. Free-tier limits apply.</small>
-          </div>
-          {entry("google")?.connected
-            ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
-            : <KeyPaste providerId="google" link="https://aistudio.google.com/apikey" linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={onConnected} />}
-        </li>
-        <li className="byo-row byo-key-row">
-          <div className="byo-row-text">
-            <strong>Nous Portal{!nousConnected && <span className="byo-free">Free plan</span>}</strong>
-            <small>A free plan with a rotating set of free models, from the makers of Hermes Agent. An account is enough, no card. Free models may use your requests to improve their service.</small>
-          </div>
-          {nousConnected
-            ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
-            : <KeyPaste providerId="nous" link="https://portal.nousresearch.com" linkLabel="Create a free account" placeholder="Paste your Nous Portal API key" onSaved={onConnected} />}
-        </li>
+        {geminiRow}
+        {nousRow}
       </ul>
 
       <h4>Use a subscription you already have</h4>
@@ -109,28 +178,13 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
         {account("xai", "Grok", "SuperGrok")}
       </ul>
 
-      {attempt && attempt.status !== "connected" && (
-        <div className="byo-attempt" role={attempt.status === "failed" ? "alert" : "status"}>
-          <strong>{attempt.status === "failed" ? "Sign-in wasn’t completed" : "Finish signing in, then come back"}</strong>
-          <p>{attempt.error || attempt.instructions}</p>
-          {attempt.url && <a href={attempt.url} target="_blank" rel="noopener noreferrer">Open the sign-in page again <ExternalLink size={13} /></a>}
-          {attempt.status === "waiting" && attempt.callbackMode === "code" && <CodeForm busy={busy === "code"} onSubmit={finishWithCode} />}
-        </div>
-      )}
-      {error && <p className="byo-error" role="alert">{error}</p>}
+      {attemptBlock}
+      {errorBlock}
 
       <details className="byo-more">
         <summary>Other options <ChevronDown size={14} aria-hidden="true" /></summary>
         <ul className="byo-list">
-          <li className="byo-row byo-key-row">
-            <div className="byo-row-text">
-              <strong>OpenCode Go</strong>
-              <small>No subscription? One key for fast, capable models — about $10 a month.</small>
-            </div>
-            {entry("opencode")?.connected
-              ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
-              : <KeyPaste providerId="opencode-go" link="https://opencode.ai/go" linkLabel="Get a key" placeholder="Paste your OpenCode Go key" onSaved={onConnected} />}
-          </li>
+          {openCodeRow}
           <li className="byo-row">
             <div className="byo-row-text">
               <strong>A model on this Mac</strong>
@@ -144,29 +198,95 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
   );
 }
 
-export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go" | "nous"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
-  const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (busy) return;
+/** Ollama on this Mac: one click when it's running with a model that can use tools. */
+function OllamaRow({ connectedId, use, onSaved }: { connectedId?: string; use: (connectionId: string, name: string) => ReactNode; onSaved: (connectionId: string) => Promise<void> | void }) {
+  const [found, setFound] = useState<{ running: boolean; models: string[]; apiBaseUrl: string } | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  useEffect(() => {
+    if (connectedId) return;
+    let live = true;
+    void fetch("/api/provider/ollama", { credentials: "same-origin" }).then(async (response) => { if (live && response.ok) setFound(await response.json()); }).catch(() => { if (live) setFound({ running: false, models: [], apiBaseUrl: "" }); });
+    return () => { live = false; };
+  }, [connectedId]);
+  const save = async () => {
+    if (!found?.models.length) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId, key }) });
+      const response = await fetch("/api/providers", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Ollama on this Mac", authMode: "api_key", apiConfig: { baseUrl: found.apiBaseUrl, protocol: "openai-compatible", modelIds: found.models } }) });
+      const result = await response.json().catch(() => ({})) as { id?: string; error?: string };
+      if (!response.ok || !result.id) throw new Error(result.error || "Ollama couldn't be added.");
+      await onSaved(result.id);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Ollama couldn't be added."); }
+    finally { setBusy(false); }
+  };
+  const detail = connectedId ? "Ollama is connected."
+    : !found ? "Looking for Ollama…"
+    : !found.running ? "Free and private with Ollama. Needs a capable Mac; weaker at multi-step work."
+    : found.models.length ? `Ollama is running with ${found.models.length === 1 ? "a model" : `${found.models.length} models`} that can use tools.`
+    : "Ollama is running, but none of its models can use tools. Add one in Ollama, then come back.";
+  return (
+    <li className="byo-row">
+      <div className="byo-row-text">
+        <strong>A model on this Mac</strong>
+        <small>{detail}</small>
+        {error && <small className="byo-error" role="alert">{error}</small>}
+      </div>
+      {connectedId ? use(connectedId, "Ollama")
+        : !found ? <span className="byo-unavailable" role="status">Checking…</span>
+        : found.models.length ? <button type="button" className="byo-action" disabled={busy} onClick={() => void save()}>{busy ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}Use Ollama</button>
+        : found.running ? <a className="byo-action" href="https://ollama.com/search?c=tools" target="_blank" rel="noreferrer">Find a model <ExternalLink size={13} aria-hidden="true" /></a>
+        : <a className="byo-action" href="https://ollama.com/download" target="_blank" rel="noreferrer">Get Ollama <ExternalLink size={13} aria-hidden="true" /></a>}
+    </li>
+  );
+}
+
+export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go" | "nous"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
+  const [key, setKey] = useState(""), [busy, setBusy] = useState<"" | "saving" | "testing">(""), [error, setError] = useState("");
+  const [untested, setUntested] = useState<{ connectionId: string; error: string } | null>(null);
+  const gemini = providerId === "google";
+  const connect = async (value: string) => {
+    if (busy) return;
+    setBusy("saving"); setError(""); setUntested(null);
+    try {
+      if (gemini) {
+        // Save, then one tiny live reply. A key that fails the test stays saved, and the owner decides.
+        const result = await connectGeminiKey(value, fetch, () => { setKey(""); setBusy("testing"); });
+        if (!result.tested) { setUntested({ connectionId: result.connectionId, error: result.error }); return; }
+        await onSaved(result.connectionId);
+        return;
+      }
+      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId, key: value }) });
       const result = await response.json().catch(() => ({})) as { error?: string; connectionId?: string };
       if (!response.ok || !result.connectionId) throw new Error(result.error || "The key wasn't accepted.");
       setKey("");
       await onSaved(result.connectionId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The key wasn't accepted."); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
+  };
+  const submit = (event: FormEvent) => { event.preventDefault(); void connect(key); };
+  const change = (value: string) => {
+    setKey(value);
+    // A whole Gemini key pasted in one go connects without another click.
+    if (gemini && !busy && looksLikeGeminiKey(value) && !looksLikeGeminiKey(key)) void connect(value.trim());
   };
   return (
     <div className="byo-key">
       <a className="byo-link" href={link} target="_blank" rel="noreferrer">{linkLabel} <ExternalLink size={13} aria-hidden="true" /></a>
-      <form onSubmit={(event) => void submit(event)}>
-        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => setKey(event.target.value)} placeholder={placeholder} aria-label={placeholder} />
-        <button type="submit" className="byo-action" disabled={busy || key.trim().length < 20}>{busy ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}Connect</button>
+      <form onSubmit={submit}>
+        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => change(event.target.value)} placeholder={placeholder} aria-label={placeholder} disabled={Boolean(busy)} />
+        <button type="submit" className="byo-action" disabled={Boolean(busy) || key.trim().length < 20}>{busy ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}Connect</button>
       </form>
+      {busy === "testing" && <p className="byo-status" role="status">Testing your key with Google…</p>}
+      {untested && <div className="byo-untested" role="alert">
+        <p>Your key was saved, but the test didn’t pass: {untested.error}</p>
+        <p>Paste another key, or continue and try a message.</p>
+        <button type="button" className="byo-action" onClick={() => { const id = untested.connectionId; setUntested(null); void onSaved(id); }}>Continue anyway</button>
+      </div>}
       {error && <p className="byo-error" role="alert">{error}</p>}
+      {gemini && <div className="byo-terms">
+        {GEMINI_TERMS.notices.map((notice) => <p key={notice}>{notice}</p>)}
+        <a href={GEMINI_TERMS.url} target="_blank" rel="noreferrer">Google’s Gemini API terms, updated {GEMINI_TERMS.updated} <ExternalLink size={12} aria-hidden="true" /></a>
+      </div>}
     </div>
   );
 }

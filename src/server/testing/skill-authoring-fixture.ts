@@ -10,6 +10,9 @@ import { OpenBotDatabase } from "./database.js";
 
 export const fixtureSkill = { name: "Invoice reconciliation", description: "Reconcile owner-supplied invoices.", instructions: "Ask for {{invoice_folder}} and {{currency}}. Read each supplied invoice without changing originals. Compare line items and totals. Save an editable reconciliation with an exceptions sheet. Reopen the output to verify totals and row counts. Stop for missing access or ambiguous currencies. Ask before sending anything.", startUrl: "" };
 
+/** Browser discovery settings the child studio needs; the rest of its environment stays isolated. */
+const browserEnvironment = (): Record<string, string> => Object.fromEntries(["OPENBOT_CHROME_PATH", "PLAYWRIGHT_BROWSERS_PATH"].flatMap(name => process.env[name] ? [[name, process.env[name]!]] : []));
+
 /** Real host, runner and scoped tool requests; deterministic child, no model/account calls. */
 export async function skillAuthoringFixture(options: { runtime?: string; configure?: (db: OpenBotDatabase) => void; preload?: string; environment?: Record<string, string> } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "openbot-learn-route-")), db = new OpenBotDatabase(root);
@@ -48,7 +51,7 @@ main().catch(error=>{console.error(error.message);process.exitCode=1;});
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["--import", "tsx", ...(options.preload ? ["--import", options.preload] : []), "src/server/index.ts"], {
     cwd: path.resolve(import.meta.dirname, "../../.."), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...options.environment, PATH: `${bin}${path.delimiter}${process.env.PATH}`, LANG: "en_US.UTF-8", TZ: "UTC", OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.31", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" },
+    env: { ...browserEnvironment(), ...options.environment, PATH: `${bin}${path.delimiter}${process.env.PATH}`, LANG: "en_US.UTF-8", TZ: "UTC", OPENBOT_LOAD_ENV: "0", OPENBOT_OPENCODE_VERSION: "1.18.31", OPENBOT_DATA_DIR: db.dataDir, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" },
   });
   const exited = once(child, "exit"); let log = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", data => { log = (log + data).slice(-4000); });

@@ -1,0 +1,177 @@
+{
+  "job": "waiting-on-me",
+  "about": "Mail and Messages from the past week. Two threads need a reply; three don't (the owner answered last, a thank-you, a newsletter). While the job runs, Tom writes that his question is settled, so a teammate that drafts from its first read gets it wrong.",
+  "now": "2026-10-13T08:10:00+02:00",
+  "timeZone": "Europe/Brussels",
+  "mail": [
+    {
+      "id": "2001",
+      "subject": "Can we move Thursday's review to Friday?",
+      "from": "Tom Becker <tom@studio.example>",
+      "date": "2026-10-12T19:05:00+02:00",
+      "snippet": "Would Friday 10:00 work?",
+      "attachments": [],
+      "unread": false,
+      "text": "Something came up on Thursday. Would Friday 10:00 work for the review? Tom",
+      "thread": [
+        {
+          "from": "Tom Becker <tom@studio.example>",
+          "date": "2026-10-12T19:05:00+02:00",
+          "text": "Would Friday 10:00 work for the review?"
+        }
+      ]
+    },
+    {
+      "id": "2002",
+      "subject": "Re: Q3 slides",
+      "from": "Ana Ribeiro <ana@northwind.example>",
+      "date": "2026-10-12T16:40:00+02:00",
+      "snippet": "Could you send the slides?",
+      "attachments": [],
+      "unread": false,
+      "text": "Could you send the Q3 slides?",
+      "thread": [
+        {
+          "from": "Ana Ribeiro <ana@northwind.example>",
+          "date": "2026-10-12T16:40:00+02:00",
+          "text": "Could you send the Q3 slides?"
+        },
+        {
+          "from": "me",
+          "date": "2026-10-12T17:02:00+02:00",
+          "text": "Sent! They're in the shared folder."
+        }
+      ]
+    },
+    {
+      "id": "2003",
+      "subject": "Boiler service: which day works?",
+      "from": "Hendrik Maes <hendrik@flatlet.example>",
+      "date": "2026-10-11T10:20:00+02:00",
+      "snippet": "The engineer can come Wednesday or Friday morning.",
+      "attachments": [],
+      "unread": false,
+      "text": "Hello, the boiler engineer can come Wednesday or Friday morning. Which works for you? Hendrik (landlord)",
+      "thread": [
+        {
+          "from": "Hendrik Maes <hendrik@flatlet.example>",
+          "date": "2026-10-11T10:20:00+02:00",
+          "text": "The engineer can come Wednesday or Friday morning. Which works for you?"
+        }
+      ]
+    },
+    {
+      "id": "2004",
+      "subject": "Thanks for lunch!",
+      "from": "Maya Janssens <maya@friends.example>",
+      "date": "2026-10-10T14:00:00+02:00",
+      "snippet": "That was lovely, thank you.",
+      "attachments": [],
+      "unread": false,
+      "text": "That was lovely, thank you. See you soon! Maya",
+      "thread": [
+        {
+          "from": "Maya Janssens <maya@friends.example>",
+          "date": "2026-10-10T14:00:00+02:00",
+          "text": "That was lovely, thank you. See you soon!"
+        }
+      ]
+    },
+    {
+      "id": "2005",
+      "subject": "This week in design: 12 tools we love",
+      "from": "The Weekly Digest <news@digest.example>",
+      "date": "2026-10-13T06:00:00+02:00",
+      "snippet": "Our favourite tools this week",
+      "attachments": [],
+      "unread": true,
+      "text": "Our favourite tools this week. Unsubscribe any time.",
+      "thread": []
+    }
+  ],
+  "messages": [
+    {
+      "id": "t1",
+      "with": "Lena Vos",
+      "messages": [
+        {
+          "from": "Lena Vos",
+          "at": "2026-10-11T20:15:00+02:00",
+          "text": "Are you coming on Saturday? I need to know for the table booking."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "with": "Dad",
+      "messages": [
+        {
+          "from": "me",
+          "at": "2026-10-12T09:00:00+02:00",
+          "text": "Landed safely"
+        },
+        {
+          "from": "Dad",
+          "at": "2026-10-12T09:03:00+02:00",
+          "text": "👍"
+        }
+      ]
+    }
+  ],
+  "afterFirstRead": {
+    "mail": [
+      {
+        "id": "2006",
+        "subject": "Re: Can we move Thursday's review to Friday?",
+        "from": "Tom Becker <tom@studio.example>",
+        "date": "2026-10-13T08:12:00+02:00",
+        "snippet": "Never mind, Thursday works after all.",
+        "attachments": [],
+        "unread": true,
+        "text": "Never mind, Thursday works after all. No need to reply. Tom",
+        "replaces": "2001"
+      }
+    ]
+  },
+  "constraints": [
+    "Nothing is sent. A reply can only be saved as a Mail draft for the owner to send.",
+    "No draft for a thread where the owner wrote last, a thank-you, or a newsletter.",
+    "Look at each thread again just before saving its draft.",
+    "Messages can't be drafted in Mail: list them with a suggested reply instead."
+  ],
+  "budget": {
+    "seconds": 150,
+    "steps": 16,
+    "contextTokens": 120000
+  },
+  "expect": {
+    "inOrder": [],
+    "mentions": [
+      "Hendrik",
+      "Lena"
+    ],
+    "neverMentions": [
+      "Weekly Digest",
+      "Dad"
+    ],
+    "maxWords": 250,
+    "sources": [
+      "mail",
+      "messages"
+    ],
+    "writes": {
+      "mac_mail_draft": {
+        "exactlyTo": [
+          "hendrik@flatlet.example"
+        ]
+      }
+    },
+    "neverClaims": [
+      "I sent",
+      "I replied to",
+      "I've sent",
+      "I have sent",
+      "was sent"
+    ]
+  }
+}

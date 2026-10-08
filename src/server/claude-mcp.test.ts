@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { createServer } from "node:http";
 
 const bridgePath = fileURLToPath(new URL("./claude-mcp.mjs", import.meta.url));
 
@@ -107,5 +108,48 @@ test("Claude bridge exposes tools while keeping file access inside the bot works
     child.kill("SIGTERM");
     rmSync(workspace, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("in a real run, Claude's workspace tools go through Sidemates, so they are logged and masked like every tool", async () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "openbot-claude-server-workspace-"));
+  writeFileSync(path.join(workspace, "local.txt"), "read locally", "utf8");
+  const calls: Array<{ action: string; args: Record<string, unknown>; token: string | undefined }> = [];
+  const server = createServer((request, response) => {
+    let body = "";
+    request.on("data", (chunk) => { body += chunk; });
+    request.on("end", () => {
+      const parsed = JSON.parse(body) as { action: string; args: Record<string, unknown> };
+      calls.push({ action: parsed.action, args: parsed.args, token: request.headers["x-openbot-token"] as string | undefined });
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ path: "notes.txt", content: "From the server: [EMAIL_1]" }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const endpoint = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const child = spawn(process.execPath, [bridgePath], { env: { ...process.env, OPENBOT_WORKSPACE: workspace, OPENBOT_SERVER_WORKSPACE: "1", OPENBOT_INTERNAL_URL: endpoint, OPENBOT_INTERNAL_TOKEN: "scoped-fixture", OPENBOT_BOT_ID: "nova", OPENBOT_RUN_ID: "run-1" }, stdio: ["pipe", "pipe", "pipe"] });
+  try {
+    let buffer = "";
+    const answer = new Promise<Record<string, unknown>>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Claude MCP bridge did not answer.")), 4_000);
+      child.stdout.on("data", (chunk) => {
+        buffer += String(chunk);
+        for (const line of buffer.split(/\r?\n/)) {
+          if (!line.trim()) continue;
+          const message = JSON.parse(line) as Record<string, unknown>;
+          if (message.id === 2) { clearTimeout(timer); resolve(message); }
+        }
+      });
+    });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } })}\n${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "workspace_read", arguments: { path: "local.txt" } } })}\n`);
+    const message = await answer;
+    assert.deepEqual(calls, [{ action: "workspace_read", args: { path: "local.txt" }, token: "scoped-fixture" }]);
+    assert.match(JSON.stringify(message.result), /From the server: \[EMAIL_1\]/);
+    assert.doesNotMatch(JSON.stringify(message.result), /read locally/);
+  } finally {
+    child.kill();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    rmSync(workspace, { recursive: true, force: true });
   }
 });

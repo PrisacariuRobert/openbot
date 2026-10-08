@@ -10,7 +10,7 @@ import path from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { workSourcesInput, type WorkSourcesSettings } from "../shared/work-sources.js";
 import { memoryKeyIdentity, type PrivateMemory } from "../shared/private-memory.js";
-import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, modelBelongsToConnection, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
+import { apiRuntimeEnvironment, providerInput, isLocalModelUrl, modelBelongsToConnection, isBlockedFreeTierModel, BLOCKED_FREE_TIER_MESSAGE, MODEL_KEY_ENV, type ProviderInput } from "../shared/provider-config.js";
 import type {
   Activity,
   AgentMessage,
@@ -67,12 +67,20 @@ import { legacyCadence, normalizeRoutineInterval } from "../shared/routines.js";
 import { replyEscalatesToOwner } from "../shared/routing.js";
 import { intervalSchedule, nextRoutineOccurrence, routineScheduleInput, scheduleLabel, type RoutineSchedule } from "../shared/calendar-schedule.js";
 import { skillSlug } from "../shared/skills.js";
+import { isHardStop, type HardStop } from "../shared/hard-stops.js";
+import { commandHardStop } from "./hard-stops.js";
 import type { AttachmentAnalysis } from "./attachments.js";
 import { attachmentClassification } from "./attachments.js";
 import type { WorkSnapshot, WorkReport } from "../shared/work-reports.js";
 import type { CodeCheckReceipt } from "../shared/code-checks.js";
 import { automationRepairHint, normalizedTriggerConfig } from "./automations.js";
 import { WorkflowValidation } from "./workflow-validation.js";
+import { normalizeToolGroups } from "../shared/tool-groups.js";
+import { promptVersion } from "./prompt-files.js";
+
+/** Stored only when the teammate has a choice; null keeps every group. */
+const toolGroupsJson = (groups: string[] | null | undefined) => groups == null ? null : JSON.stringify(normalizeToolGroups(groups));
+const storedGroups = (text: string): string[] => { try { const value = JSON.parse(text); return Array.isArray(value) ? value.map(String) : []; } catch { return []; } };
 
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
@@ -322,6 +330,15 @@ export class OpenBotDatabase {
 
   deleteExtensionRecord(kind: string, id: string) {
     this.db.prepare("DELETE FROM extension_records WHERE kind=? AND id=?").run(kind, id);
+  }
+
+  countExtensionRecords(kind: string): number {
+    return Number((this.db.prepare("SELECT COUNT(*) AS count FROM extension_records WHERE kind=?").get(kind) as Row).count || 0);
+  }
+
+  /** Removes records whose kind starts with `prefix` and whose id (a timestamp first) sorts before `before`. */
+  deleteExtensionRecordsBefore(prefix: string, before: string): number {
+    return Number(this.db.prepare("DELETE FROM extension_records WHERE kind LIKE ? ESCAPE '\\' AND id < ?").run(`${prefix.replace(/[\\%_]/g, "\\$&")}%`, before).changes);
   }
 
   markApprovedActionUncertain(approvalId: string, message: string) {
@@ -835,6 +852,11 @@ export class OpenBotDatabase {
         dedupe_key TEXT NOT NULL UNIQUE,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS known_people (
+        address TEXT PRIMARY KEY,
+        source TEXT NOT NULL CHECK(source IN ('owner', 'contacts', 'sent')),
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS message_submissions (
         request_id TEXT PRIMARY KEY,
         thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -1000,6 +1022,7 @@ export class OpenBotDatabase {
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "autopilot INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("bots", "tool_groups_json TEXT");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
     this.addColumn("threads", "section_name TEXT");
     this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
@@ -1009,6 +1032,7 @@ export class OpenBotDatabase {
     this.addColumn("messages", "event_type TEXT");
     this.addColumn("messages", "event_data TEXT");
     this.addColumn("runs", "approval_id TEXT");
+    this.addColumn("approvals", "hard_stop TEXT");
     this.addColumn("runs", "partial_text TEXT");
     this.addColumn("runs", "progress_at TEXT");
     this.addColumn("runs", "input_tokens INTEGER NOT NULL DEFAULT 0");
@@ -1213,6 +1237,7 @@ export class OpenBotDatabase {
       color: String(row.color), role: String(row.role), instructions: String(row.instructions), model: String(row.model),
       status: this.botStatus(row), currentAction: row.current_action ? String(row.current_action) : null,
       computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), autopilot: asBoolean(row.autopilot), macAccessEnabled: asBoolean(row.mac_access_enabled),
+      toolGroups: row.tool_groups_json ? normalizeToolGroups(storedGroups(String(row.tool_groups_json))) : null,
       weeklyTokenBudget: Number(row.weekly_token_budget || 0), tokensUsedThisWeek: Number(row.tokens_used_week || 0),
       createdAt: String(row.created_at), lastActiveAt: row.last_active_at ? String(row.last_active_at) : null,
       threadId: String(row.thread_id), retiredAt: row.retired_at ? String(row.retired_at) : null,
@@ -1404,6 +1429,7 @@ export class OpenBotDatabase {
   createBot(input: {
     name: string; emoji: string; mascot?: MascotKind; color: string; role: string; instructions: string; model?: string;
     providerInstanceId?: string | null; computerEnabled?: boolean; browserEnabled?: boolean; weeklyTokenBudget?: number; inheritAccess?: boolean;
+    toolGroups?: string[] | null;
   }): Bot {
     const maxTeammates = this.getStudioSettings().maxTeammates;
     if (this.listBots().length >= maxTeammates) throw new Error(`This studio has room for ${maxTeammates} teammate${maxTeammates === 1 ? "" : "s"}. Retire or raise the limit before adding another.`);
@@ -1412,14 +1438,14 @@ export class OpenBotDatabase {
     const createdAt = now();
     this.db.prepare(`
       INSERT INTO bots
-      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, tool_groups_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, DEFAULT_OWNER, input.providerInstanceId || null, input.name, input.emoji, input.mascot || "orbit",
       input.color, input.role, input.instructions, input.model || "", input.computerEnabled === false ? 0 : 1,
       input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
       // A guard against runaway API bills, not a wall: ~100+ ordinary tasks a week.
-      input.weeklyTokenBudget ?? 2_000_000, createdAt,
+      input.weeklyTokenBudget ?? 2_000_000, toolGroupsJson(input.toolGroups), createdAt,
     );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);
@@ -1451,7 +1477,7 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">> & { toolGroups?: string[] | null }): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
     this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, autopilot=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
@@ -1460,6 +1486,7 @@ export class OpenBotDatabase {
       (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, (patch.autopilot ?? current.autopilot) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );
+    if (patch.toolGroups !== undefined) this.db.prepare("UPDATE bots SET tool_groups_json=? WHERE id=?").run(toolGroupsJson(patch.toolGroups), id);
     if (patch.name) this.db.prepare("UPDATE threads SET title=? WHERE bot_id=?").run(patch.name, id);
     return this.getBot(id);
   }
@@ -1472,7 +1499,7 @@ export class OpenBotDatabase {
       role: source.role, instructions: source.instructions, model: source.model, providerInstanceId: source.providerInstanceId,
       weeklyTokenBudget: source.weeklyTokenBudget,
     });
-    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled });
+    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled, toolGroups: source.toolGroups });
     this.db.prepare("DELETE FROM bot_connector_access WHERE bot_id=?").run(copy.id);
     this.db.prepare(`INSERT INTO bot_connector_access (bot_id,connector_id,service,can_read,can_send,created_at,updated_at)
       SELECT ?,connector_id,service,can_read,can_send,?,? FROM bot_connector_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
@@ -1714,6 +1741,12 @@ export class OpenBotDatabase {
   messageForRunEvent(runId: string, eventType: string): Message | null {
     const row = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.run_id=? AND m.event_type=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 1`).get(runId, eventType) as Row | undefined;
     return row ? this.messageFromRow(row) : null;
+  }
+
+  /** Every system event message a run emitted for a given event type, oldest first. */
+  messagesForRunEvent(runId: string, eventType: string): Message[] {
+    const rows = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.run_id=? AND m.event_type=? ORDER BY m.created_at ASC,m.rowid ASC`).all(runId, eventType) as Row[];
+    return rows.map((row) => this.messageFromRow(row));
   }
 
   listMessages(threadId: string, limit = 120, offset = 0): Message[] {
@@ -2559,6 +2592,21 @@ export class OpenBotDatabase {
     return this.getRun(id)!.task;
   }
 
+  /** Setup timeline (A1): the earliest times the studio's own records prove. A
+   * finished job is a completed run in which a teammate used a tool or saved a file. */
+  setupMilestoneTimes(): import("./setup-timeline.js").SetupMilestoneTimes {
+    const earliest = (sql: string) => {
+      const at = (this.db.prepare(sql).get() as Row | undefined)?.at;
+      return typeof at === "string" && at ? at : null;
+    };
+    return {
+      installedAt: earliest("SELECT MIN(created_at) AS at FROM users"),
+      firstTeammateAt: earliest("SELECT MIN(created_at) AS at FROM bots"),
+      firstAnswerAt: earliest("SELECT MIN(finished_at) AS at FROM runs WHERE status='completed'"),
+      firstJobAt: earliest("SELECT MIN(finished_at) AS at FROM runs WHERE status='completed' AND id IN (SELECT run_id FROM activities WHERE kind IN ('tool','file'))"),
+    };
+  }
+
   addActivity(input: Omit<Activity, "id" | "createdAt">): Activity {
     const activity: Activity = { ...input, id: randomUUID(), createdAt: now() };
     this.db.prepare("INSERT INTO activities (id,run_id,bot_id,kind,label,detail,created_at) VALUES (?,?,?,?,?,?,?)").run(activity.id, activity.runId, activity.botId, activity.kind, activity.label, activity.detail, activity.createdAt);
@@ -2575,7 +2623,8 @@ export class OpenBotDatabase {
     const codeProjects = this.listCodeProjects(botId).map((project) => ({ id: project.id, canRead: true, access: project.access.find((item) => item.botId === botId) || null }));
     const serviceErrors = this.listConnectorServiceErrors().map((item) => item.service).sort();
     return JSON.stringify({
-      bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled } : null,
+      bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled, toolGroups: bot.toolGroups } : null,
+      prompts: [promptVersion("teammate"), promptVersion("request"), promptVersion("tools")],
       providerConfig: bot ? this.providerForBot(bot.id)?.apiConfig || null : null,
       macAccessEnabled: this.getStudioSettings().macAccessEnabled,
       connectors, serviceErrors,
@@ -2645,11 +2694,11 @@ export class OpenBotDatabase {
     });
   }
 
-  createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown }): Approval {
+  createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown; hardStop?: HardStop | null }): Approval {
     const id = randomUUID();
     const run = this.getRun(input.runId);
-    this.db.prepare("INSERT INTO approvals (id,run_id,bot_id,kind,reason,action_label,action_json,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',?)").run(
-      id, input.runId, input.botId, input.kind, input.reason, input.actionLabel, input.action ? JSON.stringify(input.action) : null, now(),
+    this.db.prepare("INSERT INTO approvals (id,run_id,bot_id,kind,reason,action_label,action_json,status,created_at,hard_stop) VALUES (?,?,?,?,?,?,?,'pending',?,?)").run(
+      id, input.runId, input.botId, input.kind, input.reason, input.actionLabel, input.action ? JSON.stringify(input.action) : null, now(), input.hardStop ?? null,
     );
     this.db.prepare("UPDATE runs SET status='awaiting_approval',approval_reason=?,approval_id=?,task_stage='waiting',progress_at=? WHERE id=?").run(input.reason, id, now(), input.runId);
     if (run?.automationEventId) this.db.prepare("UPDATE automation_events SET status='waiting' WHERE id=?").run(run.automationEventId);
@@ -2665,7 +2714,27 @@ export class OpenBotDatabase {
       requiresSignIn,
       reason: String(row.reason), actionLabel: String(row.action_label), status: row.status as Approval["status"],
       createdAt: String(row.created_at), decidedAt: row.decided_at ? String(row.decided_at) : null,
+      hardStop: isHardStop(row.hard_stop) ? row.hard_stop : null,
     };
+  }
+
+  /** Known people (task T1): someone the owner wrote to, or saved in Contacts.
+   * Someone who only wrote to the owner isn't known until the owner replies once. */
+  isKnownPerson(address: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM known_people WHERE address=?").get(address));
+  }
+
+  rememberKnownPerson(address: string, source: "owner" | "contacts" | "sent") {
+    this.db.prepare("INSERT INTO known_people (address,source,created_at) VALUES (?,?,?) ON CONFLICT(address) DO NOTHING").run(address, source, now());
+  }
+
+  knownPeopleCount(): number {
+    return Number((this.db.prepare("SELECT COUNT(*) count FROM known_people").get() as Row).count);
+  }
+
+  /** Every approval asked in a conversation, oldest first. */
+  listThreadApprovals(threadId: string): Approval[] {
+    return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN runs r ON r.id=a.run_id JOIN bots b ON b.id=a.bot_id WHERE r.thread_id=? ORDER BY a.created_at ASC").all(threadId) as Row[]).map((row) => this.approvalFromRow(row));
   }
 
   getApproval(id: string): Approval | null {
@@ -3172,6 +3241,7 @@ export class OpenBotDatabase {
   chooseInitialProvider(providerId: string, model: string): number {
     const provider = this.getProvider(providerId);
     if (!provider || !modelBelongsToConnection(model, provider)) throw new Error("Choose a model from your selected AI connection.");
+    if (isBlockedFreeTierModel(model)) throw new Error(BLOCKED_FREE_TIER_MESSAGE);
     return Number(this.db.prepare("UPDATE bots SET provider_instance_id=?, model=? WHERE provider_instance_id IS NULL AND model=''").run(providerId, model).changes);
   }
 
@@ -3784,6 +3854,8 @@ export class OpenBotDatabase {
     if (input.scope === "command" && input.effect === "always_allow" && !input.id) {
       const bare = pattern.replace(/\*+$/g, "").trimEnd();
       if (["rm", "rmdir", "shred", "find", "sudo", "chmod", "chown"].includes(bare.toLowerCase())) throw new Error("Never allow deleting or system-changing commands; write a narrower pattern such as \"git status*\".");
+      // Task T1: a push, a publish, a deploy or a delete always asks, so no rule may allow one.
+      if (commandHardStop(bare)) throw new Error("Pushing, publishing, deploying and deleting always ask, at every autonomy level, so they can't be allowed by a rule.");
     }
     const existing = input.id ? this.listAutoReviewRules().find((rule) => rule.id === input.id) : undefined;
     const id = existing?.id || randomUUID();
@@ -4273,12 +4345,17 @@ export class OpenBotDatabase {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === source);
   }
 
-  automationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage"): string | null {
+  automationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage" | "folder" | "mail"): string | null {
     const row = this.db.prepare("SELECT cursor FROM automation_cursors WHERE routine_id=? AND source=?").get(routineId, source) as Row | undefined;
     return row?.cursor ? String(row.cursor) : null;
   }
 
-  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage", cursor: string) {
+  /** Events a routine's trigger started since a time (task F5's hourly cap). */
+  automationEventsSince(routineId: string, sinceIso: string): number {
+    return Number((this.db.prepare("SELECT COUNT(*) count FROM automation_events WHERE routine_id=? AND received_at>=? AND status!='rate_limited' AND source!='manual'").get(routineId, sinceIso) as Row).count || 0);
+  }
+
+  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage" | "folder" | "mail", cursor: string) {
     if (cursor.length > 32_000) throw new Error("The automation checkpoint is too large.");
     this.db.prepare(`INSERT INTO automation_cursors (routine_id,source,cursor,updated_at) VALUES (?,?,?,?)
       ON CONFLICT(routine_id,source) DO UPDATE SET cursor=excluded.cursor,updated_at=excluded.updated_at`).run(routineId, source, cursor.slice(0, 32_000), now());

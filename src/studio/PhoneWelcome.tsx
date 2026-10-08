@@ -31,7 +31,7 @@ export function PhonePairing() {
   }, []);
   return <main className="studio-access"><section>
     <span className={`access-mark${error ? "" : " is-opening"}`}><img src="/design/openbot-face.svg" width="26" height="26" alt="" /></span>
-    <p className="overline">OPENBOT</p>
+    <p className="overline">Sidemates</p>
     <h1>{error ? "Let’s try that again." : "Connecting this phone."}</h1>
     <p>{error ? <>{error} On your Mac, open <strong>Settings → Your phone</strong> and scan the new code.</> : "One moment — your team is on its way."}</p>
     {!error && <LoaderCircle className="spinner" size={21} aria-label="Connecting" />}

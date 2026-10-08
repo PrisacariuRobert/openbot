@@ -1,4 +1,5 @@
 import { KnowsPanel } from "../components/KnowsPanel";
+import { SetupTimelinePanel } from "../components/SetupTimelinePanel";
 import { useCallback, useEffect, useState } from "react";
 import { enablePushNotifications } from "./push";
 import type { AppState, Bot, ConnectorStatus, ProviderConnectionTest, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
@@ -118,12 +119,13 @@ export function CapabilityPanelHost({ panel, state, threadId, onOpen, onThread, 
       onDelete={async (id) => { await change(`/api/providers/${encodeURIComponent(id)}`, "DELETE", undefined, "Connection removed."); setConnectionTests((previous) => { const next = { ...previous }; delete next[id]; return next; }); await loadProvider(); }}
       onConnect={(providerId) => request<ProviderLoginAttempt>("/api/provider/connect", "POST", { providerId })}
       onFinish={async (id, code) => { await request(`/api/provider/connect/${encodeURIComponent(id)}/callback`, "POST", { code }); await loadProvider(); }} />}
-    {panel === "connectors" && <ConnectorPanel status={connections} bots={state.bots} onRefresh={loadConnections} onNotice={setNotice} onOpenThread={onThread} onCreateTeammate={onCreate} onReviewTeammate={onEditBot} onStartWorkflow={async (prompt, expectedWorkKind, botId) => {
+    {panel === "connectors" && <ConnectorPanel status={connections} bots={state.bots} macAccessEnabled={state.settings.macAccessEnabled} onRefresh={loadConnections} onNotice={setNotice} onOpenThread={onThread} onCreateTeammate={onCreate} onReviewTeammate={onEditBot} onStartWorkflow={async (prompt, expectedWorkKind, botId) => {
       await workflowMessage("team-room", prompt, botId ? [botId] : [], expectedWorkKind);
     }} />}
     {panel === "projects" && <CodeProjectsPanel bots={state.bots} onNotice={setNotice} />}
     {panel === "telegram" && <TelegramPanel bots={state.bots} />}
     {panel === "knows" && <KnowsPanel />}
+    {panel === "setup" && <SetupTimelinePanel />}
     {panel === "remote" && <RemotePanel bots={state.bots} runner={state.runner} installPrompt={null} onInstalled={() => {}} onNotice={setNotice} />}
     {panel === "bot" && bot && <BotPanel key={bot.id} bot={bot} thread={state.threads.find((item) => item.id === bot.threadId)!} provider={provider} apps={connections?.access} autopilotForEveryone={state.settings.yoloMode} onSave={saveBot}
       onUpdateThread={async (patch) => { await change(`/api/threads/${encodeURIComponent(bot.threadId)}`, "PATCH", patch); }}

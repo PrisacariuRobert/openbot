@@ -11,8 +11,12 @@
 # Nothing needs an administrator password. Remove everything any time with:
 #   "~/Library/Application Support/Sidemates/uninstall.sh"
 #
+# The same script installs from the Mac disk image ("Install Sidemates" runs it
+# with the bundle on the image), so both ways end in the same setup.
+#
 # Overrides (for testing or custom setups): OPENBOT_INSTALL_FROM (URL or
-# folder holding the bundle), OPENBOT_INSTALL_DIR, OPENBOT_INSTALL_PORT,
+# folder holding the bundle), OPENBOT_INSTALL_METHOD (disk-image or terminal,
+# shown in Settings > Your setup), OPENBOT_INSTALL_DIR, OPENBOT_INSTALL_PORT,
 # OPENBOT_INSTALL_LABEL, OPENBOT_INSTALL_APP (path of the .app),
 # OPENBOT_INSTALL_NO_DOCK=1, OPENBOT_INSTALL_NO_OPEN=1.
 # Coming from OpenBot (the old name), the installer moves its data folder across; tests can point at
@@ -29,6 +33,7 @@ LABEL="${OPENBOT_INSTALL_LABEL:-app.sidemates.studio}"
 APP="${OPENBOT_INSTALL_APP:-$HOME/Applications/Sidemates.app}"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 URL="http://127.0.0.1:$PORT"
+case "${OPENBOT_INSTALL_METHOD:-terminal}" in disk-image) METHOD="disk-image" ;; *) METHOD="terminal" ;; esac
 
 if [ -t 1 ]; then BOLD="$(printf '\033[1m')"; DIM="$(printf '\033[2m')"; RESET="$(printf '\033[0m')"; else BOLD=""; DIM=""; RESET=""; fi
 say() { printf '%s\n' "$*"; }
@@ -76,7 +81,10 @@ download_bundle() { # base-url
   [ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ]
 }
 
-step "Downloading Sidemates for this Mac (about 140 MB: a minute or less on most connections)…"
+case "$FROM" in
+  http://*|https://*) step "Downloading Sidemates for this Mac (about 140 MB: a minute or less on most connections)…" ;;
+  *) step "Copying Sidemates from $( [ "$METHOD" = "disk-image" ] && echo "the disk image" || echo "$FROM" )…" ;;
+esac
 if ! download_bundle "$FROM"; then
   [ -z "${OPENBOT_INSTALL_FROM:-}" ] || fail "the download didn't finish or didn't match its fingerprint, so nothing was installed. Please try again."
   step "That route didn't work. Trying GitHub directly (this can be slower)…"
@@ -114,6 +122,10 @@ BUNDLE="$(find "$WORK" -mindepth 1 -maxdepth 1 -type d -name 'sidemates-*' | hea
 NAME="$(basename "$BUNDLE")"
 rm -rf "$DIR/versions/$NAME"
 mv "$BUNDLE" "$DIR/versions/$NAME"
+# A disk image opened from a browser download marks its files as downloaded. The bundle's fingerprint
+# was checked above, as with the one-line install (which never adds the mark), so clear it: the
+# background service must not stop at a download warning nobody can see.
+xattr -dr com.apple.quarantine "$DIR/versions/$NAME" >/dev/null 2>&1 || true
 ln -sfn "$DIR/versions/$NAME" "$DIR/current"
 
 # Sidemates.app runs the service, so macOS lists permissions as "Sidemates".
@@ -153,6 +165,7 @@ cat > "$PLIST" <<EOF
     <key>OPENBOT_APP_URL</key><string>$(xml "$URL")</string>
     <key>OPENBOT_DEPLOYMENT_MODE</key><string>local</string>
     <key>NODE_ENV</key><string>production</string>
+    <key>OPENBOT_INSTALL_METHOD</key><string>$METHOD</string>
   </dict>
   <key>WorkingDirectory</key><string>$(xml "$DIR/current")</string>
   <key>RunAtLoad</key><true/>
@@ -163,6 +176,8 @@ cat > "$PLIST" <<EOF
 </dict>
 </plist>
 EOF
+# macOS 27 refuses a background job whose settings file carries the download mark.
+xattr -d com.apple.quarantine "$PLIST" >/dev/null 2>&1 || true
 DOMAIN="gui/$(id -u)"
 launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
 # Stopping the old copy finishes in the background; wait for it before starting

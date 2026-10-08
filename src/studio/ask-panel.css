@@ -1,0 +1,19 @@
+/* Task F7: the "Ask my Mac" panel. Design tokens only. */
+.ask-panel { box-sizing: border-box; min-height: 100vh; padding: 16px; display: grid; align-content: start; gap: 10px; background: var(--system-background, var(--surface)); color: var(--label-primary, var(--ink)); }
+.ask-box { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--separator-strong, var(--line)); border-radius: 14px; background: var(--secondary-system-background, var(--surface-muted)); }
+.ask-box input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 17px; outline: none; }
+.ask-box:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ask-privacy, .ask-meta, .ask-note, .ask-status { margin: 0; font-size: 12.5px; color: var(--label-secondary, var(--muted)); }
+.ask-error { margin: 0; color: var(--danger); font-size: 13px; }
+.ask-answer { margin: 4px 0 0; font-size: 15px; line-height: 1.5; }
+.ask-answer sup { font-size: 11px; color: var(--accent); margin-left: 1px; }
+.ask-sources { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 6px; }
+.ask-sources button { width: 100%; display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 8px 10px; border: 1px solid var(--separator, var(--line)); border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.ask-sources li.is-cited button { border-color: var(--accent); }
+.ask-sources button:focus-visible, .ask-sources button[aria-current="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-source-n { font-size: 12px; color: var(--label-secondary, var(--muted)); min-width: 26px; }
+.ask-source-text { display: grid; gap: 2px; min-width: 0; }
+.ask-source-text strong { font-size: 14px; overflow-wrap: anywhere; }
+.ask-source-text small { font-size: 12px; color: var(--label-secondary, var(--muted)); }
+.ask-source-text span { font-size: 13px; color: var(--label-secondary, var(--secondary)); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ask-panel .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -35,6 +35,8 @@ try {
   let release: (() => void) | undefined;
   await page.route("**/api/**", async (route) => {
     const request = route.request(), pathname = new URL(request.url()).pathname;
+    // The studio notes its own visit for Settings → Your setup; that is not a decision.
+    if (request.method() === "POST" && pathname === "/api/setup/visit") return route.fulfill({ status: 204 });
     if (request.method() === "GET" && pathname === "/api/state") {
       const result = structuredClone(state);
       if (recorded && allowRecovery) { result.approvals = []; for (const item of [...result.runs, ...result.studioRuns]) item.status = "queued"; }

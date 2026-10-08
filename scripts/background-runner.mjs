@@ -3,6 +3,8 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+// M6: every OPENBOT_* setting can also be given as SIDEMATES_*; an OPENBOT_ value already set wins.
+for (const [key, value] of Object.entries(process.env)) if (key.startsWith("SIDEMATES_") && key.length > 10 && process.env[`OPENBOT_${key.slice(10)}`] === undefined) process.env[`OPENBOT_${key.slice(10)}`] = value;
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));

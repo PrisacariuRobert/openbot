@@ -60,7 +60,7 @@ No administrator password. It checks the download’s fingerprint, runs Sidemate
 
 ```sh
 git clone https://github.com/PrisacariuRobert/sidemates.git
-cd openbot
+cd sidemates
 npm ci
 npm run dev
 ```
@@ -76,14 +76,14 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
   </tr>
   <tr>
     <td><strong>Real files.</strong> Word documents, spreadsheets and plans arrive as files you can open and share. Drop in a PDF and your teammate reads it first.</td>
-    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on.</td>
+    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on, and even then money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards still ask.</td>
   </tr>
 </table>
 
 - **Research with sources** — each teammate browses in its own private browser and links what it found; when something can’t be checked, it says so.
 - **Group chats** — write “Nova: find… Scout, double-check…” and each does their part, in order.
 - **Routines** — “Every Monday at 9, plan my week.” Plus a Sunday look back at what got done.
-- **Voice and phone** — talk hands-free, or pair your iPhone with one scan to chat and approve from your Home Screen.
+- **Voice and phone (beta)** — talk hands-free in the studio. From your phone, chat with your team through Telegram, or use the Home Screen app with a relay you set up; pairing with one scan is on the way.
 - **Skills** — teach a teammate a method once, or add reviewed skills from the community.
 - **Bring your setup** — one-click import from Hermes Agent and OpenClaw, including automations.
 
@@ -97,23 +97,23 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
 | **Pay per use** | OpenCode Go · any OpenAI-compatible API |
 | **Stay private** | Models on your Mac with Ollama |
 
-Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, Sidemates starts your own `claude` command and never sees your login. Anthropic’s terms restrict using Claude subscription logins in other products, and how that applies to a tool that starts your own Claude Code is not settled, so check them before relying on it.
+Each teammate can use a different AI. Sidemates never resells tokens or adds a fee; each provider’s own terms and limits apply. For Claude, Sidemates starts your own `claude` command and never sees your login. Anthropic’s terms allow signing in to the unmodified Claude Code program with your own subscription ([checked 7 October 2026](https://code.claude.com/docs/en/legal-and-compliance)). Use by tools that start it may count against your plan differently, so check your plan before relying on it.
 
 ## How it compares
 
 | | Cloud agents (OpenAI dots, Grok Bot, Meta Muse) | Siri AI (macOS 27) | Hermes Desktop, OpenClaw | **Sidemates** |
 | :--- | :--- | :--- | :--- | :--- |
-| Price | $0–300/month plans | Free, with daily limits | Free + your models | **Free + your models** |
-| Runs on | Their cloud computers | Your Mac + Apple's cloud | Your machine | **Your Mac** |
-| Uses your Mac's apps and files | No | Quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
+| Price | Free with caps (Muse) to $100+/month (dots); Grok Bot from $20–30 | Free, with daily limits | Free + your models | **Free + your models** |
+| Runs on | Their cloud computers; Muse for Mac and dots (if you turn it on) also act on your Mac | Your Mac + Apple's cloud | Your machine | **Your Mac** |
+| Uses your Mac's apps and files | Muse for Mac (US and Canada only); dots, if you turn it on; not Grok Bot | Personal context and quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
 | Long jobs on websites | Yes, in their browser | No | Yes | **Yes, each teammate in its own browser** |
 | A team of named teammates | Grok Bot only | No | Hermes Bot Mode | **Yes** |
-| Scheduled work | Yes | No | Yes | **Yes, and your Mac wakes for it** |
+| Scheduled work | Yes | No | Yes | **Yes, while your Mac is awake** |
 | Asks before acting | Yes | Yes | Configurable | **By default, with the exact button — or Autopilot** |
 | Choose your AI | No | No | Yes | **Yes — ChatGPT, Claude, Gemini, local…** |
 | Open source | No | No | Yes (MIT) | **Yes (MIT)** |
 
-Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots is not available in the EU, UK or Switzerland; Sidemates works wherever your Mac does. Competitor details as of 30 September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
+Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots’ personal plans aren’t offered in the EU, UK or Switzerland, and Meta’s Muse is available only in the US and Canada; Sidemates works wherever your Mac does. Competitor details as of 7 October 2026, from their public pages and press. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
 
 ## Privacy and safety
 
@@ -122,6 +122,33 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 ## Status
 
 Sidemates 0.42.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/sidemates/releases/tag/v0.42.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+
+Sidemates has no token or cryptocurrency. Anyone selling one in its name is not us.
+
+## Coming in the next release
+
+These are in the code but not in a release yet. The [changelog](CHANGELOG.md) has the details.
+
+- **A guided first run**: choose your AI, meet your first teammate, and get three things to try.
+- **A free Gemini key in a few clicks**, tested as soon as you paste it, and a private browser download for computers without Chrome, Edge or Brave.
+- **Lighter requests to your AI**: a teammate's "hi" sends about 40% less, measured offline.
+- **Install without Terminal**, from a disk image for your kind of Mac.
+- **Gmail and Google Calendar through the Mac's own Mail and Calendar**, without a Google Cloud project.
+- **Your setup** in Settings: a timeline of your first days that stays on your Mac.
+- **When a job can't finish**, you see what's missing and the one-click fix.
+- **Hard stops, even on Autopilot**: money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards always ask.
+- **Submit a teammate to the gallery** from its settings, without Git.
+- **A developer try-path**: `node bin/sidemates.mjs` (and `npx sidemates` after the first npm release) runs the studio without the app; the runner image is published to GitHub's container registry on each release.
+- **Move in, move out**: memories from a ChatGPT or Claude export (each one reviewed), and any teammate out as plain files that work elsewhere.
+- **Ask my Mac**: a shortcut from anywhere on the Mac to ask about your own mail, notes and files, with every answer citing its source and nothing sent to a cloud AI.
+- **Your saved secrets' key in the Keychain** on a Mac, instead of a file next to the data.
+- **Memory you can trace**: every memory says where it came from, and facts learned from mail, web pages or files wait for your review before any task uses them.
+- **Skills you can trust**: risky lines listed before you add a skill, every skill pinned to the version you reviewed with a diff before updates, and scripts off until you turn them on.
+- **Private mode**: personal details become placeholders before a cloud AI sees them and come back on your Mac, and every task's receipt shows exactly what was sent, what it used and what it cost.
+- **Shared results carry "Make this teammate"**, so whoever reads one can add the same teammate, and the page previews with the teammate's face.
+- **Your Mac reacts**: automations that start when a file lands in a folder or mail like this arrives.
+- **A teammate can suggest a specialist** (a researcher or a writer) when a job needs one; it's added only if you approve.
+- **Published attack tests**: what a prompt injection can and can't make a teammate do, run on every change ([security model](docs/SECURITY.md#attack-tests-what-we-test-and-what-still-gets-through)).
 
 ## What's new in 0.42.0
 
@@ -132,6 +159,16 @@ Sidemates 0.42.0 is a public beta ([release notes](https://github.com/Prisacariu
 Everything earlier is in the [changelog](CHANGELOG.md) and the [releases](https://github.com/PrisacariuRobert/sidemates/releases).
 
 ## For developers
+
+Run the studio without the Mac app, from a checkout (Node 22.13 or later):
+
+```sh
+npm ci && npm run build
+node bin/sidemates.mjs            # http://127.0.0.1:4311, data in ~/.openbot
+node bin/sidemates.mjs --help
+```
+
+Once the package is on npm, `npx sidemates` does the same. The always-on Linux runner image will be at `ghcr.io/prisacariurobert/sidemates/runner` from the first release built after this change ([deploy/private-runner](deploy/private-runner/README.md)).
 
 ```text
 Web studio (desktop + phone)  →  Sidemates service  →  teammates' runtimes
@@ -150,8 +187,8 @@ Web studio (desktop + phone)  →  Sidemates service  →  teammates' runtimes
 | `skills/`, `mcp/` | Bundled skills and the MCP interface |
 
 ```sh
-npm run verify     # guards, types, build and ~1,000 tests
-npm start          # production build on 127.0.0.1:4311
+npm run verify               # guards, types, build and ~1,100 tests
+npm run build && npm start   # production build on 127.0.0.1:4311
 ```
 
 More in the [docs](docs/README.md), [desktop guide](desktop/README.md) and [private runner guide](deploy/private-runner/README.md).

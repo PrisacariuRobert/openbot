@@ -1,0 +1,62 @@
+/* The guided first run, its "Try one" cards, the on-demand Mac setup and the
+ * add-a-specialist card. Design tokens only. */
+.guided-run { width: min(640px, 100%); margin: 0 auto; padding: 24px 0 32px; scroll-margin-top: 12px; display: grid; gap: 16px; text-align: left; }
+.guided-run h2 { font-size: 28px; line-height: 34px; letter-spacing: -.6px; margin: 0; }
+.guided-run h2:focus { outline: none; }
+.guided-run h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+.guided-run-lead, .guided-run-note, .guided-run-role { margin: 0; font-size: 15px; line-height: 22px; color: var(--secondary); }
+.guided-run-note { font-size: 13px; }
+.guided-run-role strong { color: var(--ink); font-weight: 600; }
+.guided-run-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.guided-run-progress { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+.guided-run-progress li { display: inline-flex; align-items: center; gap: 6px; }
+.guided-run-progress li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-strong); }
+.guided-run-progress li.done::before, .guided-run-progress li.current::before { background: var(--ink); border-color: var(--ink); }
+.guided-run-progress li.current { color: var(--ink); font-weight: 600; }
+.guided-run button, .first-run-mac button, .add-specialist button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--tertiary-system-background, var(--hover)); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.guided-run button.primary, .first-run-mac button.primary { background: var(--strong); color: var(--on-strong); }
+.guided-run button:disabled, .first-run-mac button:disabled, .add-specialist button:disabled { opacity: .5; cursor: default; }
+.guided-run button:focus-visible, .first-run-mac button:focus-visible, .add-specialist button:focus-visible, .guided-run input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.guided-run .guided-run-quiet { min-height: 40px; background: none; color: var(--secondary); font-weight: 500; padding: 8px 10px; }
+.guided-run-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.guided-run-field { display: grid; gap: 6px; font-size: 13px; color: var(--secondary); }
+.guided-run-field input { min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; }
+.guided-run-teammate { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; }
+.guided-run-teammate > div { display: grid; gap: 12px; }
+.guided-run-error { margin: 0; }
+.guided-run .byo.is-first-run { padding: 0; }
+.first-run-try { display: grid; justify-items: center; gap: 4px; margin-top: 8px; }
+.first-run-try-lead { margin: 0; font-size: 13px; line-height: 19px; color: var(--secondary); text-align: center; }
+.first-run-mac { width: min(560px, 100%); margin: 20px auto 0; display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; }
+.first-run-mac h3 { margin: 0; font-size: 18px; }
+.first-run-mac .first-run-try-lead { text-align: left; }
+.first-run-mac ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.first-run-mac li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 0; }
+.first-run-mac li + li { border-top: 1px solid var(--line); }
+.first-run-mac-mark { color: var(--secondary); display: grid; place-items: center; width: 20px; }
+.first-run-mac li.done .first-run-mac-mark { color: var(--ink); }
+.first-run-mac-text { display: grid; gap: 2px; min-width: 0; }
+.first-run-mac-text strong { font-size: 14px; font-weight: 600; }
+.first-run-mac-text small { font-size: 12px; line-height: 17px; color: var(--secondary); }
+.first-run-mac-text .first-run-mac-state { color: var(--ink); }
+.first-run-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.add-specialist { width: min(560px, 100%); margin: 16px auto; display: grid; gap: 8px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; }
+.add-specialist.is-row { width: 100%; margin: 0 0 20px; }
+.add-specialist-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.add-specialist h3 { margin: 0; font-size: 16px; }
+.add-specialist p { margin: 0; font-size: 13px; line-height: 19px; color: var(--secondary); }
+.add-specialist ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.add-specialist li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.add-specialist li span { display: grid; gap: 2px; min-width: 0; }
+.add-specialist li strong { font-size: 14px; font-weight: 600; }
+.add-specialist li small { font-size: 12px; line-height: 17px; color: var(--secondary); }
+.add-specialist .add-specialist-dismiss { min-height: 36px; min-width: 36px; padding: 6px; background: none; color: var(--secondary); }
+@media (max-width: 600px) {
+  .guided-run { padding: 12px 0 24px; }
+  .guided-run h2 { font-size: 24px; line-height: 30px; }
+  .guided-run-teammate { grid-template-columns: 1fr; }
+  .guided-run-actions > button { flex: 1 1 auto; }
+  .first-run-mac li, .add-specialist li { grid-template-columns: auto 1fr; }
+  .first-run-mac li > :last-child:not(.first-run-mac-text), .add-specialist li > button { grid-column: 1 / -1; justify-self: stretch; }
+}
+@media (prefers-reduced-motion: reduce) { .guided-run *, .first-run-mac *, .add-specialist * { transition: none !important; animation: none !important; } }

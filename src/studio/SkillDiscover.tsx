@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { SkillFlags } from "../components/SkillTrust";
+import type { SkillFlag } from "../shared/skill-trust";
 import { ArrowRight, Check, FileText, LoaderCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -6,7 +8,7 @@ import type { Bot } from "../shared/types";
 import "./skill-discover.css";
 
 export type CatalogEntry = { name: string; description: string; url: string; collection: string; license: string; addable: boolean; reason: string | null; installed?: boolean };
-type Preview = { name: string; description: string; license: string; source: string; files: Record<string, string>; instructions: string; digest: string; warnings: string[]; blockers: string[] };
+type Preview = { name: string; description: string; license: string; source: string; files: Record<string, string>; instructions: string; digest: string; warnings: string[]; blockers: string[]; flags?: SkillFlag[]; scripts?: string[] };
 
 export const skillTitle = (name: string) => name.replace(/-/g, " ").replace(/\b(mcp|api|pdf|ui|csv|seo)\b/g, (word) => word.toUpperCase()).replace(/^./, (letter) => letter.toUpperCase());
 
@@ -114,12 +116,13 @@ export function SkillDiscoverDetail({ entry, bots, face, onAdded }: { entry: Cat
             <div className="prose"><ReactMarkdown remarkPlugins={[remarkGfm]}>{preview.instructions.replace(/^---\n[\s\S]*?\n---\n?/, "")}</ReactMarkdown></div>
           </details>
           <ul className="skill-discover-warnings">{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          <SkillFlags flags={preview.flags ?? []} />
           {preview.blockers.map((blocker) => <p className="send-error" key={blocker}>{blocker}</p>)}
           <button type="button" className="primary full-width" disabled={busy || !chosen.length || preview.blockers.length > 0} onClick={() => void add()}>
             {busy ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : null}
             {entry.installed ? "Update who can use it" : "Add skill"} {!busy && <ArrowRight size={15} />}
           </button>
-          <small className="boundary-note">{Object.keys(preview.files).length} {Object.keys(preview.files).length === 1 ? "file" : "files"} · pinned to this exact version · adds instructions only, never account access</small>
+          <small className="boundary-note">{Object.keys(preview.files).length} {Object.keys(preview.files).length === 1 ? "file" : "files"} · pinned to this exact version · adds instructions{preview.scripts?.length ? " and scripts that stay off until you turn them on" : " only"}, never account access</small>
         </>
       )}
       {error && <p className="send-error" role="alert">{error}</p>}

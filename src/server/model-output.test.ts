@@ -14,6 +14,22 @@ test("provider failures explain the recovery path without leaking payloads", () 
   }
 });
 
+test("Google's free Gemini limits say whether to wait a minute or until tomorrow", () => {
+  const failure = (statusCode: number, message: string) => {
+    const output = new ModelOutput("opencode");
+    output.add({ type: "error", error: { data: { statusCode, message } } });
+    return output.failure!;
+  };
+  const minute = failure(429, "RESOURCE_EXHAUSTED: Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 15, quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier");
+  assert.match(minute, /this minute/);
+  assert.match(minute, /Try again in a minute/);
+  const day = failure(429, "You exceeded your current quota. quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, model: gemini-flash-lite-latest");
+  assert.match(day, /for today is used up/);
+  assert.match(day, /Google AI Studio/);
+  assert.match(failure(429, "gemini quota exceeded free_tier"), /free AI allowance is used up/, "no period named: the general free-allowance message");
+  assert.match(failure(429, "rate limit reached for gpt"), /usage or rate limit/, "other providers keep the general message");
+});
+
 test("OpenCode free-tier agent restriction explains model choice without suggesting a sign-in retry", () => {
   const output = new ModelOutput("opencode");
   output.add({ type: "error", error: { data: { statusCode: 403, message: "Error from provider (Console): OpenCode's free tier can only be used from within OpenCode secret-private-payload" } } });

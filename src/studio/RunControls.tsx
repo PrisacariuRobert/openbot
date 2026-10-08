@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Coins, Globe, LockKeyhole, Mail } from "lucide-react";
+import { CalendarDays, Coins, Globe, LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+import { HARD_STOP_TEXT } from "../shared/hard-stops";
 import type { Approval, Run } from "../shared/types";
 import type { ApprovalPreview } from "../shared/approval-preview";
 import { TASK_TOKEN_OPTIONS } from "../shared/task-token-budget";
@@ -208,6 +209,7 @@ export function RunControls({
             </div>
           </div>
           {preview && !preview.browserSignIn && <p className="run-control-note">{preview.reason}</p>}
+          {approval?.hardStop && <p className="decision-hard-stop"><ShieldAlert size={13} strokeWidth={2} aria-hidden="true" /><span><strong>Always asks, even on Autopilot.</strong> {HARD_STOP_TEXT[approval.hardStop].why}</span></p>}
           {preview?.taskTokens && <label className="run-token-amount">Extra tokens for this task
             <select aria-label="Extra tokens for this task" value={preview.taskTokens.additionalTokens} disabled={busy || needsRefresh} onChange={event => void chooseTokenAmount(Number(event.target.value))}>
               {TASK_TOKEN_OPTIONS.map(amount => <option key={amount} value={amount}>{amount.toLocaleString()}</option>)}

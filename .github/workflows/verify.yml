@@ -36,10 +36,10 @@ jobs:
       - name: Validate private runner Compose bundle
         run: docker compose --env-file deploy/private-runner/.env.example -f deploy/private-runner/docker-compose.yml config --quiet
       - name: Build private runner image
-        run: docker build --file deploy/private-runner/Dockerfile --tag openbot-private-runner:verify .
+        run: docker build --file deploy/private-runner/Dockerfile --tag sidemates-private-runner:verify .
       - name: Smoke test private runner image
         run: |
-          docker run --detach --name openbot-private-runner-smoke \
+          docker run --detach --name sidemates-private-runner-smoke \
             --group-add "$(stat -c '%g' /var/run/docker.sock)" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --publish 127.0.0.1:4311:4311 \
@@ -47,19 +47,19 @@ jobs:
             --env OPENBOT_APP_URL=https://studio.example.com/ \
             --env OPENBOT_DATA_DIR=/srv/openbot/data \
             --env OPENBOT_HOST=0.0.0.0 \
-            openbot-private-runner:verify
+            sidemates-private-runner:verify
           cleanup() {
-            docker logs openbot-private-runner-smoke
-            docker rm --force openbot-private-runner-smoke >/dev/null
+            docker logs sidemates-private-runner-smoke
+            docker rm --force sidemates-private-runner-smoke >/dev/null
           }
           trap cleanup EXIT
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:4311/api/healthz; then
-              docker exec openbot-private-runner-smoke opencode --version
-              docker exec openbot-private-runner-smoke npx tsx scripts/test-provider-runtime.ts
-              docker exec openbot-private-runner-smoke chromium --version
-              docker exec openbot-private-runner-smoke docker info --format '{{.ServerVersion}}'
-              access_token="$(docker exec openbot-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"
+              docker exec sidemates-private-runner-smoke opencode --version
+              docker exec sidemates-private-runner-smoke npx tsx scripts/test-provider-runtime.ts
+              docker exec sidemates-private-runner-smoke chromium --version
+              docker exec sidemates-private-runner-smoke docker info --format '{{.ServerVersion}}'
+              access_token="$(docker exec sidemates-private-runner-smoke sh -c 'cat /srv/openbot/data/access.token')"
               curl --fail --silent \
                 --header "Authorization: Bearer ${access_token}" \
                 http://127.0.0.1:4311/api/runner/diagnostics \
@@ -94,14 +94,40 @@ jobs:
         # Keep aligned with deploy/private-runner/Dockerfile. This is a runtime,
         # not a provider account; onboarding uses a new empty credentials home.
         run: |
-          npm install --global --prefix "$RUNNER_TEMP/openbot-runtime" --no-audit --no-fund opencode-ai@1.18.28
-          test "$("$RUNNER_TEMP/openbot-runtime/bin/opencode" --version)" = "1.18.28"
+          npm install --global --prefix "$RUNNER_TEMP/openbot-runtime" --no-audit --no-fund opencode-ai@1.18.31
+          test "$("$RUNNER_TEMP/openbot-runtime/bin/opencode" --version)" = "1.18.31"
           echo "$RUNNER_TEMP/openbot-runtime/bin" >> "$GITHUB_PATH"
       - run: npm run build
       - name: Test conversations, first teammate, action review and draft recovery
         run: npm run test:conversation-flow
       - name: Test the complete first-run provider choice journey
         run: npm run test:onboarding
+      - name: Test the hero jobs against a scripted model and synthetic Mac data
+        # Credential-free: a scripted OpenAI-compatible model on loopback and the
+        # qa/hero-jobs fixtures. Checks Sidemates' plumbing, not any model.
+        run: npm run test:hero-jobs
+      - name: One-click fixes when a job can't finish
+        run: npm run test:failure-fixes
+      - name: Submit a teammate to the gallery from its settings
+        run: npm run test:gallery-submit
+      - name: Shared result pages offer "Make this teammate"
+        run: npm run test:share-result
+      - name: Private mode and what the AI saw in the work receipt
+        run: npm run test:private-mode
+      - name: Skills pinned, diffed before updates, scripts off until approved
+        run: npm run test:skill-trust
+      - name: Memories from mail, pages and files wait for review
+        run: npm run test:memory-review
+      - name: Ask my Mac answers from the on-device index by keyboard
+        run: npm run test:ask-my-mac
+      - name: Move in from an export, take a teammate out as files and back
+        run: npm run test:move-in
+      - name: npx sidemates starts the studio from the packed package
+        run: npm run test:npx
+      - name: Attack tests (prompt injections against a scripted stand-in that obeys them)
+        # Checks what the server lets through at Ask first and Autopilot against
+        # the table published in docs/SECURITY.md. Credential-free.
+        run: npm run test:attacks
       - name: Test full action review in existing app surfaces
         run: npm run test:app-approvals
       - name: Test keyboard controls, appearance and browser-access states

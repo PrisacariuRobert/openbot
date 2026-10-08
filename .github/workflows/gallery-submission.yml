@@ -1,0 +1,73 @@
+name: Gallery submission
+
+# Task R3: a teammate submitted through the issue form becomes a pull request, after
+# the same check every gallery teammate passes (src/server/gallery.test.ts). The
+# issue text is untrusted data: it reaches the script only through an environment
+# variable, is parsed and validated there, and is never run.
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: gallery-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  submit:
+    if: startsWith(github.event.issue.title, '[Gallery]') && github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.13
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Read the submission
+        id: read
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: npx tsx scripts/gallery-submission.ts
+      - name: Check it like every gallery teammate
+        id: check
+        run: npx tsx --test src/server/gallery.test.ts > "$RUNNER_TEMP/gallery-check.txt" 2>&1
+      - name: Open or update the pull request
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLUG: ${{ steps.read.outputs.slug }}
+          NAME: ${{ steps.read.outputs.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          branch="gallery/$SLUG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add site/teammates
+          git commit -m "Gallery: add $NAME (#$ISSUE_NUMBER)"
+          git push --force origin "$branch"
+          if ! gh pr view "$branch" > /dev/null 2>&1; then
+            gh pr create --head "$branch" --title "Gallery: add $NAME" --body "Adds the teammate submitted in #$ISSUE_NUMBER. It passed the gallery check (src/server/gallery.test.ts). A maintainer reviews the instructions before merging."
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body "Thanks! It passed the gallery check, and a pull request is open for review: $(gh pr view "$branch" --json url --jq .url)"
+      - name: Say what to fix
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          {
+            echo "This teammate couldn't be added yet. Edit the issue to fix it, and the check runs again."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/gallery-error.txt" 2>/dev/null || grep -E "^not ok|AssertionError|Error:" "$RUNNER_TEMP/gallery-check.txt" | head -20
+            echo '```'
+          } > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/comment.md"

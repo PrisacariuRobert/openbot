@@ -95,8 +95,18 @@ try {
       path: path.join(output, `empty-${width}.png`),
       animations: "disabled",
     });
+    // The guided setup draws in place of the welcome, fits the width, and Not now returns to the welcome.
+    await page.getByRole("button", { name: "Set up my team" }).click();
+    await page.getByRole("heading", { name: "How should your team think?" }).waitFor();
+    assert.ok(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      `The guided setup fits ${width}px`,
+    );
+    assert.equal(await page.getByRole("dialog").count(), 0, "The guided setup is not a modal");
+    await page.screenshot({ path: path.join(output, `guided-${width}.png`), animations: "disabled" });
+    await page.getByRole("button", { name: "Not now" }).click();
     await page
-      .getByRole("button", { name: "Create your first teammate" })
+      .getByRole("button", { name: "Create one teammate myself" })
       .click();
     const sheet = page.getByRole("dialog");
     await sheet.getByLabel("Name", { exact: true }).fill("Remy");

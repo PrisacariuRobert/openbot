@@ -123,6 +123,12 @@ export class PersonalIndex {
     return rows.map((row) => ({ source: row.source as SourceKind, key: String(row.key), title: String(row.title), author: row.author == null ? null : String(row.author), at: String(row.at), snippet: String(row.snippet || "").replace(/\s+/g, " ").trim() }));
   }
 
+  /** One indexed item, or null: "Ask my Mac" opens only what the index holds. */
+  get(source: SourceKind, key: string): { source: SourceKind; key: string; title: string } | null {
+    const row = this.db.prepare("SELECT source, key, title FROM items WHERE source=? AND key=?").get(source, key) as { source: SourceKind; key: string; title: string } | undefined;
+    return row ? { source: row.source, key: row.key, title: row.title } : null;
+  }
+
   counts(): Record<SourceKind, { items: number; newest: string | null }> {
     const out = Object.fromEntries(SOURCES.map((source) => [source, { items: 0, newest: null as string | null }])) as Record<SourceKind, { items: number; newest: string | null }>;
     for (const row of this.db.prepare("SELECT source, COUNT(*) AS n, MAX(at) AS newest FROM items GROUP BY source").all() as Array<{ source: SourceKind; n: number; newest: string | null }>) if (out[row.source]) out[row.source] = { items: Number(row.n), newest: row.newest };

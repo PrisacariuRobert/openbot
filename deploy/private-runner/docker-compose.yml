@@ -6,7 +6,7 @@ services:
       context: ../..
       dockerfile: deploy/private-runner/Dockerfile
       args:
-        OPENCODE_VERSION: ${OPENCODE_VERSION:-1.18.28}
+        OPENCODE_VERSION: ${OPENCODE_VERSION:-1.18.31}
     image: openbot-private-runner:local
     restart: unless-stopped
     environment:

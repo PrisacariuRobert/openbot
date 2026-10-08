@@ -22,6 +22,7 @@
 
 ## Project
 
+- [Developer plan](DEVELOPER_PLAN.md)
 - [Roadmap](ROADMAP.md)
 - [Competitive scorecard](COMPETITIVE_SCORECARD_2026-09-23.md)
 - [Product gap audit](PRODUCT_GAP_AUDIT.md)

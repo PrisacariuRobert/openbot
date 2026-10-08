@@ -1,0 +1,42 @@
+name: Add a teammate to the gallery
+description: Share a teammate you made with everyone. A check runs automatically and opens a pull request for review.
+title: "[Gallery] "
+labels: ["gallery"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use **Submit to the gallery** in your teammate's settings in Sidemates to fill this in. Everything here is public. The teammate file holds the name, job, instructions and paused routines, never your conversations, memory, files, accounts or keys. Please read it once before you submit.
+  - type: input
+    id: slug
+    attributes:
+      label: Short name for the gallery
+      description: Lowercase letters, numbers and dashes, like receipt-keeper. It becomes the page address.
+    validations:
+      required: true
+  - type: input
+    id: about
+    attributes:
+      label: One sentence about it
+      description: What it does for someone, in 30 to 240 characters.
+    validations:
+      required: true
+  - type: textarea
+    id: teammate
+    attributes:
+      label: Teammate file
+      description: The file from "Submit to the gallery" or "Share as a file".
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: It contains no personal details, names of real people, accounts or keys.
+          required: true
+        - label: Its instructions never tell it to send, buy, pay or delete on its own.
+          required: true
+        - label: I'm happy for it to be shared under the project's MIT license.
+          required: true

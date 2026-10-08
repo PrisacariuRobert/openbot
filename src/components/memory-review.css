@@ -1,0 +1,16 @@
+/* Task T5: "What <teammate> remembers" and the review queue. Design tokens only. */
+.memory-review { display: grid; gap: 10px; margin-bottom: 16px; }
+.memory-review h4 { margin: 0; font-size: 17px; color: var(--ink); }
+.memory-search-mode, .memory-review-empty { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.memory-review-queue { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--warning); border-radius: 12px; background: var(--surface); }
+.memory-review-queue h5 { margin: 0; font-size: 14px; color: var(--ink); }
+.memory-review-queue > p { margin: 0; font-size: 13px; color: var(--secondary); }
+.memory-review-item { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.memory-review-item header { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 14px; overflow-wrap: anywhere; }
+.memory-review-item header span { font-size: 12px; color: var(--muted); }
+.memory-review-item textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-muted); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; }
+.memory-review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.memory-review-actions button { min-height: 40px; }
+.memory-review textarea:focus-visible, .memory-review button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.memory-review-error { margin: 0; font-size: 13px; color: var(--danger); }
+.memory-review-all { justify-self: start; min-height: 40px; }

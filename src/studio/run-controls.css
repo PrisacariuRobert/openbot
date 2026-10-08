@@ -233,3 +233,7 @@ button.decision-stop-btn:disabled { opacity: .5; cursor: default; }
 .decision-actions .decision-confirm { min-height: 44px; font-size: 13px; border-radius: 9px; }
 .decision-actions .decision-decline { width: 100%; font-size: 13px; border-radius: 9px; }
 @media(max-width:600px) { .run-controls > .decision-card { padding: 16px; } .run-controls > .decision-card .decision-headline { font-size: 18px; line-height: 24px; letter-spacing: -.3px; } .run-controls > .decision-card .decision-top > .character { width: 28px; height: 28px; } .decision-facts > div { grid-template-columns: 1fr; gap: 2px; } .decision-actions { grid-template-columns: minmax(0,1fr); } }
+/* Task T1: why this approval waits for the owner whatever the autonomy level. */
+.decision-hard-stop { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--surface-muted); color: var(--ink); font-size: 12px; line-height: 1.45; }
+.decision-hard-stop svg { flex-shrink: 0; margin-top: 2px; }
+.decision-hard-stop strong { font-weight: 600; }

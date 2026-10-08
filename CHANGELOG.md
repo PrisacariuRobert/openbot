@@ -1,5 +1,57 @@
 # Changelog
 
+## Unreleased
+
+- Settings can now use Sidemates names: every `OPENBOT_*` environment variable can also be written `SIDEMATES_*` (for example `SIDEMATES_PORT`). Existing `OPENBOT_*` settings keep working and win if both are set.
+- **Try Sidemates without the app.** `node bin/sidemates.mjs` from a checkout (and `npx sidemates` once it's on npm) runs the studio on your computer, with your data in ~/.openbot. Each release also builds the always-on Linux runner as an image on GitHub's container registry.
+- **Move in, move out.** Take any teammate out as plain files: who it is (AGENTS.md, which other agents read as is), what it remembers, its skills in the Agent Skills format and its routines, in one .zip, without keys or conversations. Bring memory in from a ChatGPT or Claude data export: Sidemates suggests the sentences where you described yourself, and each waits for your review (or "Keep all"). A teammate's own files come back in as the same teammate.
+- **Ask my Mac.** In the Mac app, Option+Space (or Control+Option+Space if another app uses it) opens a small box anywhere. Ask about your own mail, notes and files and get the best matching sources from what Sidemates has indexed on your Mac, each one click from opening in Mail, Notes or Finder. With a model in Ollama, a short answer citing those sources is written on your Mac too. Nothing you ask there is sent to a cloud AI. It works with the keyboard alone.
+- **The key that protects your saved secrets moves into your Mac's Keychain.** Sidemates encrypts the API keys and sign-ins it saves; on a Mac the key for that now lives in your login Keychain ("Sidemates vault key") instead of a file next to the data, and an existing key file moves there by itself the first time. If the Keychain can't take it, the file stays as before.
+- **Memory you can see and trace.** Each teammate's memory page ("What Nova remembers") says where every memory came from: you, your conversation, an email, a web page, a file, a message, your calendar or an app. A fact a teammate learns after reading mail, a web page or a file now waits in a review queue, which you keep (as written or edited, and then it's yours) or discard; until then no task uses it. This closes the memory attack in the published attack tests. Memories are found by meaning on your Mac when Ollama has an embedding model such as EmbeddingGemma, with nothing sent anywhere; otherwise by their words, or through an embeddings connection you choose. Tool answers that can't be recorded are no longer returned.
+- **Skills you can trust.** Before you add a community skill, Sidemates lists the lines worth reading: links that would send your data somewhere, uploads, request-catching addresses, hidden comments, and asks to ignore its rules or keep things from you. Lines that download code and run it still block adding it. An added skill is pinned to the exact version you reviewed: if its files change, teammates can't use it, and "Check for an update" shows a line-by-line diff that you install or skip. Skills with scripts can now be added; their scripts stay off until you turn them on, and then run only in the teammate's own computer, never on your Mac.
+- **Private mode and a receipt for every task.** Turn on Private mode for a teammate and, before anything reaches a cloud AI, names, email addresses, phone numbers, IBANs and card numbers become placeholders such as [NAME_1]; the answer, and anything the teammate does for you, get the real ones back on your Mac. Pictures and screenshots stay on the Mac. With a model on your Mac, nothing leaves at all. Each task's work receipt now shows exactly what was sent to which AI (with personal details masked), the tokens and requests it used, and what that cost or which plan or free allowance it counted toward. Claude Code's workspace tools now go through Sidemates like every other tool, so they are covered too.
+- **Shared results bring people back.** A result page you share can carry a "Make this teammate" link that adds the same teammate (its name, job and instructions, nothing from the conversation) to the reader's own Sidemates; untick it to leave it out. Put online, the page previews with its title, one sentence of the answer (personal details still hidden) and the teammate's face. Sharing from a phone now opens the share sheet too.
+- **Submit a teammate to the gallery without Git.** "Submit to the gallery" in a teammate's settings opens the gallery form on GitHub, filled in with that teammate. Nothing is sent until you submit it there. A check then runs the gallery's own test and opens a pull request for review, or comments on what to fix.
+- **Your Mac reacts.** Two new automation triggers: "a file lands in a folder" (optionally only some file types) and "mail like this arrives" (by sender or subject, from the Mail app). What's already there never starts a run, files or mails arriving together start one run once things are quiet for half a minute, and each automation runs at most six times an hour. Both need Files & apps on this Mac.
+- **A teammate can suggest a specialist.** When a job would clearly go better with a researcher or a writer, your teammate can propose one, saying why and which AI they'd use. Nothing is added unless you approve, even on Autopilot, and a "no" isn't asked again in that conversation.
+- **Published attack tests.** Prompt injections in a web page, an email, a PDF and a calendar invite run in CI against a stand-in that obeys them, at Ask first and on Autopilot. docs/SECURITY.md shows what each one achieves, including the ones that still get through and the tasks that will close them.
+- **Some things always ask, even on Autopilot.** Spending money, the first message to someone you haven't written to, anything that can't be undone (deleting, account and security settings), publishing (public posts, pushes, deploys), and passwords and card details. The approval card says why. Teammates never type card or bank details; you enter those yourself. A button that looks harmless but shows "Pay now" on screen, or a plain link into a checkout, now asks too.
+- **When a job can't finish, you see what's missing and the fix.** A stopped task, or a tool refused for a reason only you can change, shows one button: choose another AI, reconnect an app, open the right macOS privacy page, turn on Files & apps, get a browser, or try again.
+- **A guided first run.** After installing, Sidemates helps you choose your AI (ChatGPT, a free Gemini key, Claude Code, or Ollama on your Mac in one click), confirm a model and meet your first teammate, then suggests three things to try. Calendar and Reminders access is asked only when a suggestion needs it, and specialists (a researcher, a writer) can be added later with one click on the same AI.
+- The loading and phone pairing screens say Sidemates instead of OpenBot.
+- **A free Gemini key in a few clicks.** Paste the key from Google AI Studio and Sidemates connects it and tests it with one tiny reply straight away; if the test fails you see why and can paste another key or continue. Two notes from Google's terms are shown next to it (dated, with a link), and Gemini's free limits now say whether to wait a minute or until tomorrow.
+- **Gmail and Google Calendar without a Google Cloud project.** Apps & tools now recommends adding your Google account to the Mac's own Mail and Calendar, which teammates can read, with one button each for Internet Accounts, Files & apps and Full Disk Access. The Google Cloud connection is still there, marked advanced.
+- The morning brief checks its own rundown before posting it: times in order, at most five mails, nothing changed, and where each part came from.
+- **Install without Terminal.** A disk image for each kind of Mac installs exactly what the one-line install does, in three steps (macOS asks you to allow it once, since Sidemates isn't signed by Apple yet). sidemates.app/mac-download/ shows each step. Settings → Your setup notes which way you installed.
+- **Lighter requests to your AI.** A teammate's "hi" now sends about 40% less to the AI (measured offline: from about 8,800 to 5,200 tokens), which stretches free allowances and suits smaller models. Teammates also have optional tool groups (documents and spreadsheets, routines and reminders, working with teammates) under Advanced Teammate Options; turning off what a teammate doesn't need makes every request shorter, and the teammate tells you when a request needs one that's off.
+- **A browser for everyone.** If your computer has no Chrome, Edge or Brave, Sidemates offers to download a private browser for your teammates (about 190 MB) into its own data folder. Nothing is downloaded unless you click.
+- **Your setup** (Settings): a timeline of your first days with Sidemates: the first start, opening the studio, connecting an AI, your first teammate, first answer and first finished job, and coming back. It stays on your Mac and is never sent; Copy puts it in a note or a bug report.
+- Safer AI defaults:
+  - A model whose provider doesn't train on your prompts is now recommended first.
+  - The Muse Spark Contributor models are labelled, because Meta may train on their prompts.
+  - OpenCode's free models only work inside OpenCode's own app, so they can no longer be chosen for a teammate; you're told why up front instead of a failed task.
+  - The Claude card says it uses the Claude Code you installed, instead of showing an "Official login" badge.
+- The website and README now say only what is true today:
+  - Phone access works through Telegram, or the Home Screen app with a relay you set up; pairing with one scan is on the way.
+  - The install takes a few minutes and downloads about 140 MB.
+  - Web tasks need Chrome, Edge or Brave.
+  - Routines run while your Mac is awake.
+  - Voice and phone access are marked beta.
+  - Competitor facts are updated to 7 October 2026.
+- Website:
+  - A new page compares Sidemates with Meta Muse.
+  - The Grok Bot and OpenAI dots pages have current prices and say that dots can use your computer through the ChatGPT desktop app.
+  - The site's font is served from sidemates.app, so a visit no longer contacts Google Fonts.
+  - The teammate gallery shows a title and picture when shared.
+  - The site and README say that Sidemates has no token or cryptocurrency.
+- Security: packages with known vulnerabilities are updated: proxy-addr, the MCP client and SDK, sharp, fast-uri, ip-address, and shell-quote, which the development tools use. `npm audit` now reports none.
+- Docs:
+  - "Reach your Mac from your phone" is now a general guide, not one person's setup.
+  - The product audit is marked as a historical record.
+  - The security model says the native iPhone app is retired.
+- For contributors: the README's run-from-source steps work again (`cd sidemates`). CONTRIBUTING names scripts that exist. Browser tests now honor `OPENBOT_CHROME_PATH` in the studios they start.
+- Private runner and CI: the runner's README, setup, update and transfer messages, the CI artifacts and the bug report form now say Sidemates. Server paths, `OPENBOT_*` settings, the `openbot` service and `.openbot-home` files keep their names, so existing servers keep working.
+
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
 - **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.

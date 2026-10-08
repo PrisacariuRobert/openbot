@@ -24,7 +24,7 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
-  echo "OpenBot has uncommitted source changes. Review or commit them before updating."
+  echo "Sidemates has uncommitted source changes. Review or commit them before updating."
   exit 1
 fi
 if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
@@ -60,7 +60,7 @@ update_record="${host_root}/data/runner-update.json"
 last_successful_revision="$(sed -n 's/^.*"revision":"\([a-f0-9]*\)".*$/\1/p' "${update_record}" 2>/dev/null | head -n 1 || true)"
 if [[ "${target_revision}" == "${current_revision}" ]]; then
   if [[ "${last_successful_revision}" == "${target_revision}" ]]; then
-    echo "OpenBot ${current_version} is already current."
+    echo "Sidemates ${current_version} is already current."
     exit 0
   fi
   echo "The source is current, but this release was not recorded as healthy. Rebuilding it safely…"
@@ -70,18 +70,18 @@ if ! git -C "${repo_root}" merge-base --is-ancestor "${current_revision}" "${tar
   exit 1
 fi
 
-echo "Creating a private backup before changing OpenBot…"
+echo "Creating a private backup before changing Sidemates…"
 "${runner_dir}/backup.sh"
 if [[ "${target_revision}" != "${current_revision}" ]]; then
   git -C "${repo_root}" merge --ff-only "${target_revision}"
 fi
 next_version="$(sed -n 's/^[[:space:]]*"version": "\([^"]*\)",/\1/p' "${repo_root}/package.json" | head -n 1)"
 if [[ ! "${next_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
-  echo "The selected release does not contain a valid OpenBot version. The existing service is still running."
+  echo "The selected release does not contain a valid Sidemates version. The existing service is still running."
   exit 1
 fi
 
-echo "Building OpenBot ${next_version} while the current service keeps running…"
+echo "Building Sidemates ${next_version} while the current service keeps running…"
 "${compose[@]}" build openbot
 "${compose[@]}" up -d --no-deps openbot
 
@@ -105,7 +105,7 @@ if [[ -z "${next_container}" ]] || ! wait_for_healthy "${next_container}"; then
   if [[ -z "${restored_container}" ]] || ! wait_for_healthy "${restored_container}"; then
     echo "Automatic recovery also needs attention. Restore the latest archive in ${host_root}/backups."
   else
-    echo "The previous OpenBot service is healthy again. Source remains at ${next_version}; review the failed container logs before retrying."
+    echo "The previous Sidemates service is healthy again. Source remains at ${next_version}; review the failed container logs before retrying."
   fi
   exit 1
 fi
@@ -117,4 +117,4 @@ record_tmp="${record}.tmp.$$"
 printf '{"lastUpdateAt":"%s","fromVersion":"%s","toVersion":"%s","revision":"%s"}\n' "${updated_at}" "${current_version}" "${next_version}" "${target_revision}" > "${record_tmp}"
 chmod 0600 "${record_tmp}"
 mv "${record_tmp}" "${record}"
-echo "OpenBot ${next_version} is healthy. The backup-first update is complete."
+echo "Sidemates ${next_version} is healthy. The backup-first update is complete."

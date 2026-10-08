@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Install Sidemates without Terminal — Sidemates</title>
+  <meta name="description" content="Download Sidemates for your Mac as a disk image and install it in three steps, without Terminal. macOS asks you to allow it once, because Sidemates isn't signed by Apple yet." />
+  <link rel="canonical" href="https://sidemates.app/mac-download/" />
+  <meta property="og:title" content="Install Sidemates without Terminal — Sidemates" />
+  <meta property="og:description" content="Download Sidemates for your Mac and install it in three steps, without Terminal." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://sidemates.app/mac-download/" />
+  <meta property="og:image" content="https://sidemates.app/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="../fonts/nunito.css" />
+  <style>
+    :root {
+      --ink: #1b1b1f; --ink-2: #4a4a52; --muted: #7a7a84; --paper: #ffffff; --cloud: #f4f3f0; --line: #e7e5e0;
+      --nova: #6757d9; --pixel: #d86889; --scout: #299575; --sun: #ffc83d;
+      --round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+      --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Nunito", system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cloud); color: var(--ink); font: 17px/1.55 var(--text); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { font-family: var(--round); font-weight: 900; letter-spacing: -0.03em; }
+    a { color: inherit; }
+    header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 900 22px/1 var(--round); letter-spacing: -.03em; text-decoration: none; }
+    .brand svg { width: 32px; height: 32px; }
+    .btn { --face: var(--ink); --edge: #000; --label: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 20px; border: 0; border-radius: 15px; background: var(--face); color: var(--label); font: 800 16px/1 var(--round); cursor: pointer; text-decoration: none; box-shadow: 0 5px 0 var(--edge); transition: transform .12s, box-shadow .12s, filter .15s; }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(5px); box-shadow: 0 0 0 var(--edge); }
+    .btn.small { height: 40px; padding: 0 16px; font-size: 15px; border-radius: 13px; box-shadow: 0 4px 0 var(--edge); }
+    .btn.small:active { transform: translateY(4px); }
+    .btn.ghost { --face: #fff; --edge: var(--line); --label: var(--ink); }
+    .btn:focus-visible, .card a:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 24px 90px; }
+    .hero { padding: 24px 0 28px; max-width: 760px; }
+    .hero h1 { margin: 0 0 12px; font-size: clamp(38px, 6.5vw, 62px); line-height: 1.02; }
+    .hero p { margin: 0 0 10px; font-size: 19px; color: var(--ink-2); }
+    .get { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 8px; }
+    .get .btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+    .note { margin: 6px 0 0; font-size: 15px; color: var(--muted); }
+    .note[hidden] { display: none; }
+    .steps { list-style: none; margin: 34px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 22px; counter-reset: step; }
+    .steps li { background: var(--paper); border-radius: 28px; padding: 24px; display: grid; gap: 12px; align-content: start; box-shadow: 0 24px 50px rgba(40,30,80,.07), 0 2px 0 rgba(0,0,0,.04); }
+    .steps h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+    .steps h2::before { counter-increment: step; content: counter(step); display: inline-grid; place-items: center; width: 34px; height: 34px; margin-right: 10px; border-radius: 50%; background: var(--ink); color: var(--cloud); font-size: 18px; vertical-align: 2px; }
+    .steps p { margin: 0; color: var(--ink-2); font-size: 16px; }
+    .steps svg { width: 100%; height: auto; border-radius: 16px; background: var(--cloud); }
+    .fine { margin: 30px 0 0; max-width: 760px; font-size: 15px; color: var(--muted); }
+    .fine p { margin: 0 0 8px; }
+    .cmd { display: inline-flex; gap: 8px; align-items: center; background: #0c0c10; color: #fff; border-radius: 12px; padding: 6px 12px; font: 13.5px/1.4 var(--mono); overflow-wrap: anywhere; }
+    .ill-win { fill: #fff; stroke: #d8d6d0; }
+    .ill-text { fill: #1b1b1f; font: 600 13px var(--text); }
+    .ill-soft { fill: #6b6b75; font: 12px var(--text); }
+    .ill-btn { fill: #e9e8e4; }
+    .ill-btn-text { fill: #1b1b1f; font: 600 12px var(--text); }
+    .ill-pick { fill: #0a84ff; }
+    .ill-pick-text { fill: #fff; font: 700 12px var(--text); }
+    .ill-ring { fill: none; stroke: #ffc83d; stroke-width: 4; }
+    .ill-side { fill: #f1f0ec; }
+    .ill-sel { fill: #dcdad4; }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f3f2f6; --ink-2: #c7c6cf; --muted: #9c9ba6; --cloud: #141418; --line: #2a2a31; } .card { background: #1c1c22; box-shadow: none; } .btn { --edge: rgba(0,0,0,.5); } .btn:not(.ghost) { --face: #f3f2f6; --label: #1b1b1f; } .btn.ghost { --face: #2a2a31; } .share { background: #1c1c22; } .share .btn { --face: #f3f2f6; --label: #1b1b1f; } }
+    @media (prefers-color-scheme: dark) { .steps li { background: #1c1c22; box-shadow: none; } .ill-win { fill: #2a2a31; stroke: #3a3a42; } .ill-text { fill: #f3f2f6; } .ill-soft { fill: #b4b3bc; } .ill-btn { fill: #3a3a42; } .ill-btn-text { fill: #f3f2f6; } .ill-side { fill: #232329; } .ill-sel { fill: #3a3a42; } }
+  </style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../" aria-label="Sidemates"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="10"/><path d="M15 15v3M25 15v3M14 24c3.2 3.2 8.8 3.2 12 0"/></svg>sidemates</a>
+  <a class="btn small ghost" href="../#install">One-line install</a>
+</header>
+<main>
+  <section class="hero">
+    <h1>Install Sidemates without Terminal.</h1>
+    <p>Download the disk image for your Mac and open it. It installs exactly what the one-line install does: same app, same background service, same studio.</p>
+    <div class="get">
+      <a class="btn" id="arm" href="https://sidemates.app/download/latest/Sidemates-mac-arm64.dmg">Download for Apple silicon</a>
+      <a class="btn ghost" id="intel" href="https://sidemates.app/download/latest/Sidemates-mac-x64.dmg">Download for Intel</a>
+    </div>
+    <p class="note">Not sure which? Apple menu → About This Mac: “Chip: Apple M…” is Apple silicon; “Processor: … Intel” is Intel. About 140 MB. macOS 13 or later.</p>
+    <p class="note" id="pending" role="status" hidden>The disk image arrives with the next release of Sidemates. Until then, use the <a href="../#install">one-line install</a>.</p>
+  </section>
+
+  <ol class="steps" aria-label="Three steps">
+    <li>
+      <h2>Open “Install Sidemates”</h2>
+      <p>Open the downloaded disk image and double-click <strong>Install Sidemates</strong>. macOS says it can't check it. Click <strong>Done</strong>, not Move to Trash.</p>
+      <svg viewBox="0 0 320 190" role="img" aria-label="Illustration: macOS warning that it cannot check Install Sidemates, with the Done button highlighted">
+        <rect class="ill-win" x="40" y="18" width="240" height="154" rx="14" />
+        <text class="ill-text" x="160" y="58" text-anchor="middle">Apple cannot check</text>
+        <text class="ill-text" x="160" y="76" text-anchor="middle">“Install Sidemates” for</text>
+        <text class="ill-text" x="160" y="94" text-anchor="middle">malicious software.</text>
+        <rect class="ill-btn" x="58" y="122" width="96" height="30" rx="8" /><text class="ill-btn-text" x="106" y="141" text-anchor="middle">Move to Trash</text>
+        <rect class="ill-pick" x="166" y="122" width="96" height="30" rx="8" /><text class="ill-pick-text" x="214" y="141" text-anchor="middle">Done</text>
+        <rect class="ill-ring" x="160" y="116" width="108" height="42" rx="12" />
+      </svg>
+    </li>
+    <li>
+      <h2>Click “Open Anyway”</h2>
+      <p>Open <strong>System Settings → Privacy &amp; Security</strong> and scroll down to <strong>Open Anyway</strong> next to “Install Sidemates”. macOS may ask for your Mac's password or Touch ID here; that's macOS asking, not Sidemates.</p>
+      <svg viewBox="0 0 320 190" role="img" aria-label="Illustration: System Settings, Privacy and Security, with the Open Anyway button highlighted">
+        <rect class="ill-win" x="12" y="14" width="296" height="162" rx="14" />
+        <rect class="ill-side" x="13" y="15" width="92" height="160" rx="13" />
+        <rect class="ill-sel" x="21" y="70" width="76" height="22" rx="6" /><text class="ill-soft" x="27" y="85">Privacy &amp; …</text>
+        <text class="ill-soft" x="27" y="50">General</text><text class="ill-soft" x="27" y="118">Desktop</text><text class="ill-soft" x="27" y="146">Displays</text>
+        <text class="ill-text" x="118" y="44">Security</text>
+        <text class="ill-soft" x="118" y="72">“Install Sidemates” was</text>
+        <text class="ill-soft" x="118" y="90">blocked to protect your Mac.</text>
+        <rect class="ill-pick" x="186" y="114" width="104" height="30" rx="8" /><text class="ill-pick-text" x="238" y="133" text-anchor="middle">Open Anyway</text>
+        <rect class="ill-ring" x="180" y="108" width="116" height="42" rx="12" />
+      </svg>
+    </li>
+    <li>
+      <h2>Click “Open”, then wait</h2>
+      <p>The warning appears once more: click <strong>Open</strong>. A Terminal window shows the install, and your studio opens in the browser in a few minutes. You can eject the disk afterwards.</p>
+      <svg viewBox="0 0 320 190" role="img" aria-label="Illustration: the warning shown again with the Open button highlighted, then the installer running">
+        <rect class="ill-win" x="40" y="18" width="240" height="96" rx="14" />
+        <text class="ill-text" x="160" y="50" text-anchor="middle">Open “Install Sidemates”?</text>
+        <rect class="ill-btn" x="58" y="70" width="96" height="30" rx="8" /><text class="ill-btn-text" x="106" y="89" text-anchor="middle">Cancel</text>
+        <rect class="ill-pick" x="166" y="70" width="96" height="30" rx="8" /><text class="ill-pick-text" x="214" y="89" text-anchor="middle">Open</text>
+        <rect class="ill-ring" x="160" y="64" width="108" height="42" rx="12" />
+        <rect x="40" y="124" width="240" height="52" rx="10" fill="#0c0c10" />
+        <text x="54" y="146" fill="#fff" style="font: 12px ui-monospace, Menlo, monospace">• Copying Sidemates from the disk…</text>
+        <text x="54" y="164" fill="#7ee2a8" style="font: 12px ui-monospace, Menlo, monospace">Sidemates is installed.</text>
+      </svg>
+    </li>
+  </ol>
+
+  <div class="fine">
+    <p>These are illustrations of macOS's own windows; the exact words can differ between macOS versions. Apple describes the same steps in <a href="https://support.apple.com/en-us/102445">Safely open apps on your Mac</a> (published 27 May 2026, checked 8 October 2026).</p>
+    <p>Why macOS asks: Sidemates isn't signed by Apple yet. The installer checks the bundle's fingerprint before using it, needs no administrator password of its own, and leaves an uninstaller: <span class="cmd">"~/Library/Application Support/Sidemates/uninstall.sh"</span></p>
+    <p>Comfortable with Terminal? The <a href="../#install">one-line install</a> does the same without these steps.</p>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  // Until a release carries the disk images, say so instead of offering a broken link.
+  var buttons = [document.getElementById("arm"), document.getElementById("intel")];
+  fetch(buttons[0].getAttribute("href").replace("https://sidemates.app", ""), { method: "HEAD", cache: "no-store" }).then(function (response) {
+    if (response.ok) return;
+    buttons.forEach(function (button) { button.setAttribute("aria-disabled", "true"); button.removeAttribute("href"); });
+    document.getElementById("pending").hidden = false;
+  }).catch(function () { /* Offline or a local preview: leave the links as they are. */ });
+})();
+</script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8f2032f0ecba495292edb586086c935b"}'></script>
+</body>
+</html>

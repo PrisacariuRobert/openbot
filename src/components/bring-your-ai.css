@@ -26,9 +26,17 @@
 .byo-attempt strong { font-size: 14px; } .byo-attempt p { margin: 0; font-size: 13px; color: var(--label-secondary); }
 .byo-attempt a { font-size: 13px; color: var(--label-primary); }
 .byo-error { margin: 4px 0 0; font-size: 13px; color: var(--danger); }
+.byo-status { margin: 0; font-size: 13px; color: var(--label-secondary); }
+.byo-untested { display: grid; gap: 6px; justify-items: start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--secondary-system-background); }
+.byo-untested p { margin: 0; font-size: 13px; line-height: 18px; color: var(--label-primary); }
+.byo-terms { display: grid; gap: 4px; }
+.byo-terms p { margin: 0; font-size: 12px; line-height: 17px; color: var(--label-secondary); }
+.byo .byo-terms a { justify-self: start; font-size: 12px; color: var(--label-secondary); text-decoration: underline; text-underline-offset: 3px; }
+.byo-terms a svg { vertical-align: -1px; margin-left: 2px; }
+.byo-terms a:focus-visible, .byo-untested button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 .byo-more { margin-top: 10px; }
 .byo-more summary { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--label-secondary); list-style: none; }
 .byo-more summary::-webkit-details-marker { display: none; }
 .byo-more[open] summary svg { transform: rotate(180deg); }
 .byo-more .byo-list { margin-top: 8px; }
-@media (max-width: 520px) { .byo { padding: 16px; } .byo-key form, .byo-code { flex-direction: column; } }
+@media (max-width: 520px) { .byo { padding: 16px; } .byo-key form, .byo-code { flex-direction: column; } .byo-key input, .byo-code input { flex: 0 0 auto; } }

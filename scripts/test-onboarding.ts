@@ -61,7 +61,7 @@ try {
   browser = await chromium.launch({ executablePath: process.env.OPENBOT_CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const unexpected: string[] = [], errors: string[] = [];
-  let connectionWrites = 0, teammateWrites = 0;
+  let connectionWrites = 0, teammateWrites = 0, visitNotes = 0;
   context.on("page", (page) => page.on("pageerror", (error) => errors.push(error.message)));
   await context.route("**/*", async (route) => {
     const req = route.request(), url = new URL(req.url());
@@ -72,6 +72,8 @@ try {
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) {
       if (req.method() === "POST" && url.pathname === "/api/providers") connectionWrites++;
       else if (req.method() === "POST" && url.pathname === "/api/bots") teammateWrites++;
+      // The studio notes its own visit for Settings → Your setup (A1); it stays on this host.
+      else if (req.method() === "POST" && url.pathname === "/api/setup/visit") visitNotes++;
       else {
         unexpected.push(req.method() + " " + url.pathname);
         return route.abort("blockedbyclient");
@@ -83,7 +85,7 @@ try {
   page.setDefaultTimeout(15_000);
   await page.goto(base + "/studio.html");
   await page.getByRole("heading", { name: "Good work starts with a conversation." }).waitFor();
-  await page.getByRole("button", { name: "Create your first teammate" }).click();
+  await page.getByRole("button", { name: "Create one teammate myself" }).click();
   const creation = page.getByRole("dialog");
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");
@@ -185,6 +187,10 @@ try {
   assert.equal(final.settings.macAccessEnabled, false);
   assert.equal(final.messages.filter((message) => message.senderType === "bot").length, 0, "Setup never fabricates a reply");
   assert.deepEqual(unexpected, []);
+  assert.ok(visitNotes >= 1, "opening the studio is noted for the local setup timeline");
+  const timeline = await (await request("/api/setup")).json() as { milestones: Array<{ name: string; at: string | null }>; sharing: { available: boolean; enabled: boolean } };
+  for (const name of ["installed", "studio_opened", "first_teammate"]) assert.ok(timeline.milestones.find((entry) => entry.name === name)?.at, `${name} is on the setup timeline`);
+  assert.deepEqual(timeline.sharing, { available: false, enabled: false }, "nothing about setup is shared");
   assert.deepEqual(errors, []);
   console.log("PASS: actual empty-studio UI → separate API/local setup → saved, untested connection → focus refresh with draft preserved → explicit provider/model choice → real teammate creation → persisted reload. Zero model jobs, account sign-ins, copied keys or browser/computer grants. Desktop and 390px setup fit.");
 } finally {

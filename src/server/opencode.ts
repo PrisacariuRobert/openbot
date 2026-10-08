@@ -8,9 +8,10 @@ import { fileURLToPath } from "node:url";
 import type { Bot, Run } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
-import { connectedAppsText, prepareWorkspace } from "./workspace.js";
-import { browserTaskDirection } from "./browser-access.js";
-import { conversationStyle } from "./conversation-style.js";
+import { prepareWorkspace } from "./workspace.js";
+import { fragment } from "./prompt-files.js";
+import { accessForTask } from "./access-summary.js";
+import { studioNow } from "./hero-fixture-mac.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { prepareConsultationFiles } from "./consultation-files.js";
 import { routeBotReply } from "./group-routing.js";
@@ -85,7 +86,7 @@ function friendlyToolActivity(rawName: string, title: string | null): ToolActivi
     spreadsheet_inspect: "Checking your saved workbook", conversation_search: "Looking back in this conversation",
     table_summary: "Calculating your table totals",
     task_plan: "Setting the finish line", task_progress: "Moving the job forward", task_verify: "Checking the finished work",
-    routine_create: "Setting up your routine", skill_propose: "Preparing a reusable skill for your review",
+    routine_create: "Setting up your routine", skill_propose: "Preparing a reusable skill for your review", propose_teammate: "Suggesting a teammate for your okay",
     message_teammate: "Checking in with a teammate", request_approval: "Checking with you first", self_extend: "Proposing to write its own tool",
   };
   return { label: labels[name] || title || "Working on it", detail: null, kind: name === "handoff" ? "handoff" : "tool" };
@@ -435,18 +436,12 @@ export class OpenCodeRunner {
     let request = redirectedFrom
       ? `The user added a new direction while you were working. Continue the same job without repeating finished work.\n\nPrevious request: ${redirectedFrom.prompt}\n\nNewest direction (authoritative): ${run.prompt}`
       : continuing
-        ? `Continue the existing task after the user's latest instruction or approval. Current request: ${run.prompt}`
-        : `Take care of this new request for the user: ${run.prompt}\nOlder tasks are background only, not part of this request. Do not repeat their actions or append unrelated completion claims.`;
-    request = `${currentMoment()}\n\n${request}`;
-    const sharedProjects = this.options.db.listCodeProjects(bot.id).map((project) => {
-      const access = project.access.find((item) => item.botId === bot.id)!;
-      return `- ${project.name} (${project.id}): ${access.canWrite ? "edit" : "read-only"}${access.canRun ? ", checks enabled" : ""}`;
-    }).join("\n") || "- No code projects are shared with this teammate.";
-    const hasProjects = this.options.db.listCodeProjects(bot.id).length > 0;
-    const codeHint = hasProjects ? " For code work, inspect project instructions and current status, make focused changes, and run the smallest relevant checks." : "";
-    const inboxHint = toolAvailability(this.options.db, bot).gmail_search ? " For “latest” or “last email,” search the inbox for one newest message, then read it before answering." : "";
-    const liveApps = `Current connected-app state for this task (authoritative; it overrides older messages and memories):\n${connectedAppsText(this.options.db, bot)}\n\n${browserTaskDirection(this.options.db, bot)}\n\nShared code projects:\n${sharedProjects}\n\nIf the request can be answered with an available app or code project, use its tool now.${codeHint}${inboxHint} Never claim an app is disconnected based only on an earlier reply; only report a connection problem when a tool returns one during this task.`;
-    const completion = `Completion rules:\n- Own the requested outcome, not merely the next response.\n- For multi-step work, call task_plan before the first work tool, keep meaningful steps current with task_progress, and call task_verify before the final answer.\n- For a text deliverable saved in your workspace, give task_verify workspace_file evidence so Sidemates independently reopens it and checks its size or required text; do not rely only on your own passed boolean.\n- Continue until the deliverable is finished and checked, an external action needs approval, or a real blocker remains.\n- A progress update, explanation of what you could do, or unverified draft is not a finished deliverable.\n- Keep the conversation quiet: use the task tools for progress and reserve prose for a short useful result or a genuine question.\n- Answer questions and short requests in chat. Save a file only when the user asks for one or the result is a substantial document; then keep it inside your workspace and include its relative path as a Markdown link in the final answer so Sidemates can show it as a reviewable result card.`;
+        ? fragment("request", "continue", { prompt: run.prompt })
+        : fragment("request", "new", { prompt: run.prompt });
+    request = `${currentMoment(studioNow())}\n\n${request}`;
+    const latestEmail = toolAvailability(this.options.db, bot).gmail_search ? `\n${fragment("request", "latest-email")}` : "";
+    const liveApps = fragment("request", "access", { access: accessForTask(this.options.db, bot) }) + latestEmail;
+    const completion = fragment("request", "completion");
     const taskContext = continuing && run.task.tracked
       ? `\n\nResume the existing job contract; do not replace its plan unless the user's outcome changed.\nGoal: ${run.task.goal}\nDeliverable: ${run.task.deliverable}\nSteps:\n${run.task.steps.map((step) => `- ${step.id}. [${step.status}] ${step.title}${step.detail ? ` — ${step.detail}` : ""}`).join("\n")}`
       : "";
@@ -467,7 +462,7 @@ export class OpenCodeRunner {
     if (run.parentRunId && !run.expectedWorkKind && run.prompt.startsWith("Private teammate question from ")) {
       return `${request}\n\nAnswer this private question directly. Use only the tools the question needs; do not call task_plan, task_progress or task_verify unless you save a file for your teammate. End with a short, specific finding and say plainly what you could not check.\n\n${liveApps}${teamContext}${recovery}`;
     }
-    return `${request}${methodContext}\n\n${completion}\n\n${conversationStyle}${taskContext}${requiredReport}\n\n${liveApps}${localContext}${teamContext}${resumeEvidence}${recovery}`;
+    return `${request}${methodContext}\n\n${completion}\n\n${fragment("request", "style")}${taskContext}${requiredReport}\n\n${liveApps}${localContext}${teamContext}${resumeEvidence}${recovery}`;
   }
 
   private executeRun(run: Run) {
@@ -500,7 +495,20 @@ export class OpenCodeRunner {
     const initialStop = meter.reason(previousTokens, !this.options.db.budgetAvailable(bot.id).allowed);
     if (initialStop === "tokens") { this.pauseForTokens(run.id); return; }
     if (initialStop) { this.failBeforeStart(run, executionStopMessage[initialStop]); return; }
-    const workspace = prepareWorkspace(this.options.db, bot, Boolean(run.expectedWorkKind));
+    // Task F3: in Private mode with a cloud AI, everything Sidemates hands the
+    // runtime is masked, and what comes back gets the real values here.
+    const privacy = RunPrivacy.forRun(this.options.db, run);
+    const restore = (text: string) => privacy.unmask(text);
+    privacy.learnFromOwner([
+      run.prompt, ...(run.steeredFromRunId ? [this.options.db.getRun(run.steeredFromRunId)?.prompt || ""] : []),
+      ...this.options.db.listMessages(run.threadId).filter((message) => message.senderType === "user").slice(-20).map((message) => message.body),
+      ...this.options.db.listMemories(bot.id).map((memory) => memory.content),
+    ]);
+    const workspace = prepareWorkspace(this.options.db, bot, Boolean(run.expectedWorkKind), (profile) => {
+      const sent = privacy.mask(profile);
+      logSentText(this.options.db, run, { kind: "instructions", label: "Instructions and memories", text: sent.text, masked: privacy.masked, local: privacy.local, counts: sent.counts });
+      return sent.text;
+    });
     const sharedFiles = prepareConsultationFiles(this.options.db, run);
     const useClaude = provider?.runtime === "claude_code";
     // Gate 1a: an unverified runtime fails closed for model execution only.
@@ -531,11 +539,22 @@ export class OpenCodeRunner {
       ...this.options.db.providerEnvironment(bot.id), OPENBOT_INTERNAL_URL: this.options.internalUrl,
       OPENBOT_INTERNAL_TOKEN: scopedToolToken(this.options.internalToken, bot.id, run.id), OPENBOT_BOT_ID: bot.id, OPENBOT_RUN_ID: run.id, OPENBOT_WORKSPACE: workspace,
       OPENBOT_TOOL_AVAILABILITY: JSON.stringify(toolAvailability(this.options.db, bot, Boolean(run.expectedWorkKind))),
+      // Claude Code's workspace tools go through the server too, so they are logged and masked like every other tool.
+      OPENBOT_SERVER_WORKSPACE: "1",
     };
-    const prompt = this.buildPrompt(run, bot, sessionChoice.continuing) + (!previousSession ? conversationBridge(this.options.db, run) : "") + sharedFiles;
-    const attachedFiles = modelAttachmentFiles(this.options.db, run);
+    let fullPrompt = this.buildPrompt(run, bot, sessionChoice.continuing) + (!previousSession ? conversationBridge(this.options.db, run) : "") + sharedFiles;
+    let attachedFiles = modelAttachmentFiles(this.options.db, run);
+    if (privacy.masked && attachedFiles.length) {
+      const kept = run.attachmentIds.map((id) => this.options.db.getAttachment(id)).filter((attachment) => attachment && ["image", "audio", "video"].includes(attachment.kind)).map((attachment) => attachment!.name);
+      fullPrompt += `\n\nPrivate mode: the owner attached ${kept.join(", ")}. Pictures, audio and video can't be masked, so they stay on this Mac and you can't see them. If the task needs them, say so.`;
+      logSentText(this.options.db, run, { kind: "kept", label: "Kept on this Mac", text: kept.join("\n"), masked: true, local: false });
+      attachedFiles = [];
+    }
+    const sentPrompt = privacy.mask(fullPrompt);
+    logSentText(this.options.db, run, { kind: "request", label: "The request and conversation", text: sentPrompt.text, masked: privacy.masked, local: privacy.local, counts: sentPrompt.counts });
+    const prompt = sentPrompt.text;
     const mcpConfig = JSON.stringify({ mcpServers: { openbot: { command: process.execPath, args: [CLAUDE_MCP_PATH] } } });
-    const claudeTools = ["mcp__openbot__connected_tools", "mcp__openbot__connected_call", "mcp__openbot__community_skill_search", "mcp__openbot__community_skill_read", "mcp__openbot__memory_search", "mcp__openbot__conversation_search", "mcp__openbot__table_summary", "mcp__openbot__table_reconcile", "mcp__openbot__spreadsheet_export", "mcp__openbot__document_export", "mcp__openbot__web_search", "mcp__openbot__web_read", "mcp__openbot__spreadsheet_inspect", "mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_request_sign_in", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_observe", "mcp__openbot__browser_see", "mcp__openbot__browser_semantic_act", "mcp__openbot__browser_semantic_upload", "mcp__openbot__browser_arm_downloads", "mcp__openbot__browser_download_results", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__browser_upload_saved_file", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_read", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__mac_calendar_events", "mcp__openbot__mac_mail_unread", "mcp__openbot__search_my_mac", "mcp__openbot__mac_mail_search", "mcp__openbot__mac_mail_read", "mcp__openbot__mac_mail_save_attachment", "mcp__openbot__mac_reminders", "mcp__openbot__mac_reminder_create", "mcp__openbot__mac_notes_search", "mcp__openbot__mac_note_read", "mcp__openbot__mac_note_create", "mcp__openbot__mac_contacts_find", "mcp__openbot__mac_calendars", "mcp__openbot__mac_event_create", "mcp__openbot__mac_mail_draft", "mcp__openbot__mac_shortcuts_list", "mcp__openbot__mac_shortcut_run", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__gmail_reply", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_drive_create", "mcp__openbot__google_calendar_agenda", "mcp__openbot__google_calendar_create", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__slack_search", "mcp__openbot__slack_read", "mcp__openbot__slack_post", "mcp__openbot__notion_search", "mcp__openbot__notion_read", "mcp__openbot__notion_update", "mcp__openbot__todoist_tasks", "mcp__openbot__todoist_task_create", "mcp__openbot__todoist_task_update", "mcp__openbot__todoist_task_complete", "mcp__openbot__dropbox_search", "mcp__openbot__dropbox_read", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__skill_propose", "mcp__openbot__routine_create", "mcp__openbot__routine_list", "mcp__openbot__routine_update", "mcp__openbot__routine_pause", "mcp__openbot__routine_resume", "mcp__openbot__routine_delete", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval", "mcp__openbot__self_extend"].join(",");
+    const claudeTools = ["mcp__openbot__connected_tools", "mcp__openbot__connected_call", "mcp__openbot__community_skill_search", "mcp__openbot__community_skill_read", "mcp__openbot__memory_search", "mcp__openbot__conversation_search", "mcp__openbot__table_summary", "mcp__openbot__table_reconcile", "mcp__openbot__spreadsheet_export", "mcp__openbot__document_export", "mcp__openbot__web_search", "mcp__openbot__web_read", "mcp__openbot__spreadsheet_inspect", "mcp__openbot__workspace_list", "mcp__openbot__workspace_read", "mcp__openbot__workspace_write", "mcp__openbot__workspace_replace", "mcp__openbot__isolated_bash", "mcp__openbot__browser_request_sign_in", "mcp__openbot__browser_open", "mcp__openbot__browser_snapshot", "mcp__openbot__browser_observe", "mcp__openbot__browser_see", "mcp__openbot__browser_semantic_act", "mcp__openbot__browser_semantic_upload", "mcp__openbot__browser_arm_downloads", "mcp__openbot__browser_download_results", "mcp__openbot__browser_click", "mcp__openbot__browser_type", "mcp__openbot__browser_upload_saved_file", "mcp__openbot__mac_list", "mcp__openbot__mac_read", "mcp__openbot__mac_organize", "mcp__openbot__mac_apps_list", "mcp__openbot__mac_app_inspect", "mcp__openbot__mac_app_read", "mcp__openbot__mac_app_open", "mcp__openbot__mac_app_click", "mcp__openbot__mac_app_type", "mcp__openbot__mac_app_key", "mcp__openbot__mac_app_scroll", "mcp__openbot__mac_calendar_events", "mcp__openbot__mac_mail_unread", "mcp__openbot__search_my_mac", "mcp__openbot__mac_mail_search", "mcp__openbot__mac_mail_read", "mcp__openbot__mac_mail_save_attachment", "mcp__openbot__mac_reminders", "mcp__openbot__mac_reminder_create", "mcp__openbot__mac_notes_search", "mcp__openbot__mac_note_read", "mcp__openbot__mac_note_create", "mcp__openbot__mac_contacts_find", "mcp__openbot__mac_calendars", "mcp__openbot__mac_event_create", "mcp__openbot__mac_mail_draft", "mcp__openbot__mac_shortcuts_list", "mcp__openbot__mac_shortcut_run", "mcp__openbot__code_projects", "mcp__openbot__code_list", "mcp__openbot__code_search", "mcp__openbot__code_read", "mcp__openbot__code_write", "mcp__openbot__code_replace", "mcp__openbot__code_status", "mcp__openbot__code_diff", "mcp__openbot__code_branch", "mcp__openbot__code_commit", "mcp__openbot__code_request_review", "mcp__openbot__code_review_result", "mcp__openbot__code_publish_pr", "mcp__openbot__code_run", "mcp__openbot__gmail_search", "mcp__openbot__gmail_read", "mcp__openbot__gmail_send", "mcp__openbot__gmail_reply", "mcp__openbot__google_drive_search", "mcp__openbot__google_drive_read", "mcp__openbot__google_drive_create", "mcp__openbot__google_calendar_agenda", "mcp__openbot__google_calendar_create", "mcp__openbot__github_notifications", "mcp__openbot__github_issues", "mcp__openbot__github_issue_create", "mcp__openbot__slack_search", "mcp__openbot__slack_read", "mcp__openbot__slack_post", "mcp__openbot__notion_search", "mcp__openbot__notion_read", "mcp__openbot__notion_update", "mcp__openbot__todoist_tasks", "mcp__openbot__todoist_task_create", "mcp__openbot__todoist_task_update", "mcp__openbot__todoist_task_complete", "mcp__openbot__dropbox_search", "mcp__openbot__dropbox_read", "mcp__openbot__task_plan", "mcp__openbot__task_progress", "mcp__openbot__task_verify", "mcp__openbot__skill_propose", "mcp__openbot__propose_teammate", "mcp__openbot__routine_create", "mcp__openbot__routine_list", "mcp__openbot__routine_update", "mcp__openbot__routine_pause", "mcp__openbot__routine_resume", "mcp__openbot__routine_delete", "mcp__openbot__remember", "mcp__openbot__handoff", "mcp__openbot__message_teammate", "mcp__openbot__request_approval", "mcp__openbot__self_extend"].join(",");
     const args = useClaude
       ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", `${claudeTools},mcp__openbot__work_collect,mcp__openbot__work_report,mcp__openbot__code_benchmark`, ...(previousSession ? ["--resume", previousSession] : []), prompt]
       : ["run", "--auto", "--format", "json", "--model", model, "--dir", workspace, "--agent", run.expectedWorkKind ? "openbot-report" : "openbot", ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · Sidemates`, prompt];
@@ -597,7 +616,7 @@ export class OpenCodeRunner {
         stoppedFor = "tester_fault";
         checkpoint();
         const faultError = executionStopMessage.tester_fault;
-        this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: faultError, partialText: responseText || null });
+        this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: faultError, partialText: restore(responseText) || null });
         this.options.db.finishRunTask(run.id, "failed", faultError);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Tester fault injected", detail: "source=tester_fault · after_verified_artifact" });
         terminate();
@@ -624,7 +643,7 @@ export class OpenCodeRunner {
       checkpoint();
       // Revoke tool access immediately, before waiting for process exit.
       const error = executionStopMessage[reason];
-      this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error, partialText: responseText || null });
+      this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error, partialText: restore(responseText) || null });
       this.options.db.finishRunTask(run.id, "failed", error);
       for (const childRun of this.options.db.listChildRuns(run.id)) this.cancelTask(childRun.id);
       this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Stopped to protect your usage", detail: error });
@@ -651,10 +670,10 @@ export class OpenCodeRunner {
       if (stoppedFor || processClosed || !text || text === liveShown || text.length < responseText.length) return;
       liveShown = text;
       // Pushed as a small event; saved (for reloads and salvage) at most once a second.
-      if (this.options.onLive) this.options.onLive(run.id, text);
+      if (this.options.onLive) this.options.onLive(run.id, restore(text));
       if (!this.options.onLive || Date.now() - liveSavedAt > 1_000) {
         liveSavedAt = Date.now();
-        this.options.db.updateRun(run.id, { partialText: text, progressAt: new Date().toISOString() });
+        this.options.db.updateRun(run.id, { partialText: restore(text), progressAt: new Date().toISOString() });
         if (!this.options.onLive) this.options.onChange();
       }
     };
@@ -683,12 +702,12 @@ export class OpenCodeRunner {
         output.add(event);
         if (output.exceededLimit) { meter.output(this.limits.maxOutputBytes + 1); enforce(); return; }
         for (const update of output.drainProgress()) {
-          this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "message", label: "Progress update", detail: update });
+          this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "message", label: "Progress update", detail: restore(update) });
         }
         if (output.currentText !== responseText) {
           if (output.currentText) meter.progress();
           responseText = output.currentText;
-          this.options.db.updateRun(run.id, { partialText: responseText, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
+          this.options.db.updateRun(run.id, { partialText: restore(responseText), progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
           this.options.onChange();
         }
         usage = usageAccumulator.add(event);
@@ -700,7 +719,7 @@ export class OpenCodeRunner {
         if (tool && ["completed", "error"].includes(toolState || "")) meter.progress();
         if (tool && tool.label !== lastTool) {
           lastTool = tool.label;
-          this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: tool.kind, label: tool.label, detail: tool.detail });
+          this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: tool.kind, label: tool.label, detail: typeof tool.detail === "string" ? restore(tool.detail) : tool.detail });
           this.options.onChange();
         }
         enforce();
@@ -731,7 +750,7 @@ export class OpenCodeRunner {
       if (this.restartQueue.delete(run.id) || this.stopping) return;
       if (wrapUp) {
         this.options.db.setRunPrompt(run.id, "You have used this task's step budget. Do not use any more tools. From what you have already found in this conversation, give the user your best final answer to their request now. Say clearly which parts you could not check, and in one line what is left to do.");
-        this.options.db.updateRun(run.id, { ...usagePatch(), status: "queued", partialText: responseText || null, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
+        this.options.db.updateRun(run.id, { ...usagePatch(), status: "queued", partialText: restore(responseText) || null, progressAt: new Date().toISOString(), ...(sessionId ? { sessionId } : {}) });
         this.options.onChange();
         return;
       }
@@ -755,7 +774,7 @@ export class OpenCodeRunner {
         this.options.db.updateRun(run.id, finalUsage);
         this.shareChildOutcome(run, bot, current.error || "The job was stopped.", true);
       } else if (waiting) {
-        this.options.db.updateRun(run.id, { ...finalUsage, partialText: responseText || current?.partialText || "" });
+        this.options.db.updateRun(run.id, { ...finalUsage, partialText: restore(responseText) || current?.partialText || "" });
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Waiting for you", detail: current?.approvalReason || null });
       } else if (approvalPaused && current && ["queued", "running"].includes(current.status)) {
         // Approval may finish before the paused process exits. Preserve its
@@ -788,7 +807,7 @@ export class OpenCodeRunner {
               this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Finishing the missing report", detail: "The first answer did not include the promised saved result. One repair attempt will use this job's remaining allowance." });
             } else {
               const error = "The teammate returned an answer but did not save the promised source-linked report. This job is incomplete. Check its app access and try again; Sidemates has not marked it finished.";
-              this.options.db.updateRun(run.id, { status: "failed", finishedAt, error, partialText: responseText });
+              this.options.db.updateRun(run.id, { status: "failed", finishedAt, error, partialText: restore(responseText) });
               this.options.db.finishRunTask(run.id, "failed", error);
               this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "The promised report is missing", detail: error });
               this.shareChildOutcome(run, bot, error, true);
@@ -802,7 +821,7 @@ export class OpenCodeRunner {
           const report = this.options.db.getWorkReport(snapshot.id)!;
           return `**Sources:** ${snapshot.sources.length} checked · ${snapshot.coverage.some((entry) => entry.state !== "complete") ? "some coverage is missing" : "checked within the saved scope"}${report.drafts.length ? ` · ${report.drafts.length} unsent reply draft${report.drafts.length === 1 ? "" : "s"}` : ""}. [Saved report](/api/work-reports/${snapshot.id}). Sidemates checked the source links and recipients; please review the recommendations. The report itself did not change anything in your connected apps.`;
         }).join("\n\n") : "";
-        const rawSummary = output.finalText + receipt;
+        const rawSummary = restore(output.finalText) + receipt;
         const summary = await this.options.attachments.resolveExistingArtifactLinks(bot, run.threadId, rawSummary);
         this.options.db.updateRun(run.id, { ...finalUsage, status: "completed", finishedAt, summary, partialText: null, error: null });
         this.options.db.finishRunTask(run.id, "completed");
@@ -856,7 +875,7 @@ export class OpenCodeRunner {
         }
       } else {
         const error = output.failure || cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
-        this.options.db.updateRun(run.id, { ...finalUsage, status: "failed", finishedAt, error, partialText: responseText || null });
+        this.options.db.updateRun(run.id, { ...finalUsage, status: "failed", finishedAt, error, partialText: restore(responseText) || null });
         this.options.db.finishRunTask(run.id, "failed", error);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Couldn’t finish", detail: error });
         void this.captureStoppedResult(run, bot);
@@ -870,7 +889,7 @@ export class OpenCodeRunner {
         const current = this.options.db.getRun(run.id);
         if (current?.status === "running") {
           const message = error instanceof Error ? error.message : String(error);
-          this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: `Could not finalize the finished answer: ${message}`, partialText: responseText || null });
+          this.options.db.updateRun(run.id, { status: "failed", finishedAt: new Date().toISOString(), error: `Could not finalize the finished answer: ${message}`, partialText: restore(responseText) || null });
           this.options.db.finishRunTask(run.id, "failed", message);
           this.options.onChange();
         }
@@ -888,3 +907,5 @@ export class OpenCodeRunner {
   }
 }
 import { WorkflowValidation } from "./workflow-validation.js";
+import { RunPrivacy } from "./private-mode.js";
+import { logSentText } from "./sent-log.js";

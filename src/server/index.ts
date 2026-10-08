@@ -1,9 +1,11 @@
+// M6: SIDEMATES_* settings are read alongside OPENBOT_* before any other module looks.
+import { applyEnvAliases } from "./env-aliases.js";
 import { homedir } from "node:os";
 import express from "express";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -15,6 +17,26 @@ import { tombstoneHttpMapping, validateReplayDisclosure } from "./message-admiss
 import { registerExtensionRoutes } from "./extension-routes.js";
 import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js";
 import { registerRecipeRoutes } from "./recipe-routes.js";
+import { registerSetupRoutes } from "./setup-routes.js";
+import { registerOllamaRoutes } from "./ollama.js";
+import { ManagedBrowser, registerBrowserDownloadRoutes } from "./browser-download.js";
+import { openSettingsPane, probeFullDiskAccess, registerMacPermissionRoutes } from "./mac-permissions.js";
+import { noteFixableToolFailures } from "./failure-notes.js";
+import { privateToolTraffic } from "./private-mode.js";
+import { registerPrivateModeRoutes } from "./private-mode-routes.js";
+import { pruneSentLog } from "./sent-log.js";
+import { rememberFromTask, reviewMessage } from "./memory-review.js";
+import { registerMemoryReviewRoutes } from "./memory-review-routes.js";
+import { registerAskRoutes } from "./ask-routes.js";
+import { registerMoveRoutes } from "./move-routes.js";
+import { MacMail } from "./mac-mail-index.js";
+import { actionHardStop, browserHardStop, commandHardStop } from "./hard-stops.js";
+import { HARD_STOP_TEXT, hardStopLine, type HardStop } from "../shared/hard-stops.js";
+import { recipientsOf, rememberRecipients, unknownRecipients, type KnownPeopleSources } from "./known-people.js";
+import { ContactNames } from "./mac-messages-index.js";
+import { MacTriggers } from "./mac-triggers.js";
+import { performTeammateProposal, prepareTeammateProposal, proposalProblem, teammateProposalSchema } from "./teammate-proposals.js";
+import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
 import { ApprovedConnectorDispatch, ApprovedConnectorOutcomeUncertainError, ApprovalReviewChangedError, approvalReviewFingerprint, sameReviewFingerprint } from "./approval-review-binding.js";
 import { WorkReportService } from "./work-reports.js";
@@ -37,14 +59,15 @@ import { macFallbackAllowed } from "./mac-productivity.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
+import { teammateLink } from "../shared/teammate-link.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
-import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
-import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
+import { BLOCKED_FREE_TIER_MESSAGE, isBlockedFreeTierModel, modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
+import { BrowserManager, BrowserUploadUncertainError, ComputerManager, systemChromePath, useDownloadedBrowser } from "./runtime.js";
 import { modelCanReceiveBrowserImage } from "./browser-image-capability.js";
 import { TesterBrowser } from "./tester-browser.js";
 import { LiveViewHub, type LiveViewEvent } from "./live-view.js";
@@ -81,7 +104,7 @@ import { proposeSkillFromRun } from "./skill-proposals.js";
 import { requestRunReview } from "./run-review.js";
 import { parseAuthoredSkill } from "./skill-authoring.js";
 import { learningCommandDirection, skillStartingUrlSchema } from "../shared/skill-authoring.js";
-import { TEAM_TEMPLATES, teamTemplate } from "./team-templates.js";
+import { registerTeamTemplateRoutes } from "./team-template-routes.js";
 import { acquireStudioLock } from "./studio-lock.js";
 import { WEEKLY_BUDGET_STEP_RESERVE } from "./execution-policy.js";
 import { automationEventMatches, automationExternalId, automationPrompt, sanitizeAutomationPayload, summarizeAutomationPayload, todoistActivityWindow, verifyAutomationSignature } from "./automations.js";
@@ -122,12 +145,16 @@ import { BrowserNavigationGrants, browserNavigationAllowanceOffer, reviewedBrows
 import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
 import { browserSavedFileUploadSchema } from "../shared/browser-upload-review.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
+import { TOOL_GROUPS, TOOL_GROUP_IDS, toolGroupOf, toolTurnedOff } from "../shared/tool-groups.js";
+import { installMethod } from "../shared/setup-timeline.js";
+import { FixtureAppleApps, heroFixtureFromEnv } from "./hero-fixture-mac.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appVersion = String(JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version);
 if (process.env.OPENBOT_LOAD_ENV !== "0" && existsSync(path.join(rootDir, ".env"))) process.loadEnvFile(path.join(rootDir, ".env"));
+for (const name of applyEnvAliases()) console.warn(`${name} and its OPENBOT_ name are both set to different values; Sidemates uses the OPENBOT_ one.`);
 const port = Number(process.env.OPENBOT_PORT || 4311);
 const deployment = readDeploymentConfig(process.env, { port, production: process.env.NODE_ENV === "production" });
 // Production hosts start empty: onboarding creates the first teammate.
@@ -143,6 +170,10 @@ if (!studioLock.acquired) {
   process.exit(1);
 }
 process.on("exit", () => studioLock.release());
+// Start the setup timeline on the first boot, so a studio from before it is recognised as older.
+// It is a convenience: a problem with it never stops the studio.
+const setupTimeline = new SetupTimeline(db, undefined, undefined, installMethod(process.env.OPENBOT_INSTALL_METHOD));
+try { setupTimeline.view(); } catch (error) { console.warn(`Setup timeline unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 const app = express();
 app.disable("x-powered-by");
 if (deployment.trustProxy) app.set("trust proxy", "loopback");
@@ -181,7 +212,9 @@ const attachmentsService = new AttachmentService(db);
 const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
-const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
+// A staging studio running the hero jobs (OPENBOT_HERO_FIXTURE) reads a synthetic Mac instead of the real apps.
+const heroFixture = heroFixtureFromEnv();
+const appleApps = heroFixture ? new FixtureAppleApps(heroFixture.fixture, heroFixture.record) : new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
 // Calendar answers slowly; while it's being used, keep the next two weeks warm.
 setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
 const personalIndex = new PersonalIndex(path.join(db.dataDir, "personal-index.sqlite"));
@@ -332,6 +365,22 @@ registerPairingRoutes(app, pairedDevices, awayAccess, (deviceId) => {
 
 const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callback: deploymentCallbackUrl(deployment, "/api/extensions/oauth/callback"), app: appUrl });
 registerRecipeRoutes(app, db, () => broadcast());
+registerSetupRoutes(app, setupTimeline);
+registerPrivateModeRoutes(app, db, () => broadcast());
+registerMemoryReviewRoutes(app, db, () => broadcast());
+// Task F7: "Ask my Mac" answers from the on-device index; sources open in Mail, Notes or Finder.
+const askMail = new MacMail();
+registerAskRoutes(app, { db, index: personalIndex, mailFile: (id) => askMail.fileFor(id) });
+// Task F8: a teammate out as plain files, and memories in from ChatGPT or Claude exports.
+registerMoveRoutes(app, db, () => broadcast());
+// Task F3: what each run sent to its AI is kept for 30 days.
+try { pruneSentLog(db); } catch { /* A failed cleanup never stops the server. */ }
+setInterval(() => { try { pruneSentLog(db); } catch { /* retried tomorrow */ } }, 86_400_000).unref();
+registerOllamaRoutes(app);
+const managedBrowser = new ManagedBrowser(path.join(db.dataDir, "browsers"));
+useDownloadedBrowser(() => managedBrowser.executable());
+registerBrowserDownloadRoutes(app, managedBrowser, () => Boolean(systemChromePath()));
+registerMacPermissionRoutes(app, { available: process.platform === "darwin", requestAccess: (target) => appleApps.requestAccess(target), fullDiskAccess: () => probeFullDiskAccess(), openPane: openSettingsPane });
 const interruptedApprovedActions = db.recoverInterruptedApprovedActions();
 for (const receipt of interruptedApprovedActions) {
   const detail = `${receipt.actionLabel} may or may not have completed before Sidemates restarted. It has not been repeated.`;
@@ -797,12 +846,19 @@ app.delete("/api/code-projects/:projectId", (request, response) => {
   } catch (error) { response.status(409).json({ error: error instanceof Error ? error.message : String(error) }); }
 });
 
+/** Provider status for the studio; the first working connection is a setup milestone. */
+async function providerStatus() {
+  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  try { setupTimeline.noteConnections(status.instances); } catch { /* The timeline never blocks AI setup. */ }
+  return status;
+}
+
 app.get("/api/provider", async (_request, response) => {
-  response.json(await readProviderStatus(db, providerConnections.listAttempts()));
+  response.json(await providerStatus());
 });
 
 app.get("/api/readiness", async (_request, response) => {
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connected = status.instances.filter((instance) => instance.connected);
   const compatibility = opencodeCompatibility();
   const readyTeammates = db.listBots().filter((bot) => {
@@ -824,7 +880,7 @@ app.get("/api/readiness", async (_request, response) => {
 app.post("/api/provider/choose", async (request, response) => {
   const parsed = z.object({ providerInstanceId: z.string().min(1).max(80), model: z.string().min(1).max(300) }).safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: "Choose your provider and a model first." });
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connection = status.instances.find((entry) => entry.id === parsed.data.providerInstanceId);
   if (!connection?.connected || !connection.models?.includes(parsed.data.model)) return response.status(409).json({ error: "Finish connecting this provider and choose one of its available models. Saving credentials alone does not test model access." });
   try {
@@ -848,16 +904,19 @@ app.post("/api/provider/key", async (request, response) => {
     try {
       const models = await checkNousKey(parsed.data.key);
       const instance = db.upsertProvider({ id: "nous-portal", name: "Nous Portal", provider: "custom", authMode: "api_key", runtime: "opencode", secret: parsed.data.key.trim(), apiConfig: { baseUrl: NOUS_BASE_URL, protocol: "openai-compatible", modelIds: models } });
+      db.deleteExtensionRecord("provider-test", instance.id);
       broadcast();
       return response.json({ connectionId: instance.id, models });
     } catch (error) { return response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
   }
   try {
     await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
-    const status = await readProviderStatus(db, providerConnections.listAttempts());
+    const status = await providerStatus();
     const instanceId = parsed.data.providerId === "google" ? "local-google" : "local-opencode";
     const instance = status.instances.find((item) => item.id === instanceId && item.connected);
     if (!instance) return response.status(400).json({ error: parsed.data.providerId === "google" ? "OpenCode saved the key but didn't list Gemini. Paste the key again." : "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
+    // A new key makes the previous test result meaningless: never show it as tested, and let it be tested now.
+    db.deleteExtensionRecord("provider-test", instance.id);
     response.json({ connectionId: instance.id, models: instance.models || [] });
   } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
 });
@@ -883,7 +942,7 @@ app.post("/api/provider/:id/test", async (request, response) => {
   if (!db.getProvider(request.params.id)) return response.status(404).json({ error: "That connection no longer exists." });
   const previous = db.extensionRecord<ProviderConnectionTest>("provider-test", request.params.id);
   if (!probeAllowed(previous?.testedAt || null)) return response.status(429).json({ error: `A test just ran for this connection. Wait ${Math.ceil(PROBE_COOLDOWN_MS / 1_000)} seconds between tests to protect your usage.` });
-  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  const status = await providerStatus();
   const connection = status.instances.find((entry) => entry.id === request.params.id);
   if (!connection) return response.status(404).json({ error: "That connection no longer exists." });
   if (!connection.connected) return response.status(409).json({ error: "Connect this provider first. Saved credentials alone are never shown as ready." });
@@ -1884,6 +1943,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     if (!db.getBot(parsed.data.botId) || !access?.canRead || !access?.canSend || !capability?.connected || !capability.writeConnected) throw new Error("Replying needs this teammate's Gmail read and send permissions.");
     const reply = gmailReplyReviewSchema.parse(args);
     const result = await googleWorkspace.reply(reply, approvalID);
+    rememberRecipients(db, "gmail_reply", reply);
     db.addConnectorEvent({ botId: parsed.data.botId, action: "gmail_reply", status: "completed", summary: `Reply checked in the original conversation: “${reply.subject.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
     return `The reply to ${result.to} was checked in Gmail's sent copy: ${result.webLink}. The recipient, message text and original conversation matched the approved reply. This confirms Gmail's sent copy, not recipient delivery or reading.${result.recovered ? " The send response was lost or incomplete; the matching sent copy was found without another send request." : ""}`;
@@ -1894,6 +1954,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     if (!bot || !access?.canSend || capability?.writeConnected !== true) throw new Error("Gmail sending is not available for this teammate.");
     const message = { to: String(args.to || ""), cc: String(args.cc || ""), subject: String(args.subject || ""), body: String(args.body || "") };
     const result = await googleWorkspace.send(message);
+    rememberRecipients(db, "gmail_send", message);
     db.addConnectorEvent({ botId: bot.id, action: "gmail_send", status: "completed", summary: `Sent “${message.subject.replace(/[\r\n]+/g, " ").slice(0, 120)}” to ${message.to.replace(/[\r\n]+/g, " ").slice(0, 120)}` });
     broadcast({ type: "connector", at: Date.now() });
     return `Gmail accepted the email to ${message.to} for sending. This does not prove recipient delivery or reading. Gmail reference: ${result.id}.`;
@@ -1916,6 +1977,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
       description: args.description ? String(args.description) : undefined, location: args.location ? String(args.location) : undefined,
       attendees: Array.isArray(args.attendees) ? args.attendees.map(String) : undefined, addGoogleMeet: args.addGoogleMeet === true,
     }, approvalID);
+    rememberRecipients(db, "google_calendar_create", args);
     db.addConnectorEvent({ botId: bot.id, action: "google_calendar_create", status: "completed", summary: `${bot.name} created the approved calendar event “${event.title.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
     return `The calendar event was confirmed: ${event.title}${event.webLink ? ` (${event.webLink})` : ""}${event.meetingLink ? ` Meet: ${event.meetingLink}` : ""}.${event.recovered ? " Its original response was lost or incomplete; a matching Google readback confirmed the event without another create request." : ""}${event.meetingPending ? " The requested Meet link is not confirmed yet. Check this event later; do not recreate it." : ""}`;
@@ -2150,6 +2212,11 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     if (parsed.data.type === "mac_app_key") await macApps.key(appName, String(args.key || ""), Array.isArray(args.modifiers) ? args.modifiers.map(String) : []);
     return `The approved action was completed in ${appName}.`;
   }
+  if (parsed.data.type === "propose_teammate") {
+    const result = performTeammateProposal(db, args);
+    broadcast();
+    return result;
+  }
   if (parsed.data.type === "skill_propose") {
     const approval = db.getApproval(approvalID);
     if (!approval || approval.botId !== parsed.data.botId) throw new Error("This skill review is no longer available.");
@@ -2292,6 +2359,11 @@ function currentApprovalReview(approvalId: string) {
       preview.limitation = "Replying needs this teammate's Gmail read and send access. Check Apps & tools before reviewing this reply again.";
     }
   }
+  if (type === "propose_teammate") {
+    const proposal = teammateProposalSchema.safeParse(args);
+    const problem = proposal.success ? proposalProblem(db, proposal.data) : "This proposal is incomplete.";
+    if (problem) { preview.canApprove = false; preview.limitation = `${problem} Decline it, and the teammate will carry on without a new teammate.`; }
+  }
   if (type === "skill_propose") {
     try { parseAuthoredSkill(args); }
     catch { preview.canApprove = false; preview.limitation = "This skill contains invalid or potentially private content. Decline it and ask for a new draft without private values."; }
@@ -2323,12 +2395,33 @@ function currentApprovalReview(approvalId: string) {
  * ledger stay intact; only the human pause is skipped. Reviews that cannot be approved (incomplete preview) stay
  * pending for the owner. Access grants are untouched: Autopilot skips reviews, never permissions, and the reviews
  * listed in shared/autopilot.ts always wait for a person, including more spending. */
+/** Task T1: card and bank details are entered by the owner, never by a teammate. */
+const CARD_DETAILS_REFUSAL = "Card and bank details are entered by the owner, never by a teammate, at every autonomy level. Nothing was typed. Stop here and ask the owner to take over the browser and enter them.";
+function hardStopCommandReason(command: string): string | null {
+  // An owner's "always allow" rule never covers a push, a deploy or a delete.
+  return commandHardStop(command) ? commandApprovalReason(command) || "This command always needs your okay." : null;
+}
+function firstMessageNote(newPeople: string[]): string {
+  return newPeople.length ? ` First message to ${newPeople.slice(0, 3).join(", ")}${newPeople.length > 3 ? ` and ${newPeople.length - 3} more` : ""}: this always asks.` : "";
+}
+let contactsCache: { at: number; names: ContactNames } | null = null;
+function knownPeopleSources(): KnownPeopleSources {
+  return {
+    // Mac Contacts, only when the owner turned on Files & apps (it needs Full Disk Access).
+    contacts: process.platform === "darwin" && db.getStudioSettings().macAccessEnabled && !(appleApps instanceof FixtureAppleApps) ? (key) => {
+      if (!contactsCache || Date.now() - contactsCache.at > 10 * 60_000) contactsCache = { at: Date.now(), names: ContactNames.load() };
+      return contactsCache.names.lookup(key) !== null;
+    } : undefined,
+    sentMail: db.getConnector("google-workspace")?.connected ? async (address) => (await googleWorkspace.search(`in:sent to:${address}`, 1)).length > 0 : undefined,
+  };
+}
+
 function autopilotDecides(approvalId: string) {
   const approval = db.getApproval(approvalId);
   if (!approval) return false;
   if (!autopilotOn(db.getStudioSettings().yoloMode, db.getBot(approval.botId))) return false;
   const stored = db.getApprovalAction(approvalId) as { type?: string; args?: { semanticBound?: boolean } } | null;
-  return autopilotMayDecide({ kind: approval.kind, actionType: stored?.type, semanticBound: stored?.args?.semanticBound === true });
+  return autopilotMayDecide({ kind: approval.kind, actionType: stored?.type, semanticBound: stored?.args?.semanticBound === true, hardStop: approval.hardStop });
 }
 
 function autoApproveIfYolo(approvalId: string) {
@@ -2920,6 +3013,8 @@ const botInput = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i), role: z.string().trim().min(1).max(60),
   instructions: z.string().trim().min(1).max(2_000), model: z.string().optional(), providerInstanceId: z.string().nullable().optional(),
   computerEnabled: z.boolean().optional(), browserEnabled: z.boolean().optional(), weeklyTokenBudget: z.number().int().min(0).max(100_000_000).optional(),
+  // Which optional tool groups the teammate has; null or absent means all of them.
+  toolGroups: z.array(z.enum(TOOL_GROUP_IDS as [string, ...string[]])).max(TOOL_GROUP_IDS.length).nullable().optional(),
 });
 
 // Bring a Hermes or OpenClaw profile into the studio: dry-run preview first,
@@ -2957,6 +3052,7 @@ app.post("/api/bots", (request, response) => {
   const connection = db.getProvider(parsed.data.providerInstanceId || "");
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   if (!parsed.data.model || !modelBelongsToConnection(parsed.data.model, connection)) return response.status(400).json({ error: "Choose a model from the selected connection." });
+  if (isBlockedFreeTierModel(parsed.data.model)) return response.status(400).json({ error: BLOCKED_FREE_TIER_MESSAGE });
   try {
     const bot = db.createBot(parsed.data);
     broadcast();
@@ -3041,7 +3137,7 @@ app.get("/api/bots/:id/share", (request, response) => {
 });
 
 // A finished result as a page you can send: personal details hidden first.
-app.get("/api/messages/:id/share-page", (request, response) => {
+app.get("/api/messages/:id/share-page", async (request, response) => {
   const message = db.getMessage(request.params.id);
   if (!message || message.senderType !== "bot" || !message.runId) return response.status(400).json({ error: "Only a teammate's finished result can be shared." });
   const run = db.getRun(message.runId), bot = message.senderId ? db.getBot(message.senderId) : null;
@@ -3050,8 +3146,12 @@ app.get("/api/messages/:id/share-page", (request, response) => {
   // The question: the message that started the task, or else the owner's last message before this reply.
   const trigger = (run.triggerMessageId ? db.getMessage(run.triggerMessageId) : null) || db.listMessages(message.threadId, 200).filter((item) => item.senderType === "user" && item.createdAt <= message.createdAt).at(-1) || null;
   const withQuestion = request.query.question !== "0";
-  const page = renderResultPage({ question: withQuestion ? (trigger?.body || null) : null, answer: message.body, files: (message.attachments || []).map((file) => file.name), teammate: { name: bot.name, role: bot.role, color: bot.color, mascot: bot.mascot }, at: new Date(message.createdAt) });
-  response.json({ title: page.title, html: page.html, text: page.text, filename: page.filename, hidden: page.hidden, total: page.total, summary: page.summary, hasQuestion: Boolean(trigger?.body) });
+  // Task R5: "Make this teammate", from the same bundle as "Copy share link" (no history, memory or access).
+  let link: string | null = null;
+  try { link = await teammateLink(exportBot(db, bot.id)); } catch { /* a retired teammate or one carrying a credential isn't offered */ }
+  const withTeammate = request.query.teammate !== "0" && Boolean(link);
+  const page = renderResultPage({ teammateLink: withTeammate ? link : null, question: withQuestion ? (trigger?.body || null) : null, answer: message.body, files: (message.attachments || []).map((file) => file.name), teammate: { name: bot.name, role: bot.role, color: bot.color, mascot: bot.mascot }, at: new Date(message.createdAt) });
+  response.json({ title: page.title, html: page.html, text: page.text, filename: page.filename, hidden: page.hidden, total: page.total, summary: page.summary, hasQuestion: Boolean(trigger?.body), hasTeammate: Boolean(link) });
 });
 
 // Preview a gallery teammate before adding it. Fetches only from the Sidemates gallery.
@@ -3078,7 +3178,7 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Teammate not found." });
   // Appearance does not execute a model or change access. It remains editable
   // when an old teammate has no provider or its chosen model is unavailable.
-  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot"].includes(key));
+  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot", "toolGroups"].includes(key));
   // Name, job and appearance are local profile metadata. Keep them editable
   // when an older teammate's provider is unavailable; access/model changes
   // still use the full connection validation below.
@@ -3087,7 +3187,7 @@ app.patch("/api/bots/:id", (request, response) => {
     // Leave a note in the chat whenever the safety posture changes, so it is never a silent switch.
     if (bot && parsed.data.autopilot !== undefined && parsed.data.autopilot !== current.autopilot) {
       db.addMessage({ threadId: bot.threadId, senderType: "system", senderId: null, body: parsed.data.autopilot
-        ? `Autopilot is on for ${bot.name}: it will act without asking first. You can switch it back to Ask first in ${bot.name}’s settings.`
+        ? `Autopilot is on for ${bot.name}: it will act without asking first, except for money, someone new, anything that can't be undone, publishing, and passwords and cards. You can switch it back to Ask first in ${bot.name}’s settings.`
         : `Autopilot is off for ${bot.name}: it asks before anything important.` });
     }
     broadcast();
@@ -3098,6 +3198,7 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   const model = parsed.data.model ?? current.model;
   if (!modelBelongsToConnection(model, connection)) return response.status(400).json({ error: "That model does not belong to the selected connection." });
+  if (isBlockedFreeTierModel(model) && model !== current.model) return response.status(400).json({ error: BLOCKED_FREE_TIER_MESSAGE });
   const bot = db.updateBot(request.params.id, parsed.data);
   broadcast();
   response.json(bot);
@@ -3183,10 +3284,12 @@ const triggerConfigInput = z.object({
   todoistEvent: z.enum(["added", "updated", "completed", "any"]).optional(), dropboxPath: z.string().trim().max(1_000).optional(),
   slackEvent: z.enum(["mention", "message", "reaction", "any"]).optional(), slackChannel: z.string().trim().max(200).optional(),
   notionEvent: z.enum(["page_updated", "page_created", "comment", "database", "any"]).optional(), notionEntityId: z.string().trim().max(200).optional(),
+  folderPath: z.string().trim().max(1_000).optional(), fileTypes: z.string().trim().max(120).optional(),
+  mailFrom: z.string().trim().max(200).optional(), mailSubject: z.string().trim().max(200).optional(),
 });
 const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
-  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage"]).optional(), triggerConfig: triggerConfigInput.optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage", "folder", "mail"]).optional(), triggerConfig: triggerConfigInput.optional(),
   schedule: routineScheduleInput.optional(),
   expectedRevision: z.number().int().min(1).optional(),
 });
@@ -3214,12 +3317,30 @@ function resolveRoutineUpdate(current: Routine, patch: RoutinePatch) {
 // Single validation rule for routine mutations (P03b). Owner PATCH, scoped
 // model tools and approved-action execution share it, so enabling or editing
 // a routine is revalidated the same way everywhere.
+/** Task F5: a folder trigger watches a real folder in the owner's home folder (never
+ * Sidemates' own data); "~/" is expanded and saved. A mail trigger needs a sender or a subject. */
+function macTriggerError(input: { triggerType?: string; triggerConfig?: RoutineTriggerConfig }): string | null {
+  if (input.triggerType === "mail") return input.triggerConfig?.mailFrom?.trim() || input.triggerConfig?.mailSubject?.trim() ? null : "Say which mail starts it: part of the sender, the subject, or both.";
+  if (input.triggerType !== "folder") return null;
+  const home = homedir(), raw = input.triggerConfig?.folderPath?.trim() || "";
+  const folder = path.resolve(raw.startsWith("~/") ? path.join(home, raw.slice(2)) : raw);
+  if (!raw || !path.isAbsolute(raw.startsWith("~/") ? folder : raw)) return "Choose a folder on this Mac, like ~/Documents/Receipts.";
+  if (!folder.startsWith(home + path.sep)) return "Choose a folder inside your home folder.";
+  const data = path.resolve(db.dataDir);
+  if (folder === data || folder.startsWith(data + path.sep) || data.startsWith(folder + path.sep)) return "Choose a folder outside Sidemates' own data.";
+  try { if (!statSync(folder).isDirectory()) return "That isn't a folder."; } catch { return "That folder doesn't exist on this Mac."; }
+  input.triggerConfig!.folderPath = folder;
+  return null;
+}
+
 function routineMutationError(next: { botId: string; threadId: string; enabled: boolean; intervalMinutes: number; schedule?: Routine["schedule"]; triggerType?: string; triggerConfig?: Routine["triggerConfig"] }, current: Routine, nextTriggerType: string): string | null {
   const scheduleError = routineScheduleError({ schedule: next.schedule, triggerType: next.triggerType, enabled: next.enabled, intervalMinutes: next.intervalMinutes }, current);
   if (scheduleError) return scheduleError;
   if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return "Choose a valid teammate and conversation.";
   const watchError = pageWatchError({ triggerType: next.triggerType, triggerConfig: next.triggerConfig, intervalMinutes: next.intervalMinutes }, current.id);
   if (watchError) return watchError;
+  const macError = macTriggerError({ triggerType: nextTriggerType, triggerConfig: next.triggerConfig });
+  if (macError) return macError;
   if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft.";
   if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.`;
   if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.`;
@@ -3301,7 +3422,7 @@ function dispatchRoutineEvent(routine: Routine, input: { source: AutomationEvent
 app.post("/api/routines", (request, response) => {
   const parsed = routineInput.safeParse(request.body);
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getThread(parsed.data.threadId)) return response.status(400).json({ error: "That routine needs a teammate, conversation and instruction." });
-  const watchError = pageWatchError(parsed.data);
+  const watchError = pageWatchError(parsed.data) || macTriggerError(parsed.data);
   if (watchError) return response.status(400).json({ error: watchError });
   const scheduleError = routineScheduleError(parsed.data);
   if (scheduleError) return response.status(400).json({ error: scheduleError });
@@ -3632,23 +3753,8 @@ app.post("/api/bots/:id/browser/nav", async (request, response) => {
 app.get("/api/workflows", (_request, response) => response.json(db.listWorkflows()));
 app.get("/api/bots/:id/workflows", (request, response) => response.json(db.listWorkflows(request.params.id)));
 app.get("/api/skill-templates", (_request, response) => response.json(SKILL_TEMPLATES.map(({ steps, ...template }) => ({ ...template, stepCount: steps.length }))));
-// Starter rosters: one request creates the whole team as ordinary teammates.
-app.get("/api/team-templates", (_request, response) => response.json(TEAM_TEMPLATES));
-app.post("/api/team-templates/:id/install", (request, response) => {
-  const template = teamTemplate(request.params.id);
-  if (!template) return response.status(404).json({ error: "That team template is not available." });
-  try {
-    const created = template.members.map((member) => db.createBot({
-      name: member.name, emoji: "●", mascot: member.mascot, color: member.color,
-      role: member.role, instructions: `${member.instructions}\n\nYou are a starting template, not a finished teammate: the owner will shape your job, connect your model and set your limits.`,
-      browserEnabled: false, computerEnabled: false,
-    }));
-    broadcast();
-    response.status(201).json({ template: template.name, bots: created });
-  } catch (error) {
-    return response.status(409).json({ error: error instanceof Error ? error.message : "The team could not be created completely. Teammates already created stay in the roster; retire them or free a slot and try again." });
-  }
-});
+// Starter rosters, installed as ordinary teammates (also used one member at a time by the guided first run).
+registerTeamTemplateRoutes(app, db, () => broadcast());
 app.get("/api/workflows/:id/versions", (request, response) => {
   if (!db.getWorkflowRecord(request.params.id)) return response.status(404).json({ error: "That skill is no longer available." });
   response.json(db.listWorkflowVersions(request.params.id));
@@ -3747,7 +3853,11 @@ const calendarCreateInput = z.object({
   const duration = Date.parse(value.end) - Date.parse(value.start);
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
-const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose", "propose_teammate"]), args: z.record(z.string(), z.unknown()) });
+// Task F3: real values back into the arguments; the answer masked (Private mode) and logged for the receipt.
+app.use("/api/internal/tools", privateToolTraffic(db, (request) => validToolToken(internalToken, String(request.body?.botId ?? ""), String(request.body?.runId ?? ""), request.headers["x-openbot-token"])));
+// Task J6: a tool failure only the owner can fix leaves a note with the fix.
+app.use("/api/internal/tools", noteFixableToolFailures(db, () => broadcast()));
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3755,24 +3865,29 @@ app.post("/api/internal/tools", async (request, response) => {
   if (!parsed.success || !db.getBot(parsed.data.botId) || !toolRun || toolRun.botId !== parsed.data.botId) return response.status(400).json({ error: "Invalid bot tool request." });
   if (toolRun.status !== "running" || runner.isApprovalPaused(toolRun.id)) return response.status(409).json({ error: "This task is no longer active or is pausing for approval." });
   const { botId, runId, action, args } = parsed.data;
+  response.locals.toolCall = { botId, runId };
   if (toolRun.expectedWorkKind && !["work_collect", "work_report", "task_plan", "task_progress", "task_verify"].includes(action)) {
     return response.status(403).json({ error: "This report job only reads its bounded source snapshot and saves a local result. Start a separate request for other work or changes." });
   }
   const bot = db.getBot(botId)!;
-  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action) => {
+  // A tool group the owner turned off for this teammate stays off here too, not only in the runtime's tool list.
+  if (toolTurnedOff(bot.toolGroups, action)) return response.status(403).json({ error: `The owner turned off ${TOOL_GROUPS.find((group) => group.id === toolGroupOf(action))!.label.toLowerCase()} for ${bot.name}. Say this can't be done here; the owner can turn it on in ${bot.name}'s settings.` });
+  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action, hardStop?: HardStop | null) => {
     // The owner already said no to this exact action in this task: never ask
     // again, whatever the model decided after the decline.
     const declined = db.listRunApprovals(runId).some((earlier) => earlier.status === "denied" && earlier.kind === kind && earlier.actionLabel === actionLabel
       && (db.getApprovalAction(earlier.id) as { type?: string } | null)?.type === approvalAction);
     if (declined) return response.status(409).json({ error: "The owner already declined this action in this task. Do not propose it again or try an equivalent. Finish without it and tell the user what was not done." });
-    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs } });
+    // Task T1: money, someone new, anything gone for good, publishing and credentials always wait for the owner.
+    const stop = hardStop !== undefined ? hardStop : actionHardStop({ action: approvalAction, args: savedArgs, reason, label: actionLabel });
+    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs }, hardStop: stop });
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not
     // let its eventual shutdown cancel the approved action or replacement.
     const yolo = autopilotDecides(approval.id);
     if (yolo) autoApproveIfYolo(approval.id);
     broadcast();
-    return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by Autopilot. Sidemates is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
+    return response.json({ approvalRequired: true, approvalId: approval.id, ...(stop ? { alwaysAsks: HARD_STOP_TEXT[stop].label } : {}), message: yolo ? "Auto-approved by Autopilot. Sidemates is performing it now; the task continues on its own." : stop ? `Paused: this always needs the owner's okay, even on Autopilot (${HARD_STOP_TEXT[stop].label.toLowerCase()}). Don't look for another way to do it. The user can approve it whenever they are ready; finish what you can and say what's waiting.` : "Paused. The user can approve this whenever they are ready; it will not expire." });
   };
   try {
     new WorkflowValidation(db).assertRun(runId);
@@ -4035,14 +4150,14 @@ app.post("/api/internal/tools", async (request, response) => {
           publicationReview: ready, publicationIdentity,
         });
       }
-      const command = z.string().min(1).max(4_000).parse(args.command), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason;
+      const command = z.string().min(1).max(4_000).parse(args.command), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason || hardStopCommandReason(command);
       if (reason) return holdForApproval("terminal", reason, `Run in ${db.getCodeProject(projectId)?.name || "code project"}: ${command.slice(0, 140)}`, { ...args, workspaceRunId: runId });
       const result = await codeChecks.execute(botId, projectId, runId, command);
       return response.json(result);
     }
     if (action === "bash") {
       if (!bot.computerEnabled) return response.status(403).json({ error: "Your computer access is turned off. The user can enable it in your settings." });
-      const command = String(args.command || ""), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason;
+      const command = String(args.command || ""), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason || hardStopCommandReason(command);
       if (reason) return holdForApproval("terminal", reason, command.slice(0, 180));
       const result = await computer.execute(botId, command);
       return response.json(result);
@@ -4128,19 +4243,21 @@ app.post("/api/internal/tools", async (request, response) => {
         if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
         const selector = observed.selector;
         const value = requested.value ?? "";
+        const stop = browserHardStop(requested.kind, target);
+        if (requested.kind === "type" && stop === "credentials") return response.status(403).json({ error: CARD_DETAILS_REFUSAL });
         const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target), browserApprovalReason(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target));
         const mustReviewChange = requested.kind === "click" && (/\b(save|submit|send|confirm|delete|remove|purchase|publish|update)\b/i.test(target.label) || Boolean(target.formMethod && target.formMethod !== "get"));
         if (mustReviewChange) browser.assertNoPriorReviewedSemanticEffect(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind });
-        const reviewReason = mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason;
+        const reviewReason = (mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason) || (stop ? hardStopLine(stop) : null);
         const requiredByRule = decision.matched?.effect === "require_approval";
-        const grantClaimed = requested.kind === "click" && !mustReviewChange && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
+        const grantClaimed = requested.kind === "click" && !mustReviewChange && !stop && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
         if (reviewReason && !grantClaimed) {
-          const offer = requested.kind === "click" && !mustReviewChange ? browserNavigationAllowanceOffer(target, requiredByRule) : null;
+          const offer = requested.kind === "click" && !mustReviewChange && !stop ? browserNavigationAllowanceOffer(target, requiredByRule) : null;
           return holdForApproval("browser", reviewReason, requested.kind === "click" ? `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}` : `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, {
             selector, ...(requested.kind === "type" ? { value } : {}), targetFingerprint: target.fingerprint, targetReview: target.review,
             semanticBound: true, semanticSessionId, semanticRole: observed.role, semanticLabel: observed.label, semanticReviewDigest: observed.reviewDigest,
             ...(offer ? { navigationAllowanceOffer: offer } : {}),
-          }, requested.kind === "click" ? "browser_click" : "browser_type");
+          }, requested.kind === "click" ? "browser_click" : "browser_type", stop);
         }
         const mutationKey = browser.mintSemanticMutation(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}) });
         const result = await browser.semanticAct(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}), mutationKey });
@@ -4159,15 +4276,17 @@ app.post("/api/internal/tools", async (request, response) => {
         if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
         const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("click", selector, target), browserApprovalReason("click", selector, target));
         const requiredByRule = decision.matched?.effect === "require_approval";
-        if (decision.reason) {
-          if (browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule)) {
+        // A link or harmless-looking button on a checkout page, or one whose visible text says "Pay now", still asks.
+        const stop = browserHardStop("click", target), reason = decision.reason || (stop ? hardStopLine(stop) : null);
+        if (reason) {
+          if (!stop && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule)) {
             const result = await browser.click(botId, selector, target.fingerprint);
             db.addActivity({ runId, botId, kind: "status", label: "Used navigation allowance", detail: `Clicked “${target.label}” on ${new URL(target.url).hostname}; the exact target was checked again first.` });
             const next = await browser.signInState(botId);
             return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
           }
-          const offer = browserNavigationAllowanceOffer(target, requiredByRule);
-          return holdForApproval("browser", decision.reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined });
+          const offer = stop ? null : browserNavigationAllowanceOffer(target, requiredByRule);
+          return holdForApproval("browser", reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined }, undefined, stop);
         }
         const result = await browser.click(botId, selector, target.fingerprint);
         const next = await browser.signInState(botId);
@@ -4176,6 +4295,7 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_type") {
         const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
         if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential field ${target.label || target.tag}`.slice(0, 160) });
+        if (browserHardStop("type", target) === "credentials") return response.status(403).json({ error: CARD_DETAILS_REFUSAL });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("type", `${selector} ${value}`, target), browserApprovalReason("type", `${selector} ${value}`, target)).reason;
         if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, value, targetFingerprint: target.fingerprint, targetReview: target.review });
         return response.json(await browser.type(botId, selector, value, target.fingerprint));
@@ -4186,6 +4306,7 @@ app.post("/api/internal/tools", async (request, response) => {
       if (!db.getStudioSettings().macAccessEnabled) return response.status(403).json({ error: "Files & apps on this Mac is turned off for the studio. The owner can turn it on in Permissions." });
       const input = z.object({ query: z.string().trim().min(2).max(300), sources: z.array(z.enum(["files", "notes", "mail", "messages"])).max(4).optional(), days: z.number().int().min(1).max(3650).optional(), limit: z.number().int().min(1).max(10).optional() }).strict().safeParse(args);
       if (!input.success) return response.status(400).json({ error: "Give some names or key words to look for." });
+      if (appleApps instanceof FixtureAppleApps) return response.json(appleApps.searchMyMac(input.data));
       const status = personalIndexer.status();
       const searched = input.data.sources?.length ? input.data.sources : status.sources.filter((source) => source.enabled && source.items > 0).map((source) => source.id);
       if (!status.sources.some((source) => source.enabled && source.items > 0)) return response.json({ results: [], note: "Nothing is indexed yet. Ask the owner to choose what to include under Workspace → What your team knows; until then use mac_notes_search, mac_mail_search or mac_list." });
@@ -4256,7 +4377,8 @@ app.post("/api/internal/tools", async (request, response) => {
       const reply = await googleWorkspace.prepareReply(input.data);
       const currentAccess = db.getBotConnectorAccess(botId);
       if (db.getRun(runId)?.status !== "running" || runner.isApprovalPaused(runId) || !currentAccess?.canRead || !currentAccess.canSend) return response.status(409).json({ error: "This task or its Gmail permissions changed. No reply was proposed." });
-      return holdForApproval("external", `${bot.name} prepared a reply in the original Gmail conversation. Review the recipient and full reply before sending.`, `Reply to ${reply.to}`, reply);
+      const newPeople = await unknownRecipients(db, recipientsOf("gmail_reply", reply), knownPeopleSources());
+      return holdForApproval("external", `${bot.name} prepared a reply in the original Gmail conversation. Review the recipient and full reply before sending.${firstMessageNote(newPeople)}`, `Reply to ${reply.to}`, reply, undefined, newPeople.length ? "new-person" : null);
     }
     if (action === "gmail_search" || action === "gmail_read" || action === "gmail_send") {
       const connection = db.getConnector("google-workspace"), access = db.getBotConnectorAccess(botId);
@@ -4284,7 +4406,8 @@ app.post("/api/internal/tools", async (request, response) => {
       db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared “${subject}” for ${recipient}` });
       broadcast({ type: "connector", at: Date.now() });
       const preview = email.body.trim().replace(/\s+/g, " ").slice(0, 260);
-      return holdForApproval("external", `${bot.name} prepared an email to ${recipient}. Subject: “${subject}”. Preview: ${preview}${email.body.trim().length > 260 ? "…" : ""}`, `Send “${subject}” to ${recipient}`);
+      const newPeople = await unknownRecipients(db, recipientsOf("gmail_send", email), knownPeopleSources());
+      return holdForApproval("external", `${bot.name} prepared an email to ${recipient}. Subject: “${subject}”. Preview: ${preview}${email.body.trim().length > 260 ? "…" : ""}${firstMessageNote(newPeople)}`, `Send “${subject}” to ${recipient}`, undefined, undefined, newPeople.length ? "new-person" : null);
     }
     if (action === "google_drive_search" || action === "google_drive_read" || action === "google_drive_create") {
       const access = db.getBotConnectorAccess(botId, "google-drive"), catalog = connectorCatalog(Boolean(db.getConnector("google-workspace")?.connected), db.getConnector("google-workspace")?.scopes || []);
@@ -4322,7 +4445,8 @@ app.post("/api/internal/tools", async (request, response) => {
         const guests = input.data.attendees?.length ? input.data.attendees.join(", ") : "No guests";
         db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared the calendar event “${input.data.title.slice(0, 120)}”` });
         broadcast({ type: "connector", at: Date.now() });
-        return holdForApproval("external", `${bot.name} prepared “${input.data.title}” from ${input.data.start} to ${input.data.end}. Guests: ${guests}.${input.data.location ? ` Location: ${input.data.location}.` : ""}${input.data.addGoogleMeet ? " A Google Meet link will be added." : ""}${input.data.attendees?.length ? " Google will notify these guests after approval." : ""}`, `Create “${input.data.title}” in Calendar`, input.data);
+        const newPeople = await unknownRecipients(db, recipientsOf("google_calendar_create", input.data), knownPeopleSources());
+        return holdForApproval("external", `${bot.name} prepared “${input.data.title}” from ${input.data.start} to ${input.data.end}. Guests: ${guests}.${input.data.location ? ` Location: ${input.data.location}.` : ""}${input.data.addGoogleMeet ? " A Google Meet link will be added." : ""}${input.data.attendees?.length ? " Google will notify these guests after approval." : ""}${firstMessageNote(newPeople)}`, `Create “${input.data.title}” in Calendar`, input.data, undefined, newPeople.length ? "new-person" : null);
       }
       if (!access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Google Calendar." });
       const events = await googleWorkspace.calendarAgenda(Number(args.days || 7), Number(args.maxResults || 20));
@@ -4616,7 +4740,7 @@ app.post("/api/internal/tools", async (request, response) => {
         triggerType: requestedTrigger, triggerConfig: args.triggerConfig,
       });
       if (!routine.success) return response.status(400).json({ error: "Choose a name, what should happen, and a repeat time of at least 5 minutes." });
-      const watchError = pageWatchError(routine.data);
+      const watchError = pageWatchError(routine.data) || macTriggerError(routine.data);
       if (watchError) return response.status(400).json({ error: watchError });
       const scheduleError = routineScheduleError(routine.data);
       if (scheduleError) return response.status(400).json({ error: scheduleError });
@@ -4637,7 +4761,10 @@ app.post("/api/internal/tools", async (request, response) => {
     }
     if (action === "remember") {
       const input = z.object({ key: z.string().min(1).max(80), content: z.string().min(1).max(1200), expectedRevision: z.string().max(80).optional(), expiresAt: z.string().datetime({ offset: true }).optional() }).strict().parse(args);
-      return response.json(db.remember(botId, input.key, input.content, { ...input, source: "task", runId }));
+      // Task T5: after reading mail, web pages or files, a memory waits for the owner's review.
+      const remembered = rememberFromTask(db, toolRun, input);
+      if (remembered.review) { broadcast(); return response.json({ saved: false, waitingForReview: true, message: reviewMessage(remembered.item) }); }
+      return response.json(remembered.saved);
     }
     if (action === "handoff") {
       let target: Bot;
@@ -4740,6 +4867,11 @@ app.post("/api/internal/tools", async (request, response) => {
         { capability: proposal.data.capability, plan: proposal.data.plan, toolName },
       );
     }
+    if (action === "propose_teammate") {
+      const prepared = prepareTeammateProposal(db, bot, toolRun.threadId, args);
+      if ("error" in prepared) return response.status(prepared.status).json({ error: prepared.error });
+      return holdForApproval("external", prepared.reason, prepared.label, prepared.proposal, "propose_teammate");
+    }
     if (action === "request_approval") return holdForApproval("external", String(args.reason || "This action needs your okay."), String(args.actionLabel || "Sensitive action"));
     return response.status(400).json({ error: "Unknown tool." });
   } catch (error) {
@@ -4772,6 +4904,23 @@ function dispatchDueRoutines() {
   return changed;
 }
 setInterval(dispatchDueRoutines, 15_000);
+
+// Task F5: a file lands in a folder, or mail like this arrives.
+const macTriggerQuietMs = Math.max(200, Number(process.env.OPENBOT_MAC_TRIGGER_QUIET_MS || 30_000));
+const macTriggers = new MacTriggers({
+  routines: () => db.listRoutines().filter((routine) => routine.enabled && (routine.triggerType === "folder" || routine.triggerType === "mail")),
+  macAccess: () => db.getStudioSettings().macAccessEnabled,
+  listFolder: (folder) => readdirSync(folder, { withFileTypes: true }).filter((entry) => entry.isFile()).flatMap((entry) => {
+    try { const stats = statSync(path.join(folder, entry.name)); return [{ name: entry.name, size: stats.size, modifiedMs: stats.mtimeMs }]; } catch { return []; }
+  }),
+  unreadMail: async () => (await appleApps.unreadMail({ days: 2, limit: 20 })).messages.map(({ id, from, subject, date }) => ({ id, from, subject, date })),
+  cursor: { get: (routineId, source) => db.automationCursor(routineId, source), set: (routineId, source, value) => db.saveAutomationCursor(routineId, source, value) },
+  startedSince: (routineId, since) => db.automationEventsSince(routineId, new Date(since).toISOString()),
+  dispatch: (routine, source, payload, externalId) => { dispatchRoutineEvent(routine, { source, payload, externalId, skipMatch: true, rateLimit: 20 }); },
+  alert: (routine, message) => { db.createAutomationAlert({ routineId: routine.id, kind: "failure", message }); broadcast(); },
+  quietMs: macTriggerQuietMs,
+});
+setInterval(() => { if (runner.isLeader()) void macTriggers.tick(); }, Math.max(200, Number(process.env.OPENBOT_MAC_TRIGGER_INTERVAL_MS || 15_000)));
 
 let calendarPollRunning = false;
 setInterval(async () => {

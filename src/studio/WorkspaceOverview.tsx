@@ -1,4 +1,6 @@
 import { ExistingAgentsCard } from "../components/ExistingAgentsCard";
+import { AddSpecialist } from "./AddSpecialist";
+import { MoveInCard } from "../components/MoveInOut";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, ChevronRight, Link2, Plus, Upload } from "lucide-react";
 import { TeammatePreviewCard, readTeammate, type TeammatePreview } from "../components/TeammatePreviewCard";
@@ -50,6 +52,7 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
   }, []);
   return <div className="team-overview">
     <div className="workspace-page-actions"><button className="button-primary" onClick={onCreate}><Plus size={16} /> New teammate</button><button disabled={pending} onClick={() => file.current?.click()}><Upload size={16} /> Import a profile</button><button disabled={pending} onClick={() => setLinkOpen((open) => !open)}><Link2 size={16} /> Add from a link</button></div>
+    {(() => { const anchor = state.bots.find((bot) => bot.providerInstanceId && bot.model); return anchor ? <AddSpecialist layout="row" teammates={state.bots} anchor={anchor} onAdded={() => undefined} /> : null; })()}
     {linkOpen && <form className="teammate-link-form" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await fromLink(linkText); setLinkOpen(false); setLinkText(""); }); }}><input value={linkText} onChange={(event) => setLinkText(event.target.value)} placeholder="Paste a teammate link" aria-label="Teammate link" autoFocus /><button type="submit" className="button-primary" disabled={pending || !linkText.trim()}>Preview</button></form>}
     <input ref={file} className="visually-hidden" type="file" accept=".json,application/json" aria-label="Import a teammate profile" onChange={event => {
       const selected = event.target.files?.[0]; event.target.value = "";
@@ -57,6 +60,7 @@ export function TeamOverview({ state, onCreate, onEdit, onThread, onImport, onRe
     }} />
     {preview && <div ref={previewAnchor}><TeammatePreviewCard preview={preview} pending={pending} macAccess={state.settings.macAccessEnabled} onCancel={() => setPreview(null)} onAdd={() => void perform(async () => { await onImport(preview.raw); setPreview(null); })} /></div>}
     <ExistingAgentsCard onOpen={(botId) => { const bot = state.bots.find((item) => item.id === botId); if (bot) onEdit(bot.threadId); }} />
+    <MoveInCard bots={state.bots} onReview={(threadId) => { window.location.href = `/?panel=teach&thread=${encodeURIComponent(threadId)}`; }} />
     {error && <p role="alert" className="panel-error">{error}</p>}
     <div className="workspace-team-grid">{state.bots.map(bot => <article key={bot.id} className="workspace-teammate">
       <button className="workspace-teammate-identity" onClick={() => onEdit(bot.threadId)} aria-label={`Edit ${bot.name}`}><Character name={bot.name} color={bot.color} variant={bot.mascot} size={60} /><span><strong>{bot.name}</strong><small>{bot.role}</small></span><ChevronRight size={16} /></button>

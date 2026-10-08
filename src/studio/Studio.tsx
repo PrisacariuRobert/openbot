@@ -20,6 +20,7 @@ import { createSpring, rubberband } from "./spring";
 import {
   Activity,
   ArrowRight,
+  Flag,
   Boxes,
   Files,
   FolderGit2,
@@ -87,6 +88,12 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
+import { useSetupVisits } from "./setup-visits";
+import { GuidedFirstRun } from "./GuidedFirstRun";
+import { FirstRunTryOne } from "./FirstRunTryOne";
+import { AddSpecialist } from "./AddSpecialist";
+import { startsGuidedRun, withoutWelcome } from "./first-run-steps";
+import { dismissSpecialistCard, firstRunTeammate, rememberFirstRunTeammate, specialistCardDismissed } from "./first-run-memory";
 import { conversationMatches } from "./conversation-filter";
 import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
@@ -95,7 +102,6 @@ import { useConversationAttachments } from "./useConversationAttachments";
 import { RunControls } from "./RunControls";
 import { ConversationProgress } from "./ConversationProgress";
 import { DeliveryReceipt, DeliveredFile, DeliveryCard } from "./DeliveryReceipt";
-import { WorkReceipt } from "../CapabilityPanels";
 import { cancelledRunForTrigger, latestCancelledWithoutTrigger } from "./cancelled-run-outcome";
 import { groupConsecutiveActionEvents, groupConsecutiveRoutineRuns } from "./action-event-groups";
 import { useAgentsToBringOver } from "../components/ExistingAgentsCard";
@@ -111,7 +117,11 @@ import { fileLabel, fileSiglaClass } from "./file-glyph";
 import { foldTalkingPills } from "./talk-folds";
 import "./character-context.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
+import { FailureFixAction } from "./FailureFixAction";
+import { failureFix, failureFixById } from "../shared/failure-fixes";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
+// M5: the receipt comes with the panels, so their 7,500 lines stay out of the first download.
+const WorkReceipt = lazy(() => import("../CapabilityPanels").then((module) => ({ default: module.WorkReceipt })));
 
 type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
 type Detail =
@@ -247,6 +257,8 @@ function eventTitle(message: Message): string {
       return String(data.title || (data.botName ? `${data.botName} stopped` : "Task stopped"));
     case "action_completed":
       return String(data.title || "Task update");
+    case "needs_fix":
+      return String(data.title || "Needs your help");
     case "routine_created":
       return `Created Routine ${data.name ?? message.body}`;
     case "routine_run":
@@ -355,6 +367,8 @@ function eventDetail(message: Message): string {
       const line = sentence.endsWith(".") ? sentence : `${sentence}.`;
       return line.length > 140 ? `${line.slice(0, 137)}…` : line;
     }
+    case "needs_fix":
+      return message.body.replace(/^[^:.]{1,40}:\s*/, "");
     case "routine_created":
       return `${data.schedule ?? ""}${data.enabled === "false" ? " · Paused" : ""}`;
     case "routine_run":
@@ -422,7 +436,7 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
 { id: "provider", title: "Your AI", description: "Choose the connection. Keep the conversation.", icon: Sparkles, keywords: ["models", "provider", "api key", "account", "local"] },
 { id: "connectors", title: "Apps & tools", description: "Familiar tools. Clear boundaries.", icon: Boxes, keywords: ["google", "slack", "notion", "github", "connectors", "mcp"] },
 { id: "telegram", title: "Chat apps", description: "iMessage, Telegram and Discord: ask from the app you already use.", icon: Send, keywords: ["imessage", "messages", "sms", "telegram", "discord", "chat", "message", "channel", "bot", "phone"] },
-{ id: "remote", title: "Your phone", description: "The same conversations, wherever you are.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] }
+{ id: "remote", title: "Your phone", description: "Beta. The same conversations on your phone, through a relay you set up.", icon: Smartphone, keywords: ["remote", "away", "pair", "https"] }
 ]},
 { title: "Work", items: [
 { id: "projects", title: "Projects", description: "Real changes, with room to review.", icon: FolderGit2, keywords: ["git", "code", "worktree"] },
@@ -433,7 +447,8 @@ const SETTINGS_CATEGORIES: ReadonlyArray<{
 { title: "Trust & usage", items: [
 { id: "control", title: "Permissions", description: "Clear boundaries make the helpful part easier.", icon: ShieldCheck, keywords: ["safety", "mac access", "yolo", "security"] },
 { id: "usage", title: "Usage & limits", description: "A clear budget. An honest stopping point.", icon: Activity, keywords: ["tokens", "cost", "budget", "allowance"] },
-{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] }
+{ id: "live", title: "Activity & recovery", description: "Know what happened. Choose what happens next.", icon: Activity, keywords: ["audit", "receipt", "recovery"] },
+{ id: "setup", title: "Your setup", description: "How your first days went. Kept on this Mac.", icon: Flag, keywords: ["onboarding", "first run", "timeline", "milestones", "getting started"] }
 ]}];
 
 function SettingsWorkspacePage({
@@ -647,6 +662,13 @@ function SettingsWorkspacePage({
 
 export function Studio() {
   const { appearance, setAppearance } = useAppearance();
+  useSetupVisits();
+  // The installer opens ?welcome=installed on every install and update: it starts the guided run only
+  // where the empty-studio welcome would show, and always leaves the address.
+  const [guided, setGuided] = useState(() => startsGuidedRun(window.location.search, 0));
+  useEffect(() => { const clean = withoutWelcome(window.location.href); if (clean) window.history.replaceState(null, "", clean); }, []);
+  const [firstRunBot, setFirstRunBot] = useState(() => firstRunTeammate());
+  const [specialistCardHidden, setSpecialistCardHidden] = useState(() => specialistCardDismissed());
   const [page, setPage] = useState<Page>(() => {
     const p = new URLSearchParams(window.location.search).get("panel");
     if (p === "settings" || isCapabilityPanel(p)) return "settings";
@@ -741,6 +763,8 @@ export function Studio() {
     setDraft = composerDraft.setBody;
   const [dictating, setDictating] = useState(false);
   const showsMic = dictating || (!draft.trim() && !attached.files.length && !sending && dictationSupported());
+  // The teammate the guided run made: its conversation offers the first things to try.
+  const firstRunThreadBot = state?.bots.find((bot) => bot.id === firstRunBot && bot.threadId === thread) ?? null;
   const pickStarter = (text: string) => {
     setDraft(text);
     window.setTimeout(() => { const box = document.getElementById("studio-message") as HTMLTextAreaElement | null; box?.focus(); box?.setSelectionRange(box.value.length, box.value.length); }, 0);
@@ -1053,6 +1077,20 @@ export function Studio() {
     if (!trigger || trigger.attachments.length) return null;
     return { replyId: reply.id, body: trigger.body, botId: run.botId };
   }, [state?.messages, state?.runs]);
+  // J6: "Try again" on a stopped task sends its request again, the same way.
+  const retryRunRequest = (run: Run | undefined) => {
+    const trigger = run && !run.parentRunId && ["failed", "cancelled"].includes(run.status) ? state?.messages.find((message) => message.id === run.triggerMessageId && message.kind === "text" && message.senderType === "user") : undefined;
+    if (!run || !trigger || trigger.attachments.length) return undefined;
+    // Only the teammate's latest task in this conversation: an older stop was already followed up.
+    if (state?.runs.some((other) => other.botId === run.botId && other.threadId === run.threadId && !other.parentRunId && (state.messages.find((message) => message.id === other.triggerMessageId)?.createdAt ?? "") > trigger.createdAt)) return undefined;
+    return async () => {
+      setSendError("");
+      try {
+        await api("/api/messages", { threadId: run.threadId, body: trigger.body, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, targetBotIds: [run.botId], requestId: `retry-${run.id}-${Date.now()}` });
+        setRefresh((n) => n + 1);
+      } catch (reason) { throw reason instanceof Error ? reason : new Error("Couldn't ask again. Try once more."); }
+    };
+  };
   const lastOwnMessageId = useMemo(() => {
     return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "user")?.id || null;
   }, [state?.messages]);
@@ -1922,6 +1960,8 @@ export function Studio() {
     <div
       className={`studio-shell ${documentFile && page === "chat" ? "with-document" : ""} ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
     >
+      {/* Outside the sidebar, which is hidden on a phone while a conversation is open. */}
+      {sharing && <ShareResultSheet messageId={sharing} onClose={() => setSharing(null)} />}
       <aside className="sidebar">
         <a className="wordmark" href="/">
           <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
@@ -1972,7 +2012,6 @@ export function Studio() {
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
-          {sharing && <ShareResultSheet messageId={sharing} onClose={() => setSharing(null)} />}
           <SidebarExtras />
           <button
             className="workspace-link"
@@ -2552,10 +2591,15 @@ export function Studio() {
                 >
                   <div className="chat-messages">
                     {state.activeThreadId === thread && state.messages[0] && <div className="conversation-date">{dayKey(state.messages[0].createdAt) === dayKey(new Date()) ? "Today" : dateText(state.messages[0].createdAt)} · {timeText(state.messages[0].createdAt)}</div>}
-                    {!state.bots.length ? (
+                    {!state.bots.length && guided ? (
+                      <GuidedFirstRun onClose={() => setGuided(false)} onCreated={(bot) => {
+                        rememberFirstRunTeammate(bot.id); setFirstRunBot(bot.id); setGuided(false);
+                        setRecipient(bot.id); setThread(bot.threadId); setPage("chat"); setRefresh((value) => value + 1);
+                      }} />
+                    ) : !state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><p className="welcome-tagline">A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
+                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Choose the AI behind your team, meet your first teammate, and start with something small.</p><button className="primary" onClick={() => setGuided(true)}>Set up my team <ArrowRight size={16}/></button><button onClick={() => setDetail({ kind: "create" })}>Create one teammate myself</button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>
@@ -2573,7 +2617,7 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
-                        <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
+                        {firstRunThreadBot ? <FirstRunTryOne bot={firstRunThreadBot} macAccess={Boolean(state.settings.macAccessEnabled)} onPick={pickStarter} /> : <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
                       </div>
                     ) : (<>{
                       state.messages.map((message, index) => {
@@ -2613,7 +2657,7 @@ export function Studio() {
                           const stopped = state.runs.find((run) => run.id === message.runId && !run.parentRunId) || state.runs.find((run) => stops.some((item) => item.runId === run.id));
                           return <div key={message.id} className="chat-event" data-event="run_stopped" role="status">
                             <span className="chat-event-mark" aria-hidden="true">{faces.length ? faces.map((face) => <Face key={face.id} bot={face} size={20} />) : <MessageCircle size={14} />}</span>
-                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}</span>
+                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}{(() => { const fix = failureFix(message.body); return fix && <FailureFixAction fix={fix} macAccessOn={state.settings.macAccessEnabled} onOpenPanel={(panel) => openCapability(panel, panel === "bot" ? allBots.find((bot) => bot.id === message.eventData?.botId)?.threadId : undefined)} onRetry={retryRunRequest(stopped)} />; })()}</span>
                           </div>;
                         }
                         if (message.kind === "event") {
@@ -2643,7 +2687,7 @@ export function Studio() {
                                   title={eventTitle(message)}
                                   lines={eventDetail(message) ? [eventDetail(message)] : []}
                                 />
-                              : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
+                              : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed', 'needs_fix'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
                                 {eventFaces.length > 0 ? (
                                   eventFaces.map((face) => <Face key={face.id} bot={face} size={20} />)
@@ -2653,6 +2697,13 @@ export function Studio() {
                                 <strong>{eventTitle(message)}</strong>
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
+                                {(() => {
+                                  const fix = message.eventType === "run_stopped" ? failureFix(message.body) : message.eventType === "needs_fix" ? failureFixById(message.eventData?.fix) : null;
+                                  if (!fix) return null;
+                                  const run = state.runs.find((item) => item.id === message.runId);
+                                  const botThread = allBots.find((bot) => bot.id === message.eventData?.botId)?.threadId;
+                                  return <FailureFixAction fix={fix} macAccessOn={state.settings.macAccessEnabled} onOpenPanel={(panel) => openCapability(panel, panel === "bot" ? botThread : undefined)} onRetry={message.eventType === "run_stopped" ? retryRunRequest(run) : undefined} />;
+                                })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                           );
@@ -2700,7 +2751,7 @@ export function Studio() {
                             )}
                             <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
-                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && (
+                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && !state.messages.some((item) => item.eventType === "needs_fix" && item.runId === message.runId && item.eventData?.fix === "mac-access") && (
                                 <MacAccessOffer name={message.senderName} threadId={message.threadId} onDone={() => setRefresh((n) => n + 1)} />
                               )}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (
@@ -2731,7 +2782,8 @@ export function Studio() {
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
-                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
+                      {!state.messages.some((message) => message.senderType === "user") && (firstRunThreadBot ? <FirstRunTryOne bot={firstRunThreadBot} macAccess={Boolean(state.settings.macAccessEnabled)} onPick={pickStarter} /> : <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />)}
+                      {firstRunThreadBot && !specialistCardHidden && state.messages.some((message) => message.senderType === "bot") && <AddSpecialist teammates={state.bots} anchor={firstRunThreadBot} onAdded={() => setRefresh((value) => value + 1)} onDismiss={() => { dismissSpecialistCard(); setSpecialistCardHidden(true); }} />}
                     </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);
@@ -3033,7 +3085,7 @@ export function Studio() {
               )}
               {!detail.run.summary && detail.run.partialText && <details className="message-work-updates"><summary>Latest work update</summary><div className="prose"><MarkdownMessage body={detail.run.partialText} /></div></details>}
               <DeliveryReceipt run={detail.run} teammates={state?.bots} />
-              <WorkReceipt runId={detail.run.id} />
+              <Suspense fallback={<p className="work-receipt-missing">Assembling the receipt…</p>}><WorkReceipt runId={detail.run.id} /></Suspense>
               <button
                 className="primary full-width"
                 onClick={() => openThread(detail.run.threadId)}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -128,6 +128,7 @@ test("every internal link and image on the comparison page resolves", () => {
 const DETAIL_PAGES = [
   { slug: "openai-dots", name: "OpenAI dots" },
   { slug: "grok-bot", name: "Grok Bot" },
+  { slug: "meta-muse", name: "Meta Muse" },
   { slug: "siri-ai", name: "Siri AI" },
   { slug: "openmausbot", name: "OpenMausBot" },
 ];
@@ -171,4 +172,39 @@ test("the home page leads with the alternative-to sentence people search for, an
   assert.match(html, /<p class="kicker">The open-source alternative to OpenAI dots, Grok Bot and Siri AI<\/p>/);
   assert.match(html, /free to use/i);
   assert.match(read("llms.txt"), /alternative to OpenAI dots, Grok Bot and Siri AI/);
+});
+
+/** Every HTML page the site serves, as paths relative to site/. */
+function pages(relative = ""): string[] {
+  return readdirSync(path.join(site, relative), { withFileTypes: true }).flatMap(entry => {
+    const child = path.posix.join(relative, entry.name);
+    return entry.isDirectory() ? pages(child) : entry.name.endsWith(".html") ? [child] : [];
+  });
+}
+
+test("the site serves its own font, so a visit doesn't contact Google Fonts", () => {
+  const html = pages();
+  assert.ok(html.length >= 9, "finds the site's pages");
+  for (const page of html) {
+    const source = read(page);
+    assert.doesNotMatch(source, /fonts\.(?:googleapis|gstatic)\.com/, `${page} loads no third-party font`);
+    for (const match of source.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)) {
+      assert.ok(!/^https?:/.test(match[1]), `${page} loads only its own stylesheets`);
+      assert.ok(existsSync(path.resolve(path.dirname(path.join(site, page)), match[1])), `${page}: ${match[1]} exists`);
+    }
+  }
+  const files = [...read("fonts/nunito.css").matchAll(/url\("([^"]+)"\)/g)].map(match => match[1]);
+  assert.deepEqual(files, ["nunito-latin.woff2", "nunito-latin-ext.woff2"]);
+  for (const file of files) assert.equal(readFileSync(path.join(site, "fonts", file)).subarray(0, 4).toString("latin1"), "wOF2", `${file} is a WOFF2 font`);
+  assert.match(read("fonts/OFL.txt"), /SIL Open Font License, Version 1\.1/, "the font's license travels with it");
+});
+
+test("the teammate gallery can be shared with a canonical address, a title and a picture", () => {
+  const html = read("teammates/index.html");
+  assert.match(html, /<link rel="canonical" href="https:\/\/sidemates\.app\/teammates\/" \/>/);
+  assert.match(html, /<meta property="og:url" content="https:\/\/sidemates\.app\/teammates\/" \/>/);
+  assert.match(html, /<meta property="og:title" content="[^"]+" \/>/);
+  const image = html.match(/<meta property="og:image" content="https:\/\/sidemates\.app\/([^"]+)" \/>/)?.[1];
+  assert.ok(image && existsSync(path.join(site, image)), "the share picture exists on the site");
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image" \/>/);
 });

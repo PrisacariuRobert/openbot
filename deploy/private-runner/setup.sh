@@ -51,7 +51,7 @@ if [[ ! -e "${env_file}" ]]; then
     echo "OPENBOT_DOMAIN=${domain}"
     echo "OPENBOT_HOST_ROOT=${host_root}"
     echo "DOCKER_GID=${docker_gid}"
-    echo "OPENCODE_VERSION=1.18.28"
+    echo "OPENCODE_VERSION=1.18.31"
   } > "${env_file}"
 else
   echo "Keeping the existing ${env_file}."
@@ -79,7 +79,7 @@ if [[ -n "${relay_domain}" ]]; then
 fi
 
 docker compose --env-file "${env_file}" -f "${runner_dir}/docker-compose.yml" up -d --build
-echo "OpenBot is starting (${with_relay_wording}): https://${domain}/"
+echo "Sidemates is starting (${with_relay_wording}): https://${domain}/"
 echo "After the health check passes, read the private key with:"
 echo "  sudo cat ${host_root}/data/access.token"
 if [[ -n "${relay_domain}" ]]; then

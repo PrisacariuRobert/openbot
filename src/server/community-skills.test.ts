@@ -19,18 +19,23 @@ test("portable skill bundles preserve provenance and explicit references without
 });
 
 test("traversal, hidden files, scripts, alias bombs, oversized files and missing references fail visibly", () => {
-  for (const name of ["../SKILL.md", "references/../secret.md", "references//x.md", "/SKILL.md", "scripts/install.py", ".env", "references\\secret.md", "references/%2e%2e/x.md"]) assert.throws(() => skillFilePath(name));
+  for (const name of ["../SKILL.md", "references/../secret.md", "references//x.md", "/SKILL.md", "scripts/install.exe", "bin/install.py", "scripts/../x.py", ".env", "references\\secret.md", "references/%2e%2e/x.md"]) assert.throws(() => skillFilePath(name));
   assert.throws(() => inspectCommunitySkill({ ...bundle, files: { "SKILL.md": "x".repeat(33_000) } }));
   assert.throws(() => inspectCommunitySkill({ ...bundle, files: { "SKILL.md": "---\nname: &a alias\ndescription: *a\n---\nbody" } }));
   assert.match(inspectCommunitySkill({ ...bundle, files: { "SKILL.md": markdown } }).blockers.join(), /Missing referenced/);
 });
 
-test("Hermes metadata, tool approval policies, and scripts require adaptation instead of silent compatibility", () => {
+test("Hermes metadata, tool approval policies and installation steps require adaptation; scripts come in switched off (T4)", () => {
   for (const extra of ["allowed-tools: Bash\n", "metadata:\n  hermes:\n    requires_tools: [terminal]\n", "platforms: [linux]\n"]) {
     const inspected = inspectCommunitySkill({ ...bundle, files: { ...bundle.files, "SKILL.md": markdown.replace("license: MIT\n", extra) } });
     assert.ok(inspected.blockers.length > 0);
   }
-  assert.ok(inspectCommunitySkill({ ...bundle, files: { ...bundle.files, "SKILL.md": markdown + "\nRun scripts/setup.py" } }).blockers.length > 0);
+  assert.ok(inspectCommunitySkill({ ...bundle, files: { ...bundle.files, "SKILL.md": markdown + "\nFirst run pip install pypdf" } }).blockers.length > 0);
+  assert.match(inspectCommunitySkill({ ...bundle, files: { ...bundle.files, "SKILL.md": markdown + "\nRun `scripts/setup.py`." } }).blockers.join(), /Missing referenced file: scripts\/setup\.py/);
+  const withScript = inspectCommunitySkill({ ...bundle, files: { ...bundle.files, "SKILL.md": markdown + "\nRun `scripts/setup.py`.", "scripts/setup.py": "print('ready')\n" } });
+  assert.ok(!withScript.blockers.some((blocker) => blocker.includes("scripts/")), "an included script doesn't block");
+  assert.deepEqual(withScript.scripts, ["scripts/setup.py"]);
+  assert.match(withScript.warnings.join(" "), /stays off until you turn it on/);
 });
 
 test("review is bound to exact skill bytes; access can be revoked without touching source files", () => {
@@ -63,7 +68,7 @@ test("memory correction and deletion invalidate old sessions; notes stay private
     for (let i = 0; i < 30; i++) db.remember("nova", `note-${i}`, "A useful preference. ".repeat(50));
     prepareWorkspace(db, db.getBot("nova")!);
     const profile = readFileSync(path.join(db.workspacesDir, "nova", "AGENTS.md"), "utf8");
-    const memory = profile.split("## Durable memory")[1]!.split("## Optional community")[0]!;
+    const memory = profile.split("## What you remember")[1]!.split("\n## ")[0]!;
     assert.ok(memory.length < 4_600);
     assert.equal(toolAvailability(db, db.getBot("nova")!, true).memory_search, false);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }

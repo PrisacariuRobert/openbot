@@ -38,7 +38,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ github.event_name == 'workflow_call' || inputs.upload_artifacts }}
         with:
-          name: openbot-desktop-${{ matrix.platform }}
+          name: sidemates-desktop-${{ matrix.platform }}
           if-no-files-found: error
           path: |
             desktop/release/*.dmg

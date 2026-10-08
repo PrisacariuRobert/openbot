@@ -12,8 +12,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const UPDATED = "2 October 2026";
-const UPDATED_ISO = "2026-10-02";
+/** The day each page's facts were last checked. A page keeps its old date until someone re-checks it. */
+const CHECKED_2_OCTOBER = { text: "2 October 2026", iso: "2026-10-02" };
+const CHECKED_7_OCTOBER = { text: "7 October 2026", iso: "2026-10-07" };
 const base = readFileSync(path.join(root, "site/alternatives/index.html"), "utf8");
 const style = base.slice(base.indexOf("<style>"), base.indexOf("</style>") + "</style>".length);
 const brand = base.slice(base.indexOf("<header>"), base.indexOf("</header>") + "</header>".length).replaceAll('href="../"', 'href="../../"').replaceAll('href="../#install"', 'href="../../#install"');
@@ -28,24 +29,25 @@ const PAGES = [
     h1: "An open-source alternative to OpenAI dots",
     description: "Looking for an alternative to OpenAI dots? Sidemates is a free, open-source team of AI teammates that runs on your own Mac, works in your Mail, Calendar and Notes, and is free to use. Compared honestly, including when dots is the better pick.",
     lede: "OpenAI dots is an always-on agent that works on its own cloud computer. Sidemates is the open-source alternative that works on yours.",
-    what: "OpenAI announced dots at DevDay on 29 September 2026: an always-on agent with its own cloud computer and virtual browser, plugins for thousands of apps, and read-only access until you approve actions. It is included with ChatGPT Pro and Business Premium, with one dot on Pro, and it was not offered in the EEA, UK or Switzerland at launch.",
+    updated: CHECKED_7_OCTOBER,
+    what: "OpenAI announced dots at DevDay on 29 September 2026: an always-on agent with its own cloud computer and virtual browser, plugins for thousands of apps, and read-only access until you approve actions. Through the ChatGPT desktop app it can also use your own computer, if you give it access. It comes with ChatGPT Pro, from $100 a month, with one dot on Pro, and with Business Premium. Personal plans don't include it in the EEA, the UK or Switzerland, where Business Premium is the only way to get it.",
     rows: [
-      ["Runs on", "Its own cloud computer with a virtual browser", "Your Mac"],
-      ["Price", "Included with ChatGPT Pro and Business Premium; one dot on Pro", "Free and open source (MIT). You pay only for the AI you choose."],
-      ["Your Mac's Mail, Calendar, Notes and files", "No (cloud apps through plugins)", "Yes, in your own apps"],
+      ["Runs on", "Its own cloud computer with a virtual browser, and your computer through the ChatGPT desktop app if you allow it", "Your Mac"],
+      ["Price", "Included with ChatGPT Pro (from $100 a month) and Business Premium; one dot on Pro", "Free and open source (MIT). You pay only for the AI you choose."],
+      ["Your Mac's Mail, Calendar, Notes and files", "Through the ChatGPT desktop app, if you give it access to your computer; cloud apps through plugins", "Yes, in your own apps"],
       ["How many agents", "One agent per dot", "A team of named teammates, each with its own browser and workspace"],
       ["Works while your computer is off", "Yes", "No. It works while your Mac is on, and keeps the Mac awake for scheduled jobs."],
-      ["Where it is offered", "Not in the EEA, UK or Switzerland at launch", "Wherever your Mac works"],
+      ["Where it is offered", "Personal plans exclude the EEA, UK and Switzerland; there, only Business Premium includes it", "Wherever your Mac works"],
       ["Source code", "Closed", "Open (MIT)"],
     ],
     chooseThem: ["want an agent that keeps working while your computer is off", "want it managed for you with nothing to install, and already pay for ChatGPT Pro or Business Premium", "are happy for your work to run on OpenAI's servers"],
-    chooseUs: ["want the agent to work in your own Mail, Calendar, Notes, Messages and folders", "want to be asked before it sends, buys or changes anything, or to switch that off for a teammate you trust", "want free, open-source software instead of another paid app", "live in the EEA, UK or Switzerland, or want software you can read"],
+    chooseUs: ["want the agent to work in your own Mail, Calendar, Notes, Messages and folders", "want to be asked before it sends, buys or changes anything, or to switch that off for a teammate you trust", "want free, open-source software instead of another paid app", "live in the EEA, UK or Switzerland and don't have Business Premium, or want software you can read"],
     faq: [
       ["Is Sidemates a free alternative to OpenAI dots?", "Yes. Sidemates is free, MIT-licensed software. You pay only for the AI you connect, and free options exist (a Google Gemini key or a free Nous Portal plan). It does not run in the cloud, so it works while your Mac is on, not while it is off."],
-      ["Does Sidemates work in Europe?", "Yes. It runs on your own Mac, so it works wherever your Mac does, including the EEA, UK and Switzerland, where OpenAI dots was not offered at launch."],
+      ["Does Sidemates work in Europe?", "Yes. It runs on your own Mac, so it works wherever your Mac does, including the EEA, UK and Switzerland, where OpenAI dots isn't part of personal ChatGPT plans."],
       ["Can Sidemates use my Mac's Mail and Calendar?", "Yes. Teammates can read your Apple Mail, Calendar, Reminders, Notes, Contacts and Messages and search folders you choose, and they ask before they change anything."],
     ],
-    sources: [["Android Headlines on dots", "https://www.androidheadlines.com/2026/09/openai-launches-dots-always-on-ai-agents.html"], ["DevDay coverage", "https://pasqualepillitteri.it/en/news/19302/openai-dots-personal-ai-agent-devday-2026"]],
+    sources: [["Android Headlines on dots", "https://www.androidheadlines.com/2026/09/openai-launches-dots-always-on-ai-agents.html"], ["DevDay coverage", "https://pasqualepillitteri.it/en/news/19302/openai-dots-personal-ai-agent-devday-2026"], ["DataCamp on dots plans", "https://www.datacamp.com/blog/openai-dots"], ["eesel review of dots, including Europe", "https://www.eesel.ai/blog/openai-dots-review"], ["The ChatGPT desktop app", "https://learn.chatgpt.com/docs/app"]],
   },
   {
     slug: "grok-bot",
@@ -54,28 +56,30 @@ const PAGES = [
     h1: "An open-source alternative to Grok Bot",
     description: "Looking for an open-source alternative to Grok Bot? Sidemates is a free team of AI teammates on your own Mac, each with its own browser, with no cloud computer to rent. Compared honestly.",
     lede: "Grok Bot gives you named AI teammates that share one cloud computer. Sidemates gives you a team on your own Mac, for free.",
-    what: "xAI's Grok Bot has been in beta since 11 August 2026. It gives you named AI teammates that share one managed cloud computer, with desktop and iOS apps. It is bundled with xAI plans that cost $120 to $300 a month.",
+    updated: CHECKED_7_OCTOBER,
+    what: "xAI's Grok Bot has been in beta since 11 August 2026. It gives you named AI teammates that share one managed cloud computer, with desktop and iOS apps. It runs through Cursor: it is included in every paid Cursor plan, from $20 a month, and you can also link a SuperGrok subscription. The weekly allowance isn't published, and extra use is billed through Cursor if you turn on on-demand usage.",
     rows: [
       ["Runs on", "A managed cloud computer shared by the teammates", "Your Mac, each teammate with its own browser and workspace"],
-      ["Price", "Bundled with $120 to $300 a month plans", "Free and open source (MIT). You pay only for the AI you choose."],
+      ["Price", "Included in every paid Cursor plan, from $20 a month, or with a linked SuperGrok subscription; the weekly allowance isn't published", "Free and open source (MIT). You pay only for the AI you choose."],
       ["Your Mac's Mail, Calendar, Notes and files", "No", "Yes, in your own apps"],
       ["Teammates", "Yes, sharing one computer", "Yes, each isolated from the others"],
-      ["Where you use it", "Desktop and iOS apps", "macOS; iPhone through a Home Screen app, Siri and the Share menu"],
+      ["Where you use it", "Desktop and iOS apps", "macOS; on iPhone, Telegram, or with a relay you set up, the Home Screen web app, Siri and the Share menu"],
       ["Works while your computer is off", "Yes", "No. It works while your Mac is on."],
       ["Source code", "Closed", "Open (MIT)"],
     ],
-    chooseThem: ["want a managed, hosted team with a native iOS app", "already pay for the xAI plan that includes it", "need it to keep working while your computer is off"],
-    chooseUs: ["don't want to rent a cloud computer or pay $120 or more a month", "want teammates that don't share one computer", "want them to work in your own Mac apps", "want free, open-source software"],
+    chooseThem: ["want a managed, hosted team with a native iOS app", "already pay for Cursor or SuperGrok", "need it to keep working while your computer is off"],
+    chooseUs: ["don't want to rent a cloud computer or watch a weekly allowance", "want teammates that don't share one computer", "want them to work in your own Mac apps", "want free, open-source software"],
     faq: [
       ["Is there an open-source alternative to Grok Bot?", "Yes. Sidemates is a free, open-source team of AI teammates for your Mac. Another open-source option is OpenMausBot, which is aimed at developers and also runs on Windows and Linux."],
-      ["How much does Sidemates cost compared with Grok Bot?", "Sidemates is free. Grok Bot is bundled with xAI plans that cost $120 to $300 a month. With Sidemates you pay only for the AI you connect, and free options exist."],
+      ["How much does Sidemates cost compared with Grok Bot?", "Sidemates is free. Grok Bot is included in every paid Cursor plan, from $20 a month, or with a linked SuperGrok subscription. Its weekly allowance isn't published, and extra use is billed through Cursor if you turn on on-demand usage. With Sidemates you pay only for the AI you connect, and free options exist."],
       ["Do Sidemates teammates share a computer?", "No. Each teammate has its own workspace and its own browser profile on your Mac. Browser profiles are separate profiles, not a security sandbox."],
     ],
-    sources: [["xAI announcement", "https://x.ai/news/introducing-grok-bot"], ["Grok Bot overview", "https://www.digitalapplied.com/blog/grok-bot-ai-teammates-launch-cloud-computer-2026"]],
+    sources: [["xAI announcement", "https://x.ai/news/introducing-grok-bot"], ["Grok Bot plans (Cursor Help)", "https://cursor.com/help/grok-bot/plans"], ["Cursor pricing", "https://cursor.com/pricing"], ["Grok Bot overview", "https://www.digitalapplied.com/blog/grok-bot-ai-teammates-launch-cloud-computer-2026"]],
   },
   {
     slug: "siri-ai",
     name: "Siri AI",
+    updated: CHECKED_2_OCTOBER,
     title: "Siri AI alternative and companion: Sidemates, open source on your Mac",
     h1: "Sidemates and Siri AI: use both, or choose",
     description: "Comparing Sidemates with Apple's Siri AI on macOS 27. Siri is built in for quick questions; Sidemates is a free, open-source team for longer jobs across your apps and the web. When to use each.",
@@ -102,6 +106,7 @@ const PAGES = [
   {
     slug: "openmausbot",
     name: "OpenMausBot",
+    updated: CHECKED_2_OCTOBER,
     title: "OpenMausBot alternative: Sidemates, simpler on a Mac",
     h1: "Sidemates and OpenMausBot compared",
     description: "OpenMausBot and Sidemates are both open-source teams of AI bots. OpenMausBot suits developers and runs everywhere; Sidemates is simpler on a Mac and works in your own Mail, Calendar and Notes. When to choose which.",
@@ -124,6 +129,38 @@ const PAGES = [
     ],
     sources: [["OpenMausBot on GitHub", "https://github.com/milind-soni/OpenMausBot"], ["OpenMausBot website", "https://www.openmausbot.com/"], ["OpenMausBot pricing", "https://www.openmausbot.com/pricing"]],
   },
+  {
+    slug: "meta-muse",
+    name: "Meta Muse",
+    updated: CHECKED_7_OCTOBER,
+    title: "Meta Muse alternative: Sidemates, free and open source on your Mac",
+    h1: "An open-source alternative to Meta Muse",
+    description: "Looking for an alternative to Meta Muse? Sidemates is a free, open-source team of AI teammates on your own Mac, with the AI you choose, wherever you live. Compared honestly, including when Muse is the better pick.",
+    lede: "Meta Muse is one personal agent on Meta's cloud computer, and its Mac app also works in your own apps. Sidemates is an open-source team on your Mac, with the AI you choose.",
+    what: "Meta launched Muse on 8 September 2026 in the US, on iPhone, Android, the web and WhatsApp, and in Canada on 18 September. Muse is one personal agent that works on its own cloud computer with a browser (Muse Secure VM), keeps working after you close the app, and runs on Meta's Muse Spark model. A second agent, Sentinel, must approve what Muse sends to the internet, and Muse asks before sensitive actions such as sending an email or making a purchase. Muse for Mac, released on 17 September, can also work in your files, Messages, Calendar, Notes and Mail, with access you opt into. Muse is free with a weekly allowance; the Power ($20 a month) and Maximum ($100 a month) plans add usage, not features. Signing up asks for a payment card, even for the free plan.",
+    rows: [
+      ["Runs on", "Meta's cloud computer with its own browser; the Mac app also works in your Mac's apps", "Your Mac, each teammate with its own browser and workspace"],
+      ["Price", "Free with a weekly allowance; $20 and $100 a month plans add usage. A card is needed to sign up.", "Free and open source (MIT). You pay only for the AI you choose, and free options exist."],
+      ["Your Mac's Mail, Calendar, Notes and files", "Yes, with the Mac app: files, Messages, Calendar, Notes and Mail, with access you opt into", "Yes: Mail, Calendar, Reminders, Notes, Contacts, Messages and folders you choose"],
+      ["Choice of AI", "Meta's Muse Spark", "Your choice: ChatGPT, Claude, Grok, GitHub Copilot, Gemini, Nous Portal, OpenCode Go or a model on your Mac"],
+      ["How many agents", "One personal agent", "A team of named teammates"],
+      ["Where it is offered", "The US and Canada", "Wherever your Mac works"],
+      ["Where you use it", "iPhone, Android, the web, WhatsApp and Mac", "macOS 13 or later; on iPhone, Telegram, or with a relay you set up, the Home Screen web app, Siri and the Share menu"],
+      ["Works while your computer is off", "Yes, on Meta's cloud computer", "No. It works while your Mac is on."],
+      ["Asks before acting", "Before sensitive actions, such as sending an email or buying something", "Before it sends, buys or changes anything, unless you turn on Autopilot for a teammate"],
+      ["Your data", "Conversations and work live in Meta's cloud. Meta says they stay out of its ad systems, and you can opt out of AI training.", "Stored on your Mac. The text a teammate needs goes to the AI you chose."],
+      ["Source code", "Closed", "Open (MIT)"],
+    ],
+    chooseThem: ["want nothing to install, on iPhone, Android, the web or WhatsApp", "need it to keep working while your devices are off", "live in the US or Canada and are happy with Meta's AI and its free allowance", "want a second agent checking what it sends to the internet"],
+    chooseUs: ["live outside the US and Canada", "want to choose the AI, including one that runs on your Mac", "want a team of named teammates, each with its own browser, instead of one agent", "want your work stored on your Mac, in free software you can read"],
+    faq: [
+      ["Is Sidemates an alternative to Meta Muse?", "Yes. Both can work in your Mac's Mail, Calendar, Notes and files. Muse is one agent on Meta's cloud computer, with Meta's own AI, in the US and Canada. Sidemates is a free, open-source team on your own Mac, with the AI you choose, wherever your Mac works."],
+      ["Is Meta Muse free?", "Muse has a free plan with a weekly allowance, and paid plans at $20 and $100 a month that add usage, not features. It asks for a card when you sign up. Sidemates is free, MIT-licensed software, and you pay only for the AI you connect; free options exist."],
+      ["Can I use Meta Muse outside the US and Canada?", "Not yet. As of 7 October 2026, Meta hasn't announced other countries. Sidemates runs on your own Mac, so it works wherever your Mac does."],
+      ["Does Muse keep working when my computer is off?", "Yes. Muse works on Meta's cloud computer, so it keeps going after you close the app. Sidemates works while your Mac is on, and keeps the Mac awake while scheduled work is due."],
+    ],
+    sources: [["Meta: Introducing Muse", "https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/"], ["TechCrunch on Muse for Mac", "https://techcrunch.com/2026/09/18/metas-muse-hits-mac-letting-the-ai-take-actions-on-your-computer/"], ["Muse plans and prices (Carly, 30 September 2026)", "https://www.usecarly.com/blog/meta-muse-pricing/"], ["Where Muse is available (Carly, 30 September 2026)", "https://www.usecarly.com/blog/meta-muse-availability/"]],
+  },
 ];
 
 const esc = (value) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -134,7 +171,7 @@ for (const page of PAGES) {
   const ld = {
     "@context": "https://schema.org",
     "@graph": [
-      { "@type": "Article", headline: page.h1, description: page.description, dateModified: UPDATED_ISO, author: { "@type": "Organization", name: "Sidemates" }, mainEntityOfPage: url },
+      { "@type": "Article", headline: page.h1, description: page.description, dateModified: page.updated.iso, author: { "@type": "Organization", name: "Sidemates" }, mainEntityOfPage: url },
       { "@type": "FAQPage", mainEntity: page.faq.map(([question, answer]) => ({ "@type": "Question", name: jsonText(question), acceptedAnswer: { "@type": "Answer", text: jsonText(answer) } })) },
     ],
   };
@@ -157,9 +194,7 @@ for (const page of PAGES) {
   <meta property="og:image" content="https://sidemates.app/social.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../fonts/nunito.css" />
   <script type="application/ld+json">
 ${JSON.stringify(ld, null, 2)}
   </script>
@@ -171,7 +206,7 @@ ${brand}
 <main>
   <h1>${esc(page.h1)}</h1>
   <p class="lede">${esc(page.lede)}</p>
-  <p class="updated">Last updated ${UPDATED}. Details about ${esc(page.name)} come from its public pages (linked below) and can change. If something is out of date, <a href="https://github.com/PrisacariuRobert/sidemates/issues/new">tell us</a>. See the <a href="../">full comparison</a> with the other options.</p>
+  <p class="updated">Last updated ${page.updated.text}. Details about ${esc(page.name)} come from the public sources linked below and can change. If something is out of date, <a href="https://github.com/PrisacariuRobert/sidemates/issues/new">tell us</a>. See the <a href="../">full comparison</a> with the other options.</p>
 
   <section id="what">
     <h2>What ${esc(page.name)} is</h2>

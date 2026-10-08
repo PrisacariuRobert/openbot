@@ -1,6 +1,7 @@
 import { isLocalModelUrl, legacyApiProviderId } from "../shared/provider-config.js";
 import type { OpenBotDatabase } from "./database.js";
 import { rankMemories } from "./memory-retrieval.js";
+import { detectLocalEmbeddings } from "./ollama.js";
 
 export interface EmbeddingsEndpoint {
   baseUrl: string;
@@ -136,14 +137,21 @@ function memoryText(key: string, content: string): string {
 /** Rank a teammate's private memories. With a working embeddings connection
  * this blends meaning similarity with the existing keyword score; otherwise
  * it returns exactly today's keyword ranking. Never throws. */
+/** Task T5: the connection the owner chose for embeddings; otherwise an embedding model in Ollama on this Mac. */
+export async function memorySearchEndpoint(db: OpenBotDatabase): Promise<EmbeddingsEndpoint | null> {
+  const resolution = resolveEmbeddingsEndpoint(db);
+  if (resolution.ok) return resolution.endpoint;
+  if (resolution.reason !== "not_configured") return null;
+  return detectLocalEmbeddings();
+}
+
 export async function searchMemoriesWithMeaning(db: OpenBotDatabase, botId: string, query: string, limit = 18): Promise<MeaningSearchResult> {
   const notes = db.memoryEntries(botId);
   const keyword = rankMemories(query, notes, limit).map((note) => ({ key: note.key, content: note.content, score: note.score }));
   const trimmed = query.trim();
   if (!trimmed || !notes.length) return { notes: [], retrieval: "keyword" };
-  const resolution = resolveEmbeddingsEndpoint(db);
-  if (!resolution.ok) return { notes: keyword, retrieval: "keyword" };
-  const { endpoint } = resolution;
+  const endpoint = await memorySearchEndpoint(db);
+  if (!endpoint) return { notes: keyword, retrieval: "keyword" };
   try {
     const cached = db.getMemoryVectors(botId, endpoint.model);
     const missing = notes.filter((note) => {

@@ -18,7 +18,9 @@ export function morningBriefPrompt(city?: string | null): string {
 2. Mail that needs me: from my unread mail of the last two days, pick at most five that look like they need an answer or an action. One line each: who, and what is asked. Skip newsletters and automatic notifications.
 3. Reminders due today or overdue.${weather}
 
-Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.`;
+Keep it short enough to read in half a minute: a few labelled lines, no introduction. If you can't reach a source, say so in one line instead of guessing. Mention where each part came from in a few words.
+
+Before you answer, check: times are in order, at most five mails, nothing was changed, and each part says where it came from.`;
 }
 
 export interface MorningBriefSetup { botId: string; time: string; weekdaysOnly: boolean; city?: string | null; timeZone: string }

@@ -166,15 +166,27 @@ test("free-tier suffix detection names the tier without judging other models", (
   assert.equal(isFreeTierModel(""), false);
 });
 
+test("models that train on prompts are named, and only those", async () => {
+  const { trainsOnPrompts } = await import("./provider-config.js");
+  assert.equal(trainsOnPrompts("opencode-go/muse-spark-1.3-contributor"), true);
+  assert.equal(trainsOnPrompts("opencode-go/muse-spark-1.2-contributor"), true);
+  assert.equal(trainsOnPrompts("opencode/muse-spark-1.3-contributor-free"), true);
+  assert.equal(trainsOnPrompts("opencode-go/deepseek-v4.1-flash"), false);
+  assert.equal(trainsOnPrompts("google/gemini-flash-lite-latest"), false);
+  assert.equal(trainsOnPrompts("custom/my-contributor-notes"), false);
+});
+
 test("model choices lead with a recommendation and never offer OpenCode's app-only free tier", async () => {
   const { modelChoices, defaultModelChoice, friendlyModelName, isBlockedFreeTierModel } = await import("./provider-config.js");
   const models = ["opencode/big-pickle", "opencode/muse-spark-1.3-contributor-free", "opencode-go/deepseek-v4.1-flash", "opencode-go/gpt-5.6-luna", "opencode-go/muse-spark-1.3-contributor"];
   const choices = modelChoices(models);
-  assert.equal(choices[0]!.value, "opencode-go/muse-spark-1.3-contributor");
+  assert.equal(choices[0]!.value, "opencode-go/deepseek-v4.1-flash", "a model that doesn't train on prompts is recommended first");
   assert.equal(choices[0]!.detail, "Recommended");
+  assert.equal(choices.find((choice) => choice.value === "opencode-go/muse-spark-1.3-contributor")!.detail, "OpenCode Go · prompts may be used to train Meta's models");
   assert.equal(choices.at(-1)!.value, "opencode/muse-spark-1.3-contributor-free");
   assert.equal(choices.at(-1)!.disabled, true);
-  assert.equal(defaultModelChoice(models), "opencode-go/muse-spark-1.3-contributor");
+  assert.equal(defaultModelChoice(models), "opencode-go/deepseek-v4.1-flash");
+  assert.equal(defaultModelChoice(["opencode-go/muse-spark-1.3-contributor"]), "opencode-go/muse-spark-1.3-contributor", "still offered when it is the only known model");
   assert.equal(defaultModelChoice(["anthropic/claude-x"]), "", "no guess for other connections");
   assert.equal(friendlyModelName("opencode-go/gpt-5.6-luna"), "GPT 5.6 Luna");
   assert.equal(friendlyModelName("opencode-go/muse-spark-1.3-contributor"), "Muse Spark 1.3 Contributor");

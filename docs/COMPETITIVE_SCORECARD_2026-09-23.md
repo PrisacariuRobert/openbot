@@ -2,6 +2,19 @@
 
 Where Sidemates stands against the four products people compare it with, after the competitive-plan work on branch `fix/runtime-pin-and-quiet-chat` ([#92](https://github.com/PrisacariuRobert/sidemates/pull/92)). Competitor facts come from their public pages and press as of this date; Sidemates facts come from this checkout and its live eval (`qa/prompt-eval/`). Nothing here is a head-to-head benchmark on equal models.
 
+## Update — 7 October 2026: what changed in a week
+
+| | What changed | Where Sidemates differs | Sources |
+| :--- | :--- | :--- | :--- |
+| **Meta Muse for Mac** (17 Sep) | Free Mac app that acts across "apps, files, calendar, notes, and messages", with approvals. Muse is available only in the US and Canada | Your choice of AI, including models on your Mac; a team with its own browsers; available wherever your Mac is | [TechCrunch](https://techcrunch.com/2026/09/18/metas-muse-hits-mac-letting-the-ai-take-actions-on-your-computer/), [availability](https://www.usecarly.com/blog/meta-muse-availability/) |
+| **Grok Bot** (xAI, beta) | Since 26 August included in every SuperGrok and Cursor Pro plan, so it starts at $20 (Cursor Pro) or $30 (SuperGrok); weekly allowances are unpublished | Free app with your own AI; each teammate has its own browser and logins, while Grok Bot's bots share one cloud computer | [Cursor help](https://cursor.com/help/grok-bot/plans), [Basenor](https://www.basenor.com/blogs/news/xai-launches-grok-bot-creator-rewards-program) |
+| **OpenAI dots** (29 Sep) | Starts at $100 a month (ChatGPT Pro). Personal plans exclude the EEA, the UK and Switzerland. It can work on your own computer through the ChatGPT desktop app, off by default | Free, with the AI you choose; available in Europe; works natively in Apple's apps | [DataCamp](https://www.datacamp.com/blog/openai-dots), [eesel](https://www.eesel.ai/blog/openai-dots-review), [ChatGPT app docs](https://learn.chatgpt.com/docs/app) |
+| **Apple Siri AI** (macOS 27) | Available on Macs in the EU, but not on EU iPhones and iPads because of the Digital Markets Act | Long jobs on a schedule, several teammates, your choice of AI; also on macOS 13–26 | [Apple Support](https://support.apple.com/en-us/121115), [Apple Newsroom](https://www.apple.com/newsroom/2026/06/due-to-dma-siri-ai-delayed-in-eu-for-ios-27-and-ipados-27/) |
+| **Claude Cowork** | Since 6 October, new Pro and Max tasks run in Anthropic's cloud; local folders and the browser work while the desktop app is open | Everything runs on your Mac; any AI, including Claude through your own Claude Code | [Claude Help Center](https://support.claude.com/en/articles/15520349-use-claude-cowork-on-web-desktop-and-mobile) |
+| **Open-source field** | OpenClaw 391,544 stars, Hermes Agent 251,779, OpenMausBot (also called MausBot) 4,123 | Built for people who live in Apple's apps, not for developers | [OpenClaw](https://github.com/openclaw/openclaw), [Hermes Agent](https://github.com/NousResearch/hermes-agent), [OpenMausBot](https://github.com/milind-soni/OpenMausBot) |
+
+Where another product is better, it says so above: Muse needs no setup, dots and Grok Bot keep working while your laptop is off, Siri AI is built into macOS, and OpenClaw and Hermes have far larger communities.
+
 ## Update — 1 October 2026: the closest competitor we had missed
 
 | | What it is | Reach | Money | Where Sidemates differs |

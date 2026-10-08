@@ -29,6 +29,7 @@
     "files": [
       "main.mjs",
       "navigation.mjs",
+      "ask-shortcut.mjs",
       "studio-identity.mjs",
       "package.json"
     ],

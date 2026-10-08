@@ -5,6 +5,8 @@ import { macFallbackAllowed } from "./mac-productivity.js";
 import { McpConnections } from "./mcp-connections.js";
 import { CommunitySkills } from "./community-skills.js";
 import { webResearchEnabled } from "./web-research.js";
+import { toolTurnedOff } from "../shared/tool-groups.js";
+import { HERO_FIXTURE_ACTIVE } from "./hero-fixture-mac.js";
 
 // Context reduction only. The tool endpoints remain the authorization boundary
 // and recheck grants when a call arrives, including after session revocation.
@@ -45,6 +47,8 @@ export function toolAvailability(
     // (even in YOLO). They must be listed here: the runtime denies every tool
     // that is not, so /learn silently produced a loose file instead.
     skill_propose: true,
+    // AU4: always an approval, at every level; the server re-checks the roster and the limit.
+    propose_teammate: true,
     self_extend: db.getStudioSettings().selfExtendEnabled,
   };
   const set = (names: string[], available: boolean) => {
@@ -78,10 +82,10 @@ export function toolAvailability(
   // only on a Mac.
   set(
     ["mac_calendar_events", "mac_mail_unread", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run"],
-    db.getStudioSettings().macAccessEnabled && process.platform === "darwin",
+    db.getStudioSettings().macAccessEnabled && (process.platform === "darwin" || HERO_FIXTURE_ACTIVE),
   );
   // The personal index is searchable once the owner has switched a source on.
-  flags.search_my_mac = db.getStudioSettings().macAccessEnabled && process.platform === "darwin" && Object.values(db.extensionRecord<{ enabled?: Record<string, boolean> }>("personal-index", "config")?.enabled || {}).some(Boolean);
+  flags.search_my_mac = db.getStudioSettings().macAccessEnabled && HERO_FIXTURE_ACTIVE || db.getStudioSettings().macAccessEnabled && process.platform === "darwin" && Object.values(db.extensionRecord<{ enabled?: Record<string, boolean> }>("personal-index", "config")?.enabled || {}).some(Boolean);
   const apps: {
     id: string;
     service: ConnectorServiceId;
@@ -180,5 +184,7 @@ export function toolAvailability(
     const names = [...Object.keys(flags), "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "code_projects", "code_review_result", "task_plan", "task_progress", "task_verify", "skill_propose", "routine_create", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "read", "write", "edit", "glob", "grep", "list", "task", "todowrite", "todoread", "webfetch", "websearch", "question", "skill", "apply_patch", "lsp"];
     return { ...Object.fromEntries(names.map((name) => [name, false])), work_collect: flags.work_collect, work_report: flags.work_report };
   }
+  // The owner's choice of tool groups for this teammate (task A7).
+  for (const name of Object.keys(flags)) if (toolTurnedOff(bot.toolGroups ?? null, name)) flags[name] = false;
   return flags;
 }

@@ -8,6 +8,7 @@ import path from "node:path";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { OpenBotDatabase } from "../src/server/testing/database.js";
+import { isBlockedFreeTierModel } from "../src/shared/provider-config.js";
 import { startMcpFixture } from "./fixtures/mcp-service.js";
 import type { AppState, Run } from "../src/shared/types.js";
 import type { CommunitySkill, McpConnection } from "../src/shared/extensions.js";
@@ -15,7 +16,7 @@ import type { CommunitySkill, McpConnection } from "../src/shared/extensions.js"
 const model = process.env.OPENBOT_BENCHMARK_MODEL;
 const documentMethod = process.env.OPENBOT_BENCHMARK_MODE === "bundled-documents";
 const bundled = process.env.OPENBOT_BENCHMARK_MODE === "bundled" || documentMethod;
-assert.equal(model, "opencode/muse-spark-1.3-contributor-free", "Explicitly select the requested free Spark 1.3 model. No fallback is used.");
+assert.ok(model && !isBlockedFreeTierModel(model), "Set OPENBOT_BENCHMARK_MODEL to a model that works in Sidemates, for example opencode-go/deepseek-v4.1-flash. OpenCode's free models only work inside OpenCode's own app. No fallback is used.");
 const root = mkdtempSync(path.join(tmpdir(), "openbot-extension-acceptance-"));
 const db = new OpenBotDatabase(root);
 db.chooseInitialProvider("local-opencode", model);

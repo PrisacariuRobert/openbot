@@ -12,7 +12,8 @@ jobs:
   desktop:
     uses: ./.github/workflows/desktop.yml
   # The free, one-command Mac install (scripts/install.sh) downloads these
-  # under stable names from the latest release.
+  # under stable names from the latest release; the Mac download page links
+  # the disk images (Sidemates-mac-*.dmg) the same way.
   terminal-bundles:
     strategy:
       fail-fast: false
@@ -43,13 +44,18 @@ jobs:
           cp sidemates-*-${{ matrix.platform }}.tar.gz sidemates-${{ matrix.platform }}.tar.gz
           shasum -a 256 sidemates-${{ matrix.platform }}.tar.gz > sidemates-${{ matrix.platform }}.tar.gz.sha256
           cp ../scripts/install.sh install.sh
+      # The same bundle and installer as a disk image, for people who don't use Terminal.
+      - name: Disk image for the Mac download page
+        run: scripts/build-mac-download.sh ${{ matrix.platform }} dist-release dist-release
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: openbot-desktop-terminal-${{ matrix.platform }}
+          name: sidemates-desktop-terminal-${{ matrix.platform }}
           path: |
             dist-release/sidemates-${{ matrix.platform }}.tar.gz
             dist-release/sidemates-${{ matrix.platform }}.tar.gz.sha256
             dist-release/install.sh
+            dist-release/Sidemates-mac-*.dmg
+            dist-release/Sidemates-mac-*.dmg.sha256
           if-no-files-found: error
   publish:
     needs: [desktop, terminal-bundles]
@@ -63,7 +69,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          pattern: openbot-desktop-*
+          pattern: sidemates-desktop-*
           merge-multiple: true
           path: release-artifacts
       - name: Create a draft for owner review (publish it as Latest so the installer finds it)

@@ -51,7 +51,7 @@ jobs:
         run: shasum -a 256 desktop/release/*.dmg desktop/release/*.zip > desktop/release/SHA256SUMS.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: openbot-signed-mac-${{ matrix.platform }}
+          name: sidemates-signed-mac-${{ matrix.platform }}
           if-no-files-found: error
           path: |
             desktop/release/*.dmg

@@ -71,6 +71,8 @@ export interface Bot {
   /** Acts like a person: reviews are approved for the owner as they appear. Off unless the owner turns it on. */
   autopilot: boolean;
   macAccessEnabled: boolean;
+  /** Optional tool groups this teammate has (src/shared/tool-groups.ts); null means all of them. */
+  toolGroups: import("./tool-groups.js").ToolGroupId[] | null;
   weeklyTokenBudget: number;
   tokensUsedThisWeek: number;
   createdAt: string;
@@ -392,6 +394,8 @@ export interface Approval {
   status: "pending" | "approved" | "denied";
   createdAt: string;
   decidedAt: string | null;
+  /** Task T1: why this always waits for the owner, at every autonomy level. */
+  hardStop?: import("./hard-stops").HardStop | null;
 }
 
 export type ApprovedActionStatus =
@@ -421,7 +425,7 @@ export interface ApprovedActionReceipt {
   reviewedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion" | "webpage";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion" | "webpage" | "folder" | "mail";
 
 export interface RoutineTriggerConfig {
   pageUrl?: string;
@@ -438,6 +442,12 @@ export interface RoutineTriggerConfig {
   slackChannel?: string;
   notionEvent?: "page_updated" | "page_created" | "comment" | "database" | "any";
   notionEntityId?: string;
+  /** Task F5: a folder on this Mac, optionally only some file types ("pdf, jpg"). */
+  folderPath?: string;
+  fileTypes?: string;
+  /** Task F5: new unread mail whose sender and/or subject contain these. */
+  mailFrom?: string;
+  mailSubject?: string;
 }
 
 export interface Routine {

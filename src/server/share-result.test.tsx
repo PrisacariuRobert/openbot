@@ -53,3 +53,37 @@ test("the title is one line: the question, or the answer's first line without fo
   const long = renderResultPage({ question: `${"word ".repeat(30)}end`, answer: "x", files: [], teammate, at });
   assert.ok(long.title.endsWith("…") && long.title.length <= 71);
 });
+
+test("“Make this teammate” carries the teammate link, and only a link this studio made", async () => {
+  const { teammateLink, decodeTeammate, payloadFromLink } = await import("../shared/teammate-link.js");
+  const bundle = { kind: "openbot-teammate", version: 1, bot: { name: "Nova", emoji: "✦", color: "#6757d9", role: "Research", instructions: "Find sources. Never buy anything." }, skills: [], routines: [] };
+  const link = await teammateLink(bundle);
+  const page = renderResultPage({ question: null, answer: "Done.", files: [], teammate, at, teammateLink: link });
+  assert.match(page.html, /<p class="make"><a href="https:\/\/sidemates\.app\/t\/#1\.[A-Za-z0-9_-]+" target="_blank" rel="noopener">Make this teammate<\/a>/);
+  assert.match(page.html, /Adds Nova to your own Sidemates: its name, job and instructions\. Nothing from this conversation\./);
+  const href = /<a href="(https:\/\/sidemates\.app\/t\/#[^"]+)"/.exec(page.html)![1]!;
+  assert.deepEqual(await decodeTeammate(payloadFromLink(href)!), bundle, "the link opens exactly this teammate");
+  for (const hostile of ["https://evil.example/t/#1.abcdefgh", 'https://sidemates.app/t/#1.abc"onmouseover="x', "javascript:alert(1)"]) {
+    assert.doesNotMatch(renderResultPage({ question: null, answer: "Done.", files: [], teammate, at, teammateLink: hostile }).html, /class="make"/, hostile);
+  }
+  assert.doesNotMatch(renderResultPage({ question: null, answer: "Done.", files: [], teammate, at }).html, /Make this teammate/, "off unless asked for");
+});
+
+test("a page put online previews with its title, a redacted sentence and the teammate's face", async () => {
+  const { readFileSync } = await import("node:fs");
+  const page = renderResultPage({ question: "Plan the Lisbon trip", answer: "## Plan\nBook the 9:10 train and email **anna@example.com** about dinner.", files: [], teammate: { ...teammate, mascot: "sprout" }, at });
+  assert.match(page.html, /<meta property="og:title" content="Plan the Lisbon trip" \/>/);
+  assert.match(page.html, /<meta property="og:image" content="https:\/\/sidemates\.app\/og\/sprout\.png" \/>/);
+  assert.match(page.html, /<meta name="twitter:card" content="summary_large_image" \/>/);
+  const description = /<meta property="og:description" content="([^"]*)"/.exec(page.html)![1]!;
+  assert.match(description, /Book the 9:10 train/);
+  assert.doesNotMatch(description, /anna@example/, "personal details stay hidden in previews too");
+  assert.match(renderResultPage({ question: null, answer: "x", files: [], teammate: { ...teammate, mascot: "../../etc" }, at }).html, /og\/nova\.png/, "an unknown face falls back");
+  // Every face has its image in site/og, 1200 × 630.
+  const { OG_MASCOTS } = await import("./share-result.js");
+  for (const mascot of OG_MASCOTS) {
+    const png = readFileSync(new URL(`../../site/og/${mascot}.png`, import.meta.url));
+    assert.equal(png.subarray(1, 4).toString(), "PNG", mascot);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630], mascot);
+  }
+});

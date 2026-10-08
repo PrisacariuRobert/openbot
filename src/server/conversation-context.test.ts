@@ -102,3 +102,11 @@ test("bounded continuity and history search stay in this public conversation, no
   assert.ok(f.db.conversationSearch("bot-pixel", "Cedar").every(message => message.excerpt.length <= 2400));
   assert.equal(conversationBridge(f.db, f.make("Private", { parentRunId: f.old.id })), "");
 });
+
+test("a teammate's own greeting alone is not resent as continuity; the owner's first message is", t => {
+  const f = fixture(t);
+  f.db.addMessage({ threadId: "bot-pixel", senderType: "bot", senderId: "pixel", body: "Hi, I'm Pixel. What should we make?" });
+  assert.equal(conversationBridge(f.db, f.make("hi")), "", "Only the greeting so far");
+  f.db.addMessage({ threadId: "bot-pixel", senderType: "user", senderId: null, body: "Draft a note about the Cedar launch" });
+  assert.match(conversationBridge(f.db, f.make("Shorter, please")), /Cedar launch/);
+});

@@ -203,6 +203,21 @@ export class AppleApps {
     return JSON.parse(raw) as Record<string, unknown>;
   }
 
+  /** Asks macOS for Automation access to Calendar or Reminders now, with a read that returns no data.
+   * The first time, macOS shows its permission prompt; after a denial it never asks again. */
+  async requestAccess(app: "Calendar" | "Reminders"): Promise<"granted" | "denied" | "waiting" | "unavailable" | "error"> {
+    if (!this.available) return "unavailable";
+    const touch = app === "Calendar" ? "Application('Calendar').calendars.length; JSON.stringify({ ok: true })" : "Application('Reminders').lists.length; JSON.stringify({ ok: true })";
+    try {
+      await this.execute("/usr/bin/osascript", ["-l", "JavaScript", "-e", touch], 30_000);
+      return "granted";
+    } catch (error) {
+      if (/-1743|not authori[sz]ed|not permitted/i.test(String(error))) return "denied";
+      if ((error as { killed?: boolean })?.killed || /timed out|ETIMEDOUT/i.test(String(error))) return "waiting";
+      return "error";
+    }
+  }
+
   async reminders(input: z.input<typeof remindersInput>) {
     const args = remindersInput.parse(input);
     const result = await this.script("Reminders", REMINDERS_READ_SCRIPT, args);

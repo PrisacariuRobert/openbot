@@ -21,6 +21,7 @@ import { validateVisualAction } from "./visual-grounding.js";
 import { journalPropose, journalTransition, journalReconcile, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
 import { selectModality } from "./modality-router.js";
 import { storeObservation, getObservation, findObservationWithTarget, invalidateObservationsForRun, invalidateObservationsForBot, type CapturedObservation, type RegistryTarget, type RegistryPane } from "./observation-registry.js";
+import { CARD_FIELD } from "./hard-stops.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
@@ -292,8 +293,18 @@ export function chromeCandidates(platform: NodeJS.Platform = process.platform, e
   return [...custom, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium", "/usr/bin/microsoft-edge"];
 }
 
-export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
+/** The private browser the owner downloaded into the data folder (task A5), used only when no
+ * browser is installed on this computer. Set once at startup. */
+let downloadedBrowser: () => string | null = () => null;
+export function useDownloadedBrowser(lookup: () => string | null) { downloadedBrowser = lookup; }
+
+/** A browser installed on this computer, without the downloaded one. */
+export function systemChromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
   return chromeCandidates(platform, env).find((candidate) => exists(candidate));
+}
+
+export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync, downloaded: () => string | null = downloadedBrowser): string | undefined {
+  return systemChromePath(platform, env, exists) ?? downloaded() ?? undefined;
 }
 
 /** Multi-label public suffixes where the last two labels are NOT the
@@ -1217,7 +1228,7 @@ export class BrowserManager {
   async describeTarget(botId: string, selector: string): Promise<BrowserTarget & { fingerprint: string }> {
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
-    const details = await page.locator(selector).first().evaluate((element) => {
+    const details = await page.locator(selector).first().evaluate((element, cardFieldSource) => {
       const node = element.closest("button,a,input,textarea,select,[role=button],[role=link]") || element;
       const input = node as HTMLInputElement;
       const form = input.form || node.closest("form");
@@ -1286,11 +1297,19 @@ export class BrowserManager {
         searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
         stateful,
         review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), destination: destination || location.href, fields, contextScope, disclosure, complete },
+        facts: {
+          text: ((node as HTMLElement).innerText || node.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160),
+          title: document.title.slice(0, 160),
+          cardFields: [...(form || dialog || document.body).querySelectorAll<HTMLElement>('input,select')].filter(el => new RegExp(cardFieldSource, "i").test(`${el.getAttribute('autocomplete') || ''} ${el.getAttribute('name') || ''} ${el.getAttribute('aria-label') || ''} ${el.getAttribute('placeholder') || ''} ${[...((el as HTMLInputElement).labels || [])].map(item => item.textContent || '').join(' ')}`)).length,
+        },
       };
-    }, undefined, { timeout: 12_000 });
+    }, CARD_FIELD.source, { timeout: 12_000 });
     this.assertPageAccess(botId, page);
-    const target = { url: page.url(), ...details };
-    return { ...target, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
+    const { facts, ...observed } = details;
+    const target = { url: page.url(), ...observed };
+    // The hard-stop facts stay out of the fingerprint: a title like "(3) Inbox"
+    // changes on its own and must not invalidate an approved click.
+    return { ...target, facts, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
   }
 
   async describeFileInput(botId: string, selector: string) {

@@ -39,7 +39,7 @@ test("current task prompts surface relevant methods, honor opt-outs and preserve
     const prompt = runner["buildPrompt"](run, db.getBot("nova")!, false);
     assert.match(prompt, /Conversation style:/);
     assert.match(prompt, /Never hide a failure/);
-    assert.match(prompt, /Keep checksums, byte counts, tool names/);
+    assert.match(prompt, /Keep tool names, IDs, receipts and routine checks in the work details/);
     assert.match(runner["buildPrompt"](run, db.getBot("nova")!, true), /Conversation style:/);
     assert.match(prompt, /bundled-document-to-action-items/);
     const context = prompt.split("Reviewed methods already available")[1]!.split("Completion rules:")[0]!;
@@ -67,7 +67,7 @@ test("only private findings from this job family enter the active prompt", () =>
     assert.doesNotMatch(prompt, /UNRELATED PRIVATE FINDING/);
     assert.match(prompt, /Host action receipts/);
     const newPrompt = runner["buildPrompt"](run, db.getBot("pixel")!, false);
-    assert.match(newPrompt, /new request/);
+    assert.match(newPrompt, /New request from the owner/);
     assert.doesNotMatch(newPrompt, /Continue the existing task/);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });

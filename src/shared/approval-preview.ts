@@ -2,6 +2,7 @@ import type { Approval, Run } from "./types";
 import { taskTokenRequestSchema, type TaskTokenReview } from "./task-token-budget";
 import { codePublicationReviewSchema } from "./code-publication";
 import { authoredSkillSchema } from "./skill-authoring";
+import { teammateProposalSchema } from "./teammate-proposal";
 import { gmailReplyReviewSchema } from "./gmail-reply";
 import { browserControlApprovalSchema, type BrowserNavigationAllowanceOffer } from "./browser-control-review";
 import { signInOrigin, type BrowserSignInHandoff } from "./browser-sign-in";
@@ -286,6 +287,13 @@ export function approvalPreview(
     field("instructions", "Instructions to save", true);
     if (args.startUrl) field("startUrl", "Starting website", true);
     preview.fields.push({ label: "Effect", value: "Save these instructions as a new draft skill for this teammate, available to both supported runtimes. Existing skills are not replaced. Nothing is run or scheduled; permissions do not change. Two distinct supervised checks are required before scheduling. You can edit or delete the skill in Skills." });
+  } else if (object.type === "propose_teammate") {
+    if (!teammateProposalSchema.safeParse(args).success) incomplete = true;
+    field("name", "New teammate", true);
+    field("role", "Role", true);
+    field("why", "Why", true);
+    field("model", "AI they'd use", true);
+    preview.fields.push({ label: "Effect", value: `Add one teammate from the starter team, with their own conversation, on this AI. ${args.browserEnabled === true ? "Their browser is on, for looking things up." : "Their browser is off."} They count toward the teammate limit, start on Ask first, and can be retired at any time. Nothing else changes.` });
   } else if (object.type === "self_extend") {
     field("capability", "Missing capability", true);
     field("plan", "Plan for the new tool", true);
@@ -423,7 +431,7 @@ export function approvalPreview(
         incomplete = true;
     }
   } else supported = false;
-  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && !String(object.type).startsWith("mac_") && object.type !== "routine_resume" && object.type !== "routine_update" && object.type !== "routine_delete" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose") {
+  if (supported && object.type !== "task_tokens" && object.type !== "run" && object.type !== "mac_organize" && !String(object.type).startsWith("mac_") && object.type !== "routine_resume" && object.type !== "routine_update" && object.type !== "routine_delete" && object.type !== "browser_sign_in" && object.type !== "browser_click" && object.type !== "browser_type" && object.type !== "browser_upload_saved_file" && object.type !== "self_extend" && object.type !== "skill_propose" && object.type !== "propose_teammate") {
     if (!accountLabel?.trim()) incomplete = true;
     preview.fields.unshift({
       label: "Connected account",

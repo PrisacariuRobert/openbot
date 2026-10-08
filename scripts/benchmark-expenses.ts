@@ -1,5 +1,8 @@
 // Opt-in, real model + production HTTP/upload/tool/artifact pipeline.
 // Synthetic records only. No personal inbox, payments, or external writes.
+// OPENBOT_BENCHMARK_TRIGGER=folder (task F5) drops the three files into a watched
+// folder instead of attaching them: a folder routine starts the job. The server then
+// gets a temporary home folder; OpenCode keeps your own sign-in through XDG paths.
 import assert from "node:assert/strict";
 import { spawn, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -25,9 +28,17 @@ const address = reservation.address();
 assert.ok(address && typeof address === "object");
 await new Promise<void>((resolve) => reservation.close(() => resolve()));
 const base = `http://127.0.0.1:${address.port}`;
+const viaFolder = process.env.OPENBOT_BENCHMARK_TRIGGER === "folder";
+const realHome = process.env.HOME || "";
+const serverHome = path.join(root, "home");
+if (viaFolder) mkdirSync(path.join(serverHome, "Receipts"), { recursive: true });
+const homeEnv = viaFolder ? {
+  HOME: serverHome, XDG_DATA_HOME: process.env.XDG_DATA_HOME || path.join(realHome, ".local", "share"), XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || path.join(realHome, ".config"),
+  OPENBOT_MAC_TRIGGER_INTERVAL_MS: "1000", OPENBOT_MAC_TRIGGER_QUIET_MS: "3000",
+} : {};
 const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
   cwd: path.resolve(import.meta.dirname, ".."), stdio: ["ignore", "pipe", "pipe"],
-  env: { ...process.env, OPENBOT_LOAD_ENV: "0", OPENBOT_DATA_DIR: root, OPENBOT_PORT: String(address.port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" },
+  env: { ...process.env, ...homeEnv, OPENBOT_LOAD_ENV: "0", OPENBOT_DATA_DIR: root, OPENBOT_PORT: String(address.port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" },
 });
 let serverLog = "", key = "";
 for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { serverLog = (serverLog + chunk).slice(-4000); });
@@ -57,6 +68,7 @@ try {
   }
   assert.ok(ready, `Isolated server failed to start: ${serverLog}`);
   key = readFileSync(path.join(root, "access.token"), "utf8").trim();
+  if (viaFolder) await api("/api/settings", { macAccessEnabled: true }, "PATCH");
   for (const botId of ["nova", "pixel", "scout"]) await api(`/api/bots/${botId}`, { model, providerInstanceId: process.env.OPENBOT_BENCHMARK_PROVIDER || "local-opencode", computerEnabled: false, browserEnabled: false, weeklyTokenBudget: 400_000 }, "PATCH");
   for (let i = 0; i < repetitions; i++) {
     const caseName = `expenses-${i + 1}`, botId = ["nova", "pixel", "scout"][i % 3], threadId = `bot-${botId}`;
@@ -88,13 +100,25 @@ try {
     writeFileSync(path.join(folder, "source-policy.md"), policy);
     const started = Date.now(); let runId = "", state: AppState | undefined;
     try {
-      const sources = await Promise.all([upload(threadId, "expenses.csv", source), upload(threadId, "policy.md", policy), upload(threadId, "receipts.csv", `receipt_id\n${receipts.join("\n")}\n`)]);
+      const receiptList = `receipt_id\n${receipts.join("\n")}\n`, dropFolder = path.join(serverHome, "Receipts", caseName);
+      const sources = viaFolder ? [] : await Promise.all([upload(threadId, "expenses.csv", source), upload(threadId, "policy.md", policy), upload(threadId, "receipts.csv", receiptList)]);
       const consultation = i === repetitions - 1 && repetitions > 1;
       const reviewer = botId === "nova" ? "pixel" : "nova";
       const prompt = `Reconcile these attached expenses against the attached policy and receipt list. Preserve the original inputs. Return ${caseName}.xlsx with two sheets: Expenses (all original rows and columns, amount numeric, IDs preserved as text), and Totals (columns currency,total; EUR then USD; numeric totals). Also save ${caseName}.json with exactly totals (currency to number), excludedIds, missingReceiptIds, policyExceptions (one {id,rule} pair per violation). Keep IDs as strings. Save ${caseName}.md with source row IDs, a policy citation for each exception, and an unsent follow-up for each owner with missing information. Explain currency handling and exclusions. Link all three files. Do not send messages externally, change reimbursement records, or access external apps.${consultation ? ` Before your final answer, privately ask ${reviewer} to independently check the totals and exceptions against the attachments: call the handoff tool with botId "${reviewer}", a task describing the independent check, and dedupeKey "review". No artifacts are needed for a review question; Sidemates pauses you until their result is ready. Wait for their findings, incorporate any corrections, and give me just one combined answer.` : ""}`;
       writeFileSync(path.join(folder, "prompt.txt"), prompt);
-      const submitted = await api<{ runs: Run[] }>("/api/messages", { threadId, targetBotIds: [botId], body: prompt, attachmentIds: sources.map((item) => item.id) });
-      assert.equal(submitted.runs.length, 1); runId = submitted.runs[0].id;
+      if (viaFolder) {
+        // A folder routine starts the job: the three files land together and become one run.
+        mkdirSync(dropFolder, { recursive: true });
+        const folderPrompt = `${prompt.replace(/these attached expenses against the attached policy and receipt list/, "the expenses against the policy and receipt list that just landed in the folder (expenses.csv, policy.md, receipts.csv; read them with mac_read at the paths in the event data)")}`;
+        const routine = await api<{ id: string }>("/api/routines", { name: `Expenses ${caseName}`, botId, threadId, prompt: folderPrompt, intervalMinutes: 1440, enabled: true, triggerType: "folder", triggerConfig: { folderPath: dropFolder } });
+        await delay(2500); // the watcher records the empty folder first
+        writeFileSync(path.join(dropFolder, "expenses.csv"), source); writeFileSync(path.join(dropFolder, "policy.md"), policy); writeFileSync(path.join(dropFolder, "receipts.csv"), receiptList);
+        for (let tries = 0; tries < 60 && !runId; tries++) { await delay(1000); runId = (await api<AppState>(`/api/state?threadId=${threadId}`)).runs.find((run) => run.routineId === routine.id && !run.parentRunId)?.id || ""; }
+        assert.ok(runId, "The folder trigger didn't start a run within a minute.");
+      } else {
+        const submitted = await api<{ runs: Run[] }>("/api/messages", { threadId, targetBotIds: [botId], body: prompt, attachmentIds: sources.map((item) => item.id) });
+        assert.equal(submitted.runs.length, 1); runId = submitted.runs[0].id;
+      }
       let completed = false;
       while (Date.now() - started < 300_000) {
         await delay(1000); state = await api<AppState>(`/api/state?threadId=${threadId}`);
@@ -131,6 +155,7 @@ try {
       const validation: SpawnSyncReturns<string> = spawnSync(python, ["scripts/verify-workbook.py", path.join(folder, `${caseName}.xlsx`)], { input: JSON.stringify(workbookRows), encoding: "utf8" });
       assert.equal(validation.status, 0, validation.stderr || validation.stdout);
       writeFileSync(path.join(folder, "independent-reader.json"), validation.stdout);
+      if (viaFolder) for (const [name, content] of [["expenses.csv", source], ["policy.md", policy], ["receipts.csv", receiptList]] as const) assert.equal(digest(readFileSync(path.join(dropFolder, name))), digest(content), "A file in the watched folder changed.");
       for (let n = 0; n < sources.length; n++) {
         const original = await fetch(`${base}/api/attachments/${sources[n].id}`, { headers: { authorization: `Bearer ${key}` } });
         const originalData = Buffer.from(await original.arrayBuffer());

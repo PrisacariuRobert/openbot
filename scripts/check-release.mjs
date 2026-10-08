@@ -19,7 +19,8 @@ const externalHeartbeat = readFileSync(new URL("../src/server/external-heartbeat
 const notifications = readFileSync(new URL("../src/server/notifications.ts", import.meta.url), "utf8");
 const apns = readFileSync(new URL("../src/server/apns.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../src/server/index.ts", import.meta.url), "utf8");
-const workspace = readFileSync(new URL("../src/server/workspace.ts", import.meta.url), "utf8");
+// Teammate prompt text lives in versioned files next to workspace.ts (task A7); check them together.
+const workspace = ["workspace.ts", "prompts/teammate.md", "prompts/request.md", "prompts/tools.md"].map((file) => readFileSync(new URL(`../src/server/${file}`, import.meta.url), "utf8")).join("\n");
 const verificationEvidence = readFileSync(new URL("../src/server/verification-evidence.ts", import.meta.url), "utf8");
 const connectorManifests = readFileSync(new URL("../src/server/connectors.ts", import.meta.url), "utf8");
 const connectorEvents = readFileSync(new URL("../src/server/connector-events.ts", import.meta.url), "utf8");

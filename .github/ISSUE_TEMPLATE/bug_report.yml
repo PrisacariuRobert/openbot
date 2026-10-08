@@ -3,12 +3,12 @@ description: Report a reproducible problem without private data.
 body:
   - type: markdown
     attributes:
-      value: "For vulnerabilities, read SECURITY.md instead. Never upload .openbot, credentials, browser profiles or private conversations."
+      value: "For vulnerabilities, read SECURITY.md instead. Never upload your Sidemates data folder (.openbot in a source checkout, or ~/Library/Application Support/Sidemates/data), credentials, browser profiles or private conversations."
   - type: input
     id: version
     attributes:
       label: Version and environment
-      description: Sidemates version or commit, operating system, and web/Mac/iPhone client.
+      description: Sidemates version or commit, operating system, where you used it (the Mac app, a browser or the Home Screen app on a phone), and the AI and model the teammate uses.
     validations:
       required: true
   - type: textarea
