@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { MemoryReviewQueue } from "./MemoryReview";
+import { MEMORY_ORIGIN_TEXT } from "../shared/memory-origin";
 import { SkillFlags, SkillTrustControls } from "./SkillTrust";
 import {
   BookOpen,
@@ -755,6 +757,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
       </div>
     )}
     {tab === "memory" && <>
+      <MemoryReviewQueue key={botId} botId={botId} botName={currentBot?.name || "This teammate"} onDecided={() => void request<PrivateMemory[]>(`/memory/${encodeURIComponent(botId)}`).then(setMemories).catch(() => undefined)} />
       <p>Your corrections are protected. Task-learned notes expire after 30 days unless you change that here. Expired or conflicting notes are excluded from new-task context; past chats and running tasks are not erased.</p>
       {memories.length === 0 && <p className="extension-empty">No saved notes yet. Add a preference you want this teammate to remember.</p>}
       <button type="button" onClick={() => void run(async () => { setMemories(await request<PrivateMemory[]>(`/memory/${encodeURIComponent(botId)}`)); }, "Notes refreshed. Choose Edit for the latest version.")}>Refresh notes</button>
@@ -763,7 +766,7 @@ export function ExtensionsPanel({ bots, skillsOnly = false, selectedBotId, initi
           {memories.map((note) => <SettingsRow
             key={note.key}
             title={note.key}
-            description={<><span>{note.content}</span><span>{note.source === "owner" ? "Set by you · protected" : note.source === "task" ? "Learned in a task" : "Older saved note · protected"}{note.expiresAt ? ` · ${note.expired ? "Expired" : "Expires"} ${new Date(note.expiresAt).toLocaleString()}` : " · No expiry"}{note.conflict ? " · Conflicting note: review before use" : ""}</span></>}
+            description={<><span>{note.content}</span><span>{note.origin ? `${MEMORY_ORIGIN_TEXT[note.origin]} · ` : ""}{note.source === "owner" ? "Set by you · protected" : note.source === "task" ? "Learned in a task" : "Older saved note · protected"}{note.expiresAt ? ` · ${note.expired ? "Expired" : "Expires"} ${new Date(note.expiresAt).toLocaleString()}` : " · No expiry"}{note.conflict ? " · Conflicting note: review before use" : ""}</span></>}
             control={<div className="extension-actions"><button type="button" onClick={() => { setMemoryKey(note.key); setMemoryText(note.content); setMemoryRevision(note.revision); setMemoryExpiry(note.expiresAt ? new Date(Date.parse(note.expiresAt) - new Date(note.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" onClick={() => { if (!window.confirm(`Forget “${note.key}”? This permanently removes the correction; past chats keep what already happened.`)) return; void run(() => request(`/memory/${encodeURIComponent(botId)}`, "DELETE", { key: note.key, expectedRevision: note.revision }), "Memory removed from future tasks."); }}><Trash2 size={15} />Forget</button></div>}
           />)}
         </SettingsCard>

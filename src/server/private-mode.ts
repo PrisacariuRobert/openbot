@@ -106,7 +106,12 @@ export function privateToolTraffic(db: OpenBotDatabase, validToken: (request: Re
       const { value, counts } = privacy.maskValue(payload);
       try {
         logSentText(db, run, { kind: "tool", label: response.statusCode >= 400 ? `${action} (refused)` : action, text: JSON.stringify(value), masked: privacy.masked, local: privacy.local, counts });
-      } catch { /* The log never changes what the teammate receives. */ }
+      } catch {
+        // The log is the receipt and the record of what the task read (T5 reviews memories from it):
+        // an answer that can't be recorded isn't returned.
+        response.status(500);
+        return json({ error: "Sidemates couldn't record this tool's answer, so it wasn't returned. Try again." });
+      }
       return json(value);
     }) as Response["json"];
     if (privacy.masked && PICTURE_TOOLS.has(action)) return response.status(403).json({ error: PICTURE_REFUSAL });

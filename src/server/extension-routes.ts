@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { memoryOrigin, noteOwnerMemory } from "./memory-review.js";
 import { z } from "zod";
 import type { OpenBotDatabase } from "./database.js";
 import { McpConnections } from "./mcp-connections.js";
@@ -71,10 +72,13 @@ export function registerExtensionRoutes(app: Express, db: OpenBotDatabase, onCha
     const input = z.object({ enabled: z.boolean(), digest: z.string().length(64) }).strict().parse(request.body);
     skills.setScripts(String(request.params.id), input.enabled, input.digest); return { saved: true };
   }));
-  app.get("/api/extensions/memory/:botId", route((request) => db.memoryEntries(String(request.params.botId), true)));
+  // Task T5: each memory says where it came from.
+  app.get("/api/extensions/memory/:botId", route((request) => db.memoryEntries(String(request.params.botId), true).map((entry) => ({ ...entry, origin: memoryOrigin(db, String(request.params.botId), entry.key)?.origin ?? (entry.source === "owner" ? "you" : null) }))));
   app.patch("/api/extensions/memory/:botId", route((request) => {
     const input = memoryEdit.parse(request.body);
-    return db.remember(String(request.params.botId), input.key, input.content, { ...input, source: "owner", requireRevision: true });
+    const saved = db.remember(String(request.params.botId), input.key, input.content, { ...input, source: "owner", requireRevision: true });
+    noteOwnerMemory(db, String(request.params.botId), input.key);
+    return saved;
   }));
   app.delete("/api/extensions/memory/:botId", route((request) => {
     const input = z.object({ key: z.string().trim().min(1).max(80), expectedRevision: z.string().max(80).optional() }).strict().parse(request.body);

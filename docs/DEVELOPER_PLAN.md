@@ -109,7 +109,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | R5 | Shared results that bring people back | S | 0.47 | ✅ |
 | F3 | Run receipts and Private mode | M | 0.48 | ✅ |
 | T4 | Skills you can trust | S–M | 0.48 | ✅ |
-| T5 | Memory you can see, edit and trace | M | 0.48 | ☐ |
+| T5 | Memory you can see, edit and trace | M | 0.48 | ✅ |
 | T6 | The vault key in the Keychain | S–M | 0.48 | ☐ |
 | F7 | Ask my Mac | M | 0.49 | ☐ |
 | F8 | Move in, move out | S–M | 0.49 | ☐ |
@@ -872,7 +872,7 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 
 **Status, 8 October 2026.** Done.
 - Ten attacks across a web page, an email, a PDF and a calendar invite (`src/server/attack-suite.ts`, `qa/attacks/`). `scripts/attack-tests.ts --fake` runs each through a staging studio at Ask first and at Autopilot, with a scripted stand-in that obeys every injection. 20 of 20 results match the table, which CI checks on every push (`npm run test:attacks`); a unit test checks the page holds the current table.
-- Published in docs/SECURITY.md. What still gets through: data in a link (T2), a memory from untrusted content (T5), a routine created and switched on (T2), and on Autopilot a non-payment form submit (T2).
+- Published in docs/SECURITY.md. What still gets through: data in a link (T2), a memory from untrusted content (T5), a routine created and switched on (T2), and on Autopilot a non-payment form submit (T2). T5 has since closed the memory one: it now asks at both levels.
 - Live runs with real models are the owner's (`--model`); results go to `qa/attacks/results/`.
 
 ### T4 · Skills you can trust · S–M
@@ -901,6 +901,8 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 - Show a plain-language activity history with undo where macOS allows it: unsent drafts, the Trash, calendar history.
 
 **Prompt.** `Do task T5 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done, except the activity history with undo, which is F2's (its plan waits for the owner's approval). Local embeddings come from an embedding model in Ollama on the Mac (EmbeddingGemma first, `src/server/ollama.ts`), used when no embeddings connection is chosen; bundling a model without Ollama waits for A4's helper. Memories carry an origin (`src/shared/memory-origin.ts`), worked out from what the task read according to F3's sent log (`src/server/memory-review.ts`). A fact learned after reading mail, a web page, a file, a message, a calendar or an app waits in a review queue that no task uses; the owner keeps (or edits) or discards it on "What <teammate> remembers". The attack table's memory row now asks at both levels.
 
 ### T6 · The vault key in the Keychain · S–M
 

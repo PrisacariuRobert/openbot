@@ -23,6 +23,8 @@ import { noteFixableToolFailures } from "./failure-notes.js";
 import { privateToolTraffic } from "./private-mode.js";
 import { registerPrivateModeRoutes } from "./private-mode-routes.js";
 import { pruneSentLog } from "./sent-log.js";
+import { rememberFromTask, reviewMessage } from "./memory-review.js";
+import { registerMemoryReviewRoutes } from "./memory-review-routes.js";
 import { actionHardStop, browserHardStop, commandHardStop } from "./hard-stops.js";
 import { HARD_STOP_TEXT, hardStopLine, type HardStop } from "../shared/hard-stops.js";
 import { recipientsOf, rememberRecipients, unknownRecipients, type KnownPeopleSources } from "./known-people.js";
@@ -359,6 +361,7 @@ const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callbac
 registerRecipeRoutes(app, db, () => broadcast());
 registerSetupRoutes(app, setupTimeline);
 registerPrivateModeRoutes(app, db, () => broadcast());
+registerMemoryReviewRoutes(app, db, () => broadcast());
 // Task F3: what each run sent to its AI is kept for 30 days.
 try { pruneSentLog(db); } catch { /* A failed cleanup never stops the server. */ }
 setInterval(() => { try { pruneSentLog(db); } catch { /* retried tomorrow */ } }, 86_400_000).unref();
@@ -4747,7 +4750,10 @@ app.post("/api/internal/tools", async (request, response) => {
     }
     if (action === "remember") {
       const input = z.object({ key: z.string().min(1).max(80), content: z.string().min(1).max(1200), expectedRevision: z.string().max(80).optional(), expiresAt: z.string().datetime({ offset: true }).optional() }).strict().parse(args);
-      return response.json(db.remember(botId, input.key, input.content, { ...input, source: "task", runId }));
+      // Task T5: after reading mail, web pages or files, a memory waits for the owner's review.
+      const remembered = rememberFromTask(db, toolRun, input);
+      if (remembered.review) { broadcast(); return response.json({ saved: false, waitingForReview: true, message: reviewMessage(remembered.item) }); }
+      return response.json(remembered.saved);
     }
     if (action === "handoff") {
       let target: Bot;
