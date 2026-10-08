@@ -3,11 +3,11 @@ import type { Run } from "../shared/types";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { Character } from "./Character";
 import { RunControls } from "./RunControls";
-import { conversationProgress, liveTail } from "./conversation-progress";
+import { conversationProgress, helperProgress, liveTail } from "./conversation-progress";
 import "./conversation-progress.css";
 
-export function ConversationProgress({ run, onDetails, onChange }: {
-  run: Run; onDetails: () => void; onChange: () => void;
+export function ConversationProgress({ run, helpers = [], onDetails, onChange }: {
+  run: Run; helpers?: Run[]; onDetails: () => void; onChange: () => void;
 }) {
   const progress = conversationProgress(run);
   // Show the reply as it is written only once it has visibly grown: a
@@ -28,6 +28,9 @@ export function ConversationProgress({ run, onDetails, onChange }: {
         <small>{progress.detail}</small>
       </div>
     </div>
+    {run.status === "waiting_for_teammate" && helpers.length > 0 && <ul className="conversation-progress-helpers" aria-label="Who is helping">
+      {helpers.map((helper) => { const line = helperProgress(helper); return <li key={helper.id}><Character name={helper.botName} color={helper.botColor} variant={helper.botMascot} status="working" size={20} /><span><strong>{line.name}:</strong> {line.doing}</span>{line.since && <small>{line.since}</small>}</li>; })}
+    </ul>}
     {live && <div className={`conversation-progress-live prose${live.startsWith("…") ? " is-trimmed" : ""}`} aria-live="off" style={{ "--message-tint": run.botColor } as CSSProperties}><MarkdownMessage body={live} /></div>}
     <div className="conversation-progress-actions">
       <button type="button" className="text-action" onClick={onDetails}>View progress</button>
