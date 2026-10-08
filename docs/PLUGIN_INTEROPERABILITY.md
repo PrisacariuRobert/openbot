@@ -4,7 +4,7 @@ Research and implementation checked 5 September 2026. Sidemates 0.36 includes li
 
 ## Implemented in the development beta
 
-Web, native Mac, and iPhone share **Tools, skills & memory** controls. OpenCode and Claude tool bridges expose the same host-controlled actions. No Hermes code or private Grok Bot session was imported.
+The Mac app and the phone web app share **Tools, skills & memory** controls. OpenCode and Claude tool bridges expose the same host-controlled actions. No Hermes code or private Grok Bot session was imported.
 
 | Component | Supported now | Explicit boundary |
 |---|---|---|
@@ -32,7 +32,7 @@ Cursor documents both an open Agent Plugins format (root `plugin.json`, skills a
 | Cursor-specific hooks/rules/variables | Show an explicit unsupported-components report or implement a reviewed translation | Never silently discard safety rules while claiming full compatibility |
 | Grok Bot hosted connector login | Use an independently supported provider integration and its own login flow | Do not extract/reuse Cursor tokens, impersonate its OAuth client, or call undocumented private backends |
 
-Grok Bot's connector connections belong to the account used to sign into Grok Bot. Their documentation does not establish an export/reuse API for those sessions. Portable Cursor plugin format support therefore does **not** establish access to the entire Grok Bot marketplace or its hosted connectors. [Grok Bot connector setup](https://cursor.com/help/grok-bot/connect-plugins).
+Grok Bot is xAI's product, distributed with Cursor, which hosts its documentation. Its connector connections belong to the account used to sign into Grok Bot. Their documentation does not establish an export/reuse API for those sessions. Portable Cursor plugin format support therefore does **not** establish access to the entire Grok Bot marketplace or its hosted connectors. [Grok Bot connector setup](https://cursor.com/help/grok-bot/connect-plugins).
 
 ## Required gate for any broader compatibility claim
 

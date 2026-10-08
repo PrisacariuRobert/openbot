@@ -2064,7 +2064,7 @@ export function Studio() {
           <div className="topbar-right">
             {page === "settings" && <button className="workspace-return" onClick={() => openThread(thread)}>Back to conversation</button>}
             {page === "chat" && conversationBot && botReady && voiceModeSupported() && (
-              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name}`} onClick={() => setVoiceOpen(true)}>
+              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name} (voice is in beta)`} onClick={() => setVoiceOpen(true)}>
                 <AudioLines size={19} strokeWidth={1.5} />
               </button>
             )}

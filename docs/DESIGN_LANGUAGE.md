@@ -2,7 +2,7 @@
 
 **Intent:** a quiet place to work with a teammate, with personality in the characters—not a dashboard decorated with AI feature cards.
 
-This contract describes the new `/studio.html` interface and the corresponding native source direction. The older `/` interface is not fully migrated. Native source changes and successful compilation do **not** mean the owner’s installed app has been updated. Keep release claims separate from this design contract.
+This contract describes the `/studio.html` interface, which the Mac app and the phone web app both load. The older `/` interface is not fully migrated. A source change does **not** mean the owner’s installed app has been updated. Keep release claims separate from this design contract.
 
 ## 1. Conversation is the product
 
@@ -20,21 +20,21 @@ Apple’s principles favor familiar behavior, clear feedback and recovery that d
 - State is communicated with words and symbols: “Working,” “Needs your approval,” “Not connected,” or “Try again.” Never depend on a green/red dot alone.
 - Saturated identity color belongs to characters. A custom color picker may show the selected color; that is a control, not an interface accent. User attachments and live computer content are not recolored to enforce the theme.
 
-Web authority: [`design-tokens.css`](../src/studio/design-tokens.css). Native authority: [`StudioPalette.swift`](../ios/OpenBotMobile/Models/StudioPalette.swift), shared by Mac and iPhone. Legacy names such as `purple` and `green` can resolve to neutral semantic colors; they are not permission to reintroduce purple buttons or green status panels.
+Authority: [`design-tokens.css`](../src/studio/design-tokens.css), shared by the Mac app and the phone web app. Legacy names such as `purple` and `green` can resolve to neutral semantic colors; they are not permission to reintroduce purple buttons or green status panels.
 
 Apple recommends appearance-aware semantic colors and testing contrast across appearances. Our monochrome palette is a Sidemates choice, not an Apple rule. [Apple color](https://developer.apple.com/design/human-interface-guidelines/color), [Apple Dark Mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode).
 
 ## 3. Type and spacing
 
-Use the system font: SF on Apple platforms and the web’s system-font stack elsewhere. Native views use the default system design; monospaced type is reserved for code, file content and genuinely technical values. Do not embed Apple font files or use rounded display type for every label.
+Use the system font: SF on Apple platforms and the web’s system-font stack elsewhere. Monospaced type is reserved for code, file content and genuinely technical values. Do not embed Apple font files or use rounded display type for every label.
 
 Hierarchy comes from restrained differences in size, weight and spacing. Use regular, medium and semibold for ordinary interface text. Prefer a readable label and one short explanation over uppercase microcopy, multiple badges and a paragraph of implementation detail. Leave breathing room inside controls, not just between cards.
 
-Apple’s typography guidance treats legibility and hierarchy as primary. Its platform recommendations remain reference points for the release audit; some existing native advanced screens still contain small fixed-size text. [Apple typography](https://developer.apple.com/design/human-interface-guidelines/typography).
+Apple’s typography guidance treats legibility and hierarchy as primary. Its platform recommendations remain reference points for the release audit; some advanced screens still contain small fixed-size text. [Apple typography](https://developer.apple.com/design/human-interface-guidelines/typography).
 
 ## 4. Menus should behave like menus
 
-Use native SwiftUI `Menu`, `Picker` and context menus where appropriate. Web selections use [`ChoiceMenu`](../src/studio/ChoiceMenu.tsx), a browser top-layer popover—not an HTML imitation of a macOS window.
+Selections use [`ChoiceMenu`](../src/studio/ChoiceMenu.tsx), a browser top-layer popover—not an HTML imitation of a macOS window.
 
 Preserve these behaviors:
 
@@ -48,7 +48,7 @@ Keep frequent commands easy to find and avoid deeply nested feature catalogs. [A
 
 ## 5. One original character family
 
-Characters are editable vectors: SVG on web and SwiftUI Canvas on native, not decorative bitmap portraits. Their saved color belongs to their identity and must survive navigation and appearance changes.
+Characters are editable vectors: drawn in SVG, not decorative bitmap portraits. Their saved color belongs to their identity and must survive navigation and appearance changes.
 
 | Saved ID | Identity |
 | --- | --- |
@@ -59,7 +59,7 @@ Characters are editable vectors: SVG on web and SwiftUI Canvas on native, not de
 | `pebble` | Asymmetric pebble |
 | `sunny` | Sunny with rays |
 
-Keep six genuinely distinct silhouettes. Web definitions live in [`mascot-catalog.ts`](../src/studio/mascot-catalog.ts) and [`Character.tsx`](../src/studio/Character.tsx); native definitions live in `StudioCharacter` in `StudioPalette.swift`. Mac and iPhone share the native renderer. Web and native share the **identity family and saved IDs**, not exact geometry, expression timing or pixel parity.
+Keep six genuinely distinct silhouettes. Definitions live in [`mascot-catalog.ts`](../src/studio/mascot-catalog.ts) and [`Character.tsx`](../src/studio/Character.tsx), shared by the Mac app and the phone web app. Saved IDs stay stable so a character looks the same everywhere it appears.
 
 Use gentle independent blinks and movement. A character can acknowledge work, but must not obscure a message or pretend to prove that a task succeeded. Appearance editing changes only `mascot` and `color`, retains choices on failure, and prevents duplicate saves.
 
@@ -67,7 +67,7 @@ Use gentle independent blinks and movement. A character can acknowledge work, bu
 
 Provide meaningful accessible names for icon actions, expose selected/expanded states, retain visible keyboard focus, and preserve natural reading order. Respect reduced motion; neither task status nor essential information may depend on animation.
 
-Aim for comfortable 44-point primary iPhone touch targets and readable text enlargement. Current web form triggers are at least 44 CSS pixels; some compact mobile controls are 40 pixels. Do not claim every control meets a 44-point target or that all native screens support Dynamic Type fully. Screen-reader use, large text, increased contrast, keyboard-only use and both appearances remain release checks, not assumptions based on a passing screenshot test. [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
+Aim for comfortable 44-point primary iPhone touch targets and readable text enlargement. Current web form triggers are at least 44 CSS pixels; some compact mobile controls are 40 pixels. Do not claim every control meets a 44-point target or that every screen scales fully with larger text. Screen-reader use, large text, increased contrast, keyboard-only use and both appearances remain release checks, not assumptions based on a passing screenshot test. [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
 
 ## 7. Honest access and recovery
 
@@ -87,4 +87,4 @@ Premium feel comes from rhythm, not decoration: messages group like iMessage (ti
 
 ## 8. Change checklist
 
-Before calling a design change complete: inspect 320/390-pixel and desktop layouts, light/dark appearances, keyboard and modal behavior, unsent-state recovery, and actual action payloads. Use [`StudioPolish.browser.ts`](../src/studio/StudioPolish.browser.ts) for the focused character/menu/appearance contract and the wider Studio/native checks for integration. A component fixture is not proof that every legacy screen, native installation or connected account has been verified.
+Before calling a design change complete: inspect 320/390-pixel and desktop layouts, light/dark appearances, keyboard and modal behavior, unsent-state recovery, and actual action payloads. Use [`StudioPolish.browser.ts`](../src/studio/StudioPolish.browser.ts) for the focused character/menu/appearance contract and the wider studio checks for integration. A component fixture is not proof that every legacy screen, installed app or connected account has been verified.

@@ -28,7 +28,7 @@ Each teammate uses its own persistent Chromium profile under Sidemates’s data 
 
 Sidemates does not import your ordinary Chrome profile, extract its cookies, copy another teammate’s login, or automatically grant a new teammate access to connected accounts. No API currently claims to have verified website login merely because a profile exists. The owner must enter passwords, passkeys and verification codes through takeover, never ordinary chat.
 
-This is a deliberate difference from Grok Bot’s documented account-wide computer: its bots share files and browser sessions. Its docs also distinguish persistent computer sign-ins from structured plugins and recommend human takeover for sensitive steps. Sidemates keeps per-teammate browser identities, trading some setup convenience for clearer separation. [Grok Bot: computer and apps](https://cursor.com/docs/grok-bot/work#the-computer-and-apps).
+This is a deliberate difference from Grok Bot’s documented account-wide computer: its bots share files and browser sessions. (Grok Bot is xAI's product, distributed with Cursor, which hosts its documentation.) Its docs also distinguish persistent computer sign-ins from structured plugins and recommend human takeover for sensitive steps. Sidemates keeps per-teammate browser identities, trading some setup convenience for clearer separation. [Grok Bot: computer and apps](https://cursor.com/docs/grok-bot/work#the-computer-and-apps).
 
 ## Permission rules
 

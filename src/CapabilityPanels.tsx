@@ -156,6 +156,7 @@ import type {
 import { mentionedBotIds, mentionSlug } from "./shared/routing";
 import { presentBotMessage, signalKindLabels } from "./shared/presentation";
 import { routineScheduleLabel, routineStartsInLabel } from "./shared/routines";
+import { mayTrainOnPrompts, TRAINING_NOTICE } from "./shared/provider-config";
 import { ProviderIcon } from "./ProviderIcon";
 import { useModalFocus } from "./components/useModalFocus";
 import { ConnectorIcon } from "./ConnectorIcon";
@@ -4891,6 +4892,7 @@ export function BotPanel({
           <SettingsCard>
             <SettingsRow
               title="Model engine"
+              description={mayTrainOnPrompts(form.model) ? TRAINING_NOTICE : undefined}
               control={
                 <select
                   value={form.model}

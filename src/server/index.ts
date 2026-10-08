@@ -43,7 +43,7 @@ import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
-import { modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
+import { isBlockedFreeTierModel, modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
 import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
 import { modelCanReceiveBrowserImage } from "./browser-image-capability.js";
 import { TesterBrowser } from "./tester-browser.js";
@@ -887,7 +887,7 @@ app.post("/api/provider/:id/test", async (request, response) => {
   const connection = status.instances.find((entry) => entry.id === request.params.id);
   if (!connection) return response.status(404).json({ error: "That connection no longer exists." });
   if (!connection.connected) return response.status(409).json({ error: "Connect this provider first. Saved credentials alone are never shown as ready." });
-  const model = connection.defaultModel || (connection.models || [])[0];
+  const model = connection.defaultModel || (connection.models || []).find((entry) => !isBlockedFreeTierModel(entry));
   if (!model) return response.status(409).json({ error: "This connection offers no usable models to test." });
   try {
     const result: ProviderConnectionTest = { tested: true, ...(await probeProviderModel(model, db.providerEnvironmentById(connection.id))) };

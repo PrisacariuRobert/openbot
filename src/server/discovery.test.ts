@@ -128,6 +128,7 @@ test("every internal link and image on the comparison page resolves", () => {
 const DETAIL_PAGES = [
   { slug: "openai-dots", name: "OpenAI dots" },
   { slug: "grok-bot", name: "Grok Bot" },
+  { slug: "meta-muse", name: "Meta Muse" },
   { slug: "siri-ai", name: "Siri AI" },
   { slug: "openmausbot", name: "OpenMausBot" },
 ];
@@ -171,4 +172,24 @@ test("the home page leads with the alternative-to sentence people search for, an
   assert.match(html, /<p class="kicker">The open-source alternative to OpenAI dots, Grok Bot and Siri AI<\/p>/);
   assert.match(html, /free to use/i);
   assert.match(read("llms.txt"), /alternative to OpenAI dots, Grok Bot and Siri AI/);
+});
+
+test("the site serves its own font, so a visit reaches no font service", () => {
+  const pages = ["index.html", "t/index.html", "teammates/index.html", "alternatives/index.html", ...DETAIL_PAGES.map(({ slug }) => `alternatives/${slug}/index.html`)];
+  for (const page of pages) {
+    const html = read(page);
+    assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/, `${page} loads no Google Fonts`);
+    for (const match of html.matchAll(/url\("((?:\.\.\/)*fonts\/[^"]+)"\)/g)) {
+      assert.ok(existsSync(path.resolve(path.dirname(path.join(site, page)), match[1])), `${page}: ${match[1]} exists`);
+    }
+  }
+  assert.ok(existsSync(path.join(site, "fonts/OFL.txt")), "the font's license ships with it");
+});
+
+test("the teammate gallery has a canonical address and a share card", () => {
+  const html = read("teammates/index.html");
+  assert.match(html, /<link rel="canonical" href="https:\/\/sidemates\.app\/teammates\/" \/>/);
+  assert.match(html, /<meta property="og:url" content="https:\/\/sidemates\.app\/teammates\/" \/>/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/sidemates\.app\/[^"]+\.png" \/>/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image" \/>/);
 });
