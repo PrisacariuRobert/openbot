@@ -32,3 +32,4 @@
 .byo-more[open] summary svg { transform: rotate(180deg); }
 .byo-more .byo-list { margin-top: 8px; }
 @media (max-width: 520px) { .byo { padding: 16px; } .byo-key form, .byo-code { flex-direction: column; } }
+.byo-row-text .byo-terms { display: block; margin-top: 4px; font-size: 12px; line-height: 17px; color: var(--label-tertiary, var(--label-secondary)); }
