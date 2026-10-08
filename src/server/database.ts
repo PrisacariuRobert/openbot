@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { defaultConversation } from "../shared/default-conversation.js";
+import { fixFor } from "../shared/recovery.js";
 import { TASK_TOKEN_TOP_UP, taskTokenAmountSchema, taskTokenRequestSchema, type TaskTokenPolicy, type TaskTokenReview } from "../shared/task-token-budget.js";
 import type { ExecutionLimits } from "./execution-policy.js";
 import { BUNDLED_ACCESS_KIND, bundledSkillsRevision } from "./bundled-skills.js";
@@ -1076,6 +1077,7 @@ export class OpenBotDatabase {
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "autopilot INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("bots", "ai_mode TEXT NOT NULL DEFAULT 'chosen'");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
     this.addColumn("threads", "section_name TEXT");
     this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
@@ -1243,8 +1245,8 @@ export class OpenBotDatabase {
       ];
       const insertBot = this.db.prepare(`
         INSERT INTO bots
-        (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, created_at)
-        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, ai_mode, created_at)
+        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'automatic', ?)
       `);
       const insertThread = this.db.prepare(`INSERT INTO threads (id, title, kind, bot_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`);
       const insertThreadBot = this.db.prepare("INSERT INTO thread_bots (thread_id, bot_id) VALUES (?, ?)");
@@ -1290,7 +1292,7 @@ export class OpenBotDatabase {
       name: String(row.name), emoji: String(row.emoji), mascot: String(row.mascot || "orbit") as MascotKind,
       color: String(row.color), role: String(row.role), instructions: String(row.instructions), model: String(row.model),
       status: this.botStatus(row), currentAction: row.current_action ? String(row.current_action) : null,
-      computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), autopilot: asBoolean(row.autopilot), macAccessEnabled: asBoolean(row.mac_access_enabled),
+      computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), autopilot: asBoolean(row.autopilot), aiMode: row.ai_mode === "automatic" ? "automatic" : "chosen", macAccessEnabled: asBoolean(row.mac_access_enabled),
       weeklyTokenBudget: Number(row.weekly_token_budget || 0), tokensUsedThisWeek: Number(row.tokens_used_week || 0),
       createdAt: String(row.created_at), lastActiveAt: row.last_active_at ? String(row.last_active_at) : null,
       threadId: String(row.thread_id), retiredAt: row.retired_at ? String(row.retired_at) : null,
@@ -1482,6 +1484,7 @@ export class OpenBotDatabase {
   createBot(input: {
     name: string; emoji: string; mascot?: MascotKind; color: string; role: string; instructions: string; model?: string;
     providerInstanceId?: string | null; computerEnabled?: boolean; browserEnabled?: boolean; weeklyTokenBudget?: number; inheritAccess?: boolean;
+    aiMode?: Bot["aiMode"];
   }): Bot {
     const maxTeammates = this.getStudioSettings().maxTeammates;
     if (this.listBots().length >= maxTeammates) throw new Error(`This studio has room for ${maxTeammates} teammate${maxTeammates === 1 ? "" : "s"}. Retire or raise the limit before adding another.`);
@@ -1490,14 +1493,14 @@ export class OpenBotDatabase {
     const createdAt = now();
     this.db.prepare(`
       INSERT INTO bots
-      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, ai_mode, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, DEFAULT_OWNER, input.providerInstanceId || null, input.name, input.emoji, input.mascot || "orbit",
       input.color, input.role, input.instructions, input.model || "", input.computerEnabled === false ? 0 : 1,
       input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
       // A guard against runaway API bills, not a wall: ~100+ ordinary tasks a week.
-      input.weeklyTokenBudget ?? 2_000_000, createdAt,
+      input.weeklyTokenBudget ?? 2_000_000, input.aiMode === "automatic" ? "automatic" : "chosen", createdAt,
     );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);
@@ -1529,7 +1532,7 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId" | "aiMode">>): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
     this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, autopilot=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
@@ -1538,6 +1541,7 @@ export class OpenBotDatabase {
       (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, (patch.autopilot ?? current.autopilot) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );
+    if (patch.aiMode) this.db.prepare("UPDATE bots SET ai_mode=? WHERE id=?").run(patch.aiMode, id);
     if (patch.name) this.db.prepare("UPDATE threads SET title=? WHERE bot_id=?").run(patch.name, id);
     return this.getBot(id);
   }
@@ -1548,7 +1552,7 @@ export class OpenBotDatabase {
     const copy = this.createBot({
       name: `${source.name} copy`.slice(0, 30), emoji: source.emoji, mascot: source.mascot, color: source.color,
       role: source.role, instructions: source.instructions, model: source.model, providerInstanceId: source.providerInstanceId,
-      weeklyTokenBudget: source.weeklyTokenBudget,
+      weeklyTokenBudget: source.weeklyTokenBudget, aiMode: source.aiMode,
     });
     this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled });
     this.db.prepare("DELETE FROM bot_connector_access WHERE bot_id=?").run(copy.id);
@@ -2638,7 +2642,7 @@ export class OpenBotDatabase {
     if (outcome === "failed" && !run.parentRunId && !this.db.prepare("SELECT 1 FROM messages WHERE run_id=? AND event_type='run_stopped'").get(id)) {
       const reason = detail || run.error || "The task stopped before it finished.";
       const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /free AI allowance/i.test(reason) ? "Free AI limit reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : /runtime not verified|could not check the installed OpenCode/i.test(reason) ? "Runtime update needed" : "Work stopped";
-      this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId } });
+      this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId, fix: JSON.stringify(fixFor(reason, { automatic: this.getBot(run.botId)?.aiMode === "automatic" })) } });
     }
     return this.getRun(id)!.task;
   }

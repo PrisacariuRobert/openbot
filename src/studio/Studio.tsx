@@ -81,6 +81,9 @@ import { CreateTeammate } from "./CreateTeammate";
 import { WeeklyRecapEntry } from "./WeeklyRecap";
 import { WaitingEntry, WaitingForYou } from "./WaitingForYou";
 import { VoiceMode, voiceModeSupported } from "./VoiceMode";
+import { startersFor } from "./starters";
+import { FirstRun } from "./FirstRun";
+import { StopFix } from "./StopFix";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -374,24 +377,11 @@ function eventDetail(message: Message): string {
 
 
 
-const STARTER_PROMPTS = [
-  { label: "Plan my week", hint: "Three things that matter most", text: "Help me plan my week: ask what's on my plate, then pick the three things that matter most." },
-  { label: "Make sense of something", hint: "A document, notes or a long message", text: "Summarize this and tell me what I need to do: " },
-  { label: "Look something up", hint: "With sources you can check", text: "Research this and bring back a short answer with sources: " },
-] as const;
-
-/** With Files & apps on, lead with what only a team on your own Mac can do. */
-const MAC_STARTER_PROMPTS = [
-  { label: "What's on my plate?", hint: "Your reminders, calendar and notes", text: "What's on my plate today? Check my reminders, calendar and notes, and tell me the three things that matter most." },
-  { label: "Remind me", hint: "Added to Reminders after your okay", text: "Remind me to " },
-  { label: "Find that note", hint: "Searches your Apple Notes", text: "Find my note about " },
-] as const;
-
 /** Starters fill the message box without sending, so a blank page never
  * has to be solved alone. Shown until the owner sends a first message. */
-function ChatStarters({ onPick, mac = false }: { onPick: (text: string) => void; mac?: boolean }) {
+function ChatStarters({ onPick, jobs, mac = false }: { onPick: (text: string) => void; jobs: string[]; mac?: boolean }) {
   return <div className="chat-starters" aria-label="Ideas to start with">
-    {(mac ? MAC_STARTER_PROMPTS : STARTER_PROMPTS).map((starter) => (
+    {startersFor(jobs, mac).map((starter) => (
       <button key={starter.label} type="button" className="chat-starter" onClick={() => onPick(starter.text)}>
         <strong>{starter.label}</strong>
         <span>{starter.hint}</span>
@@ -1129,6 +1119,8 @@ export function Studio() {
   const threadTitle =
     state?.threads.find((item) => item.id === thread)?.title || "Conversation";
   const agentsToBringOver = useAgentsToBringOver();
+  // Set once the first team is created, so Waiting for you starts the first look by itself.
+  const [firstLook, setFirstLook] = useState(false);
   const actionGroups = groupConsecutiveActionEvents(state?.messages || []);
   const actionGroupByFirstId = new Map(actionGroups.map((group) => [group[0]!.id, group]));
   const actionGroupMemberIds = new Set(actionGroups.flatMap((group) => group.slice(1).map((message) => message.id)));
@@ -1147,6 +1139,8 @@ export function Studio() {
       ? state?.bots.find((bot) => bot.threadId === thread)
       : undefined;
   const conversationThread = page === "chat" ? state?.threads.find((item) => item.id === thread) : undefined;
+  // What the teammates here are for, so the starters fit their jobs.
+  const conversationJobs = conversationBot ? [conversationBot.role] : (conversationThread?.botIds || []).map((id) => state?.bots.find((bot) => bot.id === id)?.role || "");
   const title =
     page === "chat"
       ? threadTitle
@@ -2078,7 +2072,7 @@ export function Studio() {
           <div className="topbar-right">
             {page === "settings" && <button className="workspace-return" onClick={() => openThread(thread)}>Back to conversation</button>}
             {page === "chat" && conversationBot && botReady && voiceModeSupported() && (
-              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name}`} onClick={() => setVoiceOpen(true)}>
+              <button className="topbar-control" aria-label={`Talk with ${conversationBot.name}`} title={`Talk with ${conversationBot.name} (voice is in beta)`} onClick={() => setVoiceOpen(true)}>
                 <AudioLines size={19} strokeWidth={1.5} />
               </button>
             )}
@@ -2150,7 +2144,7 @@ export function Studio() {
                 onRefresh={() => setRefresh((n) => n + 1)}
               />
             )}
-            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} demoMac={state?.demoMac} onChanged={() => setRefresh((value) => value + 1)} />}
+            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} demoMac={state?.demoMac} firstLook={firstLook} onChanged={() => setRefresh((value) => value + 1)} />}
             {page === "home" && (
               <div className="page-content conversations-page">
                 <div className="page-heading">
@@ -2571,7 +2565,7 @@ export function Studio() {
                     {!state.bots.length ? (
                       <div className="first-teammate refined-welcome">
                         <div className="welcome-personality"><div className="welcome-faces"><Character name="Scout" variant="sprout" color="#299575" size={80}/><Character name="Pixel" variant="blob" color="#d86889" size={120}/><Character name="Nova" variant="nova" color="#6757d9" size={80}/></div><p className="welcome-tagline">A little help with the work.<br/>A little more room for you.</p></div>
-                        <div className="welcome-start"><h2>Good work starts<br/>with a conversation.</h2><p>Give a teammate a specialty, choose the AI behind them, and start with something small.</p><button className="primary" onClick={() => setDetail({ kind: "create" })}>Create your first teammate <ArrowRight size={16}/></button><button onClick={() => openCapability("team")}>{agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"}</button><small>Your team lives on this Mac. What you ask goes only to the AI you choose.</small></div>
+                        <FirstRun onTeamReady={() => { setFirstLook(true); navigate("waiting"); }} onMakeOwn={() => setDetail({ kind: "create" })} onBringTeam={() => openCapability("team")} bringLabel={agentsToBringOver.count ? `Bring your ${agentsToBringOver.source} team (${agentsToBringOver.count})` : "Bring an existing teammate"} />
                       </div>
                     ) : state.activeThreadId !== thread ? (
                       <p className="quiet-copy">Opening conversation…</p>
@@ -2589,7 +2583,7 @@ export function Studio() {
                         <p>
                           Start with a question or something you’d like done.
                         </p>
-                        <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
+                        <ChatStarters onPick={pickStarter} jobs={conversationJobs} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />
                       </div>
                     ) : (<>{
                       state.messages.map((message, index) => {
@@ -2668,6 +2662,7 @@ export function Studio() {
                               <span>
                                 <strong>{eventTitle(message)}</strong>
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
+                                {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); const asked = stopped ? (state.messages.find((item) => item.id === stopped.triggerMessageId)?.body || stopped.prompt) : ""; return <StopFix message={message} run={stopped} request={asked} openPanel={(panel) => openCapability(panel)} />; })()}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
@@ -2747,7 +2742,7 @@ export function Studio() {
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
-                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
+                      {!state.messages.some((message) => message.senderType === "user") && <ChatStarters onPick={pickStarter} jobs={conversationJobs} mac={Boolean(state?.settings.macAccessEnabled && navigator.userAgent.includes("Mac"))} />}
                     </>)}
                     {state.activeThreadId === thread && (() => {
                       const fallback = latestCancelledWithoutTrigger(state.runs, state.messages);

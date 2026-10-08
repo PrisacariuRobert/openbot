@@ -58,21 +58,21 @@ async function decryptFile(input, output, secret) {
   const source = await open(input, "r");
   try {
     const metadata = await source.stat();
-    if (metadata.size < MAGIC.length + 4 + TAG_BYTES + 1) fail("That file is not a complete OpenBot home transfer.");
+    if (metadata.size < MAGIC.length + 4 + TAG_BYTES + 1) fail("That file is not a complete Sidemates home transfer.");
     const prefix = Buffer.alloc(MAGIC.length + 4);
     await source.read(prefix, 0, prefix.length, 0);
-    if (!prefix.subarray(0, MAGIC.length).equals(MAGIC)) fail("That file is not an OpenBot private-home transfer.");
+    if (!prefix.subarray(0, MAGIC.length).equals(MAGIC)) fail("That file is not a Sidemates private-home transfer.");
     const headerLength = prefix.readUInt32BE(MAGIC.length);
-    if (headerLength < 2 || headerLength > MAX_HEADER_BYTES || metadata.size <= prefix.length + headerLength + TAG_BYTES) fail("That OpenBot transfer header is invalid.");
+    if (headerLength < 2 || headerLength > MAX_HEADER_BYTES || metadata.size <= prefix.length + headerLength + TAG_BYTES) fail("That Sidemates transfer header is invalid.");
     const headerBytes = Buffer.alloc(headerLength);
     await source.read(headerBytes, 0, headerLength, prefix.length);
     let header;
     try { header = JSON.parse(headerBytes.toString("utf8")); }
-    catch { fail("That OpenBot transfer header is unreadable."); }
-    if (header?.format !== "openbot.private-home" || header?.version !== 1 || header?.cipher !== "aes-256-gcm" || header?.kdf !== "scrypt" || !Array.isArray(header?.contents)) fail("That OpenBot transfer version is not supported.");
+    catch { fail("That Sidemates transfer header is unreadable."); }
+    if (header?.format !== "openbot.private-home" || header?.version !== 1 || header?.cipher !== "aes-256-gcm" || header?.kdf !== "scrypt" || !Array.isArray(header?.contents)) fail("That Sidemates transfer version is not supported.");
     const salt = Buffer.from(String(header.salt || ""), "base64url");
     const iv = Buffer.from(String(header.iv || ""), "base64url");
-    if (salt.length !== 16 || iv.length !== 12) fail("That OpenBot transfer has invalid encryption metadata.");
+    if (salt.length !== 16 || iv.length !== 12) fail("That Sidemates transfer has invalid encryption metadata.");
     const tag = Buffer.alloc(TAG_BYTES);
     await source.read(tag, 0, TAG_BYTES, metadata.size - TAG_BYTES);
     const decipher = createDecipheriv("aes-256-gcm", deriveKey(secret, salt), iv);
@@ -103,7 +103,7 @@ function safeArchiveEntries(listing) {
     const normalized = entry.replace(/^\.\//, "").replace(/\/$/, "");
     if (!normalized || normalized.startsWith("/") || normalized.includes("\0")) fail("The transfer contains an unsafe path.");
     const pieces = normalized.split("/");
-    if (pieces.some((piece) => piece === "..") || !CONTENTS.includes(pieces[0])) fail("The transfer contains files outside the OpenBot home.");
+    if (pieces.some((piece) => piece === "..") || !CONTENTS.includes(pieces[0])) fail("The transfer contains files outside the Sidemates home.");
     roots.add(pieces[0]);
   }
   for (const root of CONTENTS) if (!roots.has(root)) fail(`The transfer is missing its ${root} folder.`);
@@ -111,7 +111,7 @@ function safeArchiveEntries(listing) {
 
 function safeArchiveKinds(listing) {
   const entries = listing.split("\n").filter(Boolean);
-  if (entries.some((entry) => entry[0] !== "d" && entry[0] !== "-")) fail("The transfer contains links or special files that OpenBot will not restore.");
+  if (entries.some((entry) => entry[0] !== "d" && entry[0] !== "-")) fail("The transfer contains links or special files that Sidemates will not restore.");
 }
 
 export async function exportHome(root, output, secret) {
@@ -174,12 +174,12 @@ async function main() {
   const secret = await passphrase();
   if (action === "export" && source && destination) {
     const result = await exportHome(source, destination, secret);
-    console.log(`Encrypted OpenBot home created at ${result.output}`);
+    console.log(`Encrypted Sidemates home created at ${result.output}`);
     return;
   }
   if (action === "import" && source && destination) {
     const result = await importHome(source, destination, secret);
-    console.log(`Encrypted OpenBot home verified and staged at ${result.staging}`);
+    console.log(`Encrypted Sidemates home verified and staged at ${result.staging}`);
     return;
   }
   fail("Use export <private-home-root> <output-file> or import <transfer-file> <staging-folder>.");

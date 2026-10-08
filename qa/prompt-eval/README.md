@@ -24,7 +24,7 @@ Context per model step (input + cache reads ÷ steps) is the stable comparison: 
 
 The 8-case set adds `teammate-help` (ask Scout; exactly one consultation; answer relayed) and `learn-skill` (/learn ends in a skill proposal waiting for review). Before this session's fixes, `learn-skill` was 0/2 and `teammate-help` took ~100s with repeated asks.
 
-A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The default model is `opencode-go/muse-spark-1.3-contributor`. The free-tier `opencode/…-free` models return 403 for Sidemates' restricted tool configuration and cannot be evaluated.
+A one-step "hi" costs 12,410 tokens at baseline and 8,140 at 9eeeae5 on Muse Spark. `muse-slim-v1` and `muse-slim-v2` overlapped in time, so their timings are not comparable; token counts are. The eval's default model is `opencode-go/muse-spark-1.3-contributor`; its fixed requests are synthetic. The app no longer recommends it, because its provider may train on prompts (opencode.ai/docs/go, checked 7 October 2026): new teammates start on `opencode-go/deepseek-v4.1-flash`, which passed the six-case set above (12 of 12, `baseline` and `slim-v1`) but hasn't been run on the 8- and 11-case sets yet. The free-tier `opencode/…-free` models return 403 for Sidemates' restricted tool configuration and cannot be evaluated.
 
 ## Fixed prompt budget next to Hermes (offline, 23 Sep 2026)
 

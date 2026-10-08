@@ -191,8 +191,21 @@ export function apiRuntimeEnvironment(
 }
 
 /** Models known to run Sidemates teammates well, best first. The first one a
- * connection offers is shown first and preselected. */
-export const RECOMMENDED_MODELS = ["opencode-go/muse-spark-1.3-contributor", "opencode-go/deepseek-v4.1-flash", "google/gemini-flash-lite-latest"] as const;
+ * connection offers is shown first and preselected. Teammates read mail,
+ * messages, notes and files, so a model whose provider may train on prompts is
+ * never recommended (see mayTrainOnPrompts). DeepSeek V4.1 Flash on OpenCode Go
+ * is "Not used" for training with zero retention (opencode.ai/docs/go, 7 Oct
+ * 2026) and passed every live prompt-eval case (qa/prompt-eval). */
+export const RECOMMENDED_MODELS = ["opencode-go/deepseek-v4.1-flash", "google/gemini-flash-lite-latest"] as const;
+
+/** Shown wherever such a model can be chosen or is in use. */
+export const TRAINING_NOTICE = "This provider may use your prompts to train its models.";
+
+/** OpenCode's "Contributor" models are discounted in exchange for letting Meta
+ * train on prompts and completions (opencode.ai/docs/go, checked 7 Oct 2026). */
+export function mayTrainOnPrompts(model: string): boolean {
+  return /^opencode(?:-go)?\/.+-contributor(?:-free)?$/i.test(model);
+}
 
 /** OpenCode's free tier only answers requests from OpenCode's own app, so it
  * rejects teammate runs (HTTP 403). Offering it would be a first-run trap. */
@@ -200,7 +213,7 @@ export function isBlockedFreeTierModel(model: string): boolean {
   return model.startsWith("opencode/") && isFreeTierModel(model);
 }
 
-const MODEL_WORDS: Record<string, string> = { gpt: "GPT", glm: "GLM", ai: "AI", llm: "LLM", vl: "VL", exp: "Experimental", hy: "HY" };
+const MODEL_WORDS: Record<string, string> = { gpt: "GPT", glm: "GLM", ai: "AI", llm: "LLM", vl: "VL", exp: "Experimental", hy: "HY", deepseek: "DeepSeek" };
 
 /** "opencode-go/gpt-5.6-luna" → "GPT 5.6 Luna". */
 export function friendlyModelName(model: string): string {
@@ -217,18 +230,26 @@ export function friendlyModelName(model: string): string {
 
 export interface ModelChoice { value: string; label: string; detail?: string; disabled?: boolean }
 
-/** Recommended first, usable models next, blocked free-tier models last. */
-export function modelChoices(models: string[]): ModelChoice[] {
-  const recommended = RECOMMENDED_MODELS.find((id) => models.includes(id));
-  const rank = (model: string) => model === recommended ? 0 : isBlockedFreeTierModel(model) ? 2 : 1;
+/** Recommended first, usable models next, models that may train on prompts
+ * after them, blocked free-tier models last. */
+/** The model a connection should start on: a known-good one if it offers one,
+ * otherwise the connection's own default, never one that fails or trains on prompts. */
+function recommendedModel(models: string[], connectionDefault?: string): string | undefined {
+  return RECOMMENDED_MODELS.find((id) => models.includes(id))
+    || (connectionDefault && models.includes(connectionDefault) && !isBlockedFreeTierModel(connectionDefault) && !mayTrainOnPrompts(connectionDefault) ? connectionDefault : undefined);
+}
+
+export function modelChoices(models: string[], connectionDefault?: string): ModelChoice[] {
+  const recommended = recommendedModel(models, connectionDefault);
+  const rank = (model: string) => model === recommended ? 0 : isBlockedFreeTierModel(model) ? 3 : mayTrainOnPrompts(model) ? 2 : 1;
   return [...models].sort((a, b) => rank(a) - rank(b)).map((model) => ({
     value: model,
     label: friendlyModelName(model),
-    detail: model === recommended ? "Recommended" : isBlockedFreeTierModel(model) ? "Free tier · works only inside OpenCode's own app" : isFreeTierModel(model) ? "Free tier" : model.split("/")[0] === "opencode-go" ? "OpenCode Go" : undefined,
+    detail: model === recommended ? "Recommended" : isBlockedFreeTierModel(model) ? "Free tier · works only inside OpenCode's own app" : mayTrainOnPrompts(model) ? "May train on your prompts" : isFreeTierModel(model) ? "Free tier" : model.split("/")[0] === "opencode-go" ? "OpenCode Go" : undefined,
     disabled: isBlockedFreeTierModel(model) || undefined,
   }));
 }
 
-export function defaultModelChoice(models: string[]): string {
-  return RECOMMENDED_MODELS.find((id) => models.includes(id)) || "";
+export function defaultModelChoice(models: string[], connectionDefault?: string): string {
+  return recommendedModel(models, connectionDefault) || "";
 }

@@ -81,9 +81,17 @@ try {
   });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
+  // Start from a Mac with no AI connected, whatever this host has signed in to,
+  // until the test saves its own connection.
+  await page.route("**/api/provider", async (route) => {
+    if (connectionWrites > 0 || route.request().method() !== "GET") return route.fallback();
+    const response = await route.fetch();
+    const status = await response.json() as { instances?: Array<{ connected?: boolean }> };
+    await route.fulfill({ response, json: { ...status, instances: (status.instances || []).map((instance) => ({ ...instance, connected: false })) } });
+  });
   await page.goto(base + "/studio.html");
-  await page.getByRole("heading", { name: "Good work starts with a conversation." }).waitFor();
-  await page.getByRole("button", { name: "Create your first teammate" }).click();
+  await page.getByRole("heading", { name: "One step: connect an AI." }).waitFor();
+  await page.getByRole("button", { name: "Make your own teammate" }).click();
   const creation = page.getByRole("dialog");
   await creation.getByLabel("Name", { exact: true }).fill("Remy");
   await creation.getByLabel("Their job").fill("Help plan my week");
@@ -146,18 +154,19 @@ try {
   assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
   assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
-  assert.equal(await service.innerText(), "Choose your AI service", "A sole saved connection still needs the owner's choice");
+  // Nobody has to pick an AI: Automatic is preselected once one is connected.
+  assert.equal(await service.innerText(), "Automatic", "Automatic is the starting choice");
   const modelId = "openbot-" + saved.id + "/chosen-model";
-  assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(), "No teammate can start before choosing a model");
+  assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(), "Automatic is ready without choosing a model");
+  assert.equal(await creation.getByRole("combobox", { name: "Model", exact: true }).count(), 0, "No model picker on Automatic");
   await service.click();
   await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
+  // Choosing the connection is the only decision: its own model is preselected.
   const model = creation.getByRole("combobox", { name: "Model", exact: true });
-  assert.equal(await model.innerText(), "Choose a model");
-  await model.click();
-  await creation.getByRole("option", { name: friendlyModelName(modelId), exact: true }).click();
+  assert.equal(await model.innerText(), friendlyModelName(modelId), "The connection's model is preselected");
   assert.ok(
     await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(),
-    "The form is ready only after explicit provider and model selection",
+    "The form is ready once a connection is chosen",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await creation.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));

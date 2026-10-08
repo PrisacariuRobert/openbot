@@ -2518,3 +2518,11 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .share-actions { display: inline-flex; gap: 8px; }
 .share-sheet footer button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 999px; border: 0; font-weight: 600; font-size: 13.5px; cursor: pointer; color: var(--on-strong, #fff); background: var(--strong, #1d1d1f); }
 .share-sheet footer button.secondary { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+
+/* First run: no form, just the team getting ready, the honesty line and two quiet ways out. */
+.refined-welcome .first-run .first-run-honest { margin: 18px 0 0; font-size: 13px; line-height: 19px; color: var(--label-secondary); }
+.refined-welcome .first-run .first-run-other { display: flex; flex-wrap: wrap; gap: 8px; }
+.refined-welcome .first-run .first-run-other button { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+
+/* Never just "I can't": the fix sits first under a stopped job. */
+.chat-event .stop-fix { margin-right: 12px; font-weight: 600; }

@@ -43,7 +43,7 @@ Hosted AI agents rent you their computer for $20–300 a month. Sidemates gives 
 
 - **No new bill.** Sign in with the ChatGPT, Grok or GitHub Copilot plan you already pay for, use Claude through the Claude Code you already have installed (or an API key), start free with a Gemini key, or run a model on your Mac.
 - **A real team, not one bot.** Every teammate has a name, a job, a private workspace and its own browser. When one builds on another’s work, it waits for the answer.
-- **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting waits for your okay by default — with the website and the exact button. Trust a teammate completely? Turn on **Autopilot** for it.
+- **You stay in charge.** Reading and searching just happen. Sending, buying, signing in or submitting waits for your okay by default — with the website and the exact button. Trust a teammate completely? Turn on **Autopilot** for it. Autopilot still stops for sign-ins, CAPTCHAs, more AI spending, saving new instructions and uploading saved files to a website. It does **not** stop for purchases, payments, deletions or messages to new people.
 - **Nothing hidden.** No account, no tracking. Your studio is a folder on your Mac, and every line of Sidemates is here.
 
 ## Try it
@@ -54,13 +54,15 @@ Hosted AI agents rent you their computer for $20–300 a month. Sidemates gives 
 curl -fsSL https://sidemates.app/install.sh | sh
 ```
 
-No administrator password. It checks the download’s fingerprint, runs Sidemates in the background and adds it to your Dock. [Read the installer](scripts/install.sh) first if you like.
+It takes a few minutes and downloads about 140 MB. No administrator password. It checks the download’s fingerprint, runs Sidemates in the background and adds it to your Dock. [Read the installer](scripts/install.sh) first if you like.
+
+Web tasks need Chrome, Edge or Brave on your Mac, and the private computer needs Docker.
 
 **Or run from source** (Node.js 22.13+):
 
 ```sh
 git clone https://github.com/PrisacariuRobert/sidemates.git
-cd openbot
+cd sidemates
 npm ci
 npm run dev
 ```
@@ -76,14 +78,14 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
   </tr>
   <tr>
     <td><strong>Real files.</strong> Word documents, spreadsheets and plans arrive as files you can open and share. Drop in a PDF and your teammate reads it first.</td>
-    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on.</td>
+    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on, and it still stops for sign-ins, CAPTCHAs, more AI spending and new instructions.</td>
   </tr>
 </table>
 
 - **Research with sources** — each teammate browses in its own private browser and links what it found; when something can’t be checked, it says so.
 - **Group chats** — write “Nova: find… Scout, double-check…” and each does their part, in order.
-- **Routines** — “Every Monday at 9, plan my week.” Plus a Sunday look back at what got done.
-- **Voice and phone** — talk hands-free, or pair your iPhone with one scan to chat and approve from your Home Screen.
+- **Routines** — “Every Monday at 9, plan my week.” Plus a Sunday look back at what got done. Routines run while your Mac is awake; Sidemates can wake it once a day for them (macOS asks for your password to allow that).
+- **Voice and phone (beta)** — talk hands-free, or chat and approve from your phone’s Home Screen once your Mac has an address the phone can reach ([guide](docs/AWAY_ACCESS_PERSONAL_MAC.md)).
 - **Skills** — teach a teammate a method once, or add reviewed skills from the community.
 - **Bring your setup** — one-click import from Hermes Agent and OpenClaw, including automations.
 
@@ -105,15 +107,15 @@ Each teammate can use a different AI. Sidemates never resells tokens or adds a f
 | :--- | :--- | :--- | :--- | :--- |
 | Price | $0–300/month plans | Free, with daily limits | Free + your models | **Free + your models** |
 | Runs on | Their cloud computers | Your Mac + Apple's cloud | Your machine | **Your Mac** |
-| Uses your Mac's apps and files | No | Quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
+| Uses your Mac's apps and files | Muse's Mac app and dots (if you allow it) can; Grok Bot can't | Quick actions | Files and scripts | **Mail, Calendar, files, apps — with your okay** |
 | Long jobs on websites | Yes, in their browser | No | Yes | **Yes, each teammate in its own browser** |
 | A team of named teammates | Grok Bot only | No | Hermes Bot Mode | **Yes** |
-| Scheduled work | Yes | No | Yes | **Yes, and your Mac wakes for it** |
+| Scheduled work | Yes | No | Yes | **Yes, while your Mac is awake (it can wake it once a day)** |
 | Asks before acting | Yes | Yes | Configurable | **By default, with the exact button — or Autopilot** |
 | Choose your AI | No | No | Yes | **Yes — ChatGPT, Claude, Gemini, local…** |
 | Open source | No | No | Yes (MIT) | **Yes (MIT)** |
 
-Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots is not available in the EU, UK or Switzerland; Sidemates works wherever your Mac does. Competitor details as of 30 September 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
+Siri is great for quick questions — Sidemates is for the whole job, and works with Siri (“Hey Siri, Ask Sidemates”). OpenAI dots isn’t offered on its Pro plan in the EEA, UK or Switzerland, Meta Muse is available in the US and Canada, and Siri AI is on Macs in the EU but not yet on iPhones there; Sidemates works wherever your Mac does. Grok Bot is now included with SuperGrok and Cursor Pro. Competitor details as of 7 October 2026, from their public pages. See the [full scorecard](docs/COMPETITIVE_SCORECARD_2026-09-23.md).
 
 ## Privacy and safety
 
@@ -122,6 +124,8 @@ Your studio, conversations and files live on your Mac. When a teammate works, wh
 ## Status
 
 Sidemates 0.42.0 is a public beta ([release notes](https://github.com/PrisacariuRobert/sidemates/releases/tag/v0.42.0)). Known gaps are tracked openly in the [product gap audit](docs/PRODUCT_GAP_AUDIT.md) and the [roadmap](docs/ROADMAP.md).
+
+Sidemates has no token or cryptocurrency. Anything that claims otherwise isn’t us.
 
 ## What's new in 0.42.0
 
@@ -150,8 +154,8 @@ Web studio (desktop + phone)  →  Sidemates service  →  teammates' runtimes
 | `skills/`, `mcp/` | Bundled skills and the MCP interface |
 
 ```sh
-npm run verify     # guards, types, build and ~1,000 tests
-npm start          # production build on 127.0.0.1:4311
+npm run verify                # guards, types, build and ~1,000 tests
+npm run build && npm start   # production build on 127.0.0.1:4311
 ```
 
 More in the [docs](docs/README.md), [desktop guide](desktop/README.md) and [private runner guide](deploy/private-runner/README.md).

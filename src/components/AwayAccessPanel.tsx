@@ -51,7 +51,7 @@ export function AwayAccessPanel() {
   return <section className="away-pairing" aria-label="Away access">
     <div className="away-pairing-heading"><span className="away-pairing-icon"><Globe2 size={23} /></span><div>
       <h3>{status?.ready ? "Away access is ready" : "Your studio, wherever you are"}</h3>
-      <p>Your team on your phone. No app store, no VPN.</p>
+      <p>Your team on your phone, in beta. No app store, no VPN.</p>
     </div></div>
     <SettingsGroup title="Your phone">
       <SettingsCard>
