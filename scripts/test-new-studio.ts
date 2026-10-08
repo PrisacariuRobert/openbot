@@ -689,6 +689,8 @@ try {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto(base + "/studio.html?thread=team-room");
     await page.locator(".from-team .prose").first().waitFor();
+    assert.equal(await page.locator(".message-honesty").count(), 1, "The honesty line shows once, under the latest teammate answer");
+    assert.equal(await page.locator(".from-team").last().locator(".message-honesty").count(), 1);
     assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(0, 0, 0)", "System dark appearance applies the dark canvas token");
     for (const selector of [".from-team > .prose", ".from-you > .prose"]) {
       const colors = await page.locator(selector).first().evaluate((element) => {
