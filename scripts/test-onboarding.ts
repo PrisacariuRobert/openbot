@@ -146,9 +146,11 @@ try {
   assert.equal(await creation.getByLabel("Their job").inputValue(), "Help plan my week");
   assert.equal(await creation.getByRole("textbox", { name: "Additional instructions", exact: true }).inputValue(), instructions);
   const service = creation.getByRole("combobox", { name: "AI connection", exact: true });
-  assert.equal(await service.innerText(), "Choose your AI service", "A sole saved connection still needs the owner's choice");
+  // Nobody has to pick an AI: Automatic is preselected once one is connected.
+  assert.equal(await service.innerText(), "Automatic", "Automatic is the starting choice");
   const modelId = "openbot-" + saved.id + "/chosen-model";
-  assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isDisabled(), "No teammate can start before choosing a model");
+  assert.ok(await creation.getByRole("button", { name: "Create teammate", exact: true }).isEnabled(), "Automatic is ready without choosing a model");
+  assert.equal(await creation.getByRole("combobox", { name: "Model", exact: true }).count(), 0, "No model picker on Automatic");
   await service.click();
   await creation.getByRole("option", { name: "Local beta test", exact: true }).click();
   // Choosing the connection is the only decision: its own model is preselected.

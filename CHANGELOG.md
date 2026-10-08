@@ -5,6 +5,7 @@
 - **Waiting for you.** Your team prepares cards (a reply to draft, a reminder to add, a receipt to file) and you tap Approve, Skip or Undo. "Look at my last few days" finds things on the first day, and the morning brief prepares cards too.
 - **Earned trust.** After you approve the same kind of card several times in a row, the team offers to do that kind on its own, with Undo and a daily limit. Any Undo pauses it.
 - **Receipts for your accountant.** Filed receipts are collected with vendor, amount and date, ready to export.
+- **Automatic AI.** Nobody has to pick a model. A new teammate uses the best AI you've connected for each job (a strong one for big jobs, a fast one for small ones) and moves to another when one runs out of allowance. You can still choose an AI yourself in settings.
 
 ## 0.42.1 — Credibility fixes (unreleased)
 

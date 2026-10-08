@@ -114,6 +114,10 @@ function connectedInstance(db: OpenBotDatabase, input: Parameters<OpenBotDatabas
   return db.upsertProvider(input);
 }
 
+let latestStatus: ProviderStatus | null = null;
+/** The most recent provider status, without waiting for a new check. */
+export const latestProviderStatus = () => latestStatus;
+
 export function createProviderStatusReader(inspect: (db: OpenBotDatabase, attempts: ProviderLoginAttempt[]) => Promise<ProviderStatus>, ttlMs = 15_000) {
   const cache = new WeakMap<OpenBotDatabase, { key: string; expires: number; pending: boolean; promise: Promise<ProviderStatus> }>();
   return (db: OpenBotDatabase, loginAttempts: ProviderLoginAttempt[] = []): Promise<ProviderStatus> => {
@@ -122,7 +126,7 @@ export function createProviderStatusReader(inspect: (db: OpenBotDatabase, attemp
     if (current?.key === key && (current.pending || current.expires > Date.now())) return current.promise;
     const entry = { key, expires: 0, pending: true, promise: Promise.resolve(null as unknown as ProviderStatus) };
     entry.promise = inspect(db, loginAttempts).then((result) => {
-      entry.pending = false; entry.expires = Date.now() + ttlMs; return result;
+      entry.pending = false; entry.expires = Date.now() + ttlMs; latestStatus = result; return result;
     }).catch((error) => { if (cache.get(db) === entry) cache.delete(db); throw error; });
     cache.set(db, entry);
     return entry.promise;

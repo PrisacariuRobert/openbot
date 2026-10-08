@@ -70,6 +70,9 @@ export interface Bot {
   browserEnabled: boolean;
   /** Acts like a person: reviews are approved for the owner as they appear. Off unless the owner turns it on. */
   autopilot: boolean;
+  /** "automatic": Sidemates picks the best connected AI before each job, and the
+   * provider and model fields hold its current pick. "chosen": the owner picked them. */
+  aiMode: "automatic" | "chosen";
   macAccessEnabled: boolean;
   weeklyTokenBudget: number;
   tokensUsedThisWeek: number;

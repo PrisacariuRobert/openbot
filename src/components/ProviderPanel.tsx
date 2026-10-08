@@ -720,8 +720,9 @@ export function ProviderPanel({
         <p>Mix subscriptions and models to suit the work. Your current choice stays active until you select a different model.</p>
         <SettingsCard>
           {bots.map((bot) => {
-            const selectedConnectionId = pendingConnections[bot.id] ?? bot.providerInstanceId ?? "";
-            const changingConnection = selectedConnectionId !== (bot.providerInstanceId ?? "");
+            const automatic = bot.aiMode === "automatic";
+            const selectedConnectionId = pendingConnections[bot.id] ?? (automatic ? "automatic" : bot.providerInstanceId ?? "");
+            const changingConnection = selectedConnectionId !== (automatic ? "automatic" : bot.providerInstanceId ?? "");
             const connection = provider?.instances.find(
               (entry) => entry.id === selectedConnectionId,
             );
@@ -742,11 +743,23 @@ export function ProviderPanel({
                       aria-label={`${bot.name} connection`}
                       value={selectedConnectionId}
                       disabled={busy !== null || !provider}
-                      onChange={(event) => setPendingConnections((previous) => ({ ...previous, [bot.id]: event.target.value }))}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        // Automatic needs no model: Sidemates picks one before each job.
+                        if (value === "automatic") {
+                          void act(bot.id, async () => {
+                            await onUpdateBot(bot.id, { aiMode: "automatic" });
+                            setPendingConnections((previous) => { const next = { ...previous }; delete next[bot.id]; return next; });
+                          });
+                          return;
+                        }
+                        setPendingConnections((previous) => ({ ...previous, [bot.id]: value }));
+                      }}
                     >
-                      {!connection && (
+                      {!connection && selectedConnectionId !== "automatic" && (
                         <option value="">Choose a connection</option>
                       )}
+                      <option value="automatic">Automatic · the best AI you have for each job</option>
                       {provider?.instances.map((entry) => (
                         <option
                           key={entry.id}
@@ -761,6 +774,7 @@ export function ProviderPanel({
                   }
                 >
                   {changingConnection && <p className="settings-row-note">Choose a model below to switch {bot.name}. Their current connection is still active.</p>}
+                  {automatic && !changingConnection && <p className="settings-row-note">Sidemates picks the best AI you've connected for each job{bot.model ? `, now ${modelLabel(bot.model)}` : ""}, and switches if one runs out.</p>}
                 </SettingsRow>
                 <SettingsRow
                   title="Model"
@@ -768,12 +782,12 @@ export function ProviderPanel({
                     <select
                       aria-label={`${bot.name} model`}
                       value={changingConnection ? "" : bot.model}
-                      disabled={busy !== null || !connection?.connected}
+                      disabled={busy !== null || !connection?.connected || (automatic && !changingConnection)}
                       onChange={(event) => {
                         const model = event.target.value;
                         if (!model) return;
                         void act(bot.id, async () => {
-                          await onUpdateBot(bot.id, { providerInstanceId: selectedConnectionId, model });
+                          await onUpdateBot(bot.id, { providerInstanceId: selectedConnectionId, model, aiMode: "chosen" });
                           setPendingConnections((previous) => {
                             const next = { ...previous };
                             delete next[bot.id];

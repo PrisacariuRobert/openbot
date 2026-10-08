@@ -15,7 +15,8 @@ import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { prepareConsultationFiles } from "./consultation-files.js";
 import { routeBotReply } from "./group-routing.js";
 import { decideTaskOutcome } from "./task-outcome.js";
-import { modelBelongsToConnection } from "../shared/provider-config.js";
+import { friendlyModelName, modelBelongsToConnection } from "../shared/provider-config.js";
+import { aiRest, classifyJob, isLimitError, rankAi, type AiConnection } from "./ai-router.js";
 import { toolAvailability } from "./tool-availability.js";
 import { CommunitySkills } from "./community-skills.js";
 import { UsageEvidenceAccumulator, type UsageAttempt } from "./usage-ledger.js";
@@ -175,6 +176,8 @@ export interface OpenCodeRunnerOptions {
   runtimeCheck?: () => RuntimeCompatibility;
   // Allows real-process fault fixtures without invoking a model account.
   spawnProcess?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+  /** The owner's connected AIs, for teammates set to automatic. */
+  aiConnections?: () => AiConnection[];
 }
 
 export class OpenCodeRunner {
@@ -470,10 +473,42 @@ export class OpenCodeRunner {
     return `${request}${methodContext}\n\n${completion}\n\n${conversationStyle}${taskContext}${requiredReport}\n\n${liveApps}${localContext}${teamContext}${resumeEvidence}${recovery}`;
   }
 
+  /** What kind of job this is, for automatic AI. */
+  private aiJob(run: Run, bot: Bot) {
+    return classifyJob({ prompt: run.prompt, expectedWorkKind: run.expectedWorkKind, browserEnabled: bot.browserEnabled, attachments: run.attachmentIds.length, routine: Boolean(run.routineId) });
+  }
+
+  /** A teammate on automatic AI gets the best connected AI for a new job. A
+   * resumed job keeps its AI, unless that AI has run out of allowance. */
+  private chooseAutomaticAi(run: Run, bot: Bot): Bot {
+    if (bot.aiMode !== "automatic") return bot;
+    const resting = bot.providerInstanceId ? aiRest.isResting(bot.providerInstanceId) : true;
+    if (run.startedAt && !resting && bot.providerInstanceId && bot.model) return bot;
+    const pick = rankAi(this.options.aiConnections?.() || [], this.aiJob(run, bot), aiRest.isResting)[0];
+    if (!pick || (pick.instanceId === bot.providerInstanceId && pick.model === bot.model)) return bot;
+    return this.options.db.updateBot(bot.id, { providerInstanceId: pick.instanceId, model: pick.model }) || bot;
+  }
+
+  /** When an automatic teammate's AI runs out of allowance, rest that AI and,
+   * if nothing was done yet, give the same job to the next one. */
+  private switchAiAfterLimit(run: Run, bot: Bot, error: string, usedTools: boolean): "switched" | "rested" | "none" {
+    if (bot.aiMode !== "automatic" || !bot.providerInstanceId || !isLimitError(error)) return "none";
+    aiRest.rest(bot.providerInstanceId);
+    const next = rankAi(this.options.aiConnections?.() || [], this.aiJob(run, bot), aiRest.isResting)[0];
+    const switches = this.options.db.extensionRecord<{ count: number }>("ai-switch", run.id)?.count ?? 0;
+    // Work that already used tools is never repeated on another AI.
+    if (!next || usedTools || switches >= 2) return next ? "rested" : "none";
+    this.options.db.saveExtensionRecord("ai-switch", run.id, { count: switches + 1 });
+    this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "status", label: "Switched AI", detail: `${friendlyModelName(bot.model)} reached its limit, so ${friendlyModelName(next.model)} is taking over.` });
+    this.options.db.updateRun(run.id, { status: "queued", progressAt: new Date().toISOString() });
+    return "switched";
+  }
+
   private executeRun(run: Run) {
     if (this.enforceJobBudget(run.id)) return;
-    const bot = this.options.db.getBot(run.botId);
-    if (!bot) return;
+    const found = this.options.db.getBot(run.botId);
+    if (!found) return;
+    const bot = found.retiredAt ? found : this.chooseAutomaticAi(run, found);
     if (bot.retiredAt) {
       this.failBeforeStart(run, "This teammate is retired. Restore them in the studio before starting new work. No model was started or charged by Sidemates.");
       return;
@@ -857,7 +892,15 @@ export class OpenCodeRunner {
           } catch { /* A finished answer remains complete even if routing could not run. */ }
         }
       } else {
-        const error = output.failure || cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
+        const failure = output.failure || cleanError(stderr) || `${useClaude ? "Claude Code" : "OpenCode"} stopped before returning a response.`;
+        const limit = this.switchAiAfterLimit(run, bot, `${failure} ${cleanError(stderr)}`, Boolean(lastTool));
+        if (limit === "switched") {
+          this.options.db.updateRun(run.id, { ...finalUsage, status: "queued" });
+          this.options.onChange();
+          void this.tick();
+          return;
+        }
+        const error = limit === "rested" ? `${failure} Sidemates will use another of your AIs for the next job.` : failure;
         this.options.db.updateRun(run.id, { ...finalUsage, status: "failed", finishedAt, error, partialText: responseText || null });
         this.options.db.finishRunTask(run.id, "failed", error);
         this.options.db.addActivity({ runId: run.id, botId: bot.id, kind: "error", label: "Couldn’t finish", detail: error });

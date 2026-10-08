@@ -37,10 +37,11 @@ import { PersonalIndexer, type IndexerConfig } from "./personal-indexer.js";
 import { checkNousKey, NOUS_BASE_URL } from "./nous-portal.js";
 import { renderResultPage } from "./share-result.js";
 import { macFallbackAllowed } from "./mac-productivity.js";
+import { aiRest, connectionsFrom, rankAi } from "./ai-router.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
-import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
+import { ProviderConnectionManager, readProviderStatus, latestProviderStatus } from "./providers.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
@@ -379,7 +380,10 @@ for (const receipt of db.listPreparedApprovedActions()) {
   db.addActivity({ runId: receipt.runId, botId: receipt.botId, kind: "error", label: "Review again after restart", detail });
 }
 
-const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), onLive: (runId, text) => broadcast({ type: "live", runId, text }), internalUrl, internalToken, maxParallel: 3 });
+const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), onLive: (runId, text) => broadcast({ type: "live", runId, text }), internalUrl, internalToken, maxParallel: 3, aiConnections: () => connectionsFrom(latestProviderStatus()) });
+// Automatic AI needs to know which AIs are connected, even before anyone opens the studio.
+void readProviderStatus(db).catch(() => {});
+setInterval(() => { void readProviderStatus(db).catch(() => {}); }, 10 * 60_000).unref();
 const notifications = new NotificationService(db, () => runner.isLeader());
 const awakeGuard = new AwakeGuard({ db, enabled: () => runner.isLeader() });
 const telegram = new TelegramChannel({
@@ -870,11 +874,21 @@ app.get("/api/provider", async (_request, response) => {
   response.json(await readProviderStatus(db, providerConnections.listAttempts()));
 });
 
+/** A teammate on automatic AI that has never worked yet gets its first AI
+ * here, so a fresh studio needs no model choice before the first message. */
+function withAutomaticAi(bot: Bot): Bot {
+  if (bot.aiMode !== "automatic" || (bot.providerInstanceId && bot.model)) return bot;
+  const pick = rankAi(connectionsFrom(latestProviderStatus()), "heavy", aiRest.isResting)[0];
+  return pick ? db.updateBot(bot.id, { providerInstanceId: pick.instanceId, model: pick.model }) || bot : bot;
+}
+
 app.get("/api/readiness", async (_request, response) => {
   const status = await readProviderStatus(db, providerConnections.listAttempts());
   const connected = status.instances.filter((instance) => instance.connected);
   const compatibility = opencodeCompatibility();
+  const automaticReady = rankAi(connectionsFrom(status), "heavy", aiRest.isResting).length > 0;
   const readyTeammates = db.listBots().filter((bot) => {
+    if (bot.aiMode === "automatic" && automaticReady) return true;
     if (!bot.providerInstanceId || !bot.model) return false;
     const provider = db.providerForBot(bot.id);
     return Boolean(provider && modelBelongsToConnection(bot.model, provider));
@@ -1705,6 +1719,7 @@ app.post("/api/messages", (request, response) => {
     if (!requested.length || requested.some((bot) => !workReports.canStart(bot.id, kind))) return response.status(400).json({ error: "This job needs a teammate with read access to its mail or calendar source. Connect the app or enable Mac access in settings, then try again. No model run was started." });
   }
   if (!requested.length) return response.status(400).json({ error: "Choose at least one teammate." });
+  requested = requested.map(withAutomaticAi);
   if (requested.some((bot) => !bot.providerInstanceId || !bot.model)) return response.status(409).json({ error: "Choose your AI provider and model in AI connections before sending this task. Nothing has been started.", code: "provider_choice_required" });
   const learningDirection = workflow ? "" : learningCommandDirection(parsed.data.body);
   const routineIntent = !learningDirection && parsed.data.attachmentIds.length === 0 ? parseRoutineIntent(parsed.data.body, parsed.data.timeZone) : null;
@@ -2989,6 +3004,7 @@ const botInput = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i), role: z.string().trim().min(1).max(60),
   instructions: z.string().trim().min(1).max(2_000), model: z.string().optional(), providerInstanceId: z.string().nullable().optional(),
   computerEnabled: z.boolean().optional(), browserEnabled: z.boolean().optional(), weeklyTokenBudget: z.number().int().min(0).max(100_000_000).optional(),
+  aiMode: z.enum(["automatic", "chosen"]).optional(),
 });
 
 // Bring a Hermes or OpenClaw profile into the studio: dry-run preview first,
@@ -3023,11 +3039,15 @@ app.post("/api/imports/profile/apply", (request, response) => {
 app.post("/api/bots", (request, response) => {
   const parsed = botInput.safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ error: botInputProblem(parsed.error) });
+  const automatic = parsed.data.aiMode === "automatic";
   const connection = db.getProvider(parsed.data.providerInstanceId || "");
-  if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
-  if (!parsed.data.model || !modelBelongsToConnection(parsed.data.model, connection)) return response.status(400).json({ error: "Choose a model from the selected connection." });
+  if (!automatic && !connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
+  if (!automatic && (!parsed.data.model || !connection || !modelBelongsToConnection(parsed.data.model, connection))) return response.status(400).json({ error: "Choose a model from the selected connection." });
   try {
-    const bot = db.createBot(parsed.data);
+    // Automatic: Sidemates picks the AI now and again before each job.
+    const bot = automatic
+      ? withAutomaticAi(db.createBot({ ...parsed.data, providerInstanceId: null, model: "", aiMode: "automatic" }))
+      : db.createBot({ ...parsed.data, aiMode: "chosen" });
     broadcast();
     response.status(201).json(bot);
   } catch (error) {
@@ -3147,12 +3167,13 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Teammate not found." });
   // Appearance does not execute a model or change access. It remains editable
   // when an old teammate has no provider or its chosen model is unavailable.
-  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot"].includes(key));
+  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot", "aiMode"].includes(key));
   // Name, job and appearance are local profile metadata. Keep them editable
   // when an older teammate's provider is unavailable; access/model changes
   // still use the full connection validation below.
   if (profileOnly) {
-    const bot = db.updateBot(request.params.id, parsed.data);
+    const updated = db.updateBot(request.params.id, parsed.data);
+    const bot = updated && parsed.data.aiMode === "automatic" ? withAutomaticAi(updated) : updated;
     // Leave a note in the chat whenever the safety posture changes, so it is never a silent switch.
     if (bot && parsed.data.autopilot !== undefined && parsed.data.autopilot !== current.autopilot) {
       db.addMessage({ threadId: bot.threadId, senderType: "system", senderId: null, body: parsed.data.autopilot
@@ -3167,7 +3188,10 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!connection) return response.status(400).json({ error: "Choose a valid AI connection for this teammate." });
   const model = parsed.data.model ?? current.model;
   if (!modelBelongsToConnection(model, connection)) return response.status(400).json({ error: "That model does not belong to the selected connection." });
-  const bot = db.updateBot(request.params.id, parsed.data);
+  // Choosing a connection or model yourself turns automatic off for this teammate.
+  // Saving a settings form that resends the current pick is not a choice.
+  const choosing = (parsed.data.providerInstanceId !== undefined && parsed.data.providerInstanceId !== current.providerInstanceId) || (parsed.data.model !== undefined && parsed.data.model !== current.model);
+  const bot = db.updateBot(request.params.id, { ...parsed.data, ...(choosing && !parsed.data.aiMode ? { aiMode: "chosen" as const } : {}) });
   broadcast();
   response.json(bot);
 });
