@@ -394,6 +394,8 @@ export interface Approval {
   status: "pending" | "approved" | "denied";
   createdAt: string;
   decidedAt: string | null;
+  /** Task T1: why this always waits for the owner, at every autonomy level. */
+  hardStop?: import("./hard-stops").HardStop | null;
 }
 
 export type ApprovedActionStatus =

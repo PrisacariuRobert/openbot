@@ -20,6 +20,10 @@ import { registerOllamaRoutes } from "./ollama.js";
 import { ManagedBrowser, registerBrowserDownloadRoutes } from "./browser-download.js";
 import { openSettingsPane, probeFullDiskAccess, registerMacPermissionRoutes } from "./mac-permissions.js";
 import { noteFixableToolFailures } from "./failure-notes.js";
+import { actionHardStop, browserHardStop, commandHardStop } from "./hard-stops.js";
+import { HARD_STOP_TEXT, hardStopLine, type HardStop } from "../shared/hard-stops.js";
+import { recipientsOf, rememberRecipients, unknownRecipients, type KnownPeopleSources } from "./known-people.js";
+import { ContactNames } from "./mac-messages-index.js";
 import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
 import { ApprovedConnectorDispatch, ApprovedConnectorOutcomeUncertainError, ApprovalReviewChangedError, approvalReviewFingerprint, sameReviewFingerprint } from "./approval-review-binding.js";
@@ -1915,6 +1919,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     if (!db.getBot(parsed.data.botId) || !access?.canRead || !access?.canSend || !capability?.connected || !capability.writeConnected) throw new Error("Replying needs this teammate's Gmail read and send permissions.");
     const reply = gmailReplyReviewSchema.parse(args);
     const result = await googleWorkspace.reply(reply, approvalID);
+    rememberRecipients(db, "gmail_reply", reply);
     db.addConnectorEvent({ botId: parsed.data.botId, action: "gmail_reply", status: "completed", summary: `Reply checked in the original conversation: “${reply.subject.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
     return `The reply to ${result.to} was checked in Gmail's sent copy: ${result.webLink}. The recipient, message text and original conversation matched the approved reply. This confirms Gmail's sent copy, not recipient delivery or reading.${result.recovered ? " The send response was lost or incomplete; the matching sent copy was found without another send request." : ""}`;
@@ -1925,6 +1930,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
     if (!bot || !access?.canSend || capability?.writeConnected !== true) throw new Error("Gmail sending is not available for this teammate.");
     const message = { to: String(args.to || ""), cc: String(args.cc || ""), subject: String(args.subject || ""), body: String(args.body || "") };
     const result = await googleWorkspace.send(message);
+    rememberRecipients(db, "gmail_send", message);
     db.addConnectorEvent({ botId: bot.id, action: "gmail_send", status: "completed", summary: `Sent “${message.subject.replace(/[\r\n]+/g, " ").slice(0, 120)}” to ${message.to.replace(/[\r\n]+/g, " ").slice(0, 120)}` });
     broadcast({ type: "connector", at: Date.now() });
     return `Gmail accepted the email to ${message.to} for sending. This does not prove recipient delivery or reading. Gmail reference: ${result.id}.`;
@@ -1947,6 +1953,7 @@ async function performApprovedAction(action: unknown, approvalID: string): Promi
       description: args.description ? String(args.description) : undefined, location: args.location ? String(args.location) : undefined,
       attendees: Array.isArray(args.attendees) ? args.attendees.map(String) : undefined, addGoogleMeet: args.addGoogleMeet === true,
     }, approvalID);
+    rememberRecipients(db, "google_calendar_create", args);
     db.addConnectorEvent({ botId: bot.id, action: "google_calendar_create", status: "completed", summary: `${bot.name} created the approved calendar event “${event.title.slice(0, 120)}”` });
     broadcast({ type: "connector", at: Date.now() });
     return `The calendar event was confirmed: ${event.title}${event.webLink ? ` (${event.webLink})` : ""}${event.meetingLink ? ` Meet: ${event.meetingLink}` : ""}.${event.recovered ? " Its original response was lost or incomplete; a matching Google readback confirmed the event without another create request." : ""}${event.meetingPending ? " The requested Meet link is not confirmed yet. Check this event later; do not recreate it." : ""}`;
@@ -2354,12 +2361,33 @@ function currentApprovalReview(approvalId: string) {
  * ledger stay intact; only the human pause is skipped. Reviews that cannot be approved (incomplete preview) stay
  * pending for the owner. Access grants are untouched: Autopilot skips reviews, never permissions, and the reviews
  * listed in shared/autopilot.ts always wait for a person, including more spending. */
+/** Task T1: card and bank details are entered by the owner, never by a teammate. */
+const CARD_DETAILS_REFUSAL = "Card and bank details are entered by the owner, never by a teammate, at every autonomy level. Nothing was typed. Stop here and ask the owner to take over the browser and enter them.";
+function hardStopCommandReason(command: string): string | null {
+  // An owner's "always allow" rule never covers a push, a deploy or a delete.
+  return commandHardStop(command) ? commandApprovalReason(command) || "This command always needs your okay." : null;
+}
+function firstMessageNote(newPeople: string[]): string {
+  return newPeople.length ? ` First message to ${newPeople.slice(0, 3).join(", ")}${newPeople.length > 3 ? ` and ${newPeople.length - 3} more` : ""}: this always asks.` : "";
+}
+let contactsCache: { at: number; names: ContactNames } | null = null;
+function knownPeopleSources(): KnownPeopleSources {
+  return {
+    // Mac Contacts, only when the owner turned on Files & apps (it needs Full Disk Access).
+    contacts: process.platform === "darwin" && db.getStudioSettings().macAccessEnabled && !(appleApps instanceof FixtureAppleApps) ? (key) => {
+      if (!contactsCache || Date.now() - contactsCache.at > 10 * 60_000) contactsCache = { at: Date.now(), names: ContactNames.load() };
+      return contactsCache.names.lookup(key) !== null;
+    } : undefined,
+    sentMail: db.getConnector("google-workspace")?.connected ? async (address) => (await googleWorkspace.search(`in:sent to:${address}`, 1)).length > 0 : undefined,
+  };
+}
+
 function autopilotDecides(approvalId: string) {
   const approval = db.getApproval(approvalId);
   if (!approval) return false;
   if (!autopilotOn(db.getStudioSettings().yoloMode, db.getBot(approval.botId))) return false;
   const stored = db.getApprovalAction(approvalId) as { type?: string; args?: { semanticBound?: boolean } } | null;
-  return autopilotMayDecide({ kind: approval.kind, actionType: stored?.type, semanticBound: stored?.args?.semanticBound === true });
+  return autopilotMayDecide({ kind: approval.kind, actionType: stored?.type, semanticBound: stored?.args?.semanticBound === true, hardStop: approval.hardStop });
 }
 
 function autoApproveIfYolo(approvalId: string) {
@@ -3121,7 +3149,7 @@ app.patch("/api/bots/:id", (request, response) => {
     // Leave a note in the chat whenever the safety posture changes, so it is never a silent switch.
     if (bot && parsed.data.autopilot !== undefined && parsed.data.autopilot !== current.autopilot) {
       db.addMessage({ threadId: bot.threadId, senderType: "system", senderId: null, body: parsed.data.autopilot
-        ? `Autopilot is on for ${bot.name}: it will act without asking first. You can switch it back to Ask first in ${bot.name}’s settings.`
+        ? `Autopilot is on for ${bot.name}: it will act without asking first, except for money, someone new, anything that can't be undone, publishing, and passwords and cards. You can switch it back to Ask first in ${bot.name}’s settings.`
         : `Autopilot is off for ${bot.name}: it asks before anything important.` });
     }
     broadcast();
@@ -3784,20 +3812,22 @@ app.post("/api/internal/tools", async (request, response) => {
   const bot = db.getBot(botId)!;
   // A tool group the owner turned off for this teammate stays off here too, not only in the runtime's tool list.
   if (toolTurnedOff(bot.toolGroups, action)) return response.status(403).json({ error: `The owner turned off ${TOOL_GROUPS.find((group) => group.id === toolGroupOf(action))!.label.toLowerCase()} for ${bot.name}. Say this can't be done here; the owner can turn it on in ${bot.name}'s settings.` });
-  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action) => {
+  const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action, hardStop?: HardStop | null) => {
     // The owner already said no to this exact action in this task: never ask
     // again, whatever the model decided after the decline.
     const declined = db.listRunApprovals(runId).some((earlier) => earlier.status === "denied" && earlier.kind === kind && earlier.actionLabel === actionLabel
       && (db.getApprovalAction(earlier.id) as { type?: string } | null)?.type === approvalAction);
     if (declined) return response.status(409).json({ error: "The owner already declined this action in this task. Do not propose it again or try an equivalent. Finish without it and tell the user what was not done." });
-    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs } });
+    // Task T1: money, someone new, anything gone for good, publishing and credentials always wait for the owner.
+    const stop = hardStop !== undefined ? hardStop : actionHardStop({ action: approvalAction, args: savedArgs, reason, label: actionLabel });
+    const approval = db.createApproval({ runId, botId, kind, reason, actionLabel, action: { type: approvalAction, botId, args: savedArgs }, hardStop: stop });
     runner.pauseForApproval(runId);
     // Retire this worker before continuation; an immediate decision must not
     // let its eventual shutdown cancel the approved action or replacement.
     const yolo = autopilotDecides(approval.id);
     if (yolo) autoApproveIfYolo(approval.id);
     broadcast();
-    return response.json({ approvalRequired: true, approvalId: approval.id, message: yolo ? "Auto-approved by Autopilot. Sidemates is performing it now; the task continues on its own." : "Paused. The user can approve this whenever they are ready; it will not expire." });
+    return response.json({ approvalRequired: true, approvalId: approval.id, ...(stop ? { alwaysAsks: HARD_STOP_TEXT[stop].label } : {}), message: yolo ? "Auto-approved by Autopilot. Sidemates is performing it now; the task continues on its own." : stop ? `Paused: this always needs the owner's okay, even on Autopilot (${HARD_STOP_TEXT[stop].label.toLowerCase()}). Don't look for another way to do it. The user can approve it whenever they are ready; finish what you can and say what's waiting.` : "Paused. The user can approve this whenever they are ready; it will not expire." });
   };
   try {
     new WorkflowValidation(db).assertRun(runId);
@@ -4060,14 +4090,14 @@ app.post("/api/internal/tools", async (request, response) => {
           publicationReview: ready, publicationIdentity,
         });
       }
-      const command = z.string().min(1).max(4_000).parse(args.command), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason;
+      const command = z.string().min(1).max(4_000).parse(args.command), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason || hardStopCommandReason(command);
       if (reason) return holdForApproval("terminal", reason, `Run in ${db.getCodeProject(projectId)?.name || "code project"}: ${command.slice(0, 140)}`, { ...args, workspaceRunId: runId });
       const result = await codeChecks.execute(botId, projectId, runId, command);
       return response.json(result);
     }
     if (action === "bash") {
       if (!bot.computerEnabled) return response.status(403).json({ error: "Your computer access is turned off. The user can enable it in your settings." });
-      const command = String(args.command || ""), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason;
+      const command = String(args.command || ""), reason = commandAutoDecision(db.listAutoReviewRules(), command, commandApprovalReason(command)).reason || hardStopCommandReason(command);
       if (reason) return holdForApproval("terminal", reason, command.slice(0, 180));
       const result = await computer.execute(botId, command);
       return response.json(result);
@@ -4153,19 +4183,21 @@ app.post("/api/internal/tools", async (request, response) => {
         if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
         const selector = observed.selector;
         const value = requested.value ?? "";
+        const stop = browserHardStop(requested.kind, target);
+        if (requested.kind === "type" && stop === "credentials") return response.status(403).json({ error: CARD_DETAILS_REFUSAL });
         const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target), browserApprovalReason(requested.kind, requested.kind === "type" ? `${selector} ${value}` : selector, target));
         const mustReviewChange = requested.kind === "click" && (/\b(save|submit|send|confirm|delete|remove|purchase|publish|update)\b/i.test(target.label) || Boolean(target.formMethod && target.formMethod !== "get"));
         if (mustReviewChange) browser.assertNoPriorReviewedSemanticEffect(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind });
-        const reviewReason = mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason;
+        const reviewReason = (mustReviewChange ? decision.reason || "Review this exact change before it is saved." : decision.reason) || (stop ? hardStopLine(stop) : null);
         const requiredByRule = decision.matched?.effect === "require_approval";
-        const grantClaimed = requested.kind === "click" && !mustReviewChange && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
+        const grantClaimed = requested.kind === "click" && !mustReviewChange && !stop && Boolean(reviewReason) && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule);
         if (reviewReason && !grantClaimed) {
-          const offer = requested.kind === "click" && !mustReviewChange ? browserNavigationAllowanceOffer(target, requiredByRule) : null;
+          const offer = requested.kind === "click" && !mustReviewChange && !stop ? browserNavigationAllowanceOffer(target, requiredByRule) : null;
           return holdForApproval("browser", reviewReason, requested.kind === "click" ? `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}` : `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, {
             selector, ...(requested.kind === "type" ? { value } : {}), targetFingerprint: target.fingerprint, targetReview: target.review,
             semanticBound: true, semanticSessionId, semanticRole: observed.role, semanticLabel: observed.label, semanticReviewDigest: observed.reviewDigest,
             ...(offer ? { navigationAllowanceOffer: offer } : {}),
-          }, requested.kind === "click" ? "browser_click" : "browser_type");
+          }, requested.kind === "click" ? "browser_click" : "browser_type", stop);
         }
         const mutationKey = browser.mintSemanticMutation(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}) });
         const result = await browser.semanticAct(botId, runId, { targetId: requested.targetId, sessionId: semanticSessionId, kind: requested.kind, ...(requested.kind === "type" ? { value } : {}), mutationKey });
@@ -4184,15 +4216,17 @@ app.post("/api/internal/tools", async (request, response) => {
         if (/sign[ -]?in|log[ -]?in|password|passkey|verification code|one.time.code/i.test(`${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential control ${target.label || target.tag}`.slice(0, 160) });
         const decision = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("click", selector, target), browserApprovalReason("click", selector, target));
         const requiredByRule = decision.matched?.effect === "require_approval";
-        if (decision.reason) {
-          if (browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule)) {
+        // A link or harmless-looking button on a checkout page, or one whose visible text says "Pay now", still asks.
+        const stop = browserHardStop("click", target), reason = decision.reason || (stop ? hardStopLine(stop) : null);
+        if (reason) {
+          if (!stop && browserNavigationGrants.claim(runId, botId, target, db.getRun(runId)?.status || null, requiredByRule)) {
             const result = await browser.click(botId, selector, target.fingerprint);
             db.addActivity({ runId, botId, kind: "status", label: "Used navigation allowance", detail: `Clicked “${target.label}” on ${new URL(target.url).hostname}; the exact target was checked again first.` });
             const next = await browser.signInState(botId);
             return next.needsSignIn ? requestSignIn(next.siteOrigin, { source: "host", observedUrl: next.siteOrigin, observedText: next.evidence || undefined }) : response.json(result);
           }
-          const offer = browserNavigationAllowanceOffer(target, requiredByRule);
-          return holdForApproval("browser", decision.reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined });
+          const offer = stop ? null : browserNavigationAllowanceOffer(target, requiredByRule);
+          return holdForApproval("browser", reason, `Click “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, targetFingerprint: target.fingerprint, targetReview: target.review, navigationAllowanceOffer: offer || undefined }, undefined, stop);
         }
         const result = await browser.click(botId, selector, target.fingerprint);
         const next = await browser.signInState(botId);
@@ -4201,6 +4235,7 @@ app.post("/api/internal/tools", async (request, response) => {
       if (action === "browser_type") {
         const selector = String(args.selector || ""), value = String(args.value || ""), target = await browser.describeTarget(botId, selector);
         if (/password|passkey|verification code|one.time.code/i.test(`${selector} ${target.label} ${target.inputType} ${target.autocomplete}`)) return requestSignIn(gate.siteOrigin, { source: "host", observedUrl: target.url, observedText: `credential field ${target.label || target.tag}`.slice(0, 160) });
+        if (browserHardStop("type", target) === "credentials") return response.status(403).json({ error: CARD_DETAILS_REFUSAL });
         const reason = browserAutoDecision(db.listAutoReviewRules(), browserTargetText("type", `${selector} ${value}`, target), browserApprovalReason("type", `${selector} ${value}`, target)).reason;
         if (reason) return holdForApproval("browser", reason, `Enter information in “${target.label || target.tag}” on ${new URL(target.url).hostname}`, { selector, value, targetFingerprint: target.fingerprint, targetReview: target.review });
         return response.json(await browser.type(botId, selector, value, target.fingerprint));
@@ -4282,7 +4317,8 @@ app.post("/api/internal/tools", async (request, response) => {
       const reply = await googleWorkspace.prepareReply(input.data);
       const currentAccess = db.getBotConnectorAccess(botId);
       if (db.getRun(runId)?.status !== "running" || runner.isApprovalPaused(runId) || !currentAccess?.canRead || !currentAccess.canSend) return response.status(409).json({ error: "This task or its Gmail permissions changed. No reply was proposed." });
-      return holdForApproval("external", `${bot.name} prepared a reply in the original Gmail conversation. Review the recipient and full reply before sending.`, `Reply to ${reply.to}`, reply);
+      const newPeople = await unknownRecipients(db, recipientsOf("gmail_reply", reply), knownPeopleSources());
+      return holdForApproval("external", `${bot.name} prepared a reply in the original Gmail conversation. Review the recipient and full reply before sending.${firstMessageNote(newPeople)}`, `Reply to ${reply.to}`, reply, undefined, newPeople.length ? "new-person" : null);
     }
     if (action === "gmail_search" || action === "gmail_read" || action === "gmail_send") {
       const connection = db.getConnector("google-workspace"), access = db.getBotConnectorAccess(botId);
@@ -4310,7 +4346,8 @@ app.post("/api/internal/tools", async (request, response) => {
       db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared “${subject}” for ${recipient}` });
       broadcast({ type: "connector", at: Date.now() });
       const preview = email.body.trim().replace(/\s+/g, " ").slice(0, 260);
-      return holdForApproval("external", `${bot.name} prepared an email to ${recipient}. Subject: “${subject}”. Preview: ${preview}${email.body.trim().length > 260 ? "…" : ""}`, `Send “${subject}” to ${recipient}`);
+      const newPeople = await unknownRecipients(db, recipientsOf("gmail_send", email), knownPeopleSources());
+      return holdForApproval("external", `${bot.name} prepared an email to ${recipient}. Subject: “${subject}”. Preview: ${preview}${email.body.trim().length > 260 ? "…" : ""}${firstMessageNote(newPeople)}`, `Send “${subject}” to ${recipient}`, undefined, undefined, newPeople.length ? "new-person" : null);
     }
     if (action === "google_drive_search" || action === "google_drive_read" || action === "google_drive_create") {
       const access = db.getBotConnectorAccess(botId, "google-drive"), catalog = connectorCatalog(Boolean(db.getConnector("google-workspace")?.connected), db.getConnector("google-workspace")?.scopes || []);
@@ -4348,7 +4385,8 @@ app.post("/api/internal/tools", async (request, response) => {
         const guests = input.data.attendees?.length ? input.data.attendees.join(", ") : "No guests";
         db.addConnectorEvent({ botId, action, status: "waiting", summary: `${bot.name} prepared the calendar event “${input.data.title.slice(0, 120)}”` });
         broadcast({ type: "connector", at: Date.now() });
-        return holdForApproval("external", `${bot.name} prepared “${input.data.title}” from ${input.data.start} to ${input.data.end}. Guests: ${guests}.${input.data.location ? ` Location: ${input.data.location}.` : ""}${input.data.addGoogleMeet ? " A Google Meet link will be added." : ""}${input.data.attendees?.length ? " Google will notify these guests after approval." : ""}`, `Create “${input.data.title}” in Calendar`, input.data);
+        const newPeople = await unknownRecipients(db, recipientsOf("google_calendar_create", input.data), knownPeopleSources());
+        return holdForApproval("external", `${bot.name} prepared “${input.data.title}” from ${input.data.start} to ${input.data.end}. Guests: ${guests}.${input.data.location ? ` Location: ${input.data.location}.` : ""}${input.data.addGoogleMeet ? " A Google Meet link will be added." : ""}${input.data.attendees?.length ? " Google will notify these guests after approval." : ""}${firstMessageNote(newPeople)}`, `Create “${input.data.title}” in Calendar`, input.data, undefined, newPeople.length ? "new-person" : null);
       }
       if (!access?.canRead) return response.status(403).json({ error: "This teammate does not have permission to read Google Calendar." });
       const events = await googleWorkspace.calendarAgenda(Number(args.days || 7), Number(args.maxResults || 20));

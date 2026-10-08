@@ -83,6 +83,10 @@ export interface BrowserTarget {
   /** Host-observed control state. Navigation grants fail closed for controls
    * that edit or select state even when their page-authored label sounds safe. */
   stateful?: boolean;
+  /** Observed for the hard stops (task T1): the control's own visible text (its
+   * label may be a different, page-authored aria-label), the page title, and how
+   * many card or bank fields share its form or page. */
+  facts?: { text: string; title: string; cardFields: number };
   review?: {
     url: string;
     label: string;

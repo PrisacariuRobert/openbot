@@ -24,10 +24,11 @@ test("some reviews always wait for a person, even on Autopilot", () => {
     assert.equal(autopilotMayDecide({ kind: "external", actionType }), false, actionType);
   }
   assert.equal(autopilotMayDecide({ kind: "browser", actionType: "browser_click", semanticBound: true }), false);
+  assert.equal(autopilotMayDecide({ kind: "external", actionType: "gmail_send", hardStop: "new-person" }), false, "a hard stop always asks");
 });
 
 test("the warning names what changes and what still pauses", () => {
-  for (const phrase of ["send emails and messages", "without asking first", "activity feed", "Ask first", "sign in yourself", "CAPTCHAs", "AI spending", "new instructions"]) {
+  for (const phrase of ["without asking first", "activity feed", "Ask first", "let you sign in", "CAPTCHAs", "AI spending", "new instructions", "always ask, even on Autopilot", "spending money", "first message to someone new", "can't be undone", "publishing", "card details"]) {
     assert.ok(AUTOPILOT_WARNING.includes(phrase), phrase);
   }
 });

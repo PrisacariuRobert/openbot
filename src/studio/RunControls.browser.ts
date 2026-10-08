@@ -18,6 +18,8 @@ const approval: Approval = {
   status: "pending",
   createdAt: "2026-09-06",
   decidedAt: null,
+  // Task T1: a first message to someone new always asks, and the card says so.
+  hardStop: "new-person",
 };
 const run = {
   id: approval.runId,
@@ -165,6 +167,12 @@ try {
     await page.getByText(mode === "sign-in" ? "Sign in to support.example.test" : "Send the draft email", { exact: true }).waitFor();
   };
   await open();
+  await page.getByText("Always asks, even on Autopilot.", { exact: true }).waitFor();
+  assert.match(await page.locator(".decision-hard-stop").innerText(), /haven't written to and haven't saved in Contacts/);
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.screenshot({ path: `/tmp/openbot-run-controls-hard-stop-${scheme}.png` });
+  }
   const approve = page.getByRole("button", {
     name: "Approve action",
     exact: true,

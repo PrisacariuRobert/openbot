@@ -51,7 +51,7 @@ export function ConversationContext({
           <h3>Safety</h3>
           <p>
             {yoloMode
-              ? "Autopilot is on: sends, posts and purchases go ahead without asking. Sign-ins, access grants and more AI spending still pause."
+              ? "Autopilot is on: most work goes ahead without asking. Money, someone new, anything that can't be undone, publishing, passwords and cards still ask, and sign-ins and more AI spending still pause."
               : "Ask first: work can start, but sensitive actions wait for your approval."}
           </p>
           <button

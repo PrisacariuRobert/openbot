@@ -94,7 +94,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | J5 | Gmail and Google Calendar without a Google Cloud project | S | 0.44 | ✅ |
 | J6 | Honest failure in every hero job | S–M | 0.44 | ✅ |
 | F1 | Open Loops: everything waiting on you | M–L | 0.44 | ☐ |
-| T1 | Hard stops at every level: money, new people, gone for good, credentials | M | 0.45 | ☐ |
+| T1 | Hard stops at every level: money, new people, gone for good, credentials | M | 0.45 | ✅ |
 | T2 | Untrusted content can't trigger outward actions on its own | M–L | 0.45 | ☐ |
 | F2 | Rewind: an undo button | M–L | 0.45 | ☐ |
 | AU1 | Autonomy levels and the Smart default | M | 0.45 | ☐ |
@@ -825,6 +825,13 @@ In 2026 the best-known agents all had public safety incidents: injected instruct
 **Done when.** There is a test per category, including a fixture page that tries to trick a "Pay now" click while Autopilot is on.
 
 **Prompt.** `Do task T1 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- `src/server/hard-stops.ts` decides the stop from what the host observed. `describeTarget` now also records the control's visible text, the page title and card fields beside it (kept out of the click fingerprint). Each approval stores its stop (`approvals.hard_stop`), Autopilot never decides one, and the approval card says why.
+- Money: label, visible text, price, the page, where it goes, its title, card fields. Links count. Someone new: Gmail sends, replies and invitations checked against `known_people` (sends the owner approved, Gmail's Sent folder, Mac Contacts); web and Mac-app sends always ask. Gone for good: deletes, account and security settings, deleting commands. Publishing: publish, post, deploy and merge buttons, GitHub issues and pull requests, pushes and deploys; no "always allow" rule can cover them. Credentials: teammates never type card or bank details.
+- Prompt-level approvals (the owner's own request) are unchanged: the stop is on the action itself, where the facts are.
+- Tests: hard-stops (9, one per category and more), known-people (3), and hard-stop-autopilot: a page whose "Claim your free gift" button shows "Pay now €49.00" waits for the owner on Autopilot (before T1 it ran with no review), a card field is refused, and the owner can still approve.
+- Not verified here: Mac Contacts as a source (needs a Mac with Full Disk Access).
 
 ### T2 · Untrusted content can't trigger outward actions on its own · M–L · plan first
 

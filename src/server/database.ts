@@ -67,6 +67,8 @@ import { legacyCadence, normalizeRoutineInterval } from "../shared/routines.js";
 import { replyEscalatesToOwner } from "../shared/routing.js";
 import { intervalSchedule, nextRoutineOccurrence, routineScheduleInput, scheduleLabel, type RoutineSchedule } from "../shared/calendar-schedule.js";
 import { skillSlug } from "../shared/skills.js";
+import { isHardStop, type HardStop } from "../shared/hard-stops.js";
+import { commandHardStop } from "./hard-stops.js";
 import type { AttachmentAnalysis } from "./attachments.js";
 import { attachmentClassification } from "./attachments.js";
 import type { WorkSnapshot, WorkReport } from "../shared/work-reports.js";
@@ -841,6 +843,11 @@ export class OpenBotDatabase {
         dedupe_key TEXT NOT NULL UNIQUE,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS known_people (
+        address TEXT PRIMARY KEY,
+        source TEXT NOT NULL CHECK(source IN ('owner', 'contacts', 'sent')),
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS message_submissions (
         request_id TEXT PRIMARY KEY,
         thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -1016,6 +1023,7 @@ export class OpenBotDatabase {
     this.addColumn("messages", "event_type TEXT");
     this.addColumn("messages", "event_data TEXT");
     this.addColumn("runs", "approval_id TEXT");
+    this.addColumn("approvals", "hard_stop TEXT");
     this.addColumn("runs", "partial_text TEXT");
     this.addColumn("runs", "progress_at TEXT");
     this.addColumn("runs", "input_tokens INTEGER NOT NULL DEFAULT 0");
@@ -2677,11 +2685,11 @@ export class OpenBotDatabase {
     });
   }
 
-  createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown }): Approval {
+  createApproval(input: { runId: string; botId: string; kind: Approval["kind"]; reason: string; actionLabel: string; action?: unknown; hardStop?: HardStop | null }): Approval {
     const id = randomUUID();
     const run = this.getRun(input.runId);
-    this.db.prepare("INSERT INTO approvals (id,run_id,bot_id,kind,reason,action_label,action_json,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',?)").run(
-      id, input.runId, input.botId, input.kind, input.reason, input.actionLabel, input.action ? JSON.stringify(input.action) : null, now(),
+    this.db.prepare("INSERT INTO approvals (id,run_id,bot_id,kind,reason,action_label,action_json,status,created_at,hard_stop) VALUES (?,?,?,?,?,?,?,'pending',?,?)").run(
+      id, input.runId, input.botId, input.kind, input.reason, input.actionLabel, input.action ? JSON.stringify(input.action) : null, now(), input.hardStop ?? null,
     );
     this.db.prepare("UPDATE runs SET status='awaiting_approval',approval_reason=?,approval_id=?,task_stage='waiting',progress_at=? WHERE id=?").run(input.reason, id, now(), input.runId);
     if (run?.automationEventId) this.db.prepare("UPDATE automation_events SET status='waiting' WHERE id=?").run(run.automationEventId);
@@ -2697,7 +2705,22 @@ export class OpenBotDatabase {
       requiresSignIn,
       reason: String(row.reason), actionLabel: String(row.action_label), status: row.status as Approval["status"],
       createdAt: String(row.created_at), decidedAt: row.decided_at ? String(row.decided_at) : null,
+      hardStop: isHardStop(row.hard_stop) ? row.hard_stop : null,
     };
+  }
+
+  /** Known people (task T1): someone the owner wrote to, or saved in Contacts.
+   * Someone who only wrote to the owner isn't known until the owner replies once. */
+  isKnownPerson(address: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM known_people WHERE address=?").get(address));
+  }
+
+  rememberKnownPerson(address: string, source: "owner" | "contacts" | "sent") {
+    this.db.prepare("INSERT INTO known_people (address,source,created_at) VALUES (?,?,?) ON CONFLICT(address) DO NOTHING").run(address, source, now());
+  }
+
+  knownPeopleCount(): number {
+    return Number((this.db.prepare("SELECT COUNT(*) count FROM known_people").get() as Row).count);
   }
 
   getApproval(id: string): Approval | null {
@@ -3817,6 +3840,8 @@ export class OpenBotDatabase {
     if (input.scope === "command" && input.effect === "always_allow" && !input.id) {
       const bare = pattern.replace(/\*+$/g, "").trimEnd();
       if (["rm", "rmdir", "shred", "find", "sudo", "chmod", "chown"].includes(bare.toLowerCase())) throw new Error("Never allow deleting or system-changing commands; write a narrower pattern such as \"git status*\".");
+      // Task T1: a push, a publish, a deploy or a delete always asks, so no rule may allow one.
+      if (commandHardStop(bare)) throw new Error("Pushing, publishing, deploying and deleting always ask, at every autonomy level, so they can't be allowed by a rule.");
     }
     const existing = input.id ? this.listAutoReviewRules().find((rule) => rule.id === input.id) : undefined;
     const id = existing?.id || randomUUID();

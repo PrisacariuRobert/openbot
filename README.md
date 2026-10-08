@@ -76,7 +76,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310), connect your AI, create a t
   </tr>
   <tr>
     <td><strong>Real files.</strong> Word documents, spreadsheets and plans arrive as files you can open and share. Drop in a PDF and your teammate reads it first.</td>
-    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on.</td>
+    <td><strong>Asks before it acts.</strong> Anything with consequences stops and shows you the website, the button and what will change. Say no and the teammate finishes honestly without it. Prefer no questions? Autopilot, per teammate, is off until you turn it on, and even then money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards still ask.</td>
   </tr>
 </table>
 
@@ -136,6 +136,7 @@ These are in the code but not in a release yet. The [changelog](CHANGELOG.md) ha
 - **Gmail and Google Calendar through the Mac's own Mail and Calendar**, without a Google Cloud project.
 - **Your setup** in Settings: a timeline of your first days that stays on your Mac.
 - **When a job can't finish**, you see what's missing and the one-click fix.
+- **Hard stops, even on Autopilot**: money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards always ask.
 
 ## What's new in 0.42.0
 

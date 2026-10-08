@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Some things always ask, even on Autopilot.** Spending money, the first message to someone you haven't written to, anything that can't be undone (deleting, account and security settings), publishing (public posts, pushes, deploys), and passwords and card details. The approval card says why. Teammates never type card or bank details; you enter those yourself. A button that looks harmless but shows "Pay now" on screen, or a plain link into a checkout, now asks too.
 - **When a job can't finish, you see what's missing and the fix.** A stopped task, or a tool refused for a reason only you can change, shows one button: choose another AI, reconnect an app, open the right macOS privacy page, turn on Files & apps, get a browser, or try again.
 - **A guided first run.** After installing, Sidemates helps you choose your AI (ChatGPT, a free Gemini key, Claude Code, or Ollama on your Mac in one click), confirm a model and meet your first teammate, then suggests three things to try. Calendar and Reminders access is asked only when a suggestion needs it, and specialists (a researcher, a writer) can be added later with one click on the same AI.
 - The loading and phone pairing screens say Sidemates instead of OpenBot.

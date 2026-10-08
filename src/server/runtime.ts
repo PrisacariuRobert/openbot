@@ -21,6 +21,7 @@ import { validateVisualAction } from "./visual-grounding.js";
 import { journalPropose, journalTransition, journalReconcile, admitOnce, acquireDesktopLease, releaseDesktopLease } from "./action-journal.js";
 import { selectModality } from "./modality-router.js";
 import { storeObservation, getObservation, findObservationWithTarget, invalidateObservationsForRun, invalidateObservationsForBot, type CapturedObservation, type RegistryTarget, type RegistryPane } from "./observation-registry.js";
+import { CARD_FIELD } from "./hard-stops.js";
 
 type CommandResult = { code: number; stdout: string; stderr: string; sourceChanged?: boolean; runtimeIdentity?: string };
 type TeachStep = SkillStep & { at: string };
@@ -1227,7 +1228,7 @@ export class BrowserManager {
   async describeTarget(botId: string, selector: string): Promise<BrowserTarget & { fingerprint: string }> {
     const page = await this.page(botId);
     this.assertPageAccess(botId, page);
-    const details = await page.locator(selector).first().evaluate((element) => {
+    const details = await page.locator(selector).first().evaluate((element, cardFieldSource) => {
       const node = element.closest("button,a,input,textarea,select,[role=button],[role=link]") || element;
       const input = node as HTMLInputElement;
       const form = input.form || node.closest("form");
@@ -1296,11 +1297,19 @@ export class BrowserManager {
         searchForm: Boolean(form && (form.getAttribute("role") === "search" || form.querySelector('input[type="search"]'))),
         stateful,
         review: { url: location.href, label, control: node.getAttribute('role') || node.tagName.toLowerCase(), destination: destination || location.href, fields, contextScope, disclosure, complete },
+        facts: {
+          text: ((node as HTMLElement).innerText || node.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160),
+          title: document.title.slice(0, 160),
+          cardFields: [...(form || dialog || document.body).querySelectorAll<HTMLElement>('input,select')].filter(el => new RegExp(cardFieldSource, "i").test(`${el.getAttribute('autocomplete') || ''} ${el.getAttribute('name') || ''} ${el.getAttribute('aria-label') || ''} ${el.getAttribute('placeholder') || ''} ${[...((el as HTMLInputElement).labels || [])].map(item => item.textContent || '').join(' ')}`)).length,
+        },
       };
-    }, undefined, { timeout: 12_000 });
+    }, CARD_FIELD.source, { timeout: 12_000 });
     this.assertPageAccess(botId, page);
-    const target = { url: page.url(), ...details };
-    return { ...target, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
+    const { facts, ...observed } = details;
+    const target = { url: page.url(), ...observed };
+    // The hard-stop facts stay out of the fingerprint: a title like "(3) Inbox"
+    // changes on its own and must not invalidate an approved click.
+    return { ...target, facts, fingerprint: createHash("sha256").update(JSON.stringify(target)).digest("hex") };
   }
 
   async describeFileInput(botId: string, selector: string) {
