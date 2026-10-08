@@ -45,6 +45,8 @@ import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
 import { ProviderConnectionManager, readProviderStatus, latestProviderStatus } from "./providers.js";
 import { once } from "node:events";
 import { ChatGptPlan } from "./chatgpt-plan.js";
+import { checkGeminiKey } from "./gemini-key.js";
+import { PrivateBrowserInstall, privateBrowserPath } from "./private-browser.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
 import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-test.js";
@@ -160,6 +162,9 @@ const internalToken = randomBytes(32).toString("base64url");
 const approvedConnectorDispatch = new ApprovedConnectorDispatch();
 const computer = new ComputerManager(db);
 const browser = new BrowserManager(db, { onDownloadSaved: () => broadcast() });
+// A browser for everyone: the private one Sidemates downloaded, if the Mac has none of its own.
+process.env.OPENBOT_PRIVATE_BROWSER = privateBrowserPath(db.dataDir) || "";
+const privateBrowser = new PrivateBrowserInstall({ dataDir: db.dataDir, onDone: (executable) => { if (executable) process.env.OPENBOT_PRIVATE_BROWSER = executable; broadcast(); } });
 const browserNavigationGrants = new BrowserNavigationGrants();
 db.onRunStatusChange((runId, status) => browserNavigationGrants.observeRunStatus(runId, status));
 // The tester browser always starts at the studio itself (loopback), never at
@@ -966,6 +971,11 @@ app.post("/api/chatgpt/signin", async (_request, response) => {
   catch (error) { response.status(503).json({ error: error instanceof Error ? error.message : "ChatGPT sign-in couldn't start." }); }
 });
 app.post("/api/chatgpt/signout", async (_request, response) => { response.json(await chatgptPlan.signOut()); broadcast(); });
+app.get("/api/browser/private", (_request, response) => { response.json({ available: browser.isAvailable(), install: privateBrowser.current() }); });
+app.post("/api/browser/private/install", (_request, response) => {
+  if (browser.isAvailable() && privateBrowser.current().state !== "downloading") return response.json({ state: "done", detail: "Your teammates already have a browser." });
+  response.status(202).json(privateBrowser.start());
+});
 
 app.post("/api/provider/connect", async (request, response) => {
   const parsed = z.object({ providerId: z.enum(["claude", "openai", "github-copilot", "gitlab", "xai"]) }).safeParse(request.body);
@@ -986,6 +996,8 @@ app.post("/api/provider/key", async (request, response) => {
     } catch (error) { return response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
   }
   try {
+    // Check a Gemini key with Google first, so a bad key is caught in plain words.
+    if (parsed.data.providerId === "google") await checkGeminiKey(parsed.data.key);
     await providerConnections.saveKey(parsed.data.providerId, parsed.data.key);
     const status = await readProviderStatus(db, providerConnections.listAttempts());
     const instanceId = parsed.data.providerId === "google" ? "local-google" : "local-opencode";

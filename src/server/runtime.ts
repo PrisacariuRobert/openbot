@@ -281,15 +281,17 @@ export class ComputerManager {
  * OPENBOT_CHROME_PATH always wins when it is set. */
 export function chromeCandidates(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string[] {
   const custom = env.OPENBOT_CHROME_PATH ? [env.OPENBOT_CHROME_PATH] : [];
+  // The private browser Sidemates downloaded comes last: the owner's own browser wins.
+  const downloaded = env.OPENBOT_PRIVATE_BROWSER ? [env.OPENBOT_PRIVATE_BROWSER] : [];
   if (platform === "win32") {
     const roots = [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA, "C:\\Program Files", "C:\\Program Files (x86)"].filter((value): value is string => Boolean(value));
     const apps = ["Google\\Chrome\\Application\\chrome.exe", "Chromium\\Application\\chrome.exe", "Microsoft\\Edge\\Application\\msedge.exe", "BraveSoftware\\Brave-Browser\\Application\\brave.exe"];
-    return [...custom, ...apps.flatMap((app) => roots.map((root) => `${root.replace(/[\\/]+$/, "")}\\${app}`))];
+    return [...custom, ...apps.flatMap((app) => roots.map((root) => `${root.replace(/[\\/]+$/, "")}\\${app}`)), ...downloaded];
   }
   if (platform === "darwin") {
-    return [...custom, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"];
+    return [...custom, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", ...downloaded];
   }
-  return [...custom, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium", "/usr/bin/microsoft-edge"];
+  return [...custom, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium", "/usr/bin/microsoft-edge", ...downloaded];
 }
 
 export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
