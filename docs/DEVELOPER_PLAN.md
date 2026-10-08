@@ -111,7 +111,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | T4 | Skills you can trust | S–M | 0.48 | ✅ |
 | T5 | Memory you can see, edit and trace | M | 0.48 | ✅ |
 | T6 | The vault key in the Keychain | S–M | 0.48 | ✅ |
-| F7 | Ask my Mac | M | 0.49 | ☐ |
+| F7 | Ask my Mac | M | 0.49 | ✅ |
 | F8 | Move in, move out | S–M | 0.49 | ☐ |
 | R2 | Siri and Spotlight (experiment) | M–L | 0.49 | ☐ |
 | R4 | A developer try-path (`npx`, container image) | S–M | 0.49 | ☐ |
@@ -703,6 +703,8 @@ Each has a draft ready in Mail, plus Done, Snooze and Remind me.
 - The panel works with the keyboard alone.
 
 **Prompt.** `Do task F7 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Built through the Electron shell (`desktop/ask-shortcut.mjs`: Option+Space, else Control+Option+Space); the A4 helper can register it later for people without the app open. The panel (`src/studio/AskPanel.tsx`, `/ask`) answers from the personal index (`src/server/ask-my-mac.ts`): word search, put in order by meaning with an embedding model in Ollama, and a written answer only from a model in Ollama that cites the sources; never a cloud AI. On the synthetic set of eight questions every right source comes first (`ask-my-mac.test.ts`). `npm run test:ask-my-mac` runs in CI. **Owner check on a real Mac:** the shortcut, and that Mail, Notes and Finder open the right item.
 
 ### F8 · Move in, move out · S–M · 0.49
 

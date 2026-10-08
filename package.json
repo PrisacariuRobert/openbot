@@ -26,6 +26,7 @@
     "test:private-mode": "tsx scripts/test-private-mode.ts",
     "test:skill-trust": "tsx scripts/test-skill-trust.ts",
     "test:memory-review": "tsx scripts/test-memory-review.ts",
+    "test:ask-my-mac": "tsx scripts/test-ask-my-mac.ts",
     "test:calendar-routines": "tsx scripts/test-calendar-routines.ts",
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
     "test:recipes-memory-ui": "tsx scripts/test-recipes-memory-ui.ts",

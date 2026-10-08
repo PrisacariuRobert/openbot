@@ -6,6 +6,7 @@ import "@fontsource-variable/jetbrains-mono";
 import { Studio } from "./Studio";
 import { StudioAccess } from "./StudioAccess";
 import { PhonePairing, PhoneWelcome } from "./PhoneWelcome";
+import { AskPanel } from "./AskPanel";
 import "./studio.css";
 import "./conversation-shell.css";
 import "./design-tokens.css";
@@ -18,7 +19,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {window.location.pathname === "/pair" && window.location.hash.length > 1
       ? <PhonePairing />
-      : <StudioAccess><Studio /><PhoneWelcome /></StudioAccess>}
+      : window.location.pathname === "/ask"
+        ? <StudioAccess><AskPanel /></StudioAccess>
+        : <StudioAccess><Studio /><PhoneWelcome /></StudioAccess>}
   </StrictMode>,
 );
 

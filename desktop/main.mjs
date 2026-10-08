@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, shell } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync } from "node:fs";
 import http from "node:http";
@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { installNavigationGuards } from "./navigation.mjs";
+import { askWindowToggle, registerAskShortcut } from "./ask-shortcut.mjs";
 import { studioHealth, studioIdentity } from "./studio-identity.mjs";
 
 // One shell, one web client, every platform: the window renders the same
@@ -60,10 +61,27 @@ function main() {
       return;
     }
     createWindow();
+    // Task F7: "Ask my Mac" from anywhere. The window uses the same navigation guards.
+    if (!process.env.OPENBOT_QA_SCREENSHOT) {
+      registerAskShortcut(globalShortcut, askWindowToggle((options) => {
+        const ask = new BrowserWindow(options);
+        askWindows.add(ask);
+        installNavigationGuards(ask.webContents, BASE, (url) => shell.openExternal(url), () => console.warn("Sidemates could not open that web link."));
+        return ask;
+      }, BASE));
+    }
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (mainWindows().length === 0) createWindow();
     });
   });
+
+  // The hidden ask window doesn't keep the shell open or stand in for the main window.
+  const askWindows = new WeakSet();
+  const mainWindows = () => BrowserWindow.getAllWindows().filter((window) => !askWindows.has(window));
+  app.on("browser-window-created", (_event, window) => {
+    window.on("closed", () => { if (!askWindows.has(window) && mainWindows().length === 0) app.quit(); });
+  });
+  app.on("will-quit", () => globalShortcut.unregisterAll());
 
   app.on("window-all-closed", () => {
     // The detached runner keeps the studio alive for teammates and routines;

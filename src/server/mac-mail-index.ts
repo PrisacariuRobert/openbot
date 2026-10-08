@@ -210,6 +210,9 @@ export class MacMail {
     return { messages, matched };
   }
 
+  /** Task F7: the message's file, so "Ask my Mac" can open it in Mail. */
+  fileFor(id: string): string | null { return this.findFile(id); }
+
   private findFile(id: string): string | null {
     if (!/^\d{1,15}$/.test(id)) return null;
     const cached = this.known.get(id);
