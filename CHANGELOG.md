@@ -9,6 +9,7 @@
 - The website, README and comparison pages say what is true today: the install takes a few minutes and downloads about 140 MB; web tasks need Chrome, Edge or Brave and the private computer needs Docker; routines run while your Mac is awake (it can wake once a day); phone access needs an address for your Mac that you set up; Autopilot's real stops are listed, including what it doesn't stop for. Voice and phone access are marked beta, in the app too.
 - Competitor facts are re-checked and dated 7 October 2026, with sources: Meta Muse's Mac app, Grok Bot's new $20–30 plans, OpenAI dots reaching your own computer and its regions, and Siri AI on EU Macs.
 - The website has a Meta Muse comparison page, the teammate gallery gets proper share cards, and the site serves its own font instead of loading it from Google, so a visit reaches no font service.
+- Security updates for the libraries the app ships with: no high or critical warnings remain. Contributor docs work as written, and public docs no longer describe one person's private setup.
 
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
