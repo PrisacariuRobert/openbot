@@ -21,3 +21,11 @@ export function conversationMatches(thread: Thread, bots: Bot[], query: string):
   }
   return haystacks.some((field) => field.toLowerCase().includes(needle));
 }
+
+/** The faces at the top of Conversations: the teammates you talked to most
+ * recently (a new teammate counts from when it was made), not always the
+ * first three ever created. */
+export function recentTeammates(bots: Bot[], threads: Thread[], count = 3): Bot[] {
+  const lastActive = (bot: Bot) => threads.find((thread) => thread.id === bot.threadId)?.updatedAt || "";
+  return [...bots].filter((bot) => !bot.retiredAt).sort((a, b) => lastActive(b).localeCompare(lastActive(a))).slice(0, count);
+}
