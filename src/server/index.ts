@@ -28,6 +28,7 @@ import { summarizeTable } from "./table-summary.js";
 import { reconcileTables } from "./table-reconcile.js";
 import { AppReadService, renderAppRead } from "./mac-app-read.js";
 import { AppleApps, describeAppleChange, spokenTime } from "./mac-apple-apps.js";
+import { demoMacEnabled, demoQueueExecutor } from "./demo-mac.js";
 import { QueueError, WorkQueue, proposalFromFlatArgs, queueProposalInput, queueScanPrompt } from "./queue.js";
 import { MailSeen } from "./queue-grounding.js";
 import { PersonalIndex, SOURCES as INDEX_SOURCES } from "./personal-index.js";
@@ -185,7 +186,9 @@ const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
 const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
 /** "Waiting for you": cards a teammate prepared. Proposing runs nothing; a person approves, skips or undoes. */
-const workQueue = new WorkQueue(db, () => appleApps);
+const demoMac = demoMacEnabled();
+if (demoMac) console.warn("Sample Mac mode: Waiting for you will not touch this Mac's Reminders, Calendar, Mail or files.");
+const workQueue = new WorkQueue(db, demoMac ? (() => { const sample = demoQueueExecutor(homedir()); return () => sample; })() : () => appleApps);
 const mailSeen = new MailSeen();
 // Calendar answers slowly; while it's being used, keep the next two weeks warm.
 setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
@@ -499,7 +502,7 @@ function compactRuns<T extends { status: string; startedAt: string | null; activ
 app.get("/api/state", (request, response) => {
   const threadId = typeof request.query.threadId === "string" ? request.query.threadId : undefined;
   const state = db.getState(threadId);
-  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap(), queueReady: workQueue.list().ready.length });
+  response.json({ ...state, runs: compactRuns(state.runs), studioRuns: compactRuns(state.studioRuns), runner: runnerPayload(state.runner), weeklyRecap: cachedRecap(), queueReady: workQueue.list().ready.length, ...(demoMac ? { demoMac: true } : {}) });
 });
 
 const queueFailure = (response: express.Response, error: unknown) => {

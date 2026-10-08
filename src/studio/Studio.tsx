@@ -2150,7 +2150,7 @@ export function Studio() {
                 onRefresh={() => setRefresh((n) => n + 1)}
               />
             )}
-            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} onChanged={() => setRefresh((value) => value + 1)} />}
+            {page === "waiting" && <WaitingForYou queueReady={state?.queueReady} demoMac={state?.demoMac} onChanged={() => setRefresh((value) => value + 1)} />}
             {page === "home" && (
               <div className="page-content conversations-page">
                 <div className="page-heading">
