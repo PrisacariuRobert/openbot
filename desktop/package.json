@@ -68,7 +68,8 @@
           "target": "zip"
         }
       ],
-      "identity": null
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "nsis": {
       "oneClick": false,

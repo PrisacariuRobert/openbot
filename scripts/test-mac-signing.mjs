@@ -31,7 +31,13 @@ test('signed packaging explicitly requires signing, hardened runtime and notariz
   }
   assert.doesNotMatch(args.join(' '), /fixture-password|fixture-p12|fixture-key/);
   const desktop = JSON.parse(readFileSync(new URL('../desktop/package.json', import.meta.url), 'utf8'));
-  assert.equal(desktop.build.mac.identity, null, 'ordinary development packaging stays unsigned');
+  // A free ad-hoc signature, never a Developer ID: with no bundle signature at
+  // all, a downloaded app is "damaged and can't be opened" (only Move to
+  // Trash); self-signed, macOS offers Open Anyway in Privacy & Security.
+  assert.equal(desktop.build.mac.identity, '-', 'ordinary packaging is self-signed (ad hoc), not unsigned');
+  // Hardened runtime needs a Team ID to load Electron's own frameworks; the
+  // Developer ID path turns it on explicitly (mac.hardenedRuntime=true above).
+  assert.equal(desktop.build.mac.hardenedRuntime, false, 'a self-signed app can start');
 });
 
 test('an Apple ID or keychain profile is a complete alternative notary method', () => {
