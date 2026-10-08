@@ -49,6 +49,7 @@ import { macFallbackAllowed } from "./mac-productivity.js";
 import { OpenCodeRunner } from "./opencode.js";
 import { embedTexts, resolveEmbeddingsEndpoint, searchMemoriesWithMeaning } from "./embeddings.js";
 import { fetchGalleryTeammate, exportBot, importBot } from "./sharing.js";
+import { teammateLink } from "../shared/teammate-link.js";
 import { ProviderConnectionManager, readProviderStatus } from "./providers.js";
 import { opencodeCompatibility } from "./runtime-compatibility.js";
 import { buildReadinessSteps } from "./readiness.js";
@@ -3115,7 +3116,7 @@ app.get("/api/bots/:id/share", (request, response) => {
 });
 
 // A finished result as a page you can send: personal details hidden first.
-app.get("/api/messages/:id/share-page", (request, response) => {
+app.get("/api/messages/:id/share-page", async (request, response) => {
   const message = db.getMessage(request.params.id);
   if (!message || message.senderType !== "bot" || !message.runId) return response.status(400).json({ error: "Only a teammate's finished result can be shared." });
   const run = db.getRun(message.runId), bot = message.senderId ? db.getBot(message.senderId) : null;
@@ -3124,8 +3125,12 @@ app.get("/api/messages/:id/share-page", (request, response) => {
   // The question: the message that started the task, or else the owner's last message before this reply.
   const trigger = (run.triggerMessageId ? db.getMessage(run.triggerMessageId) : null) || db.listMessages(message.threadId, 200).filter((item) => item.senderType === "user" && item.createdAt <= message.createdAt).at(-1) || null;
   const withQuestion = request.query.question !== "0";
-  const page = renderResultPage({ question: withQuestion ? (trigger?.body || null) : null, answer: message.body, files: (message.attachments || []).map((file) => file.name), teammate: { name: bot.name, role: bot.role, color: bot.color, mascot: bot.mascot }, at: new Date(message.createdAt) });
-  response.json({ title: page.title, html: page.html, text: page.text, filename: page.filename, hidden: page.hidden, total: page.total, summary: page.summary, hasQuestion: Boolean(trigger?.body) });
+  // Task R5: "Make this teammate", from the same bundle as "Copy share link" (no history, memory or access).
+  let link: string | null = null;
+  try { link = await teammateLink(exportBot(db, bot.id)); } catch { /* a retired teammate or one carrying a credential isn't offered */ }
+  const withTeammate = request.query.teammate !== "0" && Boolean(link);
+  const page = renderResultPage({ teammateLink: withTeammate ? link : null, question: withQuestion ? (trigger?.body || null) : null, answer: message.body, files: (message.attachments || []).map((file) => file.name), teammate: { name: bot.name, role: bot.role, color: bot.color, mascot: bot.mascot }, at: new Date(message.createdAt) });
+  response.json({ title: page.title, html: page.html, text: page.text, filename: page.filename, hidden: page.hidden, total: page.total, summary: page.summary, hasQuestion: Boolean(trigger?.body), hasTeammate: Boolean(link) });
 });
 
 // Preview a gallery teammate before adding it. Fetches only from the Sidemates gallery.

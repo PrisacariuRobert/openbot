@@ -14,10 +14,14 @@ export interface ResultInput {
   question: string | null; answer: string; files: string[];
   teammate: { name: string; role: string; color: string; mascot: string };
   at: Date;
+  /** Task R5: the teammate as a sidemates.app/t/ link, for "Make this teammate". */
+  teammateLink?: string | null;
 }
 export interface ResultPage { title: string; html: string; hidden: Redaction["hidden"]; total: number; summary: string; filename: string; text: string }
 
 const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** For the preview tags' values: also "=", so page text can never even look like an attribute. */
+const attr = (value: string) => escapeHtml(value).replace(/=/g, "&#61;");
 const safeUrl = (url: string) => (/^(?:https?:|mailto:)/i.test(url) ? url : "");
 
 function markdown(text: string): string {
@@ -36,6 +40,10 @@ function markdown(text: string): string {
 }
 
 const MASCOTS = ["nova", "blob", "sprout", "orbit", "pebble", "sunny"];
+/** Task R5: one link-preview image per face, built by scripts/build-og-images.tsx into site/og/. */
+export const OG_MASCOTS = MASCOTS;
+/** Only a teammate link this studio made: the fixed address and base64url, nothing else. */
+const TEAMMATE_LINK = /^https:\/\/sidemates\.app\/t\/#1\.[A-Za-z0-9_-]{8,60000}$/;
 
 const CSS = `
 :root{--ink:#1b1b1f;--ink2:#4a4a52;--muted:#7a7a84;--cloud:#f4f3f0;--line:#e7e5e0;--bubble:#e9e6fb;--me:#1b1b1f;--round:ui-rounded,"SF Pro Rounded","Nunito",system-ui,sans-serif;--text:-apple-system,BlinkMacSystemFont,"SF Pro Text","Nunito",system-ui,sans-serif}
@@ -51,6 +59,7 @@ main{max-width:720px;margin:0 auto;padding:40px 22px 60px}
 .a blockquote{margin:1em 0;padding-left:14px;border-left:4px solid var(--line);color:var(--ink2)}
 .files{margin:14px 0 0;color:var(--muted);font-size:14.5px}
 footer{margin-top:34px;text-align:center;color:var(--muted);font-size:14.5px}footer a{color:inherit;font-weight:700}
+.make{margin:22px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}.make a{display:inline-block;background:var(--ink);color:var(--cloud);border-radius:999px;padding:10px 18px;font:800 16px/1.2 var(--round);text-decoration:none}.make a:focus-visible{outline:3px solid #a79cff;outline-offset:3px}.make span{color:var(--muted);font-size:14.5px}
 @media(prefers-color-scheme:dark){:root{--ink:#f3f2f6;--ink2:#c7c6cf;--muted:#9c9ba6;--cloud:#141418;--line:#2a2a31;--me:#2f2f38}.a{background:#1c1c22;box-shadow:none}.a a{color:#a79cff}.a pre{background:#25252d}}
 `;
 
@@ -69,17 +78,26 @@ export function renderResultPage(input: ResultInput): ResultPage {
   const color = /^#[0-9a-f]{6}$/i.test(input.teammate.color) ? input.teammate.color : "#6757d9";
   const face = renderToStaticMarkup(<Character name={input.teammate.name} color={color} variant={mascot as never} size={64} mood="happy" />);
   const date = input.at.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const make = input.teammateLink && TEAMMATE_LINK.test(input.teammateLink) ? input.teammateLink : null;
+  // For link previews when the page is put online: a sentence from the answer (already redacted) and the teammate's face.
+  const description = answer.text.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\b(?:https?|ftp|mailto|javascript):\S*/gi, "").replace(/[#>*_`[\]()|-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
 
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" /><meta name="referrer" content="no-referrer" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:" />
-<title>${escapeHtml(title)}</title><style>${CSS}</style></head>
+<title>${escapeHtml(title)}</title>
+<meta property="og:type" content="article" /><meta property="og:site_name" content="Sidemates" /><meta property="og:title" content="${attr(title)}" />
+<meta property="og:description" content="${attr(description)}" /><meta property="og:image" content="https://sidemates.app/og/${mascot}.png" />
+<meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="${attr(`${input.teammate.name}, a Sidemates teammate`)}" />
+<meta name="twitter:card" content="summary_large_image" />
+<style>${CSS}</style></head>
 <body><main>
 <div class="who"><div class="face" style="--character-color:${color}" aria-hidden="true">${face}</div><div><strong>${escapeHtml(input.teammate.name)}</strong><span>${escapeHtml(input.teammate.role)} · ${escapeHtml(date)}</span></div></div>
 ${question ? `<div class="q">${escapeHtml(question.text)}</div>` : ""}
 <article class="a">${markdown(answer.text)}</article>
 ${files.length ? `<p class="files">Files delivered: ${files.map((file) => escapeHtml(file.text)).join(", ")}</p>` : ""}
+${make ? `<p class="make"><a href="${make}" target="_blank" rel="noopener">Make this teammate</a><span>Adds ${escapeHtml(input.teammate.name)} to your own Sidemates: its name, job and instructions. Nothing from this conversation.</span></p>` : ""}
 <footer>Made with <a href="https://sidemates.app/?ref=result" target="_blank" rel="noopener">Sidemates</a> — free, open-source AI teammates on your Mac</footer>
 </main></body></html>`;
 

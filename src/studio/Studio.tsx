@@ -1959,6 +1959,8 @@ export function Studio() {
     <div
       className={`studio-shell ${documentFile && page === "chat" ? "with-document" : ""} ${contextOpen && !narrow && page === "chat" ? "with-context" : ""} ${signInPane && !narrow && page === "chat" ? "with-sign-in" : ""}`}
     >
+      {/* Outside the sidebar, which is hidden on a phone while a conversation is open. */}
+      {sharing && <ShareResultSheet messageId={sharing} onClose={() => setSharing(null)} />}
       <aside className="sidebar">
         <a className="wordmark" href="/">
           <img className="approved-face-mark" src="/design/openbot-face.svg" alt="" />
@@ -2009,7 +2011,6 @@ export function Studio() {
           {conversationRows}
         </div>
         <div className="sidebar-bottom">
-          {sharing && <ShareResultSheet messageId={sharing} onClose={() => setSharing(null)} />}
           <SidebarExtras />
           <button
             className="workspace-link"

@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Download, EyeOff, LoaderCircle, X } from "lucide-react";
 
-interface Shared { title: string; html: string; text: string; filename: string; total: number; summary: string; hasQuestion: boolean }
+interface Shared { title: string; html: string; text: string; filename: string; total: number; summary: string; hasQuestion: boolean; hasTeammate?: boolean }
 
 /** Turns a finished result into a page you can send. Personal details are
  * hidden first, and the owner sees exactly what will be shared. The page is a
  * file made on this Mac: nothing is uploaded anywhere. */
 export function ShareResultSheet({ messageId, onClose }: { messageId: string; onClose: () => void }) {
-  const [page, setPage] = useState<Shared | null>(null), [question, setQuestion] = useState(true), [error, setError] = useState(""), [copied, setCopied] = useState(false);
+  const [page, setPage] = useState<Shared | null>(null), [question, setQuestion] = useState(true), [teammate, setTeammate] = useState(true), [error, setError] = useState(""), [copied, setCopied] = useState(false);
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}/share-page?question=${question ? 1 : 0}`, { credentials: "same-origin" });
+      const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}/share-page?question=${question ? 1 : 0}&teammate=${teammate ? 1 : 0}`, { credentials: "same-origin" });
       const value = await response.json().catch(() => ({})) as Shared & { error?: string };
       if (!response.ok) throw new Error(value.error || "That result couldn't be prepared.");
       setPage(value);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "That result couldn't be prepared."); }
-  }, [messageId, question]);
+  }, [messageId, question, teammate]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, [onClose]);
 
@@ -41,6 +41,7 @@ export function ShareResultSheet({ messageId, onClose }: { messageId: string; on
           <p className={`share-hidden${page.total ? " has" : ""}`}><EyeOff size={15} aria-hidden="true" />{page.total ? <span><strong>{page.total} {page.total === 1 ? "detail" : "details"} hidden:</strong> {page.summary}.</span> : <span>Nothing personal was found — still, read it before you send it.</span>}</p>
           <iframe className="share-preview" title="Preview of the page" sandbox="" srcDoc={page.html} />
           {page.hasQuestion && <label><input type="checkbox" checked={question} onChange={(event) => { setPage(null); setQuestion(event.target.checked); }} /> Include my question</label>}
+          {page.hasTeammate && <label><input type="checkbox" checked={teammate} onChange={(event) => { setPage(null); setTeammate(event.target.checked); }} /> Include “Make this teammate” <small>(its name, job and instructions, so others can add it)</small></label>}
           <footer>
             <small>A page made on this Mac. Nothing is uploaded; you choose who gets it.</small>
             <span className="share-actions">

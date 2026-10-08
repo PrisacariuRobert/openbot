@@ -18,7 +18,7 @@ Tagline: an AI team that does the work on your real Mac, not just answers.
 - Work as a team: write "Nova: find... Scout, double-check..." and each does their part in order.
 - Autopilot: an opt-in mode, off by default and switched on per teammate (or for everyone), where a teammate acts like a person without asking first. It still stops for sign-ins, CAPTCHAs, more AI spending and saving new instructions, every action is logged, it is never part of a shared teammate, and a teammate on Autopilot can be misled by hostile web pages or emails like any assistant, so use it for teammates you trust.
 - Share teammates: a teammate can be shared as a link or added from the gallery at https://sidemates.app/teammates/. Imported teammates start with the browser and private computer off, use your own AI, and ask before anything important.
-- Share a result: turn a finished answer into a web page with private details (emails, phone numbers, keys, your home folder) removed before it is shared.
+- Share a result: turn a finished answer into a web page with private details (emails, phone numbers, keys, your home folder) removed before it is shared. The page can carry a "Make this teammate" link (the teammate's name, job and instructions, nothing from the conversation) and previews with the teammate's face when posted online.
 - Phone and voice: hands-free voice conversation; from a phone, chat with your team through Telegram, or use the Home Screen app with notifications through a relay you set up (pairing with one scan is on the way); "Hey Siri, ask Sidemates" and a Share menu shortcut hand work to your team.
 - Switch from another tool: one-click import from Hermes Agent and OpenClaw, including automations (imported paused).
 

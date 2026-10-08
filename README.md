@@ -138,6 +138,7 @@ These are in the code but not in a release yet. The [changelog](CHANGELOG.md) ha
 - **When a job can't finish**, you see what's missing and the one-click fix.
 - **Hard stops, even on Autopilot**: money, the first message to someone new, anything that can't be undone, publishing, and passwords and cards always ask.
 - **Submit a teammate to the gallery** from its settings, without Git.
+- **Shared results carry "Make this teammate"**, so whoever reads one can add the same teammate, and the page previews with the teammate's face.
 - **Your Mac reacts**: automations that start when a file lands in a folder or mail like this arrives.
 - **A teammate can suggest a specialist** (a researcher or a writer) when a job needs one; it's added only if you approve.
 - **Published attack tests**: what a prompt injection can and can't make a teammate do, run on every change ([security model](docs/SECURITY.md#attack-tests-what-we-test-and-what-still-gets-through)).

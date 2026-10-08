@@ -106,7 +106,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | F5 | Triggers: your Mac reacts | M | 0.47 | ✅ |
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
 | R3 | Gallery submissions without Git | S | 0.47 | ✅ |
-| R5 | Shared results that bring people back | S | 0.47 | ☐ |
+| R5 | Shared results that bring people back | S | 0.47 | ✅ |
 | F3 | Run receipts and Private mode | M | 0.48 | ☐ |
 | T4 | Skills you can trust | S–M | 0.48 | ☐ |
 | T5 | Memory you can see, edit and trace | M | 0.48 | ☐ |
@@ -960,6 +960,8 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 **Do.** Shared result pages (`src/server/share-result.tsx`) get a "Make this teammate" button (a one-click import of the teammate behind the result) and their own Open Graph image.
 
 **Prompt.** `Do task R5 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done. The page links to `sidemates.app/t/#1.…` (the existing teammate link: name, job and instructions; the owner can untick it), and carries Open Graph and Twitter tags with a redacted one-sentence description and `site/og/<face>.png` (1200 × 630, from `scripts/build-og-images.tsx`). The browser test found that Share did nothing on a phone (the sheet was inside the hidden sidebar); fixed. `npm run test:share-result` runs in CI.
 
 ---
 

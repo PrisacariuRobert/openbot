@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Shared results bring people back.** A result page you share can carry a "Make this teammate" link that adds the same teammate (its name, job and instructions, nothing from the conversation) to the reader's own Sidemates; untick it to leave it out. Put online, the page previews with its title, one sentence of the answer (personal details still hidden) and the teammate's face. Sharing from a phone now opens the share sheet too.
 - **Submit a teammate to the gallery without Git.** "Submit to the gallery" in a teammate's settings opens the gallery form on GitHub, filled in with that teammate. Nothing is sent until you submit it there. A check then runs the gallery's own test and opens a pull request for review, or comments on what to fix.
 - **Your Mac reacts.** Two new automation triggers: "a file lands in a folder" (optionally only some file types) and "mail like this arrives" (by sender or subject, from the Mail app). What's already there never starts a run, files or mails arriving together start one run once things are quiet for half a minute, and each automation runs at most six times an hour. Both need Files & apps on this Mac.
 - **A teammate can suggest a specialist.** When a job would clearly go better with a researcher or a writer, your teammate can propose one, saying why and which AI they'd use. Nothing is added unless you approve, even on Autopilot, and a "no" isn't asked again in that conversation.
