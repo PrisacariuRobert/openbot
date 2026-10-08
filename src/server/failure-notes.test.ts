@@ -122,7 +122,10 @@ test("through the real tool route: Files & apps off leaves one note; a provider 
   try {
     const checked = await send("What's on my calendar tomorrow?");
     assert.equal(checked.status, "completed", checked.error || "");
-    const reply = db.listMessages(nova.threadId).find((message) => message.runId === checked.id && message.senderType === "bot")!;
+    // The reply is saved just after the run is marked done.
+    let reply = db.listMessages(nova.threadId).find((message) => message.runId === checked.id && message.senderType === "bot");
+    for (let n = 0; n < 50 && !reply; n++) { await delay(100); reply = db.listMessages(nova.threadId).find((message) => message.runId === checked.id && message.senderType === "bot"); }
+    assert.ok(reply, "the teammate's reply was saved");
     assert.match(reply.body, /Statuses: 403,403,403/, "the forged call is refused and both Mac tools say Files & apps is off");
     const notes = db.messagesForRunEvent(checked.id, "needs_fix");
     assert.equal(notes.length, 1, "two refusals with the same fix, one note; the forged call left none");
