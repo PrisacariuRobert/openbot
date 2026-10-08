@@ -83,6 +83,7 @@ import { WaitingEntry, WaitingForYou } from "./WaitingForYou";
 import { VoiceMode, voiceModeSupported } from "./VoiceMode";
 import { startersFor } from "./starters";
 import { FirstRun } from "./FirstRun";
+import { StopFix } from "./StopFix";
 import { SkillDiscover, SkillDiscoverDetail, type CatalogEntry } from "./SkillDiscover";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationActions } from "./ConversationActions";
@@ -2661,6 +2662,7 @@ export function Studio() {
                               <span>
                                 <strong>{eventTitle(message)}</strong>
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
+                                {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); const asked = stopped ? (state.messages.find((item) => item.id === stopped.triggerMessageId)?.body || stopped.prompt) : ""; return <StopFix message={message} run={stopped} request={asked} openPanel={(panel) => openCapability(panel)} />; })()}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>

@@ -2523,3 +2523,6 @@ mark.mention { background: none; color: inherit; font-weight: 600; padding: 0; }
 .refined-welcome .first-run .first-run-honest { margin: 18px 0 0; font-size: 13px; line-height: 19px; color: var(--label-secondary); }
 .refined-welcome .first-run .first-run-other { display: flex; flex-wrap: wrap; gap: 8px; }
 .refined-welcome .first-run .first-run-other button { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+
+/* Never just "I can't": the fix sits first under a stopped job. */
+.chat-event .stop-fix { margin-right: 12px; font-weight: 600; }

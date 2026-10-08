@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { defaultConversation } from "../shared/default-conversation.js";
+import { fixFor } from "../shared/recovery.js";
 import { TASK_TOKEN_TOP_UP, taskTokenAmountSchema, taskTokenRequestSchema, type TaskTokenPolicy, type TaskTokenReview } from "../shared/task-token-budget.js";
 import type { ExecutionLimits } from "./execution-policy.js";
 import { BUNDLED_ACCESS_KIND, bundledSkillsRevision } from "./bundled-skills.js";
@@ -2641,7 +2642,7 @@ export class OpenBotDatabase {
     if (outcome === "failed" && !run.parentRunId && !this.db.prepare("SELECT 1 FROM messages WHERE run_id=? AND event_type='run_stopped'").get(id)) {
       const reason = detail || run.error || "The task stopped before it finished.";
       const title = /weekly.*(?:budget|token limit)/i.test(reason) ? "Weekly budget reached" : /free AI allowance/i.test(reason) ? "Free AI limit reached" : /(?:token|step|time|shared).*limit/i.test(reason) ? "Task limit reached" : /quota|rate.?limit|usage limit|credit balance/i.test(reason) ? "Provider limit reached" : /runtime not verified|could not check the installed OpenCode/i.test(reason) ? "Runtime update needed" : "Work stopped";
-      this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId } });
+      this.addMessage({ threadId: run.threadId, senderType: "system", senderId: null, runId: id, kind: "event", eventType: "run_stopped", body: `${run.botName}: ${reason} Completed actions are not undone. Review the saved progress before retrying.`, eventData: { title, botId: run.botId, fix: JSON.stringify(fixFor(reason, { automatic: this.getBot(run.botId)?.aiMode === "automatic" })) } });
     }
     return this.getRun(id)!.task;
   }
