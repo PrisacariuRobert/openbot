@@ -1,0 +1,13 @@
+/* The one-click fix on a stopped task or a "needs your help" note (task J6). Design tokens only. */
+.failure-fix { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-left: 8px; }
+.failure-fix .text-action.strong { font-weight: 600; display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; }
+.failure-fix .text-action.strong:disabled { opacity: .6; cursor: default; }
+.failure-fix .text-action.strong:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.chat-event .failure-fix small { margin-left: 0; }
+.chat-event .failure-fix small[role="alert"] { color: var(--danger, var(--ink)); }
+.chat-event .failure-fix-done { margin-left: 8px; }
+/* The browser download card needs room: the pill becomes a soft card. */
+.chat-event:has(.failure-fix-download) { border-radius: 14px; max-width: min(560px, 94%); }
+.chat-event .failure-fix-download { margin-top: 8px; }
+@media (max-width: 640px) { .failure-fix { margin-left: 0; display: flex; } }
+@media (prefers-reduced-motion: reduce) { .failure-fix .spinner { animation: none !important; } }

@@ -19,6 +19,7 @@ import { registerSetupRoutes } from "./setup-routes.js";
 import { registerOllamaRoutes } from "./ollama.js";
 import { ManagedBrowser, registerBrowserDownloadRoutes } from "./browser-download.js";
 import { openSettingsPane, probeFullDiskAccess, registerMacPermissionRoutes } from "./mac-permissions.js";
+import { noteFixableToolFailures } from "./failure-notes.js";
 import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
 import { ApprovedConnectorDispatch, ApprovedConnectorOutcomeUncertainError, ApprovalReviewChangedError, approvalReviewFingerprint, sameReviewFingerprint } from "./approval-review-binding.js";
@@ -3767,6 +3768,8 @@ const calendarCreateInput = z.object({
   if (duration <= 0 || duration > 7 * 86_400_000) context.addIssue({ code: "custom", message: "Choose an end after the start, no more than seven days later." });
 });
 const internalToolInput = z.object({ botId: z.string(), runId: z.string(), action: z.enum(["connected_tools", "connected_call", "community_skill_search", "community_skill_read", "memory_search", "conversation_search", "table_summary", "table_reconcile", "spreadsheet_export", "document_export", "web_search", "web_read", "spreadsheet_inspect", "work_collect", "work_report", "bash", "browser_request_sign_in", "browser_open", "browser_snapshot", "browser_observe", "browser_see", "browser_semantic_act", "browser_semantic_upload", "browser_arm_downloads", "browser_download_results", "browser_click", "browser_type", "browser_upload_saved_file", "mac_list", "mac_read", "mac_organize", "mac_apps_list", "mac_app_inspect", "mac_app_read", "mac_app_open", "mac_app_click", "mac_app_type", "mac_app_key", "mac_app_scroll", "mac_reminders", "mac_reminder_create", "mac_notes_search", "mac_note_read", "mac_note_create", "mac_contacts_find", "mac_calendars", "mac_event_create", "mac_mail_draft", "mac_shortcuts_list", "mac_shortcut_run", "mac_mail_search", "mac_mail_read", "mac_mail_save_attachment", "search_my_mac", "mac_calendar_events", "mac_mail_unread", "code_projects", "code_list", "code_search", "code_read", "code_write", "code_replace", "code_status", "code_diff", "code_branch", "code_commit", "code_request_review", "code_review_result", "code_publish_pr", "code_run", "code_benchmark", "gmail_search", "gmail_read", "gmail_send", "gmail_reply", "google_drive_search", "google_drive_read", "google_drive_create", "google_calendar_agenda", "google_calendar_create", "github_notifications", "github_issues", "github_issue_create", "slack_search", "slack_read", "slack_post", "notion_search", "notion_read", "notion_update", "todoist_tasks", "todoist_task_create", "todoist_task_update", "todoist_task_complete", "dropbox_search", "dropbox_read", "workspace_list", "workspace_read", "workspace_write", "workspace_replace", "task_plan", "task_progress", "task_verify", "routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete", "remember", "handoff", "message_teammate", "request_approval", "self_extend", "skill_propose"]), args: z.record(z.string(), z.unknown()) });
+// Task J6: a tool failure only the owner can fix leaves a note with the fix.
+app.use("/api/internal/tools", noteFixableToolFailures(db, () => broadcast()));
 app.post("/api/internal/tools", async (request, response) => {
   const parsed = internalToolInput.safeParse(request.body);
   if (!parsed.success || !validToolToken(internalToken, parsed.data.botId, parsed.data.runId, request.headers["x-openbot-token"])) return response.status(403).json({ error: "Internal tool access denied." });
@@ -3774,6 +3777,7 @@ app.post("/api/internal/tools", async (request, response) => {
   if (!parsed.success || !db.getBot(parsed.data.botId) || !toolRun || toolRun.botId !== parsed.data.botId) return response.status(400).json({ error: "Invalid bot tool request." });
   if (toolRun.status !== "running" || runner.isApprovalPaused(toolRun.id)) return response.status(409).json({ error: "This task is no longer active or is pausing for approval." });
   const { botId, runId, action, args } = parsed.data;
+  response.locals.toolCall = { botId, runId };
   if (toolRun.expectedWorkKind && !["work_collect", "work_report", "task_plan", "task_progress", "task_verify"].includes(action)) {
     return response.status(403).json({ error: "This report job only reads its bounded source snapshot and saves a local result. Start a separate request for other work or changes." });
   }

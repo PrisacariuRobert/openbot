@@ -125,6 +125,18 @@ Sidemates 0.42.0 is a public beta ([release notes](https://github.com/Prisacariu
 
 Sidemates has no token or cryptocurrency. Anyone selling one in its name is not us.
 
+## Coming in the next release
+
+These are in the code but not in a release yet. The [changelog](CHANGELOG.md) has the details.
+
+- **A guided first run**: choose your AI, meet your first teammate, and get three things to try.
+- **A free Gemini key in a few clicks**, tested as soon as you paste it, and a private browser download for computers without Chrome, Edge or Brave.
+- **Lighter requests to your AI**: a teammate's "hi" sends about 40% less, measured offline.
+- **Install without Terminal**, from a disk image for your kind of Mac.
+- **Gmail and Google Calendar through the Mac's own Mail and Calendar**, without a Google Cloud project.
+- **Your setup** in Settings: a timeline of your first days that stays on your Mac.
+- **When a job can't finish**, you see what's missing and the one-click fix.
+
 ## What's new in 0.42.0
 
 - **OpenBot is now Sidemates.** A new name and a new home at [sidemates.app](https://sidemates.app). OpenBot was too close to other products' names, so we changed it early. Updating keeps your teammates, chats and files, and the old install link still works.

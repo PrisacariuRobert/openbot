@@ -92,7 +92,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | J3 | Real-Mac acceptance kit | M | 0.44 | ☐ |
 | J4 | Fast Calendar and Reminders through EventKit | M | 0.44 | ☐ |
 | J5 | Gmail and Google Calendar without a Google Cloud project | S | 0.44 | ✅ |
-| J6 | Honest failure in every hero job | S–M | 0.44 | ☐ |
+| J6 | Honest failure in every hero job | S–M | 0.44 | ✅ |
 | F1 | Open Loops: everything waiting on you | M–L | 0.44 | ☐ |
 | T1 | Hard stops at every level: money, new people, gone for good, credentials | M | 0.45 | ☐ |
 | T2 | Untrusted content can't trigger outward actions on its own | M–L | 0.45 | ☐ |
@@ -534,6 +534,13 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 - Add a test for each failure path.
 
 **Prompt.** `Do task J6 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- `src/shared/failure-fixes.ts` maps each failure message Sidemates writes to one fix: choose another AI or model, reconnect the AI or an app, review the budget, open Automation, Accessibility or Full Disk Access, turn on Files & apps, get a browser, turn on the teammate's browser, or try again.
+- A stopped task shows its fix next to "Review saved progress". "Try again" sends the same request once, only for the teammate's latest task and never with files attached.
+- When a tool fails for a reason only the owner can fix, the conversation gets one note per task with the fix (`src/server/failure-notes.ts`), whatever the teammate's reply says. A note changes nothing until the owner clicks.
+- Tests: every failure path against the message as written in the source; the note on a stand-in runtime through the real tool route (a forged call leaves no note); and the buttons in Chromium at 1280 and 390 px, light and dark, by keyboard (`npm run test:failure-fixes`, in CI).
+- Not verified here: the Automation, Accessibility and Full Disk Access pages opening on a real Mac.
 
 ---
 

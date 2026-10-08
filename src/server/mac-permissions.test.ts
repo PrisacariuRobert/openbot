@@ -70,9 +70,10 @@ test("on the Mac itself, the routes ask, report and open the right System Settin
     assert.equal((await mac.send("/api/mac/permissions/request", { app: "Mail" })).status, 400, "Mail is never launched during setup");
     assert.equal((await mac.send("/api/mac/permissions/open", { pane: "full-disk-access" })).status, 200);
     assert.equal((await mac.send("/api/mac/permissions/open", { pane: "internet-accounts" })).status, 200, "where a Google account is added for Mail and Calendar");
-    assert.equal((await mac.send("/api/mac/permissions/open", { pane: "accessibility" })).status, 400);
+    assert.equal((await mac.send("/api/mac/permissions/open", { pane: "accessibility" })).status, 200, "the fix when reading an app needs Accessibility (J6)");
+    assert.equal((await mac.send("/api/mac/permissions/open", { pane: "camera" })).status, 400, "only the pages Sidemates needs");
     assert.deepEqual(mac.asked, ["Calendar"]);
-    assert.deepEqual(mac.opened, ["full-disk-access", "internet-accounts"]);
+    assert.deepEqual(mac.opened, ["full-disk-access", "internet-accounts", "accessibility"]);
   } finally { mac.close(); }
 });
 

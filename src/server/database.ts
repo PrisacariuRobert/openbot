@@ -1726,6 +1726,12 @@ export class OpenBotDatabase {
     return row ? this.messageFromRow(row) : null;
   }
 
+  /** Every system event message a run emitted for a given event type, oldest first. */
+  messagesForRunEvent(runId: string, eventType: string): Message[] {
+    const rows = this.db.prepare(`SELECT m.*,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color FROM messages m LEFT JOIN bots b ON b.id=m.sender_id WHERE m.run_id=? AND m.event_type=? ORDER BY m.created_at ASC,m.rowid ASC`).all(runId, eventType) as Row[];
+    return rows.map((row) => this.messageFromRow(row));
+  }
+
   listMessages(threadId: string, limit = 120, offset = 0): Message[] {
     const rows = this.db.prepare(`SELECT * FROM (SELECT m.*,m.rowid message_rowid,b.name bot_name,b.emoji bot_emoji,b.mascot bot_mascot,b.color bot_color,reply.id reply_id,reply.body reply_body,reply.sender_type reply_sender_type,reply_bot.name reply_bot_name FROM messages m LEFT JOIN bots b ON b.id=m.sender_id LEFT JOIN messages reply ON reply.id=m.reply_to_id LEFT JOIN bots reply_bot ON reply_bot.id=reply.sender_id WHERE m.thread_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT ? OFFSET ?) ORDER BY created_at ASC,message_rowid ASC`).all(threadId, limit, Math.max(0, offset)) as Row[];
     return rows.map((row) => this.messageFromRow(row));

@@ -17,7 +17,7 @@ export interface MacPermissionDeps {
   available: boolean;
   requestAccess(app: "Calendar" | "Reminders"): Promise<AutomationState>;
   fullDiskAccess(): FullDiskAccessState;
-  openPane(pane: "automation" | "full-disk-access" | "internet-accounts" | "reveal-app"): void;
+  openPane(pane: "automation" | "accessibility" | "full-disk-access" | "internet-accounts" | "reveal-app"): void;
   isLocal?(request: Request): boolean;
 }
 
@@ -39,6 +39,7 @@ export function probeFullDiskAccess(home = homedir()): FullDiskAccessState {
 
 const PANES = {
   automation: ["x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"],
+  accessibility: ["x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"],
   "full-disk-access": ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"],
   // Where a Google account is added for Mail and Calendar (task J5).
   "internet-accounts": ["x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension"],
@@ -72,7 +73,7 @@ export function registerMacPermissionRoutes(app: Express, deps: MacPermissionDep
 
   app.post("/api/mac/permissions/open", (request, response) => {
     if (unavailable(request)) return response.status(409).json({ error: "Set this up on the Mac that runs Sidemates." });
-    const parsed = z.object({ pane: z.enum(["automation", "full-disk-access", "internet-accounts", "reveal-app"]) }).strict().safeParse(request.body);
+    const parsed = z.object({ pane: z.enum(["automation", "accessibility", "full-disk-access", "internet-accounts", "reveal-app"]) }).strict().safeParse(request.body);
     if (!parsed.success) return response.status(400).json({ error: "Choose a System Settings page." });
     deps.openPane(parsed.data.pane);
     response.json({ ok: true });

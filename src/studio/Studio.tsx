@@ -118,6 +118,8 @@ import { fileLabel, fileSiglaClass } from "./file-glyph";
 import { foldTalkingPills } from "./talk-folds";
 import "./character-context.css";
 import { capabilityTitles, isCapabilityPanel, type CapabilityPanel } from "./capability-navigation";
+import { FailureFixAction } from "./FailureFixAction";
+import { failureFix, failureFixById } from "../shared/failure-fixes";
 const CapabilityPanelHost = lazy(() => import("./CapabilityPanelHost").then((module) => ({ default: module.CapabilityPanelHost })));
 
 type Page = "home" | "activity" | "schedule" | "library" | "chat" | "settings";
@@ -254,6 +256,8 @@ function eventTitle(message: Message): string {
       return String(data.title || (data.botName ? `${data.botName} stopped` : "Task stopped"));
     case "action_completed":
       return String(data.title || "Task update");
+    case "needs_fix":
+      return String(data.title || "Needs your help");
     case "routine_created":
       return `Created Routine ${data.name ?? message.body}`;
     case "routine_run":
@@ -362,6 +366,8 @@ function eventDetail(message: Message): string {
       const line = sentence.endsWith(".") ? sentence : `${sentence}.`;
       return line.length > 140 ? `${line.slice(0, 137)}…` : line;
     }
+    case "needs_fix":
+      return message.body.replace(/^[^:.]{1,40}:\s*/, "");
     case "routine_created":
       return `${data.schedule ?? ""}${data.enabled === "false" ? " · Paused" : ""}`;
     case "routine_run":
@@ -1070,6 +1076,20 @@ export function Studio() {
     if (!trigger || trigger.attachments.length) return null;
     return { replyId: reply.id, body: trigger.body, botId: run.botId };
   }, [state?.messages, state?.runs]);
+  // J6: "Try again" on a stopped task sends its request again, the same way.
+  const retryRunRequest = (run: Run | undefined) => {
+    const trigger = run && !run.parentRunId && ["failed", "cancelled"].includes(run.status) ? state?.messages.find((message) => message.id === run.triggerMessageId && message.kind === "text" && message.senderType === "user") : undefined;
+    if (!run || !trigger || trigger.attachments.length) return undefined;
+    // Only the teammate's latest task in this conversation: an older stop was already followed up.
+    if (state?.runs.some((other) => other.botId === run.botId && other.threadId === run.threadId && !other.parentRunId && (state.messages.find((message) => message.id === other.triggerMessageId)?.createdAt ?? "") > trigger.createdAt)) return undefined;
+    return async () => {
+      setSendError("");
+      try {
+        await api("/api/messages", { threadId: run.threadId, body: trigger.body, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, targetBotIds: [run.botId], requestId: `retry-${run.id}-${Date.now()}` });
+        setRefresh((n) => n + 1);
+      } catch (reason) { throw reason instanceof Error ? reason : new Error("Couldn't ask again. Try once more."); }
+    };
+  };
   const lastOwnMessageId = useMemo(() => {
     return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "user")?.id || null;
   }, [state?.messages]);
@@ -2635,7 +2655,7 @@ export function Studio() {
                           const stopped = state.runs.find((run) => run.id === message.runId && !run.parentRunId) || state.runs.find((run) => stops.some((item) => item.runId === run.id));
                           return <div key={message.id} className="chat-event" data-event="run_stopped" role="status">
                             <span className="chat-event-mark" aria-hidden="true">{faces.length ? faces.map((face) => <Face key={face.id} bot={face} size={20} />) : <MessageCircle size={14} />}</span>
-                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}</span>
+                            <span><strong>{stops.length} tasks stopped</strong>{stopped && <> <button type="button" className="text-action" onClick={() => setDetail({ kind: "run", run: stopped })}>Review saved progress</button></>}{(() => { const fix = failureFix(message.body); return fix && <FailureFixAction fix={fix} macAccessOn={state.settings.macAccessEnabled} onOpenPanel={(panel) => openCapability(panel, panel === "bot" ? allBots.find((bot) => bot.id === message.eventData?.botId)?.threadId : undefined)} onRetry={retryRunRequest(stopped)} />; })()}</span>
                           </div>;
                         }
                         if (message.kind === "event") {
@@ -2665,7 +2685,7 @@ export function Studio() {
                                   title={eventTitle(message)}
                                   lines={eventDetail(message) ? [eventDetail(message)] : []}
                                 />
-                              : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed'].includes(message.eventType || '') ? 'status' : undefined}>
+                              : <div className="chat-event" data-event={message.eventType || "note"} role={['run_stopped', 'action_completed', 'needs_fix'].includes(message.eventType || '') ? 'status' : undefined}>
                               <span className="chat-event-mark" aria-hidden="true">
                                 {eventFaces.length > 0 ? (
                                   eventFaces.map((face) => <Face key={face.id} bot={face} size={20} />)
@@ -2675,6 +2695,13 @@ export function Studio() {
                                 <strong>{eventTitle(message)}</strong>
                                 {eventDetail(message) && <small>{eventDetail(message)}</small>}
                                 {message.eventType === 'run_stopped' && (() => { const stopped = state.runs.find(run => run.id === message.runId); return stopped && <> <button type="button" className="text-action" onClick={() => setDetail({kind: 'run', run: stopped})}>Review saved progress</button></>; })()}
+                                {(() => {
+                                  const fix = message.eventType === "run_stopped" ? failureFix(message.body) : message.eventType === "needs_fix" ? failureFixById(message.eventData?.fix) : null;
+                                  if (!fix) return null;
+                                  const run = state.runs.find((item) => item.id === message.runId);
+                                  const botThread = allBots.find((bot) => bot.id === message.eventData?.botId)?.threadId;
+                                  return <FailureFixAction fix={fix} macAccessOn={state.settings.macAccessEnabled} onOpenPanel={(panel) => openCapability(panel, panel === "bot" ? botThread : undefined)} onRetry={message.eventType === "run_stopped" ? retryRunRequest(run) : undefined} />;
+                                })()}
                               </span>
                             </div>}{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                           );
@@ -2722,7 +2749,7 @@ export function Studio() {
                             )}
                             <div className="prose" id={`message-text-${message.id}`}>
                               <MarkdownMessage body={message.body} attachments={message.attachments} />
-                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && (
+                              {message.senderType === "bot" && state && !state.settings.macAccessEnabled && index === state.messages.length - 1 && /Files (?:&|and) apps on this Mac/i.test(message.body) && !state.messages.some((item) => item.eventType === "needs_fix" && item.runId === message.runId && item.eventData?.fix === "mac-access") && (
                                 <MacAccessOffer name={message.senderName} threadId={message.threadId} onDone={() => setRefresh((n) => n + 1)} />
                               )}
                               {message.senderType === "bot" && !!message.progressUpdates?.length && (

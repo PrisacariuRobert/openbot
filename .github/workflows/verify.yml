@@ -106,6 +106,8 @@ jobs:
         # Credential-free: a scripted OpenAI-compatible model on loopback and the
         # qa/hero-jobs fixtures. Checks Sidemates' plumbing, not any model.
         run: npm run test:hero-jobs
+      - name: One-click fixes when a job can't finish
+        run: npm run test:failure-fixes
       - name: Test full action review in existing app surfaces
         run: npm run test:app-approvals
       - name: Test keyboard controls, appearance and browser-access states
