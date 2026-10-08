@@ -107,7 +107,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
 | R3 | Gallery submissions without Git | S | 0.47 | ✅ |
 | R5 | Shared results that bring people back | S | 0.47 | ✅ |
-| F3 | Run receipts and Private mode | M | 0.48 | ☐ |
+| F3 | Run receipts and Private mode | M | 0.48 | ✅ |
 | T4 | Skills you can trust | S–M | 0.48 | ☐ |
 | T5 | Memory you can see, edit and trace | M | 0.48 | ☐ |
 | T6 | The vault key in the Keychain | S–M | 0.48 | ☐ |
@@ -615,6 +615,8 @@ Each has a draft ready in Mail, plus Done, Snooze and Remind me.
 - The receipt's numbers match the recorded usage.
 
 **Prompt.** `Do task F3 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done for Ollama; Apple Intelligence joins when A4 ships. Private mode (`src/shared/private-mask.ts`, `src/server/private-mode.ts`) masks the instructions file with memories, the request and every tool answer, and restores the answer, activity details and tool arguments. Names are caught where they can be recognised (mail headers, greetings and sign-offs, contact records, first and last names in the owner's own words, and the owner's list); a first name alone in passing can get through, and the studio says so. Pictures and screenshots are kept back. The receipt (`src/server/ai-receipt.ts`, `src/components/AiReceiptSections.tsx`) shows the logged text (`src/server/sent-log.ts`, 30 days), tokens, requests, reported cost and the plan, free-key or weekly-budget line. `npm run test:private-mode` runs in CI.
 
 ### F4 · Trust ladder: autonomy teammates earn · M · 0.46
 

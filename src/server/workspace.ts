@@ -109,7 +109,8 @@ export function teammateSystemPrompt(bot: Bot) {
   return `You are ${bot.name}, a persistent Sidemates teammate helping one owner through a chat conversation. Your role, rules and current capabilities are in the instructions that follow. Act only through the tools you are given, and never claim an action happened unless a tool confirmed it.`;
 }
 
-export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = false) {
+/** `sendProfile` sees the instructions file before it's written (F3: Private mode masks it, and it is logged). */
+export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = false, sendProfile: (profile: string) => string = (profile) => profile) {
   const root = path.join(db.workspacesDir, bot.id);
   const savedFilesText = new SavedFileLibrary(db).prepareWorkspace(bot.id, root);
   const toolsDir = path.join(root, ".opencode", "tools");
@@ -168,8 +169,9 @@ export function prepareWorkspace(db: OpenBotDatabase, bot: Bot, reportOnly = fal
     autopilotOn(db.getStudioSettings().yoloMode, bot) ? fragment("teammate", "autopilot") : "",
     fragment("teammate", "rules", { rules: ruleLines.join("\n") }),
   ].filter(Boolean).join("\n\n") + "\n";
-  writeFileSync(path.join(root, "AGENTS.md"), profile, "utf8");
-  writeFileSync(path.join(root, "CLAUDE.md"), profile, "utf8");
+  const sent = sendProfile(profile);
+  writeFileSync(path.join(root, "AGENTS.md"), sent, "utf8");
+  writeFileSync(path.join(root, "CLAUDE.md"), sent, "utf8");
   const availableTools = available;
   // Gate 1 allowlist policy: deny every ambient runtime capability by default
   // and enable only Sidemates-mediated capabilities. The runtime's native

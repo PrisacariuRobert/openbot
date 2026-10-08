@@ -48,6 +48,7 @@ The software is free. You pay only for the AI you connect, and free options exis
 
 - Your teammates, chats, files and the search index of your own notes, mail and messages are stored on your Mac. There is no Sidemates account and no tracking.
 - When a teammate works, the text it needs is sent to the AI provider you chose, under that provider's terms. Choose a model running on your Mac to keep everything local.
+- In the next release, Private mode (per teammate) replaces names, email addresses, phone numbers, IBANs and card numbers with placeholders before a cloud AI sees them, and puts the real ones back on the Mac. Names are caught where they can be recognised (mail headers, greetings, contacts, first and last names you write); a first name alone mentioned in passing can get through. Each task's receipt shows exactly what was sent, the tokens and requests used, and the reported cost or plan.
 - Teammate browsers are separate profiles, not a security sandbox.
 - Security model: https://github.com/PrisacariuRobert/sidemates/blob/main/docs/SECURITY.md
 

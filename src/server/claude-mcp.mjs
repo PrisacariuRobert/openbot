@@ -144,12 +144,14 @@ const availableTools = tools.filter((tool) => availability[tool.action || tool.n
 function send(message) { process.stdout.write(`${JSON.stringify(message)}\n`); }
 
 async function callTool(tool, args) {
-  if (tool.local) return localTool(tool.local, args || {});
+  // In a real run the workspace tools go through Sidemates like every other
+  // tool, so what the AI reads is logged (and masked in Private mode).
+  if (tool.local && process.env.OPENBOT_SERVER_WORKSPACE !== "1") return localTool(tool.local, args || {});
   if (!endpoint || !botId || !runId) throw new Error("Sidemates did not provide a valid tool session.");
   const response = await fetch(`${endpoint}/api/internal/tools`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-openbot-token": token },
-    body: JSON.stringify({ botId, runId, action: tool.action, args: args || {} }),
+    body: JSON.stringify({ botId, runId, action: tool.action || tool.name, args: args || {} }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Sidemates tool failed.");

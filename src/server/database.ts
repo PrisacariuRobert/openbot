@@ -332,6 +332,15 @@ export class OpenBotDatabase {
     this.db.prepare("DELETE FROM extension_records WHERE kind=? AND id=?").run(kind, id);
   }
 
+  countExtensionRecords(kind: string): number {
+    return Number((this.db.prepare("SELECT COUNT(*) AS count FROM extension_records WHERE kind=?").get(kind) as Row).count || 0);
+  }
+
+  /** Removes records whose kind starts with `prefix` and whose id (a timestamp first) sorts before `before`. */
+  deleteExtensionRecordsBefore(prefix: string, before: string): number {
+    return Number(this.db.prepare("DELETE FROM extension_records WHERE kind LIKE ? ESCAPE '\\' AND id < ?").run(`${prefix.replace(/[\\%_]/g, "\\$&")}%`, before).changes);
+  }
+
   markApprovedActionUncertain(approvalId: string, message: string) {
     this.db.prepare("UPDATE approved_actions SET status='uncertain',last_error=?,finished_at=? WHERE approval_id=? AND status='running'")
       .run(message.slice(0, 1_000), now(), approvalId);

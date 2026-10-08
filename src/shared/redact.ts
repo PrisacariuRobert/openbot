@@ -13,6 +13,8 @@ const LONG_NUMBER = /\b(?:\d[ -]?){13,19}\b/g;
 const PHONE = /(?<![\w.])(?:\+|00)\d{1,3}[\s.()-]*\d(?:[\s.()-]*\d){6,12}\b|(?<![\w.,/-])(?:\(0\)|\(?0\d{1,4}\)?)[\s.-]?\d{2,4}(?:[\s.-]\d{2,4}){1,3}\b/g;
 const DATE = /^\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}$/;
 const HOME = /\/Users\/[^/\s)"'`]+/g;
+/** The same patterns, for Private mode's placeholders (src/shared/private-mask.ts). */
+export const PERSONAL_PATTERNS = { email: EMAIL, iban: IBAN, longNumber: LONG_NUMBER, phone: PHONE, date: DATE } as const;
 const SECRET_PARAMS = /^(?:token|access_token|refresh_token|id_token|key|api_key|apikey|secret|auth|authorization|session|sessionid|sid|sig|signature|code|password|pass|pwd|ticket|otp|jwt)$/i;
 
 /** Web addresses keep their site and path, which are the useful part. The

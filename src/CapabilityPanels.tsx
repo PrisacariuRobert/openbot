@@ -5,6 +5,8 @@ import { MacWakeCard } from "./components/MacWakeCard";
 import { MorningBriefCard } from "./components/MorningBriefCard";
 import { CopyShareLink } from "./components/CopyShareLink";
 import { SubmitToGallery } from "./components/SubmitToGallery";
+import { PrivateModeCard } from "./components/PrivateModeCard";
+import { AiReceiptSections } from "./components/AiReceiptSections";
 import { AutopilotCard } from "./components/AutopilotCard";
 import { AUTOPILOT_WARNING } from "./shared/autopilot";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
@@ -4837,6 +4839,7 @@ export function BotPanel({
         </div>
       </div>
       <AutopilotCard name={bot.name} on={bot.autopilot} everyone={autopilotForEveryone} onChange={(next) => onSave(bot.id, { autopilot: next })} />
+      <PrivateModeCard botId={bot.id} name={bot.name} />
       <SettingsGroup title="Teammate Profile">
         <SettingsCard>
           <SettingsRow
@@ -7543,6 +7546,8 @@ export function WorkReceipt({ runId }: { runId: string }) {
           ))}
         </section>
       )}
+
+      <AiReceiptSections runId={receipt.runId} />
 
       <footer className="work-receipt-foot">
         <span><Coins size={13} aria-hidden /> {receipt.usage.tokens.toLocaleString()} tokens{receipt.usage.cost > 0 ? ` · $${receipt.usage.cost.toFixed(4)}` : ""}</span>
