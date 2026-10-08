@@ -16,6 +16,7 @@
 - **The Mac app finds your AIs on its first start.** The very first check of an AI gets up to a minute, so a just-installed app no longer says OpenCode is missing while macOS is still looking it over.
 - **Start a group from New conversation.** Name it, pick two or more teammates, and you're in. Main buttons also stay solid when you point at them (they nearly disappeared in light mode).
 - **Helpers hand back their files.** When a teammate asks another for help, the files the helper saved (a checker's corrected drafts, say) come back with the answer, so the lead uses the exact text instead of retyping it.
+- **Lighter Claude teammates.** Teammates on Claude get their own short identity instead of Claude Code's coding-assistant instructions, and your personal Claude Code settings (like an output style) no longer leak into their work. On Haiku, a small note job went from about 82,000 tokens to 49,000, and got faster.
 - **Sign in with ChatGPT.** Have ChatGPT Plus or Pro? Sign in once and your team uses your plan, with Sidemates' own sign-in (nothing to set up, no key). Your sign-in stays encrypted on your Mac, and when your plan's limit is reached your team moves to another AI.
 - **A free Gemini key in a minute.** A pasted key is checked with Google before it's saved, and Google's free-tier terms are stated in plain words.
 - **A browser for everyone.** If your Mac has no Chrome, Edge or Brave, one tap downloads a private browser just for your teammates (about 150 MB), and the stopped job runs again.
