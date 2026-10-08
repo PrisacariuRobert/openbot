@@ -1055,6 +1055,10 @@ export function Studio() {
     if (!trigger || trigger.attachments.length) return null;
     return { replyId: reply.id, body: trigger.body, botId: run.botId };
   }, [state?.messages, state?.runs]);
+  // The honesty line sits once, under the latest teammate answer.
+  const lastTeamReplyId = useMemo(() => {
+    return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "bot")?.id || null;
+  }, [state?.messages]);
   const lastOwnMessageId = useMemo(() => {
     return [...(state?.messages || [])].reverse().find((message) => message.kind === "text" && message.senderType === "user")?.id || null;
   }, [state?.messages]);
@@ -2739,6 +2743,7 @@ export function Studio() {
                             {message.senderType === "bot" && message.runId
                               ? <DeliveryCard onOpenDocument={file => { setContextOpen(false); setDocumentFile(file); }} message={message} run={state.runs.find((run) => run.id === message.runId)} childRuns={state.runs.filter((run) => run.parentRunId === message.runId)} teammates={state.bots} visibleFiles={conversationFiles} />
                               : <>{message.attachments.map((file) => <DeliveredFile key={file.id} file={file} />)}</>}
+                            {lastTeamReplyId === message.id && <p className="message-honesty">AI can make mistakes, so check anything important.</p>}
                           </article>{cancelledOutcome && <CancelledRunOutcome run={cancelledOutcome} onReview={() => setDetail({ kind: "run", run: cancelledOutcome })} />}</Fragment>
                         );
                       })}
@@ -2842,7 +2847,7 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? "Conversation participants"
+                ? detail.threadId ? "Conversation participants" : "New group"
               : detail.kind === "workspace"
                 ? "Your workspace"
                 : detail.kind === "new"
@@ -2907,6 +2912,7 @@ export function Studio() {
                 ))}
               </div>
               <div className="new-chat-options">
+                {state.bots.length > 1 && <button type="button" onClick={() => setDetail({ kind: "group", threadId: "" })}><UsersRound size={18} /> Start a group</button>}
                 <button type="button" onClick={() => setDetail({ kind: "create" })}><Plus size={18} /> Create a teammate</button>
               </div>
             </div>

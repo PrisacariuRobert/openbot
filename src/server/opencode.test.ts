@@ -78,7 +78,7 @@ test("sums OpenCode steps, deduplicates replayed IDs, and keeps cancelled-run us
   meter.add(step);
   meter.add(step);
   meter.add({ type: "step_finish", part: { id: "step-2", tokens: { input: 200, output: 30, cache: { read: 40 } }, cost: 0.02 } });
-  assert.deepEqual(meter.total(), { inputTokens: 300, outputTokens: 50, cacheReadTokens: 40, reasoningTokens: 0, cost: 0.03 });
+  assert.deepEqual(meter.total(), { inputTokens: 300, outputTokens: 50, cacheReadTokens: 40, cacheWriteTokens: 0, reasoningTokens: 0, cost: 0.03 });
   meter.add({ type: "error", error: "cancelled" });
   assert.equal(meter.total().inputTokens, 300);
 });
@@ -97,7 +97,7 @@ test("Claude's final cumulative result replaces message subtotals instead of dou
 
 test("rejects invalid usage numbers instead of poisoning budgets with NaN", () => {
   assert.deepEqual(eventUsage({ tokens: { input: -1, output: "oops", reasoning: Infinity }, cost: NaN }), {
-    inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cost: 0,
+    inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0,
   });
 });
 
@@ -112,8 +112,8 @@ test("publishes only the coordinator's final answer to the conversation", () => 
 });
 
 test("reads token and cache usage from OpenCode completion events", () => {
-  assert.deepEqual(eventUsage({ tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 80 } }, cost: 0 }), {
-    inputTokens: 100, outputTokens: 20, reasoningTokens: 5, cacheReadTokens: 80, cost: 0,
+  assert.deepEqual(eventUsage({ tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 80, write: 30 } }, cost: 0 }), {
+    inputTokens: 100, outputTokens: 20, reasoningTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 30, cost: 0,
   });
 });
 
@@ -130,11 +130,11 @@ test("reads Claude Code stream events without a provider-specific UI path", () =
     session_id: "claude-session",
     message: {
       content: [{ type: "text", text: "I finished the note." }, { type: "tool_use", name: "mcp__openbot__workspace_write" }],
-      usage: { input_tokens: 90, output_tokens: 12, cache_read_input_tokens: 40 },
+      usage: { input_tokens: 90, output_tokens: 12, cache_read_input_tokens: 40, cache_creation_input_tokens: 25_000 },
     },
   };
   assert.equal(eventText(event), "I finished the note.");
-  assert.deepEqual(eventUsage(event), { inputTokens: 90, outputTokens: 12, reasoningTokens: 0, cacheReadTokens: 40, cost: 0 });
+  assert.deepEqual(eventUsage(event), { inputTokens: 90, outputTokens: 12, reasoningTokens: 0, cacheReadTokens: 40, cacheWriteTokens: 25_000, cost: 0 });
   assert.deepEqual(toolActivity(event), { label: "Saving your file", detail: null, kind: "tool" });
 });
 

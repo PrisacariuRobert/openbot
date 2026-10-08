@@ -4,6 +4,7 @@ import {
   oauthMethodIndex,
   ProviderConnectionManager,
   createProviderStatusReader,
+  steadyCheck,
 } from "./providers.js";
 import type { OpenBotDatabase } from "./database.js";
 import type { ProviderInstance, ProviderStatus } from "../shared/types.js";
@@ -177,4 +178,14 @@ test("provider status explains an OpenCode sign-in with no usable models and des
     db.close();
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a slow AI check keeps the last answer, so connected AIs don't vanish from the list", async () => {
+  const signedIn = { code: 0, stdout: "OpenAI oauth\nOpenCode Zen api", stderr: "" };
+  assert.deepEqual(await steadyCheck("fixture auth", async () => signedIn), signedIn);
+  assert.deepEqual(await steadyCheck("fixture auth", async () => ({ code: 1, stdout: "", stderr: "", timedOut: true })), signedIn, "A timeout says nothing about the connection");
+  const signedOut = { code: 1, stdout: "", stderr: "Not signed in" };
+  assert.deepEqual(await steadyCheck("fixture auth", async () => signedOut), signedOut, "A real answer always replaces the last one");
+  const first = { code: 1, stdout: "", stderr: "", timedOut: true };
+  assert.deepEqual(await steadyCheck("fixture never answered", async () => first), first, "With nothing to fall back on, the timeout stands");
 });
