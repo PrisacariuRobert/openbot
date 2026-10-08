@@ -110,7 +110,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | F3 | Run receipts and Private mode | M | 0.48 | ✅ |
 | T4 | Skills you can trust | S–M | 0.48 | ✅ |
 | T5 | Memory you can see, edit and trace | M | 0.48 | ✅ |
-| T6 | The vault key in the Keychain | S–M | 0.48 | ☐ |
+| T6 | The vault key in the Keychain | S–M | 0.48 | ✅ |
 | F7 | Ask my Mac | M | 0.49 | ☐ |
 | F8 | Move in, move out | S–M | 0.49 | ☐ |
 | R2 | Siri and Spotlight (experiment) | M–L | 0.49 | ☐ |
@@ -911,6 +911,8 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 **Do.** Move it to the macOS Keychain, through the A4 helper or the `security` command, with migration and a fallback.
 
 **Prompt.** `Do task T6 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Built with the `security` command (`src/server/keychain.ts`, `src/server/vault.ts`): the key goes in on stdin, an existing file moves once the Keychain returns the same bytes, the file stays the fallback, and a key known to be in the Keychain is never replaced. Temporary folders never touch the Keychain, so tests can't reach the owner's. Mocked on Linux. **Owner check on a real Mac:** start an existing studio and confirm keys/vault.key is gone, "Sidemates vault key" is in Keychain Access, saved connections still work, and no macOS prompt appears; then lock the login keychain and confirm the clear stop.
 
 ---
 
