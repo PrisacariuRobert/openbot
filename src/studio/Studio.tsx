@@ -91,7 +91,7 @@ import { ComputerTakeover } from "./LiveComputer";
 import { GroupEditor } from "./GroupEditor";
 import { AutoReviewRules } from "./AutoReviewRules";
 import { useConversationDraft } from "./useConversationDraft";
-import { conversationMatches } from "./conversation-filter";
+import { conversationMatches, recentTeammates } from "./conversation-filter";
 import { selectPendingSignIn } from "./signin-pane";
 import { MessageControls } from "./MessageControls";
 import { ApiError, apiError, createSubmissionKeys } from "./submission-keys";
@@ -2175,7 +2175,7 @@ export function Studio() {
                   />
                 </label>
                 <div className="favorite-teammates">
-                  {state.bots.slice(0, 3).map((bot) => (
+                  {recentTeammates(state.bots, state.threads).map((bot) => (
                     <button
                       key={bot.id}
                       onClick={() => openThread(bot.threadId)}
