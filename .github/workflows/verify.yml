@@ -102,6 +102,10 @@ jobs:
         run: npm run test:conversation-flow
       - name: Test the complete first-run provider choice journey
         run: npm run test:onboarding
+      - name: Test the hero jobs against a scripted model and synthetic Mac data
+        # Credential-free: a scripted OpenAI-compatible model on loopback and the
+        # qa/hero-jobs fixtures. Checks Sidemates' plumbing, not any model.
+        run: npm run test:hero-jobs
       - name: Test full action review in existing app surfaces
         run: npm run test:app-approvals
       - name: Test keyboard controls, appearance and browser-access states

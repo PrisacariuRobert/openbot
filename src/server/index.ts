@@ -129,6 +129,7 @@ import { browserSavedFileUploadSchema } from "../shared/browser-upload-review.js
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
 import { TOOL_GROUPS, TOOL_GROUP_IDS, toolGroupOf, toolTurnedOff } from "../shared/tool-groups.js";
 import { installMethod } from "../shared/setup-timeline.js";
+import { FixtureAppleApps, heroFixtureFromEnv } from "./hero-fixture-mac.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
 
@@ -192,7 +193,9 @@ const attachmentsService = new AttachmentService(db);
 const backgroundService = new BackgroundServiceManager({ rootDir, dataDir: db.dataDir, port });
 const macFiles = new MacFileAccess();
 const macApps = new MacAppControl();
-const appleApps = new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
+// A staging studio running the hero jobs (OPENBOT_HERO_FIXTURE) reads a synthetic Mac instead of the real apps.
+const heroFixture = heroFixtureFromEnv();
+const appleApps = heroFixture ? new FixtureAppleApps(heroFixture.fixture, heroFixture.record) : new AppleApps(undefined, undefined, undefined, { load: () => db.extensionRecord<import("./mac-apple-apps.js").CalendarCache>("calendar-cache", "v1"), save: (cache) => db.saveExtensionRecord("calendar-cache", "v1", cache) });
 // Calendar answers slowly; while it's being used, keep the next two weeks warm.
 setInterval(() => { if (db.getStudioSettings().macAccessEnabled && runner.isLeader() && appleApps.calendarNeedsWarming()) void appleApps.refreshCalendar().catch(() => {}); }, 15 * 60_000).unref();
 const personalIndex = new PersonalIndex(path.join(db.dataDir, "personal-index.sqlite"));
@@ -4204,6 +4207,7 @@ app.post("/api/internal/tools", async (request, response) => {
       if (!db.getStudioSettings().macAccessEnabled) return response.status(403).json({ error: "Files & apps on this Mac is turned off for the studio. The owner can turn it on in Permissions." });
       const input = z.object({ query: z.string().trim().min(2).max(300), sources: z.array(z.enum(["files", "notes", "mail", "messages"])).max(4).optional(), days: z.number().int().min(1).max(3650).optional(), limit: z.number().int().min(1).max(10).optional() }).strict().safeParse(args);
       if (!input.success) return response.status(400).json({ error: "Give some names or key words to look for." });
+      if (appleApps instanceof FixtureAppleApps) return response.json(appleApps.searchMyMac(input.data));
       const status = personalIndexer.status();
       const searched = input.data.sources?.length ? input.data.sources : status.sources.filter((source) => source.enabled && source.items > 0).map((source) => source.id);
       if (!status.sources.some((source) => source.enabled && source.items > 0)) return response.json({ results: [], note: "Nothing is indexed yet. Ask the owner to choose what to include under Workspace → What your team knows; until then use mac_notes_search, mac_mail_search or mac_list." });

@@ -473,6 +473,14 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 
 **Prompt.** `Do task J2 in docs/DEVELOPER_PLAN.md. Build the harness and the CI fake; give me the command for the live runs.`
 
+**Status, 8 October 2026.** Harness and CI fake built; the owner's live runs are next.
+- `scripts/hero-jobs.ts` runs each hero job in a throwaway staging studio. The Mac tools read the job's synthetic data, and what arrives mid-task shows on the second read.
+- Each run is scored with J1's checks, recording pass rate, median time and context tokens.
+- CI runs all three jobs on every push against a scripted model (`npm run test:hero-jobs`). All three pass.
+- `docs/RELIABILITY.md` is built from saved live results only (`--publish`). Until the owner runs real models, it says no live runs exist yet.
+- Live-run commands are in `qa/hero-jobs/README.md`. Claude runs need the full model name; the aliases are refused.
+- **Owner:** run Gemini Flash, Claude Haiku 5.5 and Claude Sonnet 5.5 ten times each, publish, and commit the results. Tick J2 when the first scoreboard is published. If Haiku 5.5 matches Sonnet, make it the recommended Claude model.
+
 ### J3 · Real-Mac acceptance kit · M · Owner runs it
 
 **Do.**

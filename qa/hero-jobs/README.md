@@ -31,3 +31,30 @@ Long-task benchmarks keep finding the same three failures: agents lose track of 
 - `budget`: seconds, model steps and context tokens for one run.
 
 The checks are deliberately literal: a run passes only if a person reading the answer would find the same facts. When a model words something correctly in a way a check doesn't recognise, fix the check and say so in the commit.
+
+## Running them (task J2)
+
+`scripts/hero-jobs.ts` starts a throwaway Sidemates for each run, as a staging studio (`OPENBOT_STAGING=1`) whose Mac tools read the job's fixture instead of the real apps (`OPENBOT_HERO_FIXTURE`). It tells the teammate the fixture's date and time, sends the job's request to Scout, then checks the answer and every Mac tool call it recorded. An ordinary studio never reads a fixture: both settings are needed, and the fixture Mac only replaces the Mac tools.
+
+**Scripted model**, no account needed. CI runs this on every push (`npm run test:hero-jobs`):
+
+```sh
+node --import tsx scripts/hero-jobs.ts --fake
+```
+
+The scripted model (`src/server/testing/scripted-model.ts`) calls the real tools in a fixed order, looks again before acting, and writes its answer only from what the tools returned. It checks Sidemates' plumbing, never a model, and never appears on the scoreboard.
+
+**Live runs** use your own model access and allowance, so only the owner starts them. Ten runs per job per kind of AI:
+
+```sh
+# Gemini's free Flash model (a key from Google AI Studio, connected in Sidemates first)
+node --import tsx scripts/hero-jobs.ts --model google/gemini-flash-latest --repeat 10 --label gemini-flash
+# Claude through Claude Code: pass the full model name; the haiku/sonnet aliases are refused
+node --import tsx scripts/hero-jobs.ts --model claude-code/claude-haiku-5-5 --repeat 10 --label claude-haiku-5-5
+node --import tsx scripts/hero-jobs.ts --model claude-code/claude-sonnet-5-5 --repeat 10 --label claude-sonnet-5-5
+# The ChatGPT plan, once A3 lands; a local Ollama model as a stretch
+# Then rebuild docs/RELIABILITY.md from every saved live result:
+node --import tsx scripts/hero-jobs.ts --publish
+```
+
+Live results are saved to `qa/hero-jobs/results/<label>.json`. They hold the answers to synthetic data only, never personal data, and are safe to commit.

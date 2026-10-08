@@ -11,6 +11,7 @@ import { safeHostEnvironment } from "./runtime.js";
 import { prepareWorkspace } from "./workspace.js";
 import { fragment } from "./prompt-files.js";
 import { accessForTask } from "./access-summary.js";
+import { studioNow } from "./hero-fixture-mac.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { prepareConsultationFiles } from "./consultation-files.js";
 import { routeBotReply } from "./group-routing.js";
@@ -437,7 +438,7 @@ export class OpenCodeRunner {
       : continuing
         ? fragment("request", "continue", { prompt: run.prompt })
         : fragment("request", "new", { prompt: run.prompt });
-    request = `${currentMoment()}\n\n${request}`;
+    request = `${currentMoment(studioNow())}\n\n${request}`;
     const latestEmail = toolAvailability(this.options.db, bot).gmail_search ? `\n${fragment("request", "latest-email")}` : "";
     const liveApps = fragment("request", "access", { access: accessForTask(this.options.db, bot) }) + latestEmail;
     const completion = fragment("request", "completion");
