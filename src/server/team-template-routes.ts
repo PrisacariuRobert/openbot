@@ -54,7 +54,7 @@ export function registerTeamTemplateRoutes(app: Express, db: OpenBotDatabase, br
         name: member!.name, emoji: member!.emoji ?? "●", mascot: member!.mascot, color: member!.color, role: member!.role,
         instructions: input.model ? member!.instructions : `${member!.instructions}\n\n${STARTING_TEMPLATE_NOTE}`,
         providerInstanceId: input.providerInstanceId ?? null, model: input.model,
-        browserEnabled: entry.browserEnabled === true, computerEnabled: false,
+        browserEnabled: entry.browserEnabled === true, computerEnabled: false, toolGroups: member!.toolGroups ?? null,
       }));
       broadcast();
       response.status(201).json({ template: template.name, bots: created });

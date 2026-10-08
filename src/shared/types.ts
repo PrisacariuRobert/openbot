@@ -71,6 +71,8 @@ export interface Bot {
   /** Acts like a person: reviews are approved for the owner as they appear. Off unless the owner turns it on. */
   autopilot: boolean;
   macAccessEnabled: boolean;
+  /** Optional tool groups this teammate has (src/shared/tool-groups.ts); null means all of them. */
+  toolGroups: import("./tool-groups.js").ToolGroupId[] | null;
   weeklyTokenBudget: number;
   tokensUsedThisWeek: number;
   createdAt: string;

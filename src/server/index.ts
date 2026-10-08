@@ -127,6 +127,7 @@ import { BrowserNavigationGrants, browserNavigationAllowanceOffer, reviewedBrows
 import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
 import { browserSavedFileUploadSchema } from "../shared/browser-upload-review.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
+import { TOOL_GROUPS, TOOL_GROUP_IDS, toolGroupOf, toolTurnedOff } from "../shared/tool-groups.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
 
@@ -2945,6 +2946,8 @@ const botInput = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i), role: z.string().trim().min(1).max(60),
   instructions: z.string().trim().min(1).max(2_000), model: z.string().optional(), providerInstanceId: z.string().nullable().optional(),
   computerEnabled: z.boolean().optional(), browserEnabled: z.boolean().optional(), weeklyTokenBudget: z.number().int().min(0).max(100_000_000).optional(),
+  // Which optional tool groups the teammate has; null or absent means all of them.
+  toolGroups: z.array(z.enum(TOOL_GROUP_IDS as [string, ...string[]])).max(TOOL_GROUP_IDS.length).nullable().optional(),
 });
 
 // Bring a Hermes or OpenClaw profile into the studio: dry-run preview first,
@@ -3104,7 +3107,7 @@ app.patch("/api/bots/:id", (request, response) => {
   if (!current) return response.status(404).json({ error: "Teammate not found." });
   // Appearance does not execute a model or change access. It remains editable
   // when an old teammate has no provider or its chosen model is unavailable.
-  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot"].includes(key));
+  const profileOnly = Object.keys(parsed.data).length > 0 && Object.keys(parsed.data).every((key) => ["name", "role", "mascot", "color", "autopilot", "toolGroups"].includes(key));
   // Name, job and appearance are local profile metadata. Keep them editable
   // when an older teammate's provider is unavailable; access/model changes
   // still use the full connection validation below.
@@ -3771,6 +3774,8 @@ app.post("/api/internal/tools", async (request, response) => {
     return response.status(403).json({ error: "This report job only reads its bounded source snapshot and saves a local result. Start a separate request for other work or changes." });
   }
   const bot = db.getBot(botId)!;
+  // A tool group the owner turned off for this teammate stays off here too, not only in the runtime's tool list.
+  if (toolTurnedOff(bot.toolGroups, action)) return response.status(403).json({ error: `The owner turned off ${TOOL_GROUPS.find((group) => group.id === toolGroupOf(action))!.label.toLowerCase()} for ${bot.name}. Say this can't be done here; the owner can turn it on in ${bot.name}'s settings.` });
   const holdForApproval = (kind: "terminal" | "browser" | "external", reason: string, actionLabel: string, savedArgs: Record<string, unknown> = args, approvalAction = action) => {
     // The owner already said no to this exact action in this task: never ask
     // again, whatever the model decided after the decline.

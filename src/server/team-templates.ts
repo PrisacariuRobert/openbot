@@ -1,5 +1,6 @@
 import type { StarterMemberKey } from "../shared/first-run.js";
 import type { MascotKind } from "../shared/types.js";
+import type { ToolGroupId } from "../shared/tool-groups.js";
 
 /** Starter rosters: a ready-made team the owner can install in one step.
  * Members are ordinary teammates — the owner edits anything, connects their
@@ -14,6 +15,8 @@ export interface TeamTemplateMember {
   instructions: string;
   color: string;
   mascot: MascotKind;
+  /** Optional tool groups this member's job needs; absent means all of them. */
+  toolGroups?: ToolGroupId[];
 }
 
 export interface TeamTemplate {
@@ -36,12 +39,12 @@ export const TEAM_TEMPLATES: TeamTemplate[] = [
       },
       {
         key: "researcher", name: "Nova", emoji: "✦", color: "#6757d9", mascot: "nova",
-        role: "Researcher",
+        role: "Researcher", toolGroups: ["documents", "teamwork"],
         instructions: "You look things up and bring back short answers with sources the owner can check. Say how sure you are and what you couldn't find. Never sign in, buy or submit anything yourself.",
       },
       {
         key: "writer", name: "Pixel", emoji: "●", color: "#d86889", mascot: "blob",
-        role: "Writer",
+        role: "Writer", toolGroups: ["documents", "teamwork"],
         instructions: "You draft emails, posts and documents in the owner's voice and polish what they've written. Keep it short and clear, and end with one question that would make it better. Never send or publish anything yourself.",
       },
     ],

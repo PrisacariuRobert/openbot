@@ -19,6 +19,7 @@ import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { OpenBotDatabase } from "../src/server/testing/database.js";
 import { applyProfileImport } from "../src/server/profile-import.js";
+import { promptVersion } from "../src/server/prompt-files.js";
 
 const argument = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -251,7 +252,7 @@ for (const item of CASES) {
   }
 }
 const summary = {
-  label: LABEL, model: MODEL, repeat: REPEAT, at: new Date().toISOString(),
+  label: LABEL, model: MODEL, repeat: REPEAT, at: new Date().toISOString(), prompts: ["teammate", "request", "tools"].map(promptVersion),
   passed: results.filter((item) => item.pass).length, total: results.length,
   medianSeconds: [...results.map((item) => item.seconds)].sort((a, b) => a - b)[Math.floor(results.length / 2)],
   medianContextTokens: [...results.map((item) => item.contextTokens)].sort((a, b) => a - b)[Math.floor(results.length / 2)],

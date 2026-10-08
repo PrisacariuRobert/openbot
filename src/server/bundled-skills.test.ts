@@ -26,7 +26,7 @@ test("bundled methods work out of the box, preserve attribution and grant no acc
     assert.deepEqual(db.extensionRecords("mcp"), []);
     assert.equal(toolAvailability(db, db.getBot("nova")!, false).community_skill_search, true);
     prepareWorkspace(db, db.getBot("nova")!);
-    assert.match(readFileSync(path.join(db.workspacesDir, "nova/AGENTS.md"), "utf8"), /do not ask the user to import it/);
+    assert.match(readFileSync(path.join(db.workspacesDir, "nova/AGENTS.md"), "utf8"), /already installed \(don't ask the owner to import them\)/);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

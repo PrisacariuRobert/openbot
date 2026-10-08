@@ -22,15 +22,17 @@ function instructions(configure: (db: OpenBotDatabase) => void = () => {}) {
 test("a teammate only receives rules for capabilities it has", () => {
   const text = instructions();
   // Core rules every teammate keeps.
-  for (const rule of ["Never claim an external action succeeded", "task_verify", "routine_create", "table_summary", "workspace_read", "persistent approval", "remember"]) {
+  // (task_plan, task_progress and task_verify are in the completion rules sent with each request.)
+  for (const rule of ["Never claim an external action succeeded", "routine_create", "table_summary", "workspace_read", "persistent approval", "remember"]) {
     assert.ok(text.includes(rule), `core rule missing: ${rule}`);
   }
   // Rules for tools this teammate cannot call.
   for (const rule of ["Gmail search results", "Slack search results", "Notion search results", "Todoist results", "Dropbox results", "GitHub results", "code_projects", "mac_list", "mac_app_read", "use-mac-apps", "isolated bash", "Use only your own persistent browser profile", "browser_snapshot"]) {
     assert.ok(!text.includes(rule), `rule for an unavailable capability: ${rule}`);
   }
-  assert.equal(text.match(/your browser is off/g)?.length, 1, "unavailable services share one line");
-  assert.ok(!text.includes("Conversation style:"), "the per-task prompt already carries the conversation style");
+  assert.ok(!text.includes("your browser is off"), "which apps and websites are reachable is sent with each request, not saved");
+  assert.ok(!text.includes("Conversation style:") && !text.includes("Completion rules:"), "the per-task prompt carries the conversation style and completion rules");
+  for (const empty of ["## Files the owner saved for you", "## Code projects", "## Autopilot"]) assert.ok(!text.includes(empty), `no empty section: ${empty}`);
 });
 
 test("turning a capability on brings its rules back", () => {
@@ -47,7 +49,8 @@ test("turning a capability on brings its rules back", () => {
 
 test("slim instructions stay well under the old size", () => {
   const text = instructions();
-  assert.ok(text.length < 16_000, `instructions grew to ${text.length} characters`);
+  // 15,042 characters before task A7; about 3,100 after (qa/prompt-eval/README.md).
+  assert.ok(text.length < 4_500, `instructions grew to ${text.length} characters`);
 });
 
 test("the runtime gets a short teammate identity instead of its coding-assistant prompt", () => {

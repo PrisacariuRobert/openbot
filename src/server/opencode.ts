@@ -8,9 +8,9 @@ import { fileURLToPath } from "node:url";
 import type { Bot, Run } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
-import { connectedAppsText, prepareWorkspace } from "./workspace.js";
-import { browserTaskDirection } from "./browser-access.js";
-import { conversationStyle } from "./conversation-style.js";
+import { prepareWorkspace } from "./workspace.js";
+import { fragment } from "./prompt-files.js";
+import { accessForTask } from "./access-summary.js";
 import { modelAttachmentFiles, type AttachmentService } from "./attachments.js";
 import { prepareConsultationFiles } from "./consultation-files.js";
 import { routeBotReply } from "./group-routing.js";
@@ -435,18 +435,12 @@ export class OpenCodeRunner {
     let request = redirectedFrom
       ? `The user added a new direction while you were working. Continue the same job without repeating finished work.\n\nPrevious request: ${redirectedFrom.prompt}\n\nNewest direction (authoritative): ${run.prompt}`
       : continuing
-        ? `Continue the existing task after the user's latest instruction or approval. Current request: ${run.prompt}`
-        : `Take care of this new request for the user: ${run.prompt}\nOlder tasks are background only, not part of this request. Do not repeat their actions or append unrelated completion claims.`;
+        ? fragment("request", "continue", { prompt: run.prompt })
+        : fragment("request", "new", { prompt: run.prompt });
     request = `${currentMoment()}\n\n${request}`;
-    const sharedProjects = this.options.db.listCodeProjects(bot.id).map((project) => {
-      const access = project.access.find((item) => item.botId === bot.id)!;
-      return `- ${project.name} (${project.id}): ${access.canWrite ? "edit" : "read-only"}${access.canRun ? ", checks enabled" : ""}`;
-    }).join("\n") || "- No code projects are shared with this teammate.";
-    const hasProjects = this.options.db.listCodeProjects(bot.id).length > 0;
-    const codeHint = hasProjects ? " For code work, inspect project instructions and current status, make focused changes, and run the smallest relevant checks." : "";
-    const inboxHint = toolAvailability(this.options.db, bot).gmail_search ? " For “latest” or “last email,” search the inbox for one newest message, then read it before answering." : "";
-    const liveApps = `Current connected-app state for this task (authoritative; it overrides older messages and memories):\n${connectedAppsText(this.options.db, bot)}\n\n${browserTaskDirection(this.options.db, bot)}\n\nShared code projects:\n${sharedProjects}\n\nIf the request can be answered with an available app or code project, use its tool now.${codeHint}${inboxHint} Never claim an app is disconnected based only on an earlier reply; only report a connection problem when a tool returns one during this task.`;
-    const completion = `Completion rules:\n- Own the requested outcome, not merely the next response.\n- For multi-step work, call task_plan before the first work tool, keep meaningful steps current with task_progress, and call task_verify before the final answer.\n- For a text deliverable saved in your workspace, give task_verify workspace_file evidence so Sidemates independently reopens it and checks its size or required text; do not rely only on your own passed boolean.\n- Continue until the deliverable is finished and checked, an external action needs approval, or a real blocker remains.\n- A progress update, explanation of what you could do, or unverified draft is not a finished deliverable.\n- Keep the conversation quiet: use the task tools for progress and reserve prose for a short useful result or a genuine question.\n- Answer questions and short requests in chat. Save a file only when the user asks for one or the result is a substantial document; then keep it inside your workspace and include its relative path as a Markdown link in the final answer so Sidemates can show it as a reviewable result card.`;
+    const latestEmail = toolAvailability(this.options.db, bot).gmail_search ? `\n${fragment("request", "latest-email")}` : "";
+    const liveApps = fragment("request", "access", { access: accessForTask(this.options.db, bot) }) + latestEmail;
+    const completion = fragment("request", "completion");
     const taskContext = continuing && run.task.tracked
       ? `\n\nResume the existing job contract; do not replace its plan unless the user's outcome changed.\nGoal: ${run.task.goal}\nDeliverable: ${run.task.deliverable}\nSteps:\n${run.task.steps.map((step) => `- ${step.id}. [${step.status}] ${step.title}${step.detail ? ` — ${step.detail}` : ""}`).join("\n")}`
       : "";
@@ -467,7 +461,7 @@ export class OpenCodeRunner {
     if (run.parentRunId && !run.expectedWorkKind && run.prompt.startsWith("Private teammate question from ")) {
       return `${request}\n\nAnswer this private question directly. Use only the tools the question needs; do not call task_plan, task_progress or task_verify unless you save a file for your teammate. End with a short, specific finding and say plainly what you could not check.\n\n${liveApps}${teamContext}${recovery}`;
     }
-    return `${request}${methodContext}\n\n${completion}\n\n${conversationStyle}${taskContext}${requiredReport}\n\n${liveApps}${localContext}${teamContext}${resumeEvidence}${recovery}`;
+    return `${request}${methodContext}\n\n${completion}\n\n${fragment("request", "style")}${taskContext}${requiredReport}\n\n${liveApps}${localContext}${teamContext}${resumeEvidence}${recovery}`;
   }
 
   private executeRun(run: Run) {

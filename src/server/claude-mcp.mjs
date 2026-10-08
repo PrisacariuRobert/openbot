@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { lstat, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const endpoint = process.env.OPENBOT_INTERNAL_URL;
@@ -128,6 +129,15 @@ tools.push(
   { name: "work_report", description: "Save source-linked priorities and optional local unsent reply drafts from work_collect. References and recipients are checked against actual sources. For browser-readable coverage, read the pages in the teammate browser and cite each page URL with a note; those stay teammate-reported, never host-verified. No external writes.", action: "work_report", properties: { snapshotId: { type: "string" }, items: { type: "array", maxItems: 8, items: { type: "object", properties: { priority: { type: "string", enum: ["now", "soon", "fyi"] }, text: { type: "string", maxLength: 600 }, sourceRefs: { type: "array", maxItems: 5, items: { type: "string" } }, browserPages: { type: "array", maxItems: 3, items: { type: "object", properties: { url: { type: "string" }, note: { type: "string", maxLength: 200 } }, required: ["url", "note"], additionalProperties: false } } }, required: ["priority", "text", "sourceRefs"], additionalProperties: false } }, drafts: { type: "array", maxItems: 5, items: { type: "object", properties: { sourceRef: { type: "string" }, body: { type: "string", maxLength: 2000 } }, required: ["sourceRef", "body"], additionalProperties: false } } }, required: ["snapshotId", "items"] },
 );
 const availability = JSON.parse(process.env.OPENBOT_TOOL_AVAILABILITY || "{}");
+// Shared, versioned descriptions for the tools every teammate may have (prompts/tools.md, task A7).
+// Each "<!-- @name -->" fragment runs until the next marker; comments are not sent.
+try {
+  const source = readFileSync(new URL("./prompts/tools.md", import.meta.url), "utf8");
+  const markers = [...source.matchAll(/^<!-- @([a-z_]+) -->[ \t]*$/gm)];
+  const shared = new Map(markers.map((match, index) => [match[1], source.slice(match.index + match[0].length, index + 1 < markers.length ? markers[index + 1].index : source.length).replace(/<!--[\s\S]*?-->/g, "").trim().replace("{{roster}}", "")]));
+  for (const tool of tools) if (shared.has(tool.name)) tool.description = shared.get(tool.name);
+} catch { /* keep the descriptions above */ }
+
 const availableTools = tools.filter((tool) => availability[tool.action || tool.name] !== false);
 
 function send(message) { process.stdout.write(`${JSON.stringify(message)}\n`); }

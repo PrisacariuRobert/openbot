@@ -63,7 +63,7 @@ test("memory correction and deletion invalidate old sessions; notes stay private
     for (let i = 0; i < 30; i++) db.remember("nova", `note-${i}`, "A useful preference. ".repeat(50));
     prepareWorkspace(db, db.getBot("nova")!);
     const profile = readFileSync(path.join(db.workspacesDir, "nova", "AGENTS.md"), "utf8");
-    const memory = profile.split("## Durable memory")[1]!.split("## Optional community")[0]!;
+    const memory = profile.split("## What you remember")[1]!.split("\n## ")[0]!;
     assert.ok(memory.length < 4_600);
     assert.equal(toolAvailability(db, db.getBot("nova")!, true).memory_search, false);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }

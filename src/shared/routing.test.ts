@@ -5,7 +5,7 @@ import { mentionedBotIds, resolveMessageTargets } from "./routing.js";
 
 const bot = (id: string, name: string, role: string, instructions: string, status: Bot["status"] = "ready"): Bot => ({
   id, name, role, instructions, status, ownerId: "owner", providerInstanceId: "provider", emoji: "•", mascot: "orbit", color: "#6757d9",
-  model: "test/model", currentAction: null, computerEnabled: true, browserEnabled: true, autopilot: false, macAccessEnabled: false, weeklyTokenBudget: 0, tokensUsedThisWeek: 0,
+  model: "test/model", currentAction: null, computerEnabled: true, browserEnabled: true, autopilot: false, macAccessEnabled: false, toolGroups: null, weeklyTokenBudget: 0, tokensUsedThisWeek: 0,
   createdAt: new Date(0).toISOString(), lastActiveAt: null, threadId: `bot-${id}`, retiredAt: null,
 });
 

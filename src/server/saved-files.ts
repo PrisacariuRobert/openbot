@@ -4,6 +4,8 @@ import path from "node:path";
 import type { SavedFile } from "../shared/types.js";
 import type { OpenBotDatabase } from "./database.js";
 
+export const NO_SAVED_FILES = "- No files have been saved for this teammate.";
+
 export const SAVED_FILE_LIMIT = 20;
 export const SAVED_FILE_BYTES_LIMIT = 100 * 1024 * 1024;
 
@@ -99,7 +101,7 @@ export class SavedFileLibrary {
     for (const entry of readdirSync(libraryRoot)) {
       if (/^[a-f0-9]{32}$/.test(entry)) rmSync(path.join(libraryRoot, entry), { recursive: true, force: true });
     }
-    if (!records.length) return "- No files have been saved for this teammate.";
+    if (!records.length) return NO_SAVED_FILES;
     const lines: string[] = [];
     for (const record of records) {
       let bytes: Buffer;

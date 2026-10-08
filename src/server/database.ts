@@ -73,6 +73,12 @@ import type { WorkSnapshot, WorkReport } from "../shared/work-reports.js";
 import type { CodeCheckReceipt } from "../shared/code-checks.js";
 import { automationRepairHint, normalizedTriggerConfig } from "./automations.js";
 import { WorkflowValidation } from "./workflow-validation.js";
+import { normalizeToolGroups } from "../shared/tool-groups.js";
+import { promptVersion } from "./prompt-files.js";
+
+/** Stored only when the teammate has a choice; null keeps every group. */
+const toolGroupsJson = (groups: string[] | null | undefined) => groups == null ? null : JSON.stringify(normalizeToolGroups(groups));
+const storedGroups = (text: string): string[] => { try { const value = JSON.parse(text); return Array.isArray(value) ? value.map(String) : []; } catch { return []; } };
 
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
@@ -1000,6 +1006,7 @@ export class OpenBotDatabase {
     this.addColumn("bots", "browser_enabled INTEGER NOT NULL DEFAULT 1");
     this.addColumn("bots", "mac_access_enabled INTEGER NOT NULL DEFAULT 0");
     this.addColumn("bots", "autopilot INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("bots", "tool_groups_json TEXT");
     this.addColumn("bots", "weekly_token_budget INTEGER NOT NULL DEFAULT 250000");
     this.addColumn("threads", "section_name TEXT");
     this.addColumn("threads", "pinned INTEGER NOT NULL DEFAULT 0");
@@ -1213,6 +1220,7 @@ export class OpenBotDatabase {
       color: String(row.color), role: String(row.role), instructions: String(row.instructions), model: String(row.model),
       status: this.botStatus(row), currentAction: row.current_action ? String(row.current_action) : null,
       computerEnabled: asBoolean(row.computer_enabled), browserEnabled: asBoolean(row.browser_enabled), autopilot: asBoolean(row.autopilot), macAccessEnabled: asBoolean(row.mac_access_enabled),
+      toolGroups: row.tool_groups_json ? normalizeToolGroups(storedGroups(String(row.tool_groups_json))) : null,
       weeklyTokenBudget: Number(row.weekly_token_budget || 0), tokensUsedThisWeek: Number(row.tokens_used_week || 0),
       createdAt: String(row.created_at), lastActiveAt: row.last_active_at ? String(row.last_active_at) : null,
       threadId: String(row.thread_id), retiredAt: row.retired_at ? String(row.retired_at) : null,
@@ -1404,6 +1412,7 @@ export class OpenBotDatabase {
   createBot(input: {
     name: string; emoji: string; mascot?: MascotKind; color: string; role: string; instructions: string; model?: string;
     providerInstanceId?: string | null; computerEnabled?: boolean; browserEnabled?: boolean; weeklyTokenBudget?: number; inheritAccess?: boolean;
+    toolGroups?: string[] | null;
   }): Bot {
     const maxTeammates = this.getStudioSettings().maxTeammates;
     if (this.listBots().length >= maxTeammates) throw new Error(`This studio has room for ${maxTeammates} teammate${maxTeammates === 1 ? "" : "s"}. Retire or raise the limit before adding another.`);
@@ -1412,14 +1421,14 @@ export class OpenBotDatabase {
     const createdAt = now();
     this.db.prepare(`
       INSERT INTO bots
-      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, owner_id, provider_instance_id, name, emoji, mascot, color, role, instructions, model, computer_enabled, browser_enabled, mac_access_enabled, weekly_token_budget, tool_groups_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, DEFAULT_OWNER, input.providerInstanceId || null, input.name, input.emoji, input.mascot || "orbit",
       input.color, input.role, input.instructions, input.model || "", input.computerEnabled === false ? 0 : 1,
       input.browserEnabled === false ? 0 : 1, this.getStudioSettings().macAccessEnabled ? 1 : 0,
       // A guard against runaway API bills, not a wall: ~100+ ordinary tasks a week.
-      input.weeklyTokenBudget ?? 2_000_000, createdAt,
+      input.weeklyTokenBudget ?? 2_000_000, toolGroupsJson(input.toolGroups), createdAt,
     );
     this.db.prepare("INSERT INTO threads (id,title,kind,bot_id,created_at,updated_at) VALUES (?,?,'direct',?,?,?)").run(threadId, input.name, id, createdAt, createdAt);
     this.db.prepare("INSERT OR IGNORE INTO thread_bots (thread_id,bot_id) VALUES ('team-room',?)").run(id);
@@ -1451,7 +1460,7 @@ export class OpenBotDatabase {
     return this.getBot(id);
   }
 
-  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">>): Bot | null {
+  updateBot(id: string, patch: Partial<Pick<Bot, "name" | "role" | "instructions" | "model" | "mascot" | "color" | "computerEnabled" | "browserEnabled" | "autopilot" | "weeklyTokenBudget" | "providerInstanceId">> & { toolGroups?: string[] | null }): Bot | null {
     const current = this.getBot(id);
     if (!current) return null;
     this.db.prepare(`UPDATE bots SET name=?, role=?, instructions=?, model=?, mascot=?, color=?, computer_enabled=?, browser_enabled=?, autopilot=?, mac_access_enabled=?, weekly_token_budget=?, provider_instance_id=? WHERE id=?`).run(
@@ -1460,6 +1469,7 @@ export class OpenBotDatabase {
       (patch.browserEnabled ?? current.browserEnabled) ? 1 : 0, (patch.autopilot ?? current.autopilot) ? 1 : 0, current.macAccessEnabled ? 1 : 0, patch.weeklyTokenBudget ?? current.weeklyTokenBudget,
       patch.providerInstanceId === undefined ? current.providerInstanceId : patch.providerInstanceId, id,
     );
+    if (patch.toolGroups !== undefined) this.db.prepare("UPDATE bots SET tool_groups_json=? WHERE id=?").run(toolGroupsJson(patch.toolGroups), id);
     if (patch.name) this.db.prepare("UPDATE threads SET title=? WHERE bot_id=?").run(patch.name, id);
     return this.getBot(id);
   }
@@ -1472,7 +1482,7 @@ export class OpenBotDatabase {
       role: source.role, instructions: source.instructions, model: source.model, providerInstanceId: source.providerInstanceId,
       weeklyTokenBudget: source.weeklyTokenBudget,
     });
-    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled });
+    this.updateBot(copy.id, { computerEnabled: source.computerEnabled, browserEnabled: source.browserEnabled, toolGroups: source.toolGroups });
     this.db.prepare("DELETE FROM bot_connector_access WHERE bot_id=?").run(copy.id);
     this.db.prepare(`INSERT INTO bot_connector_access (bot_id,connector_id,service,can_read,can_send,created_at,updated_at)
       SELECT ?,connector_id,service,can_read,can_send,?,? FROM bot_connector_access WHERE bot_id=?`).run(copy.id, now(), now(), source.id);
@@ -2590,7 +2600,8 @@ export class OpenBotDatabase {
     const codeProjects = this.listCodeProjects(botId).map((project) => ({ id: project.id, canRead: true, access: project.access.find((item) => item.botId === botId) || null }));
     const serviceErrors = this.listConnectorServiceErrors().map((item) => item.service).sort();
     return JSON.stringify({
-      bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled } : null,
+      bot: bot ? { name: bot.name, role: bot.role, instructions: bot.instructions, model: bot.model, providerInstanceId: bot.providerInstanceId, computerEnabled: bot.computerEnabled, browserEnabled: bot.browserEnabled, toolGroups: bot.toolGroups } : null,
+      prompts: [promptVersion("teammate"), promptVersion("request"), promptVersion("tools")],
       providerConfig: bot ? this.providerForBot(bot.id)?.apiConfig || null : null,
       macAccessEnabled: this.getStudioSettings().macAccessEnabled,
       connectors, serviceErrors,

@@ -82,7 +82,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | A2 | Guided first run | M | 0.43 | ☐ |
 | A3 | Sign in with ChatGPT, with Sidemates' own client | M | 0.43 | ☐ |
 | A4 | Apple Intelligence as the no-key starter | M–L | 0.43 | ☐ |
-| A5 | A free Gemini key in a few clicks; a browser for everyone | S–M | 0.43 | ☑ |
+| A5 | A free Gemini key in a few clicks; a browser for everyone | S–M | 0.43 | ✅ |
 | A6 | Phone access that works, safely | M | 0.43 | ☐ |
 | A7 | Lighter prompts and tool lists | M | 0.43 | ☐ |
 | A8 | A download button for people who don't use Terminal | S–M | 0.43 | ☐ |
@@ -389,6 +389,16 @@ Today Sidemates borrows OpenCode's sign-in (`src/server/providers.ts`), so the c
 **Done when.** The eval records the new number and every existing live case passes.
 
 **Prompt.** `Do task A7 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Built; waiting for the owner's live eval.
+- `scripts/prompt-size.ts` measures what "hi" sends with a stand-in model, no key needed. The table is in `qa/prompt-eval/README.md`.
+- The eval's greeting fell from about 8,771 to 5,176 tokens (−41%); with web on, from 11,126 to 7,118 (−36%).
+- A teammate with only the core tools sends about 2,749 tokens. Every tool group together stays near 5,200, mostly tool definitions.
+- Prompt text moved to versioned files in `src/server/prompts/`.
+- Teammates have optional tool groups. Templates set them, the owner can change them, and the server enforces them.
+- Page snapshots were already compact text, so they stay as they are.
+- **Owner:** run `node --import tsx scripts/prompt-eval.ts --repeat 2 --label a7` with OpenCode Go and record it. OpenCode's free models refuse Sidemates' setup, so the live cases couldn't run here. Tick A7 when every case passes.
+- Possible next cut (about 400 tokens): one `routine_manage` tool in place of the five routine-management tools.
 
 ### A8 · A download button for people who don't use Terminal · S–M · Owner test
 

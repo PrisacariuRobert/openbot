@@ -1,3 +1,5 @@
+import { ToolGroupRows, toolGroupsPatch } from "./components/ToolGroupRows";
+import { TOOL_GROUP_IDS } from "./shared/tool-groups";
 import { MacWakeCard } from "./components/MacWakeCard";
 import { MorningBriefCard } from "./components/MorningBriefCard";
 import { CopyShareLink } from "./components/CopyShareLink";
@@ -4660,6 +4662,7 @@ export function BotPanel({
     browserEnabled: bot.browserEnabled,
     mascot: bot.mascot,
     color: bot.color,
+    toolGroups: bot.toolGroups ?? TOOL_GROUP_IDS,
   });
   const [section, setSection] = useState(thread.section || ""),
     [saved, setSaved] = useState(false),
@@ -4720,6 +4723,7 @@ export function BotPanel({
       if (form.weeklyTokenBudget !== bot.weeklyTokenBudget) patch.weeklyTokenBudget = form.weeklyTokenBudget;
       if (form.computerEnabled !== bot.computerEnabled) patch.computerEnabled = form.computerEnabled;
       if (form.browserEnabled !== bot.browserEnabled) patch.browserEnabled = form.browserEnabled;
+      if (JSON.stringify(toolGroupsPatch(form.toolGroups)) !== JSON.stringify(bot.toolGroups)) patch.toolGroups = toolGroupsPatch(form.toolGroups);
       if (form.mascot !== bot.mascot) patch.mascot = form.mascot;
       if (form.color !== bot.color) patch.color = form.color;
       const nextSection = section.trim() || null;
@@ -4936,6 +4940,7 @@ export function BotPanel({
                 setForm({ ...form, browserEnabled: checked })
               }
             />
+            <ToolGroupRows value={form.toolGroups} onChange={(toolGroups) => setForm({ ...form, toolGroups })} />
           </SettingsCard>
           {form.browserEnabled && (
             <div style={{ marginTop: 8 }}>
