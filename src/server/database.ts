@@ -78,6 +78,11 @@ import { WorkflowValidation } from "./workflow-validation.js";
 type Row = Record<string, string | number | null>;
 const now = () => new Date().toISOString();
 const DEFAULT_OWNER = "local-owner";
+/** A week's use as the counters show it: fresh tokens in full (including
+ * input a provider stores to re-read later), and cached re-reading at a
+ * tenth, the way AI providers price it. Per-task allowances stay on fresh
+ * input and output, so jobs don't stop sooner. */
+const WEEKLY_TOKENS_SQL = "input_tokens+output_tokens+reasoning_tokens+cache_write_tokens+cache_read_tokens/10";
 const PUBLIC_OAUTH_CLIENT = "__OPENBOT_PUBLIC_OAUTH_CLIENT__";
 
 function asBoolean(value: string | number | null | undefined): boolean {
@@ -612,6 +617,7 @@ export class OpenBotDatabase {
         output_tokens INTEGER NOT NULL DEFAULT 0,
         reasoning_tokens INTEGER NOT NULL DEFAULT 0,
         cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_write_tokens INTEGER NOT NULL DEFAULT 0,
         cost REAL NOT NULL DEFAULT 0,
         parent_run_id TEXT,
         steered_from_run_id TEXT,
@@ -1093,6 +1099,7 @@ export class OpenBotDatabase {
     this.addColumn("runs", "output_tokens INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "reasoning_tokens INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "cache_read_tokens INTEGER NOT NULL DEFAULT 0");
+    this.addColumn("runs", "cache_write_tokens INTEGER NOT NULL DEFAULT 0");
     this.addColumn("runs", "cost REAL NOT NULL DEFAULT 0");
     this.addColumn("runs", "parent_run_id TEXT");
     this.addColumn("runs", "trigger_message_id TEXT");
@@ -1307,7 +1314,7 @@ export class OpenBotDatabase {
         (SELECT status FROM runs r WHERE r.bot_id=b.id ORDER BY created_at DESC LIMIT 1) AS latest_status,
         (SELECT finished_at FROM runs r WHERE r.bot_id=b.id ORDER BY created_at DESC LIMIT 1) AS latest_finished_at,
         (SELECT a.label FROM activities a WHERE a.bot_id=b.id AND a.run_id IN (SELECT id FROM runs WHERE bot_id=b.id AND status IN ('queued','running','awaiting_approval','waiting_for_teammate')) ORDER BY a.created_at DESC LIMIT 1) AS current_action,
-        COALESCE((SELECT SUM(input_tokens+output_tokens+reasoning_tokens) FROM runs r WHERE r.bot_id=b.id AND r.created_at >= datetime('now','-7 days')),0) AS tokens_used_week
+        COALESCE((SELECT SUM(${WEEKLY_TOKENS_SQL}) FROM runs r WHERE r.bot_id=b.id AND r.created_at >= datetime('now','-7 days')),0) AS tokens_used_week
       FROM bots b JOIN threads t ON t.bot_id=b.id AND t.kind='direct' ${where} ${order}`;
   }
 
@@ -2223,7 +2230,7 @@ export class OpenBotDatabase {
       finishedAt: row.finished_at ? String(row.finished_at) : null, progressAt: row.progress_at ? String(row.progress_at) : null,
       summary: row.summary ? String(row.summary) : null, error: row.error ? String(row.error) : null,
       inputTokens: Number(row.input_tokens || 0), outputTokens: Number(row.output_tokens || 0), reasoningTokens: Number(row.reasoning_tokens || 0),
-      cacheReadTokens: Number(row.cache_read_tokens || 0), cost: Number(row.cost || 0), activities, task,
+      cacheReadTokens: Number(row.cache_read_tokens || 0), cacheWriteTokens: Number(row.cache_write_tokens || 0), cost: Number(row.cost || 0), activities, task,
       activeDurationMs: Number(row.active_duration_ms || 0), modelSteps: Number(row.model_steps || 0),
     };
   }
@@ -2410,17 +2417,17 @@ export class OpenBotDatabase {
   updateRun(id: string, patch: Partial<{
     status: RunStatus; approvalReason: string | null; approvalId: string | null; startedAt: string | null; finishedAt: string | null;
     progressAt: string | null; partialText: string | null; summary: string | null; error: string | null; sessionId: string | null; modelOverride: string | null;
-    inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cost: number; taskStage: TaskStage;
+    inputTokens: number; outputTokens: number; reasoningTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number; taskStage: TaskStage;
     activeDurationMs: number; modelSteps: number; outcome: "delivered" | "blocked" | null;
   }>) {
     const current = this.db.prepare("SELECT * FROM runs WHERE id=?").get(id) as Row | undefined;
     if (!current) return;
     const value = <K extends keyof typeof patch>(key: K, column: string) => patch[key] === undefined ? current[column] : patch[key];
-    this.db.prepare(`UPDATE runs SET status=?,approval_reason=?,approval_id=?,started_at=?,finished_at=?,progress_at=?,partial_text=?,summary=?,error=?,session_id=?,model_override=?,input_tokens=?,output_tokens=?,reasoning_tokens=?,cache_read_tokens=?,cost=?,task_stage=?,outcome=? WHERE id=?`).run(
+    this.db.prepare(`UPDATE runs SET status=?,approval_reason=?,approval_id=?,started_at=?,finished_at=?,progress_at=?,partial_text=?,summary=?,error=?,session_id=?,model_override=?,input_tokens=?,output_tokens=?,reasoning_tokens=?,cache_read_tokens=?,cache_write_tokens=?,cost=?,task_stage=?,outcome=? WHERE id=?`).run(
       value("status", "status"), value("approvalReason", "approval_reason"), value("approvalId", "approval_id"), value("startedAt", "started_at"),
       value("finishedAt", "finished_at"), value("progressAt", "progress_at"), value("partialText", "partial_text"), value("summary", "summary"),
       value("error", "error"), value("sessionId", "session_id"), value("modelOverride", "model_override") ?? null, value("inputTokens", "input_tokens"), value("outputTokens", "output_tokens"),
-      value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), value("outcome", "outcome"), id,
+      value("reasoningTokens", "reasoning_tokens"), value("cacheReadTokens", "cache_read_tokens"), value("cacheWriteTokens", "cache_write_tokens"), value("cost", "cost"), value("taskStage", "task_stage"), value("outcome", "outcome"), id,
     );
     if (patch.activeDurationMs !== undefined || patch.modelSteps !== undefined) this.db.prepare("UPDATE runs SET active_duration_ms=?,model_steps=? WHERE id=?").run(
       patch.activeDurationMs ?? current.active_duration_ms, patch.modelSteps ?? current.model_steps, id,
@@ -4854,9 +4861,9 @@ export class OpenBotDatabase {
   }
 
   getUsageSummary(): UsageSummary {
-    const row = this.db.prepare(`SELECT COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens,COALESCE(SUM(reasoning_tokens),0) reasoning_tokens,COALESCE(SUM(cache_read_tokens),0) cache_read_tokens,COALESCE(SUM(cost),0) cost,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_runs,SUM(CASE WHEN status IN ('queued','running','awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) active_runs FROM runs WHERE created_at>=datetime('now','-7 days')`).get() as Row;
-    const inputTokens = Number(row.input_tokens || 0), outputTokens = Number(row.output_tokens || 0), reasoningTokens = Number(row.reasoning_tokens || 0), cacheReadTokens = Number(row.cache_read_tokens || 0);
-    return { inputTokens, outputTokens, reasoningTokens, cacheReadTokens, totalTokens: inputTokens + outputTokens + reasoningTokens, cost: Number(row.cost || 0), completedRuns: Number(row.completed_runs || 0), activeRuns: Number(row.active_runs || 0) };
+    const row = this.db.prepare(`SELECT COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens,COALESCE(SUM(reasoning_tokens),0) reasoning_tokens,COALESCE(SUM(cache_read_tokens),0) cache_read_tokens,COALESCE(SUM(cache_write_tokens),0) cache_write_tokens,COALESCE(SUM(${WEEKLY_TOKENS_SQL}),0) weekly_tokens,COALESCE(SUM(cost),0) cost,SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_runs,SUM(CASE WHEN status IN ('queued','running','awaiting_approval','waiting_for_teammate') THEN 1 ELSE 0 END) active_runs FROM runs WHERE created_at>=datetime('now','-7 days')`).get() as Row;
+    const inputTokens = Number(row.input_tokens || 0), outputTokens = Number(row.output_tokens || 0), reasoningTokens = Number(row.reasoning_tokens || 0), cacheReadTokens = Number(row.cache_read_tokens || 0), cacheWriteTokens = Number(row.cache_write_tokens || 0);
+    return { inputTokens, outputTokens, reasoningTokens, cacheReadTokens, cacheWriteTokens, totalTokens: Number(row.weekly_tokens || 0), cost: Number(row.cost || 0), completedRuns: Number(row.completed_runs || 0), activeRuns: Number(row.active_runs || 0) };
   }
 
   budgetAvailable(botId: string, reserveTokens = 0): { allowed: boolean; used: number; budget: number; remaining: number } {

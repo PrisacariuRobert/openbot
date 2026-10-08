@@ -375,6 +375,8 @@ export interface Run {
   outputTokens: number;
   reasoningTokens: number;
   cacheReadTokens: number;
+  /** Fresh input a provider stored for re-reading later (Claude's prompt cache). */
+  cacheWriteTokens: number;
   cost: number;
   activities: Activity[];
   activeDurationMs: number;
@@ -915,6 +917,8 @@ export interface UsageSummary {
   outputTokens: number;
   reasoningTokens: number;
   cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** What the weekly counters show: fresh tokens in full, cached re-reading at a tenth. */
   totalTokens: number;
   cost: number;
   completedRuns: number;
