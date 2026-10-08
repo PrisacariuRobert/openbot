@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.42.1 — Credibility fixes (unreleased)
+
+- Teammates on Claude work again with Claude Code 2.1.226. Newer Claude Code read the task as one more tool name and stopped with "Input must be provided", so every Claude teammate failed on its first message.
+
 ## 0.42.0 — OpenBot is now Sidemates (4 October 2026)
 
 - **A new name: Sidemates.** The app, the website (sidemates.app) and the GitHub project now use it. OpenBot was too close to other products' names, so we changed it early, while few people know it.
