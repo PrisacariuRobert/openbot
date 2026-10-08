@@ -12,7 +12,7 @@ import { configuredModels, legacyApiProviderId, isBlockedFreeTierModel, isLocalM
  * as a stand-in. */
 export const OPENCODE_NO_MODELS_NOTE = "Signed in, but OpenCode lists no models Sidemates can use. OpenCode's free models only answer inside OpenCode's own app. Add OpenCode Go, or connect ChatGPT, a free Google Gemini key or Claude Code instead.";
 
-type CommandResult = { code: number; stdout: string; stderr: string };
+type CommandResult = { code: number; stdout: string; stderr: string; timedOut?: boolean };
 type OAuthAuthorization = { url: string; method: "auto" | "code"; instructions: string; methodIndex: number };
 
 export function oauthMethodIndex(methods: unknown): number {
@@ -33,11 +33,24 @@ function execute(command: string, args: string[], timeoutMs = 15_000, environmen
     child.stdout.on("data", (chunk) => (stdout = (stdout + String(chunk)).slice(-1_000_000)));
     child.stderr.on("data", (chunk) => (stderr = (stderr + String(chunk)).slice(-20_000)));
     // Discovery must not hang forever if a damaged runtime ignores SIGTERM.
-    const timer = setTimeout(() => { child.kill("SIGKILL"); }, timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, timeoutMs);
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }); } });
-    child.on("close", (code) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: code ?? 1, stdout, stderr }); } });
+    child.on("close", (code) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ code: code ?? 1, stdout, stderr, ...(timedOut ? { timedOut } : {}) }); } });
   });
 }
+
+/** A check that ran out of time says nothing about the connection (OpenCode
+ * may be refreshing its model list, or the Mac is busy). Keep the last answer
+ * instead of letting connected AIs vanish from every list for a while. A real
+ * answer, such as "not signed in", always replaces it. */
+const lastAnswers = new Map<string, CommandResult>();
+export async function steadyCheck(key: string, run: () => Promise<CommandResult>): Promise<CommandResult> {
+  const result = await run();
+  if (!result.timedOut) { lastAnswers.set(key, result); return result; }
+  return lastAnswers.get(key) ?? result;
+}
+const check = (command: string, args: string[]) => steadyCheck(`${command} ${args.join(" ")}`, () => execute(command, args));
 
 const apiModelCache = new Map<string, { expiresAt: number; models: string[] }>();
 
@@ -135,13 +148,13 @@ export function createProviderStatusReader(inspect: (db: OpenBotDatabase, attemp
 }
 
 async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: ProviderLoginAttempt[] = []): Promise<ProviderStatus> {
-  const [openCodeVersion, claudeVersion] = await Promise.all([execute("opencode", ["--version"]), execute("claude", ["--version"])]);
+  const [openCodeVersion, claudeVersion] = await Promise.all([check("opencode", ["--version"]), check("claude", ["--version"])]);
   const openCodeInstalled = openCodeVersion.code === 0;
   const claudeInstalled = claudeVersion.code === 0;
   const [auth, models, claudeAuth] = await Promise.all([
-    openCodeInstalled ? execute("opencode", ["auth", "list"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
-    openCodeInstalled ? execute("opencode", ["models"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
-    claudeInstalled ? execute("claude", ["auth", "status"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
+    openCodeInstalled ? check("opencode", ["auth", "list"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
+    openCodeInstalled ? check("opencode", ["models"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
+    claudeInstalled ? check("claude", ["auth", "status"]) : Promise.resolve({ code: 1, stdout: "", stderr: "" }),
   ]);
   let allModels = modelLines(models.stdout);
   const openCodeConnected = auth.code === 0 && authHas(auth.stdout, /OpenCode(?: Go| Zen)?\s+api/i);
