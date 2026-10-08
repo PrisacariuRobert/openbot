@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.43.0 — It just starts (unreleased)
+
+- **Waiting for you.** Your team prepares cards (a reply to draft, a reminder to add, a receipt to file) and you tap Approve, Skip or Undo. "Look at my last few days" finds things on the first day, and the morning brief prepares cards too.
+- **Earned trust.** After you approve the same kind of card several times in a row, the team offers to do that kind on its own, with Undo and a daily limit. Any Undo pauses it.
+- **Receipts for your accountant.** Filed receipts are collected with vendor, amount and date, ready to export.
+
 ## 0.42.1 — Credibility fixes (unreleased)
 
 - Teammates on Claude work again with Claude Code 2.1.226. Newer Claude Code read the task as one more tool name and stopped with "Input must be provided", so every Claude teammate failed on its first message.
