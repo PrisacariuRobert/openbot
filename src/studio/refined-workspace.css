@@ -161,3 +161,9 @@
 .capabilities .existing-agents .existing-agents-result { color: var(--secondary); }
 .capabilities .existing-agents button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
 @media (max-width: 600px) { .capabilities .existing-agents li { flex-direction: column; align-items: stretch; } }
+/* Your first minutes: a quiet timeline of how fast a new studio became useful. */
+.capabilities .first-minutes ol { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; }
+.capabilities .first-minutes li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; font-size: 13px; }
+.capabilities .first-minutes li + li { border-top: 1px solid var(--line); }
+.capabilities .first-minutes li small { color: var(--secondary); font-variant-numeric: tabular-nums; }
+.capabilities .first-minutes .workspace-footnote { margin-top: 8px; }
