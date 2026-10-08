@@ -12,6 +12,7 @@
 - **You can see the team working.** While a teammate waits on helpers, each helper gets one line: who's on it, what they're doing, and for how long. A long team job no longer looks stuck.
 - **"Used this week" tells the truth.** It now counts what Claude saves to re-read later, and re-reading at a tenth (how AI providers price it). Before, a brief that re-read 168,000 tokens showed as 5,400. A single task's allowance is unchanged, so jobs don't stop sooner.
 - **Your AIs don't vanish.** If checking an AI takes too long (OpenCode refreshing its list, or a busy Mac), Sidemates keeps the last answer instead of briefly showing only some of your AIs, or none.
+- **The Mac app finds your AIs on its first start.** The very first check of an AI gets up to a minute, so a just-installed app no longer says OpenCode is missing while macOS is still looking it over.
 - **Start a group from New conversation.** Name it, pick two or more teammates, and you're in. Main buttons also stay solid when you point at them (they nearly disappeared in light mode).
 - **Helpers hand back their files.** When a teammate asks another for help, the files the helper saved (a checker's corrected drafts, say) come back with the answer, so the lead uses the exact text instead of retyping it.
 - **Sign in with ChatGPT.** Have ChatGPT Plus or Pro? Sign in once and your team uses your plan, with Sidemates' own sign-in (nothing to set up, no key). Your sign-in stays encrypted on your Mac, and when your plan's limit is reached your team moves to another AI.

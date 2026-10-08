@@ -5,6 +5,7 @@ import {
   ProviderConnectionManager,
   createProviderStatusReader,
   steadyCheck,
+  checkTimeout,
 } from "./providers.js";
 import type { OpenBotDatabase } from "./database.js";
 import type { ProviderInstance, ProviderStatus } from "../shared/types.js";
@@ -188,4 +189,10 @@ test("a slow AI check keeps the last answer, so connected AIs don't vanish from 
   assert.deepEqual(await steadyCheck("fixture auth", async () => signedOut), signedOut, "A real answer always replaces the last one");
   const first = { code: 1, stdout: "", stderr: "", timedOut: true };
   assert.deepEqual(await steadyCheck("fixture never answered", async () => first), first, "With nothing to fall back on, the timeout stands");
+});
+
+test("the first check of a program waits longer, later ones don't", async () => {
+  assert.equal(checkTimeout("fixture first launch"), 60_000, "A just-installed program may be inspected by macOS on its first run");
+  await steadyCheck("fixture first launch", async () => ({ code: 0, stdout: "1.18.31", stderr: "" }));
+  assert.equal(checkTimeout("fixture first launch"), 15_000);
 });
