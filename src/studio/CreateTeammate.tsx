@@ -255,7 +255,8 @@ export function CreateTeammate({
           onChange={(value) => {
             setProviderId(value);
             // Preselect the recommended model so a new user has one decision fewer.
-            setModel(defaultModelChoice(providers?.instances.find((item) => item.id === value)?.models || []));
+            const chosen = providers?.instances.find((item) => item.id === value);
+            setModel(defaultModelChoice(chosen?.models || [], chosen?.defaultModel));
           }}
         />
       </div>
@@ -266,7 +267,7 @@ export function CreateTeammate({
             label="Model"
             value={model}
             placeholder="Choose a model"
-            choices={modelChoices(connection.models || [])}
+            choices={modelChoices(connection.models || [], connection.defaultModel)}
             onChange={setModel}
           />
         </div>
@@ -293,7 +294,7 @@ export function CreateTeammate({
       <div className="creation-toggle">
         <span>
           <strong>Can look things up on the web</strong>
-          <small>Uses its own private browser. Anything that sends, buys or signs in still asks you first.</small>
+          <small>Uses its own private browser. Anything that sends, buys or signs in asks you first, unless Autopilot is on.</small>
         </span>
         <Switch label="Can look things up on the web" checked={browse} onChange={setBrowse} />
       </div>
