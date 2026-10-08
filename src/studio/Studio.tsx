@@ -2842,7 +2842,7 @@ export function Studio() {
             detail.kind === "context"
               ? "Conversation details"
               : detail.kind === "group"
-                ? "Conversation participants"
+                ? detail.threadId ? "Conversation participants" : "New group"
               : detail.kind === "workspace"
                 ? "Your workspace"
                 : detail.kind === "new"
@@ -2907,6 +2907,7 @@ export function Studio() {
                 ))}
               </div>
               <div className="new-chat-options">
+                {state.bots.length > 1 && <button type="button" onClick={() => setDetail({ kind: "group", threadId: "" })}><UsersRound size={18} /> Start a group</button>}
                 <button type="button" onClick={() => setDetail({ kind: "create" })}><Plus size={18} /> Create a teammate</button>
               </div>
             </div>
