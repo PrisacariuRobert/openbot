@@ -11,6 +11,7 @@
 - **Sign in with ChatGPT.** Have ChatGPT Plus or Pro? Sign in once and your team uses your plan, with Sidemates' own sign-in (nothing to set up, no key). Your sign-in stays encrypted on your Mac, and when your plan's limit is reached your team moves to another AI.
 - **A free Gemini key in a minute.** A pasted key is checked with Google before it's saved, and Google's free-tier terms are stated in plain words.
 - **A browser for everyone.** If your Mac has no Chrome, Edge or Brave, one tap downloads a private browser just for your teammates (about 150 MB), and the stopped job runs again.
+- **Honest under every answer.** One quiet line under the latest teammate answer: AI can make mistakes, so check anything important.
 
 ## 0.42.1 — Credibility fixes (unreleased)
 
