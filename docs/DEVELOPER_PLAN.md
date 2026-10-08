@@ -101,7 +101,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | T3 | Publish the attack tests | M | 0.46 | ✅ |
 | AU2 | Real sending with an undo window and sandboxed replies | L | 0.46 | ☐ |
 | AU3 | Batch approvals and the daily digest | M | 0.46 | ☐ |
-| AU4 | A teammate proposes a specialist, and the owner approves it | S–M | 0.46 | ☐ |
+| AU4 | A teammate proposes a specialist, and the owner approves it | S–M | 0.46 | ✅ |
 | F4 | Trust ladder: autonomy teammates earn | M | 0.46 | ☐ |
 | F5 | Triggers: your Mac reacts | M | 0.47 | ☐ |
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
@@ -797,6 +797,11 @@ The opposite failure exists too: a dot reportedly emailed a city office after be
 **Done when.** Tests cover proposing, approving, declining, the limit and the no-repeat rule, and a teammate can't add one without an approval.
 
 **Prompt.** `Do task AU4 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- `propose_teammate` (in the "Working with teammates" group) takes a specialist (researcher or writer) and a reason. `src/server/teammate-proposals.ts` refuses a role already on the team, a teammate with no AI, a full studio, and a specialist the owner already declined in that conversation. Otherwise it's an approval card: who, their role, why, and the proposer's AI.
+- Autopilot never decides it (`ALWAYS_ASK_ACTIONS`). On approval the same checks run again, and one member is installed through the template install shared with the route (`installTemplateMembers`), on Ask first.
+- Tests: teammate-proposals (3), including a run through the real server on Autopilot: the card waits, a decline isn't repeated in the conversation, and an approval elsewhere adds exactly one teammate on the proposer's AI.
 
 ---
 

@@ -9,7 +9,7 @@
 const ALWAYS_ASK_KINDS = new Set(["budget"]);
 
 /** Actions that always wait for the owner, whatever the mode. */
-const ALWAYS_ASK_ACTIONS = new Set(["skill_propose", "browser_upload_saved_file", "browser_semantic_upload", "browser_semantic_act"]);
+const ALWAYS_ASK_ACTIONS = new Set(["skill_propose", "propose_teammate", "browser_upload_saved_file", "browser_semantic_upload", "browser_semantic_act"]);
 
 export interface AutopilotReview {
   kind?: string | null;

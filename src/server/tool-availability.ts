@@ -47,6 +47,8 @@ export function toolAvailability(
     // (even in YOLO). They must be listed here: the runtime denies every tool
     // that is not, so /learn silently produced a loose file instead.
     skill_propose: true,
+    // AU4: always an approval, at every level; the server re-checks the roster and the limit.
+    propose_teammate: true,
     self_extend: db.getStudioSettings().selfExtendEnabled,
   };
   const set = (names: string[], available: boolean) => {

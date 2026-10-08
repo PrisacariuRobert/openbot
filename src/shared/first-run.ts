@@ -81,3 +81,9 @@ export function firstRunModel(connection: { models?: ReadonlyArray<string>; defa
   if (recommended) return recommended;
   return connection.defaultModel && allowed.includes(connection.defaultModel) ? connection.defaultModel : "";
 }
+
+/** Specialists not yet on the team, by role (A2's "grow later" card and AU4's proposals). */
+export function missingSpecialists<T extends { key: string; role: string }>(specialists: ReadonlyArray<T>, teammates: ReadonlyArray<{ role: string }>): T[] {
+  const roles = new Set(teammates.map((teammate) => teammate.role.trim().toLowerCase()));
+  return specialists.filter((specialist) => !roles.has(specialist.role.trim().toLowerCase()));
+}

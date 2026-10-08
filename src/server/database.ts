@@ -2723,6 +2723,11 @@ export class OpenBotDatabase {
     return Number((this.db.prepare("SELECT COUNT(*) count FROM known_people").get() as Row).count);
   }
 
+  /** Every approval asked in a conversation, oldest first. */
+  listThreadApprovals(threadId: string): Approval[] {
+    return (this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN runs r ON r.id=a.run_id JOIN bots b ON b.id=a.bot_id WHERE r.thread_id=? ORDER BY a.created_at ASC").all(threadId) as Row[]).map((row) => this.approvalFromRow(row));
+  }
+
   getApproval(id: string): Approval | null {
     const row = this.db.prepare("SELECT a.*,b.name bot_name FROM approvals a JOIN bots b ON b.id=a.bot_id WHERE a.id=?").get(id) as Row | undefined;
     return row ? this.approvalFromRow(row) : null;

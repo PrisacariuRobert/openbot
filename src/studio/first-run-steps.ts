@@ -22,7 +22,4 @@ export function withoutWelcome(href: string): string | null {
 }
 
 /** A specialist can be offered while the team has no teammate in that role. */
-export function missingSpecialists<T extends { key: string; role: string }>(specialists: ReadonlyArray<T>, teammates: ReadonlyArray<{ role: string }>): T[] {
-  const roles = new Set(teammates.map((teammate) => teammate.role.trim().toLowerCase()));
-  return specialists.filter((specialist) => !roles.has(specialist.role.trim().toLowerCase()));
-}
+export { missingSpecialists } from "../shared/first-run";

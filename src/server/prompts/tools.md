@@ -46,6 +46,9 @@ Privately hand a focused part to another teammate; you wait until their result i
 <!-- @message_teammate -->
 Privately send a teammate a question, update or finding. If you expect a reply, your answer waits for it. Share a result with artifacts: [{artifactId}] or [{path:"your-file.json"}] (copied read-only).{{roster}}
 
+<!-- @propose_teammate -->
+Propose adding a specialist from the starter team (researcher or writer) when this job would clearly go better with one, and say why in a sentence. They'd use your AI. The owner always decides; if they say no, don't ask again in this conversation.
+
 <!-- @self_extend -->
 Propose writing one small new tool when nothing you have can do what the owner asks. Always asks the owner first; then you're restarted with a coding model to write it.
 

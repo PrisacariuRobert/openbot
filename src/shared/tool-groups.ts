@@ -7,7 +7,7 @@
 export const TOOL_GROUPS = [
   { id: "documents", label: "Documents and spreadsheets", detail: "Word files, spreadsheets and exact totals from CSV files", tools: ["document_export", "spreadsheet_export", "spreadsheet_inspect", "table_summary", "table_reconcile"] },
   { id: "routines", label: "Routines and reminders", detail: "Things that repeat or happen later", tools: ["routine_create", "routine_list", "routine_update", "routine_pause", "routine_resume", "routine_delete"] },
-  { id: "teamwork", label: "Working with teammates", detail: "Asking a teammate or handing part of a job over", tools: ["message_teammate", "handoff"] },
+  { id: "teamwork", label: "Working with teammates", detail: "Asking a teammate, handing part of a job over, or suggesting a new specialist", tools: ["message_teammate", "handoff", "propose_teammate"] },
 ] as const;
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"];
