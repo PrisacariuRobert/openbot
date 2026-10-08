@@ -17,6 +17,7 @@ import { WorkflowValidation, WorkflowCheckError } from "./workflow-validation.js
 import { registerRecipeRoutes } from "./recipe-routes.js";
 import { registerSetupRoutes } from "./setup-routes.js";
 import { registerOllamaRoutes } from "./ollama.js";
+import { ManagedBrowser, registerBrowserDownloadRoutes } from "./browser-download.js";
 import { openSettingsPane, probeFullDiskAccess, registerMacPermissionRoutes } from "./mac-permissions.js";
 import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
@@ -48,7 +49,7 @@ import { PROBE_COOLDOWN_MS, probeAllowed, probeProviderModel } from "./provider-
 import { approvalReason, browserApprovalReason, commandApprovalReason } from "./safety.js";
 import { promptAutoDecision, commandAutoDecision, browserAutoDecision, browserTargetText } from "./auto-review.js";
 import { BLOCKED_FREE_TIER_MESSAGE, isBlockedFreeTierModel, modelBelongsToConnection, providerInput } from "../shared/provider-config.js";
-import { BrowserManager, BrowserUploadUncertainError, ComputerManager } from "./runtime.js";
+import { BrowserManager, BrowserUploadUncertainError, ComputerManager, systemChromePath, useDownloadedBrowser } from "./runtime.js";
 import { modelCanReceiveBrowserImage } from "./browser-image-capability.js";
 import { TesterBrowser } from "./tester-browser.js";
 import { LiveViewHub, type LiveViewEvent } from "./live-view.js";
@@ -342,6 +343,9 @@ const extensions = registerExtensionRoutes(app, db, () => broadcast(), { callbac
 registerRecipeRoutes(app, db, () => broadcast());
 registerSetupRoutes(app, setupTimeline);
 registerOllamaRoutes(app);
+const managedBrowser = new ManagedBrowser(path.join(db.dataDir, "browsers"));
+useDownloadedBrowser(() => managedBrowser.executable());
+registerBrowserDownloadRoutes(app, managedBrowser, () => Boolean(systemChromePath()));
 registerMacPermissionRoutes(app, { available: process.platform === "darwin", requestAccess: (target) => appleApps.requestAccess(target), fullDiskAccess: () => probeFullDiskAccess(), openPane: openSettingsPane });
 const interruptedApprovedActions = db.recoverInterruptedApprovedActions();
 for (const receipt of interruptedApprovedActions) {
@@ -866,6 +870,7 @@ app.post("/api/provider/key", async (request, response) => {
     try {
       const models = await checkNousKey(parsed.data.key);
       const instance = db.upsertProvider({ id: "nous-portal", name: "Nous Portal", provider: "custom", authMode: "api_key", runtime: "opencode", secret: parsed.data.key.trim(), apiConfig: { baseUrl: NOUS_BASE_URL, protocol: "openai-compatible", modelIds: models } });
+      db.deleteExtensionRecord("provider-test", instance.id);
       broadcast();
       return response.json({ connectionId: instance.id, models });
     } catch (error) { return response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
@@ -876,6 +881,8 @@ app.post("/api/provider/key", async (request, response) => {
     const instanceId = parsed.data.providerId === "google" ? "local-google" : "local-opencode";
     const instance = status.instances.find((item) => item.id === instanceId && item.connected);
     if (!instance) return response.status(400).json({ error: parsed.data.providerId === "google" ? "OpenCode saved the key but didn't list Gemini. Paste the key again." : "OpenCode saved the key but didn't accept it. Check that your Go subscription is active, then paste the key again." });
+    // A new key makes the previous test result meaningless: never show it as tested, and let it be tested now.
+    db.deleteExtensionRecord("provider-test", instance.id);
     response.json({ connectionId: instance.id, models: instance.models || [] });
   } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "The key wasn't saved." }); }
 });

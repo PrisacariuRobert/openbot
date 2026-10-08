@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Globe2 } from "lucide-react";
 import type { Bot } from "../shared/types";
+import { BrowserDownloadOffer } from "./BrowserDownloadOffer";
 
 type Access = {
   botId: string;
@@ -104,6 +105,7 @@ export function BrowserAccessCard({ bot, onTakeover }: { bot: Bot; onTakeover?: 
               </div>
             ))}
           </div>
+          {access.browserEnabled && access.runtimeAvailable === false && <BrowserDownloadOffer />}
           <p className="boundary-note">
             Website sign-ins have not been verified here. They can expire and
             aren’t shared with other teammates. A denied permission still

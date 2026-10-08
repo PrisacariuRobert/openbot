@@ -30,6 +30,7 @@ import type {
 } from "../shared/types";
 import "./provider-panel.css";
 import { BringYourAI, KeyPaste } from "./BringYourAI";
+import { GEMINI_KEY_PAGE } from "../shared/gemini";
 
 type Props = {
   provider: ProviderStatus | null;
@@ -350,7 +351,7 @@ export function ProviderPanel({
               )}
             </button>
           ) : entry.id === "google" && entry.installed ? (
-            <KeyPaste providerId="google" link="https://aistudio.google.com/apikey" linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={afterConnect} />
+            <KeyPaste providerId="google" link={GEMINI_KEY_PAGE} linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={afterConnect} />
           ) : (
             <span className="ai-state">
               {entry.id === "opencode" && entry.installed ? "Paste a key above" : entry.installed ? "Set up in OpenCode" : "Setup needed"}

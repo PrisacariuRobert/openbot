@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronDown, ExternalLink, LoaderCircle } from "lucide-react";
 import type { ProviderCatalogEntry, ProviderLoginAttempt, ProviderStatus } from "../shared/types";
+import { connectGeminiKey, GEMINI_KEY_PAGE, GEMINI_TERMS, looksLikeGeminiKey } from "../shared/gemini";
 import "./bring-your-ai.css";
 
 /** Choosing the AI behind the team, in the order that costs people least:
@@ -89,7 +90,7 @@ export function BringYourAI({ onConnected, compact = false, variant = "default" 
       </div>
       {entry("google")?.connected
         ? connected(entry("google")?.connectionId, "Google Gemini")
-        : <KeyPaste providerId="google" link="https://aistudio.google.com/apikey" linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={onConnected} />}
+        : <KeyPaste providerId="google" link={GEMINI_KEY_PAGE} linkLabel="Get a free key" placeholder="Paste your Gemini API key" onSaved={onConnected} />}
     </li>
   );
   const nousRow = (
@@ -240,28 +241,52 @@ function OllamaRow({ connectedId, use, onSaved }: { connectedId?: string; use: (
 }
 
 export function KeyPaste({ providerId, link, linkLabel, placeholder, onSaved }: { providerId: "google" | "opencode-go" | "nous"; link: string; linkLabel: string; placeholder: string; onSaved: (connectionId: string) => Promise<void> | void }) {
-  const [key, setKey] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const [key, setKey] = useState(""), [busy, setBusy] = useState<"" | "saving" | "testing">(""), [error, setError] = useState("");
+  const [untested, setUntested] = useState<{ connectionId: string; error: string } | null>(null);
+  const gemini = providerId === "google";
+  const connect = async (value: string) => {
     if (busy) return;
-    setBusy(true); setError("");
+    setBusy("saving"); setError(""); setUntested(null);
     try {
-      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId, key }) });
+      if (gemini) {
+        // Save, then one tiny live reply. A key that fails the test stays saved, and the owner decides.
+        const result = await connectGeminiKey(value, fetch, () => { setKey(""); setBusy("testing"); });
+        if (!result.tested) { setUntested({ connectionId: result.connectionId, error: result.error }); return; }
+        await onSaved(result.connectionId);
+        return;
+      }
+      const response = await fetch("/api/provider/key", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId, key: value }) });
       const result = await response.json().catch(() => ({})) as { error?: string; connectionId?: string };
       if (!response.ok || !result.connectionId) throw new Error(result.error || "The key wasn't accepted.");
       setKey("");
       await onSaved(result.connectionId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The key wasn't accepted."); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
+  };
+  const submit = (event: FormEvent) => { event.preventDefault(); void connect(key); };
+  const change = (value: string) => {
+    setKey(value);
+    // A whole Gemini key pasted in one go connects without another click.
+    if (gemini && !busy && looksLikeGeminiKey(value) && !looksLikeGeminiKey(key)) void connect(value.trim());
   };
   return (
     <div className="byo-key">
       <a className="byo-link" href={link} target="_blank" rel="noreferrer">{linkLabel} <ExternalLink size={13} aria-hidden="true" /></a>
-      <form onSubmit={(event) => void submit(event)}>
-        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => setKey(event.target.value)} placeholder={placeholder} aria-label={placeholder} />
-        <button type="submit" className="byo-action" disabled={busy || key.trim().length < 20}>{busy ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}Connect</button>
+      <form onSubmit={submit}>
+        <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(event) => change(event.target.value)} placeholder={placeholder} aria-label={placeholder} disabled={Boolean(busy)} />
+        <button type="submit" className="byo-action" disabled={Boolean(busy) || key.trim().length < 20}>{busy ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}Connect</button>
       </form>
+      {busy === "testing" && <p className="byo-status" role="status">Testing your key with Google…</p>}
+      {untested && <div className="byo-untested" role="alert">
+        <p>Your key was saved, but the test didn’t pass: {untested.error}</p>
+        <p>Paste another key, or continue and try a message.</p>
+        <button type="button" className="byo-action" onClick={() => { const id = untested.connectionId; setUntested(null); void onSaved(id); }}>Continue anyway</button>
+      </div>}
       {error && <p className="byo-error" role="alert">{error}</p>}
+      {gemini && <div className="byo-terms">
+        {GEMINI_TERMS.notices.map((notice) => <p key={notice}>{notice}</p>)}
+        <a href={GEMINI_TERMS.url} target="_blank" rel="noreferrer">Google’s Gemini API terms, updated {GEMINI_TERMS.updated} <ExternalLink size={12} aria-hidden="true" /></a>
+      </div>}
     </div>
   );
 }

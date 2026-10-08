@@ -8,6 +8,7 @@ import { Character } from "./Character";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { Switch } from "./Settings";
 import { guidedStage } from "./first-run-steps";
+import { BrowserDownloadOffer } from "./BrowserDownloadOffer";
 import "../components/bring-your-ai.css";
 import "./create-teammate.css";
 import "./guided-first-run.css";
@@ -125,6 +126,7 @@ export function GuidedFirstRun({ onClose, onCreated }: { onClose: () => void; on
         </span>
         <Switch label="Can look things up on the web" checked={web} onChange={setWeb} />
       </div>
+      {web && <BrowserDownloadOffer />}
       <p className="guided-run-note">You can add a researcher or a writer later, when a job needs one.</p>
       <div className="guided-run-actions">
         <button type="button" onClick={() => setModel(null)} disabled={busy}><ArrowLeft size={16} aria-hidden="true" /> Back</button>

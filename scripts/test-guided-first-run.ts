@@ -1,7 +1,9 @@
 // The guided first run through the shipped web UI on a disposable host: the
-// installer's ?welcome=installed, the AI step in the plan's order, a one-click
+// installer's ?welcome=installed, the AI step in the plan's order, a pasted Gemini
+// key saved and tested (stand-ins; nothing reaches Google), a one-click
 // local model (a stand-in Ollama on loopback), the model step, the first
-// teammate and "Try one". No model job, sign-in, settings change or message.
+// teammate (with the private browser offer when no browser is installed) and
+// "Try one". No model job, sign-in, settings change, message or real download.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -71,6 +73,20 @@ try {
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method()) && !allowed.has(write)) { unexpected.push(write); return route.abort("blockedbyclient"); }
     return route.continue();
   });
+  // "No browser installed", without downloading 190 MB: the download route answers as on a computer without
+  // Chrome, Edge or Brave, then as a download that runs and finishes. The server side is covered by browser-download.test.ts.
+  const realDownloadStatus = await json<Record<string, unknown>>("/api/browser/download");
+  assert.deepEqual(Object.keys(realDownloadStatus).sort(), ["downloaded", "error", "state", "systemBrowser"], "The download route is registered");
+  let download: "idle" | "downloading" | "ready" = "idle", downloadPosts = 0;
+  await context.route("**/api/browser/download", async (route) => {
+    if (route.request().method() === "POST") { downloadPosts++; download = "downloading"; }
+    else if (download === "downloading" && downloadPosts) download = "ready";
+    return route.fulfill({ status: route.request().method() === "POST" ? 202 : 200, contentType: "application/json", body: JSON.stringify({ systemBrowser: false, downloaded: download === "ready", state: download, error: null }) });
+  });
+  // A pasted Gemini key: saved and tested without reaching Google. The test answers "rejected", so the owner sees why and can continue.
+  const keyCalls: string[] = [];
+  await context.route("**/api/provider/key", (route) => { keyCalls.push("save " + (JSON.parse(route.request().postData() || "{}") as { providerId?: string }).providerId); return route.fulfill({ contentType: "application/json", body: JSON.stringify({ connectionId: "local-google", models: [] }) }); });
+  await context.route("**/api/provider/local-google/test", (route) => { keyCalls.push("test"); return route.fulfill({ contentType: "application/json", body: JSON.stringify({ tested: true, ok: false, model: "google/gemini-2.5-flash", latencyMs: 400, error: "The provider rejected its sign-in or key. Reconnect it, then test again.", testedAt: new Date().toISOString() }) }); });
   const page = await context.newPage();
   await page.goto(base + "/?welcome=installed");
   await page.getByRole("heading", { name: "How should your team think?" }).waitFor();
@@ -80,6 +96,18 @@ try {
   assert.deepEqual(options, ["ChatGPT", "Google Gemini", "Claude", "A model on this Mac"], "The plan's order");
   await page.screenshot({ path: path.join(output, "1-ai.png") });
 
+  const geminiRow = page.locator(".byo-row", { hasText: "Google Gemini" });
+  assert.match(await geminiRow.innerText(), /18 or older, for professional or business use/, "Google's first notice");
+  assert.match(await geminiRow.innerText(), /Outside the EEA, the UK and Switzerland/, "Google's second notice");
+  assert.equal(await geminiRow.getByRole("link", { name: /Google’s Gemini API terms, updated/ }).getAttribute("href"), "https://ai.google.dev/gemini-api/terms");
+  assert.equal(await geminiRow.getByRole("link", { name: /Get a free key/ }).getAttribute("href"), "https://aistudio.google.com/apikey");
+  await page.getByLabel("Paste your Gemini API key").fill("AIza" + "Q".repeat(31) + "_-7z");
+  await geminiRow.getByText("Your key was saved, but the test didn’t pass").waitFor();
+  assert.deepEqual(keyCalls, ["save google", "test"], "A pasted key connects and is tested once, without pressing Connect");
+  assert.match(await geminiRow.getByRole("alert").innerText(), /rejected its sign-in or key/);
+  await geminiRow.getByRole("button", { name: "Continue anyway" }).waitFor();
+  await page.screenshot({ path: path.join(output, "1b-gemini-untested.png") });
+
   await page.getByRole("button", { name: "Use Ollama" }).click();
   await page.getByRole("heading", { name: "Which model should your teammate use?" }).waitFor();
   assert.equal(await page.evaluate(() => document.activeElement?.id), "guided-run-heading", "Focus moves to the new step");
@@ -88,7 +116,15 @@ try {
 
   await page.getByRole("heading", { name: "Meet your first teammate" }).waitFor();
   assert.equal(await page.getByRole("switch", { name: "Can look things up on the web" }).getAttribute("aria-checked"), "true", "The web switch is shown and starts on");
+  const offer = page.getByRole("button", { name: "Download a private browser for your teammates (about 190 MB)" });
+  await offer.waitFor();
   await page.screenshot({ path: path.join(output, "2-teammate.png") });
+  await page.getByRole("switch", { name: "Can look things up on the web" }).click();
+  assert.equal(await offer.count(), 0, "No browser offer when the teammate won't use the web");
+  await page.getByRole("switch", { name: "Can look things up on the web" }).click();
+  await offer.click();
+  await page.getByText("Private browser downloaded. Your teammates can use the web now.").waitFor({ timeout: 15_000 });
+  assert.equal(downloadPosts, 1, "One download, on the owner's click");
   await page.getByRole("button", { name: "Create Scout" }).click();
 
   await page.getByText("Try one.").waitFor();
@@ -112,7 +148,7 @@ try {
   assert.equal(at("ai_connected")?.detail, "A model on this Mac");
   assert.deepEqual(unexpected, []);
   assert.deepEqual(errors, []);
-  console.log("PASS: ?welcome=installed → AI step in the plan's order → one-click local model → model preselected → first teammate on it → three suggestions, the first needing nothing → message box filled. No model job, sign-in, settings change or message.");
+  console.log("PASS: ?welcome=installed → AI step in the plan's order → Gemini notices, a pasted key tested at once, a failed test explained → one-click local model → model preselected → no browser installed → private browser offered and downloaded on click → first teammate on it → three suggestions, the first needing nothing → message box filled. No model job, sign-in, settings change or message.");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

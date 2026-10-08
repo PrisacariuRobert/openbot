@@ -292,8 +292,18 @@ export function chromeCandidates(platform: NodeJS.Platform = process.platform, e
   return [...custom, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium", "/usr/bin/microsoft-edge"];
 }
 
-export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
+/** The private browser the owner downloaded into the data folder (task A5), used only when no
+ * browser is installed on this computer. Set once at startup. */
+let downloadedBrowser: () => string | null = () => null;
+export function useDownloadedBrowser(lookup: () => string | null) { downloadedBrowser = lookup; }
+
+/** A browser installed on this computer, without the downloaded one. */
+export function systemChromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync): string | undefined {
   return chromeCandidates(platform, env).find((candidate) => exists(candidate));
+}
+
+export function chromePath(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (file: string) => boolean = existsSync, downloaded: () => string | null = downloadedBrowser): string | undefined {
+  return systemChromePath(platform, env, exists) ?? downloaded() ?? undefined;
 }
 
 /** Multi-label public suffixes where the last two labels are NOT the

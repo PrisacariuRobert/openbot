@@ -1,0 +1,10 @@
+/* The private browser download offer (task A5). Design tokens only. */
+.browser-download { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-align: left; }
+.browser-download p { margin: 0; font-size: 13px; line-height: 19px; color: var(--secondary); }
+.browser-download.is-done { color: var(--ink); }
+.browser-download button { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--tertiary-system-background, var(--hover)); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+.browser-download button:disabled { opacity: .6; cursor: default; }
+.browser-download button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.browser-download .send-error { color: var(--danger, var(--ink)); }
+@media (max-width: 600px) { .browser-download button { justify-self: stretch; } }
+@media (prefers-reduced-motion: reduce) { .browser-download .spinner { animation: none !important; } }

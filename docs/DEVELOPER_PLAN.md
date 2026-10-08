@@ -82,7 +82,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | A2 | Guided first run | M | 0.43 | ☐ |
 | A3 | Sign in with ChatGPT, with Sidemates' own client | M | 0.43 | ☐ |
 | A4 | Apple Intelligence as the no-key starter | M–L | 0.43 | ☐ |
-| A5 | A free Gemini key in a few clicks; a browser for everyone | S–M | 0.43 | ☐ |
+| A5 | A free Gemini key in a few clicks; a browser for everyone | S–M | 0.43 | ☑ |
 | A6 | Phone access that works, safely | M | 0.43 | ☐ |
 | A7 | Lighter prompts and tool lists | M | 0.43 | ☐ |
 | A8 | A download button for people who don't use Terminal | S–M | 0.43 | ☐ |
@@ -351,6 +351,12 @@ Today Sidemates borrows OpenCode's sign-in (`src/server/providers.ts`), so the c
 **Done when.** Both paths have tests, and the onboarding test covers "no browser installed".
 
 **Prompt.** `Do task A5 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- A Gemini key pasted whole connects without another click and is tested with one tiny reply. A failed test says why and offers "Continue anyway".
+- Google's two notices sit next to the key, dated, with a link to the terms. Gemini's per-minute and per-day limits get their own words.
+- The browser download is about 190 MB, measured from Playwright's Chrome for Testing 151, not the 150 MB first estimated. One real download and launch were verified on Linux.
+- On a Mac, the owner still needs to check the download and a teammate browsing with it. Same for a live Gemini key test, which needs the owner's own key.
 
 ### A6 · Phone access that works, safely · M · plan first
 
