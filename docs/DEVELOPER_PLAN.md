@@ -87,7 +87,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | A7 | Lighter prompts and tool lists | M | 0.43 | ☐ |
 | A8 | A download button for people who don't use Terminal | S–M | 0.43 | ☐ |
 | F6 | Text your Mac | S–M | 0.43 | ☐ |
-| J1 | Pick the hero jobs and build their fixtures | S | 0.44 | ☐ |
+| J1 | Pick the hero jobs and build their fixtures | S | 0.44 | ✅ |
 | J2 | Reliability harness and a public scoreboard | M | 0.44 | ☐ |
 | J3 | Real-Mac acceptance kit | M | 0.44 | ☐ |
 | J4 | Fast Calendar and Reminders through EventKit | M | 0.44 | ☐ |
@@ -448,6 +448,13 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
   - checks its own result before it reports done.
 
 **Prompt.** `Do task J1 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- `qa/hero-jobs/` holds synthetic data, constraints, budgets and expected results for the morning brief, what's waiting on me and meeting prep.
+- `src/server/hero-jobs.ts` holds each job's request and the checks.
+- Each request carries its constraints and ends with a self-check. Two fixtures change mid-task (a reply that settles a question, a meeting that moves), so only runs that look again pass.
+- The morning brief routine's prompt now ends with the same self-check.
+- Running the jobs is J2.
 
 ### J2 · Reliability harness and a public scoreboard · M
 

@@ -1,0 +1,143 @@
+{
+  "job": "meeting-prep",
+  "about": "The next meeting is a supplier call with two attendees. Their recent mail and the owner's negotiation note hold the facts; another person's mail and an unrelated note are noise. While the job runs, the call moves from 15:00 to 16:00.",
+  "now": "2026-10-13T13:40:00+02:00",
+  "timeZone": "Europe/Brussels",
+  "calendar": [
+    {
+      "calendar": "Work",
+      "title": "Supplier call with Northwind",
+      "start": "2026-10-13T15:00:00+02:00",
+      "end": "2026-10-13T15:45:00+02:00",
+      "allDay": false,
+      "location": "Video call",
+      "attendees": [
+        "Ana Ribeiro <ana@northwind.example>",
+        "Joris Peeters <joris@northwind.example>"
+      ]
+    },
+    {
+      "calendar": "Work",
+      "title": "Team retro",
+      "start": "2026-10-14T11:00:00+02:00",
+      "end": "2026-10-14T12:00:00+02:00",
+      "allDay": false,
+      "location": "Room 2",
+      "attendees": []
+    }
+  ],
+  "mail": [
+    {
+      "id": "3001",
+      "subject": "Q3 volumes and November prices",
+      "from": "Ana Ribeiro <ana@northwind.example>",
+      "date": "2026-10-09T11:00:00+02:00",
+      "snippet": "Prices go up 4% from November.",
+      "attachments": [
+        {
+          "name": "q3-volumes.csv",
+          "size": 2048
+        }
+      ],
+      "unread": false,
+      "text": "Hi, attached are the Q3 volumes. Our prices go up 4% from November because of energy costs. Ana"
+    },
+    {
+      "id": "3002",
+      "subject": "Delivery delays",
+      "from": "Joris Peeters <joris@northwind.example>",
+      "date": "2026-10-12T15:30:00+02:00",
+      "snippet": "Can we discuss the delays on the call?",
+      "attachments": [],
+      "unread": false,
+      "text": "Can we discuss the two late deliveries in September on the call? Joris"
+    },
+    {
+      "id": "3003",
+      "subject": "Can we move Thursday's review to Friday?",
+      "from": "Tom Becker <tom@studio.example>",
+      "date": "2026-10-12T19:05:00+02:00",
+      "snippet": "Would Friday 10:00 work?",
+      "attachments": [],
+      "unread": false,
+      "text": "Would Friday 10:00 work for the review? Tom"
+    }
+  ],
+  "notes": [
+    {
+      "id": "n1",
+      "title": "Northwind negotiation",
+      "folder": "Work",
+      "modified": "2026-10-08T17:00:00+02:00",
+      "snippet": "Target: keep the increase at 2% or less.",
+      "text": "Target: keep the price increase at 2% or less. Ask for a delivery service level with a credit for late deliveries."
+    },
+    {
+      "id": "n2",
+      "title": "Holiday ideas",
+      "folder": "Home",
+      "modified": "2026-10-01T20:00:00+02:00",
+      "snippet": "Lisbon in spring?",
+      "text": "Lisbon in spring? Or the Ardennes."
+    }
+  ],
+  "afterFirstRead": {
+    "calendar": [
+      {
+        "calendar": "Work",
+        "title": "Supplier call with Northwind",
+        "start": "2026-10-13T16:00:00+02:00",
+        "end": "2026-10-13T16:45:00+02:00",
+        "allDay": false,
+        "location": "Video call",
+        "attendees": [
+          "Ana Ribeiro <ana@northwind.example>",
+          "Joris Peeters <joris@northwind.example>"
+        ],
+        "replaces": "Supplier call with Northwind"
+      }
+    ]
+  },
+  "constraints": [
+    "One page: the meeting, who's coming, what they wrote, and the owner's own notes.",
+    "Facts come from the sources; mark anything else as a suggestion.",
+    "Check the meeting's time again just before writing the page.",
+    "Don't email or invite anyone."
+  ],
+  "budget": {
+    "seconds": 120,
+    "steps": 14,
+    "contextTokens": 100000
+  },
+  "expect": {
+    "inOrder": [],
+    "mentions": [
+      "Northwind",
+      "16:00",
+      "Ana",
+      "Joris",
+      "4%",
+      "2%",
+      "deliver"
+    ],
+    "neverMentions": [
+      "Holiday",
+      "Lisbon",
+      "Tom",
+      "Team retro"
+    ],
+    "maxWords": 300,
+    "sources": [
+      "calendar",
+      "mail",
+      "note"
+    ],
+    "writes": {},
+    "neverClaims": [
+      "I sent",
+      "I emailed",
+      "I invited",
+      "I've sent"
+    ]
+  }
+}

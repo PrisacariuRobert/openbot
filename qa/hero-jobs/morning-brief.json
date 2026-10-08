@@ -1,0 +1,219 @@
+{
+  "job": "morning-brief",
+  "about": "Tuesday morning on a synthetic Mac: three meetings today, a train early tomorrow, mail that needs the owner mixed with newsletters and notifications, and an overdue reminder.",
+  "now": "2026-10-13T07:55:00+02:00",
+  "timeZone": "Europe/Brussels",
+  "calendar": [
+    {
+      "calendar": "Home",
+      "title": "Yoga",
+      "start": "2026-10-12T18:00:00+02:00",
+      "end": "2026-10-12T19:00:00+02:00",
+      "allDay": false,
+      "location": ""
+    },
+    {
+      "calendar": "Home",
+      "title": "Mila's birthday",
+      "start": "2026-10-13T00:00:00+02:00",
+      "end": "2026-10-14T00:00:00+02:00",
+      "allDay": true,
+      "location": ""
+    },
+    {
+      "calendar": "Work",
+      "title": "Design review",
+      "start": "2026-10-13T09:30:00+02:00",
+      "end": "2026-10-13T10:00:00+02:00",
+      "allDay": false,
+      "location": "Room 3"
+    },
+    {
+      "calendar": "Home",
+      "title": "Lunch with Maya",
+      "start": "2026-10-13T12:30:00+02:00",
+      "end": "2026-10-13T13:30:00+02:00",
+      "allDay": false,
+      "location": "Café Lumen"
+    },
+    {
+      "calendar": "Work",
+      "title": "Supplier call with Northwind",
+      "start": "2026-10-13T15:00:00+02:00",
+      "end": "2026-10-13T15:45:00+02:00",
+      "allDay": false,
+      "location": "Video call"
+    },
+    {
+      "calendar": "Home",
+      "title": "Train to Ghent",
+      "start": "2026-10-14T08:15:00+02:00",
+      "end": "2026-10-14T09:05:00+02:00",
+      "allDay": false,
+      "location": "Brussels-Central"
+    },
+    {
+      "calendar": "Work",
+      "title": "Quarterly offsite",
+      "start": "2026-10-20T09:00:00+02:00",
+      "end": "2026-10-20T17:00:00+02:00",
+      "allDay": false,
+      "location": "Leuven"
+    }
+  ],
+  "reminders": [
+    {
+      "id": "r1",
+      "title": "Pay the electricity bill",
+      "notes": "",
+      "due": "2026-10-12T18:00:00+02:00",
+      "list": "Home",
+      "completed": false
+    },
+    {
+      "id": "r2",
+      "title": "Send the Q3 slides to Ana",
+      "notes": "",
+      "due": "2026-10-13T17:00:00+02:00",
+      "list": "Work",
+      "completed": false
+    },
+    {
+      "id": "r3",
+      "title": "Buy batteries",
+      "notes": "",
+      "due": null,
+      "list": "Home",
+      "completed": false
+    },
+    {
+      "id": "r4",
+      "title": "Renew passport",
+      "notes": "",
+      "due": "2026-10-13T09:00:00+02:00",
+      "list": "Home",
+      "completed": true
+    }
+  ],
+  "mail": [
+    {
+      "id": "1001",
+      "subject": "Q3 slides: can you send them by 5?",
+      "from": "Ana Ribeiro <ana@northwind.example>",
+      "date": "2026-10-12T16:40:00+02:00",
+      "snippet": "Hi, could you send the Q3 slides by 5 today?",
+      "attachments": [],
+      "unread": true,
+      "text": "Hi, could you send the Q3 slides by 5 today? We want them in the board pack. Thanks, Ana"
+    },
+    {
+      "id": "1002",
+      "subject": "Can we move Thursday's review to Friday?",
+      "from": "Tom Becker <tom@studio.example>",
+      "date": "2026-10-12T19:05:00+02:00",
+      "snippet": "Something came up on Thursday. Would Friday 10:00 work?",
+      "attachments": [],
+      "unread": true,
+      "text": "Something came up on Thursday. Would Friday 10:00 work for the review? Tom"
+    },
+    {
+      "id": "1003",
+      "subject": "This week in design: 12 tools we love",
+      "from": "The Weekly Digest <news@digest.example>",
+      "date": "2026-10-13T06:00:00+02:00",
+      "snippet": "Our favourite tools this week",
+      "attachments": [],
+      "unread": true,
+      "text": "Our favourite tools this week. Unsubscribe any time."
+    },
+    {
+      "id": "1004",
+      "subject": "Your statement is ready",
+      "from": "Bank Notifications <noreply@bank.example>",
+      "date": "2026-10-13T05:12:00+02:00",
+      "snippet": "Your October statement is available",
+      "attachments": [],
+      "unread": true,
+      "text": "Your October statement is available in online banking. This is an automatic message."
+    },
+    {
+      "id": "1005",
+      "subject": "Dinner on Saturday?",
+      "from": "Lena Vos <lena@family.example>",
+      "date": "2026-10-12T21:30:00+02:00",
+      "snippet": "Are you free for dinner on Saturday?",
+      "attachments": [],
+      "unread": true,
+      "text": "Are you free for dinner on Saturday? Let me know by Thursday. Lena"
+    },
+    {
+      "id": "1006",
+      "subject": "[sidemates-fixture] Pull request merged",
+      "from": "GitHub <notifications@github.example>",
+      "date": "2026-10-13T07:02:00+02:00",
+      "snippet": "Merged: tidy the onboarding copy",
+      "attachments": [],
+      "unread": true,
+      "text": "Merged: tidy the onboarding copy. You are receiving this because you were mentioned."
+    }
+  ],
+  "constraints": [
+    "Only look things up; change nothing.",
+    "Today's schedule in time order, plus anything early tomorrow.",
+    "At most five mails that need an answer or an action; skip newsletters and automatic notifications.",
+    "Reminders due today or overdue.",
+    "Short enough to read in half a minute; name where each part came from."
+  ],
+  "budget": {
+    "seconds": 90,
+    "steps": 10,
+    "contextTokens": 60000
+  },
+  "expect": {
+    "inOrder": [
+      [
+        "Design review",
+        "9:30"
+      ],
+      [
+        "Lunch with Maya",
+        "12:30"
+      ],
+      [
+        "Supplier call",
+        "15:00"
+      ]
+    ],
+    "mentions": [
+      "Train to Ghent",
+      "Ana",
+      "Tom",
+      "Lena",
+      "electricity",
+      "Q3 slides"
+    ],
+    "neverMentions": [
+      "Yoga",
+      "Quarterly offsite",
+      "Weekly Digest",
+      "statement is ready",
+      "Pull request",
+      "Renew passport"
+    ],
+    "maxWords": 200,
+    "sources": [
+      "calendar",
+      "mail",
+      "reminder"
+    ],
+    "writes": {},
+    "neverClaims": [
+      "I sent",
+      "I replied",
+      "I've sent",
+      "I have sent",
+      "I added",
+      "I created"
+    ]
+  }
+}
