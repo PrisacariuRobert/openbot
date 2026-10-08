@@ -576,11 +576,14 @@ export class OpenCodeRunner {
     // The teammate's own identity replaces Claude Code's coding-assistant
     // instructions (a "software engineering" agent in a terminal, with memory
     // tools teammates don't have): the same prompt OpenCode teammates get,
-    // and about 1,300 fewer tokens on every step.
+    // and about 1,300 fewer tokens on every step. The owner's personal Claude
+    // Code settings stay out too: their output style ("an interactive CLI tool
+    // for software engineering, execute immediately") was being added to
+    // every teammate's instructions. Sign-in is unaffected.
     // "--" ends the options: Claude Code's --tools and --allowedTools take every value up to the next
     // option, so without it a trailing prompt is read as a tool name and the run stops with no input.
     const args = useClaude
-      ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--system-prompt", teammateSystemPrompt(bot), "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", `${claudeTools},mcp__openbot__work_collect,mcp__openbot__work_report,mcp__openbot__code_benchmark`, ...(previousSession ? ["--resume", previousSession] : []), "--", prompt]
+      ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model.replace(/^claude-code\//, ""), "--permission-mode", "dontAsk", "--tools", "", "--system-prompt", teammateSystemPrompt(bot), "--setting-sources", "project,local", "--mcp-config", mcpConfig, "--strict-mcp-config", "--allowedTools", `${claudeTools},mcp__openbot__work_collect,mcp__openbot__work_report,mcp__openbot__code_benchmark`, ...(previousSession ? ["--resume", previousSession] : []), "--", prompt]
       : ["run", "--auto", "--format", "json", "--model", model, "--dir", workspace, "--agent", run.expectedWorkKind ? "openbot-report" : "openbot", ...attachedFiles.flatMap((file) => ["--file", file]), ...(previousSession ? ["--session", previousSession] : []), "--title", `${bot.name} · Sidemates`, prompt];
     const runEnvironment = safeHostEnvironment(extraEnvironment);
     const liveOpenCode = !useClaude && liveOpenCodeAvailable(runEnvironment.PATH, Boolean(this.options.spawnProcess));
