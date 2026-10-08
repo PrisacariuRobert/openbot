@@ -109,6 +109,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { FolderTriggerFields, MailTriggerFields } from "./studio/MacTriggerFields";
 import type {
   AppState,
   Attachment,
@@ -5244,6 +5245,10 @@ function routineTriggerLabel(routine: Routine) {
       : "Todoist · any task change";
   if (routine.triggerType === "dropbox")
     return routine.triggerConfig.dropboxPath ? `Dropbox · ${routine.triggerConfig.dropboxPath}` : "Dropbox · any file change";
+  if (routine.triggerType === "folder")
+    return `New files · ${routine.triggerConfig.folderPath || "a folder"}${routine.triggerConfig.fileTypes ? ` (${routine.triggerConfig.fileTypes})` : ""}`;
+  if (routine.triggerType === "mail")
+    return `Mail · ${[routine.triggerConfig.mailFrom && `from ${routine.triggerConfig.mailFrom}`, routine.triggerConfig.mailSubject && `“${routine.triggerConfig.mailSubject}”`].filter(Boolean).join(", ") || "matching mail"}`;
   if (routine.triggerType === "slack")
     return `Slack · ${routine.triggerConfig.slackEvent === "any" || !routine.triggerConfig.slackEvent ? "any subscribed activity" : routine.triggerConfig.slackEvent}${routine.triggerConfig.slackChannel ? ` · ${routine.triggerConfig.slackChannel}` : ""}`;
   if (routine.triggerType === "notion")
@@ -5332,6 +5337,8 @@ export function RoutinesPanel({
     [minutesBefore, setMinutesBefore] = useState(15),
     [todoistEvent, setTodoistEvent] = useState<"added" | "updated" | "completed" | "any">("any"),
     [dropboxPath, setDropboxPath] = useState(""),
+    [folderPath, setFolderPath] = useState(""), [fileTypes, setFileTypes] = useState(""),
+    [mailFrom, setMailFrom] = useState(""), [mailSubject, setMailSubject] = useState(""),
     [slackEvent, setSlackEvent] = useState<"mention" | "message" | "reaction" | "any">("mention"),
     [slackChannel, setSlackChannel] = useState(""),
     [notionEvent, setNotionEvent] = useState<"page_updated" | "page_created" | "comment" | "database" | "any">("page_updated"),
@@ -5406,6 +5413,7 @@ export function RoutinesPanel({
     setMinutesBefore(15);
     setTodoistEvent("any");
     setDropboxPath("");
+    setFolderPath(""); setFileTypes(""); setMailFrom(""); setMailSubject("");
     setSlackEvent("mention");
     setSlackChannel("");
     setNotionEvent("page_updated");
@@ -5439,6 +5447,8 @@ export function RoutinesPanel({
     setMinutesBefore(routine.triggerConfig.minutesBefore ?? 15);
     setTodoistEvent(routine.triggerConfig.todoistEvent ?? "any");
     setDropboxPath(routine.triggerConfig.dropboxPath ?? "");
+    setFolderPath(routine.triggerConfig.folderPath ?? ""); setFileTypes(routine.triggerConfig.fileTypes ?? "");
+    setMailFrom(routine.triggerConfig.mailFrom ?? ""); setMailSubject(routine.triggerConfig.mailSubject ?? "");
     setSlackEvent(routine.triggerConfig.slackEvent ?? "mention");
     setSlackChannel(routine.triggerConfig.slackChannel ?? "");
     setNotionEvent(routine.triggerConfig.notionEvent ?? "page_updated");
@@ -5481,6 +5491,10 @@ export function RoutinesPanel({
               ? { todoistEvent }
               : triggerType === "dropbox"
                 ? { ...(dropboxPath ? { dropboxPath } : {}) }
+              : triggerType === "folder"
+                ? { folderPath: folderPath.trim(), ...(fileTypes.trim() ? { fileTypes: fileTypes.trim() } : {}) }
+              : triggerType === "mail"
+                ? { ...(mailFrom.trim() ? { mailFrom: mailFrom.trim() } : {}), ...(mailSubject.trim() ? { mailSubject: mailSubject.trim() } : {}) }
               : triggerType === "slack"
                 ? { slackEvent, ...(slackChannel ? { slackChannel } : {}) }
               : triggerType === "notion"
@@ -6109,6 +6123,8 @@ export function RoutinesPanel({
                     label: "Before a calendar event",
                     icon: <CalendarDays size={14} />,
                   },
+                  { value: "folder" as const, label: "A file lands in a folder", icon: <FolderOpen size={14} /> },
+                  { value: "mail" as const, label: "Mail like this arrives", icon: <Mail size={14} /> },
                   {
                     value: "github" as const,
                     label: "GitHub",
@@ -6313,6 +6329,8 @@ export function RoutinesPanel({
               <small className="routine-help">Sidemates checks Todoist in the background and keeps an event receipt, so a repeated delivery cannot start duplicate work.</small>
             </fieldset>
           )}
+          {triggerType === "folder" && <FolderTriggerFields folderPath={folderPath} fileTypes={fileTypes} onFolderPath={setFolderPath} onFileTypes={setFileTypes} />}
+          {triggerType === "mail" && <MailTriggerFields mailFrom={mailFrom} mailSubject={mailSubject} onMailFrom={setMailFrom} onMailSubject={setMailSubject} />}
           {triggerType === "dropbox" && (
             <fieldset className="routine-fieldset">
               <legend>Which Dropbox files?</legend>
@@ -6447,6 +6465,10 @@ export function RoutinesPanel({
                           : "a task is completed in Todoist"
                     : triggerType === "dropbox"
                       ? `a file changes${dropboxPath ? ` inside ${dropboxPath}` : " in Dropbox"}`
+                    : triggerType === "folder"
+                      ? `a file lands in ${folderPath.trim() || "the folder"}`
+                    : triggerType === "mail"
+                      ? `new mail arrives${mailFrom.trim() ? ` from ${mailFrom.trim()}` : ""}${mailSubject.trim() ? ` about “${mailSubject.trim()}”` : ""}`
                     : triggerType === "slack"
                       ? `${slackEvent === "any" ? "subscribed activity" : `a ${slackEvent}`} arrives${slackChannel ? ` in ${slackChannel}` : " from Slack"}`
                     : triggerType === "notion"

@@ -103,7 +103,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | AU3 | Batch approvals and the daily digest | M | 0.46 | ☐ |
 | AU4 | A teammate proposes a specialist, and the owner approves it | S–M | 0.46 | ✅ |
 | F4 | Trust ladder: autonomy teammates earn | M | 0.46 | ☐ |
-| F5 | Triggers: your Mac reacts | M | 0.47 | ☐ |
+| F5 | Triggers: your Mac reacts | M | 0.47 | ✅ |
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
 | R3 | Gallery submissions without Git | S | 0.47 | ☐ |
 | R5 | Shared results that bring people back | S | 0.47 | ☐ |
@@ -655,6 +655,14 @@ Each has a draft ready in Mail, plus Done, Snooze and Remind me.
 - The receipts benchmark (`npm run benchmark:expenses`) runs from a folder trigger.
 
 **Prompt.** `Do task F5 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done; the live benchmark run is the owner's.
+- `src/server/mac-triggers.ts` polls enabled folder and mail routines every 15 seconds: a baseline first (what's there never runs), then new files or matching unread mail collected until 30 seconds of quiet, then one run for the batch, at most six an hour (files arriving over the cap wait for one later run). Partial downloads and hidden files are ignored; a file whose size or date is still changing restarts the wait. Cursors are short hashes, so the saved record stays small.
+- Routines validate on save: a folder must exist inside the home folder and outside Sidemates' data ("~/" is expanded and saved); a mail trigger needs a sender or a subject. Both need Files & apps; without it the routine says so once an hour. Triggered runs are ordinary routine runs and follow the teammate's level.
+- The routine editor (`src/studio/MacTriggerFields.tsx`) and `routine_create` know both triggers.
+- `OPENBOT_BENCHMARK_TRIGGER=folder npm run benchmark:expenses` drops the three files into a watched folder instead of attaching them.
+- Tests: mac-triggers (5: baseline, settle, burst, cap, mail matching, Files & apps off); mac-triggers-route (the real server: validation, a file dropped, new mail in a staging Mac); the routines browser test (both triggers at 390 px in dark mode, with the errors shown in the form).
+- Not verified here: Mail on a real Mac, and the live benchmark (needs a model and openpyxl).
 
 ### F6 · Text your Mac · S–M · 0.43
 

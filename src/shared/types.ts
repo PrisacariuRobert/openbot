@@ -425,7 +425,7 @@ export interface ApprovedActionReceipt {
   reviewedAt: string | null;
 }
 
-export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion" | "webpage";
+export type AutomationTriggerType = "schedule" | "webhook" | "github" | "calendar" | "todoist" | "dropbox" | "slack" | "notion" | "webpage" | "folder" | "mail";
 
 export interface RoutineTriggerConfig {
   pageUrl?: string;
@@ -442,6 +442,12 @@ export interface RoutineTriggerConfig {
   slackChannel?: string;
   notionEvent?: "page_updated" | "page_created" | "comment" | "database" | "any";
   notionEntityId?: string;
+  /** Task F5: a folder on this Mac, optionally only some file types ("pdf, jpg"). */
+  folderPath?: string;
+  fileTypes?: string;
+  /** Task F5: new unread mail whose sender and/or subject contain these. */
+  mailFrom?: string;
+  mailSubject?: string;
 }
 
 export interface Routine {

@@ -3,7 +3,7 @@ import express from "express";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -24,6 +24,7 @@ import { actionHardStop, browserHardStop, commandHardStop } from "./hard-stops.j
 import { HARD_STOP_TEXT, hardStopLine, type HardStop } from "../shared/hard-stops.js";
 import { recipientsOf, rememberRecipients, unknownRecipients, type KnownPeopleSources } from "./known-people.js";
 import { ContactNames } from "./mac-messages-index.js";
+import { MacTriggers } from "./mac-triggers.js";
 import { performTeammateProposal, prepareTeammateProposal, proposalProblem, teammateProposalSchema } from "./teammate-proposals.js";
 import { SetupTimeline } from "./setup-timeline.js";
 import { McpUncertainError } from "./mcp-connections.js";
@@ -3257,10 +3258,12 @@ const triggerConfigInput = z.object({
   todoistEvent: z.enum(["added", "updated", "completed", "any"]).optional(), dropboxPath: z.string().trim().max(1_000).optional(),
   slackEvent: z.enum(["mention", "message", "reaction", "any"]).optional(), slackChannel: z.string().trim().max(200).optional(),
   notionEvent: z.enum(["page_updated", "page_created", "comment", "database", "any"]).optional(), notionEntityId: z.string().trim().max(200).optional(),
+  folderPath: z.string().trim().max(1_000).optional(), fileTypes: z.string().trim().max(120).optional(),
+  mailFrom: z.string().trim().max(200).optional(), mailSubject: z.string().trim().max(200).optional(),
 });
 const routineInput = z.object({
   name: z.string().trim().min(1).max(80), botId: z.string(), threadId: z.string(), prompt: z.string().trim().min(1).max(10_000),
-  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage"]).optional(), triggerConfig: triggerConfigInput.optional(),
+  intervalMinutes: z.number().int().min(5).max(43_200), enabled: z.boolean().optional(), triggerType: z.enum(["schedule", "webhook", "github", "calendar", "todoist", "dropbox", "slack", "notion", "webpage", "folder", "mail"]).optional(), triggerConfig: triggerConfigInput.optional(),
   schedule: routineScheduleInput.optional(),
   expectedRevision: z.number().int().min(1).optional(),
 });
@@ -3288,12 +3291,30 @@ function resolveRoutineUpdate(current: Routine, patch: RoutinePatch) {
 // Single validation rule for routine mutations (P03b). Owner PATCH, scoped
 // model tools and approved-action execution share it, so enabling or editing
 // a routine is revalidated the same way everywhere.
+/** Task F5: a folder trigger watches a real folder in the owner's home folder (never
+ * Sidemates' own data); "~/" is expanded and saved. A mail trigger needs a sender or a subject. */
+function macTriggerError(input: { triggerType?: string; triggerConfig?: RoutineTriggerConfig }): string | null {
+  if (input.triggerType === "mail") return input.triggerConfig?.mailFrom?.trim() || input.triggerConfig?.mailSubject?.trim() ? null : "Say which mail starts it: part of the sender, the subject, or both.";
+  if (input.triggerType !== "folder") return null;
+  const home = homedir(), raw = input.triggerConfig?.folderPath?.trim() || "";
+  const folder = path.resolve(raw.startsWith("~/") ? path.join(home, raw.slice(2)) : raw);
+  if (!raw || !path.isAbsolute(raw.startsWith("~/") ? folder : raw)) return "Choose a folder on this Mac, like ~/Documents/Receipts.";
+  if (!folder.startsWith(home + path.sep)) return "Choose a folder inside your home folder.";
+  const data = path.resolve(db.dataDir);
+  if (folder === data || folder.startsWith(data + path.sep) || data.startsWith(folder + path.sep)) return "Choose a folder outside Sidemates' own data.";
+  try { if (!statSync(folder).isDirectory()) return "That isn't a folder."; } catch { return "That folder doesn't exist on this Mac."; }
+  input.triggerConfig!.folderPath = folder;
+  return null;
+}
+
 function routineMutationError(next: { botId: string; threadId: string; enabled: boolean; intervalMinutes: number; schedule?: Routine["schedule"]; triggerType?: string; triggerConfig?: Routine["triggerConfig"] }, current: Routine, nextTriggerType: string): string | null {
   const scheduleError = routineScheduleError({ schedule: next.schedule, triggerType: next.triggerType, enabled: next.enabled, intervalMinutes: next.intervalMinutes }, current);
   if (scheduleError) return scheduleError;
   if (!db.getBot(next.botId) || !db.getThread(next.threadId)) return "Choose a valid teammate and conversation.";
   const watchError = pageWatchError({ triggerType: next.triggerType, triggerConfig: next.triggerConfig, intervalMinutes: next.intervalMinutes }, current.id);
   if (watchError) return watchError;
+  const macError = macTriggerError({ triggerType: nextTriggerType, triggerConfig: next.triggerConfig });
+  if (macError) return macError;
   if (nextTriggerType === "calendar" && next.enabled && !calendarAutomationReady(next.botId)) return "Connect Google Calendar in Apps & Tools and give this teammate read access first, or save it as a paused draft.";
   if ((nextTriggerType === "todoist" || nextTriggerType === "dropbox") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "todoist" ? "Todoist" : "Dropbox"} in Apps & Tools and give this teammate read access first, or save it as a paused draft.`;
   if ((nextTriggerType === "slack" || nextTriggerType === "notion") && next.enabled && !connectorAutomationReady(nextTriggerType, next.botId)) return `Connect ${nextTriggerType === "slack" ? "Slack" : "Notion"}, finish its live-event setup and give this teammate read access first, or save it as a paused draft.`;
@@ -3375,7 +3396,7 @@ function dispatchRoutineEvent(routine: Routine, input: { source: AutomationEvent
 app.post("/api/routines", (request, response) => {
   const parsed = routineInput.safeParse(request.body);
   if (!parsed.success || !db.getBot(parsed.data.botId) || !db.getThread(parsed.data.threadId)) return response.status(400).json({ error: "That routine needs a teammate, conversation and instruction." });
-  const watchError = pageWatchError(parsed.data);
+  const watchError = pageWatchError(parsed.data) || macTriggerError(parsed.data);
   if (watchError) return response.status(400).json({ error: watchError });
   const scheduleError = routineScheduleError(parsed.data);
   if (scheduleError) return response.status(400).json({ error: scheduleError });
@@ -4691,7 +4712,7 @@ app.post("/api/internal/tools", async (request, response) => {
         triggerType: requestedTrigger, triggerConfig: args.triggerConfig,
       });
       if (!routine.success) return response.status(400).json({ error: "Choose a name, what should happen, and a repeat time of at least 5 minutes." });
-      const watchError = pageWatchError(routine.data);
+      const watchError = pageWatchError(routine.data) || macTriggerError(routine.data);
       if (watchError) return response.status(400).json({ error: watchError });
       const scheduleError = routineScheduleError(routine.data);
       if (scheduleError) return response.status(400).json({ error: scheduleError });
@@ -4852,6 +4873,23 @@ function dispatchDueRoutines() {
   return changed;
 }
 setInterval(dispatchDueRoutines, 15_000);
+
+// Task F5: a file lands in a folder, or mail like this arrives.
+const macTriggerQuietMs = Math.max(200, Number(process.env.OPENBOT_MAC_TRIGGER_QUIET_MS || 30_000));
+const macTriggers = new MacTriggers({
+  routines: () => db.listRoutines().filter((routine) => routine.enabled && (routine.triggerType === "folder" || routine.triggerType === "mail")),
+  macAccess: () => db.getStudioSettings().macAccessEnabled,
+  listFolder: (folder) => readdirSync(folder, { withFileTypes: true }).filter((entry) => entry.isFile()).flatMap((entry) => {
+    try { const stats = statSync(path.join(folder, entry.name)); return [{ name: entry.name, size: stats.size, modifiedMs: stats.mtimeMs }]; } catch { return []; }
+  }),
+  unreadMail: async () => (await appleApps.unreadMail({ days: 2, limit: 20 })).messages.map(({ id, from, subject, date }) => ({ id, from, subject, date })),
+  cursor: { get: (routineId, source) => db.automationCursor(routineId, source), set: (routineId, source, value) => db.saveAutomationCursor(routineId, source, value) },
+  startedSince: (routineId, since) => db.automationEventsSince(routineId, new Date(since).toISOString()),
+  dispatch: (routine, source, payload, externalId) => { dispatchRoutineEvent(routine, { source, payload, externalId, skipMatch: true, rateLimit: 20 }); },
+  alert: (routine, message) => { db.createAutomationAlert({ routineId: routine.id, kind: "failure", message }); broadcast(); },
+  quietMs: macTriggerQuietMs,
+});
+setInterval(() => { if (runner.isLeader()) void macTriggers.tick(); }, Math.max(200, Number(process.env.OPENBOT_MAC_TRIGGER_INTERVAL_MS || 15_000)));
 
 let calendarPollRunning = false;
 setInterval(async () => {

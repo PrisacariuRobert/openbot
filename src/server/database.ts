@@ -4336,12 +4336,17 @@ export class OpenBotDatabase {
     return this.listRoutines().filter((routine) => routine.enabled && routine.triggerType === source);
   }
 
-  automationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage"): string | null {
+  automationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage" | "folder" | "mail"): string | null {
     const row = this.db.prepare("SELECT cursor FROM automation_cursors WHERE routine_id=? AND source=?").get(routineId, source) as Row | undefined;
     return row?.cursor ? String(row.cursor) : null;
   }
 
-  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage", cursor: string) {
+  /** Events a routine's trigger started since a time (task F5's hourly cap). */
+  automationEventsSince(routineId: string, sinceIso: string): number {
+    return Number((this.db.prepare("SELECT COUNT(*) count FROM automation_events WHERE routine_id=? AND received_at>=? AND status!='rate_limited' AND source!='manual'").get(routineId, sinceIso) as Row).count || 0);
+  }
+
+  saveAutomationCursor(routineId: string, source: "todoist" | "dropbox" | "webpage" | "folder" | "mail", cursor: string) {
     if (cursor.length > 32_000) throw new Error("The automation checkpoint is too large.");
     this.db.prepare(`INSERT INTO automation_cursors (routine_id,source,cursor,updated_at) VALUES (?,?,?,?)
       ON CONFLICT(routine_id,source) DO UPDATE SET cursor=excluded.cursor,updated_at=excluded.updated_at`).run(routineId, source, cursor.slice(0, 32_000), now());

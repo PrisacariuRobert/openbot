@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Your Mac reacts.** Two new automation triggers: "a file lands in a folder" (optionally only some file types) and "mail like this arrives" (by sender or subject, from the Mail app). What's already there never starts a run, files or mails arriving together start one run once things are quiet for half a minute, and each automation runs at most six times an hour. Both need Files & apps on this Mac.
 - **A teammate can suggest a specialist.** When a job would clearly go better with a researcher or a writer, your teammate can propose one, saying why and which AI they'd use. Nothing is added unless you approve, even on Autopilot, and a "no" isn't asked again in that conversation.
 - **Published attack tests.** Prompt injections in a web page, an email, a PDF and a calendar invite run in CI against a stand-in that obeys them, at Ask first and on Autopilot. docs/SECURITY.md shows what each one achieves, including the four that still get through and the tasks that will close them.
 - **Some things always ask, even on Autopilot.** Spending money, the first message to someone you haven't written to, anything that can't be undone (deleting, account and security settings), publishing (public posts, pushes, deploys), and passwords and card details. The approval card says why. Teammates never type card or bank details; you enter those yourself. A button that looks harmless but shows "Pay now" on screen, or a plain link into a checkout, now asks too.

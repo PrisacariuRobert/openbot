@@ -131,6 +131,14 @@ export function summarizeAutomationPayload(source: AutomationTriggerType | "manu
     const entity = objectAt(body, "entity"), type = normalizedText(body.type, 120).replace(/[._]/g, " ") || "Notion change";
     return [type, normalizedText(body.workspace_name, 120), normalizedText(entity.type, 60), normalizedText(entity.id, 80)].filter(Boolean).join(" · ");
   }
+  if (source === "folder") {
+    const files = Array.isArray(body.files) ? body.files as Array<Record<string, unknown>> : [];
+    return files.length ? `${files.length === 1 ? "New file" : `${files.length} new files`} · ${files.slice(0, 3).map((file) => normalizedText(file.name, 80)).join(", ")}${files.length > 3 ? "…" : ""}` : "New files";
+  }
+  if (source === "mail") {
+    const mails = Array.isArray(body.mails) ? body.mails as Array<Record<string, unknown>> : [];
+    return mails.length ? `${mails.length === 1 ? "New mail" : `${mails.length} new mails`} · ${normalizedText(mails[0]!.from, 80)}: ${normalizedText(mails[0]!.subject, 120)}` : "New mail";
+  }
   if (source === "schedule") return normalizedText(body.scheduledFor, 80) ? `Scheduled for ${normalizedText(body.scheduledFor, 80)}` : "Scheduled run";
   if (source === "manual") return "Started by you as a test run";
   return normalizedText(body.summary || body.title || body.event || body.type, 220) || "Signed webhook received";
@@ -160,6 +168,14 @@ export function normalizedTriggerConfig(type: AutomationTriggerType, value: Rout
     ...(normalizedText(config.repository, 200) ? { repository: normalizedText(config.repository, 200) } : {}),
   };
   if (type === "webhook") return normalizedText(config.eventName, 100) ? { eventName: normalizedText(config.eventName, 100) } : {};
+  if (type === "folder") return {
+    folderPath: normalizedText(config.folderPath, 1_000),
+    ...(normalizedText(config.fileTypes, 120) ? { fileTypes: normalizedText(config.fileTypes, 120) } : {}),
+  };
+  if (type === "mail") return {
+    ...(normalizedText(config.mailFrom, 200) ? { mailFrom: normalizedText(config.mailFrom, 200) } : {}),
+    ...(normalizedText(config.mailSubject, 200) ? { mailSubject: normalizedText(config.mailSubject, 200) } : {}),
+  };
   if (type === "calendar") return {
     ...(normalizedText(config.titleContains, 160) ? { titleContains: normalizedText(config.titleContains, 160) } : {}),
     minutesBefore: Math.max(0, Math.min(1_440, Math.round(Number(config.minutesBefore ?? 15)))),

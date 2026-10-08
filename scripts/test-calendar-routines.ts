@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -10,6 +10,9 @@ import { chromium } from "playwright-core";
 import type { AppState, Routine, ProviderInstance } from "../src/shared/types.js";
 
 const data = mkdtempSync(path.join(tmpdir(), "openbot-calendar-api-"));
+// A temporary home folder, so the folder trigger (F5) watches nothing of the owner's.
+const home = mkdtempSync(path.join(tmpdir(), "openbot-calendar-home-"));
+mkdirSync(path.join(home, "Receipts"), { recursive: true });
 const socket = createServer();
 await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
 const port = (socket.address() as { port: number }).port;
@@ -22,7 +25,7 @@ async function request(route: string, body?: unknown, method = "POST") {
 }
 async function start() {
   child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], { cwd: path.resolve(import.meta.dirname, ".."), stdio: "ignore",
-    env: { ...process.env, OPENBOT_LOAD_ENV: "0", OPENBOT_SEED_STARTER_BOTS: "1", OPENBOT_DATA_DIR: data, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" } });
+    env: { ...process.env, HOME: home, OPENBOT_LOAD_ENV: "0", OPENBOT_SEED_STARTER_BOTS: "1", OPENBOT_DATA_DIR: data, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_APP_URL: base, OPENBOT_DEPLOYMENT_MODE: "local", NODE_ENV: "production" } });
   for (let n = 0; n < 100; n++) { try { if ((await request("/api/healthz")).ok) return; } catch {} await delay(150); }
   throw new Error("Disposable schedule host did not start");
 }
@@ -123,9 +126,46 @@ try {
     assert.equal(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(onceCreated.schedule.at)), chosenDate);
     assert.equal(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(onceCreated.schedule.at)), "09:45");
   }
+  // F5: a file landing in a folder, and new mail, at phone width in dark mode.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.getByRole("button", { name: "Add an automation" }).click();
+  await form.getByLabel("Automation name", { exact: true }).fill("File new receipts");
+  await form.getByLabel("What should happen?", { exact: true }).fill("Add each new receipt to expenses.xlsx. Do not send anything.");
+  await form.getByLabel("What starts it?").selectOption("folder");
+  await form.getByText("Trigger details").click();
+  await form.getByLabel("Folder on this Mac").fill("~/Missing");
+  await form.getByRole("button", { name: /create automation/i }).click();
+  const folderError = form.locator(".form-actions .runner-error");
+  await folderError.waitFor({ state: "visible" });
+  assert.match(await folderError.textContent() || "", /doesn't exist/);
+  await form.getByLabel("Folder on this Mac").fill("~/Receipts");
+  await form.getByLabel("File types").fill("pdf");
+  assert.ok(await form.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "Folder trigger form overflows at phone width");
+  await form.screenshot({ path: "/tmp/openbot-folder-trigger-dark-390.png" });
+  await form.getByRole("button", { name: /create automation/i }).click();
+  await form.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Add an automation" }).click();
+  await form.getByLabel("Automation name", { exact: true }).fill("Accountant invoices");
+  await form.getByLabel("What should happen?", { exact: true }).fill("File the invoice and remind me to pay it. Do not reply.");
+  await form.getByLabel("What starts it?").selectOption("mail");
+  await form.getByRole("button", { name: /create automation/i }).click();
+  await folderError.waitFor({ state: "visible" });
+  assert.match(await folderError.textContent() || "", /Say which mail starts it/);
+  if (!await form.getByLabel("From contains").isVisible()) await form.getByText("Trigger details").click();
+  await form.getByLabel("From contains").fill("accountant@");
+  await form.getByLabel("Subject contains").fill("invoice");
+  await form.getByRole("button", { name: /create automation/i }).click();
+  await form.waitFor({ state: "detached" });
+  state = await (await request("/api/state")).json();
+  const folderRoutine = state.routines.find((r) => r.name === "File new receipts")!, mailRoutine = state.routines.find((r) => r.name === "Accountant invoices")!;
+  assert.deepEqual([folderRoutine.triggerType, folderRoutine.triggerConfig], ["folder", { folderPath: path.join(home, "Receipts"), fileTypes: "pdf" }]);
+  assert.deepEqual([mailRoutine.triggerType, mailRoutine.triggerConfig], ["mail", { mailFrom: "accountant@", mailSubject: "invoice" }]);
+  assert.ok(await page.getByText(`New files · ${path.join(home, "Receipts")} (pdf)`).count(), "the list says what starts it");
+  await request(`/api/routines/${folderRoutine.id}`, { enabled: false }, "PATCH");
+  await request(`/api/routines/${mailRoutine.id}`, { enabled: false }, "PATCH");
   await request(`/api/routines/${onceCreated.id}`, { enabled: false }, "PATCH");
   await request(`/api/routines/${created.id}`, { enabled: false }, "PATCH");
   await request(`/api/routines/${routine.id}`, { enabled: false }, "PATCH");
   assert.equal(state.studioRuns.length, 0);
   console.log("PASS: natural calendar setup, preview/save agreement, invalid-zone/past-date rejection, restart preservation, desktop/390px creation; zero model runs. Screenshots in /tmp/openbot-calendar-{desktop,mobile}.png");
-} finally { await browser?.close(); await stop(); rmSync(data, { recursive: true, force: true }); }
+} finally { await browser?.close(); await stop(); rmSync(data, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
