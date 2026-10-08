@@ -493,6 +493,13 @@ Two more already have benchmarks: receipts to a spreadsheet (`npm run benchmark:
 
 **Prompt.** `Do task J3 in docs/DEVELOPER_PLAN.md.`
 
+**Status, 8 October 2026.** Kit ready; the owner runs it.
+- `scripts/mac-acceptance.ts` (with `src/server/mac-acceptance.ts`) checks Mail, Calendar, Reminders, Notes and Contacts against the real apps, using demo items with fixed names. `--write` also checks adding a reminder, note, event and Mail draft, in the demo list, folder and calendar only.
+- It also checks Full Disk Access for Messages, the background service and its launch agent's download mark, and the wake schedule. It reports the macOS 27 privacy-database and container changes.
+- It writes `qa/mac-acceptance/<date>-macos-<version>-<arch>.md` with counts, timings and pass/fail only; a test checks that no account data gets in.
+- `qa/mac-acceptance/README.md` has the demo-account setup and the hand checks (fresh-install and update prompts, a routine waking the Mac).
+- **Owner:** run it on macOS 15, 26 and 27 and commit the reports.
+
 ### J4 · Fast Calendar and Reminders through EventKit · M
 
 **Why.** Calendar reads take about 40 seconds for 17 calendars through JXA (see the 0.38 and 0.39 changelog entries).
