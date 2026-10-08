@@ -774,10 +774,25 @@ try {
   assert.doesNotMatch(await helpers.innerText(), /Ignore the owner/, "Only Sidemates' own step names show");
   await capture("team-waiting-1440");
   teamWaiting = false;
+  // "New conversation" can start a group: name it, pick at least two, start.
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto(base + "/studio.html?thread=bot-pixel");
+  await page.getByRole("button", { name: "New conversation" }).first().click();
+  await page.getByRole("button", { name: "Start a group" }).click();
+  const startGroup = page.getByRole("button", { name: "Start the group" });
+  const members = page.getByRole("group", { name: "Shared chat teammates" }).getByRole("button");
+  await page.getByRole("textbox", { name: "Chat name" }).fill("Money");
+  await members.nth(0).click();
+  assert.equal(await startGroup.isDisabled(), true, "A group needs at least two teammates");
+  await members.nth(1).click();
+  await startGroup.hover();
+  assert.notEqual(await startGroup.evaluate((el) => getComputedStyle(el).backgroundColor), "rgba(255, 255, 255, 0.24)", "The main button stays solid on hover");
+  await startGroup.click();
+  await page.waitForURL(/thread=group-/);
   assert.deepEqual(errors, []);
   assert.deepEqual(visualFailures, [], "One or more screenshots violated the monochrome-except-mascots design contract");
   console.log(
-    `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards; helper progress. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
+    `PASS: new Studio at 1440/390/320px; isolated CSS; monochrome except animated mascots; no overflow; 5 destinations; dialogs/focus/Escape; calendar dates; app status and search; included skills; Markdown; action uncertainty and alerts; explicit selected provider; persistent text/files and send recovery; attachment-only messages; delayed-send navigation; contextual work/routines/computer status; readable attachment cards; starting a group; helper progress. Screenshots: ${output}. Synthetic data, intercepted sends, zero model calls.`,
   );
 } finally {
   // Drain intercepted polling before disposing its request context, so teardown
