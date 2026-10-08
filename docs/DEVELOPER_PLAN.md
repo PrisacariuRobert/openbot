@@ -98,7 +98,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | T2 | Untrusted content can't trigger outward actions on its own | M–L | 0.45 | ☐ |
 | F2 | Rewind: an undo button | M–L | 0.45 | ☐ |
 | AU1 | Autonomy levels and the Smart default | M | 0.45 | ☐ |
-| T3 | Publish the attack tests | M | 0.46 | ☐ |
+| T3 | Publish the attack tests | M | 0.46 | ✅ |
 | AU2 | Real sending with an undo window and sandboxed replies | L | 0.46 | ☐ |
 | AU3 | Batch approvals and the daily digest | M | 0.46 | ☐ |
 | AU4 | A teammate proposes a specialist, and the owner approves it | S–M | 0.46 | ☐ |
@@ -854,6 +854,11 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 - Publish what we test, and what still gets through, in `docs/SECURITY.md`.
 
 **Prompt.** `Do task T3 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done.
+- Ten attacks across a web page, an email, a PDF and a calendar invite (`src/server/attack-suite.ts`, `qa/attacks/`). `scripts/attack-tests.ts --fake` runs each through a staging studio at Ask first and at Autopilot, with a scripted stand-in that obeys every injection. 20 of 20 results match the table, which CI checks on every push (`npm run test:attacks`); a unit test checks the page holds the current table.
+- Published in docs/SECURITY.md. What still gets through: data in a link (T2), a memory from untrusted content (T5), a routine created and switched on (T2), and on Autopilot a non-payment form submit (T2).
+- Live runs with real models are the owner's (`--model`); results go to `qa/attacks/results/`.
 
 ### T4 · Skills you can trust · S–M
 
