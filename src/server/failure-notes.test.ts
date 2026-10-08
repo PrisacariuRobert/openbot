@@ -135,7 +135,10 @@ test("through the real tool route: Files & apps off leaves one note; a provider 
 
     const limited = await send("PROVIDER-LIMIT please");
     assert.equal(limited.status, "failed");
-    const stop = db.messagesForRunEvent(limited.id, "run_stopped")[0]!;
+    // The stop note is written just after the run is marked failed.
+    let stop = db.messagesForRunEvent(limited.id, "run_stopped")[0];
+    for (let n = 0; n < 50 && !stop; n++) { await delay(100); stop = db.messagesForRunEvent(limited.id, "run_stopped")[0]; }
+    assert.ok(stop, "the stop is noted in the conversation");
     assert.match(stop.body, /reached a usage or rate limit/);
     assert.equal(failureFix(stop.body)?.label, "Choose another AI");
     assert.equal(db.messagesForRunEvent(limited.id, "needs_fix").length, 0, "a stop is not also a note");
