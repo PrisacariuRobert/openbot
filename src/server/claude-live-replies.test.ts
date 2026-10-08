@@ -14,6 +14,18 @@ const CLAUDE = `#!${process.execPath}
 const args = process.argv.slice(2);
 if (args[0] === "--version") { console.log("2.1.226 (Claude Code)"); process.exit(0); }
 if (args[0] === "auth") { console.log(JSON.stringify({ loggedIn: true, authMethod: "claude.ai" })); process.exit(0); }
+// Read the prompt the way Claude Code 2.1.226 does: --tools, --allowedTools and --mcp-config take every
+// value up to the next option, so only "--" (or another option) keeps a trailing prompt from being swallowed.
+const valued = new Set(["--output-format", "--model", "--permission-mode", "--resume"]);
+const variadic = new Set(["--tools", "--allowedTools", "--allowed-tools", "--mcp-config"]);
+const positional = [];
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--") { positional.push(...args.slice(i + 1)); break; }
+  if (valued.has(args[i])) { i++; continue; }
+  if (variadic.has(args[i])) { while (i + 1 < args.length && !args[i + 1].startsWith("-")) i++; continue; }
+  if (!args[i].startsWith("-")) positional.push(args[i]);
+}
+if (!positional.length) { console.error("Error: Input must be provided either through stdin or as a prompt argument when using --print"); process.exit(1); }
 if (!args.includes("--include-partial-messages")) { console.log(JSON.stringify({ type: "result", subtype: "success", result: "No partial messages were requested." })); process.exit(0); }
 const say = (event) => console.log(JSON.stringify(event));
 const chunks = ["Morning walks ", "clear the head, ", "wake the body, ", "and make the first hour yours."];
