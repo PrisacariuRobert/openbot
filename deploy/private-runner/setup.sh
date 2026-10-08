@@ -51,7 +51,7 @@ if [[ ! -e "${env_file}" ]]; then
     echo "OPENBOT_DOMAIN=${domain}"
     echo "OPENBOT_HOST_ROOT=${host_root}"
     echo "DOCKER_GID=${docker_gid}"
-    echo "OPENCODE_VERSION=1.18.28"
+    echo "OPENCODE_VERSION=1.18.31"
   } > "${env_file}"
 else
   echo "Keeping the existing ${env_file}."

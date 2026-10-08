@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim
 
-ARG OPENCODE_VERSION=1.18.28
+ARG OPENCODE_VERSION=1.18.31
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates chromium docker.io git openssh-client ripgrep tini \

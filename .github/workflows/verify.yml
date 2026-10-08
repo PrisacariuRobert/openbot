@@ -94,8 +94,8 @@ jobs:
         # Keep aligned with deploy/private-runner/Dockerfile. This is a runtime,
         # not a provider account; onboarding uses a new empty credentials home.
         run: |
-          npm install --global --prefix "$RUNNER_TEMP/openbot-runtime" --no-audit --no-fund opencode-ai@1.18.28
-          test "$("$RUNNER_TEMP/openbot-runtime/bin/opencode" --version)" = "1.18.28"
+          npm install --global --prefix "$RUNNER_TEMP/openbot-runtime" --no-audit --no-fund opencode-ai@1.18.31
+          test "$("$RUNNER_TEMP/openbot-runtime/bin/opencode" --version)" = "1.18.31"
           echo "$RUNNER_TEMP/openbot-runtime/bin" >> "$GITHUB_PATH"
       - run: npm run build
       - name: Test conversations, first teammate, action review and draft recovery
