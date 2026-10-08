@@ -11,7 +11,8 @@ test("every stop comes with the fix that matches it", () => {
   assert.match(JSON.stringify(fix("Full Disk Access: System Settings → Privacy & Security → Full Disk Access → turn on Sidemates. Nothing was read.").action), /Privacy_AllFiles/);
   assert.deepEqual(fix("Mac access is turned off for the studio.").action, { kind: "setting", setting: "macAccessEnabled" });
   assert.equal(fix("Mac access is turned off for the studio.").retryAfter, true, "turning it on runs the job again");
-  assert.equal(fix("No Chrome, Edge or Brave was found on this Mac.").label, "Get a browser");
+  assert.deepEqual(fix("Chrome or Chromium is required for browser work."), { label: "Download a private browser (about 150 MB)", action: { kind: "install-browser" }, retryAfter: true });
+  assert.equal(fix("No Chrome, Edge or Brave was found on this Mac.").action.kind, "install-browser");
   assert.equal(fix("The private computer needs Docker.").label, "Get Docker");
 });
 
