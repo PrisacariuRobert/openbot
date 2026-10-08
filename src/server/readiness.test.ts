@@ -15,6 +15,9 @@ test("readiness reports the three setup steps and tracks teammates", { timeout: 
   const root = mkdtempSync(path.join(tmpdir(), "openbot-readiness-")), db = new OpenBotDatabase(root);
   const botIds = db.listBots().map((bot) => bot.id);
   assert.ok(botIds.length > 0);
+  // This checks teammates whose AI the owner chose. Teammates on Automatic are
+  // ready as soon as any AI is connected, which depends on the host.
+  for (const id of botIds) db.updateBot(id, { aiMode: "chosen" });
   const reservation = createServer();
   await new Promise<void>((resolve) => reservation.listen(0, "127.0.0.1", resolve));
   const address = reservation.address(); assert.ok(address && typeof address !== "string");
