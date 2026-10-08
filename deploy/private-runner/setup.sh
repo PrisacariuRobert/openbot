@@ -79,7 +79,7 @@ if [[ -n "${relay_domain}" ]]; then
 fi
 
 docker compose --env-file "${env_file}" -f "${runner_dir}/docker-compose.yml" up -d --build
-echo "OpenBot is starting (${with_relay_wording}): https://${domain}/"
+echo "Sidemates is starting (${with_relay_wording}): https://${domain}/"
 echo "After the health check passes, read the private key with:"
 echo "  sudo cat ${host_root}/data/access.token"
 if [[ -n "${relay_domain}" ]]; then

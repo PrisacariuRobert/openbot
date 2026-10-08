@@ -12,7 +12,11 @@ test('draft releases wait for all desktop installers and never publish automatic
   assert.deepEqual(bundles.strategy.matrix.include.map(v => v.platform).sort(), ['darwin-arm64', 'darwin-x64']);
   const upload = bundles.steps.find(s => s.uses?.startsWith('actions/upload-artifact'));
   assert.equal(upload.with['if-no-files-found'], 'error');
-  assert.match(upload.with.name, /^openbot-desktop-/, 'merged into the same draft release');
+  assert.match(upload.with.name, /^sidemates-desktop-/, 'merged into the same draft release');
+  const download = release.jobs.publish.steps.find(s => s.uses?.startsWith('actions/download-artifact'));
+  const prefix = download.with.pattern.replace(/\*$/, '');
+  assert.equal(prefix, 'sidemates-desktop-');
+  assert.ok(read('desktop').jobs.installer.steps.find(s => s.uses?.startsWith('actions/upload-artifact')).with.name.startsWith(prefix), 'installers join the same draft');
   const command = release.jobs.publish.steps.find(s => s.run?.includes('gh release')).run;
   assert.match(command, /--draft\b/); assert.match(command, /--verify-tag\b/);
   assert.doesNotMatch(release.jobs.publish.if, /always\(/);
