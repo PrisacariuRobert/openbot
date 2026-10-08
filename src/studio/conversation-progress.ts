@@ -1,4 +1,5 @@
 import type { Run } from "../shared/types";
+import { KNOWN_STEP_LABELS } from "../shared/step-labels";
 
 const visibleActivityLabels = new Set(["Opening the website", "Reading the page", "Using the page", "Preparing the next step"]);
 
@@ -13,6 +14,20 @@ export function conversationProgress(run: Run) {
     .map((item, index) => ({ item, index, time: Date.parse(item.createdAt || "") }))
     .sort((a, b) => (Number.isFinite(b.time) ? b.time : Number.NEGATIVE_INFINITY) - (Number.isFinite(a.time) ? a.time : Number.NEGATIVE_INFINITY) || b.index - a.index)[0]?.item;
   return { label: `${run.botName} is working on it`, detail: activity && visibleActivityLabels.has(activity.label) ? activity.label : "You can keep chatting while this runs.", animated: true };
+}
+
+/** While a lead waits, one line per helper: who is on it and their latest
+ * step, so a long team job never looks stuck. */
+export function helperProgress(helper: Run, now = Date.now()) {
+  // Only Sidemates' own fixed step names, never text from a model or a page.
+  const latest = [...(helper.activities || [])].filter((item) => KNOWN_STEP_LABELS.has(item.label)).at(-1);
+  const started = Date.parse(helper.startedAt || "");
+  const minutes = Number.isFinite(started) ? Math.floor((now - started) / 60_000) : 0;
+  const doing = helper.status === "queued" ? "Starting soon"
+    : helper.status === "awaiting_approval" ? "Waiting for your decision"
+    : helper.status === "waiting_for_teammate" ? "Asking another teammate"
+    : latest?.label || "Working on their part";
+  return { name: helper.botName, doing, since: minutes >= 1 ? `${minutes} min` : "" };
 }
 
 /** The reply as it is being written: the latest part, cut at a clean break. */

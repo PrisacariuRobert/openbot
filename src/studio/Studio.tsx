@@ -2766,7 +2766,7 @@ export function Studio() {
                             activeStates.includes(run.status),
                         )
                         .map((run) => (
-                          <ConversationProgress key={run.id} run={liveTexts[run.id] && liveTexts[run.id]!.length >= (run.partialText?.length || 0) ? { ...run, partialText: liveTexts[run.id]! } : run} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
+                          <ConversationProgress key={run.id} run={liveTexts[run.id] && liveTexts[run.id]!.length >= (run.partialText?.length || 0) ? { ...run, partialText: liveTexts[run.id]! } : run} helpers={state.runs.filter((helper) => helper.parentRunId === run.id && [...activeStates, "awaiting_approval"].includes(helper.status))} onDetails={() => setDetail({ kind: "run", run })} onChange={() => setRefresh((value) => value + 1)} />
                         ))}
                     <div ref={messagesEnd} />
                   </div>

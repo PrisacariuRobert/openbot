@@ -25,3 +25,10 @@
 /* Match the finished bubble's rhythm so nothing shifts when it lands. */
 .conversation-progress-live > * + * { margin-top: 16px; }
 .conversation-progress-live > * { margin-bottom: 0; }
+/* While the lead waits: one quiet line per helper. */
+.conversation-progress-helpers { list-style: none; margin: 8px 0 0 42px; padding: 0; display: grid; gap: 6px; }
+.conversation-progress-helpers li { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; line-height: 1.4; color: var(--secondary); }
+.conversation-progress-helpers li > .character { flex: none; }
+.conversation-progress-helpers span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-progress-helpers strong { color: var(--ink); font-weight: 550; }
+.conversation-progress-helpers small { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; }
