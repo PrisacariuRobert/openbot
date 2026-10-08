@@ -55,5 +55,5 @@ try {
   }
   console.log("PASS: the packed package has the studio and none of the private or test files; npx sidemates starts it from the unpacked tarball, with --help, option checks and its own data folder.");
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); // the server may still be closing its files
 }

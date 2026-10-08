@@ -127,5 +127,5 @@ try {
   child.kill("SIGTERM");
   for (let n = 0; n < 40 && child.exitCode === null && child.signalCode === null; n++) await delay(100);
   if (child.exitCode === null && child.signalCode === null) { child.kill("SIGKILL"); await new Promise<void>((resolve) => child.once("close", resolve)); }
-  rmSync(data, { recursive: true, force: true });
+  rmSync(data, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); // the server may still be closing its files
 }

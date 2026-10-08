@@ -58,5 +58,5 @@ try {
   await browser?.close();
   child.kill("SIGTERM");
   for (let n = 0; n < 40 && child.exitCode === null; n++) await delay(100);
-  rmSync(data, { recursive: true, force: true });
+  rmSync(data, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); // the server may still be closing its files
 }
