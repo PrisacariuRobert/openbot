@@ -416,9 +416,13 @@ for (const receipt of db.listPreparedApprovedActions()) {
 }
 
 const runner = new OpenCodeRunner({ db, attachments: attachmentsService, onChange: () => broadcast(), onLive: (runId, text) => broadcast({ type: "live", runId, text }), internalUrl, internalToken, maxParallel: 3, aiConnections: () => connectionsFrom(latestProviderStatus()) });
-// Automatic AI needs to know which AIs are connected, even before anyone opens the studio.
-void readProviderStatus(db).catch(() => {});
-setInterval(() => { void readProviderStatus(db).catch(() => {}); }, 10 * 60_000).unref();
+// Automatic AI needs to know which AIs are connected, even before anyone
+// opens the studio. Once it does, teammates on Automatic that have no AI
+// yet (made before the check finished, or before an AI was connected) get
+// one, so the very first message can be sent.
+const refreshAutomaticAi = () => readProviderStatus(db).then(() => { if (giveAutomaticTeammatesAnAi()) broadcast(); }).catch(() => {});
+void refreshAutomaticAi();
+setInterval(() => { void refreshAutomaticAi(); }, 10 * 60_000).unref();
 const notifications = new NotificationService(db, () => runner.isLeader());
 const awakeGuard = new AwakeGuard({ db, enabled: () => runner.isLeader() });
 const telegram = new TelegramChannel({
@@ -919,7 +923,9 @@ app.delete("/api/code-projects/:projectId", (request, response) => {
 });
 
 app.get("/api/provider", async (_request, response) => {
-  response.json(await readProviderStatus(db, providerConnections.listAttempts()));
+  const status = await readProviderStatus(db, providerConnections.listAttempts());
+  if (giveAutomaticTeammatesAnAi()) broadcast();
+  response.json(status);
 });
 
 /** A teammate on automatic AI that has never worked yet gets its first AI
@@ -928,6 +934,12 @@ function withAutomaticAi(bot: Bot): Bot {
   if (bot.aiMode !== "automatic" || (bot.providerInstanceId && bot.model)) return bot;
   const pick = rankAi(connectionsFrom(latestProviderStatus()), "heavy", aiRest.isResting)[0];
   return pick ? db.updateBot(bot.id, { providerInstanceId: pick.instanceId, model: pick.model }) || bot : bot;
+}
+/** True when any teammate on Automatic just got its first AI. */
+function giveAutomaticTeammatesAnAi(): boolean {
+  let changed = false;
+  for (const bot of db.listBots()) if (!bot.retiredAt && withAutomaticAi(bot) !== bot) changed = true;
+  return changed;
 }
 
 app.get("/api/readiness", async (_request, response) => {
