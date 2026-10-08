@@ -80,7 +80,7 @@ export function WaitingForYou({ queueReady, demoMac, firstLook = false, onChange
   const [alone, setAlone] = useState(0);
   const [receipts, setReceipts] = useState<ReceiptsSummary | null>(null);
   const [receiptMonth, setReceiptMonth] = useState("");
-  const [scan, setScan] = useState<{ state: "idle" | "starting" | "started" | "error" | "needs-mail"; text: string }>({ state: "idle", text: "" });
+  const [scan, setScan] = useState<{ state: "idle" | "starting" | "asking" | "started" | "error" | "needs-mail"; text: string }>({ state: "idle", text: "" });
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
@@ -157,6 +157,9 @@ export function WaitingForYou({ queueReady, demoMac, firstLook = false, onChange
     try {
       const response = await fetch("/api/settings", { method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ macAccessEnabled: true }) });
       if (!response.ok) throw new Error();
+      // macOS shows its "Allow" questions now, while the owner is here, not halfway through the look.
+      setScan({ state: "asking", text: "" });
+      await fetch("/api/mac/ask-access", { method: "POST", credentials: "same-origin" }).catch(() => null);
       await startScan();
     } catch { setScan({ state: "error", text: "That didn't work. Nothing was changed." }); }
   };
@@ -187,7 +190,7 @@ export function WaitingForYou({ queueReady, demoMac, firstLook = false, onChange
     </section>)}
 
     {loaded && ready.length === 0 && <div className="waiting-empty">
-      <Check size={22} aria-hidden="true" />
+      {!firstLook && <Check size={22} aria-hidden="true" />}
       <strong>{firstLook ? "First, a look at your last few days" : "You're all caught up"}</strong>
       <span>{firstLook ? "Replies you owe, bills, invitations: anything that needs you shows up here as a card." : "When a teammate notices something that needs you, such as a reply, a bill or an invitation, it shows up here as a card."}</span>
       {scan.state === "needs-mail" && <div className="waiting-mail-ask" role="group" aria-label="Let your team read your Mail">
@@ -196,7 +199,9 @@ export function WaitingForYou({ queueReady, demoMac, firstLook = false, onChange
       </div>}
       {scan.state === "started"
         ? <span className="waiting-scan-note" role="status">{scan.text}</span>
-        : scan.state === "needs-mail" ? null : <button type="button" className="waiting-skip waiting-scan" disabled={scan.state === "starting"} onClick={() => void startScan()}>{scan.state === "starting" ? "Starting…" : "Look at my last few days"}</button>}
+        : scan.state === "needs-mail" ? null
+        : scan.state === "asking" ? <span className="waiting-scan-note" role="status">Your Mac is asking whether your team may use Mail, Calendar and Notes. Choose Allow (or OK) for each.</span>
+        : <button type="button" className="waiting-skip waiting-scan" disabled={scan.state === "starting"} onClick={() => void startScan()}>{scan.state === "starting" ? "Starting…" : "Look at my last few days"}</button>}
       {scan.state === "error" && <span className="waiting-error" role="alert">{scan.text}</span>}
     </div>}
 

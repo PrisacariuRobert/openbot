@@ -580,6 +580,20 @@ app.get("/api/queue/receipts.csv", (request, response) => {
   response.setHeader("Content-Disposition", `attachment; filename="receipts-${month}.csv"`);
   response.type("text/csv; charset=utf-8").send(csv);
 });
+// Opens the exact System Settings page an answer points to; the owner makes the change there.
+app.post("/api/mac/open-settings", (request, response) => {
+  const parsed = z.object({ pane: z.enum(["files", "automation"]) }).strict().safeParse(request.body);
+  if (!parsed.success) return response.status(400).json({ error: "Say which setting to open." });
+  if (process.platform !== "darwin") return response.status(409).json({ error: "This is only on a Mac." });
+  execFile("open", [`x-apple.systempreferences:com.apple.preference.security?${parsed.data.pane === "files" ? "Privacy_AllFiles" : "Privacy_Automation"}`], () => {});
+  response.json({ ok: true });
+});
+// The moment the owner says yes: macOS asks once for Mail, Calendar and Notes
+// (no trip to System Settings), and the answers come back to the studio.
+app.post("/api/mac/ask-access", async (_request, response) => {
+  if (process.platform !== "darwin" || demoMac) return response.json({ answers: [] });
+  response.json({ answers: await appleApps.askAccess() });
+});
 // "Look at my last few days": a first useful list on day one, from the same cards as the morning review.
 app.post("/api/queue/scan", async (_request, response) => {
   if (process.platform !== "darwin") return response.status(409).json({ error: "This looks through Mail on a Mac." });
