@@ -104,7 +104,7 @@ export function BringYourAI({ onConnected, compact = false }: { onConnected: (co
 
       <h4>Use a subscription you already have</h4>
       <ul className="byo-list">
-        {account("openai", "ChatGPT", "Plus, Pro or Business")}
+        <ChatGptRow onConnected={onConnected} />
         {account("github-copilot", "GitHub Copilot", "Pro, Pro+ or Business")}
         {account("claude", "Claude", "Pro or Max")}
         {account("xai", "Grok", "SuperGrok")}
@@ -183,3 +183,51 @@ function CodeForm({ busy, onSubmit }: { busy: boolean; onSubmit: (code: string) 
 }
 
 export type { ProviderCatalogEntry };
+
+type PlanStatus = { signedIn: boolean; email: string | null; planUsage: boolean; attempt: { status: "waiting" | "connected" | "failed"; error: string | null } | null };
+
+/** Sign in with ChatGPT: the team uses the owner's ChatGPT Plus or Pro plan. */
+function ChatGptRow({ onConnected }: { onConnected: (connectionId: string) => Promise<void> | void }) {
+  const [plan, setPlan] = useState<PlanStatus | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const announced = useRef(false);
+  const load = async () => {
+    const response = await fetch("/api/chatgpt/status", { credentials: "same-origin" });
+    if (response.ok) setPlan(await response.json() as PlanStatus);
+  };
+  useEffect(() => { void load(); }, []);
+  // While the sign-in is open in another tab, check back until it lands.
+  useEffect(() => {
+    if (plan?.attempt?.status !== "waiting") return;
+    const timer = window.setInterval(() => void load(), 2_000);
+    return () => window.clearInterval(timer);
+  }, [plan?.attempt?.status]);
+  useEffect(() => {
+    if (plan?.signedIn && plan.attempt?.status === "connected" && !announced.current) { announced.current = true; void onConnected("chatgpt-plan"); }
+    if (plan?.attempt?.status === "failed" && plan.attempt.error) setError(plan.attempt.error);
+  }, [plan]);
+  const start = async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/chatgpt/signin", { method: "POST", credentials: "same-origin" });
+      const body = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !body.url) throw new Error(body.error || "Sign-in couldn't start.");
+      window.open(body.url, "_blank", "noopener,noreferrer");
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Sign-in couldn't start."); }
+    finally { setBusy(false); }
+  };
+  const waiting = plan?.attempt?.status === "waiting";
+  return (
+    <li className="byo-row">
+      <div className="byo-row-text">
+        <strong>ChatGPT</strong>
+        <small>{plan?.signedIn ? (plan.planUsage ? `Signed in${plan.email ? ` as ${plan.email}` : ""}. Your team uses your plan.` : "Signed in, but plan usage isn't enabled. Sign in again and allow it.") : "Plus or Pro. Sign in and your team uses your plan."}</small>
+        {error && <small className="byo-error" role="alert">{error}</small>}
+      </div>
+      {plan?.signedIn && plan.planUsage
+        ? <span className="byo-connected"><Check size={14} aria-hidden="true" /> Connected</span>
+        : <button type="button" className="byo-action" disabled={busy || waiting} onClick={() => void start()}>{busy || waiting ? <LoaderCircle size={14} className="spinner" aria-hidden="true" /> : null}{waiting ? "Waiting for ChatGPT…" : "Sign in with ChatGPT"}</button>}
+    </li>
+  );
+}
