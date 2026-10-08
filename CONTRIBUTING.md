@@ -40,7 +40,11 @@ The browser checks require Chrome/Chromium. Set `OPENBOT_CHROME_PATH` to its exe
 
 ## Add a teammate to the gallery
 
-The [gallery](https://sidemates.app/teammates/) is a folder of plain JSON files, `site/teammates/<name>.json`. To add one:
+The [gallery](https://sidemates.app/teammates/) is a folder of plain JSON files, `site/teammates/<name>.json`.
+
+**Without Git:** build the teammate in Sidemates, try it on real work, then use **Submit to the gallery** in its settings (under Advanced Teammate Options). It opens [the gallery form](https://github.com/PrisacariuRobert/sidemates/issues/new?template=gallery_submission.yml) on GitHub, filled in. Read it and submit. An action checks it with the gallery test below and opens the pull request; if something needs fixing, it comments on your issue, and editing the issue runs the check again.
+
+**With Git:**
 
 1. Build the teammate in Sidemates, try it on real work, then use **Share as a file** in its settings.
 2. Save the file as `site/teammates/<short-name>.json` (lowercase letters, digits and dashes) and add one line about it to `site/teammates/index.json`. Keep `about` to one plain sentence.

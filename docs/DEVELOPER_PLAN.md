@@ -105,7 +105,7 @@ Patch releases in between are fine. Dates are targets: a release ships when its 
 | F4 | Trust ladder: autonomy teammates earn | M | 0.46 | ☐ |
 | F5 | Triggers: your Mac reacts | M | 0.47 | ✅ |
 | R1 | Mac tools as an MCP server and Agent Skills | M | 0.47 | ☐ |
-| R3 | Gallery submissions without Git | S | 0.47 | ☐ |
+| R3 | Gallery submissions without Git | S | 0.47 | ✅ |
 | R5 | Shared results that bring people back | S | 0.47 | ☐ |
 | F3 | Run receipts and Private mode | M | 0.48 | ☐ |
 | T4 | Skills you can trust | S–M | 0.48 | ☐ |
@@ -940,6 +940,12 @@ AU2's sandboxed replies apply this same rule, so AU2 can't ship before T2.
 - A GitHub Action runs `gallery.test.ts` and opens the pull request.
 
 **Prompt.** `Do task R3 in docs/DEVELOPER_PLAN.md.`
+
+**Status, 8 October 2026.** Done; the first real submission is the check.
+- `src/components/SubmitToGallery.tsx` (next to "Copy share link") opens `.github/ISSUE_TEMPLATE/gallery_submission.yml` filled in: title, short name, sentence and the teammate file. A file too long for an address is copied for pasting instead. Sidemates sends nothing.
+- `.github/workflows/gallery-submission.yml` runs on "[Gallery]" issues: `scripts/gallery-submission.ts` reads the issue body only from an environment variable, validates it (`src/server/gallery-submission.ts`: short name, sentence length, valid teammate, no keys, no clash) and writes the file and index entry; then `gallery.test.ts` runs and the action opens or updates the pull request, or comments with what to fix.
+- Tests: gallery-submission (4: the prefilled address and the copy fallback, a submission that passes the gallery's own checks, six bad submissions writing nothing, and the workflow's shape: issue text only through the environment, pinned actions, narrow permissions); `npm run test:gallery-submit` in CI (the button by keyboard at 390 px dark, the form address, nothing sent).
+- Not verified here: the action on GitHub itself (it runs when the first "[Gallery]" issue is opened). The owner may want a "gallery" label in the repository.
 
 ### R4 · A developer try-path · S–M
 

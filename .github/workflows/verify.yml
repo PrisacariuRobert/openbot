@@ -108,6 +108,8 @@ jobs:
         run: npm run test:hero-jobs
       - name: One-click fixes when a job can't finish
         run: npm run test:failure-fixes
+      - name: Submit a teammate to the gallery from its settings
+        run: npm run test:gallery-submit
       - name: Attack tests (prompt injections against a scripted stand-in that obeys them)
         # Checks what the server lets through at Ask first and Autopilot against
         # the table published in docs/SECURITY.md. Credential-free.

@@ -21,6 +21,7 @@
     "test:hero-jobs": "tsx scripts/hero-jobs.ts --fake",
     "test:failure-fixes": "tsx scripts/test-failure-fixes.ts",
     "test:attacks": "tsx scripts/attack-tests.ts --fake",
+    "test:gallery-submit": "tsx scripts/test-gallery-submit.ts",
     "test:calendar-routines": "tsx scripts/test-calendar-routines.ts",
     "test:work-sources-ui": "tsx scripts/test-work-sources-ui.ts",
     "test:recipes-memory-ui": "tsx scripts/test-recipes-memory-ui.ts",

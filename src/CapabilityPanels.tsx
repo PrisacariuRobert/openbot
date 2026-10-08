@@ -4,6 +4,7 @@ import { TOOL_GROUP_IDS } from "./shared/tool-groups";
 import { MacWakeCard } from "./components/MacWakeCard";
 import { MorningBriefCard } from "./components/MorningBriefCard";
 import { CopyShareLink } from "./components/CopyShareLink";
+import { SubmitToGallery } from "./components/SubmitToGallery";
 import { AutopilotCard } from "./components/AutopilotCard";
 import { AUTOPILOT_WARNING } from "./shared/autopilot";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
@@ -5044,6 +5045,7 @@ export function BotPanel({
               Share as a file
             </button>
             <CopyShareLink botId={bot.id} />
+            <SubmitToGallery botId={bot.id} />
             <button
               type="button"
               className="quiet-danger"
