@@ -150,7 +150,7 @@ test("sharing setup counts is off, can't be turned on in this version, and would
     optedIn.noteConnections([{ id: "nous-portal", provider: "custom", apiConfig: { baseUrl: "https://inference-api.nousresearch.com/v1", protocol: "openai-compatible", modelIds: ["m"] }, connected: true }]);
     optedIn.setSharing(true);
     const payload = optedIn.countsToSend({ appVersion: "0.43.0", macosMajor: 26 })!;
-    assert.deepEqual(Object.keys(payload).sort(), ["aiKind", "appVersion", "id", "macosMajor", "milestones"]);
+    assert.deepEqual(Object.keys(payload).sort(), ["aiKind", "appVersion", "id", "installMethod", "macosMajor", "milestones"]);
     assert.match(payload.id, /^[0-9a-f-]{36}$/);
     assert.equal(payload.aiKind, "nous");
     for (const entry of payload.milestones) {
@@ -231,4 +231,28 @@ test("elapsed times and the copied timeline read plainly", () => {
     "Connected an AI (Gemini): 2026-10-07T10:03, 3 min after the first start",
     "Made the first teammate: not yet",
   ].join("\n"));
+});
+
+test("how Sidemates was installed is noted on its first start and in the counts, never guessed", async () => {
+  const { installMethod } = await import("../shared/setup-timeline.js");
+  assert.equal(installMethod("disk-image"), "disk-image");
+  assert.equal(installMethod("terminal"), "terminal");
+  assert.equal(installMethod("something-else"), null);
+  assert.equal(installMethod(undefined), null);
+  const fromImage = studio();
+  try {
+    const timeline = new SetupTimeline(fromImage.db, clock().now, "https://counts.example.invalid/setup", "disk-image");
+    const installed = timeline.view().milestones.find((entry) => entry.name === "installed")!;
+    assert.equal(installed.detail, "from the disk image");
+    assert.match(setupTimelineText(timeline.view(), (iso) => iso), /^Sidemates started for the first time \(from the disk image\): /m);
+    timeline.setSharing(true);
+    assert.equal(timeline.countsToSend({ appVersion: "0.43.0", macosMajor: 26 })!.installMethod, "disk-image");
+  } finally { fromImage.close(); }
+  const unknown = studio();
+  try {
+    const timeline = new SetupTimeline(unknown.db, clock().now, "https://counts.example.invalid/setup");
+    assert.equal(timeline.view().milestones.find((entry) => entry.name === "installed")!.detail, null, "a source run says nothing");
+    timeline.setSharing(true);
+    assert.equal(timeline.countsToSend({ appVersion: "0.43.0", macosMajor: 26 })!.installMethod, null);
+  } finally { unknown.close(); }
 });

@@ -265,7 +265,7 @@ Keep `OPENBOT_*` variables, paths and file names working; aliases come in M6.
 **Do.**
 - Record onboarding milestones locally, with timestamps: install finished, studio opened, AI connected (which kind), first teammate, first answer, first finished job, came back the next day, came back within seven days. Show them in Settings under "Your setup".
 - Add a switch, **off by default**, shown once at the end of onboarding: "Share anonymous setup counts".
-  - What it sends: milestone names, seconds elapsed, app version, macOS major version and the kind of AI, plus a random ID the user can reset.
+  - What it sends: milestone names, seconds elapsed, app version, macOS major version, the kind of AI and how it was installed (disk image or one-line install, from A8), plus a random ID the user can reset.
   - What it never sends: content or names. The endpoint stores no IP addresses.
   - The endpoint is a Cloudflare Worker on the free plan that publishes totals on a public page.
 - Document exactly what is sent in `docs/SECURITY.md` and on the site.
@@ -414,6 +414,14 @@ Today Sidemates borrows OpenCode's sign-in (`src/server/providers.ts`), so the c
 **Done when (Owner).** Both paths are tested on at least two macOS versions, with results in `qa/first-run/`.
 
 **Prompt.** `Do task A8 in docs/DEVELOPER_PLAN.md. Prepare the build and the guide; I will test on my Mac.`
+
+**Status, 8 October 2026.** Build and guide ready; the owner's Mac tests are next.
+- **One code path.** The download is a disk image per Mac type (`Sidemates-mac-arm64.dmg`, `Sidemates-mac-x64.dmg`). Each holds the one-line install's own bundle, fingerprint and `install.sh`, plus an "Install Sidemates" launcher that runs that installer from the image. Same app, same background service, same studio. The Electron build stays a development artifact.
+- **Quarantine.** The installer clears the download mark from the checked bundle and from its launch agent before starting it, for macOS 27.
+- **Release.** `scripts/build-mac-download.sh` runs in the release workflow next to the bundles, and the draft release attaches the images under fixed names. The download mirror serves them.
+- **Site.** `site/mac-download/` gives the three steps as labelled illustrations, citing Apple's guide (dated). Until a release carries the images, the page says so instead of linking to a missing file. The home page links to it.
+- **Counts.** The setup timeline notes how Sidemates was installed, so the owner can compare the two paths (A1's counts would carry it if sharing is ever turned on).
+- **Owner:** follow `qa/first-run/README.md` ("The disk image") on macOS 15, 26 and 27, after the first release that carries the images (0.43). Not verified here: building the images (`hdiutil` needs a Mac), Gatekeeper's prompts, and launchd on macOS 27.
 
 ---
 

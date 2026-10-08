@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
-  SETUP_AI_KINDS, SETUP_MILESTONES, calendarDaysBetween, setupAiKind, setupCountsPayload,
-  type SetupAiKind, type SetupCountsPayload, type SetupMilestoneName, type SetupTimelineView,
+  INSTALL_METHODS, SETUP_AI_KINDS, SETUP_MILESTONES, calendarDaysBetween, setupAiKind, setupCountsPayload,
+  type InstallMethod, type SetupAiKind, type SetupCountsPayload, type SetupMilestoneName, type SetupTimelineView,
 } from "../shared/setup-timeline.js";
 import type { ProviderInstance } from "../shared/types.js";
 
@@ -23,7 +23,7 @@ export interface SetupTimelineStore {
   setupMilestoneTimes(): SetupMilestoneTimes;
 }
 
-type Reached = { at: string; kind?: SetupAiKind };
+type Reached = { at: string; kind?: SetupAiKind; method?: InstallMethod };
 interface Stored {
   startedAt: string;
   olderThanTimeline: boolean;
@@ -51,6 +51,8 @@ export class SetupTimeline {
     private readonly store: SetupTimelineStore,
     private readonly now: () => Date = () => new Date(),
     private readonly endpoint: string | null = SETUP_COUNTS_ENDPOINT,
+    /** How this copy was installed, from the installer (OPENBOT_INSTALL_METHOD); noted with "Installed". */
+    private readonly installMethod: InstallMethod | null = null,
   ) {}
 
   view(): SetupTimelineView {
@@ -58,7 +60,7 @@ export class SetupTimeline {
     return {
       milestones: SETUP_MILESTONES.map(({ name, label }) => {
         const reached = state.milestones[name];
-        return { name, label, at: reached?.at ?? null, detail: reached?.kind ? SETUP_AI_KINDS[reached.kind] : null };
+        return { name, label, at: reached?.at ?? null, detail: reached?.kind ? SETUP_AI_KINDS[reached.kind] : reached?.method ? INSTALL_METHODS[reached.method] : null };
       }),
       startedAt: state.startedAt,
       olderThanTimeline: state.olderThanTimeline,
@@ -123,7 +125,7 @@ export class SetupTimeline {
     const milestones = { ...state.milestones };
     for (const name of PROVEN) {
       const at = provenAt[name];
-      if (at && !milestones[name]) { milestones[name] = { at }; changed = true; }
+      if (at && !milestones[name]) { milestones[name] = { at, ...(name === "installed" && this.installMethod && !state.olderThanTimeline ? { method: this.installMethod } : {}) }; changed = true; }
     }
     state = { ...state, milestones };
     if (changed) this.save(state);

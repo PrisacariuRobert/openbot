@@ -1,4 +1,4 @@
-// Serves the Mac bundle through sidemates.app so installs don't depend on how fast a visitor's
+// Serves the Mac bundle and disk images through sidemates.app so installs don't depend on how fast a visitor's
 // connection is to GitHub's release servers. Everything is fetched from our own GitHub releases and
 // cached at Cloudflare's edge; anything else on the site is served as static files.
 //   /download/latest/<file>   → redirects to the newest release's file
@@ -9,7 +9,8 @@
 
 const REPO = "PrisacariuRobert/sidemates";
 // New releases publish sidemates-*; openbot-* stays valid for releases published under the old name.
-const FILES = /^(?:sidemates|openbot)-darwin-(?:arm64|x64)\.tar\.gz(?:\.sha256)?$/;
+// Sidemates-mac-*.dmg is the disk image for people who don't use Terminal (from 0.43).
+const FILES = /^(?:(?:sidemates|openbot)-darwin-(?:arm64|x64)\.tar\.gz|Sidemates-mac-(?:arm64|x64)\.dmg)(?:\.sha256)?$/;
 const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
 
 const HOME_HOST = "sidemates.app";

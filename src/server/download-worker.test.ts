@@ -72,6 +72,10 @@ test("everything else is the static site, and downloads are read-only", async ()
 test("releases published under the old name still download, and nothing else slips through", () => {
   assert.deepEqual(routeDownload("/download/v0.41.1/openbot-darwin-arm64.tar.gz"), { kind: "release", tag: "v0.41.1", file: "openbot-darwin-arm64.tar.gz" });
   assert.equal(routeDownload("/download/latest/other-darwin-arm64.tar.gz"), null);
+  // The Mac download page's disk images, and their fingerprints.
+  assert.deepEqual(routeDownload("/download/latest/Sidemates-mac-arm64.dmg"), { kind: "latest", file: "Sidemates-mac-arm64.dmg" });
+  assert.deepEqual(routeDownload("/download/v0.43.0/Sidemates-mac-x64.dmg.sha256"), { kind: "release", tag: "v0.43.0", file: "Sidemates-mac-x64.dmg.sha256" });
+  for (const bad of ["Sidemates-mac-arm64.dmg.zip", "sidemates-mac-arm64.dmg", "Sidemates-mac-universal.dmg", "Sidemates-0.43.0-mac-arm64.dmg"]) assert.equal(routeDownload(`/download/latest/${bad}`), null, bad);
 });
 
 test("the old OpenBot host sends pages to sidemates.app but keeps the installer and downloads", async () => {

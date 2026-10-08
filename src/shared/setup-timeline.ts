@@ -35,6 +35,11 @@ export const SETUP_AI_KINDS = {
 
 export type SetupAiKind = keyof typeof SETUP_AI_KINDS;
 
+/** How Sidemates was installed (task A8), shown on "Installed". */
+export const INSTALL_METHODS = { terminal: "with the one-line install", "disk-image": "from the disk image" } as const;
+export type InstallMethod = keyof typeof INSTALL_METHODS;
+export const installMethod = (value: string | undefined): InstallMethod | null => value && Object.hasOwn(INSTALL_METHODS, value) ? value as InstallMethod : null;
+
 export function setupAiKind(connection: Pick<ProviderInstance, "id" | "provider" | "apiConfig">): SetupAiKind {
   switch (connection.provider) {
     case "google": return "gemini";
@@ -55,7 +60,7 @@ export interface SetupMilestoneEntry {
   label: string;
   /** When it first happened, or null if it hasn't (or wasn't recorded). */
   at: string | null;
-  /** For "Connected an AI": the kind of AI, as a label. */
+  /** For "Connected an AI": the kind of AI; for "Installed": how. As a label. */
   detail: string | null;
 }
 
@@ -74,12 +79,14 @@ export interface SetupTimelineView {
 
 /** What "Share anonymous setup counts" would send, if it is ever turned on:
  * milestone names and seconds since the first start, the app and macOS
- * versions, the kind of AI and a random ID. No content, names or addresses. */
+ * versions, the kind of AI, how it was installed and a random ID. No content,
+ * names or addresses. */
 export interface SetupCountsPayload {
   id: string;
   appVersion: string;
   macosMajor: number | null;
   aiKind: SetupAiKind | null;
+  installMethod: InstallMethod | null;
   milestones: Array<{ name: SetupMilestoneName; seconds: number }>;
 }
 
@@ -87,7 +94,7 @@ export function setupCountsPayload(input: {
   id: string;
   appVersion: string;
   macosMajor: number | null;
-  milestones: Partial<Record<SetupMilestoneName, { at: string; kind?: SetupAiKind }>>;
+  milestones: Partial<Record<SetupMilestoneName, { at: string; kind?: SetupAiKind; method?: InstallMethod }>>;
 }): SetupCountsPayload {
   const start = Date.parse(input.milestones.installed?.at ?? "");
   const kind = input.milestones.ai_connected?.kind;
@@ -96,6 +103,7 @@ export function setupCountsPayload(input: {
     appVersion: input.appVersion,
     macosMajor: input.macosMajor,
     aiKind: kind && Object.hasOwn(SETUP_AI_KINDS, kind) ? kind : null,
+    installMethod: installMethod(input.milestones.installed?.method),
     milestones: Number.isFinite(start)
       ? SETUP_MILESTONES.flatMap(({ name }) => {
         const at = Date.parse(input.milestones[name]?.at ?? "");

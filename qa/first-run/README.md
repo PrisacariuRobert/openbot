@@ -12,11 +12,24 @@ Task A2 is done when a fresh install reaches a first useful answer in a median o
 5. Stop the stopwatch when the first useful answer appears.
 6. Open **Settings → Your setup**, press **Copy**, and paste the text into a new file in this folder.
 
+## The disk image (task A8)
+
+Same steps as above, but install from the download page instead of Terminal:
+
+1. In Safari, open https://sidemates.app/mac-download/ and download the image for this Mac. Start the stopwatch when you click Download.
+2. Open the image, double-click **Install Sidemates**, and follow the page's three steps (Done, then System Settings → Privacy & Security → Open Anyway, then Open).
+3. Note whether macOS asked for your password or Touch ID, and the exact words of each macOS window, so the page's illustrations can be corrected.
+4. Check that Settings → Your setup says "from the disk image".
+5. Restart the Mac and check that Sidemates comes back by itself, and that a routine set to run every 5 minutes still runs. On macOS 27 this is the check that matters: launchd refuses a launch agent carrying the download mark.
+
+Run it on macOS 15, 26 and 27 (macOS 27 runs only on Apple silicon), and on an Intel Mac once.
+
 ## What to record
 
 Name the file `YYYY-MM-DD-run-N.md` and include:
 
 - the date and the macOS version (`sw_vers -productVersion`), and whether the Mac is Apple silicon or Intel;
+- how you installed it (Terminal or the disk image);
 - the AI you chose and the model;
 - the stopwatch time from paste to first answer;
 - the Copy text from Settings → Your setup;

@@ -1,0 +1,14 @@
+Install Sidemates
+
+1. Double-click "Install Sidemates".
+2. If macOS says it can't check it for malicious software, click Done. Then open
+   System Settings > Privacy & Security, scroll down, and click "Open Anyway" next to
+   "Install Sidemates". Confirm with Open. macOS may ask for your Mac's password or
+   Touch ID to allow this; Sidemates itself never asks for it.
+3. A Terminal window shows the install, and your studio opens in the browser.
+
+Pictures of each step: https://sidemates.app/mac-download/
+
+Sidemates isn't signed by Apple yet, which is why macOS asks. The installer checks
+the bundle's fingerprint before using it. Remove Sidemates any time with:
+"~/Library/Application Support/Sidemates/uninstall.sh"

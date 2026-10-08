@@ -12,6 +12,10 @@ test('draft releases wait for all desktop installers and never publish automatic
   assert.deepEqual(bundles.strategy.matrix.include.map(v => v.platform).sort(), ['darwin-arm64', 'darwin-x64']);
   const upload = bundles.steps.find(s => s.uses?.startsWith('actions/upload-artifact'));
   assert.equal(upload.with['if-no-files-found'], 'error');
+  // The Mac download page's disk images come from the same bundle and installer, under stable names.
+  assert.ok(bundles.steps.some(s => s.run === 'scripts/build-mac-download.sh ${{ matrix.platform }} dist-release dist-release'));
+  assert.match(upload.with.path, /dist-release\/Sidemates-mac-\*\.dmg\n/);
+  assert.ok(bundles.steps.findIndex(s => s.run?.includes('build-mac-download')) < bundles.steps.indexOf(upload), 'the image is built before the upload');
   const pattern = release.jobs.publish.steps.find(s => s.uses?.startsWith('actions/download-artifact')).with.pattern;
   assert.equal(pattern, 'sidemates-desktop-*');
   const prefix = pattern.slice(0, -1);

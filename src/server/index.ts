@@ -128,6 +128,7 @@ import { codeDeliveryInputSchema, deliverCodeChange } from "./code-delivery.js";
 import { browserSavedFileUploadSchema } from "../shared/browser-upload-review.js";
 import { githubWriteHost, GitHubWriteUncertainError, withPinnedGitHubWriteIdentity } from "./github-write-identity.js";
 import { TOOL_GROUPS, TOOL_GROUP_IDS, toolGroupOf, toolTurnedOff } from "../shared/tool-groups.js";
+import { installMethod } from "../shared/setup-timeline.js";
 
 const publicationIdentitySchema = z.object({ host: z.string().min(1).max(253), accountLogin: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) }).strict();
 
@@ -151,7 +152,7 @@ if (!studioLock.acquired) {
 process.on("exit", () => studioLock.release());
 // Start the setup timeline on the first boot, so a studio from before it is recognised as older.
 // It is a convenience: a problem with it never stops the studio.
-const setupTimeline = new SetupTimeline(db);
+const setupTimeline = new SetupTimeline(db, undefined, undefined, installMethod(process.env.OPENBOT_INSTALL_METHOD));
 try { setupTimeline.view(); } catch (error) { console.warn(`Setup timeline unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 const app = express();
 app.disable("x-powered-by");

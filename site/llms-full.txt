@@ -39,6 +39,7 @@ The software is free. You pay only for the AI you connect, and free options exis
 ## Where it runs and what it needs
 
 - macOS 13 or later, Apple silicon or Intel. Install: curl -fsSL https://sidemates.app/install.sh | sh
+- Without Terminal (from version 0.43): download the disk image for your Mac at https://sidemates.app/mac-download/ and open "Install Sidemates". It runs the same installer. Sidemates isn't signed by Apple yet, so macOS asks you to allow it once in System Settings > Privacy & Security.
 - Works while your Mac is on (it keeps the Mac awake for scheduled jobs). It does not run in the cloud. A Linux runner exists for an always-on server, but there is no one-click hosted option.
 - No Windows or Linux desktop app. No native iPhone app (a Home Screen web app instead).
 - Public beta.
