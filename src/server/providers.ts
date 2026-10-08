@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import type { ProviderCatalogEntry, ProviderInstance, ProviderLoginAttempt, ProviderStatus } from "../shared/types.js";
 import { OpenBotDatabase } from "./database.js";
 import { safeHostEnvironment } from "./runtime.js";
+import { chatgptPlanSignedIn, CHATGPT_PLAN_ID } from "./chatgpt-plan.js";
 import { configuredModels, legacyApiProviderId, isBlockedFreeTierModel, isLocalModelUrl, mayTrainOnPrompts } from "../shared/provider-config.js";
 
 /** Shown when an OpenCode sign-in lists no models. OpenCode's own free models
@@ -188,7 +189,8 @@ async function inspectProviderStatus(db: OpenBotDatabase, loginAttempts: Provide
   const instances = db.listProviders().map((instance) => {
     const entry = connectionMap.get(instance.id);
     const configured = instance.apiConfig ? instance.hasSecret || isLocalModelUrl(instance.apiConfig.baseUrl) : instance.hasSecret && Boolean(legacyApiProviderId(instance.envName));
-    const connected = instance.authMode === "api_key" ? openCodeInstalled && configured : Boolean(entry?.connected);
+    // The ChatGPT plan connection works only while its owner is signed in.
+    const connected = instance.id === CHATGPT_PLAN_ID ? openCodeInstalled && chatgptPlanSignedIn(db) : instance.authMode === "api_key" ? openCodeInstalled && configured : Boolean(entry?.connected);
     const instanceModels = instance.apiConfig ? configuredModels(instance) : entry?.models || (instance.authMode === "api_key" ? agentModels(apiModels.get(instance.id) || apiKeyModels(instance, allModels)) : modelsFor(instance.provider, allModels));
     const note = entry?.note || (!configured ? "Add an API address and model to finish setup." : !openCodeInstalled ? "Saved. Install OpenCode to run this model." : "Saved, not tested. Model and tool support depend on your provider.");
     return { ...instance, connected, models: instanceModels, defaultModel: preferredModel(instance.provider, instanceModels), note };
